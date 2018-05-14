@@ -106,9 +106,9 @@ class GceFirewall(network.BaseFirewall):
     with self._lock:
       if end_port is None:
         end_port = start_port
-      firewall_name = ('perfkit-firewall-%s-%d-%d' %
-                       (FLAGS.run_uri, start_port, end_port))
-      key = (vm.project, start_port, end_port)
+      firewall_name = ('perfkit-firewall-%s-%s-%d-%d' %
+                       (vm.zone, FLAGS.run_uri, start_port, end_port))
+      key = (vm.project, vm.zone, start_port, end_port)
       if key in self.firewall_rules:
         return
       allow = ','.join('{0}:{1}-{2}'.format(protocol, start_port, end_port)
@@ -186,12 +186,14 @@ class GceSubnetResource(resource.BaseResource):
   def _Exists(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'describe',
                              self.name)
+    cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def _Delete(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'delete',
                              self.name)
+    cmd.flags['region'] = self.region
     cmd.Issue()
 
 
@@ -204,6 +206,11 @@ class GceNetwork(network.BaseNetwork):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
     name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
+    # add support for zone, cidr, and separate networks
+    if network_spec.zone and network_spec.cidr:
+      name = FLAGS.gce_network_name or 'pkb-network-%s-%s' % (network_spec.zone, FLAGS.run_uri)
+      FLAGS.gce_subnet_region = util.GetRegionFromZone(network_spec.zone)
+      FLAGS.gce_subnet_addr = network_spec.cidr
     mode = 'auto' if FLAGS.gce_subnet_region is None else 'custom'
     self.network_resource = GceNetworkResource(name, mode, self.project)
     if FLAGS.gce_subnet_region is None:
@@ -214,17 +221,23 @@ class GceNetwork(network.BaseNetwork):
                                                FLAGS.gce_subnet_addr,
                                                self.project)
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
+    # add support for zone, cidr, and separate networks
+    if network_spec.zone and network_spec.cidr:
+      firewall_name = 'default-internal-%s-%s' % (network_spec.zone, FLAGS.run_uri)
+      self.NETWORK_RANGE = network_spec.cidr
     self.default_firewall_rule = GceFirewallRule(
         firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE)
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns a BaseNetworkSpec created from VM attributes."""
-    return GceNetworkSpec(project=vm.project, zone=vm.zone)
+    return GceNetworkSpec(project=vm.project, zone=vm.zone, cidr=vm.cidr)
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
     """Returns a key used to register Network instances."""
+    if spec.zone and spec.cidr:
+      return (cls.CLOUD, spec.project, spec.zone)
     return (cls.CLOUD, spec.project)
 
   def Create(self):

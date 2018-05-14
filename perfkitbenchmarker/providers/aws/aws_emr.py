@@ -95,6 +95,7 @@ class AwsEMR(spark_service.BaseSparkService):
   CLOUD = providers.AWS
   SPARK_SAMPLE_LOCATION = '/usr/lib/spark/lib/spark-examples.jar'
   SERVICE_NAME = 'emr'
+  cidr = None  # placeholder for vpn service
 
   def __init__(self, spark_service_spec):
     super(AwsEMR, self).__init__(spark_service_spec)

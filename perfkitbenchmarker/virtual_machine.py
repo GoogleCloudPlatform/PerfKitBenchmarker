@@ -93,6 +93,7 @@ class BaseVmSpec(spec.BaseSpec):
 
   Attributes:
     zone: The region / zone the in which to launch the VM.
+    cidr: The CIDR subnet range in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     gpu_count: None or int. Number of gpus to attach to the VM.
     gpu_type: None or string. Type of gpus to attach to the VM.
@@ -189,6 +190,8 @@ class BaseVmSpec(spec.BaseSpec):
         'gpu_count': (option_decoders.IntDecoder, {'min': 1, 'default': None}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
                                                  'default': None}),
+        'cidr': (option_decoders.StringDecoder, {'none_ok': True,
+                                                 'default': None}),
         'use_dedicated_host': (option_decoders.BooleanDecoder,
                                {'default': False}),
         'background_network_mbits_per_sec': (option_decoders.IntDecoder, {
@@ -221,6 +224,7 @@ class BaseVirtualMachine(resource.BaseResource):
     user_name: Account name for login. the contents of 'ssh_public_key' should
       be in .ssh/authorized_keys for this user.
     zone: The region / zone the VM was launched in.
+    cidr: The CIDR range the VM was launched in.
     disk_specs: list of BaseDiskSpec objects. Specifications for disks attached
       to the VM.
     scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
@@ -261,6 +265,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
     self.disable_rss = vm_spec.disable_rss
     self.zone = vm_spec.zone
+    self.cidr = vm_spec.cidr
     self.machine_type = vm_spec.machine_type
     self.gpu_count = vm_spec.gpu_count
     self.gpu_type = vm_spec.gpu_type
@@ -372,6 +377,8 @@ class BaseVirtualMachine(resource.BaseResource):
         'zone': self.zone,
         'cloud': self.CLOUD,
     })
+    if self.cidr is not None:
+      result['cidr'] = self.cidr
     if self.machine_type is not None:
       result['machine_type'] = self.machine_type
     if self.use_dedicated_host is not None:

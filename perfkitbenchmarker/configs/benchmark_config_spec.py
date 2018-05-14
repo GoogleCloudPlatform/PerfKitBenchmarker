@@ -692,6 +692,8 @@ class _VmGroupSpec(spec.BaseSpec):
     vm_count: int. Number of VMs in this group, including static VMs and
         provisioned VMs.
     vm_spec: BaseVmSpec. Configuration for provisioned VMs in this group.
+    cidr: subnet each vm in this group belongs to
+    zone: zone each vm group lives in.
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -753,6 +755,12 @@ class _VmGroupSpec(spec.BaseSpec):
         'vm_count': (option_decoders.IntDecoder, {
             'default': _DEFAULT_VM_COUNT,
             'min': 0
+        }),
+        'cidr': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'zone': (option_decoders.StringDecoder, {
+            'default': None
         }),
         'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
     })
