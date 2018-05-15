@@ -107,6 +107,10 @@ default_500_gb: &default_500_gb
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
+  Docker:
+    disk_type: local
+    disk_size: 500
+    mount_point: /scratch
 
 
 # TODO(nlavine): update the disk types below as more providers are
@@ -153,5 +157,9 @@ default_50_gb: &default_50_gb
     mount_point: /scratch
   ProfitBricks:
     disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  Docker:
+    disk_type: local
     disk_size: 50
     mount_point: /scratch

@@ -32,7 +32,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
+from perfkitbenchmarker.providers.docker import docker_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 FLAGS = flags.FLAGS
@@ -78,12 +78,12 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   #     })
   #   return metadata
 
-  #def _CreateDependencies(self):
+  def _CreateDependencies(self):
     #self._CheckPrerequisites()
-    #self._CreateVolumes()
+    self._CreateVolumes()
 
   def _DeleteDependencies(self):
-    #self._DeleteVolumes()
+    self._DeleteVolumes()
     pass
 
   def _Create(self):
@@ -129,16 +129,46 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       ]
 
       vm_util.IssueCommand(build_cmd)
-      
+
 
     #TODO check if container built correctly
+    logging.info("Number of scratch Disks: " + str(len(self.scratch_disks)))
 
-    create_command = ['docker', 'run', '-d', '--name', self.name, 
-                      'ubuntu_ssh:test', '/usr/sbin/sshd', '-D']
-    container_info, _, _ = vm_util.IssueCommand(create_command)
+    if len(self.scratch_disks) > 0:
+      logging.info("creating docker container with disk")
 
-    self.container_id = container_info.encode("ascii")
-    logging.info("Container ID: %s", self.container_id)
+      mount_string = 'source=' + self.name + ',target=/scratch0'
+
+      create_command = ['docker', 'run', '-d', '--name', self.name]
+
+      for vol in self.scratch_disks:
+        vol_string = vol.volume_name + ":/scratch" + str(vol.disk_num)
+        create_command.append('-v')
+        create_command.append(vol_string)
+
+      create_command.append('ubuntu_ssh:test')
+      create_command.append('/usr/sbin/sshd')
+      create_command.append('-D')
+
+      logging.info("CREATE COMMAND:")
+      logging.info(create_command)
+      logging.info(type(create_command))
+
+
+
+      container_info, _, _ = vm_util.IssueCommand(create_command)
+
+      self.container_id = container_info.encode("ascii")
+      logging.info("Container with Disk ID: %s", self.container_id)
+
+    else:
+      create_command = ['docker', 'run', '-d', '--name', self.name, 
+                        'ubuntu_ssh:test', '/usr/sbin/sshd', '-D']
+
+      container_info, _, _ = vm_util.IssueCommand(create_command)
+
+      self.container_id = container_info.encode("ascii")
+      logging.info("Container ID: %s", self.container_id)
 
 
   @vm_util.Retry()
@@ -199,8 +229,43 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     BEFORE containers creation because Kubernetes doesn't allow to attach
     volume to currently running containers.
     """
-    #self.scratch_disks = docker_disk.CreateDisks(self.disk_specs, self.name)
-    pass
+    self.scratch_disks = docker_disk.CreateDisks(self.disk_specs, self.name)
+
+
+  # def CreateScratchDisk(self, disk_spec):
+  #     """Create a VM's scratch disk.
+
+  #     Args:
+  #       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+  #     """
+
+  #     if disk_spec.disk_type == disk.LOCAL:
+  #       if self.scratch_disks and self.scratch_disks[0].disk_type == disk.LOCAL:
+  #         raise errors.Error('DigitalOcean does not support multiple local '
+  #                            'disks.')
+
+  #       if disk_spec.num_striped_disks != 1:
+  #         raise ValueError('num_striped_disks=%s, but DigitalOcean VMs can only '
+  #                          'have one local disk.' % disk_spec.num_striped_disks)
+  #       # The single unique local disk on DigitalOcean is also the boot
+  #       # disk, so we can't follow the normal procedure of formatting
+  #       # and mounting. Instead, create a folder at the "mount point" so
+  #       # the rest of PKB will work as expected and deliberately skip
+  #       # self._CreateScratchDiskFromDisks.
+  #       #self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
+  #       #                   .format(disk_spec.mount_point))
+  #       self.scratch_disks.append(
+  #           digitalocean_disk.DigitalOceanLocalDisk(disk_spec))
+  #     else:
+  #       disks = []
+  #       for _ in range(disk_spec.num_striped_disks):
+  #         # Disk 0 is the local disk.
+  #         data_disk = digitalocean_disk.DigitalOceanBlockStorageDisk(
+  #             disk_spec, self.zone)
+  #         data_disk.disk_number = self.remote_disk_counter + 1
+  #         self.remote_disk_counter += 1
+  #         disks.append(data_disk)
+  #       self._CreateScratchDiskFromDisks(disk_spec, disks)
 
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
