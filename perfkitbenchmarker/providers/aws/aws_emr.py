@@ -18,15 +18,13 @@ Spark clusters can be created and deleted.
 
 import json
 import logging
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
-
-import aws_network
-import util
+from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
@@ -165,7 +163,8 @@ class AwsEMR(spark_service.BaseSparkService):
                              json.dumps(instance_groups),
                              '--application', 'Name=Spark',
                              'Name=Hadoop',
-                             '--log-uri', logs_bucket]
+                             '--log-uri', logs_bucket,
+                             '--tags'] + util.MakeFormattedDefaultTags()
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
     stdout, _, _ = vm_util.IssueCommand(cmd)
