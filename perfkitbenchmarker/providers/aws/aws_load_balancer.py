@@ -92,7 +92,7 @@ class LoadBalancer(resource.BaseResource):
         'elbv2', 'create-load-balancer',
         '--name', self.name,
         '--type', self.type,
-    ]
+        '--tags'] + util.MakeFormattedDefaultTags()
     # Add --subnets argument to the command.
     create_cmd.append('--subnets')
     create_cmd.extend(self.subnet_ids)

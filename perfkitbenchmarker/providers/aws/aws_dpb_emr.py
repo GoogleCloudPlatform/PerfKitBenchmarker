@@ -173,7 +173,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              json.dumps(instance_groups),
                              '--application', 'Name=Spark',
                              'Name=Hadoop',
-                             '--log-uri', logs_bucket]
+                             '--log-uri', logs_bucket,
+                             '--tags'] + util.MakeFormattedDefaultTags()
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
 

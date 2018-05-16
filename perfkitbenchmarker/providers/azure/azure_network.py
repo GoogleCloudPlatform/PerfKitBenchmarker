@@ -21,7 +21,6 @@ the same project. See http://msdn.microsoft.com/library/azure/jj156007.aspx
 for more information about Azure Virtual Networks.
 """
 
-import datetime
 import json
 import threading
 
@@ -101,37 +100,25 @@ class AzureResourceGroup(resource.BaseResource):
         [azure.AZURE_PATH, 'group', 'delete',
          '--yes', '--name', self.name])
 
-  def _FormatTag(self, tag, value):
-    """ Format an individual tag for use with the --tags param of Azure CLI. """
-    return '{0}={1}'.format(str(tag), str(value))
+  def _FormatTag(self, key, value):
+    """Format an individual tag for use with the --tags param of Azure CLI."""
+    return '{0}={1}'.format(key, value)
+
+  def FormatTags(self, tags_dict):
+    """Format a dict of tags into arguments for 'tag' parameter.
+
+    Args:
+      tags_dict: Tags to be formatted.
+
+    Returns:
+      A list of tags formatted as arguments for 'tag' parameter.
+    """
+    return [self._FormatTag(k, v) for k, v in tags_dict.iteritems()]
 
   def _GetTags(self):
-    """ Gets a list of tags to be used with the --tags param of Azure CLI. """
-    tags = []
-
-    if FLAGS.owner:
-      tags.append(self._FormatTag('owner', FLAGS.owner))
-
-    now_utc = datetime.datetime.utcnow()
-
-    timeout_utc = (
-        now_utc +
-        datetime.timedelta(minutes=FLAGS.timeout_minutes))
-
-    time_format = '%y-%m-%d %H:%M:%S'
-
-    tags.append(self._FormatTag(
-        'timeout_utc', timeout_utc.strftime(time_format)))
-
-    tags.append(self._FormatTag(
-        'create_time_utc', now_utc.strftime(time_format)))
-
+    """Gets a list of tags to be used with the --tags param of Azure CLI."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    tags.append(self._FormatTag(
-        'benchmark', benchmark_spec.name))
-
-    tags.append(self._FormatTag(
-        'perfkit_uuid', benchmark_spec.uuid))
+    tags = self.FormatTags(benchmark_spec.GetResourceTags())
 
     return tags
 

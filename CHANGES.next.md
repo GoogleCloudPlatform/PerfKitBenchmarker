@@ -53,6 +53,7 @@
 - AWS EFS support via "disk_type: nfs"
 - Added disk_fill_size and prepare_sleep_time flags
 - Add timeout_minutes flag to assist with cleaning up stale resources
+- All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -220,3 +221,4 @@
 - Add ability to skip known failing scripts when running edw profiles.
 - Set the control port and data port for nuttcp benchmark.
 - Fix overwriting of bandwidth variable in nuttcp benchmark.
+- Fixed fio histogram parsing.
