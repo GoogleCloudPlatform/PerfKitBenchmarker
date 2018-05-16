@@ -78,6 +78,7 @@ def GetConfig(user_config):
         config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
     return config
 
+
 def CheckPrerequisites(benchmark_config):
     """Verifies that the required resources are present.
     Raises:
@@ -89,6 +90,7 @@ def CheckPrerequisites(benchmark_config):
         raise ValueError('"aws_dynamodb_ycsb_dynamodb_primarykey" must be set')
     if not FLAGS.aws_dynamodb_ycsb_dynamodb_endpoint:
         raise ValueError('"aws_dynamodb_ycsb_dynamodb_endpoint" must be set ')
+
 
 def Prepare(benchmark_spec):
     """Install YCSB on the target vm.
@@ -113,6 +115,7 @@ def Prepare(benchmark_spec):
     # Install required packages and copy credential files.
     vm_util.RunThreaded(_Install, vms)
     benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
+
 
 def Run(benchmark_spec):
     """Run YCSB on the target vm.
@@ -141,6 +144,7 @@ def Run(benchmark_spec):
         vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
     return samples
 
+
 def Cleanup(benchmark_spec):
     """Cleanup YCSB on the target vm.
     Args:
@@ -148,6 +152,7 @@ def Cleanup(benchmark_spec):
     required to run the benchmark.
     """
     benchmark_spec.dynamodb_instance.Delete()
+
 
 def _Install(vm):
     """Install YCSB on client 'vm'."""
