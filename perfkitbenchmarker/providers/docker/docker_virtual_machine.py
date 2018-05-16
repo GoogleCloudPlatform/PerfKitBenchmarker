@@ -84,7 +84,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _DeleteDependencies(self):
     self._DeleteVolumes()
-    pass
 
   def _Create(self):
     """Create a Docker instance"""
@@ -161,7 +160,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info(create_command)
 
     return create_command
-    
+
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -217,57 +216,21 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CreateVolumes(self):
     """
     Creates volumes for scratch disks. These volumes have to be created
-    BEFORE containers creation because Kubernetes doesn't allow to attach
+    BEFORE containers creation because Docker doesn't allow to attach
     volume to currently running containers.
     """
     self.scratch_disks = docker_disk.CreateDisks(self.disk_specs, self.name)
-
-
-  # def CreateScratchDisk(self, disk_spec):
-  #     """Create a VM's scratch disk.
-
-  #     Args:
-  #       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
-  #     """
-
-  #     if disk_spec.disk_type == disk.LOCAL:
-  #       if self.scratch_disks and self.scratch_disks[0].disk_type == disk.LOCAL:
-  #         raise errors.Error('DigitalOcean does not support multiple local '
-  #                            'disks.')
-
-  #       if disk_spec.num_striped_disks != 1:
-  #         raise ValueError('num_striped_disks=%s, but DigitalOcean VMs can only '
-  #                          'have one local disk.' % disk_spec.num_striped_disks)
-  #       # The single unique local disk on DigitalOcean is also the boot
-  #       # disk, so we can't follow the normal procedure of formatting
-  #       # and mounting. Instead, create a folder at the "mount point" so
-  #       # the rest of PKB will work as expected and deliberately skip
-  #       # self._CreateScratchDiskFromDisks.
-  #       #self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
-  #       #                   .format(disk_spec.mount_point))
-  #       self.scratch_disks.append(
-  #           digitalocean_disk.DigitalOceanLocalDisk(disk_spec))
-  #     else:
-  #       disks = []
-  #       for _ in range(disk_spec.num_striped_disks):
-  #         # Disk 0 is the local disk.
-  #         data_disk = digitalocean_disk.DigitalOceanBlockStorageDisk(
-  #             disk_spec, self.zone)
-  #         data_disk.disk_number = self.remote_disk_counter + 1
-  #         self.remote_disk_counter += 1
-  #         disks.append(data_disk)
-  #       self._CreateScratchDiskFromDisks(disk_spec, disks)
-
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _DeleteVolumes(self):
     """
     Deletes volumes.
     """
-    # for scratch_disk in self.scratch_disks[:]:
-    #   scratch_disk.Delete()
-    #   self.scratch_disks.remove(scratch_disk)
+    for scratch_disk in self.scratch_disks[:]:
+      scratch_disk.Delete()
+      self.scratch_disks.remove(scratch_disk)
     pass
+
 
   def DeleteScratchDisks(self):
     pass
