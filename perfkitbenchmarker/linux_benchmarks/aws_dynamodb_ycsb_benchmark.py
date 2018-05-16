@@ -16,11 +16,11 @@
 This benchmark does not provision VMs for the corresponding DynamboDB database.
 The only VM group is client group that sends requests to specifiedDB.
 Before running this benchmark, you have to manually create `usertable` with primaryKey 'user02'.
+TODO: fix _Exists logic.
 TODO: add DAX option.
 TODO: add global table option
 """
 
-import logging
 import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -38,7 +38,7 @@ aws_dynamodb_ycsb:
     default:
       vm_spec: *default_single_core
       vm_count: 1"""
-# BENCHMARK_THROUGHPUT = 'ReadCapacityUnits=30,WriteCapacityUnits=1000'
+
 YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'dynamodb-binding', 'lib')
 AWS_CREDENTIAL_DIR = '/tmp/AWSCredentials.properties'
 FLAGS = flags.FLAGS
