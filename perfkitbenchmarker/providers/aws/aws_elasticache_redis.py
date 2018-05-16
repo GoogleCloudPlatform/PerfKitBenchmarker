@@ -127,7 +127,7 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
               '--num-cache-clusters', '2']
 
     cmd += ['--tags']
-    cmd += util.FormatTags(util.MakeDefaultTags())
+    cmd += util.MakeFormattedDefaultTags()
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
