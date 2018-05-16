@@ -21,7 +21,6 @@ the same project. See http://msdn.microsoft.com/library/azure/jj156007.aspx
 for more information about Azure Virtual Networks.
 """
 
-import datetime
 import json
 import threading
 
