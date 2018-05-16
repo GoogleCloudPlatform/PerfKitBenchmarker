@@ -29,6 +29,7 @@ flags.DEFINE_string('aws_dynamodb_region',
                     'us-west-1',
                     'The config for the DynamoDB instance.')
 
+
 class AwsDynamoDBInstance(resource.BaseResource):
 
   def __init__(self, table_name, primary_key, throughput):
@@ -41,11 +42,11 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def _Create(self):
     """Creates the dynamodb table."""
     cmd = ['aws', 'dynamodb', 'create-table',
-          '--region', FLAGS.aws_dynamodb_region,
-          '--attribute-definitions', self.attributes,
-          '--table-name', self.table_name,
-          '--key-schema', self.primary_key,
-          '--provisioned-throughput', self.throughput]
+           '--region', FLAGS.aws_dynamodb_region,
+           '--attribute-definitions', self.attributes,
+           '--table-name', self.table_name,
+           '--key-schema', self.primary_key,
+           '--provisioned-throughput', self.throughput]
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
@@ -103,8 +104,8 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def _DescribeTable(self):
     """Calls describe on table."""
     cmd = ['aws', 'dynamodb', 'describe-table',
-            '--region', FLAGS.aws_dynamodb_region,
-            '--table-name', self.table_name]
+           '--region', FLAGS.aws_dynamodb_region,
+           '--table-name', self.table_name]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
     if retcode != 0:
       logging.info('Could not find table %s, %s', self.table_name, stderr)
