@@ -130,46 +130,38 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
       vm_util.IssueCommand(build_cmd)
 
-
     #TODO check if container built correctly
+
+    create_command = self._FormatCreateCommand()
+
+    container_info, _, _ = vm_util.IssueCommand(create_command)
+
+    self.container_id = container_info.encode("ascii")
+    logging.info("Container with Disk ID: %s", self.container_id)
+
+
+  def _FormatCreateCommand(self):
+  #TODO check if container built correctly
     logging.info("Number of scratch Disks: " + str(len(self.scratch_disks)))
 
-    if len(self.scratch_disks) > 0:
-      logging.info("creating docker container with disk")
+    logging.info("creating docker container with disk")
 
-      mount_string = 'source=' + self.name + ',target=/scratch0'
+    create_command = ['docker', 'run', '-d', '--name', self.name]
 
-      create_command = ['docker', 'run', '-d', '--name', self.name]
+    for vol in self.scratch_disks:
+      vol_string = vol.volume_name + ":/scratch" + str(vol.disk_num)
+      create_command.append('-v')
+      create_command.append(vol_string)
 
-      for vol in self.scratch_disks:
-        vol_string = vol.volume_name + ":/scratch" + str(vol.disk_num)
-        create_command.append('-v')
-        create_command.append(vol_string)
+    create_command.append('ubuntu_ssh:test')
+    create_command.append('/usr/sbin/sshd')
+    create_command.append('-D')
 
-      create_command.append('ubuntu_ssh:test')
-      create_command.append('/usr/sbin/sshd')
-      create_command.append('-D')
+    logging.info("CREATE COMMAND:")
+    logging.info(create_command)
 
-      logging.info("CREATE COMMAND:")
-      logging.info(create_command)
-      logging.info(type(create_command))
-
-
-
-      container_info, _, _ = vm_util.IssueCommand(create_command)
-
-      self.container_id = container_info.encode("ascii")
-      logging.info("Container with Disk ID: %s", self.container_id)
-
-    else:
-      create_command = ['docker', 'run', '-d', '--name', self.name, 
-                        'ubuntu_ssh:test', '/usr/sbin/sshd', '-D']
-
-      container_info, _, _ = vm_util.IssueCommand(create_command)
-
-      self.container_id = container_info.encode("ascii")
-      logging.info("Container ID: %s", self.container_id)
-
+    return create_command
+    
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -221,7 +213,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
         return True
 
     return False
-
 
   def _CreateVolumes(self):
     """
