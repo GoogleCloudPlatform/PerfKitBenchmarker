@@ -19,7 +19,7 @@ Tables can be created and deleted.
 import json
 import logging
 
-from perfkitbenchmarker import resource, errors
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
