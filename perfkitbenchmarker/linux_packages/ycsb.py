@@ -93,7 +93,7 @@ AGGREGATE_OPERATORS = {
     'MaxLatency(ms)': max}
 
 
-flags.DEFINE_string('ycsb_version', '0.9.0', 'YCSB version to use. Defaults to '
+flags.DEFINE_string('ycsb_version', '0.13.0', 'YCSB version to use. Defaults to '
                     'version 0.9.0.')
 flags.DEFINE_enum('ycsb_measurement_type', HISTOGRAM,
                   YCSB_MEASUREMENT_TYPES,
@@ -140,6 +140,9 @@ flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
                      'Defaults to None which uses the ycsb default of 10.')
 flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
                      'to None which uses the ycsb default of 100.')
+flags.DEFINE_enum('ycsb_requestdistribution',
+                    None, ['uniform', 'zipfian', 'latest'],
+                    'Type of request distribution.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -271,8 +274,8 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   if result_string.startswith('YCSB Client 0.'):
     client_string = result_string
     command_line = next(fp).strip()
-    if not command_line.startswith('Command line:'):
-      raise IOError('Unexpected second line: {0}'.format(command_line))
+#    if not command_line.startswith('Command line:'):
+#      raise IOError('Unexpected second line: {0}'.format(command_line))
   elif result_string.startswith('[OVERALL]'):  # YCSB > 0.7.0.
     lines.append(result_string)
   else:
@@ -645,7 +648,7 @@ class YCSBExecutor(object):
 
   def __init__(self, database, parameter_files=None, **kwargs):
     self.database = database
-    self.loaded = False
+    self.loaded = True
     self.parameter_files = parameter_files or []
     self.parameters = kwargs.copy()
     # Self-defined parameters, pop them out of self.parameters, so they
@@ -857,6 +860,8 @@ class YCSBExecutor(object):
       if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
         parameters['hdrhistogram.fileoutput'] = True
         parameters['hdrhistogram.output.path'] = hdr_files_dir
+      if FLAGS.ycsb_requestdistribution:
+        parameters['requestdistribution'] = FLAGS.ycsb_requestdistribution
       parameters.update(kwargs)
       remote_path = posixpath.join(INSTALL_DIR,
                                    os.path.basename(workload_file))
