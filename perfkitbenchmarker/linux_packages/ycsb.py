@@ -141,8 +141,8 @@ flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
 flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
                      'to None which uses the ycsb default of 100.')
 flags.DEFINE_enum('ycsb_requestdistribution',
-                    None, ['uniform', 'zipfian', 'latest'],
-                    'Type of request distribution.')
+                  None, ['uniform', 'zipfian', 'latest'],
+                  'Type of request distribution.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
