@@ -532,6 +532,26 @@ class BenchmarkSpec(object):
     targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
 
+  def GetResourceTags(self):
+    """Gets a list of tags to be used to tag resources."""
+    now_utc = datetime.datetime.utcnow()
+
+    timeout_utc = (
+        now_utc +
+        datetime.timedelta(minutes=FLAGS.timeout_minutes))
+
+    time_format = '%Y-%m-%d %H:%M:%S'
+
+    tags = {
+        'timeout_utc': timeout_utc.strftime(time_format),
+        'create_time_utc': now_utc.strftime(time_format),
+        'benchmark': self.name,
+        'perfkit_uuid': self.uuid,
+        'owner': FLAGS.owner
+    }
+
+    return tags
+
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
 

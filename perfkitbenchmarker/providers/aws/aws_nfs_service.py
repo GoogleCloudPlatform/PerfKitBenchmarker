@@ -127,8 +127,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
     self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
-    self.aws_commands.AddTagsToFiler(self.filer_id, FLAGS.owner, FLAGS.run_uri,
-                                     ' '.join(FLAGS.benchmarks))
+    self.aws_commands.AddTagsToFiler(self.filer_id)
     logging.info('Created filer %s with address %s', self.filer_id,
                  self.GetRemoteAddress())
 
@@ -196,13 +195,8 @@ class AwsEfsCommands(object):
       args += ['--performance-mode', nfs_tier]
     return self._IssueAwsCommand(args)['FileSystemId']
 
-  def AddTagsToFiler(self, filer_id, owner, run_uri, benchmark):
-    tag_fmt = 'Key={0},Value={1}'
-    tags = [
-        tag_fmt.format('owner', owner),
-        tag_fmt.format('perfkitbenchmarker-run', run_uri),
-        tag_fmt.format('benchmark', benchmark)
-    ]
+  def AddTagsToFiler(self, filer_id):
+    tags = util.MakeFormattedDefaultTags()
     args = ['create-tags', '--file-system-id', filer_id, '--tags'] + tags
     self._IssueAwsCommand(args, False)
 

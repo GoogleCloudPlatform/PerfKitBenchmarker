@@ -18,6 +18,8 @@ import json
 import re
 import string
 
+
+from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -99,9 +101,17 @@ def MakeDefaultTags():
   """Default tags for an AWS resource created by PerfKitBenchmarker.
 
   Returns:
-    Dict of default tags with owner and run_uri.
+    Dict of default tags, contributed from the benchmark spec.
   """
-  return {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if not benchmark_spec:
+    return {}
+  return benchmark_spec.GetResourceTags()
+
+
+def MakeFormattedDefaultTags():
+  """Get the default tags formatted correctly for --tags parameter."""
+  return FormatTags(MakeDefaultTags())
 
 
 def AddDefaultTags(resource_id, region):
