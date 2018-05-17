@@ -624,11 +624,10 @@ class KubernetesCluster(BaseContainerCluster):
 
 
 
-
 #DOCKER STUFF HERE
 
 class DockerContainer(BaseContainer):
-  """A Docker flavor of Container."""
+  """A Docker Container."""
 
   def __init__(self, container_spec, name):
     super(DockerContainer, self).__init__(container_spec)
@@ -637,24 +636,82 @@ class DockerContainer(BaseContainer):
   def _Create(self):
     """Creates the container."""
 
-    #docker run --detach --memory <bytes>
+    logging.info('Creating Docker Container')
+    with open(self.ssh_public_key) as f:
+      public_key = f.read().rstrip('\n')
 
-    run_cmd = [
-        FLAGS.docker_cli,
-        'run',
-        self.name,
-        '--image=%s' % self.image,
-        '--limits=cpu=%sm,memory=%sMi' % (int(1000 * self.cpus), self.memory),
-        '--port', str(self.port)
-    ]
-    if self.command:
-      run_cmd.extend(['--command', '--'])
-      run_cmd.extend(self.command)
-    vm_util.IssueCommand(run_cmd)
+    #logging.info(self.ssh_public_key)
+    #logging.info(public_key)
+    #docker_command = "docker run -d dphanekham/ssh_server"
+
+    ##Try to build container here
+    ##create container object
+    ##build local
+    #containerImage = container_service._ContainerImage("ubuntu_simple")
+
+    #TODO, replace this with removeIfExists type of command
+    #self._Delete()
+    
+    buildImage = False
+
+    if buildImage == True:
+      directory = os.path.dirname(
+        data.ResourcePath(os.path.join('docker', "ubuntu_ssh", 'Dockerfile')))
+
+      self.image_name = "ubuntu_ssh"
+
+      build_cmd = [
+          'docker', 'build', '--no-cache',
+          '-t', self.image_name, directory
+      ]
+
+      vm_util.IssueCommand(build_cmd)
+
+    #TODO check if container built correctly
+
+    create_command = self._FormatCreateCommand()
+
+    container_info, _, _ = vm_util.IssueCommand(create_command)
+
+    self.container_id = container_info.encode("ascii")
+    logging.info("Container with Disk ID: %s", self.container_id)
+
+
+
+  def _FormatCreateCommand(self):
+  #TODO check if container built correctly
+    logging.info("Number of scratch Disks: " + str(len(self.scratch_disks)))
+
+    logging.info("creating docker container with disk")
+
+    create_command = ['docker', 'run', '-d', '--name', self.name]
+
+    for vol in self.scratch_disks:
+      vol_string = vol.volume_name + ":/scratch" + str(vol.disk_num)
+      create_command.append('-v')
+      create_command.append(vol_string)
+
+    create_command.append('ubuntu_ssh:test')
+    create_command.append('/usr/sbin/sshd')
+    create_command.append('-D')
+
+    logging.info("CREATE COMMAND:")
+    logging.info(create_command)
+
+    return create_command
+
+  def _Kill(self):
+    """Stops container via Docker kill. Does not completely remove container"""
+    delete_command = ['docker', 'kill', self.name]
+    output = vm_util.IssueCommand(delete_command)
+    logging.info(output[STDOUT].rstrip())
+
 
   def _Delete(self):
-    """Deletes the container."""
-    pass
+    """Removes an already stopped container"""
+    remove_command = ['docker', 'rm', self.name]
+    output = vm_util.IssueCommand(remove_command)
+    logging.info(output[STDOUT].rstrip())
 
   def _IsReady(self):
     """Returns true if the container has stopped pending."""
@@ -674,10 +731,47 @@ class DockerContainer(BaseContainer):
     """Waits until the container has finished running."""
     @vm_util.Retry(timeout=timeout)
     def _WaitForExit():
-      phase = self._GetPod()['status']['phase']
-      if phase not in _K8S_FINISHED_PHASES:
-        raise Exception('POD phase (%s) not in finished phases.' % phase)
+      info, returnCode = self._GetContainerInfo()
+
+      logging.info("Checking if Docker Container is Exited")
+      if len(info) > 0 and returnCode == 0:
+        status = info[0]['State']['Running']
+
+        if status == "True" or status == True:
+          logging.info("Docker Container %s is up and running.", self.name)
+          raise Exception('Docker Container still running')
+
     _WaitForExit()
+
+  def _GetContainerInfo(self):
+    """
+    Gets Container information from Docker Inspect. Returns the information, 
+    if there is any and a return code. 0  
+    """
+    logging.info("Fetching Container Information")
+    inspect_cmd = ['docker', 'inspect', self.name]
+    info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
+
+    info = json.loads(info)
+
+    return info, returnCode
+
+  def _Exists(self):
+    """
+    Checks if Container has successful been created an is running
+    """
+    
+    info, returnCode = self._GetContainerInfo()
+
+    logging.info("Checking if Docker Container Exists")
+    if len(info) > 0 and returnCode == 0:
+      status = info[0]['State']['Running']
+
+      if status == "True" or status == True:
+        logging.info("Docker Container %s is up and running.", self.name)
+        return True
+
+    return False
 
   def GetLogs(self):
     """Returns the logs from the container."""
