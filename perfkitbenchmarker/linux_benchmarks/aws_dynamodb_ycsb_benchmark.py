@@ -16,11 +16,12 @@
 This benchmark does not provision VMs for the corresponding DynamboDB database.
 The only VM group is client group that sends requests to specifiedDB.
 Before running this benchmark, you have to manually create `usertable` with primaryKey 'user02'.
-TODO: fix _Exists logic.
+TODO: add RANGE option.
 TODO: add DAX option.
-TODO: add global table option
+TODO: add global table option.
 """
 
+import logging
 import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -45,31 +46,31 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('aws_dynamodb_ycsb_awscredentials_properties',
                     './AWSCredentials.properties',
-                    'The AWS credential location.')
+                    'The AWS credential location. Defaults to PKB top folder')
 flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_primarykey',
                     'user01',
-                    'The primaryKey of table.')
-flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_endpoint',
-                    None,
-                    'The aws dynamodb endpoint to connect to.')
-flags.DEFINE_string('aws_dynamodb_ycsb_requestdistribution',
-                    'uniform',
-                    'Type of request distribution.')
+                    'The primaryKey of dynamodb table.')
+flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_region',
+                    'us-east-1',
+                    'The AWS dynamodb region to connect to.')
 flags.DEFINE_string('aws_dynamodb_ycsb_readproportion',
                     '0.5',
-                    'The Read Proportion, default is 0.5 in workloada and 0.95 in YCSB.')
+                    'The read proportion, '
+                    'default is 0.5 in workloada and 0.95 in YCSB.')
 flags.DEFINE_string('aws_dynamodb_ycsb_updateproportion',
                     '0.5',
-                    'The Update Proportion, default is 0.5 in workloada and 0.05 in YCSB')
+                    'The update proportion, '
+                    'default is 0.5 in workloada and 0.05 in YCSB')
 flags.DEFINE_string('aws_dynamodb_ycsb_table',
-                    'usertable',
-                    'The Table flag determines which table to run on.')
-flags.DEFINE_string('aws_dynamodb_ycsb_consistentReads',
-                    'false',
-                    'Consistent reads cost 2x Eventual reads. False is default and eventual')
+                    'ycsb',
+                    'The dynamodb table name precursor.')
+flags.DEFINE_enum('aws_dynamodb_ycsb_consistentReads',
+                  None,['false','true'],
+                  "Consistent reads cost 2x eventual reads. "
+                  "'false' is default which is eventual")
 flags.DEFINE_string('aws_dynamodb_ycsb_capacity',
                     'ReadCapacityUnits=5,WriteCapacityUnits=5',
-                    'Set RCU/WCU for table')
+                    'Set RCU/WCU for dynamodb table')
 
 
 def GetConfig(user_config):
@@ -84,13 +85,7 @@ def CheckPrerequisites(benchmark_config):
     Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
     """
-    if not FLAGS.aws_dynamodb_ycsb_awscredentials_properties:
-        raise ValueError('"aws_dynamodb_ycsb_awscredentials_properties" must be set')
-    if not FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey:
-        raise ValueError('"aws_dynamodb_ycsb_dynamodb_primarykey" must be set')
-    if not FLAGS.aws_dynamodb_ycsb_dynamodb_endpoint:
-        raise ValueError('"aws_dynamodb_ycsb_dynamodb_endpoint" must be set ')
-
+    ycsb.CheckPrerequisites()
 
 def Prepare(benchmark_spec):
     """Install YCSB on the target vm.
@@ -100,19 +95,20 @@ def Prepare(benchmark_spec):
     """
     benchmark_spec.always_call_cleanup = True
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
-        table_name=FLAGS.aws_dynamodb_ycsb_table,
+        region=FLAGS.aws_dynamodb_ycsb_dynamodb_region,
+        table_name=FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri,
         primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
         throughput=FLAGS.aws_dynamodb_ycsb_capacity)
-#    if benchmark_spec.dynamodb_instance._Exists():
-#      logging.warning('DynamoDB table %s exists, delete it first.' %
-#                  FLAGS.aws_dynamodb_ycsb_table)
-#    benchmark_spec.dynamodb_instance.Delete()
+    if benchmark_spec.dynamodb_instance._Exists():
+      logging.warning('DynamoDB table %s exists, delete it first.' %
+                  FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri)
+    benchmark_spec.dynamodb_instance.Delete()
     benchmark_spec.dynamodb_instance.Create()
-#    if not benchmark_spec.dynamodb_instance._Exists():
-#      logging.warning('Failed to create DynamoDB table.')
-#    benchmark_spec.dynamodb_instance.Delete()
+    if not benchmark_spec.dynamodb_instance._Exists():
+      logging.warning('Failed to create DynamoDB table.')
+    benchmark_spec.dynamodb_instance.Delete()
     vms = benchmark_spec.vms
-    # Install required packages and copy credential files.
+    # Install required packages.
     vm_util.RunThreaded(_Install, vms)
     benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
 
@@ -130,11 +126,12 @@ def Run(benchmark_spec):
     run_kwargs = {
         'dynamodb.awsCredentialsFile': AWS_CREDENTIAL_DIR,
         'dynamodb.primaryKey': FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
-        'dynamodb.endpoint': FLAGS.aws_dynamodb_ycsb_dynamodb_endpoint,
-        'requestdistribution': FLAGS.aws_dynamodb_ycsb_requestdistribution,
+        'dynamodb.endpoint': 'http://dynamodb.' +
+                             FLAGS.aws_dynamodb_ycsb_dynamodb_region +
+                             '.amazonaws.com',
         'readproportion': FLAGS.aws_dynamodb_ycsb_readproportion,
         'updateproportion': FLAGS.aws_dynamodb_ycsb_updateproportion,
-        'table': FLAGS.aws_dynamodb_ycsb_table,
+        'table': FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri,
         'dynamodb.consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
     }
     load_kwargs = run_kwargs.copy()
