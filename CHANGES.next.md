@@ -23,6 +23,7 @@
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
   Redis Cache in Azure.
+- YCSB benchmark for DynamoDB in AWS.
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
   called a specified number of times
 - Added cuda_toolkit_version flag
@@ -52,8 +53,6 @@
 - Added `container_cluster_version` flag to container_service.py.
 - AWS EFS support via "disk_type: nfs"
 - Added disk_fill_size and prepare_sleep_time flags
-- Add timeout_minutes flag to assist with cleaning up stale resources
-- All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -123,7 +122,6 @@
 - Added support for default batch sizes given a certain GPU type and model in
   the Tensorflow benchmark.
 - Added method to get the NfsService from the linux_virtual_machine.
-- Added support for fio job files in the data directory.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -221,4 +219,3 @@
 - Add ability to skip known failing scripts when running edw profiles.
 - Set the control port and data port for nuttcp benchmark.
 - Fix overwriting of bandwidth variable in nuttcp benchmark.
-- Fixed fio histogram parsing.
