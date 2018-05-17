@@ -65,7 +65,7 @@ flags.DEFINE_string('aws_dynamodb_ycsb_table',
                     'ycsb',
                     'The dynamodb table name precursor.')
 flags.DEFINE_enum('aws_dynamodb_ycsb_consistentReads',
-                  None,['false','true'],
+                  None, ['false', 'true'],
                   "Consistent reads cost 2x eventual reads. "
                   "'false' is default which is eventual")
 flags.DEFINE_string('aws_dynamodb_ycsb_capacity',
@@ -87,6 +87,7 @@ def CheckPrerequisites(benchmark_config):
     """
     ycsb.CheckPrerequisites()
 
+
 def Prepare(benchmark_spec):
     """Install YCSB on the target vm.
     Args:
@@ -101,7 +102,7 @@ def Prepare(benchmark_spec):
         throughput=FLAGS.aws_dynamodb_ycsb_capacity)
     if benchmark_spec.dynamodb_instance._Exists():
       logging.warning('DynamoDB table %s exists, delete it first.' %
-                  FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri)
+                      FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri)
     benchmark_spec.dynamodb_instance.Delete()
     benchmark_spec.dynamodb_instance.Create()
     if not benchmark_spec.dynamodb_instance._Exists():
