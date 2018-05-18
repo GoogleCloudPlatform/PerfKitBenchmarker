@@ -49,7 +49,7 @@ SELECTOR_PREFIX = 'pkb'
 
 class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
-  Object representing a Docker instance.
+  Object representing a Docker Container instance
   """
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
@@ -62,7 +62,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec
     """
     super(DockerVirtualMachine, self).__init__(vm_spec)
-    #self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.container_id = ''
     self.user_name = FLAGS.username
@@ -146,7 +145,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
   def _FormatCreateCommand(self):
-  #TODO check if container built correctly
+    """Formats the command for Docker based on vm_spec and flags"""
+
     logging.info("Number of scratch Disks: " + str(len(self.scratch_disks)))
 
     logging.info("creating docker container with disk")
@@ -154,11 +154,11 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_command = ['docker', 'run', '-d', '--name', self.name]
 
     for vol in self.scratch_disks:
-      vol_string = vol.volume_name + ":/scratch" + str(vol.disk_num)
+      vol_string = vol.volume_name + ":" + vol.mount_point
       create_command.append('-v')
       create_command.append(vol_string)
 
-    create_command.append('ubuntu_ssh:test')
+    create_command.append('ubuntu_ssh:latest')
     create_command.append('/usr/sbin/sshd')
     create_command.append('-D')
 
@@ -170,6 +170,10 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry()
   def _PostCreate(self):
+    """
+    Prepares running container. Gets the IP address, copies public keys,
+    and configures the proxy if one is specified
+    """
 
     self._GetIpAddresses()
 
@@ -242,7 +246,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
   def _GetIpAddresses(self):
-    
     """
     Sets the internal and external IP address for the Container.
     """
