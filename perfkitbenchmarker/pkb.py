@@ -284,6 +284,13 @@ flags.DEFINE_integer(
     'An upper bound on the time in minutes that the benchmark is expected to '
     'run. This time is annotated or tagged on the resources of cloud '
     'providers.')
+flags.DEFINE_integer(
+    'persistent_timeout_minutes', 240,
+    'An upper bound on the time in minutes that resources left behind by the  '
+    'benchmark is expected run. Some benchmarks purposefully create resources '
+    'for other benchmarks to use.   Persistent timeout guages who long '
+    'these shared should live.')
+
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',

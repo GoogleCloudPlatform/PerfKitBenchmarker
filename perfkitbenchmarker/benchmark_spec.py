@@ -532,13 +532,16 @@ class BenchmarkSpec(object):
     targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
 
-  def GetResourceTags(self):
+  def GetResourceTags(self, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
     now_utc = datetime.datetime.utcnow()
 
+    if not timeout_minutes:
+      timeout_minutes = FLAGS.timeout_minutes
+
     timeout_utc = (
         now_utc +
-        datetime.timedelta(minutes=FLAGS.timeout_minutes))
+        datetime.timedelta(minutes=timeout_minutes))
 
     time_format = '%Y-%m-%d %H:%M:%S'
 
