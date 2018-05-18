@@ -16,6 +16,12 @@
 
 
 #TODO
+#add Docker build functionality
+#1) local build using a Dockerfile
+#2) build using GCloud Repo
+#3) build from custom dockerfile (To support different flavors)
+#4) make sure container builds only once
+#5) Add in resource management (specify cpu/mem etc)
 
 import json
 import logging
@@ -53,7 +59,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a Docker Container.
 
     Args:
-      vm_spec: KubernetesPodSpec object of the vm.
+      vm_spec
     """
     super(DockerVirtualMachine, self).__init__(vm_spec)
     #self.num_scratch_disks = 0
@@ -326,3 +332,5 @@ class Ubuntu1604BasedDockerVirtualMachine(
 class Ubuntu1710BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
   DEFAULT_IMAGE = 'ubuntu:17.10'
+
+
