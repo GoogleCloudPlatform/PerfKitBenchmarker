@@ -24,6 +24,7 @@ FLAGS = flags.FLAGS
 
 DEFAULT_AZURE_REGION = 'eastus2'
 
+
 class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   """Interface to Azure Blob Storage.
 
