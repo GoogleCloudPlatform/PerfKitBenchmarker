@@ -94,5 +94,17 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
     beam_benchmark_helper.AddFilesystemArgument(actual_command, testOptionVal)
     self.assertListEqual([], actual_command)
 
+  def test_add_module(self):
+    testOptionVal = "sdks/java/io/tests"
+    actual_command = []
+    beam_benchmark_helper.AddModuleArgument(actual_command, testOptionVal)
+    self.assertListEqual(['-p', testOptionVal], actual_command)
+
+  def test_add_empty_module(self):
+    testOptionVal = ""
+    actual_command = []
+    beam_benchmark_helper.AddModuleArgument(actual_command, testOptionVal)
+    self.assertListEqual([], actual_command)
+
 if __name__ == '__main__':
   unittest.main()
