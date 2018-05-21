@@ -126,7 +126,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
         self.nfs_tier = filer['PerformanceMode']
         self.filer_id = filer['FileSystemId']
         self.disk_spec.disk_size = int(
-            round(filer['SizeInBytes']['Value'] / 10.0**9))
+            round(filer['SizeInBytes']['Value'] / 10.0 ** 9))
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
     self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
