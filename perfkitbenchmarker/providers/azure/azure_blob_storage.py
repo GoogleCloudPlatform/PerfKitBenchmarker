@@ -24,6 +24,7 @@ FLAGS = flags.FLAGS
 
 DEFAULT_AZURE_REGION = 'eastus2'
 
+
 class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   """Interface to Azure Blob Storage.
 
@@ -54,7 +55,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         azure_network.AzureResourceGroup(
             resource_group_name,
             existing_resource_group is not None,
-            timeout_minutes= FLAGS.persistent_timeout_minutes)
+            timeout_minutes=FLAGS.persistent_timeout_minutes)
     self.resource_group.Create()
 
     # We use a different Azure storage account than the VM account
