@@ -76,7 +76,12 @@ FLAGS = flags.FLAGS
 SUPPORTED_RUNNERS = [dpb_service.DATAFLOW]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
-GRADLE_INSTALL_COMMAND_ARGS = ['clean', 'install', '-xcheck', '--stacktrace']
+
+
+def AddModuleArgument(command, module):
+  if module:
+    command.append('-p')
+    command.append(module)
 
 
 def AddRunnerArgument(command, runner_name):
@@ -157,9 +162,12 @@ def InitializeBeamRepo(benchmark_spec):
 def _PrebuildBeam():
   # Rebuild beam if it was not build earlier
   if not FLAGS.beam_prebuilt:
-    build_command = [_GetGradleCommand()]
-    build_command.extend(GRADLE_INSTALL_COMMAND_ARGS)
 
+    gradle_build_command = ['clean', 'assemble', '--stacktrace', '--info']
+    build_command = [_GetGradleCommand()]
+    build_command.extend(gradle_build_command)
+
+    AddModuleArgument(build_command, FLAGS.beam_it_module)
     AddRunnerArgument(build_command, FLAGS.beam_runner)
     AddFilesystemArgument(build_command, FLAGS.beam_filesystem)
     AddExtraProperties(build_command, FLAGS.beam_extra_properties)
@@ -216,12 +224,9 @@ def _BuildGradleCommand(classname, job_arguments):
   cmd.append('integrationTest')
   cmd.append('--tests={}'.format(classname))
 
-  if FLAGS.beam_it_module:
-    cmd.append('-p')
-    cmd.append(FLAGS.beam_it_module)
-
   beam_args = job_arguments if job_arguments else []
 
+  AddModuleArgument(cmd, FLAGS.beam_it_module)
   AddRunnerArgument(cmd, FLAGS.beam_runner)
   AddRunnerPipelineOption(beam_args, FLAGS.beam_runner, FLAGS.beam_runner_option)
   AddFilesystemArgument(cmd, FLAGS.beam_filesystem)
