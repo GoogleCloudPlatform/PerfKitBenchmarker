@@ -66,6 +66,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
     super(AwsNfsService, self).__init__(disk_spec, zone)
     self.region = util.GetRegionFromZone(self.zone)
     self.aws_commands = AwsEfsCommands(self.region)
+    self.disk_spec.disk_size = 0
     self.filer_id = None
     self.mount_id = None
 
@@ -124,6 +125,8 @@ class AwsNfsService(nfs_service.BaseNfsService):
       if filer:
         self.nfs_tier = filer['PerformanceMode']
         self.filer_id = filer['FileSystemId']
+        self.disk_spec.disk_size = int(
+            round(filer['SizeInBytes']['Value'] / 10.0**9))
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
     self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
