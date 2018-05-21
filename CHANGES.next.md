@@ -222,3 +222,4 @@
 - Set the control port and data port for nuttcp benchmark.
 - Fix overwriting of bandwidth variable in nuttcp benchmark.
 - Fixed fio histogram parsing.
+- Refactored AwsKeyFileManager out of AwsVirtualMachine.

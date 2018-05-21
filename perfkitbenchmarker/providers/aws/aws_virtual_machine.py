@@ -289,6 +289,47 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     return result
 
 
+class AwsKeyFileManager(object):
+  """Object for managing AWS Keyfiles."""
+  _lock = threading.Lock()
+  imported_keyfile_set = set()
+  deleted_keyfile_set = set()
+
+  @classmethod
+  def ImportKeyfile(cls, region):
+    """Imports the public keyfile to AWS."""
+    with cls._lock:
+      if region in cls.imported_keyfile_set:
+        return
+      cat_cmd = ['cat',
+                 vm_util.GetPublicKeyPath()]
+      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+      import_cmd = util.AWS_PREFIX + [
+          'ec2', '--region=%s' % region,
+          'import-key-pair',
+          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
+          '--public-key-material=%s' % keyfile]
+      util.IssueRetryableCommand(import_cmd)
+      cls.imported_keyfile_set.add(region)
+      if region in cls.deleted_keyfile_set:
+        cls.deleted_keyfile_set.remove(region)
+
+  @classmethod
+  def DeleteKeyfile(cls, region):
+    """Deletes the imported keyfile for a region."""
+    with cls._lock:
+      if region in cls.deleted_keyfile_set:
+        return
+      delete_cmd = util.AWS_PREFIX + [
+          'ec2', '--region=%s' % region,
+          'delete-key-pair',
+          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+      util.IssueRetryableCommand(delete_cmd)
+      cls.deleted_keyfile_set.add(region)
+      if region in cls.imported_keyfile_set:
+        cls.imported_keyfile_set.remove(region)
+
+
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
@@ -299,8 +340,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   _lock = threading.Lock()
-  imported_keyfile_set = set()
-  deleted_keyfile_set = set()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
 
@@ -355,7 +394,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return self.network.regional_network.vpc.default_security_group_id
 
   @classmethod
-  def _GetDefaultImage(cls, machine_type, region):
+  def GetDefaultImage(cls, machine_type, region):
     """Returns the default image given the machine type and region.
 
     If specified, aws_image_name_filter will override os_type defaults.
@@ -401,38 +440,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # the image with the 'largest' name.
     return max(images, key=lambda image: image['Name'])['ImageId']
 
-  def ImportKeyfile(self):
-    """Imports the public keyfile to AWS."""
-    with self._lock:
-      if self.region in self.imported_keyfile_set:
-        return
-      cat_cmd = ['cat',
-                 vm_util.GetPublicKeyPath()]
-      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
-      import_cmd = util.AWS_PREFIX + [
-          'ec2', '--region=%s' % self.region,
-          'import-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
-          '--public-key-material=%s' % keyfile]
-      util.IssueRetryableCommand(import_cmd)
-      self.imported_keyfile_set.add(self.region)
-      if self.region in self.deleted_keyfile_set:
-        self.deleted_keyfile_set.remove(self.region)
-
-  def DeleteKeyfile(self):
-    """Deletes the imported keyfile for a region."""
-    with self._lock:
-      if self.region in self.deleted_keyfile_set:
-        return
-      delete_cmd = util.AWS_PREFIX + [
-          'ec2', '--region=%s' % self.region,
-          'delete-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-      util.IssueRetryableCommand(delete_cmd)
-      self.deleted_keyfile_set.add(self.region)
-      if self.region in self.imported_keyfile_set:
-        self.imported_keyfile_set.remove(self.region)
-
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data and tag it."""
@@ -457,10 +464,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    self.ImportKeyfile()
-    # _GetDefaultImage calls the AWS CLI.
-    self.image = self.image or self._GetDefaultImage(self.machine_type,
-                                                     self.region)
+    AwsKeyFileManager.ImportKeyfile(self.region)
+    # GetDefaultImage calls the AWS CLI.
+    self.image = self.image or self.GetDefaultImage(self.machine_type,
+                                                    self.region)
     self.AllowRemoteAccessPorts()
 
     if self.use_dedicated_host:
@@ -473,7 +480,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
-    self.DeleteKeyfile()
+    AwsKeyFileManager.DeleteKeyfile(self.region)
     if self.host:
       with self._lock:
         if self.host in self.host_list:
@@ -748,6 +755,7 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
+  """Class with configuration for AWS Redhat virtual machines."""
   IMAGE_NAME_FILTER = 'amzn-ami-*-x86_64-*'
 
   def __init__(self, vm_spec):
@@ -763,6 +771,7 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
                                     linux_virtual_machine.Centos7Mixin):
+  """Class with configuration for AWS Centos7 virtual machines."""
   # Documentation on finding the Centos 7 image:
   # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*'
