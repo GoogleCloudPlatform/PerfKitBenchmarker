@@ -86,6 +86,9 @@ class BaseNetworkSpec(object):
     """
     self.zone = zone
 
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
+
 
 class BaseNetwork(object):
   """Object representing a Base Network."""

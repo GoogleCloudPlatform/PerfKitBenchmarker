@@ -13,10 +13,10 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
-import datetime
 import contextlib
 import copy
 import copy_reg
+import datetime
 import importlib
 import logging
 import os
@@ -26,6 +26,7 @@ import threading
 import uuid
 
 from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
@@ -39,7 +40,6 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -142,6 +142,9 @@ class BenchmarkSpec(object):
 
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
 
   def __str__(self):
     return(
@@ -318,7 +321,7 @@ class BenchmarkSpec(object):
     return vms
 
   def _CheckBenchmarkSupport(self, cloud):
-    """ Throw an exception if the benchmark isn't supported."""
+    """Throw an exception if the benchmark isn't supported."""
 
     if FLAGS.benchmark_compatibility_checking == SKIP_CHECK:
       return
@@ -589,7 +592,7 @@ class BenchmarkSpec(object):
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
         'benchmark_uid': self.uid,
-        'create_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        'create_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     for item in FLAGS.vm_metadata:
       if ':' not in item:
