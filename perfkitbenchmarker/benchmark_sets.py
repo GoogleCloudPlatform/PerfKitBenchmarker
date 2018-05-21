@@ -14,6 +14,7 @@
 
 """Benchmark set specific functions and definitions."""
 
+import collections
 import copy
 import itertools
 
@@ -359,27 +360,19 @@ def GetBenchmarksFromFlags():
   if benchmark_config_list and not FLAGS['benchmarks'].present:
     return benchmark_config_list
 
-  benchmark_names = set()
-  for benchmark in FLAGS.benchmarks:
-    if benchmark in BENCHMARK_SETS:
-      benchmark_names |= set(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
-    else:
-      benchmark_names.add(benchmark)
+  benchmark_queue = collections.deque(FLAGS.benchmarks)
+  benchmark_names = []
+  benchmark_set = set()
 
-  # Expand recursive sets
-  expanded = set()
-  did_expansion = True
-  while did_expansion:
-    did_expansion = False
-    for benchmark_name in benchmark_names:
-      if benchmark_name in BENCHMARK_SETS:
-        did_expansion = True
-        benchmark_names.remove(benchmark_name)
-        if benchmark_name not in expanded:
-          expanded.add(benchmark_name)
-          benchmark_names |= set(BENCHMARK_SETS[
-              benchmark_name][BENCHMARK_LIST])
-        break
+  while benchmark_queue:
+    benchmark = benchmark_queue.popleft()
+    if benchmark in benchmark_set:
+      continue
+    benchmark_set.add(benchmark)
+    if benchmark in BENCHMARK_SETS:
+      benchmark_queue.extendleft(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
+    else:
+      benchmark_names.append(benchmark)
 
   valid_benchmarks = _GetValidBenchmarks()
 
