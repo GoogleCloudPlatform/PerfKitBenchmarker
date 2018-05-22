@@ -15,7 +15,6 @@
 """Run YCSB benchmark against AWS DynamoDB.
 This benchmark does not provision VMs for the corresponding DynamboDB database.
 The only VM group is client group that sends requests to specifiedDB.
-Before running this benchmark, you have to manually create `usertable` with primaryKey 'user02'.
 TODO: add RANGE option.
 TODO: add DAX option.
 TODO: add global table option.
@@ -48,7 +47,7 @@ flags.DEFINE_string('aws_dynamodb_ycsb_awscredentials_properties',
                     './AWSCredentials.properties',
                     'The AWS credential location. Defaults to PKB top folder')
 flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_primarykey',
-                    'user01',
+                    'primary_key',
                     'The primaryKey of dynamodb table.')
 flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_region',
                     'us-east-1',
@@ -62,7 +61,7 @@ flags.DEFINE_string('aws_dynamodb_ycsb_updateproportion',
                     'The update proportion, '
                     'default is 0.5 in workloada and 0.05 in YCSB')
 flags.DEFINE_string('aws_dynamodb_ycsb_table',
-                    'ycsb',
+                    'pkb',
                     'The dynamodb table name precursor.')
 flags.DEFINE_enum('aws_dynamodb_ycsb_consistentReads',
                   None, ['false', 'true'],
@@ -97,12 +96,12 @@ def Prepare(benchmark_spec):
     benchmark_spec.always_call_cleanup = True
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
         region=FLAGS.aws_dynamodb_ycsb_dynamodb_region,
-        table_name=FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri,
+        table_name=FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri,
         primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
         throughput=FLAGS.aws_dynamodb_ycsb_capacity)
     if benchmark_spec.dynamodb_instance._Exists():
       logging.warning('DynamoDB table %s exists, delete it first.' %
-                      FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri)
+                      FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri)
     benchmark_spec.dynamodb_instance.Delete()
     benchmark_spec.dynamodb_instance.Create()
     if not benchmark_spec.dynamodb_instance._Exists():
@@ -132,7 +131,7 @@ def Run(benchmark_spec):
                              '.amazonaws.com',
         'readproportion': FLAGS.aws_dynamodb_ycsb_readproportion,
         'updateproportion': FLAGS.aws_dynamodb_ycsb_updateproportion,
-        'table': FLAGS.aws_dynamodb_ycsb_table + "_" + FLAGS.run_uri,
+        'table': FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri,
         'dynamodb.consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
     }
     load_kwargs = run_kwargs.copy()
@@ -149,6 +148,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
     required to run the benchmark.
     """
+    logging.warning('Attempting cleanup:')
     benchmark_spec.dynamodb_instance.Delete()
 
 
