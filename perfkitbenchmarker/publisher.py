@@ -741,6 +741,7 @@ class InfluxDBPublisher(SamplePublisher):
       logging.error('Error connecting to the database:  %s', http_exception)
 
   def _ConstructSample(self, sample):
+    sample['product_name'] = FLAGS.product_name
     timestamp = str(int((10 ** 9) * sample['timestamp']))
     measurement = 'perfkitbenchmarker'
 
