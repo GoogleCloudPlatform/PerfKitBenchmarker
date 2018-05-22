@@ -67,9 +67,6 @@ flags.DEFINE_enum('aws_dynamodb_ycsb_consistentReads',
                   None, ['false', 'true'],
                   "Consistent reads cost 2x eventual reads. "
                   "'false' is default which is eventual")
-flags.DEFINE_string('aws_dynamodb_ycsb_capacity',
-                    'ReadCapacityUnits=5,WriteCapacityUnits=5',
-                    'Set RCU/WCU for dynamodb table')
 
 
 def GetConfig(user_config):
@@ -97,8 +94,7 @@ def Prepare(benchmark_spec):
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
         region=FLAGS.aws_dynamodb_ycsb_dynamodb_region,
         table_name=FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri,
-        primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
-        throughput=FLAGS.aws_dynamodb_ycsb_capacity)
+        primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey)
     if benchmark_spec.dynamodb_instance._Exists():
       logging.warning('DynamoDB table %s exists, delete it first.' %
                       FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri)
