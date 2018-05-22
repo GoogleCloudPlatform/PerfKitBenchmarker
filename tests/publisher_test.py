@@ -442,7 +442,7 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
   def testConstructSample(self):
     sample_with_metadata = {
         'test': 'testc', 'metric': '1', 'official': 1.0,
-        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace', 'product_name': 'PerfKitBenchmarker',
         'run_uri': '323', 'sample_uri': '33',
         'timestamp': 123,
         'metadata': collections.OrderedDict([('info', '1'),
@@ -453,7 +453,7 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
 
     sample_results = ('perfkitbenchmarker,test=testc,official=1.0,'
                       'owner=Rackspace,run_uri=323,sample_uri=33,'
-                      'metric=1,unit=MB,info=1,more_info=2,bar=foo '
+                      'metric=1,unit=MB,product_name=PerfKitBenchmarker,info=1,more_info=2,bar=foo '
                       'value=non 123000000000')
 
     self.assertEqual(constructed_sample, sample_results)
@@ -481,12 +481,12 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
 
     expected = [
         ('perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,'
-         'run_uri=323,sample_uri=33,metric=1,unit=MB,info=1,more_info=2,'
+         'run_uri=323,sample_uri=33,metric=1,unit=MB,product_name=PerfKitBenchmarker,info=1,more_info=2,'
          'bar=foo value=non 123000000000'),
         ('perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,'
-         'run_uri=bba3,sample_uri=bb,metric=2,unit=MB value=non 55000000000'),
+         'run_uri=bba3,sample_uri=bb,metric=2,unit=MB,product_name=PerfKitBenchmarker value=non 55000000000'),
         ('perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,'
-         'run_uri=5rtw,sample_uri=5r,metric=3,unit=us value=non 123000000000')
+         'run_uri=5rtw,sample_uri=5r,metric=3,unit=us,product_name=PerfKitBenchmarker value=non 123000000000')
     ]
 
     mock_publish_method.return_value = None
