@@ -749,7 +749,7 @@ class InfluxDBPublisher(SamplePublisher):
       if sample['metadata']:
         tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
     tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
-                'metric', 'unit')
+                'metric', 'unit', 'product_name')
     ordered_tags = collections.OrderedDict([(k, sample[k]) for k in tag_keys])
     tag_set = ','.join(self._FormatToKeyValue(ordered_tags))
     if tag_set_metadata:
