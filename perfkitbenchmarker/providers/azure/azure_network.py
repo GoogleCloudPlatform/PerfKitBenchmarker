@@ -57,10 +57,11 @@ def GetResourceGroup(zone=None):
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name, zone=None, use_existing=False):
+  def __init__(self, name, zone=None, use_existing=False, timeout_minutes=None):
     super(AzureResourceGroup, self).__init__()
     self.name = name
     self.use_existing = use_existing
+    self.timeout_minutes = timeout_minutes
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
@@ -118,7 +119,7 @@ class AzureResourceGroup(resource.BaseResource):
   def _GetTags(self):
     """Gets a list of tags to be used with the --tags param of Azure CLI."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    tags = self.FormatTags(benchmark_spec.GetResourceTags())
+    tags = self.FormatTags(benchmark_spec.GetResourceTags(self.timeout_minutes))
 
     return tags
 
