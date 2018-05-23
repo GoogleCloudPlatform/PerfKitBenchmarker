@@ -85,9 +85,10 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
     list of samples from the results of the nuttcp tests.
   """
 
-  def _RunNuttcp(vm, options):
-    command = 'cd {exec_dir}; .\\{exec_path} {options}'.format(
+  def _RunNuttcp(vm, options, is_sender):
+    command = 'cd {exec_dir}; sleep {delay}; .\\{exec_path} {options}'.format(
         exec_dir=vm.temp_dir,
+        delay=(5 if is_sender else 0),
         exec_path=exec_path,
         options=options)
     vm.RemoteCommand(command)
@@ -119,8 +120,8 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
         data_port=UDP_PORT,
         control_port=CONTROL_PORT)
 
-    threaded_args = [((receiving_vm, receiver_args), {}),
-                     ((sending_vm, sender_args), {})]
+    threaded_args = [((receiving_vm, receiver_args, False), {}),
+                     ((sending_vm, sender_args, True), {})]
 
     vm_util.RunThreaded(_RunNuttcp, threaded_args)
 
