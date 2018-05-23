@@ -85,6 +85,8 @@ class BaseResource(object):
 
   # Timeout in seconds for resource to be ready.
   READY_TIMEOUT = None
+  # Time between retries.
+  POLL_INTERVAL = 5
 
   def __init__(self, user_managed=False):
     super(BaseResource, self).__init__()
@@ -218,10 +220,8 @@ class BaseResource(object):
   def Create(self):
     """Creates a resource and its dependencies."""
 
-    # A more general solution would allow the retry interval to be set as a
-    # property of the class.  We don't currently need that.
-    # For an example of above approach, please see the READY_TIMEOUT property.
-    @vm_util.Retry(poll_interval=5, fuzz=0, timeout=self.READY_TIMEOUT,
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
+                   timeout=self.READY_TIMEOUT,
                    retryable_exceptions=(
                        errors.Resource.RetryableCreationError,))
     def WaitUntilReady():
@@ -241,7 +241,7 @@ class BaseResource(object):
     """Deletes a resource and its dependencies."""
 
     # Retryable method which allows waiting for deletion of the resource.
-    @vm_util.Retry(poll_interval=5, fuzz=0, timeout=3600,
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0, timeout=3600,
                    retryable_exceptions=(
                        errors.Resource.RetryableDeletionError,))
     def WaitUntilDeleted():
