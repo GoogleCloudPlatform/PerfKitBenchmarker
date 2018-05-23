@@ -271,7 +271,7 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
 
   # every cloud provider has a different mechansim for setting root password
   # on initialize.  GCP doesnt support setting password at creation though.
-   # So initialize root password here early as possible.
+  # So initialize root password here early as possible.
   if FLAGS.cloud == 'GCP':
     set_db_root_password_command = 'mysqladmin -h %s -u root password %s' % (
         db.endpoint,
