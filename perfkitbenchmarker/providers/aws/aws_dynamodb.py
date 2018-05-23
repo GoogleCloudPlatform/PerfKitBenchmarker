@@ -47,22 +47,22 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def _Create(self):
     """Creates the dynamodb table."""
     cmd = util.AWS_PREFIX + [
-       'dynamodb',
-       'create-table',
-       '--region', self.region,
-       '--attribute-definitions', self.attributes,
-       '--table-name', self.table_name,
-       '--key-schema', self.primary_key,
-       '--provisioned-throughput', self.throughput]
+        'dynamodb',
+        'create-table',
+        '--region', self.region,
+        '--attribute-definitions', self.attributes,
+        '--table-name', self.table_name,
+        '--key-schema', self.primary_key,
+        '--provisioned-throughput', self.throughput]
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
     """Deletes the table."""
     cmd = util.AWS_PREFIX + [
-       'dynamodb',
-       'delete-table',
-       '--region', self.region,
-       '--table-name', self.table_name]
+        'dynamodb',
+        'delete-table',
+        '--region', self.region,
+        '--table-name', self.table_name]
     logging.info('Attempting deletion: ')
     vm_util.IssueCommand(cmd)
 
@@ -70,10 +70,10 @@ class AwsDynamoDBInstance(resource.BaseResource):
     """Check if table is ready."""
     logging.info('Getting table ready status for {0}'.format(self.table_name))
     cmd = util.AWS_PREFIX + [
-       'dynamodb',
-       'describe-table',
-       '--region', self.region,
-       '--table-name', self.table_name]
+        'dynamodb',
+        'describe-table',
+        '--region', self.region,
+        '--table-name', self.table_name]
     stdout, _, retcode = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     return result['Table']['TableStatus'] == 'ACTIVE'
@@ -82,10 +82,10 @@ class AwsDynamoDBInstance(resource.BaseResource):
     """Returns true if the table exists."""
     logging.info('Checking if table {0} exists'.format(self.table_name))
     cmd = util.AWS_PREFIX + [
-       'dynamodb',
-       'describe-table',
-       '--region', self.region,
-       '--table-name', self.table_name]
+        'dynamodb',
+        'describe-table',
+        '--region', self.region,
+        '--table-name', self.table_name]
     stdout, _, retcode = vm_util.IssueCommand(cmd)
     if retcode != 0:
       return False
@@ -95,10 +95,10 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def _DescribeTable(self):
     """Calls describe on table."""
     cmd = util.AWS_PREFIX + [
-       'dynamodb',
-       'describe-table',
-       '--region', self.region,
-       '--table-name', self.table_name]
+        'dynamodb',
+        'describe-table',
+        '--region', self.region,
+        '--table-name', self.table_name]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
     if retcode != 0:
       logging.info('Could not find table {0}, {1}'.format(self.table_name, stderr))
