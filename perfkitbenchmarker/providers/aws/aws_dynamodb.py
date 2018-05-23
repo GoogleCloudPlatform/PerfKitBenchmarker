@@ -25,8 +25,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('aws_dynamodb_attributetype',
-                    'S',
+flags.DEFINE_enum('aws_dynamodb_attributetype',
+                    'S',['S','N','B'],
                     'The type of attribute, default to S, which is string.')
 flags.DEFINE_string('aws_dynamodb_capacity',
                     'ReadCapacityUnits=5,WriteCapacityUnits=5',
@@ -38,11 +38,10 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def __init__(self, region, table_name, primary_key):
     super(AwsDynamoDBInstance, self).__init__()
     self.region = region
-    self.attributes = 'AttributeName=' + primary_key + \
-                      ',AttributeType=' + FLAGS.aws_dynamodb_attributetype
+    self.attributes = 'AttributeName={0},AttributeType={1}'\
+                      .format(primary_key,FLAGS.aws_dynamodb_attributetype)
     self.table_name = table_name
-    self.primary_key = 'AttributeName=' + primary_key + \
-                       ',KeyType=HASH'
+    self.primary_key = 'AttributeName={0},KeyType=HASH'.format(primary_key)
     self.throughput = FLAGS.aws_dynamodb_capacity
 
   def _Create(self):
@@ -64,13 +63,12 @@ class AwsDynamoDBInstance(resource.BaseResource):
       'delete-table',
       '--region', self.region,
       '--table-name', self.table_name]
-    logging.warning('Attempting deletion: ')
+    logging.info('Attempting deletion: ')
     vm_util.IssueCommand(cmd)
 
   def _IsReady(self):
     """Check if table is ready."""
-    logging.info('Getting table ready status for %s',
-                 self.table_name)
+    logging.info('Getting table ready status for {0}'.format(self.table_name))
     cmd = util.AWS_PREFIX + [
       'dynamodb',
       'describe-table',
@@ -80,10 +78,9 @@ class AwsDynamoDBInstance(resource.BaseResource):
     result = json.loads(stdout)
     return result['Table']['TableStatus'] == 'ACTIVE'
 
-  def _Exists(self):
+  def Exists(self):
     """Returns true if the table exists."""
-    logging.info('Checking if table %s exists',
-                 self.table_name)
+    logging.info('Checking if table {0} exists'.format(self.table_name))
     cmd = util.AWS_PREFIX + [
       'dynamodb',
       'describe-table',
@@ -104,7 +101,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
       '--table-name', self.table_name]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
     if retcode != 0:
-      logging.info('Could not find table %s, %s', self.table_name, stderr)
+      logging.info('Could not find table {0}, {1}'.format(self.table_name,stderr))
       return {}
     for table_info in json.loads(stdout)['Table']:
       if table_info[3] == self.table_name:
