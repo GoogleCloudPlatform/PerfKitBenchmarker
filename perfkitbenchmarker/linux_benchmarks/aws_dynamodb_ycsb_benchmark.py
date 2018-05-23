@@ -98,11 +98,11 @@ def Prepare(benchmark_spec):
     benchmark_spec.always_call_cleanup = True
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
         region=prereg,
-        table_name='{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table,FLAGS.run_uri),
+        table_name='{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri),
         primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey)
     if benchmark_spec.dynamodb_instance.Exists():
       logging.warning('DynamoDB table {0} exists, delete it first.'
-                      .format(FLAGS.aws_dynamodb_ycsb_table,FLAGS.run_uri)),
+                      .format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri)),
     benchmark_spec.dynamodb_instance._Delete()
     benchmark_spec.dynamodb_instance._Create()
     if not benchmark_spec.dynamodb_instance.Exists():
