@@ -50,8 +50,9 @@ flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_primarykey',
                     'primary_key',
                     'The primaryKey of dynamodb table.')
 flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_region',
-                    'us-east-1',
-                    'The AWS dynamodb region to connect to.')
+                    None,
+                    'The AWS dynamodb region to connect to.'
+                    'Default is to use zones.')
 flags.DEFINE_string('aws_dynamodb_ycsb_readproportion',
                     '0.5',
                     'The read proportion, '
@@ -90,19 +91,23 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
     """
+    if FLAGS.aws_dynamodb_ycsb_dynamodb_region is None:
+      prereg = FLAGS.zones[0]
+    else:
+      prereg = FLAGS.aws_dynamodb_ycsb_dynamodb_region
     benchmark_spec.always_call_cleanup = True
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
-        region=FLAGS.aws_dynamodb_ycsb_dynamodb_region,
-        table_name=FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri,
+        region=prereg,
+        table_name='{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table,FLAGS.run_uri),
         primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey)
-    if benchmark_spec.dynamodb_instance._Exists():
-      logging.warning('DynamoDB table %s exists, delete it first.' %
-                      FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri)
-    benchmark_spec.dynamodb_instance.Delete()
-    benchmark_spec.dynamodb_instance.Create()
-    if not benchmark_spec.dynamodb_instance._Exists():
+    if benchmark_spec.dynamodb_instance.Exists():
+      logging.warning('DynamoDB table {0} exists, delete it first.'
+                      .format(FLAGS.aws_dynamodb_ycsb_table,FLAGS.run_uri)),
+    benchmark_spec.dynamodb_instance._Delete()
+    benchmark_spec.dynamodb_instance._Create()
+    if not benchmark_spec.dynamodb_instance.Exists():
       logging.warning('Failed to create DynamoDB table.')
-    benchmark_spec.dynamodb_instance.Delete()
+    benchmark_spec.dynamodb_instance._Delete()
     vms = benchmark_spec.vms
     # Install required packages.
     vm_util.RunThreaded(_Install, vms)
@@ -117,17 +122,20 @@ def Run(benchmark_spec):
     Returns:
     A list of sample.Sample objects.
     """
+    if FLAGS.aws_dynamodb_ycsb_dynamodb_region is None:
+      runreg = FLAGS.zones[0]
+    else:
+      runreg = FLAGS.aws_dynamodb_ycsb_dynamodb_region
     vms = benchmark_spec.vms
 
     run_kwargs = {
         'dynamodb.awsCredentialsFile': AWS_CREDENTIAL_DIR,
         'dynamodb.primaryKey': FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
-        'dynamodb.endpoint': 'http://dynamodb.' +
-                             FLAGS.aws_dynamodb_ycsb_dynamodb_region +
-                             '.amazonaws.com',
+        'dynamodb.endpoint': 'http://dynamodb.{0}.amazonaws.com'
+                             .format(runreg),
         'readproportion': FLAGS.aws_dynamodb_ycsb_readproportion,
         'updateproportion': FLAGS.aws_dynamodb_ycsb_updateproportion,
-        'table': FLAGS.aws_dynamodb_ycsb_table + "-" + FLAGS.run_uri,
+        'table': '{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri),
         'dynamodb.consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
     }
     load_kwargs = run_kwargs.copy()
@@ -144,8 +152,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
     required to run the benchmark.
     """
-    logging.warning('Attempting cleanup:')
-    benchmark_spec.dynamodb_instance.Delete()
+    benchmark_spec.dynamodb_instance._Delete()
 
 
 def _Install(vm):
