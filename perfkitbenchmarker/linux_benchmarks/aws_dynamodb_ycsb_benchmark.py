@@ -39,7 +39,6 @@ aws_dynamodb_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'dynamodb-binding', 'lib')
 AWS_CREDENTIAL_DIR = '/tmp/AWSCredentials.properties'
 FLAGS = flags.FLAGS
 
@@ -49,23 +48,11 @@ flags.DEFINE_string('aws_dynamodb_ycsb_awscredentials_properties',
 flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_primarykey',
                     'primary_key',
                     'The primaryKey of dynamodb table.')
-flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_region',
-                    None,
-                    'The AWS dynamodb region to connect to.'
-                    'Default is to use zones.')
-flags.DEFINE_string('aws_dynamodb_ycsb_readproportion',
-                    '0.5',
-                    'The read proportion, '
-                    'default is 0.5 in workloada and 0.95 in YCSB.')
-flags.DEFINE_string('aws_dynamodb_ycsb_updateproportion',
-                    '0.5',
-                    'The update proportion, '
-                    'default is 0.5 in workloada and 0.05 in YCSB')
 flags.DEFINE_string('aws_dynamodb_ycsb_table',
                     'pkb',
                     'The dynamodb table name precursor.')
 flags.DEFINE_enum('aws_dynamodb_ycsb_consistentReads',
-                  None, ['false', 'true'],
+                  'false', ['false', 'true'],
                   "Consistent reads cost 2x eventual reads. "
                   "'false' is default which is eventual")
 
@@ -91,13 +78,9 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
     """
-    if FLAGS.aws_dynamodb_ycsb_dynamodb_region is None:
-      prereg = FLAGS.zones[0]
-    else:
-      prereg = FLAGS.aws_dynamodb_ycsb_dynamodb_region
     benchmark_spec.always_call_cleanup = True
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
-        region=prereg,
+        region=FLAGS.zones[0],
         table_name='{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri),
         primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey)
     if benchmark_spec.dynamodb_instance.Exists():
@@ -122,19 +105,13 @@ def Run(benchmark_spec):
     Returns:
     A list of sample.Sample objects.
     """
-    if FLAGS.aws_dynamodb_ycsb_dynamodb_region is None:
-      runreg = FLAGS.zones[0]
-    else:
-      runreg = FLAGS.aws_dynamodb_ycsb_dynamodb_region
     vms = benchmark_spec.vms
 
     run_kwargs = {
         'dynamodb.awsCredentialsFile': AWS_CREDENTIAL_DIR,
         'dynamodb.primaryKey': FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
         'dynamodb.endpoint': 'http://dynamodb.{0}.amazonaws.com'
-                             .format(runreg),
-        'readproportion': FLAGS.aws_dynamodb_ycsb_readproportion,
-        'updateproportion': FLAGS.aws_dynamodb_ycsb_updateproportion,
+                             .format(FLAGS.zones[0]),
         'table': '{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri),
         'dynamodb.consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
     }
