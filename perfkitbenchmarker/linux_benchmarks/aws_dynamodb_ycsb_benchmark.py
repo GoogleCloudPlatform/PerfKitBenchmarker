@@ -21,7 +21,6 @@ TODO: add global table option.
 """
 
 import logging
-import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
