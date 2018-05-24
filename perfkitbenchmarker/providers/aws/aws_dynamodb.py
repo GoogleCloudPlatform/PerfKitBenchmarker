@@ -27,7 +27,8 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 flags.DEFINE_enum('aws_dynamodb_attributetype',
                   'S', ['S', 'N', 'B'],
-                  'The type of attribute, default to S, which is string.')
+                  'The type of attribute, default to S (String).'
+                  'Alternates are N (Number) and B (Binary).')
 flags.DEFINE_string('aws_dynamodb_capacity',
                     'ReadCapacityUnits=5,WriteCapacityUnits=5',
                     'Set RCU/WCU for dynamodb table')
