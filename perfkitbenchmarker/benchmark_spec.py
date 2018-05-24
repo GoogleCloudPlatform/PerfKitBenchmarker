@@ -35,6 +35,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker.vpn_service import VPNService
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
@@ -147,6 +148,12 @@ class BenchmarkSpec(object):
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
+
+    self.vpn_service = None
+    self.vpns = {}  # dict of vpn's
+    self.vpngws = {}  # dict of vpn gw's
+    self.vpngws_lock = threading.Lock()
+    self.vpns_lock = threading.Lock()
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -464,6 +471,12 @@ class BenchmarkSpec(object):
                           'service'.format(name, spark_service.PKB_MANAGED))
         self.config.vm_groups[name] = spec
 
+  def ConstructVPNService(self):
+    """Create the VPNService object."""
+    if self.config.vpn_service is None:
+      return
+    self.vpn_service = VPNService(self)
+
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
@@ -548,6 +561,8 @@ class BenchmarkSpec(object):
           if network.__class__.__name__ == 'AwsNetwork':
             self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
+    if self.vpn_service:
+      self.vpn_service.Create()
 
   def Delete(self):
     if self.deleted:

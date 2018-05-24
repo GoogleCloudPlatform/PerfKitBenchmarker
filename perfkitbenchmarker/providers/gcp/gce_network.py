@@ -38,6 +38,157 @@ NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 
+class GceVPNGWResource(resource.BaseResource):
+
+  def __init__(self, name, network_name, region, cidr, project):
+    super(GceVPNGWResource, self).__init__()
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.cidr = cidr
+    self.project = project
+
+  def _Create(self):
+    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'create',
+                             self.name)
+    cmd.flags['network'] = self.network_name
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+  def _Exists(self):
+    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+  def _Delete(self):
+    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'delete',
+                             self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+
+class GceVPNGW(network.BaseVPNGW):
+  CLOUD = providers.GCP
+
+  def __init__(self, name, network_name, region, cidr, project):
+    super(GceVPNGW, self).__init__()
+    self._lock = threading.Lock()
+    self.forwarding_rules = {}
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.cidr = cidr
+    self.project = project
+    self.vpngw_resource = GceVPNGWResource(name, network_name, region, cidr, project)
+    self.created = False
+
+  def AllocateIP(self):
+    """ Allocates a public IP for the VPN GW """
+    #  create the address on our gw
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'create', self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+    #  store the address to this object
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe', self.name)
+    cmd.flags['region'] = self.region
+    cmd.flags['format'] = r"'value(address)'"
+    self.IP_ADDR = cmd.Issue()
+
+  def SetupForwarding(self, source_gw, target_gw):
+    """Create IPSec forwarding rules between the source gw and the target gw.
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    fr_UDP500_name = ('perfkit-fr-UDP500-%s-%s-%d' %
+                      (source_gw.region, target_gw.region, FLAGS.run_uri))
+    fr_UDP4500_name = ('perfkit-fr-UDP4500-%s-%s-%d' %
+                       (source_gw.region, target_gw.region, FLAGS.run_uri))
+    fr_ESP_name = ('perfkit-fr-ESP-%s-%s-%d' %
+                   (source_gw.region, target_gw.region, FLAGS.run_uri))
+    with self._lock:
+      if fr_UDP500_name not in self.forwarding_rules:
+        fr_UDP500 = GceForwardingRule(
+            self, fr_UDP500_name, 'UDP', source_gw, target_gw, 500)
+        self.forwarding_rules[fr_UDP500_name] = fr_UDP500
+        fr_UDP500.Create()
+      if fr_UDP4500_name not in self.forwarding_rules:
+        fr_UDP4500 = GceForwardingRule(
+            self, fr_UDP4500_name, 'UDP', source_gw, target_gw, 4500)
+        self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
+        fr_UDP4500.Create()
+      if fr_ESP_name not in self.forwarding_rules:
+        fr_ESP = GceForwardingRule(
+            self, fr_ESP_name, 'ESP', source_gw, target_gw)
+        self.forwarding_rules[fr_ESP_name] = fr_ESP
+        fr_ESP.Create()
+
+  def Create(self):
+    """Creates the actual VPNGW."""
+    with self._lock:
+      if self.created:
+        return
+      if self.vpngw_resource:
+        self.vpngw_resource.Create()
+        self.created = True
+
+  def Delete(self):
+    """Deletes the actual VPNGW."""
+    if self.vpngw_resource:
+      self.vpngw_resource.Delete()
+
+
+class GceForwardingRule(resource.BaseResource):
+  """An object representing a GCE Forwarding Rule."""
+
+  def __init__(self, name, protocol, src_vpngw, target_vpngw, port=None):
+    super(GceForwardingRule, self).__init__()
+    self.name = name
+    self.protocol = protocol
+    self.port = port
+    self.target_name = target_vpngw.name
+    self.target_ip = target_vpngw.IP_ADDR
+    self.src_region = src_vpngw.region
+
+  def __eq__(self, other):
+    """Defines equality to make comparison easy."""
+    return (self.name == other.name and
+            self.protocol == other.protocol and
+            self.port == other.port and
+            self.target_name == other.target_name and
+            self.target_ip == other.target_ip and
+            self.src_region == other.src_region)
+
+  def _Create(self):
+    """Creates the Forwarding Rule."""
+    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'create',
+                             self.name)
+    cmd.flags['ip-protocol'] = self.protocol
+    if self.ports:
+      cmd.flags['ports'] = self.ports
+    cmd.flags['address'] = self.target_ip
+    cmd.flags['target-vpn-gateway'] = self.target_name
+    cmd.flags['region'] = self.src_region
+    cmd.Issue()
+
+  def _Delete(self):
+    """Deletes the Forwarding Rule."""
+    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'delete',
+                             self.name)
+    cmd.Issue()
+
+  def _Exists(self):
+    """Returns True if the Forwarding Rule exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'describe',
+                             self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+
 class GceFirewallRule(resource.BaseResource):
   """An object representing a GCE Firewall Rule."""
 
@@ -206,20 +357,25 @@ class GceNetwork(network.BaseNetwork):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
     name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
+
     # add support for zone, cidr, and separate networks
     if network_spec.zone and network_spec.cidr:
       name = FLAGS.gce_network_name or 'pkb-network-%s-%s' % (network_spec.zone, FLAGS.run_uri)
       FLAGS.gce_subnet_region = util.GetRegionFromZone(network_spec.zone)
       FLAGS.gce_subnet_addr = network_spec.cidr
+
     mode = 'auto' if FLAGS.gce_subnet_region is None else 'custom'
     self.network_resource = GceNetworkResource(name, mode, self.project)
     if FLAGS.gce_subnet_region is None:
       self.subnet_resource = None
     else:
+      #  do we need distinct subnet_name? subnets duplicate network_name now
+      #  subnet_name = FLAGS.gce_subnet_name or 'pkb-subnet-%s' % FLAGS.run_uri
       self.subnet_resource = GceSubnetResource(name, name,
                                                FLAGS.gce_subnet_region,
                                                FLAGS.gce_subnet_addr,
                                                self.project)
+
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
     # add support for zone, cidr, and separate networks
     if network_spec.zone and network_spec.cidr:
@@ -227,6 +383,13 @@ class GceNetwork(network.BaseNetwork):
       self.NETWORK_RANGE = network_spec.cidr
     self.default_firewall_rule = GceFirewallRule(
         firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE)
+    # add VPNGW to the network
+    if network_spec.zone and network_spec.cidr and FLAGS.use_vpn:
+      vpngw_name = 'vpngw-%s-%s' % (
+          util.GetRegionFromZone(network_spec.zone), FLAGS.run_uri)
+      self.vpngw = GceVPNGW(
+          vpngw_name, name, util.GetRegionFromZone(network_spec.zone),
+          network_spec.cidr, self.project)
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -247,6 +410,8 @@ class GceNetwork(network.BaseNetwork):
       if self.subnet_resource:
         self.subnet_resource.Create()
       self.default_firewall_rule.Create()
+      if self.vpngw:
+        self.vpngw.Create()
 
   def Delete(self):
     """Deletes the actual network."""
@@ -254,4 +419,6 @@ class GceNetwork(network.BaseNetwork):
       self.default_firewall_rule.Delete()
       if self.subnet_resource:
         self.subnet_resource.Delete()
+      if self.vpngw:
+        self.vpngw.Delete()
       self.network_resource.Delete()

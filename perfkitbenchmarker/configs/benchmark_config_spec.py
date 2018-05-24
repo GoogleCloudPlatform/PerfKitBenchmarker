@@ -1188,6 +1188,85 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
     return result
 
 
+
+class _VPNServiceSpec(spec.BaseSpec):
+  """Spec needed to configure a vpn tunnel between two vm_groups.
+    Since vpn_gw may be across cloud providers we only create tunnel when
+    vpn_gw's are up and known
+  """
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_VPNServiceSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+    if not self.vpn_svc_name:
+      self.vpn_svc_name = 'pkb-vpn-svc-{0}'.format(flag_values.run_uri)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments to
+      construct in order to decode the named option.
+    """
+    result = super(_VPNServiceSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'shared_key': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'vpn_svc_name': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(_VPNServiceSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['use_vpn'].present:
+      config_values['use_vpn'] = flag_values.use_vpn
+
+
+
+class _VPNServiceDecoder(option_decoders.TypeVerifier):
+  """Validate the cloud_redis dictionary of a benchmark config object.
+  """
+
+  def __init__(self, **kwargs):
+    super(_VPNServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify cloud_redis dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _VPNService built from the config passed in in value.
+
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    vpn_service_config = super(
+        _VPNServiceDecoder, self).Decode(value, component_full_name,
+                                         flag_values)
+    result = _VPNServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **vpn_service_config)
+    return result
+
 class _AppGroupSpec(spec.BaseSpec):
   """Configurable options of a AppService group."""
 
@@ -1381,6 +1460,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None
         }),
         'cloud_redis': (_CloudRedisDecoder, {
+            'default': None
+        })
+        'vpn_service': (_VPNServiceDecoder, {
             'default': None
         }),
         'app_groups': (_AppGroupsDecoder, {

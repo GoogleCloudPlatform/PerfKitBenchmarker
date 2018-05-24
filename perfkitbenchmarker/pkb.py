@@ -547,6 +547,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
+  spec.ConstructVPNService()
   spec.ConstructNfsService()
   spec.ConstructSmbService()
   # Pickle the spec before we try to create anything so we can clean

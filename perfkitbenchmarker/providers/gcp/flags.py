@@ -17,6 +17,9 @@ from perfkitbenchmarker import flags
 
 # Sentinel value for unspecified platform.
 GCP_MIN_CPU_PLATFORM_NONE = 'none'
+flags.DEFINE_string('gce_vpn',
+                    'true',
+                    'Run Benchmark through VPN')
 
 flags.DEFINE_string('gcloud_path', 'gcloud', 'The path for the gcloud utility.')
 flags.DEFINE_list('additional_gcloud_flags', [],

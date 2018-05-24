@@ -91,6 +91,61 @@ class BaseNetworkSpec(object):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
 
+class BaseVPNGW(object):
+  """An object representing the Base VPN GW."""
+  name = None
+  CLOUD = None
+  ZONE = None
+  IP_ADDR = None  # public IP of this gw
+
+  def __init__(self, zone=None, cidr=None):
+    """Initializes the BaseNetworkSpec.
+
+    Args:
+      zone: The zone in which to create the network.
+    """
+    self.ZONE = zone
+
+  @classmethod
+  def GetVPNGW(cls):
+    """Returns a BaseVPNGW.
+    This method is used instead of directly calling the class's constructor.
+    It creates BaseVPNGW instances and registers them.
+    If a BaseVPNGW object has already been registered, that object
+    will be returned rather than creating a new one. This enables multiple
+    VMs to call this method and all share the same BaseVPN object.
+    """
+    if cls.CLOUD is None:
+      raise errors.Error('VPNGWs should have CLOUD attributes.')
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetVPN called in a thread without a '
+                         'BenchmarkSpec.')
+    with benchmark_spec.vpngws_lock:
+      key = cls.CLOUD
+      if key not in benchmark_spec.vpngws:
+        benchmark_spec.vpngws[key] = cls()
+      return benchmark_spec.vpngws[key]
+
+  def SetupForwarding(self, source_gw, target_gw):
+    """Create IPSec forwarding rules between the source gw and the target gw.
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    pass
+
+  def Create(self):
+    """Creates the actual VPNGW."""
+    pass
+
+  def Delete(self):
+      """Deletes the actual VPNGW."""
+      pass
+
+
 class BaseNetwork(object):
   """Object representing a Base Network."""
 
