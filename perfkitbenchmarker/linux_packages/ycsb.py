@@ -140,6 +140,18 @@ flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
                      'Defaults to None which uses the ycsb default of 10.')
 flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
                      'to None which uses the ycsb default of 100.')
+flags.DEFINE_enum('ycsb_requestdistribution',
+                  None, ['uniform', 'zipfian', 'latest'],
+                  'Type of request distribution.  '
+                  'This will overwrite workload file parameter')
+flags.DEFINE_float('ycsb_readproportion',
+                   None,
+                   'The read proportion, '
+                   'default is 0.5 in workloada and 0.95 in YCSB.')
+flags.DEFINE_float('ycsb_updateproportion',
+                   None,
+                   'The update proportion, '
+                   'default is 0.5 in workloada and 0.05 in YCSB')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -857,6 +869,12 @@ class YCSBExecutor(object):
       if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
         parameters['hdrhistogram.fileoutput'] = True
         parameters['hdrhistogram.output.path'] = hdr_files_dir
+      if FLAGS.ycsb_requestdistribution:
+        parameters['requestdistribution'] = FLAGS.ycsb_requestdistribution
+      if FLAGS.ycsb_readproportion:
+        parameters['readproportion'] = FLAGS.ycsb_readproportion
+      if FLAGS.ycsb_updateproportion:
+        parameters['updateproportion'] = FLAGS.ycsb_updateproportion
       parameters.update(kwargs)
       remote_path = posixpath.join(INSTALL_DIR,
                                    os.path.basename(workload_file))
