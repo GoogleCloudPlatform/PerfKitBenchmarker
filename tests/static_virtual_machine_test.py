@@ -136,6 +136,27 @@ class StaticVirtualMachineTest(unittest.TestCase):
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
 
+  def testReadFromFile_UnknownOsTypeDefaultsToLinuxRequiredKeys(self):
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags.os_type = 'unknown_os_type'
+    s = ('[{'
+         '  "ip_address": "174.12.14.1", '
+         '  "user_name": "perfkitbenchmarker", '
+         '  "keyfile_path": "perfkitbenchmarker.pem"'
+         '}]')
+    fp = BytesIO(s)
+    StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
+
+    vm_pool = StaticVirtualMachine.vm_pool
+    self.assertEqual(1, len(vm_pool))
+    self._AssertStaticVMsEqual(
+        StaticVirtualMachine(
+            StaticVmSpec(_COMPONENT,
+                         ip_address='174.12.14.1',
+                         user_name='perfkitbenchmarker',
+                         ssh_private_key='perfkitbenchmarker.pem')),
+        vm_pool[0])
+
   def testCreateReturn(self):
     s = ('[{'
          '  "ip_address": "174.12.14.1", '
