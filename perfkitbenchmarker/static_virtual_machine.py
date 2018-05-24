@@ -201,7 +201,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         os_types.RHEL: linux_required_keys,
         os_types.UBUNTU_CONTAINER: linux_required_keys,
     }
-    required_keys = required_keys_by_os[FLAGS.os_type]
+
+    # assume linux_required_keys for unknown os_type
+    required_keys = required_keys_by_os.get(FLAGS.os_type, linux_required_keys)
 
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
                                'scratch_disk_mountpoints', 'os_type',

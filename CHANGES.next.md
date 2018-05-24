@@ -225,3 +225,4 @@
 - Fixed fio histogram parsing.
 - Refactored AwsKeyFileManager out of AwsVirtualMachine.
 - Added sleep delay to windows benchmarks.
+- Defaulted static machines to linux based.
