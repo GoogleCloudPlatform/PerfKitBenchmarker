@@ -145,13 +145,13 @@ flags.DEFINE_enum('ycsb_requestdistribution',
                   'Type of request distribution.  '
                   'This will overwrite workload file parameter')
 flags.DEFINE_float('ycsb_readproportion',
-                    None,
-                    'The read proportion, '
-                    'default is 0.5 in workloada and 0.95 in YCSB.')
+                   None,
+                   'The read proportion, '
+                   'default is 0.5 in workloada and 0.95 in YCSB.')
 flags.DEFINE_float('ycsb_updateproportion',
-                    None,
-                    'The update proportion, '
-                    'default is 0.5 in workloada and 0.05 in YCSB')
+                   None,
+                   'The update proportion, '
+                   'default is 0.5 in workloada and 0.05 in YCSB')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
