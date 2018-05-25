@@ -110,23 +110,19 @@ def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
 
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
 
-  def _RunIperf3(vm, options, is_client):
-    # to ensure that the server is up before the client, we wait for 5 second
-    # when executing the client command
+  def _RunIperf3(vm, options):
     command = ('cd {iperf3_exec_dir}; '
-               'sleep {delay_time}; '
                '.\\iperf3.exe {options}').format(
                    iperf3_exec_dir=iperf3_exec_dir,
-                   delay_time=(5 if is_client else 0),
                    options=options)
     vm.RemoteCommand(command)
 
   receiver_args = '--server -1'
 
-  threaded_args = [((receiving_vm, receiver_args, False), {}),
-                   ((sending_vm, sender_args, True), {})]
+  threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
+                   (_RunIperf3, (sending_vm, sender_args), {})]
 
-  vm_util.RunThreaded(_RunIperf3, threaded_args)
+  vm_util.RunParallelThreads(threaded_args, 200, 5)
 
   cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
       iperf3_exec_dir=iperf3_exec_dir, out_file=IPERF3_OUT_FILE)
