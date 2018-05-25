@@ -224,5 +224,5 @@
 - Fix overwriting of bandwidth variable in nuttcp benchmark.
 - Fixed fio histogram parsing.
 - Refactored AwsKeyFileManager out of AwsVirtualMachine.
-- Added sleep delay to windows benchmarks.
+- Added delay between server and client initiation to windows benchmarks.
 - Defaulted static machines to linux based.
