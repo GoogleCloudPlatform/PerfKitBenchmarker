@@ -147,10 +147,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _FormatCreateCommand(self):
     """Formats the command for Docker based on vm_spec and flags"""
 
-    logging.info("Number of scratch Disks: " + str(len(self.scratch_disks)))
-
-    logging.info("creating docker container with disk")
-
     create_command = ['docker', 'run', '-d', '--name', self.name]
 
     for vol in self.scratch_disks:
@@ -308,16 +304,20 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   #     scratch_disk.SetDevicePath(self)
 
 
-  # def _BuildVolumesBody(self):
-  #   """
-  #   Constructs volumes-related part of POST request to create POD.
-  #   """
-  #   volumes = []
+  def _BuildVolumesBody(self):
+    """
+    Constructs volumes-related part of create command for Docker Container
+    """
+    volumes = []
 
-  #   for scratch_disk in self.scratch_disks:
-  #     scratch_disk.AttachVolumeInfo(volumes)
+    for scratch_disk in self.scratch_disks:
+      vol_string = scratch_disk.volume_name + ":" + scratch_disk.mount_point
 
-  #   return volumes
+      volumes.append('-v')
+      volumes.append(vol_string)
+
+    return volumes
+
 
 
 class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
