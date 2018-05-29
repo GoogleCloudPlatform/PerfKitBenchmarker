@@ -226,3 +226,4 @@
 - Refactored AwsKeyFileManager out of AwsVirtualMachine.
 - Added delay between server and client initiation to windows benchmarks.
 - Defaulted static machines to linux based.
+- Add time limit to windows fio benchmark.

@@ -86,6 +86,8 @@ DEFAULT_JOB = """
 filesize={filesize}m
 filename=fio_test_file
 ioengine=windowsaio
+runtime={runtime}s
+time_based
 
 [sequential_write]
 overwrite=0
@@ -176,6 +178,7 @@ def Run(benchmark_spec):
 
   job_file_contents = DEFAULT_JOB.format(
       filesize=filesize,
+      runtime=FLAGS.fio_runtime,
       seq_write_size=seq_write_size,
       seq_read_size=seq_read_size,
       rand_write_size=rand_write_size,
