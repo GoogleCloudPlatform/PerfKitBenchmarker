@@ -55,6 +55,7 @@
 - Added disk_fill_size and prepare_sleep_time flags
 - Add timeout_minutes flag to assist with cleaning up stale resources
 - All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
+- Added windows udp test using iperf3.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
