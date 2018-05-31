@@ -1,4 +1,4 @@
-#to build docker build
+#Dockerfile to use with Docker provider
 
 FROM ubuntu:xenial
 
