@@ -118,21 +118,14 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     #TODO, replace this with removeIfExists type of command
     #self._Delete()
-    
-    buildImage = False
 
-    if buildImage == True:
-      directory = os.path.dirname(
-        data.ResourcePath(os.path.join('docker', "ubuntu_ssh", 'Dockerfile')))
+    #set image_name
+    self.image_name = "ubuntu_ssh"
 
-      self.image_name = "ubuntu_ssh"
+    image_exists = self._LocalImageExists("ubuntu_ssh")
 
-      build_cmd = [
-          'docker', 'build', '--no-cache',
-          '-t', self.image_name, directory
-      ]
-
-      vm_util.IssueCommand(build_cmd)
+    if image_exists == False:
+      self._BuildImageLocally()
 
     #TODO check if container built correctly
 
@@ -317,6 +310,47 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       volumes.append(vol_string)
 
     return volumes
+
+
+  def _LocalImageExists(self, docker_image_name):
+    """
+    Checks if an image exists locally
+    Returns boolean
+    """
+    logging.info("Finding Image Information")
+    inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
+    info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
+
+    info = json.loads(info)
+
+    logging.info("Checking if Docker Image Exists")
+    if len(info) > 0 and returnCode == 0:
+      logging.info("Image exists")
+      return True
+
+    logging.info("Image does not exist")
+    return False
+
+
+  def _BuildImageLocally(self):
+
+    ##Try to build container here
+    ##create container object
+    ##build local
+    #containerImage = container_service._ContainerImage("ubuntu_simple")
+    
+    directory = os.path.dirname(
+      data.ResourcePath(os.path.join('docker', self.image_name, 'Dockerfile')))
+
+    
+
+    build_cmd = [
+        'docker', 'build', '--no-cache',
+        '-t', self.image_name, directory
+    ]
+
+    vm_util.IssueCommand(build_cmd)
+
 
 
 
