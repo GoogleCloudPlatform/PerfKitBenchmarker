@@ -127,9 +127,30 @@ class BaseVPNGW(object):
         benchmark_spec.vpngws[key] = cls()
       return benchmark_spec.vpngws[key]
 
-  def SetupForwarding(self, source_gw, target_gw):
+  def AllocateIP(self):
+    pass
+
+  def SetupForwarding(self, target_gw):
     """Create IPSec forwarding rules between the source gw and the target gw.
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    pass
+
+  def SetupTunnel(self, target_gw, psk):
+    """Create IPSec tunnels  between the source gw and the target gw.
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    pass
+
+  def SetupRouting(self, target_gw):
+    """Create IPSec routes  between the source gw and the target gw.
 
     Args:
       source_gw: The BaseVPN object to add forwarding rules to.

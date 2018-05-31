@@ -26,7 +26,7 @@ from __future__ import print_function
 
 import threading
 
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import flags, context, errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -76,11 +76,14 @@ class GceVPNGW(network.BaseVPNGW):
     super(GceVPNGW, self).__init__()
     self._lock = threading.Lock()
     self.forwarding_rules = {}
+    self.tunnels = {}
+    self.routes = {}
     self.name = name
     self.network_name = network_name
     self.region = region
     self.cidr = cidr
     self.project = project
+    self.IP_ADDR = None
     self.vpngw_resource = GceVPNGWResource(name, network_name, region, cidr, project)
     self.created = False
 
@@ -89,14 +92,32 @@ class GceVPNGW(network.BaseVPNGW):
     #  create the address on our gw
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'create', self.name)
     cmd.flags['region'] = self.region
+
     cmd.Issue()
+#     cmd.flags['format'] = 'json'
+#     stdout, _, _  = cmd.Issue()
+#     result = json.loads(stdout)
+#     self.IP_ADDR = result['address']
+
     #  store the address to this object
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe', self.name)
     cmd.flags['region'] = self.region
-    cmd.flags['format'] = r"'value(address)'"
-    self.IP_ADDR = cmd.Issue()
+    # cmd.flags['format'] = '\"value(address)\"'
+    cmd.flags['format'] = 'value(address)'
+    stdout, _, _ = cmd.Issue()
+    self.IP_ADDR = stdout.encode('ascii', 'ignore').rstrip()
+    # works at CLI but not here?!?
+    # gcloud compute addresses describe vpngw-us-central1-f0d624e8 --format "value(address)" --quiet --project cloud-performance-tool --region us-central1
+    # STDERR: ERROR: (gcloud.compute.addresses.describe) Name expected [default *HERE* "value(address)"].
 
-  def SetupForwarding(self, source_gw, target_gw):
+  def DeleteIP(self):
+    """ Deletes a public IP for the VPN GW """
+    #  delete the address on our gw
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'delete', self.name)
+    cmd.flags['region'] = self.region
+    self.ip_addr_name = cmd.Issue()
+
+  def SetupForwarding(self):
     """Create IPSec forwarding rules between the source gw and the target gw.
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
 
@@ -104,40 +125,117 @@ class GceVPNGW(network.BaseVPNGW):
       source_gw: The BaseVPN object to add forwarding rules to.
       target_gw: The BaseVPN object to point forwarding rules at.
     """
-    fr_UDP500_name = ('perfkit-fr-UDP500-%s-%s-%d' %
-                      (source_gw.region, target_gw.region, FLAGS.run_uri))
-    fr_UDP4500_name = ('perfkit-fr-UDP4500-%s-%s-%d' %
-                       (source_gw.region, target_gw.region, FLAGS.run_uri))
-    fr_ESP_name = ('perfkit-fr-ESP-%s-%s-%d' %
-                   (source_gw.region, target_gw.region, FLAGS.run_uri))
+    # GCP doesnt like uppercase names?!?
+    fr_UDP500_name = ('fr-udp500-%s-%s' %
+                      (self.region, FLAGS.run_uri))
+    fr_UDP4500_name = ('fr-udp4500-%s-%s' %
+                       (self.region, FLAGS.run_uri))
+    fr_ESP_name = ('fr-esp-%s-%s' %
+                   (self.region, FLAGS.run_uri))
     with self._lock:
       if fr_UDP500_name not in self.forwarding_rules:
         fr_UDP500 = GceForwardingRule(
-            self, fr_UDP500_name, 'UDP', source_gw, target_gw, 500)
+            fr_UDP500_name, 'UDP', self, 500)
         self.forwarding_rules[fr_UDP500_name] = fr_UDP500
         fr_UDP500.Create()
       if fr_UDP4500_name not in self.forwarding_rules:
         fr_UDP4500 = GceForwardingRule(
-            self, fr_UDP4500_name, 'UDP', source_gw, target_gw, 4500)
+            fr_UDP4500_name, 'UDP', self, 4500)
         self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
         fr_UDP4500.Create()
       if fr_ESP_name not in self.forwarding_rules:
         fr_ESP = GceForwardingRule(
-            self, fr_ESP_name, 'ESP', source_gw, target_gw)
+            fr_ESP_name, 'ESP', self)
         self.forwarding_rules[fr_ESP_name] = fr_ESP
         fr_ESP.Create()
 
+  def SetupTunnel(self, target_gw, psk):
+    """Create IPSec tunnel between the source gw and the target gw.
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+      psk: preshared key (or run uri for now)
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create', 'tunnel' + self.name)
+    cmd.flags['peer-address'] = target_gw.IP_ADDR
+    cmd.flags['target-vpn-gateway'] = self.name
+    cmd.flags['ike-version'] = '2'
+    cmd.flags['local-traffic-selector'] = '0.0.0.0/0'
+    cmd.flags['remote-traffic-selector'] = '0.0.0.0/0'
+    cmd.flags['shared-secret'] = psk
+    cmd.flags['region'] = self.region
+    self.tunnels['tunnel' + self.name] = cmd.Issue()
+
+  def DeleteTunnel(self, tunnel):
+    """Delete IPSec tunnel
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'delete', tunnel)
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+
+  def SetupRouting(self, target_gw):
+    """Create IPSec forwarding rules between the source gw and the target gw.
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'create', 'route' + self.name)
+    cmd.flags['destination-range'] = target_gw.cidr
+    cmd.flags['network'] = self.network_name
+    cmd.flags['next-hop-vpn-tunnel'] = 'tunnel' + self.name
+    cmd.flags['next-hop-vpn-tunnel-region'] = self.region
+    self.tunnels['route' + self.name] = cmd.Issue()
+
+  def DeleteRoute(self, route):
+    """Delete route
+
+    Args:
+      route: The route name to delete
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'delete', route)
+    cmd.Issue()
+
   def Create(self):
     """Creates the actual VPNGW."""
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
     with self._lock:
       if self.created:
         return
       if self.vpngw_resource:
         self.vpngw_resource.Create()
-        self.created = True
+    key = self.name
+    with benchmark_spec.vpngws_lock:
+      if key not in benchmark_spec.vpngws:
+        benchmark_spec.vpngws[key] = self
+      return benchmark_spec.vpngws[key]
+      self.created = True
 
   def Delete(self):
     """Deletes the actual VPNGW."""
+    if self.IP_ADDR:
+      self.DeleteIP()
+
+    if self.forwarding_rules:
+      for fr in self.forwarding_rules:
+        self.forwarding_rules[fr].Delete()
+
+    if self.tunnels:
+      for tun in self.tunnels:
+        self.DeleteTunnel(tun)
+
+    if self.routes:
+      for route in self.routes:
+        self.DeleteRoute(route)
+    self.created = False
+
+    # vpngws need deleted last
     if self.vpngw_resource:
       self.vpngw_resource.Delete()
 
@@ -145,14 +243,15 @@ class GceVPNGW(network.BaseVPNGW):
 class GceForwardingRule(resource.BaseResource):
   """An object representing a GCE Forwarding Rule."""
 
-  def __init__(self, name, protocol, src_vpngw, target_vpngw, port=None):
+  def __init__(self, name, protocol, src_vpngw, port=None):
     super(GceForwardingRule, self).__init__()
     self.name = name
     self.protocol = protocol
     self.port = port
-    self.target_name = target_vpngw.name
-    self.target_ip = target_vpngw.IP_ADDR
+    self.target_name = src_vpngw.name
+    self.target_ip = src_vpngw.IP_ADDR
     self.src_region = src_vpngw.region
+    self.project = src_vpngw.project
 
   def __eq__(self, other):
     """Defines equality to make comparison easy."""
@@ -168,8 +267,8 @@ class GceForwardingRule(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'create',
                              self.name)
     cmd.flags['ip-protocol'] = self.protocol
-    if self.ports:
-      cmd.flags['ports'] = self.ports
+    if self.port:
+      cmd.flags['ports'] = self.port
     cmd.flags['address'] = self.target_ip
     cmd.flags['target-vpn-gateway'] = self.target_name
     cmd.flags['region'] = self.src_region
@@ -179,12 +278,14 @@ class GceForwardingRule(resource.BaseResource):
     """Deletes the Forwarding Rule."""
     cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'delete',
                              self.name)
+    cmd.flags['region'] = self.src_region
     cmd.Issue()
 
   def _Exists(self):
     """Returns True if the Forwarding Rule exists."""
     cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'describe',
                              self.name)
+    cmd.flags['region'] = self.src_region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 

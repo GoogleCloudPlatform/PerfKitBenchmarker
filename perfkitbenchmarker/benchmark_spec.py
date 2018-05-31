@@ -475,6 +475,7 @@ class BenchmarkSpec(object):
     """Create the VPNService object."""
     if self.config.vpn_service is None:
       return
+    self.vpn_service_spec = self.config.vpn_service
     self.vpn_service = VPNService(self)
 
   def Prepare(self):
@@ -620,6 +621,9 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
+
+    if self.vpn_service:
+      self.vpn_service.Delete()
 
     self.deleted = True
 
