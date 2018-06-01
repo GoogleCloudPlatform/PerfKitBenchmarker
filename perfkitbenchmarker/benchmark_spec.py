@@ -592,7 +592,9 @@ class BenchmarkSpec(object):
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
         'benchmark_uid': self.uid,
-        'create_time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        'create_time_utc':
+        datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        'owner': FLAGS.owner
     }
     for item in FLAGS.vm_metadata:
       if ':' not in item:
