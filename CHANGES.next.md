@@ -228,3 +228,4 @@
 - Added delay between server and client initiation to windows benchmarks.
 - Defaulted static machines to linux based.
 - Add time limit to windows fio benchmark.
+- Adding -w buffer parameter to windows iperf3 benchmark.

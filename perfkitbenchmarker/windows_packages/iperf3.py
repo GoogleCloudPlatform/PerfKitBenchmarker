@@ -47,7 +47,10 @@ flags.DEFINE_integer('tcp_stream_seconds', 3,
                      'The amount of time to run the TCP stream test.')
 
 flags.DEFINE_integer('tcp_number_of_streams', 10,
-                     'The number of parrallel streams to run in the TCP test')
+                     'The number of parrallel streams to run in the TCP test.')
+
+flags.DEFINE_integer('socket_buffer_size', 10,
+                     'The socket buffer size in megabytes.')
 
 flags.DEFINE_bool('run_tcp', True,
                   'setting to false will disable the run of the TCP test')
@@ -86,12 +89,13 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
   receiver_ip = (
       receiving_vm.internal_ip if use_internal_ip else receiving_vm.ip_address)
 
-  sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f M '
-                 '> {out_file}').format(
+  sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f m '
+                 ' -w {socket_buffer}M > {out_file}').format(
                      ip=receiver_ip,
                      port=IPERF3_TCP_PORT,
                      time=FLAGS.tcp_stream_seconds,
                      num_streams=FLAGS.tcp_number_of_streams,
+                     socket_buffer=FLAGS.socket_buffer_size,
                      out_file=IPERF3_OUT_FILE)
 
   output = _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm)
@@ -100,6 +104,7 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
                                    FLAGS.tcp_number_of_streams, use_internal_ip)
 
 
+@vm_util.Retry(max_retries=10)
 def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """Create a server-client iperf3 pair.
 
@@ -165,7 +170,7 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
   for bandwidth in xrange(FLAGS.min_bandwidth_mb,
                           FLAGS.max_bandwidth_mb,
                           FLAGS.bandwidth_step_mb):
-    sender_args = ('--client {server_ip} --udp -t {duration} -P {num_threads}'
+    sender_args = ('--client {server_ip} --udp -t {duration} -P {num_threads} '
                    '-b {bandwidth}M -l {buffer_len} > {out_file}'.format(
                        server_ip=receiver_ip,
                        duration=FLAGS.udp_stream_seconds,
