@@ -56,6 +56,8 @@
 - Add timeout_minutes flag to assist with cleaning up stale resources
 - All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
 - Added windows udp test using iperf3.
+- Added timeout-decorator python package.
+- Added timeout support for windows vm remote command call.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

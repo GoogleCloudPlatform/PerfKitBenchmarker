@@ -120,20 +120,21 @@ def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """
 
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
+  timeout_duration = FLAGS.tcp_stream_seconds + 30
 
   def _RunIperf3(vm, options):
     command = ('cd {iperf3_exec_dir}; '
                '.\\iperf3.exe {options}').format(
                    iperf3_exec_dir=iperf3_exec_dir,
                    options=options)
-    vm.RemoteCommand(command)
+    vm.RemoteCommand(command, timeout=timeout_duration)
 
   receiver_args = '--server -1'
 
   threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
                    (_RunIperf3, (sending_vm, sender_args), {})]
 
-  vm_util.RunParallelThreads(threaded_args, 200, 15)
+  vm_util.RunParallelThreads(threaded_args, 200, 5)
 
   cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
       iperf3_exec_dir=iperf3_exec_dir, out_file=IPERF3_OUT_FILE)
