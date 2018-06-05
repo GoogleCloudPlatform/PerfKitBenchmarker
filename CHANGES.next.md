@@ -58,6 +58,7 @@
 - Added windows udp test using iperf3.
 - Added timeout-decorator python package.
 - Added timeout support for windows vm remote command call.
+- Added IOR benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
