@@ -234,3 +234,5 @@
 - Defaulted static machines to linux based.
 - Add time limit to windows fio benchmark.
 - Adding -w buffer parameter to windows iperf3 benchmark.
+- Fixed a bug in how we select images on AWS by introducing an additional
+  regular expression to match against image names.
