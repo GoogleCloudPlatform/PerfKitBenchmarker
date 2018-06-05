@@ -602,7 +602,18 @@ class KubernetesContainerService(BaseContainerService):
 
   def _Delete(self):
     """Deletes the service."""
-    pass
+    with vm_util.NamedTemporaryFile() as tf:
+      tf.write(_K8S_INGRESS.format(service_name=self.name))
+      tf.close()
+      kubernetes_helper.DeleteFromFile(tf.name)
+
+    delete_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig', FLAGS.kubeconfig,
+        'delete', 'deployment',
+        self.name
+    ]
+    vm_util.IssueCommand(delete_cmd)
 
 
 class KubernetesCluster(BaseContainerCluster):
@@ -620,5 +631,5 @@ class KubernetesCluster(BaseContainerCluster):
   def DeployContainerService(self, name, container_spec):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     service = KubernetesContainerService(container_spec, name)
-    self.containers[name] = service
+    self.services[name] = service
     service.Create()
