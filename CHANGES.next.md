@@ -236,3 +236,4 @@
 - Adding -w buffer parameter to windows iperf3 benchmark.
 - Fixed a bug in how we select images on AWS by introducing an additional
   regular expression to match against image names.
+- Terminate long running servers on windows benchmarks with timeouts.
