@@ -74,5 +74,3 @@ def ParseIORResults(test_output):
         sample.Sample('IOPS', iops, 'OPs/s', metadata)
     ])
   return results
-
-
