@@ -15,6 +15,7 @@
 
 import csv
 import io
+import posixpath
 import re
 
 from perfkitbenchmarker import sample
@@ -26,6 +27,8 @@ GIT_TAG = '945fba2aa2d571e8babc4f5f01e78e9f5e6e193e'
 _METADATA_KEYS = [
     'Operation', '#Tasks', 'segcnt', 'blksiz', 'xsize', 'aggsize', 'API',
 ]
+_MDTEST_REGEX = (r'^\s*(.*?)\s*:\s*(\d+\.\d+)\s*(\d+\.\d+)'
+                 r'\s*(\d+\.\d+)\s*(\d+\.\d+)$')
 
 
 def Install(vm):
@@ -72,5 +75,43 @@ def ParseIORResults(test_output):
     results.extend([
         sample.Sample('Bandwidth', bandwidth, 'MiB/s', metadata),
         sample.Sample('IOPS', iops, 'OPs/s', metadata)
+    ])
+  return results
+
+
+def RunMdtest(master_vm, num_tasks, files_per_proc, iterations):
+  """Run mdtest against the master vm."""
+  directory = posixpath.join(master_vm.scratch_disks[0].mount_point, 'mdtest')
+  mdtest_cmd = (
+      'mpiexec -machinefile MACHINEFILE -n {num_tasks} mdtest -d {directory} '
+      '-n {files_per_proc} -u -i {iterations}'
+  ).format(
+      directory=directory, num_tasks=num_tasks, files_per_proc=files_per_proc,
+      iterations=iterations
+  )
+
+  stdout, _ = master_vm.RobustRemoteCommand(mdtest_cmd)
+  return ParseMdtestResults(stdout)
+
+
+def ParseMdtestResults(test_output):
+  """Parses the test output and returns samples."""
+  match = re.search('Command line used: (.*)', test_output)
+  command_line = match.group(1)
+  match = re.search(r'(\d+) tasks, (\d+) files/directories', test_output)
+  num_tasks, num_files = match.groups()
+  metadata = {
+      'command_line': command_line, 'num_tasks': num_tasks,
+      'num_files': num_files
+  }
+  results = []
+  output = re.findall(_MDTEST_REGEX, test_output, re.MULTILINE)
+  for result in output:
+    op_type, max_ops, min_ops, mean_ops, std_dev = result
+    results.extend([
+        sample.Sample(op_type + ' (Max)', float(max_ops), 'OPs/s', metadata),
+        sample.Sample(op_type + ' (Min)', float(min_ops), 'OPs/s', metadata),
+        sample.Sample(op_type + ' (Mean)', float(mean_ops), 'OPs/s', metadata),
+        sample.Sample(op_type + ' (Std Dev)', float(std_dev), 'OPs/s', metadata)
     ])
   return results
