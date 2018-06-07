@@ -21,6 +21,7 @@ import contextlib
 import copy
 import os
 
+from perfkitbenchmarker import app_service
 from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import disk
@@ -1175,6 +1176,106 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _AppGroupSpec(spec.BaseSpec):
+  """Configurable options of a AppService group."""
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_AppGroupSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'app_runtime': (option_decoders.StringDecoder, {
+            'default': None, 'none_ok': True}),
+        'app_type': (option_decoders.StringDecoder, {
+            'default': None, 'none_ok': True}),
+        'appservice_count': (
+            option_decoders.IntDecoder, {'default': 1}),
+        'appservice_spec': (_AppServiceDecoder, {})
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super(_AppGroupSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['appservice_count'].present:
+      config_values['appservice_count'] = flag_values.appservice_count
+    if flag_values['app_runtime'].present:
+      config_values['app_runtime'] = flag_values.app_runtime
+    if flag_values['app_type'].present:
+      config_values['app_type'] = flag_values.app_type
+
+
+class _AppGroupsDecoder(option_decoders.TypeVerifier):
+  """Verify app_groups dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_AppGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifys app_groups dictionary of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary.
+      component_full_name: string. Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+     dict mapping app group name string to _AppGroupSpec.
+
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    app_group_configs = super(_AppGroupsDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = {}
+    for app_group_name, app_group_config in app_group_configs.iteritems():
+      result[app_group_name] = _AppGroupSpec(
+          '{0}.{1}'.format(
+              self._GetOptionFullName(component_full_name), app_group_name),
+          flag_values=flag_values,
+          **app_group_config)
+    return result
+
+
+class _AppServiceDecoder(option_decoders.TypeVerifier):
+  """Verify app_service dict of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_AppServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify app_service dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary.
+      component_full_name: string. Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      AppService object built from config.
+
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    config = super(_AppServiceDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    spec_cls = app_service.GetAppServiceSpecClass(
+        flag_values.appservice or config.get('appservice'))
+    return spec_cls(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values, **config)
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -1269,6 +1370,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'cloud_redis': (_CloudRedisDecoder, {
             'default': None
+        }),
+        'app_groups': (_AppGroupsDecoder, {
+            'default': {}
         })
     })
     return result
