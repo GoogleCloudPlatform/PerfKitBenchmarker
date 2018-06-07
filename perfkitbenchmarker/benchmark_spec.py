@@ -132,6 +132,7 @@ class BenchmarkSpec(object):
     self.edw_service = None
     self.cloud_redis = None
     self.nfs_service = None
+    self.app_groups = {}
     self._zone_index = 0
 
     # Modules can't be pickled, but functions can, so we store the functions
