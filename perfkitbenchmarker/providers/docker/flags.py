@@ -13,3 +13,29 @@
 # limitations under the License.
 
 from perfkitbenchmarker import flags
+
+flags.DEFINE_string('remote_image_repository', None,
+                    'Remote Repository to use')
+
+flags.DEFINE_boolean('use_google_container_builder', False,
+                     'Chooses whether to build locally or use Google container builder')
+
+flags.DEFINE_string('custom_docker_image', None,
+                    'Custom docker image location')
+
+_DOCKER_VOLUME_TYPES = ['something', 'something_else']
+
+flags.DEFINE_enum('docker_volume_type', None, _DOCKER_VOLUME_TYPES,
+                  'The name of the types of Docker volumes available')
+
+flags.DEFINE_boolean('privileged_docker', False,
+                     'If set to True, will attempt to create Docker containers '
+                     'in a privileged mode. Note that some benchmarks execute '
+                     'commands which are only allowed in privileged mode.')
+
+# Defined in providers/mesos/flags.py
+# flags.DEFINE_integer('docker_memory_mb', 2048,
+#                      'Memory limit for docker containers.')
+
+# flags.DEFINE_float('docker_cpus', 1,
+#                    'CPU limit for docker containers.')

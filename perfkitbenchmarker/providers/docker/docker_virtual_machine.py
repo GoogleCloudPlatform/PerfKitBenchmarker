@@ -39,6 +39,7 @@ from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker.providers.docker import docker_disk
+from perfkitbenchmarker.providers.docker import docker_resource_spec
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 FLAGS = flags.FLAGS
@@ -66,20 +67,23 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.container_id = ''
     self.user_name = FLAGS.username
     self.image = self.image or self.DEFAULT_IMAGE
-    #self.resource_limits = vm_spec.resource_limits
-    #self.resource_requests = vm_spec.resource_requests
+    self.cpus = vm_spec.docker_cpus
+    self.memory_mb = vm_spec.docker_memory_mb
+    self.privileged = vm_spec.privileged_docker
+  #   self.resource_limits = vm_spec.resource_limits
+  #   self.resource_requests = vm_spec.resource_requests
 
   # def GetResourceMetadata(self):
   #   metadata = super(DockerVirtualMachine, self).GetResourceMetadata()
   #   if self.resource_limits:
   #     metadata.update({
-  #         'pod_cpu_limit': self.resource_limits.cpus,
-  #         'pod_memory_limit_mb': self.resource_limits.memory,
+  #         'container_cpu_limit': self.resource_limits.cpus,
+  #         'container_memory_limit_mb': self.resource_limits.memory,
   #     })
   #   if self.resource_requests:
   #     metadata.update({
-  #         'pod_cpu_request': self.resource_requests.cpus,
-  #         'pod_memory_request_mb': self.resource_requests.memory,
+  #         'container_cpu_request': self.resource_requests.cpus,
+  #         'container_memory_request_mb': self.resource_requests.memory,
   #     })
   #   return metadata
 
@@ -103,7 +107,9 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     #NOTE for building Dockerfile, might want to use container_service
 
+
     logging.info('Creating Docker Container')
+    logging.info(self.memory_mb)
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 
@@ -119,10 +125,10 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #TODO, replace this with removeIfExists type of command
     #self._Delete()
 
-    #set image_name
-    self.image_name = "ubuntu_ssh"
+    #set container image
+    self.container_image = "pkb/ubuntu_ssh"
 
-    image_exists = self._LocalImageExists("ubuntu_ssh")
+    image_exists = self._LocalImageExists(self.container_image)
 
     if image_exists == False:
       self._BuildImageLocally()
@@ -142,12 +148,24 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     create_command = ['docker', 'run', '-d', '--name', self.name]
 
+
+    #format scratch disks
     for vol in self.scratch_disks:
       vol_string = vol.volume_name + ":" + vol.mount_point
       create_command.append('-v')
       create_command.append(vol_string)
 
-    create_command.append('ubuntu_ssh:latest')
+    #format cpus option
+    if self.cpus > 0:
+      create_command.append('--cpus')
+      create_command.append(self.cpus)
+
+    #format memory option
+    if self.memory_mb > 0:
+      create_command.append('-m')
+      create_command.append(str(self.memory_mb) + 'm')
+
+    create_command.append(self.container_image)
     create_command.append('/usr/sbin/sshd')
     create_command.append('-D')
 
@@ -340,34 +358,32 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #containerImage = container_service._ContainerImage("ubuntu_simple")
     
     directory = os.path.dirname(
-      data.ResourcePath(os.path.join('docker', self.image_name, 'Dockerfile')))
+      data.ResourcePath(os.path.join('docker', self.container_image, 'Dockerfile')))
 
     
 
     build_cmd = [
         'docker', 'build', '--no-cache',
-        '-t', self.image_name, directory
+        '-t', self.container_image, directory
     ]
 
     vm_util.IssueCommand(build_cmd)
-
-
 
 
 class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
                                           linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
-class Ubuntu1404BasedDockerVirtualMachine(
-    DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
-  DEFAULT_IMAGE = 'ubuntu:14.04'
+# class Ubuntu1404BasedDockerVirtualMachine(
+#     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
+#   DEFAULT_IMAGE = 'ubuntu:14.04'
 
 class Ubuntu1604BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
-  DEFAULT_IMAGE = 'ubuntu:16.04'
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
-class Ubuntu1710BasedDockerVirtualMachine(
-    DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
-  DEFAULT_IMAGE = 'ubuntu:17.10'
+# class Ubuntu1710BasedDockerVirtualMachine(
+#     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
+#   DEFAULT_IMAGE = 'ubuntu:17.10'
 
 
