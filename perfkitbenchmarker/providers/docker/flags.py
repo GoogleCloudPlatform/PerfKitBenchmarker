@@ -23,10 +23,10 @@ flags.DEFINE_boolean('use_google_container_builder', False,
 flags.DEFINE_string('custom_docker_image', None,
                     'Custom docker image location')
 
-_DOCKER_VOLUME_TYPES = ['something', 'something_else']
+# _DOCKER_VOLUME_TYPES = ['something', 'something_else']
 
-flags.DEFINE_enum('docker_volume_type', None, _DOCKER_VOLUME_TYPES,
-                  'The name of the types of Docker volumes available')
+# flags.DEFINE_enum('docker_volume_type', None, _DOCKER_VOLUME_TYPES,
+#                   'The name of the types of Docker volumes available')
 
 flags.DEFINE_boolean('privileged_docker', False,
                      'If set to True, will attempt to create Docker containers '

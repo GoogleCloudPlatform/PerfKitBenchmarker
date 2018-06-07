@@ -45,8 +45,7 @@ from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu:xenial'
-SELECTOR_PREFIX = 'pkb'
-
+DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16_ssh'
 
 class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
@@ -70,22 +69,13 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.cpus = vm_spec.docker_cpus
     self.memory_mb = vm_spec.docker_memory_mb
     self.privileged = vm_spec.privileged_docker
-  #   self.resource_limits = vm_spec.resource_limits
-  #   self.resource_requests = vm_spec.resource_requests
+    self.container_image = DEFAULT_DOCKER_IMAGE
 
-  # def GetResourceMetadata(self):
-  #   metadata = super(DockerVirtualMachine, self).GetResourceMetadata()
-  #   if self.resource_limits:
-  #     metadata.update({
-  #         'container_cpu_limit': self.resource_limits.cpus,
-  #         'container_memory_limit_mb': self.resource_limits.memory,
-  #     })
-  #   if self.resource_requests:
-  #     metadata.update({
-  #         'container_cpu_request': self.resource_requests.cpus,
-  #         'container_memory_request_mb': self.resource_requests.memory,
-  #     })
-  #   return metadata
+    #apply flags
+    if FLAGS.custom_docker_image:
+      self.container_image = FLAGS.custom_docker_image
+
+
 
   def _CreateDependencies(self):
     #self._CheckPrerequisites()
@@ -126,7 +116,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #self._Delete()
 
     #set container image
-    self.container_image = "pkb/ubuntu_ssh"
+    
 
     image_exists = self._LocalImageExists(self.container_image)
 
@@ -142,12 +132,10 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.container_id = container_info.encode("ascii")
     logging.info("Container with Disk ID: %s", self.container_id)
 
-
   def _FormatCreateCommand(self):
     """Formats the command for Docker based on vm_spec and flags"""
 
     create_command = ['docker', 'run', '-d', '--name', self.name]
-
 
     #format scratch disks
     for vol in self.scratch_disks:
