@@ -25,10 +25,11 @@ IOR_DIR = '%s/ior' % INSTALL_DIR
 GIT_REPO = 'https://github.com/hpc/ior'
 GIT_TAG = '945fba2aa2d571e8babc4f5f01e78e9f5e6e193e'
 _METADATA_KEYS = [
-    'Operation', '#Tasks', 'segcnt', 'blksiz', 'xsize', 'aggsize', 'API',
+    'Operation', '#Tasks', 'segcnt', 'blksiz', 'xsize', 'aggsize', 'API', 'fPP',
 ]
-_MDTEST_REGEX = (r'^\s*(.*?)\s*:\s*(\d+\.\d+)\s*(\d+\.\d+)'
-                 r'\s*(\d+\.\d+)\s*(\d+\.\d+)$')
+_MDTEST_RESULT_REGEX = (r'\s*(.*?)\s*:\s*(\d+\.\d+)\s*(\d+\.\d+)'
+                        r'\s*(\d+\.\d+)\s*(\d+\.\d+)')
+_MDTEST_SUMMARY_REGEX = r'(\d+) tasks, (\d+) files[^\n]*\n\s*\n(.*?)\n\s*\n'
 
 
 def Install(vm):
@@ -79,15 +80,14 @@ def ParseIORResults(test_output):
   return results
 
 
-def RunMdtest(master_vm, num_tasks, files_per_proc, iterations):
+def RunMdtest(master_vm, num_tasks, mdtest_args):
   """Run mdtest against the master vm."""
   directory = posixpath.join(master_vm.scratch_disks[0].mount_point, 'mdtest')
   mdtest_cmd = (
-      'mpiexec -machinefile MACHINEFILE -n {num_tasks} mdtest -d {directory} '
-      '-n {files_per_proc} -u -i {iterations}'
+      'mpiexec -machinefile MACHINEFILE -n {num_tasks} '
+      'mdtest -d {directory} {additional_args}'
   ).format(
-      directory=directory, num_tasks=num_tasks, files_per_proc=files_per_proc,
-      iterations=iterations
+      directory=directory, num_tasks=num_tasks, additional_args=mdtest_args
   )
 
   stdout, _ = master_vm.RobustRemoteCommand(mdtest_cmd)
@@ -96,22 +96,30 @@ def RunMdtest(master_vm, num_tasks, files_per_proc, iterations):
 
 def ParseMdtestResults(test_output):
   """Parses the test output and returns samples."""
-  match = re.search('Command line used: (.*)', test_output)
-  command_line = match.group(1)
-  match = re.search(r'(\d+) tasks, (\d+) files/directories', test_output)
-  num_tasks, num_files = match.groups()
-  metadata = {
-      'command_line': command_line, 'num_tasks': num_tasks,
-      'num_files': num_files
-  }
   results = []
-  output = re.findall(_MDTEST_REGEX, test_output, re.MULTILINE)
-  for result in output:
-    op_type, max_ops, min_ops, mean_ops, std_dev = result
-    results.extend([
-        sample.Sample(op_type + ' (Max)', float(max_ops), 'OPs/s', metadata),
-        sample.Sample(op_type + ' (Min)', float(min_ops), 'OPs/s', metadata),
-        sample.Sample(op_type + ' (Mean)', float(mean_ops), 'OPs/s', metadata),
-        sample.Sample(op_type + ' (Std Dev)', float(std_dev), 'OPs/s', metadata)
-    ])
+  match = re.search('Command line used: (.*)', test_output)
+  command_line = match.group(1).strip()
+  dir_per_task = '-u' in command_line
+  summaries = re.findall(_MDTEST_SUMMARY_REGEX, test_output, re.DOTALL)
+  for num_tasks, num_files, summary in summaries:
+    metadata = {
+        'command_line': command_line, 'num_tasks': num_tasks,
+        'num_files': num_files, 'dir_per_task': dir_per_task
+    }
+    result_lines = re.findall(_MDTEST_RESULT_REGEX, summary)
+    for result_line in result_lines:
+      op_type, max_ops, min_ops, mean_ops, std_dev = result_line
+      if not float(mean_ops):
+        continue
+      results.append(sample.Sample(
+          op_type + ' (Mean)', float(mean_ops), 'OPs/s', metadata))
+      if float(std_dev):
+        results.extend([
+            sample.Sample(
+                op_type + ' (Max)', float(max_ops), 'OPs/s', metadata),
+            sample.Sample(
+                op_type + ' (Min)', float(min_ops), 'OPs/s', metadata),
+            sample.Sample(
+                op_type + ' (Std Dev)', float(std_dev), 'OPs/s', metadata)
+        ])
   return results
