@@ -19,10 +19,10 @@ mdtest is used for distributed testing of filesystem metadata performance.
 See https://github.com/hpc/ior for more info.
 """
 
+import itertools
 import posixpath
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
@@ -30,25 +30,26 @@ from perfkitbenchmarker.linux_packages import ior
 
 FLAGS = flags.FLAGS
 
-flag_util.DEFINE_integerlist(
-    'ior_num_procs', flag_util.IntegerList([256]),
+flags.DEFINE_integer(
+    'ior_num_procs', 256,
     'The number of MPI processes to use for IOR.')
 flags.DEFINE_string(
     'ior_script', 'default_ior_script',
     'The IOR script to run. See '
     'https://github.com/hpc/ior/blob/master/doc/sphinx/userDoc/skripts.rst '
     'for more info.')
-flag_util.DEFINE_integerlist(
-    'mdtest_num_procs', flag_util.IntegerList([32]),
+flags.DEFINE_integer(
+    'mdtest_num_procs', 32,
     'The number of MPI processes to use for mdtest.')
-flags.DEFINE_integer(
-    'mdtest_files_per_proc', 1000,
-    'The number of files/directories per mdtest process.',
-    lower_bound=1)
-flags.DEFINE_integer(
-    'mdtest_iterations', 5,
-    'The number of test iterations for mdtest.',
-    lower_bound=1)
+flags.DEFINE_list(
+    'mdtest_args', ['-n 1000 -u'],
+    'Command line arguments to be passed to mdtest. '
+    'Each set of args in the list will be run separately.')
+flags.DEFINE_boolean(
+    'mdtest_drop_caches', True,
+    'Whether to drop caches between the create/stat/delete phases. '
+    'If this is set, mdtest will be run 3 times with the -C, -T, and -r '
+    'options and the client page caches will be dropped between runs.')
 
 
 BENCHMARK_NAME = 'ior'
@@ -96,14 +97,22 @@ def Run(benchmark_spec):
   """
   master_vm = benchmark_spec.vms[0]
   results = []
-  remote_script_path = posixpath.join(master_vm.scratch_disks[0].mount_point,
-                                      FLAGS.ior_script)
-  master_vm.PushDataFile(FLAGS.ior_script, remote_script_path)
-  for num_procs in FLAGS.ior_num_procs:
-    results += ior.RunIOR(master_vm, num_procs, remote_script_path)
-  for num_procs in FLAGS.mdtest_num_procs:
-    results += ior.RunMdtest(master_vm, num_procs, FLAGS.mdtest_files_per_proc,
-                             FLAGS.mdtest_iterations)
+  # Run IOR benchmark.
+  if FLAGS.ior_num_procs and FLAGS.ior_script:
+    remote_script_path = posixpath.join(master_vm.scratch_disks[0].mount_point,
+                                        FLAGS.ior_script)
+    master_vm.PushDataFile(FLAGS.ior_script, remote_script_path)
+    results += ior.RunIOR(master_vm, FLAGS.ior_num_procs, remote_script_path)
+
+  # Run mdtest benchmark.
+  phase_args = ('-C', '-T', '-r') if FLAGS.mdtest_drop_caches else ('',)
+  mdtest_args = (' '.join(args) for args in
+                 itertools.product(FLAGS.mdtest_args, phase_args))
+  for args in mdtest_args:
+    results += ior.RunMdtest(master_vm, FLAGS.mdtest_num_procs, args)
+    if FLAGS.mdtest_drop_caches:
+      vm_util.RunThreaded(lambda vm: vm.DropCaches(), benchmark_spec.vms)
+
   return results
 
 
