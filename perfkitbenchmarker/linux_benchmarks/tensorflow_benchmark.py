@@ -126,6 +126,8 @@ flags.register_validator('tf_local_parameter_device',
                          LocalParameterDeviceValidator)
 
 
+
+NVIDIA_TESLA_P4 = cuda_toolkit.NVIDIA_TESLA_P4
 NVIDIA_TESLA_K80 = cuda_toolkit.NVIDIA_TESLA_K80
 NVIDIA_TESLA_P100 = cuda_toolkit.NVIDIA_TESLA_P100
 NVIDIA_TESLA_V100 = cuda_toolkit.NVIDIA_TESLA_V100
@@ -145,6 +147,13 @@ DEFAULT_BATCH_SIZES = {
         'resnet50': 64,
         'resnet152': 32,
         'vgg16': 32,
+    },
+    NVIDIA_TESLA_P4: {
+        'alexnet': 512,
+        'inception3': 128,
+        'resnet50': 128,
+        'resnet152': 64,
+        'vgg16': 64,
     },
     NVIDIA_TESLA_P100: {
         'alexnet': 512,
