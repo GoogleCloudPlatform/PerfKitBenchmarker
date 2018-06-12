@@ -51,7 +51,9 @@ flags.DEFINE_boolean(
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
-VALID_GPU_TYPES = ['k80', 'p100', 'v100']
+# Note: If adding a gpu type here, be sure to add it to
+# the flag definition in pkb.py too.
+VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws']
 
 
 def GetVmSpecClass(cloud):
