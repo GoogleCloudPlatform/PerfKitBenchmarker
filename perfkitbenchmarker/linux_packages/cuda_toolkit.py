@@ -30,6 +30,7 @@ from perfkitbenchmarker import flag_util
 
 
 NVIDIA_TESLA_K80 = 'k80'
+NVIDIA_TESLA_P4 = 'p4'
 NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 GPU_DEFAULTS = {
@@ -37,6 +38,11 @@ GPU_DEFAULTS = {
         'base_clock': [2505, 562],
         'max_clock': [2505, 875],
         'autoboost_enabled': True,
+    },
+    NVIDIA_TESLA_P4: {
+        'base_clock': [3003, 885],
+        'max_clock': [3003, 1531],
+        'autoboost_enabled': None,
     },
     NVIDIA_TESLA_P100: {
         'base_clock': [715, 1189],
@@ -180,6 +186,8 @@ def GetGpuType(vm):
 
   if 'K80' in gpu_types[0]:
     return NVIDIA_TESLA_K80
+  if 'P4' in gpu_types[0]:
+    return NVIDIA_TESLA_P4
   if 'P100' in gpu_types[0]:
     return NVIDIA_TESLA_P100
   if 'V100' in gpu_types[0]:
