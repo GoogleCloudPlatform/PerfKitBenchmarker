@@ -82,7 +82,7 @@ class DockerDisk(disk.BaseDisk):
     output = vm_util.IssueCommand(cmd)
 
   def _Delete(self):
-  	cmd = ['docker', 'volume', 'delete', self.volume_name]
+  	cmd = ['docker', 'volume', 'rm', self.volume_name]
   	output = vm_util.IssueCommand(cmd)
 
   def AttachVolumeInfo(self, volume_mounts):
