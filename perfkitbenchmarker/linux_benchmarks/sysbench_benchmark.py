@@ -71,7 +71,8 @@ flags.DEFINE_integer('sysbench_run_seconds', 480,
 flag_util.DEFINE_integerlist(
     'sysbench_thread_counts',
     flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
-    'array of thread counts passed to sysbench, one at a time')
+    'array of thread counts passed to sysbench, one at a time',
+    module_name=__name__)
 flags.DEFINE_integer('sysbench_latency_percentile', 100,
                      'The latency percentile we ask sysbench to compute.')
 flags.DEFINE_integer('sysbench_report_interval', 2,
