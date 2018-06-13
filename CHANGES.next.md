@@ -133,6 +133,7 @@
 - Added InvalidConfigurationError.
 - Added owner tag in metadata.
 - Added support for NVIDIA P4 GPUs.
+- Added YCSB timeseries parsing.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
