@@ -52,7 +52,7 @@ flag_util.DEFINE_integerlist(
     'specsfs2014_load', [1],
     'The starting load in units of SPEC "business metrics". The meaning of '
     'business metric varies depending on the SPEC benchmark (e.g. VDI has '
-    'load measured in virtual desktops).')
+    'load measured in virtual desktops).', module_name=__name__)
 flags.DEFINE_integer(
     'specsfs2014_incr_load', 1,
     'The amount to increment "load" by for each run.',
