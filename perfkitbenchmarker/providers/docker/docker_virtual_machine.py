@@ -42,6 +42,8 @@ from perfkitbenchmarker.providers.docker import docker_disk
 from perfkitbenchmarker.providers.docker import docker_resource_spec
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
+from perfkitbenchmarker.providers.gcp import google_container_engine
+
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu:xenial'
@@ -96,10 +98,11 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #Start container and start ssh server
 
     #NOTE for building Dockerfile, might want to use container_service
-
+    # logging.info("google container")
+    # registry_spec = 
+    # gcr = google_container_engine.GoogleContainerRegistry()
 
     logging.info('Creating Docker Container')
-    logging.info(self.memory_mb)
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 
