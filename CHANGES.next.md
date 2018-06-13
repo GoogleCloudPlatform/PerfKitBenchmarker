@@ -240,3 +240,4 @@
   regular expression to match against image names.
 - Terminate long running servers on windows benchmarks with timeouts.
 - Updated azure_cli package to match installation instructions.
+- Fix helpmatch for intergerlist.

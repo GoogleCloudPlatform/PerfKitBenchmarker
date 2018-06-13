@@ -116,7 +116,8 @@ tensorflow_serving:
 flags.DEFINE_integer(
     'tf_serving_runtime', 60, 'benchmark runtime in seconds', lower_bound=1)
 flag_util.DEFINE_integerlist('tf_serving_client_thread_counts', [16, 32],
-                             'number of client worker threads')
+                             'number of client worker threads',
+                             module_name=__name__)
 
 
 class ClientWorkloadScriptExecutionError(Exception):
