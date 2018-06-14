@@ -414,7 +414,7 @@ class FargateCluster(container_service.BaseContainerCluster):
   """Class representing an AWS Fargate cluster."""
 
   CLOUD = providers.AWS
-  CLUSTER_TYPE = container_service.SERVERLESS
+  CLUSTER_TYPE = 'Fargate'
 
   def __init__(self, cluster_spec):
     super(FargateCluster, self).__init__(cluster_spec)
