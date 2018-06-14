@@ -238,8 +238,8 @@ group_reporting=1
 {{parameter}}
 {%- endfor %}
 {%- for scenario in scenarios %}
-{%- for iodepth in iodepths %}
 {%- for numjob in numjobs %}
+{%- for iodepth in iodepths %}
 
 [{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
 stonewall
