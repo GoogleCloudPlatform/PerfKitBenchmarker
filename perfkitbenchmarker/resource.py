@@ -158,7 +158,7 @@ class BaseResource(object):
     return False
 
   def _PostCreate(self):
-    """Method that will be called once after _CreateReource is called.
+    """Method that will be called once after _CreateResource() is called.
 
     Supplying this method is optional. If it is supplied, it will be called
     once, after the resource is confirmed to exist. It is intended to allow

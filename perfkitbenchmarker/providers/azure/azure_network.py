@@ -28,9 +28,9 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers import azure
 
 FLAGS = flags.FLAGS
@@ -93,7 +93,7 @@ class AzureResourceGroup(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def _Delete(self):
@@ -250,7 +250,7 @@ class AzureStorageAccount(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
 
@@ -302,6 +302,8 @@ class AzureVirtualNetwork(resource.BaseResource):
 
 
 class AzureSubnet(resource.BaseResource):
+  """Object representing an Azure Subnet."""
+
   def __init__(self, vnet, name):
     super(AzureSubnet, self).__init__()
     self.resource_group = GetResourceGroup()
@@ -331,6 +333,8 @@ class AzureSubnet(resource.BaseResource):
 
 
 class AzureNetworkSecurityGroup(resource.BaseResource):
+  """Object representing an Azure Network Security Group."""
+
   def __init__(self, location, subnet, name):
     super(AzureNetworkSecurityGroup, self).__init__()
 
@@ -383,6 +387,9 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       start_port: either a single port or the start of a range.
       end_port: if given, the end of the port range.
       source_range: unsupported at present.
+
+    Raises:
+      ValueError: when there are too many firewall rules.
     """
 
     with self.rules_lock:
@@ -425,6 +432,7 @@ class AzureFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the port for.
       start_port: The local port to open.
       end_port: if given, open the range [start_port, end_port].
+      source_range: unsupported at present.
     """
 
     vm.network.nsg.AllowPort(vm, start_port, end_port=end_port,
