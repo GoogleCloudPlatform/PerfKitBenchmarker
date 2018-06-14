@@ -41,8 +41,7 @@ import yaml
 
 
 KUBERNETES = 'Kubernetes'
-SERVERLESS = 'Serverless'
-CLUSTER_TYPES = [KUBERNETES, SERVERLESS]
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('kubeconfig', None,
@@ -77,8 +76,8 @@ flags.DEFINE_integer('container_cluster_num_vms', None,
                      'Number of nodes in the cluster. Defaults to '
                      'container_cluster.vm_count')
 
-flags.DEFINE_enum('container_cluster_type', KUBERNETES, CLUSTER_TYPES,
-                  'The type of container cluster.')
+flags.DEFINE_string('container_cluster_type', KUBERNETES,
+                    'The type of container cluster.')
 
 flags.DEFINE_string('container_cluster_version', None,
                     'Optional version flag to pass to the cluster create '

@@ -943,8 +943,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
         }),
-        'type': (option_decoders.EnumDecoder, {
-            'valid_values': container_service.CLUSTER_TYPES,
+        'type': (option_decoders.StringDecoder, {
             'default': 'Kubernetes',
         }),
         'vm_count': (option_decoders.IntDecoder, {
