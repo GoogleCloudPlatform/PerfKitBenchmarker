@@ -23,6 +23,7 @@ Homepage: http://www.netlib.org/benchmark/hpl/
 
 HPL requires a BLAS library (Basic Linear Algebra Subprograms)
 OpenBlas: http://www.openblas.net/
+Intel MKL: https://software.intel.com/en-us/mkl
 
 HPL also requires a MPI (Message Passing Interface) Library
 OpenMPI: http://www.open-mpi.org/
@@ -53,6 +54,17 @@ HPCCINF_FILE = 'hpccinf.txt'
 MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
+
+MKL_TGZ = 'l_mkl_2018.2.199.tgz'
+BENCHMARK_DATA = {
+    # Intel MKL package downloaded from:
+    # https://software.intel.com/en-us/mkl
+    # In order to get "l_mkl_2018.2.199.tgz", please choose the product
+    # "Intel Performance Libraries for Linux*", choose the version
+    # "2018 Update 2" and choose the download option "Intel
+    # Math Kernel Library(Intel Mkl)".
+    MKL_TGZ: 'fd31b656a8eb859c89495b9cc41230b4',
+}
 
 BENCHMARK_NAME = 'hpcc'
 BENCHMARK_CONFIG = """
@@ -174,6 +186,7 @@ def UpdateMetadata(metadata):
     metadata['override_binary'] = FLAGS.hpcc_binary
   if FLAGS['hpcc_mpi_env'].present:
     metadata['mpi_env'] = FLAGS.hpcc_mpi_env
+  metadata['hpcc_math_library'] = FLAGS.hpcc_math_library
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
