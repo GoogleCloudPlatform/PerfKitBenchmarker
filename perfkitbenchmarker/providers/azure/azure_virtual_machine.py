@@ -137,7 +137,7 @@ class AzurePublicIPAddress(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def GetIPAddress(self):
@@ -190,7 +190,7 @@ class AzureNIC(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def GetInternalIP(self):
@@ -298,7 +298,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def _Delete(self):
@@ -428,6 +428,8 @@ class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
 
 class WindowsAzureVirtualMachine(AzureVirtualMachine,
                                  windows_virtual_machine.WindowsMixin):
+  """Class supporting Windows Azure virtual machines."""
+
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
   def __init__(self, vm_spec):
