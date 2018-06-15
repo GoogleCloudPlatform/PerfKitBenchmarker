@@ -30,7 +30,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase/stable/'
-HBASE_PATTERN = r'>(hbase-\d+.\d+.\d+-bin.tar.gz)<'
+HBASE_PATTERN = r'>(hbase-\d+.\d+.\d+.\d+-bin.tar.gz)<'
 
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
               'hbase/hbase-env.sh.j2']
