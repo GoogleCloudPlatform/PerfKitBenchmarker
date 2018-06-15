@@ -243,3 +243,4 @@
 - Terminate long running servers on windows benchmarks with timeouts.
 - Updated azure_cli package to match installation instructions.
 - Fix helpmatch for intergerlist.
+- Fix PSPing benchmark so that it runs on AWS and Azure.
