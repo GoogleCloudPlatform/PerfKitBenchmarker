@@ -44,9 +44,9 @@ import math
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker.linux_packages import hpcc
 
 FLAGS = flags.FLAGS
@@ -84,17 +84,16 @@ flags.DEFINE_string('hpcc_binary', None,
                     'The path of prebuilt hpcc binary to use. If not provided, '
                     'this benchmark built its own using OpenBLAS.')
 flags.DEFINE_list('hpcc_mpi_env', [],
-                  'Comma seperated list containing environment variables '
+                  'Comma separated list containing environment variables '
                   'to use with mpirun command. e.g. '
                   'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512')
-
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(_):
   """Verifies that the required resources are present.
 
   Raises:
