@@ -21,8 +21,8 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('tf_cpu_pip_package',
-                    'https://anaconda.org/intel/tensorflow/1.4.0/download/'
-                    'tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl',
+                    'https://anaconda.org/intel/tensorflow/1.6.0/download/'
+                    'tensorflow-1.6.0-cp27-cp27mu-linux_x86_64.whl',
                     'TensorFlow CPU pip package to install. By default, PKB '
                     'will install an Intel-optimized CPU build when using CPUs.')
 flags.DEFINE_string('tf_gpu_pip_package', 'tensorflow-gpu==1.7',
