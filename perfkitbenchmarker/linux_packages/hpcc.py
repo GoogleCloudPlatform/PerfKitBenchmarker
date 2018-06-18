@@ -25,7 +25,6 @@ import re
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
-from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import openblas
 
 HPCC_TAR = 'hpcc-1.4.3.tar.gz'
