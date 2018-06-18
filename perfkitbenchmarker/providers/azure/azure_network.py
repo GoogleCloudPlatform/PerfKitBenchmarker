@@ -98,8 +98,8 @@ class AzureResourceGroup(resource.BaseResource):
 
   def _Delete(self):
     vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'group', 'delete',
-         '--yes', '--name', self.name])
+        [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
+        timeout=600)
 
   def _FormatTag(self, key, value):
     """Format an individual tag for use with the --tags param of Azure CLI."""
