@@ -73,4 +73,3 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the OpenBLAS package on the VM."""
   _Install(vm)
-
