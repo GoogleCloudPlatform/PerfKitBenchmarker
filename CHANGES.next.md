@@ -244,3 +244,4 @@
 - Updated azure_cli package to match installation instructions.
 - Fix helpmatch for intergerlist.
 - Fix PSPing benchmark so that it runs on AWS and Azure.
+- Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
