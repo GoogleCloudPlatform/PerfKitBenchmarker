@@ -66,6 +66,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
     super(AwsNfsService, self).__init__(disk_spec, zone)
     self.region = util.GetRegionFromZone(self.zone)
     self.aws_commands = AwsEfsCommands(self.region)
+    self.disk_spec.disk_size = 0
     self.filer_id = None
     self.mount_id = None
 
@@ -120,13 +121,16 @@ class AwsNfsService(nfs_service.BaseNfsService):
       logging.warn('_CreateFiler() already called for %s', self.filer_id)
       return
     if FLAGS.aws_efs_token:
-      self.filer_id = self.aws_commands.GetFilerId(FLAGS.aws_efs_token)
-      if self.filer_id:
+      filer = self.aws_commands.GetFiler(FLAGS.aws_efs_token)
+      if filer:
+        self.nfs_tier = filer['PerformanceMode']
+        self.filer_id = filer['FileSystemId']
+        self.disk_spec.disk_size = int(
+            round(filer['SizeInBytes']['Value'] / 10.0 ** 9))
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
     self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
-    self.aws_commands.AddTagsToFiler(self.filer_id, FLAGS.owner, FLAGS.run_uri,
-                                     ' '.join(FLAGS.benchmarks))
+    self.aws_commands.AddTagsToFiler(self.filer_id)
     logging.info('Created filer %s with address %s', self.filer_id,
                  self.GetRemoteAddress())
 
@@ -178,15 +182,15 @@ class AwsEfsCommands(object):
   def __init__(self, region):
     self.efs_prefix = util.AWS_PREFIX + ['--region', region, 'efs']
 
-  def GetFilerId(self, token):
-    """Returns the filer id using the creation token or None."""
+  def GetFiler(self, token):
+    """Returns the filer using the creation token or None."""
     args = ['describe-file-systems', '--creation-token', token]
     response = self._IssueAwsCommand(args)
     file_systems = response['FileSystems']
     if not file_systems:
       return None
     assert len(file_systems) < 2, 'Too many file systems.'
-    return file_systems[0]['FileSystemId']
+    return file_systems[0]
 
   def CreateFiler(self, token, nfs_tier=None):
     args = ['create-file-system', '--creation-token', token]
@@ -194,15 +198,10 @@ class AwsEfsCommands(object):
       args += ['--performance-mode', nfs_tier]
     return self._IssueAwsCommand(args)['FileSystemId']
 
-  def AddTagsToFiler(self, filer_id, owner, run_uri, benchmark):
-    tag_fmt = 'Key={0},Value={1}'
-    tags = ' '.join([
-        tag_fmt.format('owner', owner),
-        tag_fmt.format('perfkitbenchmarker-run', run_uri),
-        tag_fmt.format('benchmark', benchmark)
-    ])
-    self._IssueAwsCommand(
-        ['create-tags', '--file-system-id', filer_id, '--tags', tags], False)
+  def AddTagsToFiler(self, filer_id):
+    tags = util.MakeFormattedDefaultTags()
+    args = ['create-tags', '--file-system-id', filer_id, '--tags'] + tags
+    self._IssueAwsCommand(args, False)
 
   @vm_util.Retry()
   def WaitUntilFilerAvailable(self, filer_id):
@@ -211,9 +210,13 @@ class AwsEfsCommands(object):
       raise errors.Resource.RetryableCreationError(
           '{} not ready'.format(filer_id))
 
+  @vm_util.Retry()
   def DeleteFiler(self, file_system_id):
-    self._IssueAwsCommand(
-        ['delete-file-system', '--file-system-id', file_system_id], False)
+    args = self.efs_prefix + [
+        'delete-file-system', '--file-system-id', file_system_id]
+    _, stderr, retcode = vm_util.IssueCommand(args)
+    if retcode and 'FileSystemInUse' in stderr:
+      raise Exception('Mount Point hasn\'t finished deleting.')
 
   def CreateMount(self, file_system_id, subnet_id, security_group=None):
     args = [

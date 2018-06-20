@@ -138,7 +138,7 @@ flags.DEFINE_integer(
     'specified.')
 flags.DEFINE_enum(
     'gpu_type', None,
-    ['k80', 'p100', 'v100'],
+    ['k80', 'p100', 'v100', 'p4', 'p4-vws'],
     'Type of gpus to attach to the VM. Requires gpu_count to be '
     'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
@@ -275,6 +275,22 @@ flags.DEFINE_boolean(
 flags.DEFINE_string(
     'skip_pending_runs_file', None,
     'If file exists, any pending runs will be not be executed.')
+flags.DEFINE_integer(
+    'prepare_sleep_time', 0,
+    'The time in seconds to sleep after the prepare phase. This can be useful '
+    'for letting burst tokens accumulate.')
+flags.DEFINE_integer(
+    'timeout_minutes', 240,
+    'An upper bound on the time in minutes that the benchmark is expected to '
+    'run. This time is annotated or tagged on the resources of cloud '
+    'providers.')
+flags.DEFINE_integer(
+    'persistent_timeout_minutes', 240,
+    'An upper bound on the time in minutes that resources left behind by the  '
+    'benchmark is expected run. Some benchmarks purposefully create resources '
+    'for other benchmarks to use.   Persistent timeout guages who long '
+    'these shared should live.')
+
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -496,6 +512,10 @@ def DoPreparePhase(spec, timer):
   with timer.Measure('Benchmark Prepare'):
     spec.BenchmarkPrepare(spec)
   spec.StartBackgroundWorkload()
+  if FLAGS.prepare_sleep_time:
+    logging.info('Sleeping %s seconds after the prepare phase.',
+                 FLAGS.prepare_sleep_time)
+    time.sleep(FLAGS.prepare_sleep_time)
 
 
 def DoRunPhase(spec, collector, timer):

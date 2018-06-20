@@ -70,7 +70,7 @@ flag_util.DEFINE_integerlist(
     'hpcg_problem_size',
     flag_util.IntegerList([256, 256, 256]),
     'three dimensional problem size for each node. Must contain '
-    'three integers')
+    'three integers', module_name=__name__)
 
 flags.DEFINE_boolean(
     'hpcg_run_as_root', False, 'If true, pass --allow-run-as-root '

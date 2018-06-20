@@ -24,9 +24,10 @@ from collections import OrderedDict
 import json
 import logging
 import posixpath
+import re
 import threading
 import uuid
-from perfkitbenchmarker import context
+
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -43,8 +44,8 @@ from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 
-HVM = 'HVM'
-PV = 'PV'
+HVM = 'hvm'
+PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3'])
 NUM_LOCAL_VOLUMES = {
@@ -289,18 +290,72 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     return result
 
 
+class AwsKeyFileManager(object):
+  """Object for managing AWS Keyfiles."""
+  _lock = threading.Lock()
+  imported_keyfile_set = set()
+  deleted_keyfile_set = set()
+
+  @classmethod
+  def ImportKeyfile(cls, region):
+    """Imports the public keyfile to AWS."""
+    with cls._lock:
+      if region in cls.imported_keyfile_set:
+        return
+      cat_cmd = ['cat',
+                 vm_util.GetPublicKeyPath()]
+      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+      import_cmd = util.AWS_PREFIX + [
+          'ec2', '--region=%s' % region,
+          'import-key-pair',
+          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
+          '--public-key-material=%s' % keyfile]
+      util.IssueRetryableCommand(import_cmd)
+      cls.imported_keyfile_set.add(region)
+      if region in cls.deleted_keyfile_set:
+        cls.deleted_keyfile_set.remove(region)
+
+  @classmethod
+  def DeleteKeyfile(cls, region):
+    """Deletes the imported keyfile for a region."""
+    with cls._lock:
+      if region in cls.deleted_keyfile_set:
+        return
+      delete_cmd = util.AWS_PREFIX + [
+          'ec2', '--region=%s' % region,
+          'delete-key-pair',
+          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+      util.IssueRetryableCommand(delete_cmd)
+      cls.deleted_keyfile_set.add(region)
+      if region in cls.imported_keyfile_set:
+        cls.imported_keyfile_set.remove(region)
+
+
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
   CLOUD = providers.AWS
+
+  # The IMAGE_NAME_FILTER is passed to the AWS CLI describe-images command to
+  # filter images by name. This may be overridden by the aws_image_name_filter
+  # flag, and is otherwise overridden by most OS specializations, e.g.,
+  # Ubuntu1604BasedAwsVirtualMachine.
   IMAGE_NAME_FILTER = None
+
+  # The IMAGE_NAME_REGEX can be used to further filter images by name. It
+  # applies after the IMAGE_NAME_FILTER above. Note that before this regex is
+  # applied, Python's string formatting is used to replace {virt_type} and
+  # {disk_type} by the respective virtualization type and root disk type of the
+  # VM, allowing the regex to contain these strings. This regex supports
+  # arbitrary Python regular expressions to further narrow down the set of
+  # images considered.
+  IMAGE_NAME_REGEX = None
+
   IMAGE_OWNER = None
   IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   _lock = threading.Lock()
-  imported_keyfile_set = set()
-  deleted_keyfile_set = set()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
 
@@ -355,16 +410,20 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return self.network.regional_network.vpc.default_security_group_id
 
   @classmethod
-  def _GetDefaultImage(cls, machine_type, region):
+  def GetDefaultImage(cls, machine_type, region):
     """Returns the default image given the machine type and region.
 
-    If specified, aws_image_name_filter will override os_type defaults.
-    If no default is configured, this will return None.
+    If specified, the aws_image_name_filter and aws_image_name_regex flags will
+    override os_type defaults.
 
     Args:
       machine_type: The machine_type of the VM, used to determine virtualization
         type.
       region: The region of the VM, as images are region specific.
+
+    Returns:
+      The ID of the latest image, or None if no default image is configured or
+      none can be found.
     """
     if cls.IMAGE_NAME_FILTER is None:
       return None
@@ -372,8 +431,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if FLAGS.aws_image_name_filter:
       cls.IMAGE_NAME_FILTER = FLAGS.aws_image_name_filter
 
+    if FLAGS.aws_image_name_regex:
+      cls.IMAGE_NAME_REGEX = FLAGS.aws_image_name_regex
+
     prefix = machine_type.split('.')[0]
-    virt_type = 'paravirtual' if prefix in NON_HVM_PREFIXES else 'hvm'
+    virt_type = PV if prefix in NON_HVM_PREFIXES else HVM
 
     describe_cmd = util.AWS_PREFIX + [
         '--region=%s' % region,
@@ -395,43 +457,33 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not stdout:
       return None
 
-    images = json.loads(stdout)
+    if cls.IMAGE_NAME_REGEX:
+      # Further filter images by the IMAGE_NAME_REGEX filter.
+      image_name_regex = cls.IMAGE_NAME_REGEX.format(
+          virt_type=virt_type, disk_type=cls.DEFAULT_ROOT_DISK_TYPE)
+      images = []
+      excluded_images = []
+      for image in json.loads(stdout):
+        if re.search(image_name_regex, image['Name']):
+          images.append(image)
+        else:
+          excluded_images.append(image)
+
+      if excluded_images:
+        logging.debug('Excluded the following images with regex "%s": %s',
+                      image_name_regex,
+                      sorted(image['Name'] for image in excluded_images))
+    else:
+      images = json.loads(stdout)
+
+    if not images:
+      return None
+
     # We want to return the latest version of the image, and since the wildcard
     # portion of the image name is the image's creation date, we can just take
     # the image with the 'largest' name.
+    # TODO(deitz): Investigate sorting by CreationDate instead of by Name.
     return max(images, key=lambda image: image['Name'])['ImageId']
-
-  def ImportKeyfile(self):
-    """Imports the public keyfile to AWS."""
-    with self._lock:
-      if self.region in self.imported_keyfile_set:
-        return
-      cat_cmd = ['cat',
-                 vm_util.GetPublicKeyPath()]
-      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
-      import_cmd = util.AWS_PREFIX + [
-          'ec2', '--region=%s' % self.region,
-          'import-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
-          '--public-key-material=%s' % keyfile]
-      util.IssueRetryableCommand(import_cmd)
-      self.imported_keyfile_set.add(self.region)
-      if self.region in self.deleted_keyfile_set:
-        self.deleted_keyfile_set.remove(self.region)
-
-  def DeleteKeyfile(self):
-    """Deletes the imported keyfile for a region."""
-    with self._lock:
-      if self.region in self.deleted_keyfile_set:
-        return
-      delete_cmd = util.AWS_PREFIX + [
-          'ec2', '--region=%s' % self.region,
-          'delete-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-      util.IssueRetryableCommand(delete_cmd)
-      self.deleted_keyfile_set.add(self.region)
-      if self.region in self.imported_keyfile_set:
-        self.imported_keyfile_set.remove(self.region)
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -457,10 +509,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    self.ImportKeyfile()
-    # _GetDefaultImage calls the AWS CLI.
-    self.image = self.image or self._GetDefaultImage(self.machine_type,
-                                                     self.region)
+    AwsKeyFileManager.ImportKeyfile(self.region)
+    # GetDefaultImage calls the AWS CLI.
+    self.image = self.image or self.GetDefaultImage(self.machine_type,
+                                                    self.region)
     self.AllowRemoteAccessPorts()
 
     if self.use_dedicated_host:
@@ -473,7 +525,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
-    self.DeleteKeyfile()
+    AwsKeyFileManager.DeleteKeyfile(self.region)
     if self.host:
       with self._lock:
         if self.host in self.host_list:
@@ -606,6 +658,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     reservations = response['Reservations']
     assert len(reservations) < 2, 'Too many reservations.'
     if not reservations:
+      if not self.create_start_time:
+        return False
       logging.info('No reservation returned by describe-instances. This '
                    'sometimes shows up immediately after a successful '
                    'run-instances command. Retrying describe-instances '
@@ -646,11 +700,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks = []
     for _ in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.NFS:
-        nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
-        if nfs is None:
-          raise errors.Resource.CreationError(
-              'Have an NFS disk but no NFS service created')
-        data_disk = nfs.CreateNfsDisk()
+        data_disk = self._GetNfsService().CreateNfsDisk()
       else:
         data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
@@ -750,7 +800,13 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
+  """Class with configuration for AWS Redhat virtual machines."""
   IMAGE_NAME_FILTER = 'amzn-ami-*-x86_64-*'
+  # IMAGE_NAME_REGEX tightens up the image filter for Amazon Linux to avoid
+  # non-standard Amazon Linux images. This fixes a bug in which we were
+  # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
+  IMAGE_NAME_REGEX = (
+      r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-x86_64-{disk_type}$')
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
@@ -765,6 +821,7 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
                                     linux_virtual_machine.Centos7Mixin):
+  """Class with configuration for AWS Centos7 virtual machines."""
   # Documentation on finding the Centos 7 image:
   # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*'

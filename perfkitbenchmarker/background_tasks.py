@@ -546,7 +546,7 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
   return results
 
 
-def RunParallelThreads(target_arg_tuples, max_concurrency):
+def RunParallelThreads(target_arg_tuples, max_concurrency, post_task_delay=0):
   """Executes function calls concurrently in separate threads.
 
   Args:
@@ -554,6 +554,7 @@ def RunParallelThreads(target_arg_tuples, max_concurrency):
         contains the function to call and the arguments to pass it.
     max_concurrency: int or None. The maximum number of concurrent new
         threads.
+    post_task_delay: Delay in seconds between parallel task invocations.
 
   Returns:
     list of function return values in the order corresponding to the order of
@@ -565,7 +566,7 @@ def RunParallelThreads(target_arg_tuples, max_concurrency):
   """
   return _RunParallelTasks(
       target_arg_tuples, max_concurrency, _BackgroundThreadTaskManager,
-      errors.VmUtil.ThreadException)
+      errors.VmUtil.ThreadException, post_task_delay)
 
 
 def RunThreaded(target, thread_params, max_concurrent_threads=200):

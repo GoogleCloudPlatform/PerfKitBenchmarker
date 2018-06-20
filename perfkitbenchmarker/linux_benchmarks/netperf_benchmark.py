@@ -51,7 +51,8 @@ flags.DEFINE_bool('netperf_enable_histograms', True,
                   'collected/reported. Only for *RR benchmarks')
 flag_util.DEFINE_integerlist('netperf_num_streams', flag_util.IntegerList([1]),
                              'Number of netperf processes to run. Netperf '
-                             'will run once for each value in the list.')
+                             'will run once for each value in the list.',
+                             module_name=__name__)
 flags.DEFINE_integer('netperf_thinktime', 0,
                      'Time in nanoseconds to do work for each request.')
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,

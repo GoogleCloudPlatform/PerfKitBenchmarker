@@ -47,7 +47,8 @@ flag_util.DEFINE_integerlist(
     flag_util.IntegerList(
         [DEFAULT_RANGE_START, DEFAULT_RANGE_END,
          DEFAULT_RANGE_STEP]), 'range of transfer sizes to use in bytes. '
-    'Only used if gpu_pcie_bandwidth_mode is set to range')
+    'Only used if gpu_pcie_bandwidth_mode is set to range',
+    module_name=__name__)
 
 FLAGS = flags.FLAGS
 

@@ -6,6 +6,7 @@ tpc_profile_details module.
 
 __author__ = 'p3rf@google.com'
 
+import json
 import logging
 import time
 from absl import app
@@ -41,9 +42,9 @@ def execute_profile(profile):
     logfile_suffix = '{}_{}'.format(profile, str(script_index))
     script = '{}.sql'.format(str(script_index))
     script_performance = script_driver.execute_script(script, logfile_suffix)
-    execution_times.update(script_performance)
+    execution_times.update(json.loads(script_performance))
   execution_times['wall_time'] = round((time.time() - start_time), 2)
-  return execution_times
+  return json.dumps(execution_times)
 
 
 def main(argv):

@@ -30,6 +30,7 @@ from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_nfs_service
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.aws import util
 from tests import mock_flags
 
 _COMPONENT = 'test_component'
@@ -239,8 +240,7 @@ class AwsNfsServiceTest(BaseTest):
     nfs.Create()
     nfs.Delete()
     self.issue_cmd.CreateFiler.assert_called_with(_NFS_TOKEN, _TIER)
-    self.issue_cmd.AddTagsToFiler.assert_called_with(_FILE_ID, _OWNER, _RUN_URI,
-                                                     _BENCHMARK)
+    self.issue_cmd.AddTagsToFiler.assert_called_with(_FILE_ID)
     self.issue_cmd.WaitUntilFilerAvailable.assert_called_with(_FILE_ID)
     self.issue_cmd.CreateMount.assert_called_with(_FILE_ID, _SUBNET_ID,
                                                   _SECURITY_GROUP_ID)
@@ -344,11 +344,10 @@ class AwsEfsCommandsTest(BaseTest):
 
   def testAddTags(self):
     self._SetResponse()
-    self.aws.AddTagsToFiler(_FILE_ID, _OWNER, _RUN_URI, _BENCHMARK)
-    tags = ('Key=owner,Value=joe Key=perfkitbenchmarker-run,Value=fb810a9b '
-            'Key=benchmark,Value=fio')
+    self.aws.AddTagsToFiler(_FILE_ID)
+    tags = util.MakeFormattedDefaultTags()
     self.assertCalled('create-tags', '--file-system-id', _FILE_ID, '--tags',
-                      tags)
+                      *tags)
 
   def testFilerAvailable(self):
     self._SetResponse(_FILER.describe)

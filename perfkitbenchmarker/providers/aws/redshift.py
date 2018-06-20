@@ -23,7 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-import util
+from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
@@ -34,22 +34,17 @@ DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
 
 
-def AddTags(resource_arn, region, **kwargs):
+def AddTags(resource_arn, region):
   """Adds tags to a Redshift cluster created by PerfKitBenchmarker.
 
   Args:
     resource_arn: The arn of AWS resource to operate on.
     region: The AWS region resource was created in.
-    **kwargs: dict. Key-value pairs to set on the instance.
   """
-
-  if not kwargs:
-    return
   cmd_prefix = util.AWS_PREFIX
   tag_cmd = cmd_prefix + ['redshift', 'create-tags', '--region=%s' % region,
                           '--resource-name', resource_arn, '--tags']
-  for key, value in kwargs.iteritems():
-    tag_cmd.append('Key={0},Value={1}'.format(key, value))
+  tag_cmd += util.MakeFormattedDefaultTags()
   vm_util.IssueCommand(tag_cmd)
 
 
@@ -295,8 +290,7 @@ class Redshift(edw_service.EdwService):
     self.arn = 'arn:aws:redshift:{}:{}:cluster:{}'.format(self.region, account,
                                                           self.
                                                           cluster_identifier)
-    tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
-    AddTags(self.arn, self.region, **tags)
+    AddTags(self.arn, self.region)
 
   def _Delete(self):
     """Delete a redshift cluster and disallow creation of a snapshot."""
@@ -332,3 +326,14 @@ class Redshift(edw_service.EdwService):
     """Redshift specific run script command components."""
     return '--host={} --database={} --user={} --password={}'.format(
         self.endpoint, self.db, self.user, self.password)
+
+  def InstallAndAuthenticateRunner(self, vm):
+    """Method to perform installation and authentication of redshift runner.
+
+    psql, a terminal-based front end from PostgreSQL, used as client
+    https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-from-psql.html
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    vm.Install('pgbench')

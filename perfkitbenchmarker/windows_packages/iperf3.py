@@ -37,11 +37,20 @@ flags.DEFINE_integer('bandwidth_step_mb', 100,
 flags.DEFINE_integer('udp_stream_seconds', 3,
                      'The amount of time to run the UDP stream test.')
 
+flags.DEFINE_integer('udp_client_threads', 1,
+                     'Number of parallel client threads to run.')
+
+flags.DEFINE_integer('udp_buffer_len', 100,
+                     'UDP packet size in bytes.')
+
 flags.DEFINE_integer('tcp_stream_seconds', 3,
                      'The amount of time to run the TCP stream test.')
 
 flags.DEFINE_integer('tcp_number_of_streams', 10,
-                     'The number of parrallel streams to run in the TCP test')
+                     'The number of parrallel streams to run in the TCP test.')
+
+flags.DEFINE_integer('socket_buffer_size', 10,
+                     'The socket buffer size in megabytes.')
 
 flags.DEFINE_bool('run_tcp', True,
                   'setting to false will disable the run of the TCP test')
@@ -80,12 +89,13 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
   receiver_ip = (
       receiving_vm.internal_ip if use_internal_ip else receiving_vm.ip_address)
 
-  sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f M '
-                 '> {out_file}').format(
+  sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f m '
+                 ' -w {socket_buffer}M > {out_file}').format(
                      ip=receiver_ip,
                      port=IPERF3_TCP_PORT,
                      time=FLAGS.tcp_stream_seconds,
                      num_streams=FLAGS.tcp_number_of_streams,
+                     socket_buffer=FLAGS.socket_buffer_size,
                      out_file=IPERF3_OUT_FILE)
 
   output = _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm)
@@ -94,6 +104,7 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
                                    FLAGS.tcp_number_of_streams, use_internal_ip)
 
 
+@vm_util.Retry(max_retries=10)
 def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """Create a server-client iperf3 pair.
 
@@ -109,24 +120,21 @@ def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """
 
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
+  timeout_duration = FLAGS.tcp_stream_seconds + 30
 
-  def _RunIperf3(vm, options, is_client):
-    # to ensure that the server is up before the client, we wait for 1 second
-    # when executing the client command
+  def _RunIperf3(vm, options):
     command = ('cd {iperf3_exec_dir}; '
-               'sleep {delay_time}; '
                '.\\iperf3.exe {options}').format(
                    iperf3_exec_dir=iperf3_exec_dir,
-                   delay_time=(1 if is_client else 0),
                    options=options)
-    vm.RemoteCommand(command)
+    vm.RemoteCommand(command, timeout=timeout_duration)
 
   receiver_args = '--server -1'
 
-  threaded_args = [((receiving_vm, receiver_args, False), {}),
-                   ((sending_vm, sender_args, True), {})]
+  threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
+                   (_RunIperf3, (sending_vm, sender_args), {})]
 
-  vm_util.RunThreaded(_RunIperf3, threaded_args)
+  vm_util.RunParallelThreads(threaded_args, 200, 5)
 
   cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
       iperf3_exec_dir=iperf3_exec_dir, out_file=IPERF3_OUT_FILE)
@@ -163,11 +171,13 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
   for bandwidth in xrange(FLAGS.min_bandwidth_mb,
                           FLAGS.max_bandwidth_mb,
                           FLAGS.bandwidth_step_mb):
-    sender_args = ('--client {server_ip} --udp -t {num_tries} '
-                   '-b {bandwidth}M -w 32M > {out_file}'.format(
+    sender_args = ('--client {server_ip} --udp -t {duration} -P {num_threads} '
+                   '-b {bandwidth}M -l {buffer_len} > {out_file}'.format(
                        server_ip=receiver_ip,
-                       num_tries=FLAGS.udp_stream_seconds,
+                       duration=FLAGS.udp_stream_seconds,
+                       num_threads=FLAGS.udp_client_threads,
                        bandwidth=bandwidth,
+                       buffer_len=FLAGS.udp_buffer_len,
                        out_file=IPERF3_OUT_FILE))
 
     # the "-1" flag will cause the server to exit after performing a single
@@ -175,10 +185,10 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
     # until the command completes, even if it is run as a daemon.
     receiver_args = '--server -1'
 
-    threaded_args = [((receiving_vm, receiver_args), {}),
-                     ((sending_vm, sender_args), {})]
+    threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
+                     (_RunIperf3, (sending_vm, sender_args), {})]
 
-    vm_util.RunThreaded(_RunIperf3, threaded_args)
+    vm_util.RunParallelThreads(threaded_args, 200, 15)
 
     # retrieve the results and parse them
     cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(

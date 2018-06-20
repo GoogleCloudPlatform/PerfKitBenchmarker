@@ -49,7 +49,7 @@ flags.DEFINE_integer(
 flag_util.DEFINE_integerlist(
     'pgbench_client_counts',
     flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
-    'array of client counts passed to pgbench')
+    'array of client counts passed to pgbench', module_name=__name__)
 FLAGS = flags.FLAGS
 
 

@@ -16,6 +16,7 @@
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
 FLAGS = flags.FLAGS
@@ -61,3 +62,15 @@ class Bigquery(edw_service.EdwService):
     """Bigquery specific run script command components."""
     bq = self.cluster_identifier.split('.')
     return '--bq_project_id={} --bq_dataset_id={}'.format(bq[0], bq[1])
+
+  def InstallAndAuthenticateRunner(self, vm):
+    """Method to perform installation and authentication of bigquery runner.
+
+    Native Bigquery client that ships with the google_cloud_sdk
+    https://cloud.google.com/bigquery/docs/bq-command-line-too used as client.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    vm.Install('google_cloud_sdk')
+    gcp_util.AuthenticateServiceAccount(vm)

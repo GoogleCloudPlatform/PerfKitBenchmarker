@@ -86,6 +86,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.cluster_id = None
     self.all_instance_ids = []
+    self.primary_zone = None
+    self.secondary_zone = None
 
     if hasattr(self.spec, 'zones') and self.spec.zones is not None:
       self.zones = self.spec.zones
@@ -219,15 +221,14 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
 
-    create_db_subnet_group_cmd = util.AWS_PREFIX + [
-        'rds',
-        'create-db-subnet-group',
-        '--db-subnet-group-name', db_subnet_group_name,
-        '--db-subnet-group-description', 'pkb_subnet_group_for_db',
-        '--region', self.region,
-        '--subnet-ids']
-    for subnet in subnets:
-      create_db_subnet_group_cmd.append(subnet.id)
+    create_db_subnet_group_cmd = util.AWS_PREFIX + (
+        ['rds',
+         'create-db-subnet-group',
+         '--db-subnet-group-name', db_subnet_group_name,
+         '--db-subnet-group-description', 'pkb_subnet_group_for_db',
+         '--region', self.region,
+         '--subnet-ids'] + [subnet.id for subnet in subnets] +
+        ['--tags'] + util.MakeFormattedDefaultTags())
 
     vm_util.IssueCommand(create_db_subnet_group_cmd)
 
@@ -302,8 +303,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--engine-version=%s' % self.spec.engine_version,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
-          '--availability-zone=%s' % self.spec.vm_spec.zone
-      ]
+          '--availability-zone=%s' % self.spec.vm_spec.zone,
+          '--tags'] + util.MakeFormattedDefaultTags()
 
       if self.spec.disk_spec.disk_type == aws_disk.IO1:
         cmd.append('--iops=%s' % self.spec.disk_spec.iops)
@@ -335,8 +336,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--region=%s' % self.region,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
-          '--availability-zones=%s' % self.spec.zones[0]
-      ]
+          '--availability-zones=%s' % self.spec.zones[0],
+          '--tags'] + util.MakeFormattedDefaultTags()
+
       self.cluster_id = cluster_identifier
       vm_util.IssueCommand(cmd)
 
@@ -360,8 +362,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
             '--no-auto-minor-version-upgrade',
             '--db-instance-class=%s' % self.spec.machine_type,
             '--region=%s' % self.region,
-            '--availability-zone=%s' % zone
-        ]
+            '--availability-zone=%s' % zone,
+            '--tags'] + util.MakeFormattedDefaultTags()
         vm_util.IssueCommand(cmd)
 
     else:
@@ -448,11 +450,17 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       describe_instance_json: output in json format from calling
         'aws rds describe-db-instances'
     """
-    self.primary_zone = (
-        describe_instance_json['DBInstances'][0]['AvailabilityZone'])
-    if self.spec.high_availability:
-      self.secondary_zone = (describe_instance_json['DBInstances'][0]
-                             ['SecondaryAvailabilityZone'])
+
+    if self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+      self.primary_zone = self.zones[0]
+      if len(self.zones) > 1:
+        self.secondary_zone = ','.join(self.zones[1:])
+    else:
+      self.primary_zone = (
+          describe_instance_json['DBInstances'][0]['AvailabilityZone'])
+      if self.spec.high_availability:
+        self.secondary_zone = (describe_instance_json['DBInstances'][0]
+                               ['SecondaryAvailabilityZone'])
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.

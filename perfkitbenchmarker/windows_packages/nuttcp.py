@@ -90,7 +90,9 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
         exec_dir=vm.temp_dir,
         exec_path=exec_path,
         options=options)
-    vm.RemoteCommand(command)
+    # Timeout after expected duration, 5sec server wait plus 25sec buffer
+    timeout_duration = FLAGS.nuttcp_udp_stream_seconds + 30
+    vm.RemoteCommand(command, timeout=timeout_duration)
 
   samples = []
 
@@ -103,8 +105,18 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
   if FLAGS.nuttcp_udp_unlimited_bandwidth:
     bandwidths.append('u')
 
-  for bandwidth in bandwidths:
+  @vm_util.Retry(max_retries=15)
+  def RunSingleBandwidth(bandwidth):
+    """Create a server-client nuttcp pair.
 
+    The server exits after the client completes its request.
+
+    Args:
+      bandwidth: the requested transmission bandwidth
+
+    Returns:
+      output from the client nuttcp process.
+    """
     sender_args = ('-u -p{data_port} -P{control_port} -R{bandwidth} '
                    '-T{time} -l{packet_size} {dest_ip} > {out_file}').format(
                        data_port=UDP_PORT,
@@ -119,10 +131,14 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
         data_port=UDP_PORT,
         control_port=CONTROL_PORT)
 
-    threaded_args = [((receiving_vm, receiver_args), {}),
-                     ((sending_vm, sender_args), {})]
+    threaded_args = [(_RunNuttcp, (receiving_vm, receiver_args), {}),
+                     (_RunNuttcp, (sending_vm, sender_args), {})]
 
-    vm_util.RunThreaded(_RunNuttcp, threaded_args)
+    vm_util.RunParallelThreads(threaded_args, 200, 5)
+
+  for bandwidth in bandwidths:
+
+    RunSingleBandwidth(bandwidth)
 
     # retrieve the results and parse them
     cat_command = 'cd {nuttcp_exec_dir}; cat {out_file}'.format(
@@ -138,7 +154,7 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
 #  drop/pkt 6.72 %loss
 
 
-def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
+def GetUDPStreamSample(command_out, sending_vm, receiving_vm, request_bandwidth,
                        network_type, iteration):
   """Get a sample from the nuttcp string results.
 
@@ -146,7 +162,7 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
     command_out: the nuttcp output.
     sending_vm: vm sending the UDP packets.
     receiving_vm: vm receiving the UDP packets.
-    bandwidth: the requested bandwidth in the nuttcp sample.
+    request_bandwidth: the requested bandwidth in the nuttcp sample.
     network_type: the type of the network, external or internal.
     iteration: the run number of the test.
 
@@ -156,7 +172,7 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
   data_line = command_out.split('\n')[0].split(' ')
   data_line = [val for val in data_line if val]
 
-  bandwidth = float(data_line[6])
+  actual_bandwidth = float(data_line[6])
   units = data_line[7]
   packet_loss = data_line[16]
 
@@ -166,9 +182,9 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
       'sending_machine_type': sending_vm.machine_type,
       'sending_zone': sending_vm.zone,
       'packet_loss': packet_loss,
-      'bandwidth_requested': bandwidth,
+      'bandwidth_requested': request_bandwidth,
       'network_type': network_type,
       'iteration': iteration
   }
 
-  return sample.Sample('bandwidth', bandwidth, units, metadata)
+  return sample.Sample('bandwidth', actual_bandwidth, units, metadata)

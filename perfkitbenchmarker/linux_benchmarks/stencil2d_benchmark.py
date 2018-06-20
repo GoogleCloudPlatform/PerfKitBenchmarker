@@ -33,7 +33,7 @@ flag_util.DEFINE_integerlist(
     'number, like --stencil2d_problem_sizes=4096 '
     'or a list like --stencil2d_problem_sizes='
     '1024,4096',
-    on_nonincreasing=flag_util.IntegerListParser.WARN)
+    on_nonincreasing=flag_util.IntegerListParser.WARN, module_name=__name__)
 FLAGS = flags.FLAGS
 
 MACHINEFILE = 'machinefile'

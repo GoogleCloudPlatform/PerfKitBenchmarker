@@ -20,6 +20,7 @@ managed data warehouse solutions such as Redshift and BigQuery.
 
 
 import copy
+import json
 import os
 
 from perfkitbenchmarker import configs
@@ -46,8 +47,11 @@ edw_benchmark:
     client:
       vm_spec: *default_single_core
 """
-flags.DEFINE_list('edw_benchmark_scripts', 'sample.sql', 'Comma separated '
-                                                         'list of scripts.')
+
+SERVICE_SPECIFIC_SCRIPT_LIST = ['script_runner.sh',
+                                'provider_specific_script_driver.py']
+
+flags.DEFINE_string('edw_benchmark_script', None, 'Path to the sql script.')
 
 FLAGS = flags.FLAGS
 
@@ -56,63 +60,75 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+def _PushScripts(benchmark_spec, vm):
+  """Method to push the sql script and driver scripts on the client vm.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+    required to run the benchmark.
+    vm: Client vm on which the script will be run.
+  """
+  service_specific_dir = os.path.join('edw',
+                                      benchmark_spec.edw_service.SERVICE_TYPE)
+
+  def _PushServiceSpecificScripts():
+    """Push service type specific scripts."""
+    for script in SERVICE_SPECIFIC_SCRIPT_LIST:
+      vm.PushFile(data.ResourcePath(os.path.join(service_specific_dir, script)))
+    runner_perms_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    vm.RemoteCommand(runner_perms_update_cmd)
+
+  vm.PushFile(data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+  _PushServiceSpecificScripts()
+  vm.PushFile(FLAGS.edw_benchmark_script)
+
+
+def RunScriptsAndParseOutput(launch_command, vm):
+  """A function to launch the command and return the performance.
+
+  Args:
+    launch_command: Arguments to the script driver.
+    vm: Client vm on which the script will be run.
+
+  Returns:
+    json representation of the performance results.
+  """
+  stdout, _ = vm.RemoteCommand(launch_command)
+  performance = json.loads(stdout)
+  return performance
+
+
 def Prepare(benchmark_spec):
+  """Install script execution environment on the client vm.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+    required to run the benchmark.
+  """
   vm = benchmark_spec.vms[0]
-  vm.Install('pgbench')
+  vm.Install('pip')
+  vm.RemoteCommand('sudo pip install absl-py')
+  edw_service_instance = benchmark_spec.edw_service
+  edw_service_instance.InstallAndAuthenticateRunner(vm)
+  _PushScripts(benchmark_spec, vm)
 
 
 def Run(benchmark_spec):
   """Run phase executes the sql scripts on edw cluster and collects duration."""
   vm = benchmark_spec.vms[0]
-  driver_name = '{}_driver.sh'.format(benchmark_spec.edw_service.SERVICE_TYPE)
-  driver_path = data.ResourcePath(os.path.join('edw', driver_name))
-  vm.PushFile(driver_path)
-
-  scripts_dir = '{}_sql'.format(benchmark_spec.edw_service.SERVICE_TYPE)
-  scripts_list = FLAGS.edw_benchmark_scripts
-  for script in scripts_list:
-    script_path = data.ResourcePath(os.path.join('edw', scripts_dir, script))
-    vm.PushFile(script_path)
-
-  driver_perms_update_cmd = 'chmod 755 {}'.format(driver_name)
-  vm.RemoteCommand(driver_perms_update_cmd)
-
-  endpoint = benchmark_spec.edw_service.endpoint
-  db = benchmark_spec.edw_service.db
-  user = benchmark_spec.edw_service.user
-  password = benchmark_spec.edw_service.password
-
-  launch_command_generic = './{} {} {} {} {} '.format(driver_name, endpoint, db,
-                                                      user, password)
-  scripts_list = FLAGS.edw_benchmark_scripts
-
-  results = []
   edw_service_instance = benchmark_spec.edw_service
-  edw_metadata = copy.copy(edw_service_instance.GetMetadata())
-
-  if FLAGS.edw_query_execution_mode == 'sequential':
-    total_time = 0.0
-    for script in scripts_list:
-      launch_command = '{}{}'.format(launch_command_generic, script)
-      stdout, _ = vm.RemoteCommand(launch_command)
-      sql_script_metadata = copy.copy(edw_metadata)
-      sql_script_metadata['edw_benchmark_script'] = script
-      results.append(sample.Sample('sql_script_run_time', float(stdout),
-                                   'seconds', sql_script_metadata))
-      total_time += float(stdout)
-    edw_metadata['edw_query_execution_mode'] = 'sequential'
-    edw_metadata['edw_benchmark_scripts'] = FLAGS.edw_benchmark_scripts
-    results.append(sample.Sample('all_sql_run_time', total_time, 'seconds',
-                                 edw_metadata))
-  else:
-    scripts_list_serialized = ' '.join(scripts_list)
-    launch_command = '{}{}'.format(launch_command_generic,
-                                   scripts_list_serialized)
-    stdout, _ = vm.RemoteCommand(launch_command)
-    edw_metadata['edw_query_execution_mode'] = 'concurrent'
-    edw_metadata['edw_benchmark_scripts'] = FLAGS.edw_benchmark_scripts
-    results.append(sample.Sample('all_sql_run_time', float(stdout), 'seconds',
-                                 edw_metadata))
+  instance_specific_launch_command = edw_service_instance.RunCommandHelper()
+  script_name = os.path.basename(os.path.normpath(FLAGS.edw_benchmark_script))
+  launch_command = ' '.join(['python', 'script_driver.py',
+                             '--script={}'.format(script_name),
+                             instance_specific_launch_command])
+  script_performance = RunScriptsAndParseOutput(launch_command, vm)[script_name]
+  results = []
+  script_metadata = copy.copy(edw_service_instance.GetMetadata())
+  script_metadata['script'] = script_name
+  script_performance_sample = sample.Sample(
+      'script_runtime', script_performance, 'seconds', script_metadata)
+  results.append(script_performance_sample)
   return results
 
 

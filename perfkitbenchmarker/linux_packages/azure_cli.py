@@ -26,7 +26,7 @@ Steps for both Apt and Yum installs:
 
 # Debian info
 _DEB_REPO_FILE = '/etc/apt/sources.list.d/azure-cli.list'
-_DEB_REPO_KEY = '52E16F86FEE04B979B07E28DB02C46DF417A0893'
+_DEB_REPO_KEY = 'https://packages.microsoft.com/keys/microsoft.asc'
 _DEB_REPO = ('deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ '
              '{az_repo} main')
 
@@ -53,9 +53,8 @@ def AptInstall(vm):
   vm.InstallPackages('apt-transport-https')
   az_repo, _ = vm.RemoteCommand('lsb_release -cs')
   _CreateFile(vm, _DEB_REPO.format(az_repo=az_repo.strip()), _DEB_REPO_FILE)
-  vm.RemoteCommand(('sudo apt-key adv '
-                    '--keyserver packages.microsoft.com '
-                    '--recv-keys {key}').format(key=_DEB_REPO_KEY))
+  vm.RemoteCommand(
+      'curl -L {key} | sudo apt-key add -'.format(key=_DEB_REPO_KEY))
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('azure-cli')
 

@@ -126,10 +126,12 @@ flag_util.DEFINE_integerlist('fio_io_depths', flag_util.IntegerList([1]),
                              'number, like --fio_io_depths=1, a range, like '
                              '--fio_io_depths=1-4, or a list, like '
                              '--fio_io_depths=1-4,6-8',
-                             on_nonincreasing=flag_util.IntegerListParser.WARN)
+                             on_nonincreasing=flag_util.IntegerListParser.WARN,
+                             module_name=__name__)
 flag_util.DEFINE_integerlist('fio_num_jobs', flag_util.IntegerList([1]),
                              'Number of concurrent fio jobs to run.',
-                             on_nonincreasing=flag_util.IntegerListParser.WARN)
+                             on_nonincreasing=flag_util.IntegerListParser.WARN,
+                             module_name=__name__)
 flags.DEFINE_integer('fio_working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device. If using '
@@ -236,8 +238,8 @@ group_reporting=1
 {{parameter}}
 {%- endfor %}
 {%- for scenario in scenarios %}
-{%- for iodepth in iodepths %}
 {%- for numjob in numjobs %}
+{%- for iodepth in iodepths %}
 
 [{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
 stonewall
@@ -442,7 +444,7 @@ def Prepare(benchmark_spec):
 def GetFileAsString(file_path):
   if not file_path:
     return None
-  with open(file_path, 'r') as jobfile:
+  with open(data.ResourcePath(file_path), 'r') as jobfile:
     return jobfile.read()
 
 

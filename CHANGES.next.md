@@ -23,6 +23,7 @@
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
   Redis Cache in Azure.
+- YCSB benchmark for DynamoDB in AWS.
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
   called a specified number of times
 - Added cuda_toolkit_version flag
@@ -51,6 +52,14 @@
 - Added support for custom machine types on GKE.
 - Added `container_cluster_version` flag to container_service.py.
 - AWS EFS support via "disk_type: nfs"
+- Added disk_fill_size and prepare_sleep_time flags
+- Add timeout_minutes flag to assist with cleaning up stale resources
+- All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
+- Added windows udp test using iperf3.
+- Added timeout-decorator python package.
+- Added timeout support for windows vm remote command call.
+- Added IOR benchmark.
+- Added mdtest to IOR benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -119,6 +128,13 @@
 - Support for cloud NFS services (no implementation).
 - Added support for default batch sizes given a certain GPU type and model in
   the Tensorflow benchmark.
+- Added method to get the NfsService from the linux_virtual_machine.
+- Added support for fio job files in the data directory.
+- Added InvalidConfigurationError.
+- Added owner tag in metadata.
+- Added support for NVIDIA P4 GPUs.
+- Added YCSB timeseries parsing.
+- Added Intel MKL to HPCC benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -215,3 +231,18 @@
 - Added support for more AWS regions in the object storage benchmark.
 - Add ability to skip known failing scripts when running edw profiles.
 - Set the control port and data port for nuttcp benchmark.
+- Fix overwriting of bandwidth variable in nuttcp benchmark.
+- Fixed fio histogram parsing.
+- Refactored AwsKeyFileManager out of AwsVirtualMachine.
+- Added delay between server and client initiation to windows benchmarks.
+- Defaulted static machines to linux based.
+- Add time limit to windows fio benchmark.
+- Adding -w buffer parameter to windows iperf3 benchmark.
+- Fixed a bug in how we select images on AWS by introducing an additional
+  regular expression to match against image names.
+- Terminate long running servers on windows benchmarks with timeouts.
+- Updated azure_cli package to match installation instructions.
+- Fix helpmatch for intergerlist.
+- Fix PSPing benchmark so that it runs on AWS and Azure.
+- Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
+- Moved from ACS to AKS for Azure Kubernetes clusters.

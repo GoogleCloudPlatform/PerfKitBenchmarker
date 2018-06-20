@@ -68,13 +68,14 @@ def StartPspingServer(vm):
 
 def _RunPsping(vm, command):
   try:
-    vm.RemoteCommand(command)
+    vm.RemoteCommand(command, timeout=FLAGS.psping_timeout)
   except errors.VirtualMachine.RemoteCommandError:
     # We expect psping to return an error here because the psping server has
     # to be killed with a CTRL+C.
     pass
 
 
+@vm_util.Retry(max_retries=15)
 def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
   """Run the psping latency test.
 
@@ -112,17 +113,10 @@ def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
           psping_exec_dir=sending_vm.temp_dir,
           port=TEST_PORT)
 
-  # psping does not have a way to exit without killing the program from the
-  # outside. Therefore we need an extra command running whose only purpose
-  # is to kill the server after a timeout.
-  killer_command = 'timeout /t {timeout}; taskkill /F /im psping.exe'.format(
-      timeout=FLAGS.psping_timeout)
+  threaded_args = [(_RunPsping, (receiving_vm, server_command), {}),
+                   (_RunPsping, (sending_vm, client_command), {})]
 
-  threaded_args = [((sending_vm, client_command), {}),
-                   ((receiving_vm, server_command), {}),
-                   ((receiving_vm, killer_command), {})]
-
-  vm_util.RunThreaded(_RunPsping, threaded_args)
+  vm_util.RunParallelThreads(threaded_args, 200, 1)
 
   cat_command = 'cd {psping_exec_dir}; cat {out_file}'.format(
       psping_exec_dir=sending_vm.temp_dir,
