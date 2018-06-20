@@ -116,6 +116,11 @@ flags.DEFINE_integer('num_disable_cpus', None,
 flags.DEFINE_integer('disk_fill_size', 0,
                      'Size of file to create in GBs.')
 
+flags.DEFINE_bool(
+    'enable_transparent_hugepages', None, 'Whether to enable or '
+    'disable transparent hugepages. If unspecified, the setting '
+    'is unchanged from the default in the OS.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -137,6 +142,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+
+  def _SetTransparentHugepages(self):
+    """Sets transparent hugepages based on --enable_transparent_hugepages.
+
+    If the flag is unset (None), this is a nop.
+    """
+    if FLAGS.enable_transparent_hugepages is None:
+      return
+    setting = 'always' if FLAGS.enable_transparent_hugepages else 'never'
+    self.RemoteCommand(
+        'echo %s | sudo tee /sys/kernel/mm/transparent_hugepage/enabled' %
+        setting)
+    self.os_metadata['transparent_hugepage'] = setting
 
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
@@ -259,6 +277,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     self._CreateVmTmpDir()
+    self._SetTransparentHugepages()
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
@@ -670,6 +689,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     This will be called after every call to Reboot().
     """
     self._CreateVmTmpDir()
+    self._SetTransparentHugepages()
 
   def MoveFile(self, target, source_path, remote_path=''):
     self.MoveHostFile(target, source_path, remote_path)
@@ -1594,8 +1614,8 @@ class JujuMixin(DebianMixin):
 
       # Accept blocked because the service may be waiting on relation
       if ss not in ['active', 'unknown']:
-          raise errors.Juju.TimeoutException(
-              'Service %s is not ready; status is %s' % (service, ss))
+        raise errors.Juju.TimeoutException(
+            'Service %s is not ready; status is %s' % (service, ss))
 
       if ss in ['error']:
         # The service has failed to deploy.

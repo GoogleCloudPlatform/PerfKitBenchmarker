@@ -135,6 +135,8 @@
 - Added support for NVIDIA P4 GPUs.
 - Added YCSB timeseries parsing.
 - Added Intel MKL to HPCC benchmark.
+- Added flag support for enabling or disabling transparent hugepages on Linux
+  VMs.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
