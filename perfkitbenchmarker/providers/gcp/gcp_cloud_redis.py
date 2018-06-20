@@ -39,7 +39,6 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     super(CloudRedis, self).__init__(spec)
     self.project = FLAGS.project
     self.size = FLAGS.gcp_redis_gb
-    self.version = spec.redis_version
     self.redis_region = FLAGS.redis_region
     self.failover_style = FLAGS.redis_failover_style
     if self.failover_style == cloud_redis.Failover.FAILOVER_NONE:
@@ -61,7 +60,6 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     """
     result = super(CloudRedis, self).GetResourceMetadata()
     result['size'] = self.size
-    result['version'] = self.version
     result['tier'] = self.tier
     result['region'] = self.redis_region
     return result
@@ -75,7 +73,6 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     cmd.flags['network'] = FLAGS.gce_network_name
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
-    cmd.flags['redis-version'] = self.version
     cmd.Issue()
 
   def _Delete(self):
