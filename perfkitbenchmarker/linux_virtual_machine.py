@@ -1698,3 +1698,4 @@ class JujuMixin(DebianMixin):
       for unit in self.units:
         unit.controller = self
         self.JujuAddMachine(unit)
+        
