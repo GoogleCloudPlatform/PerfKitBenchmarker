@@ -170,3 +170,23 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
     message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
     logging.error(message)
     raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+
+
+def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud'):
+  """Authorize gcloud to access Cloud Platform with a Google service account.
+
+  If you want gcloud (and other tools in the Cloud SDK) to use service account
+  credentials to make requests, use this method to authenticate.
+  Account name is provided by FLAGS.gcp_service_account
+  Credentials are fetched from a file whose local path is provided by
+  FLAGS.gcp_service_account_key_filethat. It contains private authorization key.
+
+  Args:
+    vm: vm on which the gcloud library needs to be authenticated.
+    vm_gcloud_path: Optional path to the gcloud binary on the vm.
+  """
+  vm.PushFile(FLAGS.gcp_service_account_key_file)
+  activate_cmd = ('{} auth activate-service-account {} --key-file={}'
+                  .format(vm_gcloud_path, FLAGS.gcp_service_account,
+                          FLAGS.gcp_service_account_key_file.split('/')[-1]))
+  vm.RemoteCommand(activate_cmd)

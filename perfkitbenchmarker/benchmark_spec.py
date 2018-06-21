@@ -13,10 +13,10 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
-import datetime
 import contextlib
 import copy
 import copy_reg
+import datetime
 import importlib
 import logging
 import os
@@ -26,6 +26,7 @@ import threading
 import uuid
 
 from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
@@ -35,10 +36,10 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -130,6 +131,8 @@ class BenchmarkSpec(object):
     self.cloud_tpu = None
     self.edw_service = None
     self.cloud_redis = None
+    self.nfs_service = None
+    self.app_groups = {}
     self._zone_index = 0
 
     # Modules can't be pickled, but functions can, so we store the functions
@@ -140,6 +143,9 @@ class BenchmarkSpec(object):
 
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
 
   def __str__(self):
     return(
@@ -234,6 +240,27 @@ class BenchmarkSpec(object):
     cloud_redis_class = cloud_redis.GetCloudRedisClass(cloud)
     self.cloud_redis = cloud_redis_class(self.config.cloud_redis)
 
+  def ConstructNfsService(self):
+    """Construct the NFS service object.
+
+    Creates an NFS Service only if an NFS disk is found in the disk_specs.
+    """
+    if self.nfs_service:
+      logging.info('NFS service already created: %s', self.nfs_service)
+      return
+    for group_spec in self.config.vm_groups.values():
+      if not group_spec.disk_spec:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type != disk.NFS:
+        continue
+      cloud = group_spec.cloud
+      providers.LoadProvider(cloud)
+      nfs_class = nfs_service.GetNfsServiceClass(cloud)
+      self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
+      logging.info('NFS service %s', self.nfs_service)
+      break
+
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
     vms = []
@@ -295,7 +322,7 @@ class BenchmarkSpec(object):
     return vms
 
   def _CheckBenchmarkSupport(self, cloud):
-    """ Throw an exception if the benchmark isn't supported."""
+    """Throw an exception if the benchmark isn't supported."""
 
     if FLAGS.benchmark_compatibility_checking == SKIP_CHECK:
       return
@@ -411,6 +438,10 @@ class BenchmarkSpec(object):
     if self.container_cluster:
       self.container_cluster.Create()
 
+    # do after network setup but before VM created
+    if self.nfs_service:
+      self.nfs_service.Create()
+
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
       sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
@@ -457,6 +488,8 @@ class BenchmarkSpec(object):
       self.cloud_tpu.Delete()
     if self.edw_service:
       self.edw_service.Delete()
+    if self.nfs_service:
+      self.nfs_service.Delete()
 
     if self.vms:
       try:
@@ -503,6 +536,29 @@ class BenchmarkSpec(object):
     targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
 
+  def GetResourceTags(self, timeout_minutes=None):
+    """Gets a list of tags to be used to tag resources."""
+    now_utc = datetime.datetime.utcnow()
+
+    if not timeout_minutes:
+      timeout_minutes = FLAGS.timeout_minutes
+
+    timeout_utc = (
+        now_utc +
+        datetime.timedelta(minutes=timeout_minutes))
+
+    time_format = '%Y-%m-%d %H:%M:%S'
+
+    tags = {
+        'timeout_utc': timeout_utc.strftime(time_format),
+        'create_time_utc': now_utc.strftime(time_format),
+        'benchmark': self.name,
+        'perfkit_uuid': self.uuid,
+        'owner': FLAGS.owner
+    }
+
+    return tags
+
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
 
@@ -537,7 +593,9 @@ class BenchmarkSpec(object):
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
         'benchmark_uid': self.uid,
-        'create_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        'create_time_utc':
+        datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        'owner': FLAGS.owner
     }
     for item in FLAGS.vm_metadata:
       if ':' not in item:

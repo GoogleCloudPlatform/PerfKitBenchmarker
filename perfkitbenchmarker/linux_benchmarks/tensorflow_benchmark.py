@@ -39,20 +39,17 @@ tensorflow:
   description: Runs Tensorflow Benchmark.
   vm_groups:
     default:
+      os_type: ubuntu1604
       vm_spec:
         GCP:
-          image: ubuntu-1604-xenial-v20180122
-          image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-41e0b93b
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
         Azure:
-          image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
 """
@@ -129,11 +126,49 @@ flags.register_validator('tf_local_parameter_device',
                          LocalParameterDeviceValidator)
 
 
+
+NVIDIA_TESLA_P4 = cuda_toolkit.NVIDIA_TESLA_P4
+NVIDIA_TESLA_K80 = cuda_toolkit.NVIDIA_TESLA_K80
+NVIDIA_TESLA_P100 = cuda_toolkit.NVIDIA_TESLA_P100
+NVIDIA_TESLA_V100 = cuda_toolkit.NVIDIA_TESLA_V100
+
 DEFAULT_BATCH_SIZE = 64
-DEFAULT_BATCH_SIZES_BY_MODEL = {
-    'vgg16': 32,
-    'alexnet': 512,
-    'resnet152': 32,
+DEFAULT_BATCH_SIZES = {
+    CPU: {
+        'alexnet': 512,
+        'inception3': 64,
+        'resnet50': 64,
+        'resnet152': 32,
+        'vgg16': 32,
+    },
+    NVIDIA_TESLA_K80: {
+        'alexnet': 512,
+        'inception3': 64,
+        'resnet50': 64,
+        'resnet152': 32,
+        'vgg16': 32,
+    },
+    NVIDIA_TESLA_P4: {
+        'alexnet': 512,
+        'inception3': 128,
+        'resnet50': 128,
+        'resnet152': 64,
+        'vgg16': 64,
+    },
+    NVIDIA_TESLA_P100: {
+        'alexnet': 512,
+        'inception3': 256,
+        'resnet50': 256,
+        'resnet152': 128,
+        'vgg16': 128,
+    },
+    NVIDIA_TESLA_V100: {
+        'alexnet': 512,
+        'inception3': 256,
+        'resnet50': 256,
+        'resnet152': 128,
+        'vgg16': 128,
+    },
 }
 
 
@@ -157,12 +192,40 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def _GetDefaultBatchSizeByModel(model):
-  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, DEFAULT_BATCH_SIZE)
+def _GetDefaultBatchSizeByModel(model, gpu_type):
+  """Return the default batch size for a given model and gpu / cpu type.
+
+  If gpu_type is none, it is assumed that the model will be running on the CPU.
+  If there is no default for the given model and gpu_type, a default batch
+  size will be returned as defined by DEFAULT_BATCH_SIZE.
+
+  Args:
+    model: name of the Tensorflow model
+    gpu_type: type of the GPU, or None
+
+  Returns:
+    default batch size for the given model / gpu_type,
+    or the default batch size.
+  """
+  computation_device = gpu_type or CPU
+  try:
+    return DEFAULT_BATCH_SIZES[computation_device][model]
+  except KeyError:
+    return DEFAULT_BATCH_SIZE
 
 
-def _GetBatchSizes(model):
-  return FLAGS.tf_batch_sizes or [_GetDefaultBatchSizeByModel(model)]
+def _GetBatchSizes(model, gpu_type):
+  """Return the batch_size flag if specified, or the appropriate default if not.
+
+  Args:
+    model: name of the Tensorflow model
+    gpu_type: type of the GPU, or None
+
+  Returns:
+    value of the batch_size flag if specified, or the default batch size for the
+    given model / gpu_type.
+  """
+  return FLAGS.tf_batch_sizes or [_GetDefaultBatchSizeByModel(model, gpu_type)]
 
 
 def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
@@ -207,6 +270,9 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm_util.RunThreaded(_PrepareVm, vms)
   benchmark_spec.tensorflow_version = tensorflow.GetTensorFlowVersion(vms[0])
+
+  if cuda_toolkit.CheckNvidiaGpuExists(vms[0]):
+    benchmark_spec.gpu_type = cuda_toolkit.GetGpuType(vms[0])
 
 
 def _GetMetadataFromBenchmarkArgs(tf_cnn_benchmark_args):
@@ -454,8 +520,9 @@ def _RunOnVm(vm, benchmark_spec):
   if FLAGS.tf_benchmark_args:
     return [_RunModelOnVm(vm, None, None, benchmark_spec)]
 
+  gpu_type = getattr(benchmark_spec, 'gpu_type', None)
   for model in FLAGS.tf_models:
-    for batch_size in _GetBatchSizes(model):
+    for batch_size in _GetBatchSizes(model, gpu_type):
       samples.append(_RunModelOnVm(vm, model, batch_size, benchmark_spec))
   return samples
 
@@ -483,8 +550,9 @@ def _RunDistributedTf(benchmark_spec):
       ps_args=_GetHostsArgs(ps_hosts), worker_args=_GetHostsArgs(worker_hosts))
   flattened_results = []
   vm_pid = collections.namedtuple('vm_pid', 'vm pid')
+  gpu_type = getattr(benchmark_spec, 'gpu_type', None)
   for model in FLAGS.tf_models:
-    for batch_size in _GetBatchSizes(model):
+    for batch_size in _GetBatchSizes(model, gpu_type):
       ps_pids = []
       for task_index, vm in enumerate(ps_hosts):
         dist_ps_args = ('{args} --task_index={index} &\n'

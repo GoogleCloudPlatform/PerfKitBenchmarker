@@ -57,9 +57,9 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
           attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None]
       if unset_attrs:
         raise Exception(
-            'Subclasses of %s must have the following attrs set: %s. The '
-            'following attrs were not set: %s.' %
-            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, unset_attrs))
+            'Subclasses of %s must have the following attrs set: %s. For %s '
+            'the following attrs were not set: %s.' %
+            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs))
       key = [cls.RESOURCE_TYPE]
       key += sorted([(attr, getattr(cls, attr)) for attr in cls.REQUIRED_ATTRS])
       _RESOURCE_REGISTRY[tuple(key)] = cls
@@ -82,6 +82,11 @@ class BaseResource(object):
   REQUIRED_ATTRS = ['CLOUD']
 
   __metaclass__ = AutoRegisterResourceMeta
+
+  # Timeout in seconds for resource to be ready.
+  READY_TIMEOUT = None
+  # Time between retries.
+  POLL_INTERVAL = 5
 
   def __init__(self, user_managed=False):
     super(BaseResource, self).__init__()
@@ -153,7 +158,7 @@ class BaseResource(object):
     return False
 
   def _PostCreate(self):
-    """Method that will be called once after _CreateReource is called.
+    """Method that will be called once after _CreateResource() is called.
 
     Supplying this method is optional. If it is supplied, it will be called
     once, after the resource is confirmed to exist. It is intended to allow
@@ -215,9 +220,8 @@ class BaseResource(object):
   def Create(self):
     """Creates a resource and its dependencies."""
 
-    # A more general solution would allow the retry interval to be set as a
-    # property of the class.  We don't currently need that.
-    @vm_util.Retry(poll_interval=5, fuzz=0,
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
+                   timeout=self.READY_TIMEOUT,
                    retryable_exceptions=(
                        errors.Resource.RetryableCreationError,))
     def WaitUntilReady():
@@ -237,7 +241,7 @@ class BaseResource(object):
     """Deletes a resource and its dependencies."""
 
     # Retryable method which allows waiting for deletion of the resource.
-    @vm_util.Retry(poll_interval=5, fuzz=0, timeout=3600,
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0, timeout=3600,
                    retryable_exceptions=(
                        errors.Resource.RetryableDeletionError,))
     def WaitUntilDeleted():

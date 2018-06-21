@@ -118,7 +118,7 @@ flags.DEFINE_integer(
 flag_util.DEFINE_integerlist(
     'multichase_thread_count', flag_util.IntegerList([1]),
     'Number of threads (one per core), to use when executing multichase. '
-    'Passed to multichase via its -t flag.')
+    'Passed to multichase via its -t flag.', module_name=__name__)
 _DefineMemorySizeFlag(
     'multichase_memory_size_min', _DEFAULT_MEMORY_SIZE,
     'Memory size to use when executing multichase. Passed to multichase via '

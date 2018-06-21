@@ -17,6 +17,7 @@
 import json
 
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -37,6 +38,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     self.login_server = None
     self.sku = 'Basic'
     self._deleted = False
+    self.acr_id = None
 
   def _Exists(self):
     """Returns True if the registry exists."""
@@ -48,8 +50,9 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     try:
       registry = json.loads(stdout)
       self.login_server = registry['loginServer']
+      self.acr_id = registry['id']
       return True
-    except Exception:
+    except ValueError:
       return False
 
   def _Create(self):
@@ -89,27 +92,31 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     return full_tag
 
 
-class AcsKubernetesCluster(container_service.KubernetesCluster):
+class AksCluster(container_service.KubernetesCluster):
+  """Class representing an Azure Kubernetes Service cluster."""
 
   CLOUD = providers.AZURE
 
   def __init__(self, spec):
     """Initializes the cluster."""
-    super(AcsKubernetesCluster, self).__init__(spec)
+    super(AksCluster, self).__init__(spec)
     self.resource_group = azure_network.GetResourceGroup(self.zone)
     self.name = 'pkbcluster%s' % FLAGS.run_uri
+    self.service_principal_id = None
     self._deleted = False
 
+  # TODO(ferneyhough): Consider adding
+  # --kubernetes-version=FLAGS.container_cluster_version.
   def _Create(self):
-    """Creates the ACS cluster."""
+    """Creates the AKS cluster."""
     vm_util.IssueCommand([
-        azure.AZURE_PATH, 'acs', 'create',
+        azure.AZURE_PATH, 'aks', 'create',
         '--name', self.name,
-        '--agent-vm-size', self.machine_type,
-        '--agent-count', str(self.num_nodes),
+        '--enable-rbac',
+        '--node-vm-size', self.machine_type,
+        '--node-count', str(self.num_nodes),
         '--location', self.zone,
-        '--orchestrator-type', 'Kubernetes',
-        '--dns-prefix', 'pkb' + FLAGS.run_uri,
+        '--dns-name-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
     ] + self.resource_group.args, timeout=1800)
 
@@ -118,25 +125,40 @@ class AcsKubernetesCluster(container_service.KubernetesCluster):
     if self._deleted:
       return False
     stdout, _, _ = vm_util.IssueCommand([
-        azure.AZURE_PATH, 'acs', 'show', '--name', self.name,
+        azure.AZURE_PATH, 'aks', 'show', '--name', self.name,
     ] + self.resource_group.args)
     try:
-      json.loads(stdout)
+      result = json.loads(stdout)
+      self.service_principal_id = result['servicePrincipalProfile']['clientId']
       return True
-    except:
+    except ValueError:
       return False
 
+  def _PostCreate(self):
+    """Authorize the cluster to pull images from ACR."""
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    registry = benchmark_spec.container_registry
+    if registry and registry.CLOUD == providers.AZURE:
+      create_role_assignment_cmd = [
+          azure.AZURE_PATH, 'role', 'assignment', 'create',
+          '--assignee', self.service_principal_id,
+          '--role', 'Reader',
+          '--scope', registry.acr_id,
+      ]
+      vm_util.IssueRetryableCommand(create_role_assignment_cmd)
+
   def _Delete(self):
-    """Deletes the ACS cluster."""
+    """Deletes the AKS cluster."""
     # This will be deleted along with the resource group
     self._deleted = True
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     vm_util.IssueCommand([
-        azure.AZURE_PATH, 'acs', 'kubernetes', 'get-credentials',
-        '--name', self.name, '--file', FLAGS.kubeconfig,
-        '--ssh-key-file', vm_util.GetPrivateKeyPath(),
+        azure.AZURE_PATH, 'aks', 'get-credentials',
+        '--admin',
+        '--name', self.name,
+        '--file', FLAGS.kubeconfig,
     ] + self.resource_group.args, suppress_warning=True)
     version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
     _, _, retcode = vm_util.IssueCommand(version_cmd, suppress_warning=True)

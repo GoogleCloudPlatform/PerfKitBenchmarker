@@ -19,8 +19,10 @@ import ConfigParser
 import csv
 import io
 import json
+import logging
 import time
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -104,8 +106,8 @@ def ParseJobFile(job_file):
   for section in config.sections():
     if section != GLOBAL:
       metadata = {}
-      metadata.update(dict(config.items(section)))
       metadata.update(global_metadata)
+      metadata.update(dict(config.items(section)))
       if JOB_STONEWALL_PARAMETER in metadata:
         del metadata[JOB_STONEWALL_PARAMETER]
       section_metadata[section] = metadata
@@ -250,7 +252,7 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
     if log_file_base and bin_vals:
       # Parse histograms
       aggregates = collections.defaultdict(collections.Counter)
-      for _ in xrange(int(job['job options']['numjobs'])):
+      for _ in xrange(int(parameters.get('numjobs', 1))):
         clat_hist_idx += 1
         hist_file_path = vm_util.PrependTempDir(
             '%s_clat_hist.%s.log' % (log_file_base, str(clat_hist_idx)))
@@ -273,8 +275,12 @@ def ComputeHistogramBinVals(vm, log_file):
   Returns:
     A list of float. Representing the mean value of the bin.
   """
-  return [float(v) for v in vm.RemoteCommand(
-      './%s %s' % (FIO_HIST_LOG_PARSER, log_file))[0].split()]
+  try:
+    return [float(v) for v in vm.RemoteCommand(
+        './%s %s' % (FIO_HIST_LOG_PARSER, log_file))[0].split()]
+  except errors.VirtualMachine.RemoteCommandError:
+    logging.exception('Calculate bin values for %s failed.', log_file)
+    return []
 
 
 def DeleteParameterFromJobFile(job_file, parameter):
@@ -305,6 +311,9 @@ def _ParseHistogram(hist_log_file, mean_bin_vals):
   Returns:
     A dict of the histograms, keyed by (data direction, block size).
   """
+  if not mean_bin_vals:
+    logging.warning('Skipping log file %s.', hist_log_file)
+    return {}
   aggregates = dict()
   with open(hist_log_file) as f:
     reader = csv.reader(f, delimiter=',')

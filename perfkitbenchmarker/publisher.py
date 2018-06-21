@@ -741,6 +741,7 @@ class InfluxDBPublisher(SamplePublisher):
       logging.error('Error connecting to the database:  %s', http_exception)
 
   def _ConstructSample(self, sample):
+    sample['product_name'] = FLAGS.product_name
     timestamp = str(int((10 ** 9) * sample['timestamp']))
     measurement = 'perfkitbenchmarker'
 
@@ -749,7 +750,7 @@ class InfluxDBPublisher(SamplePublisher):
       if sample['metadata']:
         tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
     tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
-                'metric', 'unit')
+                'metric', 'unit', 'product_name')
     ordered_tags = collections.OrderedDict([(k, sample[k]) for k in tag_keys])
     tag_set = ','.join(self._FormatToKeyValue(ordered_tags))
     if tag_set_metadata:
@@ -836,12 +837,12 @@ class SampleCollector(object):
       self.metadata_providers = DEFAULT_METADATA_PROVIDERS
 
     self.publishers = publishers[:] if publishers else []
+    for publisher_class in EXTERNAL_PUBLISHERS:
+      self.publishers.append(publisher_class())
     if publishers_from_flags:
       self.publishers.extend(SampleCollector._PublishersFromFlags())
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
-    for publisher_class in EXTERNAL_PUBLISHERS:
-      self.publishers.append(publisher_class())
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 

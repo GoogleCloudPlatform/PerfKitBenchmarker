@@ -344,6 +344,7 @@ class EcsService(container_service.BaseContainerService):
     self.load_balancer.Delete()
     self.target_group.Delete()
 
+  # TODO(ferneyhough): Consider supporting the flag container_cluster_version.
   def _Create(self):
     """Creates the service."""
     create_cmd = util.AWS_PREFIX + [
@@ -413,7 +414,7 @@ class FargateCluster(container_service.BaseContainerCluster):
   """Class representing an AWS Fargate cluster."""
 
   CLOUD = providers.AWS
-  CLUSTER_TYPE = container_service.SERVERLESS
+  CLUSTER_TYPE = 'Fargate'
 
   def __init__(self, cluster_spec):
     super(FargateCluster, self).__init__(cluster_spec)

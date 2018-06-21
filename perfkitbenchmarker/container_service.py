@@ -41,8 +41,7 @@ import yaml
 
 
 KUBERNETES = 'Kubernetes'
-SERVERLESS = 'Serverless'
-CLUSTER_TYPES = [KUBERNETES, SERVERLESS]
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('kubeconfig', None,
@@ -77,8 +76,13 @@ flags.DEFINE_integer('container_cluster_num_vms', None,
                      'Number of nodes in the cluster. Defaults to '
                      'container_cluster.vm_count')
 
-flags.DEFINE_enum('container_cluster_type', KUBERNETES, CLUSTER_TYPES,
-                  'The type of container cluster.')
+flags.DEFINE_string('container_cluster_type', KUBERNETES,
+                    'The type of container cluster.')
+
+flags.DEFINE_string('container_cluster_version', None,
+                    'Optional version flag to pass to the cluster create '
+                    'command. If not specified, the cloud-specific container '
+                    'implementation will chose an appropriate default.')
 
 
 ##### DOCKER STUFF HERE
@@ -405,6 +409,12 @@ class BaseContainerCluster(resource.BaseResource):
     super(BaseContainerCluster, self).__init__()
     self.name = 'pkb-%s' % FLAGS.run_uri
     self.machine_type = cluster_spec.vm_spec.machine_type
+    if self.machine_type is None:  # custom machine type
+      self.cpus = cluster_spec.vm_spec.cpus
+      self.memory = cluster_spec.vm_spec.memory
+    else:
+      self.cpus = None
+      self.memory = None
     self.gpu_count = cluster_spec.vm_spec.gpu_count
     self.gpu_type = cluster_spec.vm_spec.gpu_type
     self.zone = cluster_spec.vm_spec.zone
@@ -601,7 +611,18 @@ class KubernetesContainerService(BaseContainerService):
 
   def _Delete(self):
     """Deletes the service."""
-    pass
+    with vm_util.NamedTemporaryFile() as tf:
+      tf.write(_K8S_INGRESS.format(service_name=self.name))
+      tf.close()
+      kubernetes_helper.DeleteFromFile(tf.name)
+
+    delete_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig', FLAGS.kubeconfig,
+        'delete', 'deployment',
+        self.name
+    ]
+    vm_util.IssueCommand(delete_cmd)
 
 
 class KubernetesCluster(BaseContainerCluster):
@@ -619,7 +640,7 @@ class KubernetesCluster(BaseContainerCluster):
   def DeployContainerService(self, name, container_spec):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     service = KubernetesContainerService(container_spec, name)
-    self.containers[name] = service
+    self.services[name] = service
     service.Create()
 
 

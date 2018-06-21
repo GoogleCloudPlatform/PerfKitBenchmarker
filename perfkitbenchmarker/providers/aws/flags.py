@@ -42,7 +42,14 @@ flags.DEFINE_integer('aws_boot_disk_size', None,
 flags.DEFINE_string('kops', 'kops',
                     'The path to the kops binary.')
 flags.DEFINE_string('aws_image_name_filter', None,
-                    'The filter to use when searching for an image for a VM.')
+                    'The filter to use when searching for an image for a VM. '
+                    'See usage details in aws_virtual_machine.py around '
+                    'IMAGE_NAME_FILTER.')
+flags.DEFINE_string('aws_image_name_regex', None,
+                    'The Python regex to use to further filter images for a '
+                    'VM. This applies after the aws_image_name_filter. See '
+                    'usage details in aws_virtual_machine.py around '
+                    'IMAGE_NAME_REGEX.')
 flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
                     'AWS bucket where pre-provisioned data has been copied.')
 flags.DEFINE_string('redis_node_type',
@@ -51,3 +58,9 @@ flags.DEFINE_string('redis_node_type',
 flags.DEFINE_string('aws_elasticache_failover_zone',
                     None,
                     'AWS elasticache failover zone')
+flags.DEFINE_string('aws_efs_token', None,
+                    'The creation token used to create the EFS resource. '
+                    'If the file system already exists, it will use that '
+                    'instead of creating a new one.')
+flags.DEFINE_boolean('aws_delete_file_system', True,
+                     'Whether to delete the EFS file system.')

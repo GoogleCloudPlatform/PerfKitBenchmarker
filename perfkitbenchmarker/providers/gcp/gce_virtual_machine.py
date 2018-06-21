@@ -138,6 +138,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       if (flag_values.gcp_min_cpu_platform !=
           gcp_flags.GCP_MIN_CPU_PLATFORM_NONE):
         config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
+      else:
+        # Specifying gcp_min_cpu_platform explicitly removes any config.
+        config_values.pop('min_cpu_platform', None)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -236,7 +239,8 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
                              'node-groups', 'create', self.name)
     cmd.flags['node-template'] = self.node_template.name
     cmd.flags['target-size'] = 1
-    cmd.Issue()
+    _, stderr, retcode = cmd.Issue()
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _CreateDependencies(self):
     super(GceSoleTenantNodeGroup, self)._CreateDependencies()
@@ -629,9 +633,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       filename: The name of the file that was downloaded.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('gsutil -q cp gs://%s/%s/%s %s' % (
-        FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, filename)))
+    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
+        install_path, benchmark_name, filename))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
@@ -727,3 +730,12 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
     self.password = response['password']
+
+
+def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                       benchmark_name,
+                                                       filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'gsutil -q cp gs://%s/%s/%s %s' % (
+      FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+      posixpath.join(install_path, filename))

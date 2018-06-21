@@ -17,12 +17,13 @@
   `gcp_node_type`.
 
 ### New features:
-- Windows benchmarks can now be run from linux controllers
-- MXNet benchmarks can now be run from linux controllers
+- Windows benchmarks can now be run from linux controllers.
+- MXNet benchmarks can now be run from linux controllers.
 - Added initial support for preprovisioning benchmark binaries in the cloud,
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
   Redis Cache in Azure.
+- YCSB benchmark for DynamoDB in AWS.
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
   called a specified number of times
 - Added cuda_toolkit_version flag
@@ -48,6 +49,17 @@
 - Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
   Tensorflow benchmark, through the `benchmark_args` flag.
 - Added hdrhistogram support to ycsb package.
+- Added support for custom machine types on GKE.
+- Added `container_cluster_version` flag to container_service.py.
+- AWS EFS support via "disk_type: nfs"
+- Added disk_fill_size and prepare_sleep_time flags
+- Add timeout_minutes flag to assist with cleaning up stale resources
+- All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
+- Added windows udp test using iperf3.
+- Added timeout-decorator python package.
+- Added timeout support for windows vm remote command call.
+- Added IOR benchmark.
+- Added mdtest to IOR benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -107,6 +119,22 @@
 - Added a timeout to RobustRemoteCommand.
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
 - Preliminary support for NFS file systems
+- Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+- Added support for authorizing gcloud to access Cloud Platform with a Google service account.
+- Added support for specification of resource specific ready timeouts.
+- Adding runner utilities to execute multiple sql scripts on edw clusters.
+- TPU checkpoints and summaries are now stored in GCS.
+- Updated cloud TPU models version.
+- Support for cloud NFS services (no implementation).
+- Added support for default batch sizes given a certain GPU type and model in
+  the Tensorflow benchmark.
+- Added method to get the NfsService from the linux_virtual_machine.
+- Added support for fio job files in the data directory.
+- Added InvalidConfigurationError.
+- Added owner tag in metadata.
+- Added support for NVIDIA P4 GPUs.
+- Added YCSB timeseries parsing.
+- Added Intel MKL to HPCC benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -181,3 +209,40 @@
   stage metric.
 - Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
 - Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Fix Kubernetes StorageClass deletion
+- Added `git` installation to `tensorflow_serving` package.
+- MountDisk throws exception if mounting the disk fails.
+- Added support for preprovisioned benchmark data on KubernetesVirtualMachines.
+- Refactored speccpu2006 benchmark to use common elements for both
+  speccpu2006 and speccpu2017.
+- Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
+- Cleanup some redundant logging and duplicate decoder statements.
+- Fixed build_tools package re-installation for speccpu2006.
+- Fixed fio job parsing, section parameters should always overrides global
+  job parameters.
+- Refactored StaticVirtualMachines to use GetResourceClass() pattern.
+- Fixing the Redshift provider implementation to extend the edw benchmarking in pkb.
+- Support using --gcp_min_cpu_platform=none to clear --min-cpu-platform. This
+  lets the flag override a benchmark spec.
+- Fix windows security protocol casting.
+- Added '--iteration' to MNIST benchmark. The default value of 50 is too small
+  and can result in excessive communication overhead which negatively impacts
+  performance.
+- Added support for more AWS regions in the object storage benchmark.
+- Add ability to skip known failing scripts when running edw profiles.
+- Set the control port and data port for nuttcp benchmark.
+- Fix overwriting of bandwidth variable in nuttcp benchmark.
+- Fixed fio histogram parsing.
+- Refactored AwsKeyFileManager out of AwsVirtualMachine.
+- Added delay between server and client initiation to windows benchmarks.
+- Defaulted static machines to linux based.
+- Add time limit to windows fio benchmark.
+- Adding -w buffer parameter to windows iperf3 benchmark.
+- Fixed a bug in how we select images on AWS by introducing an additional
+  regular expression to match against image names.
+- Terminate long running servers on windows benchmarks with timeouts.
+- Updated azure_cli package to match installation instructions.
+- Fix helpmatch for intergerlist.
+- Fix PSPing benchmark so that it runs on AWS and Azure.
+- Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
+- Moved from ACS to AKS for Azure Kubernetes clusters.

@@ -42,6 +42,7 @@ def Prepare(benchmark_spec):
   for vm in benchmark_spec.vms:
     vm.Install('nuttcp')
     vm.AllowPort(nuttcp.CONTROL_PORT)
+    vm.AllowPort(nuttcp.UDP_PORT)
 
 
 def RunNuttcp(vms, exec_path):

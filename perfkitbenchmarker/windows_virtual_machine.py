@@ -26,6 +26,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
 
+import timeout_decorator
 import winrm
 
 FLAGS = flags.FLAGS
@@ -64,6 +65,7 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
   OS_TYPE = os_types.WINDOWS
+  BASE_OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
     super(WindowsMixin, self).__init__()
@@ -93,21 +95,30 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
-      timeout: A timeout in seconds for the command. This argument is currently
-          unused.
+      timeout: Float. A timeout in seconds for the command. If None is passed,
+          no timeout is applied. Timeout kills the winrm session which then
+          kills the process being executed.
 
     Returns:
       A tuple of stdout and stderr from running the command.
 
     Raises:
-      RemoteCommandError: If there was a problem issuing the command.
+      RemoteCommandError: If there was a problem issuing the command or the
+          command timed out.
     """
     logging.info('Running command on %s: %s', self, command)
     s = winrm.Session('https://%s:%s' % (self.ip_address, self.winrm_port),
                       auth=(self.user_name, self.password),
                       server_cert_validation='ignore')
     encoded_command = base64.b64encode(command.encode('utf_16_le'))
-    r = s.run_cmd('powershell -encodedcommand %s' % encoded_command)
+
+    @timeout_decorator.timeout(timeout, use_signals=False,
+                               timeout_exception=errors.VirtualMachine.
+                               RemoteCommandError)
+    def run_command():
+      return s.run_cmd('powershell -encodedcommand %s' % encoded_command)
+
+    r = run_command()
     retcode, stdout, stderr = r.status_code, r.std_out, r.std_err
 
     debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
@@ -352,7 +363,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     # Allow more security protocols to make it easier to download from
     # sites where we don't know the security protocol beforehand
     command = ('[Net.ServicePointManager]::SecurityProtocol = '
-               '[System.Security.Authentication.SslProtocols] '
+               '[System.Net.SecurityProtocolType] '
                '"tls, tls11, tls12";'
                'Invoke-WebRequest {url} -OutFile {dest}').format(
                    url=url, dest=dest)
