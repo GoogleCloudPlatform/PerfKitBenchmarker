@@ -198,4 +198,3 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   for vm in vms:
     vm.RemoteCommand('kill -9 ' + vm.iperf_server_pid, ignore_failure=True)
-    
