@@ -86,7 +86,7 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   def __init__(self, registry_spec):
     super(ElasticContainerRegistry, self).__init__(registry_spec)
     self.account = self.project or util.GetAccount()
-    self.region = util.GetRegionFromZone(self.zone)
+    self.region = util.GetRegionFromZone(self.zone.split(',')[0])
     self.repositories = []
 
   def _Delete(self):
@@ -485,8 +485,10 @@ class FargateCluster(container_service.BaseContainerCluster):
 
 
 class AwsKopsCluster(container_service.KubernetesCluster):
+  """Class representing a kops based Kubernetes cluster."""
 
   CLOUD = providers.AWS
+  CLUSTER_TYPE = 'kops'
 
   def __init__(self, spec):
     super(AwsKopsCluster, self).__init__(spec)

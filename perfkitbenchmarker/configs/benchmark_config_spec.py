@@ -950,15 +950,14 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'default': _DEFAULT_VM_COUNT,
             'min': 0
         }),
-        'enable_autoscaling': (option_decoders.BooleanDecoder, {
-            'default': False
-        }),
         'min_vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
+            'default': None,
+            'none_ok': True,
             'min': 0
         }),
         'max_vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
+            'default': None,
+            'none_ok': True,
             'min': 0
         }),
         'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
