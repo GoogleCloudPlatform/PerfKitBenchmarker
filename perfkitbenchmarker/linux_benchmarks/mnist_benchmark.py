@@ -50,6 +50,9 @@ mnist:
 flags.DEFINE_string('mnist_train_file',
                     'gs://tfrc-test-bucket/mnist-records/train.tfrecords',
                     'mnist train file for tensorflow')
+flags.DEFINE_string('imagenet_data_dir',
+                    'gs://cloud-tpu-test-datasets/fake_imagenet',
+                    'Directory where the input data is stored')
 flags.DEFINE_integer('mnist_train_steps', 2000,
                      'Total number of training steps')
 flags.DEFINE_integer('tpu_iterations', 500,
@@ -77,10 +80,13 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_file = FLAGS.mnist_train_file
   benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
-  benchmark_spec.master = 'grpc://{ip}:{port}'.format(
-      ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
-      port=benchmark_spec.cloud_tpu.GetCloudTpuPort()
-  ) if benchmark_spec.use_tpu else ''
+  if benchmark_spec.use_tpu:
+    benchmark_spec.master = 'grpc://{ip}:{port}'.format(
+        ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
+        port=benchmark_spec.cloud_tpu.GetCloudTpuPort())
+  else:
+    benchmark_spec.master = ''
+  benchmark_spec.tpu = benchmark_spec.master
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
 
@@ -132,6 +138,7 @@ def _CreateMetadataDict(benchmark_spec):
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
       'master': benchmark_spec.master,
+      'tpu': benchmark_spec.tpu,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations
   }

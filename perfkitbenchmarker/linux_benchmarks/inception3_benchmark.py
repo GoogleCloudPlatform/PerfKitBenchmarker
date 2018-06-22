@@ -54,20 +54,15 @@ inception3:
 flags.DEFINE_float('inception3_learning_rate', 0.165, 'Learning rate.')
 flags.DEFINE_integer('inception3_train_steps', 250000,
                      'Number of steps use for training.')
-flags.DEFINE_integer('inception3_iterations', 100,
-                     'Number of iterations per TPU training loop.')
 flags.DEFINE_enum('inception3_use_data', 'real', ['real', 'fake'],
                   'Whether to use real or fake data. If real, the data is '
-                  'downloaded from inception3_data_dir. Otherwise, synthetic '
+                  'downloaded from imagenet_data_dir. Otherwise, synthetic '
                   'data is generated.')
 flags.DEFINE_enum('inception3_mode', 'train',
                   ['train', 'eval', 'train_and_eval'],
                   'Mode to run: train, eval, train_and_eval')
 flags.DEFINE_integer('inception3_train_steps_per_eval', 2000,
                      'Number of training steps to run between evaluations.')
-flags.DEFINE_string('inception3_data_dir',
-                    'gs://cloud-tpu-test-datasets/fake_imagenet',
-                    'Directory where input data is stored')
 flags.DEFINE_integer('inception3_save_checkpoints_secs', 0, 'Interval (in '
                      'seconds) at which the model data should be checkpointed. '
                      'Set to 0 to disable.')
@@ -97,19 +92,13 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   benchmark_spec.learning_rate = FLAGS.inception3_learning_rate
   benchmark_spec.train_steps = FLAGS.inception3_train_steps
-  benchmark_spec.iterations = FLAGS.inception3_iterations
-  benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
   benchmark_spec.use_data = FLAGS.inception3_use_data
   benchmark_spec.mode = FLAGS.inception3_mode
   benchmark_spec.train_steps_per_eval = FLAGS.inception3_train_steps_per_eval
-  benchmark_spec.data_dir = FLAGS.inception3_data_dir
+  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
   benchmark_spec.save_checkpoints_secs = FLAGS.inception3_save_checkpoints_secs
   benchmark_spec.train_batch_size = FLAGS.inception3_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.inception3_eval_batch_size
-  benchmark_spec.master = 'grpc://{ip}:{port}'.format(
-      ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
-      port=benchmark_spec.cloud_tpu.GetCloudTpuPort()
-  ) if benchmark_spec.use_tpu else ''
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
 
 
@@ -135,6 +124,7 @@ def _CreateMetadataDict(benchmark_spec):
   """
   metadata = {
       'master': benchmark_spec.master,
+      'tpu': benchmark_spec.tpu,
       'learning_rate': benchmark_spec.learning_rate,
       'train_steps': benchmark_spec.train_steps,
       'iterations': benchmark_spec.iterations,
@@ -168,7 +158,7 @@ def Run(benchmark_spec):
       'tpu/models/experimental/inception/inception_v3.py')
   inception3_benchmark_cmd = (
       'python {script} '
-      '--master={master} '
+      '--tpu={tpu} '
       '--learning_rate={learning_rate} '
       '--train_steps={train_steps} '
       '--iterations={iterations} '
@@ -182,7 +172,7 @@ def Run(benchmark_spec):
       '--train_batch_size={train_batch_size} '
       '--eval_batch_size={eval_batch_size}'.format(
           script=inception3_benchmark_script,
-          master=benchmark_spec.master,
+          tpu=benchmark_spec.tpu,
           learning_rate=benchmark_spec.learning_rate,
           train_steps=benchmark_spec.train_steps,
           iterations=benchmark_spec.iterations,
