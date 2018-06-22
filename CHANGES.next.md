@@ -60,6 +60,7 @@
 - Added timeout support for windows vm remote command call.
 - Added IOR benchmark.
 - Added mdtest to IOR benchmark.
+- Added Elastic Container Service (EKS) as a container cluster type.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

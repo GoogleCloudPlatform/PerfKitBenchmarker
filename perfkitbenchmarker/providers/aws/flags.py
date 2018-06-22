@@ -14,6 +14,7 @@
 """Module containing flags applicable across benchmark run on AWS."""
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.providers.aws import util
 
 flags.DEFINE_string('aws_user_name', 'ubuntu',
                     'This determines the user name that Perfkit will '
@@ -64,3 +65,9 @@ flags.DEFINE_string('aws_efs_token', None,
                     'instead of creating a new one.')
 flags.DEFINE_boolean('aws_delete_file_system', True,
                      'Whether to delete the EFS file system.')
+flags.DEFINE_list('eks_zones', ['us-east-1a', 'us-east-1c'],
+                  'The zones into which the EKS cluster will be deployed. '
+                  'There must be at least two zones and all zones must be '
+                  'from the same region.')
+flags.register_validator('eks_zones',
+                         util._EksZonesValidator)
