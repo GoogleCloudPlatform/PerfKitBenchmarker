@@ -77,6 +77,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
 
 
 class GkeCluster(container_service.KubernetesCluster):
+  """Class representing a Google Container Engine cluster."""
 
   CLOUD = providers.GCP
 
@@ -125,16 +126,15 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
-    if self.enable_autoscaling:
+    if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
 
-
     cmd.flags['num-nodes'] = self.num_nodes
 
     if self.machine_type is None:
-      cmd.flags['machine-type'] = "custom-{0}-{1}".format(
+      cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
           self.cpus, self.memory)
     else:
       cmd.flags['machine-type'] = self.machine_type

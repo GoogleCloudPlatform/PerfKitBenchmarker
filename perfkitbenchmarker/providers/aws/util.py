@@ -65,6 +65,17 @@ def GetRegionFromZones(zones):
   return region
 
 
+def _EksZonesValidator(value):
+  if len(value) < 2:
+    return False
+  if any(IsRegion(zone) for zone in value):
+    return False
+  region = GetRegionFromZone(value[0])
+  if any(GetRegionFromZone(zone) != region for zone in value):
+    return False
+  return True
+
+
 def FormatTags(tags_dict):
   """Format a dict of tags into arguments for 'tag' parameter.
 
