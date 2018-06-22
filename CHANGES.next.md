@@ -61,6 +61,7 @@
 - Added IOR benchmark.
 - Added mdtest to IOR benchmark.
 - Added Elastic Container Service (EKS) as a container cluster type.
+- Added ResNet benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

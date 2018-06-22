@@ -137,6 +137,7 @@ BENCHMARK_SETS = {
             'pgbench',
             'ping',
             'redis_ycsb',
+            'resnet',
             'stencil2d',
             'speccpu2006',
             'sysbench',
