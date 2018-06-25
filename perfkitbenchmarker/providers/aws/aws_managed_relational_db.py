@@ -31,6 +31,8 @@ FLAGS = flags.FLAGS
 DEFAULT_MYSQL_VERSION = '5.7.16'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 
+DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
+
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
 
@@ -132,13 +134,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       engine (string): type of database (my_sql or postgres).
     Returns:
       (string): Default engine version.
+    Raises:
+      Exception: If unrecognized engine is specified.
     """
     if engine == managed_relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
+    elif engine == managed_relational_db.AURORA_MYSQL:
+      return DEFAULT_MYSQL_AURORA_VERSION
     elif engine == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
     elif engine == managed_relational_db.AURORA_POSTGRES:
       return DEFAULT_POSTGRES_VERSION
+    else:
+      raise Exception('Unspecified default version for {0}'.format(engine))
 
   def _GetNewZones(self):
     """Returns a list of zones, excluding the one that the client VM is in."""
@@ -243,7 +251,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.spec.engine == managed_relational_db.POSTGRES):
       self.subnets_used_by_db.append(self.client_vm.network.subnet)
       self._CreateSubnetInAdditionalZone()
-    elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+    elif (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
+          self.spec.engine == managed_relational_db.AURORA_MYSQL):
       self._CreateSubnetInAllZonesAssumeClientZoneExists()
     else:
       raise Exception('Unknown how to create network for {0}'.format(
@@ -312,7 +321,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
       vm_util.IssueCommand(cmd)
 
-    elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+    elif (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
+          self.spec.engine == managed_relational_db.AURORA_MYSQL):
 
       zones_needed_for_high_availability = len(self.zones) > 1
       if zones_needed_for_high_availability != self.spec.high_availability:
@@ -330,7 +340,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       cmd = util.AWS_PREFIX + [
           'rds', 'create-db-cluster',
           '--db-cluster-identifier=%s' % cluster_identifier,
-          '--engine=aurora-postgresql',
+          '--engine=%s' % self.spec.engine,
+          '--engine-version=%s' % self.spec.engine_version,
           '--master-username=%s' % self.spec.database_username,
           '--master-user-password=%s' % self.spec.database_password,
           '--region=%s' % self.region,
@@ -358,7 +369,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
             'create-db-instance',
             '--db-instance-identifier=%s' % instance_identifier,
             '--db-cluster-identifier=%s' % cluster_identifier,
-            '--engine=aurora-postgresql',
+            '--engine=%s' % self.spec.engine,
+            '--engine-version=%s' % self.spec.engine_version,
             '--no-auto-minor-version-upgrade',
             '--db-instance-class=%s' % self.spec.machine_type,
             '--region=%s' % self.region,
@@ -451,7 +463,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'aws rds describe-db-instances'
     """
 
-    if self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+    if (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
+        self.spec.engine == managed_relational_db.AURORA_MYSQL):
       self.primary_zone = self.zones[0]
       if len(self.zones) > 1:
         self.secondary_zone = ','.join(self.zones[1:])

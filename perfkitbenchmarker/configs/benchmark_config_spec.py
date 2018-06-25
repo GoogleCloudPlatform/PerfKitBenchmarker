@@ -521,6 +521,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                 managed_relational_db.MYSQL,
                 managed_relational_db.POSTGRES,
                 managed_relational_db.AURORA_POSTGRES,
+                managed_relational_db.AURORA_MYSQL,
             ]
         }),
         'zones': (option_decoders.ListDecoder, {

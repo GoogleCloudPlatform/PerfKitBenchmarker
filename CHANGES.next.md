@@ -62,6 +62,7 @@
 - Added mdtest to IOR benchmark.
 - Added Elastic Container Service (EKS) as a container cluster type.
 - Added ResNet benchmark.
+- Added support for ACI (Azure Container Instances).
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -139,6 +140,7 @@
 - Added Intel MKL to HPCC benchmark.
 - Added flag support for enabling or disabling transparent hugepages on Linux
   VMs.
+- Add AWS MySql Aurora support
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
