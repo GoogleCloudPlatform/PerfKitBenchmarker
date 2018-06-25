@@ -142,6 +142,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'database_username': 'fakeusername',
         'machine_type': 'db.r4.4xlarge',
         'zones': ['us-east-1a', 'us-east-1d'],
+        'engine_version': '9.6.2',
         'high_availability': True
     }
     spec_dict.update(additional_spec_items)
