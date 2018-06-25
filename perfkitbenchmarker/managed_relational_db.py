@@ -55,6 +55,7 @@ flags.register_validator(
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
+AURORA_MYSQL = 'aurora-mysql'
 
 FLAGS = flags.FLAGS
 
