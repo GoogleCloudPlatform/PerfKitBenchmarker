@@ -140,6 +140,7 @@
 - Added Intel MKL to HPCC benchmark.
 - Added flag support for enabling or disabling transparent hugepages on Linux
   VMs.
+- Add AWS MySql Aurora support
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
