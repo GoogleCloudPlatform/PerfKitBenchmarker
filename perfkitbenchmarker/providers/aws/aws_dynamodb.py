@@ -25,6 +25,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string('aws_dynamodb_primarykey',
+                    'primary_key',
+                    'The primaryKey of dynamodb table.')
 flags.DEFINE_enum('aws_dynamodb_attributetype',
                   'S', ['S', 'N', 'B'],
                   'The type of attribute, default to S (String).'
@@ -36,13 +39,14 @@ flags.DEFINE_string('aws_dynamodb_capacity',
 
 class AwsDynamoDBInstance(resource.BaseResource):
 
-  def __init__(self, region, table_name, primary_key):
+  def __init__(self, table_name):
     super(AwsDynamoDBInstance, self).__init__()
-    self.region = region
+    self.zone = FLAGS.zones[0]
+    self.region = util.GetRegionFromZone(self.zone)
+    self.primary_key = 'AttributeName={0},KeyType=HASH'.format(FLAGS.aws_dynamodb_primarykey)
     self.attributes = 'AttributeName={0},AttributeType={1}'\
-                      .format(primary_key, FLAGS.aws_dynamodb_attributetype)
+                      .format(FLAGS.aws_dynamodb_primarykey, FLAGS.aws_dynamodb_attributetype)
     self.table_name = table_name
-    self.primary_key = 'AttributeName={0},KeyType=HASH'.format(primary_key)
     self.throughput = FLAGS.aws_dynamodb_capacity
 
   def _Create(self):
@@ -58,7 +62,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
-    """Deletes the table."""
+    """Deletes the dynamodb table."""
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'delete-table',
@@ -68,7 +72,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
     vm_util.IssueCommand(cmd)
 
   def _IsReady(self):
-    """Check if table is ready."""
+    """Check if dynamodb table is ready."""
     logging.info('Getting table ready status for {0}'.format(self.table_name))
     cmd = util.AWS_PREFIX + [
         'dynamodb',
@@ -80,7 +84,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
     return result['Table']['TableStatus'] == 'ACTIVE'
 
   def Exists(self):
-    """Returns true if the table exists."""
+    """Returns true if the dynamodb table exists."""
     logging.info('Checking if table {0} exists'.format(self.table_name))
     cmd = util.AWS_PREFIX + [
         'dynamodb',
@@ -94,7 +98,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
       return True
 
   def _DescribeTable(self):
-    """Calls describe on table."""
+    """Calls describe on dynamodb table."""
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'describe-table',
@@ -108,3 +112,8 @@ class AwsDynamoDBInstance(resource.BaseResource):
       if table_info[3] == self.table_name:
         return table_info
     return {}
+
+  def GetEndPoint(self):
+    ddbep = 'http://dynamodb.{0}.amazonaws.com'.format(self.region)
+    return ddbep
+
