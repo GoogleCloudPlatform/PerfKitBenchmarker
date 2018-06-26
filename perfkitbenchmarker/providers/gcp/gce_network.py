@@ -257,9 +257,9 @@ class GceVPNGW(network.BaseVPNGW):
     if self.routes:
       for route in self.routes:
         if self.RouteExists(route):
-          self.DeleteTunnel(route)
+          self.DeleteRoute(route)
 
-    self.created = False
+    # self.created = False
 
     # vpngws need deleted last
     if self.vpngw_resource:
