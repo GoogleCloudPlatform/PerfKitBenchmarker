@@ -51,7 +51,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'create',
+    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'create',
                              self.spec.tpu_name)
     cmd.flags['range'] = self.spec.tpu_cidr_range
     if self.spec.tpu_accelerator_type:
@@ -71,7 +71,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Delete(self):
     """Deletes the cloud TPU."""
-    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'delete',
+    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'delete',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
@@ -84,7 +84,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _GetCloudTpuDescription(self):
     """Gets the cloud TPU description."""
-    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'describe',
+    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
