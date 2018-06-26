@@ -115,8 +115,8 @@ class BaseAppService(resource.BaseResource):
     if self.builder:
       self.builder.Delete()
 
-  def InitBuilder(self, builder=None, **kwargs):
-    """Initialize builder for AppService."""
+  def SetBuilder(self, builder=None, **kwargs):
+    """Set builder for AppService."""
     if builder:
       self.builder = builder
 
