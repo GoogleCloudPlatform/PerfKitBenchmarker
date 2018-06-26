@@ -141,6 +141,7 @@
 - Added flag support for enabling or disabling transparent hugepages on Linux
   VMs.
 - Add AWS MySql Aurora support
+- Abandon beta in TPU commands.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
