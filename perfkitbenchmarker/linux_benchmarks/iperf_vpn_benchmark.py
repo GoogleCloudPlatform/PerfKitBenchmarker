@@ -103,7 +103,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
                 FLAGS.iperf_vpn_sending_thread_count))
   # the additional time on top of the iperf runtime is to account for the
   # time it takes for the iperf process to start and exit
-  timeout_buffer = FLAGS.iperf_vpn_timeout or 30 + FLAGS.iperf_sending_thread_count
+  timeout_buffer = FLAGS.iperf_vpn_timeout or 30 + FLAGS.iperf_vpn_sending_thread_count
   stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                        timeout=FLAGS.iperf_vpn_runtime_in_seconds +
                                        timeout_buffer)
@@ -145,7 +145,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       'receiving_machine_type': receiving_vm.machine_type,
       'receiving_zone': receiving_vm.zone,
       'sending_machine_type': sending_vm.machine_type,
-      'sending_thread_count': FLAGS.iperf_sending_thread_count,
+      'sending_thread_count': FLAGS.iperf_vpn_sending_thread_count,
       'sending_zone': sending_vm.zone,
       'runtime_in_seconds': FLAGS.iperf_runtime_in_seconds,
       'ip_type': ip_type

@@ -117,6 +117,15 @@ class GceVPNGW(network.BaseVPNGW):
     cmd.flags['region'] = self.region
     cmd.Issue()
 
+  def IPExists(self):
+    """Returns True if the Route exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+
   def SetupForwarding(self):
     """Create IPSec forwarding rules between the source gw and the target gw.
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
@@ -174,6 +183,12 @@ class GceVPNGW(network.BaseVPNGW):
     cmd.flags['region'] = self.region
     cmd.Issue()
 
+  def TunnelExists(self, tunnel):
+    """Returns True if the Route exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe', tunnel)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
 
   def SetupRouting(self, target_gw):
     """Create IPSec forwarding rules between the source gw and the target gw.
@@ -199,6 +214,14 @@ class GceVPNGW(network.BaseVPNGW):
     cmd = util.GcloudCommand(self, 'compute', 'routes', 'delete', route)
     cmd.Issue()
 
+  def RouteExists(self, route):
+    """Returns True if the Route exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'describe',
+                             route)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+
   def Create(self):
     """Creates the actual VPNGW."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
@@ -219,7 +242,7 @@ class GceVPNGW(network.BaseVPNGW):
 
   def Delete(self):
     """Deletes the actual VPNGW."""
-    if self.IP_ADDR:
+    if self.IP_ADDR and self.IPExists():
       self.DeleteIP()
 
     if self.forwarding_rules:
@@ -228,11 +251,14 @@ class GceVPNGW(network.BaseVPNGW):
 
     if self.tunnels:
       for tun in self.tunnels:
-        self.DeleteTunnel(tun)
+        if self.TunnelExists(tun):
+          self.DeleteTunnel(tun)
 
     if self.routes:
       for route in self.routes:
-        self.DeleteRoute(route)
+        if self.RouteExists(route):
+          self.DeleteTunnel(route)
+
     self.created = False
 
     # vpngws need deleted last
@@ -457,11 +483,11 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
-    name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
+    name = FLAGS.gce_network_name or 'vpnpkb-network-%s' % FLAGS.run_uri
 
     # add support for zone, cidr, and separate networks
     if network_spec.zone and network_spec.cidr:
-      name = FLAGS.gce_network_name or 'pkb-network-%s-%s' % (network_spec.zone, FLAGS.run_uri)
+      name = FLAGS.gce_network_name or 'pkb-vpnnetwork-%s-%s' % (network_spec.zone, FLAGS.run_uri)
       FLAGS.gce_subnet_region = util.GetRegionFromZone(network_spec.zone)
       FLAGS.gce_subnet_addr = network_spec.cidr
 

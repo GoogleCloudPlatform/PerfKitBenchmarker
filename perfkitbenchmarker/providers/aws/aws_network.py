@@ -577,3 +577,233 @@ class AwsNetwork(network.BaseNetwork):
   def _GetKeyFromNetworkSpec(cls, spec):
     """Returns a key used to register Network instances."""
     return (cls.CLOUD, ZONE, spec.zone)
+
+
+class AwsVPNGWResource(resource.BaseResource):
+
+  def __init__(self, name, network_name, region, cidr, project):
+    super(AwsVPNGWResource, self).__init__()
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.cidr = cidr
+    self.project = project
+
+# {
+#     "VpnGateway": {
+#         "AmazonSideAsn": 64512,
+#         "State": "available",
+#         "Type": "ipsec.1",
+#         "VpnGatewayId": "vgw-9a4cacf3",
+#         "VpcAttachments": []
+#     }
+# }
+  def _Create(self):
+    """Creates the VPN gateway."""
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-vpn-gateway',
+        '--type=%s' % 'ipsec.1']
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    response = json.loads(stdout)
+    self.id = response['InternetGateway']['InternetGatewayId']
+    util.AddDefaultTags(self.id, self.region)
+
+#   describe-vpn-gateways
+# [--filters <value>]
+# [--vpn-gateway-ids <value>]
+# [--dry-run | --no-dry-run]
+# [--cli-input-json <value>]
+# [--generate-cli-skeleton <value>]
+  def _Exists(self):
+    """Returns true if the vpn gateway exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-vpn-gateways',
+        '--region=%s' % self.region,
+        '--filter=Name=vpn-gateway-id,Values=%s' % self.id]
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    vpn_gateways = response['VPNGateways']
+    assert len(vpn_gateways) < 2, 'Too many internet gateways.'
+    return len(vpn_gateways) > 0
+
+#   delete-vpn-gateway
+# --vpn-gateway-id <value>
+# [--dry-run | --no-dry-run]
+# [--cli-input-json <value>]
+# [--generate-cli-skeleton <value>]
+  def _Delete(self):
+    """Deletes the vpn gateway."""
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-vpn-gateway',
+        '--region=%s' % self.region,
+        '--vpn-gateway-id=%s' % self.id]
+    vm_util.IssueCommand(delete_cmd)
+
+
+class AwsVPNGW(network.BaseVPNGW):
+  CLOUD = providers.AWS
+
+  def __init__(self, name, network_name, region, cidr, project):
+    super(AwsVPNGW, self).__init__()
+    self._lock = threading.Lock()
+    self.forwarding_rules = {}
+    self.tunnels = {}
+    self.routes = {}
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.cidr = cidr
+    self.project = project
+    self.IP_ADDR = None
+    self.vpngw_resource = AwsVPNGWResource(name, network_name, region, cidr, project)
+    self.created = False
+
+  def AllocateIP(self):
+    raise NotImplementedError()
+
+  def DeleteIP(self):
+    raise NotImplementedError()
+
+  def IPExists(self):
+    raise NotImplementedError()
+
+
+  def SetupForwarding(self):
+    """Create IPSec forwarding rules between the source gw and the target gw.
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    # GCP doesnt like uppercase names?!?
+    fr_UDP500_name = ('fr-udp500-%s-%s' %
+                      (self.region, FLAGS.run_uri))
+    fr_UDP4500_name = ('fr-udp4500-%s-%s' %
+                       (self.region, FLAGS.run_uri))
+    fr_ESP_name = ('fr-esp-%s-%s' %
+                   (self.region, FLAGS.run_uri))
+    with self._lock:
+      if fr_UDP500_name not in self.forwarding_rules:
+        fr_UDP500 = AwsForwardingRule(
+            fr_UDP500_name, 'UDP', self, 500)
+        self.forwarding_rules[fr_UDP500_name] = fr_UDP500
+        fr_UDP500.Create()
+      if fr_UDP4500_name not in self.forwarding_rules:
+        fr_UDP4500 = AwsForwardingRule(
+            fr_UDP4500_name, 'UDP', self, 4500)
+        self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
+        fr_UDP4500.Create()
+      if fr_ESP_name not in self.forwarding_rules:
+        fr_ESP = AwsForwardingRule(
+            fr_ESP_name, 'ESP', self)
+        self.forwarding_rules[fr_ESP_name] = fr_ESP
+        fr_ESP.Create()
+
+  def SetupTunnel(self, target_gw, psk):
+    """Create IPSec tunnel between the source gw and the target gw.
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+      psk: preshared key (or run uri for now)
+    """
+    raise NotImplementedError()
+
+  def DeleteTunnel(self, tunnel):
+    """Delete IPSec tunnel
+    """
+    raise NotImplementedError()
+
+  def TunnelExists(self, tunnel):
+    """Returns True if the tunnel exists."""
+    raise NotImplementedError()
+
+
+  def SetupRouting(self, target_gw):
+    """Create IPSec forwarding rules between the source gw and the target gw.
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+      target_gw: The BaseVPN object to point forwarding rules at.
+    """
+    raise NotImplementedError()
+
+  def DeleteRoute(self, route):
+    """Delete route
+
+    Args:
+      route: The route name to delete
+    """
+    raise NotImplementedError()
+
+  def RouteExists(self, route):
+    """Returns True if the Route exists."""
+    raise NotImplementedError()
+
+  def Create(self):
+    """Creates the actual VPNGW."""
+    raise NotImplementedError()
+
+  def Delete(self):
+    """Deletes the actual VPNGW."""
+    if self.IP_ADDR and self.IPExists():
+      self.DeleteIP()
+
+    if self.forwarding_rules:
+      for fr in self.forwarding_rules:
+        self.forwarding_rules[fr].Delete()
+
+    if self.tunnels:
+      for tun in self.tunnels:
+        if self.TunnelExists(tun):
+          self.DeleteTunnel(tun)
+
+    if self.routes:
+      for route in self.routes:
+        if self.RouteExists(route):
+          self.DeleteRoute(route)
+    self.created = False
+
+    # vpngws need deleted last
+    if self.vpngw_resource:
+      self.vpngw_resource.Delete()
+
+
+class AwsForwardingRule(resource.BaseResource):
+  """An object representing a Aws Forwarding Rule."""
+
+  def __init__(self, name, protocol, src_vpngw, port=None):
+    super(AwsForwardingRule, self).__init__()
+    self.name = name
+    self.protocol = protocol
+    self.port = port
+    self.target_name = src_vpngw.name
+    self.target_ip = src_vpngw.IP_ADDR
+    self.src_region = src_vpngw.region
+    self.project = src_vpngw.project
+
+  def __eq__(self, other):
+    """Defines equality to make comparison easy."""
+    return (self.name == other.name and
+            self.protocol == other.protocol and
+            self.port == other.port and
+            self.target_name == other.target_name and
+            self.target_ip == other.target_ip and
+            self.src_region == other.src_region)
+
+  def _Create(self):
+    """Creates the Forwarding Rule."""
+    raise NotImplementedError()
+
+  def _Delete(self):
+    """Deletes the Forwarding Rule."""
+    raise NotImplementedError()
+
+  def _Exists(self):
+    """Returns True if the Forwarding Rule exists."""
+    raise NotImplementedError()
