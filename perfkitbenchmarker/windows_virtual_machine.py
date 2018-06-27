@@ -320,6 +320,18 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('rm -recurse -force %s' % self.temp_dir)
     self.EnableGuestFirewall()
 
+  def IsProcessRunning(self, process):
+    """Checks if a given process is running on the system.
+
+    Args:
+      process: string name of the process.
+
+    Returns:
+      Whether the process name is in the PS output.
+    """
+    stdout, _ = self.RemoteCommand('ps')
+    return process in stdout
+
   def _GetNumCpus(self):
     """Returns the number of logical CPUs on the VM.
 

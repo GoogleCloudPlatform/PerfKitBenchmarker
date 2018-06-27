@@ -15,7 +15,9 @@
 """Module containing nuttcp installation and cleanup functions."""
 
 import ntpath
+import threading
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -25,6 +27,7 @@ FLAGS = flags.FLAGS
 CONTROL_PORT = 5000
 UDP_PORT = 5001
 NUTTCP_OUT_FILE = 'nuttcp_results'
+CPU_OUT_FILE = 'cpu_results'
 
 flags.DEFINE_integer('nuttcp_max_bandwidth_mb', 10000,
                      'The maximum bandwidth, in megabytes, to test in a '
@@ -53,9 +56,16 @@ flags.DEFINE_integer('nuttcp_udp_iterations', 1,
 flags.DEFINE_bool('nuttcp_udp_unlimited_bandwidth', False,
                   'Run an "unlimited bandwidth" test')
 
+flags.DEFINE_integer('nuttcp_cpu_sample_time', 3,
+                     'Time, in seconds, to take the CPU usage sample.')
+
 NUTTCP_DIR = 'nuttcp-8.1.4.win64'
 NUTTCP_ZIP = NUTTCP_DIR + '.zip'
 NUTTCP_URL = 'http://nuttcp.net/nuttcp/nuttcp-8.1.4/binaries/' + NUTTCP_ZIP
+
+
+class NuttcpNotRunningError(Exception):
+  """Raised when nuttcp is not running at a time that it is expected to be."""
 
 
 def Install(vm):
@@ -65,8 +75,120 @@ def Install(vm):
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
+def CheckPrerequisites():
+  if FLAGS.nuttcp_udp_stream_seconds <= FLAGS.nuttcp_cpu_sample_time:
+    raise errors.Config.InvalidValue(
+        'nuttcp_udp_stream_seconds must be greater than nuttcp_cpu_sample_time')
+
+
 def GetExecPath():
   return 'nuttcp-8.1.4.exe'
+
+
+def _RunNuttcp(vm, options, exec_path):
+  """Run nuttcp, server or client depending on options.
+
+  Args:
+    vm: vm to run nuttcp on
+    options: string of options to pass to nuttcp
+    exec_path: string path to the nuttcp executable
+  """
+  command = 'cd {exec_dir}; .\\{exec_path} {options}'.format(
+      exec_dir=vm.temp_dir,
+      exec_path=exec_path,
+      options=options)
+  # Timeout after expected duration, 5sec server wait plus 25sec buffer
+  timeout_duration = FLAGS.nuttcp_udp_stream_seconds + 30
+  vm.RemoteCommand(command, timeout=timeout_duration)
+
+
+def _GetCpuUsage(vm, sample_time):
+  """Gather CPU usage data.
+
+  Args:
+    vm: the vm to gather cpu usage data on.
+    sample_time: the amount of time to gather the data.
+
+  Raises:
+    NuttcpNotRunningError: raised if nuttcp is not running when the CPU usage
+                           data gathering has finished.
+  """
+  command = ('cd {exec_path}; '
+             "Get-Counter -Counter '\\Processor(*)\\% Processor Time' "
+             '-SampleInterval {sample_time} | '
+             'select -ExpandProperty CounterSamples | '
+             'select InstanceName,CookedValue > {out_file}').format(
+                 exec_path=vm.temp_dir,
+                 sample_time=sample_time,
+                 out_file=CPU_OUT_FILE)
+  vm.RemoteCommand(command, vm)
+  if not vm.IsProcessRunning('nuttcp'):
+    raise NuttcpNotRunningError('nuttcp not running after getting CPU usage.')
+
+
+@vm_util.Retry(poll_interval=1, max_retries=10)
+def _WaitForNuttcpRunning(vm, machine):
+  if not vm.IsProcessRunning('nuttcp'):
+    raise NuttcpNotRunningError('nuttcp not running on the %s' %  machine)
+
+
+@vm_util.Retry(max_retries=15)
+def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
+  """Create a server-client nuttcp pair.
+
+  The server exits after the client completes its request.
+
+  Args:
+    bandwidth: the requested transmission bandwidth
+    sending_vm: vm sending the UDP packets.
+    receiving_vm: vm receiving the UDP packets.
+    dest_ip: the IP of the receiver.
+    exec_path: path to the nuttcp executable.
+
+  Returns:
+    output from the client nuttcp process.
+  """
+  sender_args = ('-u -p{data_port} -P{control_port} -R{bandwidth} '
+                 '-T{time} -l{packet_size} {dest_ip} > {out_file}').format(
+                     data_port=UDP_PORT,
+                     control_port=CONTROL_PORT,
+                     bandwidth=bandwidth,
+                     time=FLAGS.nuttcp_udp_stream_seconds,
+                     packet_size=FLAGS.nuttcp_udp_packet_size,
+                     dest_ip=dest_ip,
+                     out_file=NUTTCP_OUT_FILE)
+
+  receiver_args = '-p{data_port} -P{control_port} -1'.format(
+      data_port=UDP_PORT,
+      control_port=CONTROL_PORT)
+
+  # Thread to run the nuttcp server
+  server_thread = threading.Thread(
+      name='server',
+      target=_RunNuttcp,
+      args=(receiving_vm, receiver_args, exec_path))
+  server_thread.start()
+
+  _WaitForNuttcpRunning(receiving_vm, 'server')
+
+  # Thread to run the nuttcp client
+  client_thread = threading.Thread(
+      name='client',
+      target=_RunNuttcp,
+      args=(sending_vm, sender_args, exec_path))
+  client_thread.start()
+
+  _WaitForNuttcpRunning(sending_vm, 'client')
+
+  threaded_args = [
+      (_GetCpuUsage, (receiving_vm, FLAGS.nuttcp_cpu_sample_time), {}),
+      (_GetCpuUsage, (sending_vm, FLAGS.nuttcp_cpu_sample_time), {})
+  ]
+
+  vm_util.RunParallelThreads(threaded_args, 200)
+
+  server_thread.join()
+  client_thread.join()
 
 
 def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
@@ -85,81 +207,88 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
     list of samples from the results of the nuttcp tests.
   """
 
-  def _RunNuttcp(vm, options):
-    command = 'cd {exec_dir}; .\\{exec_path} {options}'.format(
-        exec_dir=vm.temp_dir,
-        exec_path=exec_path,
-        options=options)
-    # Timeout after expected duration, 5sec server wait plus 25sec buffer
-    timeout_duration = FLAGS.nuttcp_udp_stream_seconds + 30
-    vm.RemoteCommand(command, timeout=timeout_duration)
-
   samples = []
 
   bandwidths = [
       '{b}m'.format(b=b)
-      for b in xrange(FLAGS.nuttcp_min_bandwidth_mb, FLAGS.
-                      nuttcp_max_bandwidth_mb, FLAGS.nuttcp_bandwidth_step_mb)
+      for b in xrange(
+          FLAGS.nuttcp_min_bandwidth_mb,
+          FLAGS.nuttcp_max_bandwidth_mb,
+          FLAGS.nuttcp_bandwidth_step_mb)
   ]
 
   if FLAGS.nuttcp_udp_unlimited_bandwidth:
     bandwidths.append('u')
 
-  @vm_util.Retry(max_retries=15)
-  def RunSingleBandwidth(bandwidth):
-    """Create a server-client nuttcp pair.
-
-    The server exits after the client completes its request.
-
-    Args:
-      bandwidth: the requested transmission bandwidth
-
-    Returns:
-      output from the client nuttcp process.
-    """
-    sender_args = ('-u -p{data_port} -P{control_port} -R{bandwidth} '
-                   '-T{time} -l{packet_size} {dest_ip} > {out_file}').format(
-                       data_port=UDP_PORT,
-                       control_port=CONTROL_PORT,
-                       bandwidth=bandwidth,
-                       time=FLAGS.nuttcp_udp_stream_seconds,
-                       packet_size=FLAGS.nuttcp_udp_packet_size,
-                       dest_ip=dest_ip,
-                       out_file=NUTTCP_OUT_FILE)
-
-    receiver_args = '-p{data_port} -P{control_port} -1'.format(
-        data_port=UDP_PORT,
-        control_port=CONTROL_PORT)
-
-    threaded_args = [(_RunNuttcp, (receiving_vm, receiver_args), {}),
-                     (_RunNuttcp, (sending_vm, sender_args), {})]
-
-    vm_util.RunParallelThreads(threaded_args, 200, 5)
-
   for bandwidth in bandwidths:
 
-    RunSingleBandwidth(bandwidth)
+    RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path)
+
+    cat_command = 'cd {results_dir}; cat {out_file}'
 
     # retrieve the results and parse them
-    cat_command = 'cd {nuttcp_exec_dir}; cat {out_file}'.format(
-        nuttcp_exec_dir=sending_vm.temp_dir,
-        out_file=NUTTCP_OUT_FILE)
-    command_out, _ = sending_vm.RemoteCommand(cat_command)
+    udp_results_command = cat_command.format(
+        results_dir=sending_vm.temp_dir, out_file=NUTTCP_OUT_FILE)
+    udp_results, _ = sending_vm.RemoteCommand(udp_results_command)
+
+    # get the cpu usage for the sender
+    sender_command = cat_command.format(
+        results_dir=sending_vm.temp_dir, out_file=CPU_OUT_FILE)
+    sender_cpu_results, _ = sending_vm.RemoteCommand(sender_command)
+
+    # get the cpu usage for the receiver
+    receiver_command = cat_command.format(
+        results_dir=receiving_vm.temp_dir, out_file=CPU_OUT_FILE)
+    receiving_cpu_results, _ = receiving_vm.RemoteCommand(receiver_command)
+
     samples.append(
-        GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
-                           network_type, iteration))
+        GetUDPStreamSample(udp_results, sender_cpu_results,
+                           receiving_cpu_results, sending_vm, receiving_vm,
+                           bandwidth, network_type, iteration))
+
   return samples
+
+
+def _GetCpuResults(cpu_results):
+  r"""Transforms the string output of the cpu results.
+
+  Sample output:
+  '\r\n
+  InstanceName      CookedValue\r\n
+  ------------      -----------\r\n
+  0            22.7976893740141\r\n
+  1            32.6422793196096\r\n
+  2            18.6525988706054\r\n
+  3            44.5594145169094\r\n
+  _total       29.6629938622484\r\n
+  \r\n
+  \r\n'
+
+  Args:
+    cpu_results: string of the output of the cpu usage command.
+  Returns:
+    Array of (cpu_num, percentage)
+  """
+  results = []
+  for entry in (line for line in cpu_results.splitlines()[3:] if line):
+    cpu_num, cpu_usage = entry.split()
+    results.append((cpu_num, float(cpu_usage)))
+  return results
+
 
 # 1416.3418 MB /  10.00 sec = 1188.1121 Mbps 85 %TX 26 %RX 104429 / 1554763
 #  drop/pkt 6.72 %loss
 
 
-def GetUDPStreamSample(command_out, sending_vm, receiving_vm, request_bandwidth,
+def GetUDPStreamSample(command_out, sender_cpu_results, receiving_cpu_results,
+                       sending_vm, receiving_vm, request_bandwidth,
                        network_type, iteration):
   """Get a sample from the nuttcp string results.
 
   Args:
     command_out: the nuttcp output.
+    sender_cpu_results: the cpu usage of the sender VM
+    receiving_cpu_results: the cpu usage of the sender VM
     sending_vm: vm sending the UDP packets.
     receiving_vm: vm receiving the UDP packets.
     request_bandwidth: the requested bandwidth in the nuttcp sample.
@@ -169,6 +298,7 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, request_bandwidth,
   Returns:
     sample from the results of the nuttcp tests.
   """
+
   data_line = command_out.split('\n')[0].split(' ')
   data_line = [val for val in data_line if val]
 
@@ -184,7 +314,13 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, request_bandwidth,
       'packet_loss': packet_loss,
       'bandwidth_requested': request_bandwidth,
       'network_type': network_type,
-      'iteration': iteration
+      'iteration': iteration,
   }
+
+  for cpu_usage in _GetCpuResults(sender_cpu_results):
+    metadata['sender cpu %s' % cpu_usage[0]] = cpu_usage[1]
+
+  for cpu_usage in _GetCpuResults(receiving_cpu_results):
+    metadata['receiver cpu %s' % cpu_usage[0]] = cpu_usage[1]
 
   return sample.Sample('bandwidth', actual_bandwidth, units, metadata)
