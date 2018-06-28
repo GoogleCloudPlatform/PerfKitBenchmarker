@@ -56,21 +56,26 @@ from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
+# The default values for flags and BENCHMARK_CONFIG are not a recommended
+# configuration for comparing sysbench performance.  Rather these values
+# are set to provide a quick way to verify functionality is working.
+# A broader set covering different permuations on much larger data sets
+# is prefereable for comparison.
 flags.DEFINE_string('sysbench_testname', 'oltp_read_write',
                     'The built in oltp lua script to run')
 flags.DEFINE_integer('sysbench_tables', 4,
                      'The number of tables used in sysbench oltp.lua tests')
 flags.DEFINE_integer('sysbench_table_size', 100000,
                      'The number of rows of each table used in the oltp tests')
-flags.DEFINE_integer('sysbench_warmup_seconds', 120,
+flags.DEFINE_integer('sysbench_warmup_seconds', 10,
                      'The duration of the warmup run in which results are '
                      'discarded, in seconds.')
-flags.DEFINE_integer('sysbench_run_seconds', 480,
+flags.DEFINE_integer('sysbench_run_seconds', 10,
                      'The duration of the actual run in which results are '
                      'collected, in seconds.')
 flag_util.DEFINE_integerlist(
     'sysbench_thread_counts',
-    flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
+    flag_util.IntegerList([64]),
     'array of thread counts passed to sysbench, one at a time',
     module_name=__name__)
 flags.DEFINE_integer('sysbench_latency_percentile', 100,
@@ -249,18 +254,46 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
   logging.info('Sysbench real run, duration is %d', run_seconds)
   stdout, _ = _IssueSysbenchCommand(vm, run_seconds, benchmark_spec,
                                     sysbench_thread_count)
+
   logging.info('\n Parsing Sysbench Results...\n')
   ParseSysbenchOutput(stdout, results, metadata)
 
   return results
 
 
-def _PrepareSysbench(vm, metadata, benchmark_spec):
+def _GetDatabaseSize(vm, benchmark_spec):
+  """Get the size of the database in MB."""
+  db = benchmark_spec.managed_relational_db
+  get_db_size_cmd = (
+      'mysql %s '
+      '-e \''
+      'SELECT table_schema AS "Database", '
+      'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS "Size (MB)" '
+      'FROM information_schema.TABLES '
+      'GROUP BY table_schema; '
+      '\'' % db.MakeMysqlConnectionString())
+
+  stdout, _ = vm.RemoteCommand(get_db_size_cmd)
+  logging.info('Query database size results: \n%s', stdout)
+  # example stdout is:
+  # Database	Size (MB)
+  # information_schema	0.16
+  # mysql	5.53
+  # performance_schema	0.00
+  # sbtest	0.33
+  size_mb = 0
+  for line in stdout.splitlines()[1:]:
+    _, word_size_mb = line.split()
+    size_mb += float(word_size_mb)
+
+  return size_mb
+
+
+def _PrepareSysbench(vm, benchmark_spec):
   """Prepare the Sysbench OLTP test with data loading stage.
 
   Args:
     vm: The client VM that will issue the sysbench test.
-    metadata: The PKB metadata to be passed along to the final results.
     benchmark_spec: The benchmark specification. Contains all data that is
                     required to run the benchmark.
   Returns:
@@ -291,8 +324,9 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
   # Data loading is write only so need num_threads less than or equal to the
-  # amount of tables.
-  num_threads = FLAGS.sysbench_tables
+  # amount of tables - capped at 64 threads for when number of tables
+  # gets very large.
+  num_threads = min(FLAGS.sysbench_tables, 64)
 
   data_load_cmd_tokens = ['sysbench',
                           FLAGS.sysbench_testname,
@@ -313,6 +347,9 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
   logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
                stdout, stderr)
 
+  db.mysql_db_size_MB = _GetDatabaseSize(vm, benchmark_spec)
+  metadata = CreateMetadataFromFlags(db)
+
   results.append(sample.Sample(
       'sysbench data load time',
       load_duration,
@@ -322,7 +359,7 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
   return results
 
 
-def CreateMetadataFromFlags():
+def CreateMetadataFromFlags(db):
   """Create meta data with all flags for sysbench."""
   metadata = {
       'sysbench_testname': FLAGS.sysbench_testname,
@@ -331,7 +368,8 @@ def CreateMetadataFromFlags():
       'sysbench_warmup_seconds': FLAGS.sysbench_warmup_seconds,
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
-      'sysbench_report_interval': FLAGS.sysbench_report_interval
+      'sysbench_report_interval': FLAGS.sysbench_report_interval,
+      'mysql_db_size_MB': db.mysql_db_size_MB
   }
   return metadata
 
@@ -361,13 +399,12 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
 
   UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  metadata = CreateMetadataFromFlags()
 
   # Setup common test tools required on the client VM
   vm.Install('sysbench1')
   vm.Install('mysql')
 
-  prepare_results = _PrepareSysbench(vm, metadata, benchmark_spec)
+  prepare_results = _PrepareSysbench(vm, benchmark_spec)
   print prepare_results
 
 
@@ -384,10 +421,11 @@ def Run(benchmark_spec):
   logging.info('Start benchmarking MySQL Service, '
                'Cloud Provider is %s.', FLAGS.cloud)
   vm = benchmark_spec.vms[0]
+  db = benchmark_spec.managed_relational_db
 
   results = []
   for thread_count in FLAGS.sysbench_thread_counts:
-    metadata = CreateMetadataFromFlags()
+    metadata = CreateMetadataFromFlags(db)
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.
