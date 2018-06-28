@@ -484,11 +484,12 @@ def ParseOutput(vm, log_files, is_partial_results, runspec_metric):
   return results
 
 
-def Run(vm, benchmark_subset, version_specific_parameters=None):
+def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   """Runs SPEC CPU on the target vm.
 
   Args:
     vm: Vm. The vm on which speccpu will run.
+    cmd: command to issue.
     benchmark_subset: List. Subset of the benchmark to run.
     version_specific_parameters: List. List of parameters for specific versions.
 
@@ -508,8 +509,8 @@ def Run(vm, benchmark_subset, version_specific_parameters=None):
   if version_specific_parameters:
     fl += ' '.join(version_specific_parameters)
 
-  runspec_cmd = 'runspec --noreportable {flags} {subset}'.format(
-      flags=fl, subset=benchmark_subset)
+  runspec_cmd = '{cmd} --noreportable {flags} {subset}'.format(
+      cmd=cmd, flags=fl, subset=benchmark_subset)
 
   cmd = ' && '.join((
       'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
