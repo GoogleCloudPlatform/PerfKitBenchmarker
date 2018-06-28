@@ -74,7 +74,7 @@ def Prepare(benchmark_spec):
     benchmark_spec.always_call_cleanup = True
 
     benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
-      table_name='pkb-{0}'.format(FLAGS.run_uri))
+        table_name='pkb-{0}'.format(FLAGS.run_uri))
     benchmark_spec.dynamodb_instance._Create()
 
     vms = benchmark_spec.vms
