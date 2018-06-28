@@ -116,4 +116,3 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def GetEndPoint(self):
     ddbep = 'http://dynamodb.{0}.amazonaws.com'.format(self.region)
     return ddbep
-

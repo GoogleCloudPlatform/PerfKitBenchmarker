@@ -129,7 +129,7 @@ def _GetCpuUsage(vm, sample_time):
 @vm_util.Retry(poll_interval=1, max_retries=10)
 def _WaitForNuttcpRunning(vm, machine):
   if not vm.IsProcessRunning('nuttcp'):
-    raise NuttcpNotRunningError('nuttcp not running on the %s' %  machine)
+    raise NuttcpNotRunningError('nuttcp not running on the %s' % machine)
 
 
 @vm_util.Retry(max_retries=15)
