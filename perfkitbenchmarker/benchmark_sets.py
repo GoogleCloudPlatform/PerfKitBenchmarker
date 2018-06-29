@@ -428,7 +428,7 @@ def GetBenchmarksFromFlags():
       crossed_axes.append([benchmark_tuple[1]['flags'] for
                            benchmark_tuple in zipped_axes])
 
-    for flag, values in flag_matrix.iteritems():
+    for flag, values in sorted(flag_matrix.iteritems()):
       crossed_axes.append([{flag: v} for v in values])
 
     for flag_config in itertools.product(*crossed_axes):
