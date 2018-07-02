@@ -64,6 +64,7 @@
 - Added ResNet benchmark.
 - Added support for ACI (Azure Container Instances).
 - Added support for spec cpu 2017.
+- Added glibc benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

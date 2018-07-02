@@ -1,0 +1,518 @@
+{"timing_type": "hp_timing",
+ "functions": {
+  "acos": {
+   "": {
+    "duration": 2.03014e+10,
+    "iterations": 1.485e+08,
+    "max": 14403.4,
+    "min": 15.492,
+    "mean": 136.71
+   },
+   "slow": {
+    "duration": 2.01575e+10,
+    "iterations": 156000,
+    "max": 182374,
+    "min": 107355,
+    "mean": 129215
+   }
+  },
+  "acosh": {
+   "": {
+    "duration": 1.99935e+10,
+    "iterations": 3.492e+08,
+    "max": 2984.83,
+    "min": 28.166,
+    "mean": 57.2551
+   }
+  },
+  "asin": {
+   "": {
+    "duration": 2.01847e+10,
+    "iterations": 1.55e+08,
+    "max": 2298.04,
+    "min": 11.306,
+    "mean": 130.224
+   },
+   "slow": {
+    "duration": 2.04343e+10,
+    "iterations": 165000,
+    "max": 189102,
+    "min": 105102,
+    "mean": 123844
+   }
+  },
+  "asinh": {
+   "": {
+    "duration": 1.9995e+10,
+    "iterations": 3.534e+08,
+    "max": 2927.76,
+    "min": 33.826,
+    "mean": 56.5789
+   }
+  },
+  "atan": {
+   "": {
+    "duration": 2.00594e+10,
+    "iterations": 2.016e+08,
+    "max": 1541.09,
+    "min": 12.64,
+    "mean": 99.501
+   },
+   "144bits": {
+    "duration": 2.00145e+10,
+    "iterations": 816000,
+    "max": 44659.6,
+    "min": 20331.2,
+    "mean": 24527.6
+   }
+  },
+  "atanh": {
+   "": {
+    "duration": 1.99872e+10,
+    "iterations": 4.854e+08,
+    "max": 2807.77,
+    "min": 29.224,
+    "mean": 41.1769
+   }
+  },
+  "cos": {
+   "": {
+    "duration": 2.01899e+10,
+    "iterations": 1.265e+08,
+    "max": 3943.61,
+    "min": 20.616,
+    "mean": 159.604
+   },
+   "768bits": {
+    "duration": 2.59891e+10,
+    "iterations": 210000,
+    "max": 174790,
+    "min": 107410,
+    "mean": 123758
+   }
+  },
+  "cosh": {
+   "": {
+    "duration": 1.99691e+10,
+    "iterations": 6.7e+08,
+    "max": 26716.6,
+    "min": 8.17,
+    "mean": 29.8046
+   }
+  },
+  "exp": {
+   "": {
+    "duration": 2.03608e+10,
+    "iterations": 1.7476e+07,
+    "max": 23934.4,
+    "min": 12.252,
+    "mean": 1165.07
+   },
+   "144bits": {
+    "duration": 2.00878e+10,
+    "iterations": 5.795e+06,
+    "max": 10836,
+    "min": 32.042,
+    "mean": 3466.4
+   },
+   "768bits": {
+    "duration": 2.00969e+10,
+    "iterations": 345000,
+    "max": 90103.5,
+    "min": 54897.1,
+    "mean": 58251.8
+   }
+  },
+  "exp2": {
+   "": {
+    "duration": 1.99365e+10,
+    "iterations": 1.46258e+09,
+    "max": 3627.08,
+    "min": 8.91,
+    "mean": 13.631
+   }
+  },
+  "log": {
+   "": {
+    "duration": 2.00011e+10,
+    "iterations": 3.24704e+08,
+    "max": 3717.86,
+    "min": 18.338,
+    "mean": 61.5979
+   }
+  },
+  "log2": {
+   "": {
+    "duration": 1.99784e+10,
+    "iterations": 7.302e+08,
+    "max": 9031.5,
+    "min": 25.838,
+    "mean": 27.3602
+   }
+  },
+  "modf": {
+   "": {
+    "duration": 1.86034e+10,
+    "iterations": 2.9478e+09,
+    "max": 7851.47,
+    "min": 5.944,
+    "mean": 6.31096
+   }
+  },
+  "pow": {
+   "": {
+    "duration": 2.00081e+10,
+    "iterations": 1.9565e+08,
+    "max": 6059.23,
+    "min": 29.66,
+    "mean": 102.265
+   },
+   "240bits": {
+    "duration": 2.00625e+10,
+    "iterations": 1e+06,
+    "max": 44785.3,
+    "min": 15919.4,
+    "mean": 20062.5
+   },
+   "768bits": {
+    "duration": 3.11537e+10,
+    "iterations": 101000,
+    "max": 374324,
+    "min": 159020,
+    "mean": 308453
+   }
+  },
+  "rint": {
+   "": {
+    "duration": 1.89373e+10,
+    "iterations": 4.13704e+09,
+    "max": 1204.09,
+    "min": 4.462,
+    "mean": 4.57749
+   }
+  },
+  "sin": {
+   "": {
+    "duration": 2.0141e+10,
+    "iterations": 1.372e+08,
+    "max": 1630.97,
+    "min": 11.274,
+    "mean": 146.8
+   },
+   "768bits": {
+    "duration": 2.42238e+10,
+    "iterations": 214000,
+    "max": 158077,
+    "min": 106953,
+    "mean": 113195
+   }
+  },
+  "sincos": {
+   "": {
+    "duration": 2.03605e+10,
+    "iterations": 7.668e+07,
+    "max": 3633.05,
+    "min": 33.59,
+    "mean": 265.526
+   },
+   "768bits": {
+    "duration": 2.01138e+10,
+    "iterations": 180000,
+    "max": 154789,
+    "min": 107036,
+    "mean": 111743
+   }
+  },
+  "sinh": {
+   "": {
+    "duration": 1.99867e+10,
+    "iterations": 5.124e+08,
+    "max": 1966.2,
+    "min": 34.04,
+    "mean": 39.006
+   }
+  },
+  "sqrt": {
+   "": {
+    "duration": 1.93907e+10,
+    "iterations": 3.6581e+09,
+    "max": 1429.03,
+    "min": 5.198,
+    "mean": 5.30076
+   }
+  },
+  "tan": {
+   "": {
+    "duration": 2.04156e+10,
+    "iterations": 1.39449e+08,
+    "max": 10716.7,
+    "min": 14.116,
+    "mean": 146.402
+   },
+   "768bits": {
+    "duration": 2.00841e+10,
+    "iterations": 165000,
+    "max": 158225,
+    "min": 114245,
+    "mean": 121722
+   },
+   "240bits": {
+    "duration": 2.00182e+10,
+    "iterations": 1.74e+07,
+    "max": 3784.82,
+    "min": 939.144,
+    "mean": 1150.47
+   }
+  },
+  "tanh": {
+   "": {
+    "duration": 1.99747e+10,
+    "iterations": 4.766e+08,
+    "max": 15984.4,
+    "min": 26.94,
+    "mean": 41.9108
+   }
+  },
+  "fmin": {
+   "": {
+    "duration": 1.954e+10,
+    "iterations": 3.6351e+09,
+    "max": 7939.66,
+    "min": 5.194,
+    "mean": 5.37538
+   },
+   "qNaN": {
+    "duration": 1.91357e+10,
+    "iterations": 3.10252e+09,
+    "max": 3150.49,
+    "min": 5.932,
+    "mean": 6.16777
+   },
+   "sNaN": {
+    "duration": 1.92355e+10,
+    "iterations": 2.77623e+09,
+    "max": 2182.58,
+    "min": 5.936,
+    "mean": 6.92863
+   }
+  },
+  "fmax": {
+   "": {
+    "duration": 1.95342e+10,
+    "iterations": 3.6658e+09,
+    "max": 2544.19,
+    "min": 5.192,
+    "mean": 5.32876
+   },
+   "qNaN": {
+    "duration": 1.91256e+10,
+    "iterations": 3.04874e+09,
+    "max": 2898.51,
+    "min": 5.936,
+    "mean": 6.27328
+   },
+   "sNaN": {
+    "duration": 1.92209e+10,
+    "iterations": 2.79783e+09,
+    "max": 2659.8,
+    "min": 5.934,
+    "mean": 6.86993
+   }
+  },
+  "fminf": {
+   "": {
+    "duration": 1.9592e+10,
+    "iterations": 3.19012e+09,
+    "max": 5552.38,
+    "min": 5.93,
+    "mean": 6.14145
+   },
+   "sNaN": {
+    "duration": 1.931e+10,
+    "iterations": 2.54886e+09,
+    "max": 2690.71,
+    "min": 6.686,
+    "mean": 7.57595
+   },
+   "qNaN": {
+    "duration": 1.92408e+10,
+    "iterations": 2.8e+09,
+    "max": 13163.2,
+    "min": 6.68,
+    "mean": 6.87173
+   }
+  },
+  "fmaxf": {
+   "": {
+    "duration": 1.95902e+10,
+    "iterations": 3.1789e+09,
+    "max": 3646.08,
+    "min": 5.932,
+    "mean": 6.16257
+   },
+   "sNaN": {
+    "duration": 1.92986e+10,
+    "iterations": 2.5048e+09,
+    "max": 4137.14,
+    "min": 6.682,
+    "mean": 7.70462
+   },
+   "qNaN": {
+    "duration": 1.92288e+10,
+    "iterations": 2.79281e+09,
+    "max": 5615.46,
+    "min": 6.676,
+    "mean": 6.88512
+   }
+  },
+  "powf": {
+   "": {
+    "duration": 1.99806e+10,
+    "iterations": 8.8704e+08,
+    "max": 5421.88,
+    "min": 7.428,
+    "mean": 22.525
+   },
+   "workload-spec2006.wrf": {
+    "reciprocal-throughput": 23.8069,
+    "latency": 58.278,
+    "max-throughput": 4.20046e+07,
+    "min-throughput": 1.71591e+07
+   }
+  },
+  "trunc": {
+   "": {
+    "duration": 1.96966e+10,
+    "iterations": 3.68421e+09,
+    "max": 18073.4,
+    "min": 5.19,
+    "mean": 5.34623
+   }
+  },
+  "truncf": {
+   "": {
+    "duration": 1.96884e+10,
+    "iterations": 3.72226e+09,
+    "max": 3422.38,
+    "min": 5.19,
+    "mean": 5.28937
+   }
+  },
+  "expf": {
+   "workload-spec2017.wrf": {
+    "reciprocal-throughput": 10.0272,
+    "latency": 32.7826,
+    "max-throughput": 9.97287e+07,
+    "min-throughput": 3.0504e+07
+   }
+  },
+  "exp2f": {
+   "workload-spec2017.wrf": {
+    "reciprocal-throughput": 10.0939,
+    "latency": 32.6802,
+    "max-throughput": 9.90701e+07,
+    "min-throughput": 3.05996e+07
+   }
+  },
+  "logf": {
+   "workload-spec2017.wrf": {
+    "reciprocal-throughput": 12.4488,
+    "latency": 32.1607,
+    "max-throughput": 8.03291e+07,
+    "min-throughput": 3.10939e+07
+   }
+  },
+  "log2f": {
+   "workload-spec2017.wrf": {
+    "reciprocal-throughput": 12.5024,
+    "latency": 33.3923,
+    "max-throughput": 7.99847e+07,
+    "min-throughput": 2.9947e+07
+   }
+  },
+  "sincosf": {
+   "": {
+    "duration": 2.00211e+10,
+    "iterations": 1.28357e+09,
+    "max": 3218.99,
+    "min": 7.468,
+    "mean": 15.598
+   }
+  },
+  "sinf": {
+   "": {
+    "duration": 1.99705e+10,
+    "iterations": 1.89536e+09,
+    "max": 2833.36,
+    "min": 5.968,
+    "mean": 10.5365
+   }
+  },
+  "cosf": {
+   "": {
+    "duration": 1.99845e+10,
+    "iterations": 1.8631e+09,
+    "max": 5352.25,
+    "min": 6.696,
+    "mean": 10.7265
+   }
+  },
+  "pthread_once": {
+   "": {
+    "duration": 1.72198e+10,
+    "iterations": 3.20756e+09,
+    "max": 9626.89,
+    "min": 5.198,
+    "mean": 5.3685
+   }
+  },
+  "thread_create": {
+   "stack=2048,guard=2": {
+    "duration": 2.14147e+10,
+    "iterations": 13000,
+    "max": 1.76048e+06,
+    "min": 1.43484e+06,
+    "mean": 1.64729e+06
+   },
+   "stack=1024,guard=1": {
+    "duration": 2.12273e+10,
+    "iterations": 14000,
+    "max": 1.60198e+06,
+    "min": 1.4152e+06,
+    "mean": 1.51623e+06
+   },
+   "stack=1024,guard=2": {
+    "duration": 2.02506e+10,
+    "iterations": 13000,
+    "max": 1.62719e+06,
+    "min": 1.46251e+06,
+    "mean": 1.55774e+06
+   },
+   "stack=2048,guard=1": {
+    "duration": 2.15486e+10,
+    "iterations": 13000,
+    "max": 1.76422e+06,
+    "min": 1.55211e+06,
+    "mean": 1.65758e+06
+   }
+  },
+  "ffs": {
+   "": {
+    "duration": 1.98349e+10,
+    "iterations": 4.3427e+09,
+    "max": 3117.58,
+    "min": 4.46,
+    "mean": 4.56742
+   }
+  },
+  "ffsll": {
+   "": {
+    "duration": 1.98375e+10,
+    "iterations": 4.3639e+09,
+    "max": 1651.93,
+    "min": 4.458,
+    "mean": 4.54583
+   }
+  }
+ }
+}
