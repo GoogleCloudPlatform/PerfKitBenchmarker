@@ -52,7 +52,7 @@ glibc_default_benchset = ['bench-math',
                           'stdlib-benchset',
                           'stdio-common-benchset',
                           'math-benchset',
-                          'malloc-thread',]
+                          'malloc-thread']
 flags.DEFINE_multi_enum(
     'glibc_benchset', glibc_default_benchset, glibc_default_benchset,
     'By default, it will run the whole set of benchmarks. To run only a subset '
@@ -208,4 +208,3 @@ def Run(benchmark_spec):
 def Cleanup(unused_benchmark_spec):
   """Cleanup Glibc on the cluster."""
   pass
-
