@@ -61,7 +61,7 @@ speccpu2017:
 _SPECCPU2017_DIR = 'cpu2017'
 _SPECCPU2017_TAR = 'speccpu2017.tgz'
 _TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
-_LOG_FORMAT = r'Est. (SPEC.*2017_(fp|int)_base)\s*(\S*)'
+_LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
 BENCHMARK_DATA = {_SPECCPU2017_TAR: None}
 LLVM_TAR = 'clang+llvm-3.9.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
 LLVM_TAR_URL = 'http://releases.llvm.org/3.9.0/{0}'.format(LLVM_TAR)
@@ -114,8 +114,7 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
-
-  speccpu.Run(vm, 'runcpu', ' '.join(FLAGS.spec17_subset))
+  speccpu.Run(vm, 'ulimit -s 130000 && runcpu', ' '.join(FLAGS.spec17_subset))
 
   log_files = set()
   for test in FLAGS.spec17_subset:
