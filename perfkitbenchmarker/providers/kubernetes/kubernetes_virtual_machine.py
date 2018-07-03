@@ -419,7 +419,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # benchmarks require it.
     self.InstallPackages('ssh')
     self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
-    self.RemoteCommand('mkdir ~/.ssh')
+    self.RemoteCommand('mkdir -p ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
