@@ -729,22 +729,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_spot_instance:
       util.AddDefaultTags(self.spot_instance_request_id, self.region)
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
 
     Use --aws_preprovisioned_data_bucket to specify the name of the bucket.
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     self.Install('aws_credentials')
     self.Install('awscli')
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
-        install_path, benchmark_name, filename))
+    self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
+        install_path, module_name, filename))
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -897,10 +896,9 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
       self.password = password
 
 
-def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
-                                                       benchmark_name,
-                                                       filename):
+def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                              filename):
   """Returns a string used to download preprovisioned data."""
   return 'aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
-      FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
+      FLAGS.aws_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))

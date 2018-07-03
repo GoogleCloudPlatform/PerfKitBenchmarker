@@ -454,8 +454,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     self.RemoteCommand('sudo apt-get update && sudo apt-get install '
                        '-y google-cloud-sdk')
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.
 
     This function works by looking up the VirtualMachine class which matches
@@ -471,31 +470,31 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
 
     Raises:
       NotImplementedError: if this method does not support the specified cloud.
       AttributeError: if the VirtualMachine class does not implement
-        GenerateDownloadPreprovisionedBenchmarkDataCommand.
+        GenerateDownloadPreprovisionedDataCommand.
     """
     cloud = FLAGS.container_cluster_cloud
     if cloud == 'GCP':
       download_function = (gce_virtual_machine.
-                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+                           GenerateDownloadPreprovisionedDataCommand)
     elif cloud == 'AWS':
       download_function = (aws_virtual_machine.
-                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+                           GenerateDownloadPreprovisionedDataCommand)
     elif cloud == 'Azure':
       download_function = (azure_virtual_machine.
-                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+                           GenerateDownloadPreprovisionedDataCommand)
     else:
       raise NotImplementedError(
           'Cloud {0} does not support downloading preprovisioned '
           'data on Kubernetes VMs.'.format(cloud))
 
     self.RemoteCommand(
-        download_function(install_path, benchmark_name, filename))
+        download_function(install_path, module_name, filename))
 
 
 def _install_sudo_command():
