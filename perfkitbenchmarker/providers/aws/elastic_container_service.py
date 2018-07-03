@@ -116,6 +116,8 @@ class _EksControlPlane(resource.BaseResource):
     ]
     if self.cluster_version:
       create_cmd.extend(['--kubernetes-version', self.cluster_version])
+    if not FLAGS.eks_verify_ssl:
+      create_cmd.append('--no-verify-ssl')
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
@@ -125,6 +127,8 @@ class _EksControlPlane(resource.BaseResource):
         'eks', 'delete-cluster',
         '--name', self.name,
     ]
+    if not FLAGS.eks_verify_ssl:
+      delete_cmd.append('--no-verify-ssl')
     vm_util.IssueCommand(delete_cmd)
 
   def _IsReady(self):
@@ -134,6 +138,8 @@ class _EksControlPlane(resource.BaseResource):
         'eks', 'describe-cluster',
         '--name', self.name,
     ]
+    if not FLAGS.eks_verify_ssl:
+      describe_cmd.append('--no-verify-ssl')
     stdout, _, _ = vm_util.IssueCommand(describe_cmd)
     response = json.loads(stdout)
     ready = response['cluster']['status'] != 'CREATING'

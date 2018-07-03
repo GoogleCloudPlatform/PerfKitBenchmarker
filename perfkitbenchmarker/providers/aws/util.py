@@ -65,7 +65,7 @@ def GetRegionFromZones(zones):
   return region
 
 
-def _EksZonesValidator(value):
+def EksZonesValidator(value):
   if len(value) < 2:
     return False
   if any(IsRegion(zone) for zone in value):
