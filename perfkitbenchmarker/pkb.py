@@ -83,6 +83,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
@@ -879,6 +880,7 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
   benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
+  package_lookup.SetPackageModuleFunction(benchmark_sets.PackageModule)
 
 
 def RunBenchmarkTasksInSeries(tasks):
