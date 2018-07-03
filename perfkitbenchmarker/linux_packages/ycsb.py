@@ -696,7 +696,7 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
                                       'p' + str(percentile),
                                       'latency']),
                             value, 'ms', meta)
-        histogram.append({'microsec_latency': int(value*1000),
+        histogram.append({'microsec_latency': int(value * 1000),
                           'count': bucket_count})
       hist_meta = meta.copy()
       hist_meta.update({'histogram': json.dumps(histogram)})
