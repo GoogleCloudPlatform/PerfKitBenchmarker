@@ -70,4 +70,8 @@ flags.DEFINE_list('eks_zones', ['us-east-1a', 'us-east-1c'],
                   'There must be at least two zones and all zones must be '
                   'from the same region.')
 flags.register_validator('eks_zones',
-                         util._EksZonesValidator)
+                         util.EksZonesValidator)
+flags.DEFINE_boolean('eks_verify_ssl', True,
+                     'Whether to verify the ssl certificate when communicating '
+                     'with the EKS service. This requires SNI support which is '
+                     'not available in the SSL modules of Python < 2.7.9.')
