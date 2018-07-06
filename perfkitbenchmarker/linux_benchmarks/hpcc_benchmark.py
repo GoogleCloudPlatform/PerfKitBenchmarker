@@ -162,8 +162,9 @@ def PrepareBinaries(vms):
     master_vm.MoveFile(vm, 'hpcc', 'hpcc')
     master_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
     vm.RemoteCommand('sudo mv orted /usr/bin/orted')
-    master_vm.MoveFile(vm, '/lib/libiomp5.so', 'libiomp5.so')
-    vm.RemoteCommand('sudo mv libiomp5.so /lib/libiomp5.so')
+    if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
+      master_vm.MoveFile(vm, '/lib/libiomp5.so', 'libiomp5.so')
+      vm.RemoteCommand('sudo mv libiomp5.so /lib/libiomp5.so')
 
 
 def Prepare(benchmark_spec):
