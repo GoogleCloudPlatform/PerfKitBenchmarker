@@ -621,20 +621,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.')
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 
     Use --gce_preprovisioned_data_bucket to specify the name of the bucket.
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
-        install_path, benchmark_name, filename))
+    self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
+        install_path, module_name, filename))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
@@ -732,10 +731,9 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     self.password = response['password']
 
 
-def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
-                                                       benchmark_name,
-                                                       filename):
+def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                              filename):
   """Returns a string used to download preprovisioned data."""
   return 'gsutil -q cp gs://%s/%s/%s %s' % (
-      FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+      FLAGS.gcp_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))
