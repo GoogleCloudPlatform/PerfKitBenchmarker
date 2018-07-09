@@ -338,40 +338,40 @@ class KubernetesVirtualMachineTestCase(
           _EXPECTED_CALL_BODY_WITHOUT_GPUS
       )
 
-  def testDownloadPreprovisionedBenchmarkDataAws(self):
+  def testDownloadPreprovisionedDataAws(self):
     spec = self.create_virtual_machine_spec()
     flags = mock_flags.MockFlags()
     flags.container_cluster_cloud = 'AWS'
     with patch_critical_objects(flags=flags) as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
-      kub_vm.DownloadPreprovisionedBenchmarkData('path', 'name', 'filename')
+      kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)
       self.assertIn('s3', command_string)
 
-  def testDownloadPreprovisionedBenchmarkDataAzure(self):
+  def testDownloadPreprovisionedDataAzure(self):
     spec = self.create_virtual_machine_spec()
     flags = mock_flags.MockFlags()
     flags.container_cluster_cloud = 'Azure'
     with patch_critical_objects(flags=flags) as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
-      kub_vm.DownloadPreprovisionedBenchmarkData('path', 'name', 'filename')
+      kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)
       self.assertIn('az storage blob download', command_string)
 
-  def testDownloadPreprovisionedBenchmarkDataGcp(self):
+  def testDownloadPreprovisionedDataGcp(self):
     spec = self.create_virtual_machine_spec()
     flags = mock_flags.MockFlags()
     flags.container_cluster_cloud = 'GCP'
     with patch_critical_objects(flags=flags) as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
-      kub_vm.DownloadPreprovisionedBenchmarkData('path', 'name', 'filename')
+      kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)

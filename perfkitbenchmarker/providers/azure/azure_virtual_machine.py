@@ -354,29 +354,27 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
     Use --azure_preprovisioned_data_bucket to specify the name of the account.
 
     Note: Azure blob storage does not allow underscores in the container name,
-    so this method replaces any underscores in benchmark_name with dashes.
+    so this method replaces any underscores in module_name with dashes.
     Make sure that the same convention is used when uploading the data
     to Azure blob storage. For example: when uploading data for
-    'benchmark_name' to Azure, create a container named 'benchmark-name'.
+    'module_name' to Azure, create a container named 'benchmark-name'.
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     self.Install('azure_cli')
     self.Install('azure_credentials')
     self.RemoteCommand(
-        GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
-                                                           benchmark_name,
-                                                           filename))
+        GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                                  filename))
 
   def GetResourceMetadata(self):
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
@@ -450,11 +448,10 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
          '--protected-settings=%s' % config] + self.resource_group.args)
 
 
-def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
-                                                       benchmark_name,
-                                                       filename):
+def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                              filename):
   """Returns a string used to download preprovisioned data."""
-  benchmark_name_with_underscores_removed = benchmark_name.replace(
+  module_name_with_underscores_removed = module_name.replace(
       '_', '-')
   destpath = posixpath.join(install_path, filename)
   # TODO(ferneyhough): Refactor this so that this mkdir command
@@ -467,7 +464,7 @@ def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
                       '--name %s '
                       '--file %s' % (
                           FLAGS.azure_preprovisioned_data_bucket,
-                          benchmark_name_with_underscores_removed,
+                          module_name_with_underscores_removed,
                           filename,
                           destpath))
   return '{0} && {1}'.format(mkdir_command, download_command)
