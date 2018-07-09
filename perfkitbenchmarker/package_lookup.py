@@ -45,4 +45,3 @@ def PackageModule(package_name):
     raise errors.Setup.InvalidSetupError(
         'Cannot call package_lookup.py; Was SetUpPKB called?')
   return _global_package_module_function(package_name)
-
