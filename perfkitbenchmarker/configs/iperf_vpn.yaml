@@ -2,7 +2,7 @@
 iperf_vpn:
   description: Run iperf over vpn 
   flags:
-    iperf_vpn_sending_thread_count: 20
+    iperf_vpn_sending_thread_count: 1
     use_vpn: True
   vpn_service:
     tunnel_count: 1  # create multiple tunnels for ecmp load balance testing

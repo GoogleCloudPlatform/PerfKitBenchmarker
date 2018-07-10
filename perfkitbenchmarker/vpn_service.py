@@ -41,10 +41,18 @@ class VPN(object):
     self.name = self.getKeyFromGWPair(gwpair)
 
   def Delete(self):
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    for vpngw_key in self.GWPair:
-      vpngw = benchmark_spec.vpngws[vpngw_key]
-      vpngw.Delete()
+    pass
+#     benchmark_spec = context.GetThreadBenchmarkSpec()
+#     if benchmark_spec is None:
+#       raise errors.Error('DeleteVPN called in a thread without a '
+#                          'BenchmarkSpec.')
+#     for vpngw_key in self.GWPair:
+#       vpngw = benchmark_spec.vpngws[vpngw_key]
+#       vpngw.Delete()
+#     with benchmark_spec.vpngws_lock:
+#       key = self.getKeyFromGWPair(self.GWPair).copy()
+#       if key in benchmark_spec.vpns:
+#         benchmark_spec.vpns.pop(key)
 
   def GetVPN(self, gwpair):
     ''' gets a VPN object for the gwpair or creates one if none exists
@@ -97,6 +105,10 @@ class VPNService(resource.BaseResource):
     self.shared_key = spec.vpn_service_spec.shared_key
     self.name = spec.vpn_service_spec.name
     self.tunnel_count = spec.vpn_service_spec.tunnel_count
+
+    # update metadata
+    self.metadata.update({'t_count': self.tunnel_count,
+                          'vpn_name': self.name})
 
   def _Create(self):
     """Creates VPN objects for VPNGW pairs.

@@ -141,22 +141,22 @@ class GceVPNGW(network.BaseVPNGW):
                        (self.region, FLAGS.run_uri))
     fr_ESP_name = ('fr-esp-%s-%s' %
                    (self.region, FLAGS.run_uri))
-    with self._lock:
-      if fr_UDP500_name not in self.forwarding_rules:
-        fr_UDP500 = GceForwardingRule(
-            fr_UDP500_name, 'UDP', self, 500)
-        self.forwarding_rules[fr_UDP500_name] = fr_UDP500
-        fr_UDP500.Create()
-      if fr_UDP4500_name not in self.forwarding_rules:
-        fr_UDP4500 = GceForwardingRule(
-            fr_UDP4500_name, 'UDP', self, 4500)
-        self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
-        fr_UDP4500.Create()
-      if fr_ESP_name not in self.forwarding_rules:
-        fr_ESP = GceForwardingRule(
-            fr_ESP_name, 'ESP', self)
-        self.forwarding_rules[fr_ESP_name] = fr_ESP
-        fr_ESP.Create()
+    # with self._lock:
+    if fr_UDP500_name not in self.forwarding_rules:
+      fr_UDP500 = GceForwardingRule(
+          fr_UDP500_name, 'UDP', self, 500)
+      self.forwarding_rules[fr_UDP500_name] = fr_UDP500
+      fr_UDP500.Create()
+    if fr_UDP4500_name not in self.forwarding_rules:
+      fr_UDP4500 = GceForwardingRule(
+          fr_UDP4500_name, 'UDP', self, 4500)
+      self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
+      fr_UDP4500.Create()
+    if fr_ESP_name not in self.forwarding_rules:
+      fr_ESP = GceForwardingRule(
+          fr_ESP_name, 'ESP', self)
+      self.forwarding_rules[fr_ESP_name] = fr_ESP
+      fr_ESP.Create()
 
   def SetupTunnel(self, target_gw, psk):
     """Create IPSec tunnel between the source gw and the target gw.
@@ -184,18 +184,16 @@ class GceVPNGW(network.BaseVPNGW):
     cmd.Issue()
 
   def TunnelExists(self, tunnel):
-    """Returns True if the Route exists."""
+    """Returns True if the tunnel exists."""
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe', tunnel)
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def SetupRouting(self, target_gw):
-    """Create IPSec forwarding rules between the source gw and the target gw.
-    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+    """Create IPSec routing rules between the source gw and the target gw.
 
     Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
       target_gw: The BaseVPN object to point forwarding rules at.
     """
     cmd = util.GcloudCommand(self, 'compute', 'routes', 'create', 'route' + self.name)
@@ -228,17 +226,17 @@ class GceVPNGW(network.BaseVPNGW):
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    with self._lock:
-      if self.created:
-        return
-      if self.vpngw_resource:
-        self.vpngw_resource.Create()
+    # with self._lock:
+    if self.created:
+      return
+    if self.vpngw_resource:
+      self.vpngw_resource.Create()
     key = self.name
-    with benchmark_spec.vpngws_lock:
-      if key not in benchmark_spec.vpngws:
-        benchmark_spec.vpngws[key] = self
-      return benchmark_spec.vpngws[key]
-      self.created = True
+    # with benchmark_spec.vpngws_lock:
+    if key not in benchmark_spec.vpngws:
+      benchmark_spec.vpngws[key] = self
+    return benchmark_spec.vpngws[key]
+    self.created = True
 
   def Delete(self):
     """Deletes the actual VPNGW."""
