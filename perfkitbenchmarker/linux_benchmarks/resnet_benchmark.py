@@ -22,7 +22,8 @@ except that this can target TPU.
 # TODO(tohaowu): We only measure image processing speed for now, and we will
 # measure the other metrics in the future.
 
-import copy
+import datetime
+import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -101,7 +102,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   Args:
     benchmark_spec: benchmark specification to update
   """
-  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
   benchmark_spec.depth = FLAGS.resnet_depth
   benchmark_spec.mode = FLAGS.resnet_mode
   benchmark_spec.train_steps = FLAGS.resnet_train_steps
@@ -152,6 +152,36 @@ def _CreateMetadataDict(benchmark_spec):
   return metadata
 
 
+def _ParseDateTime(wall_time):
+  """Parse date and time from output log.
+
+  Args:
+    wall_time: date and time from output log
+
+  Example: 0626 15:10:23.018357
+
+  Returns:
+    datetime
+  """
+  if wall_time:
+    current_date = datetime.datetime.now()
+    current_month = current_date.month
+    run_month = wall_time[0:2]
+    if run_month == '12' and current_month == '01':
+      year = current_date.year - 1
+    else:
+      year = current_date.year
+    return datetime.datetime.strptime(
+        '{year}{datetime}'.format(year=year, datetime=wall_time),
+        '%Y%m%d %H:%M:%S.%f')
+
+
+def _GetTimestamp(wall_time):
+  date_time = _ParseDateTime(wall_time)
+  if date_time:
+    return time.mktime(date_time.timetuple())
+
+
 def _MakeSamplesFromOutput(metadata, output):
   """Create a sample continaing the measured throughput.
 
@@ -166,53 +196,87 @@ def _MakeSamplesFromOutput(metadata, output):
     a Sample containing the throughput
   """
   samples = []
-  pattern = r'loss = (\d+.\d+), step = 0'
-  loss = regex_util.ExtractAllMatches(pattern, output)
-  checkpoints = [('0', '', loss.pop(), '0', '0')]
-  pattern = (r'global_step/sec: (\d+.\d+)\n(.*examples/sec: \d+.\d+\n)?.*'
-             r'loss = (\d+.\d+), step = (\d+) \((\d+.\d+) sec\)')
-  checkpoints.extend(regex_util.ExtractAllMatches(pattern, output))
-  for global_speed, example_speed, loss, step, duration in checkpoints:
-    metadata_copy = copy.deepcopy(metadata)
-    metadata_copy['step'] = int(step)
-    metadata_copy['duration'] = float(duration)
-    samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
-    samples.append(sample.Sample('Global Steps Per Second', float(global_speed),
-                                 'global_steps/sec', metadata_copy))
-    if example_speed:
-      # This benchmark only reports "Examples Per Second" metric when we it
-      # using TPU.
-      pattern = r'examples/sec: (\d+.\d+)'
-      example_speed = regex_util.ExtractExactlyOneMatch(pattern, output)
-      samples.append(sample.Sample('Examples Per Second', float(example_speed),
-                                   'examples/sec', metadata_copy))
+  pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6})'
+  start_time = _ParseDateTime(regex_util.ExtractAllMatches(pattern, output)[0])
 
-  pattern = r'Loss for final step: (\d+.\d+)'
-  value = regex_util.ExtractExactlyOneMatch(pattern, output)
-  samples.append(sample.Sample('Final Loss', float(value), '', metadata))
+  if FLAGS.resnet_mode in ('train', 'train_and_eval'):
+    # If statement training true, it will parse examples_per_second,
+    # global_steps_per_second, loss
+    pattern = (
+        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving checkpoints for (\d+).*\n'
+        r'.*loss = (\d+\.\d+), step = \d+\n')
+    for wall_time, step, loss in regex_util.ExtractAllMatches(pattern, output):
+      metadata_copy = metadata.copy()
+      metadata_copy['step'] = int(step)
+      metadata_copy['duration'] = (
+          _ParseDateTime(wall_time) - start_time).seconds
+      samples.append(sample.Sample('Loss', float(loss), '', metadata_copy,
+                                   _GetTimestamp(wall_time)))
+
+    pattern = (
+        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving checkpoints for (\d+).*\n'
+        r'((.*\n){9})?.*Loss for final step: (\d+\.\d+).')
+    for wall_time, step, _, _, loss in regex_util.ExtractAllMatches(
+        pattern, output):
+      metadata_copy = metadata.copy()
+      metadata_copy['step'] = int(step)
+      metadata_copy['duration'] = (
+          _ParseDateTime(wall_time) - start_time).seconds
+      samples.append(sample.Sample('Loss', float(loss), '', metadata_copy,
+                                   _GetTimestamp(wall_time)))
+
+    pattern = (
+        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving checkpoints for (\d+).*\n'
+        r'.*global_step/sec: (\d+\.\d+)\n'
+        r'(.*examples/sec: (\d+.\d+))?')
+    for wall_time, step, global_step, _, examples_sec in (
+        regex_util.ExtractAllMatches(pattern, output)):
+      metadata_copy = metadata.copy()
+      metadata_copy['step'] = int(step)
+      metadata_copy['duration'] = (
+          _ParseDateTime(wall_time) - start_time).seconds
+      timestamp = _GetTimestamp(wall_time)
+      samples.append(sample.Sample(
+          'Global Steps Per Second', float(global_step),
+          'global_steps/sec', metadata_copy, timestamp))
+      if examples_sec:
+        # This benchmark only reports "Examples Per Second" metric when we it
+        # using TPU.
+        samples.append(sample.Sample('Examples Per Second', float(examples_sec),
+                                     'examples/sec', metadata_copy, timestamp))
+
   if FLAGS.resnet_mode in ('eval', 'train_and_eval'):
-    pattern = r'Eval results: {.*\'loss\': (\d+.\d+)'
-    value = regex_util.ExtractExactlyOneMatch(pattern, output)
-    samples.append(sample.Sample('Eval Loss', float(value), '', metadata))
-    # In the case of top-1 score, the trained model checks if the top class (the
-    # one having the highest probability) is the same as the target label.
-    # In the case of top-5 score, the trained model checks if the target label
-    # is one of your top 5 predictions (the 5 ones with the highest
-    # probabilities).
-    pattern = r'Eval results: {.*\'top_1_accuracy\': (\d+.\d+)'
-    value = regex_util.ExtractExactlyOneMatch(pattern, output)
-    samples.append(sample.Sample('Top 1 Accuracy', float(value) * 100, '%',
-                                 metadata))
+    # If statement evaluates true, it will parse top_1_accuracy, top_5_accuracy,
+    # and eval_loss.
+    pattern = (
+        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving dict for global step \d+: '
+        r'global_step = (\d+), loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
+        r'top_5_accuracy = (\d+\.\d+)')
+    for wall_time, step, loss, top_1_accuracy, top_5_accuracy in (
+        regex_util.ExtractAllMatches(pattern, output)):
+      metadata_copy = metadata.copy()
+      metadata_copy['step'] = int(step)
+      metadata_copy['duration'] = (
+          _ParseDateTime(wall_time) - start_time).seconds
+      timestamp = _GetTimestamp(wall_time)
+      samples.append(
+          sample.Sample('Eval Loss', float(loss), '', metadata_copy, timestamp))
+      # In the case of top-1 score, the trained model checks if the top class (
+      # the one having the highest probability) is the same as the target label.
+      # In the case of top-5 score, the trained model checks if the target label
+      # is one of your top 5 predictions (the 5 ones with the highest
+      # probabilities).
+      samples.append(sample.Sample(
+          'Top 1 Accuracy', float(top_1_accuracy) * 100, '%',
+          metadata_copy, timestamp))
+      samples.append(sample.Sample(
+          'Top 5 Accuracy', float(top_5_accuracy) * 100, '%',
+          metadata_copy, timestamp))
 
-    pattern = r'Eval results: {.*\'top_5_accuracy\': (\d+.\d+)'
-    value = regex_util.ExtractExactlyOneMatch(pattern, output)
-    samples.append(sample.Sample('Top 5 Accuracy', float(value) * 100, '%',
-                                 metadata))
-
-    pattern = r'Elapsed seconds (\d+)'
-    value = regex_util.ExtractExactlyOneMatch(pattern, output)
+    pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Elapsed seconds (\d+)'
+    wall_time, value = regex_util.ExtractExactlyOneMatch(pattern, output)
     samples.append(sample.Sample('Elapsed Seconds', int(value), 'seconds',
-                                 metadata))
+                                 metadata, _GetTimestamp(wall_time)))
   return samples
 
 
