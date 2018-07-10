@@ -50,6 +50,7 @@ def AptInstall(vm):
   """
   vm.Install('python')
   vm.Install('lsb_release')
+  vm.Install('curl')
   vm.InstallPackages('apt-transport-https')
   az_repo, _ = vm.RemoteCommand('lsb_release -cs')
   _CreateFile(vm, _DEB_REPO.format(az_repo=az_repo.strip()), _DEB_REPO_FILE)
