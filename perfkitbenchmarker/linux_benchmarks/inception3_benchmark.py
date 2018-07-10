@@ -95,7 +95,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.use_data = FLAGS.inception3_use_data
   benchmark_spec.mode = FLAGS.inception3_mode
   benchmark_spec.train_steps_per_eval = FLAGS.inception3_train_steps_per_eval
-  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
   benchmark_spec.save_checkpoints_secs = FLAGS.inception3_save_checkpoints_secs
   benchmark_spec.train_batch_size = FLAGS.inception3_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.inception3_eval_batch_size

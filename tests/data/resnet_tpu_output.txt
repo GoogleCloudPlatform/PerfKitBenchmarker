@@ -1,0 +1,308 @@
+Warning: Permanently added '35.202.52.110' (ECDSA) to the list of known hosts.
+W0626 15:10:23.018357 140308113725184 tf_logging.py:126] Estimator's model_fn (<function resnet_model_fn at 0x7f9be434d7d0>) includes params argument, but params are not passed to Estimator.
+I0626 15:10:23.019350 140308113725184 tf_logging.py:116] Using config: {'_save_checkpoints_secs': None, '_keep_checkpoint_max': 5, '_task_type': 'worker', '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7f9be43507d0>, '_keep_checkpoint_every_n_hours': 10000, '_service': None, '_num_ps_replicas': 0, '_tpu_config': TPUConfig(iterations_per_loop=1251, num_shards=8, computation_shape=None, per_host_input_for_training=3, tpu_job_name=None, initial_infeed_sleep_secs=None), '_tf_random_seed': None, '_cluster': <tensorflow.contrib.cluster_resolver.python.training.tpu_cluster_resolver.TPUClusterResolver object at 0x7f9be43506d0>, '_num_worker_replicas': 1, '_task_id': 0, '_log_step_count_steps': 100, '_evaluation_master': 'grpc://10.240.0.2:8470', '_global_id_in_cluster': 0, '_session_config': allow_soft_placement: true
+cluster_def {
+  job {
+    name: "worker"
+    tasks {
+      value: "10.240.0.2:8470"
+    }
+  }
+}
+, '_train_distribute': None, '_is_chief': True, '_save_checkpoints_steps': 1251, '_save_summary_steps': 100, '_model_dir': 'gs://8a31f57f', '_master': 'grpc://10.240.0.2:8470'}
+I0626 15:10:23.019737 140308113725184 tf_logging.py:116] Precision: bfloat16
+I0626 15:10:23.719902 140308113725184 tf_logging.py:116] Training for 20000 steps (15.99 epochs in total). Current step 0.
+I0626 15:10:24.103279 140308113725184 tf_logging.py:116] Querying Tensorflow master (grpc://10.240.0.2:8470) for TPU system metadata.
+2018-06-26 15:10:24.123060: W tensorflow/core/distributed_runtime/rpc/grpc_session.cc:349] GrpcSession::ListDevices will initialize the session with an empty graph and other defaults because the session has not yet been created.
+I0626 15:10:24.229726 140308113725184 tf_logging.py:116] Found TPU system:
+I0626 15:10:24.230056 140308113725184 tf_logging.py:116] *** Num TPU Cores: 8
+I0626 15:10:24.230355 140308113725184 tf_logging.py:116] *** Num TPU Workers: 1
+I0626 15:10:24.230427 140308113725184 tf_logging.py:116] *** Num TPU Cores Per Worker: 8
+I0626 15:10:24.230484 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:CPU:0, CPU, -1)
+I0626 15:10:24.230729 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:XLA_CPU:0, XLA_CPU, 17179869184)
+I0626 15:10:24.230787 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:XLA_GPU:0, XLA_GPU, 17179869184)
+I0626 15:10:24.230834 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:0, TPU, 17179869184)
+I0626 15:10:24.230882 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:1, TPU, 17179869184)
+I0626 15:10:24.230927 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:2, TPU, 17179869184)
+I0626 15:10:24.230973 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:3, TPU, 17179869184)
+I0626 15:10:24.231017 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:4, TPU, 17179869184)
+I0626 15:10:24.231060 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:5, TPU, 17179869184)
+I0626 15:10:24.231103 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:6, TPU, 17179869184)
+I0626 15:10:24.231158 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:7, TPU, 17179869184)
+I0626 15:10:24.231223 140308113725184 tf_logging.py:116] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU_SYSTEM:0, TPU_SYSTEM, 17179869184)
+I0626 15:10:24.253227 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 15:10:33.446448 140308113725184 tf_logging.py:116] Create CheckpointSaverHook.
+I0626 15:10:33.653961 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 15:10:37.363512 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 15:10:38.349322 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 15:10:41.555073 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 15:10:41.688710 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 15:10:42.332561 140308113725184 tf_logging.py:116] Init TPU system
+I0626 15:10:51.990417 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 15:10:51.991108 140306976597760 tf_logging.py:116] Starting infeed thread controller.
+I0626 15:10:51.991293 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 15:10:51.991767 140306968205056 tf_logging.py:116] Starting outfeed thread controller.
+I0626 15:11:00.526737 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 15:11:00.527398 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 15:17:57.820425 140308113725184 tf_logging.py:116] Saving checkpoints for 1251 into gs://8a31f57f/model.ckpt.
+I0626 15:18:10.368172 140308113725184 tf_logging.py:116] loss = 6.580669, step = 0
+I0626 15:18:10.369344 140308113725184 tf_logging.py:116] loss = 6.580669, step = 0
+I0626 15:18:10.370393 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 15:18:10.370584 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 15:24:38.659689 140308113725184 tf_logging.py:116] Saving checkpoints for 2502 into gs://8a31f57f/model.ckpt.
+I0626 15:24:48.776983 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 15:24:48.777291 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 15:31:17.151227 140308113725184 tf_logging.py:116] Saving checkpoints for 3753 into gs://8a31f57f/model.ckpt.
+I0626 15:31:27.813607 140308113725184 tf_logging.py:116] global_step/sec: 3.13751
+I0626 15:31:27.817471 140308113725184 tf_logging.py:116] examples/sec: 3212.81
+I0626 15:31:27.818331 140308113725184 tf_logging.py:116] loss = 3.9600616, step = 2502 (797.449 sec)
+I0626 15:31:27.819509 140308113725184 tf_logging.py:116] Enqueue next (1247) batch(es) of data to infeed.
+I0626 15:31:27.819704 140308113725184 tf_logging.py:116] Dequeue next (1247) batch(es) of data from outfeed.
+I0626 15:37:55.424413 140308113725184 tf_logging.py:116] Saving checkpoints for 5000 into gs://8a31f57f/model.ckpt.
+I0626 15:38:05.481816 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 15:38:05.482106 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 15:38:05.482353 140306976597760 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 15:38:05.482712 140306976597760 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 15:38:05.483017 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 15:38:05.483191 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 15:38:05.483365 140306968205056 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 15:38:05.483581 140306968205056 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 15:38:05.483724 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 15:38:06.648102 140308113725184 tf_logging.py:116] Loss for final step: 3.7149916.
+I0626 15:38:06.648622 140308113725184 tf_logging.py:116] Starting to evaluate.
+I0626 15:38:07.121083 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 15:38:10.528417 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 15:38:10.545217 140308113725184 tf_logging.py:116] Starting evaluation at 2018-06-26-15:38:10
+I0626 15:38:10.545471 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 15:38:11.216006 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 15:38:11.216995 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-5000
+I0626 15:38:13.390619 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 15:38:13.435986 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 15:38:13.639527 140308113725184 tf_logging.py:116] Init TPU system
+I0626 15:38:21.063730 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 15:38:21.064481 140306976597760 tf_logging.py:116] Starting infeed thread controller.
+I0626 15:38:21.064816 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 15:38:21.065423 140306968205056 tf_logging.py:116] Starting outfeed thread controller.
+I0626 15:38:21.348387 140308113725184 tf_logging.py:116] Enqueue next (48) batch(es) of data to infeed.
+I0626 15:38:21.348741 140308113725184 tf_logging.py:116] Dequeue next (48) batch(es) of data from outfeed.
+I0626 15:38:43.244467 140308113725184 tf_logging.py:116] Evaluation [48/48]
+I0626 15:38:43.244849 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 15:38:43.244924 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 15:38:43.245179 140306976597760 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 15:38:43.245481 140306976597760 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 15:38:43.245646 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 15:38:43.245816 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 15:38:43.245995 140306968205056 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 15:38:43.246187 140306968205056 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 15:38:43.246340 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 15:38:43.570837 140308113725184 tf_logging.py:116] Finished evaluation at 2018-06-26-15:38:43
+I0626 15:38:43.571149 140308113725184 tf_logging.py:116] Saving dict for global step 5000: global_step = 5000, loss = 3.7454875, top_1_accuracy = 0.3549601, top_5_accuracy = 0.6168213
+I0626 15:38:46.602598 140308113725184 tf_logging.py:116] Eval results: {'loss': 3.7454875, 'top_1_accuracy': 0.3549601, 'global_step': 5000, 'top_5_accuracy': 0.6168213}
+I0626 15:38:48.065637 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 15:38:56.989518 140308113725184 tf_logging.py:116] Create CheckpointSaverHook.
+I0626 15:38:57.196616 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 15:38:57.198292 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 15:38:58.428741 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 15:38:58.810884 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-5000
+I0626 15:39:02.276031 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 15:39:02.465234 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 15:39:03.158447 140308113725184 tf_logging.py:116] Init TPU system
+I0626 15:39:14.894179 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 15:39:14.894939 140306984990464 tf_logging.py:116] Starting infeed thread controller.
+I0626 15:39:14.895152 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 15:39:14.895910 140306943047424 tf_logging.py:116] Starting outfeed thread controller.
+I0626 15:39:22.599395 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 15:39:22.599756 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 15:46:16.325011 140308113725184 tf_logging.py:116] Saving checkpoints for 6251 into gs://8a31f57f/model.ckpt.
+I0626 15:46:26.289211 140308113725184 tf_logging.py:116] loss = 3.5848448, step = 5000
+I0626 15:46:26.290533 140308113725184 tf_logging.py:116] loss = 3.5848448, step = 5000
+I0626 15:46:26.291697 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 15:46:26.291889 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 15:52:54.831398 140308113725184 tf_logging.py:116] Saving checkpoints for 7502 into gs://8a31f57f/model.ckpt.
+I0626 15:53:08.680979 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 15:53:08.681288 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 15:59:36.842972 140308113725184 tf_logging.py:116] Saving checkpoints for 8753 into gs://8a31f57f/model.ckpt.
+I0626 15:59:47.932271 140308113725184 tf_logging.py:116] global_step/sec: 3.12108
+I0626 15:59:47.935628 140308113725184 tf_logging.py:116] examples/sec: 3195.99
+I0626 15:59:47.936033 140308113725184 tf_logging.py:116] loss = 3.1911979, step = 7502 (801.646 sec)
+I0626 15:59:47.938781 140308113725184 tf_logging.py:116] Enqueue next (1247) batch(es) of data to infeed.
+I0626 15:59:47.939023 140308113725184 tf_logging.py:116] Dequeue next (1247) batch(es) of data from outfeed.
+I0626 16:06:16.077816 140308113725184 tf_logging.py:116] Saving checkpoints for 10000 into gs://8a31f57f/model.ckpt.
+I0626 16:06:26.958547 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 16:06:26.958887 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 16:06:26.960371 140306984990464 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 16:06:26.960568 140306984990464 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 16:06:26.960800 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 16:06:26.961031 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 16:06:26.961199 140306943047424 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 16:06:26.961339 140306943047424 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 16:06:26.961455 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 16:06:28.331193 140308113725184 tf_logging.py:116] Loss for final step: 3.8248343.
+I0626 16:06:28.331485 140308113725184 tf_logging.py:116] Starting to evaluate.
+I0626 16:06:28.821476 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 16:06:32.034440 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 16:06:32.050569 140308113725184 tf_logging.py:116] Starting evaluation at 2018-06-26-16:06:32
+I0626 16:06:32.050821 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 16:06:32.851593 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 16:06:32.852252 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-10000
+I0626 16:06:34.954046 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 16:06:35.009812 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 16:06:35.216746 140308113725184 tf_logging.py:116] Init TPU system
+I0626 16:06:42.352168 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 16:06:42.352832 140306984990464 tf_logging.py:116] Starting infeed thread controller.
+I0626 16:06:42.353111 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 16:06:42.353646 140306943047424 tf_logging.py:116] Starting outfeed thread controller.
+I0626 16:06:42.627928 140308113725184 tf_logging.py:116] Enqueue next (48) batch(es) of data to infeed.
+I0626 16:06:42.628240 140308113725184 tf_logging.py:116] Dequeue next (48) batch(es) of data from outfeed.
+I0626 16:07:02.939727 140308113725184 tf_logging.py:116] Evaluation [48/48]
+I0626 16:07:02.940037 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 16:07:02.940105 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 16:07:02.940350 140306984990464 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 16:07:02.940654 140306984990464 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 16:07:02.940808 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 16:07:02.940989 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 16:07:02.941135 140306943047424 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 16:07:02.941274 140306943047424 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 16:07:02.941416 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 16:07:03.274893 140308113725184 tf_logging.py:116] Finished evaluation at 2018-06-26-16:07:03
+I0626 16:07:03.275221 140308113725184 tf_logging.py:116] Saving dict for global step 10000: global_step = 10000, loss = 3.1737862, top_1_accuracy = 0.46836343, top_5_accuracy = 0.72786456
+I0626 16:07:03.812711 140308113725184 tf_logging.py:116] Eval results: {'loss': 3.1737862, 'top_1_accuracy': 0.46836343, 'global_step': 10000, 'top_5_accuracy': 0.72786456}
+I0626 16:07:05.437719 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 16:07:14.340864 140308113725184 tf_logging.py:116] Create CheckpointSaverHook.
+I0626 16:07:14.558347 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 16:07:14.559971 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 16:07:15.823057 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 16:07:16.210289 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-10000
+I0626 16:07:20.150616 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 16:07:20.349376 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 16:07:21.092283 140308113725184 tf_logging.py:116] Init TPU system
+I0626 16:07:32.843943 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 16:07:32.844552 140306943047424 tf_logging.py:116] Starting infeed thread controller.
+I0626 16:07:32.844710 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 16:07:32.845136 140306934654720 tf_logging.py:116] Starting outfeed thread controller.
+I0626 16:07:40.775636 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 16:07:40.775999 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 16:14:33.911212 140308113725184 tf_logging.py:116] Saving checkpoints for 11251 into gs://8a31f57f/model.ckpt.
+I0626 16:14:45.215013 140308113725184 tf_logging.py:116] loss = 3.312076, step = 10000
+I0626 16:14:45.216310 140308113725184 tf_logging.py:116] loss = 3.312076, step = 10000
+I0626 16:14:45.217430 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 16:14:45.217616 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 16:21:13.742566 140308113725184 tf_logging.py:116] Saving checkpoints for 12502 into gs://8a31f57f/model.ckpt.
+I0626 16:21:24.224212 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 16:21:24.224523 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 16:27:52.740993 140308113725184 tf_logging.py:116] Saving checkpoints for 13753 into gs://8a31f57f/model.ckpt.
+I0626 16:28:02.837919 140308113725184 tf_logging.py:116] global_step/sec: 3.13681
+I0626 16:28:02.841365 140308113725184 tf_logging.py:116] examples/sec: 3212.1
+I0626 16:28:02.841684 140308113725184 tf_logging.py:116] loss = 3.1175842, step = 12502 (797.625 sec)
+I0626 16:28:02.842987 140308113725184 tf_logging.py:116] Enqueue next (1247) batch(es) of data to infeed.
+I0626 16:28:02.843154 140308113725184 tf_logging.py:116] Dequeue next (1247) batch(es) of data from outfeed.
+I0626 16:34:30.904251 140308113725184 tf_logging.py:116] Saving checkpoints for 15000 into gs://8a31f57f/model.ckpt.
+I0626 16:34:41.039164 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 16:34:41.039515 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 16:34:41.039773 140306943047424 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 16:34:41.040060 140306943047424 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 16:34:41.040250 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 16:34:41.040410 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 16:34:41.040600 140306934654720 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 16:34:41.040786 140306934654720 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 16:34:41.040919 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 16:34:42.460408 140308113725184 tf_logging.py:116] Loss for final step: 3.5890362.
+I0626 16:34:42.460726 140308113725184 tf_logging.py:116] Starting to evaluate.
+I0626 16:34:42.946086 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 16:34:46.424516 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 16:34:46.440692 140308113725184 tf_logging.py:116] Starting evaluation at 2018-06-26-16:34:46
+I0626 16:34:46.440970 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 16:34:47.136069 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 16:34:47.136754 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-15000
+I0626 16:34:49.134913 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 16:34:49.179219 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 16:34:49.387300 140308113725184 tf_logging.py:116] Init TPU system
+I0626 16:34:56.841938 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 16:34:56.842555 140306976597760 tf_logging.py:116] Starting infeed thread controller.
+I0626 16:34:56.842787 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 16:34:56.843271 140306934654720 tf_logging.py:116] Starting outfeed thread controller.
+I0626 16:34:57.126295 140308113725184 tf_logging.py:116] Enqueue next (48) batch(es) of data to infeed.
+I0626 16:34:57.126626 140308113725184 tf_logging.py:116] Dequeue next (48) batch(es) of data from outfeed.
+I0626 16:35:17.131891 140308113725184 tf_logging.py:116] Evaluation [48/48]
+I0626 16:35:17.132232 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 16:35:17.132307 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 16:35:17.132497 140306976597760 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 16:35:17.132684 140306976597760 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 16:35:17.132858 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 16:35:17.132997 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 16:35:17.133116 140306934654720 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 16:35:17.133228 140306934654720 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 16:35:17.133362 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 16:35:17.490284 140308113725184 tf_logging.py:116] Finished evaluation at 2018-06-26-16:35:17
+I0626 16:35:17.490634 140308113725184 tf_logging.py:116] Saving dict for global step 15000: global_step = 15000, loss = 3.0474436, top_1_accuracy = 0.5083008, top_5_accuracy = 0.7675781
+I0626 16:35:17.933382 140308113725184 tf_logging.py:116] Eval results: {'loss': 3.0474436, 'top_1_accuracy': 0.5083008, 'global_step': 15000, 'top_5_accuracy': 0.7675781}
+I0626 16:35:19.294864 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 16:35:28.339251 140308113725184 tf_logging.py:116] Create CheckpointSaverHook.
+I0626 16:35:28.775393 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 16:35:28.777369 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 16:35:29.850613 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 16:35:30.134682 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-15000
+I0626 16:35:33.925911 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 16:35:34.120111 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 16:35:34.858639 140308113725184 tf_logging.py:116] Init TPU system
+I0626 16:35:46.658379 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 16:35:46.659044 140306943047424 tf_logging.py:116] Starting infeed thread controller.
+I0626 16:35:46.659406 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 16:35:46.660033 140306716555008 tf_logging.py:116] Starting outfeed thread controller.
+I0626 16:35:54.996036 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 16:35:54.996382 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 16:42:50.085908 140308113725184 tf_logging.py:116] Saving checkpoints for 16251 into gs://8a31f57f/model.ckpt.
+I0626 16:43:00.520790 140308113725184 tf_logging.py:116] loss = 3.014329, step = 15000
+I0626 16:43:00.521838 140308113725184 tf_logging.py:116] loss = 3.014329, step = 15000
+I0626 16:43:00.522870 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 16:43:00.523029 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 16:49:29.089215 140308113725184 tf_logging.py:116] Saving checkpoints for 17502 into gs://8a31f57f/model.ckpt.
+I0626 16:49:38.721606 140308113725184 tf_logging.py:116] Enqueue next (1251) batch(es) of data to infeed.
+I0626 16:49:38.721887 140308113725184 tf_logging.py:116] Dequeue next (1251) batch(es) of data from outfeed.
+I0626 16:56:07.058175 140308113725184 tf_logging.py:116] Saving checkpoints for 18753 into gs://8a31f57f/model.ckpt.
+I0626 16:56:16.618913 140308113725184 tf_logging.py:116] global_step/sec: 3.14282
+I0626 16:56:16.622159 140308113725184 tf_logging.py:116] examples/sec: 3218.25
+I0626 16:56:16.622591 140308113725184 tf_logging.py:116] loss = 3.6558287, step = 17502 (796.101 sec)
+I0626 16:56:16.623677 140308113725184 tf_logging.py:116] Enqueue next (1247) batch(es) of data to infeed.
+I0626 16:56:16.623841 140308113725184 tf_logging.py:116] Dequeue next (1247) batch(es) of data from outfeed.
+I0626 17:02:44.929912 140308113725184 tf_logging.py:116] Saving checkpoints for 20000 into gs://8a31f57f/model.ckpt.
+I0626 17:02:55.107717 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 17:02:55.107995 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 17:02:55.108341 140306943047424 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 17:02:55.108625 140306943047424 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 17:02:55.108845 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 17:02:55.108988 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 17:02:55.109180 140306716555008 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 17:02:55.109361 140306716555008 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 17:02:55.109585 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 17:02:56.584384 140308113725184 tf_logging.py:116] Loss for final step: 3.4957042.
+I0626 17:02:56.584702 140308113725184 tf_logging.py:116] Starting to evaluate.
+I0626 17:02:56.911016 140308113725184 tf_logging.py:116] Calling model_fn.
+I0626 17:03:00.169421 140308113725184 tf_logging.py:116] Done calling model_fn.
+I0626 17:03:00.185518 140308113725184 tf_logging.py:116] Starting evaluation at 2018-06-26-17:03:00
+I0626 17:03:00.185827 140308113725184 tf_logging.py:116] TPU job name worker
+I0626 17:03:00.844732 140308113725184 tf_logging.py:116] Graph was finalized.
+I0626 17:03:00.845415 140308113725184 tf_logging.py:116] Restoring parameters from gs://8a31f57f/model.ckpt-20000
+I0626 17:03:02.993737 140308113725184 tf_logging.py:116] Running local_init_op.
+I0626 17:03:03.039000 140308113725184 tf_logging.py:116] Done running local_init_op.
+I0626 17:03:03.243837 140308113725184 tf_logging.py:116] Init TPU system
+I0626 17:03:10.358952 140308113725184 tf_logging.py:116] Start infeed thread controller
+I0626 17:03:10.359838 140306943047424 tf_logging.py:116] Starting infeed thread controller.
+I0626 17:03:10.360107 140308113725184 tf_logging.py:116] Start outfeed thread controller
+I0626 17:03:10.360671 140306716555008 tf_logging.py:116] Starting outfeed thread controller.
+I0626 17:03:10.658576 140308113725184 tf_logging.py:116] Enqueue next (48) batch(es) of data to infeed.
+I0626 17:03:10.658909 140308113725184 tf_logging.py:116] Dequeue next (48) batch(es) of data from outfeed.
+I0626 17:03:31.077136 140308113725184 tf_logging.py:116] Evaluation [48/48]
+I0626 17:03:31.077475 140308113725184 tf_logging.py:116] Stop infeed thread controller
+I0626 17:03:31.077563 140308113725184 tf_logging.py:116] Shutting down InfeedController thread.
+I0626 17:03:31.077826 140306943047424 tf_logging.py:116] InfeedController received shutdown signal, stopping.
+I0626 17:03:31.078099 140306943047424 tf_logging.py:116] Infeed thread finished, shutting down.
+I0626 17:03:31.078253 140308113725184 tf_logging.py:116] Stop output thread controller
+I0626 17:03:31.078388 140308113725184 tf_logging.py:116] Shutting down OutfeedController thread.
+I0626 17:03:31.078519 140306716555008 tf_logging.py:116] OutfeedController received shutdown signal, stopping.
+I0626 17:03:31.078648 140306716555008 tf_logging.py:116] Outfeed thread finished, shutting down.
+I0626 17:03:31.078758 140308113725184 tf_logging.py:116] Shutdown TPU system.
+I0626 17:03:31.455555 140308113725184 tf_logging.py:116] Finished evaluation at 2018-06-26-17:03:31
+I0626 17:03:31.455869 140308113725184 tf_logging.py:116] Saving dict for global step 20000: global_step = 20000, loss = 2.8425567, top_1_accuracy = 0.5565999, top_5_accuracy = 0.80440265
+I0626 17:03:32.040868 140308113725184 tf_logging.py:116] Eval results: {'loss': 2.8425567, 'top_1_accuracy': 0.5565999, 'global_step': 20000, 'top_5_accuracy': 0.80440265}
+I0626 17:03:32.041156 140308113725184 tf_logging.py:116] Finished training up to step 20000. Elapsed seconds 6788.
