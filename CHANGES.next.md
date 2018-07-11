@@ -146,6 +146,8 @@
 - Abandon beta in TPU commands.
 - Update ycsb hdr histograms to output {bucket:count} data set for latencies.
 - Added GPU test for ResNet benchmark.
+- Extended cluster-boot measures to use guest-reported uptime as a second metric
+  for starting VMs.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
