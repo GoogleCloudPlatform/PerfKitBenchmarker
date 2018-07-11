@@ -15,6 +15,7 @@
 """Run MNIST benchmarks."""
 
 import copy
+import os
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -46,6 +47,7 @@ mnist:
           machine_type: Standard_NC6
           zone: eastus
 """
+GCP_ENV = 'PATH=/tmp/pkb/google-cloud-sdk/bin:$PATH'
 
 flags.DEFINE_string('mnist_train_file',
                     'gs://tfrc-test-bucket/mnist-records/train.tfrecords',
@@ -89,6 +91,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.tpu = benchmark_spec.master
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
+  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
 
 
 def Prepare(benchmark_spec):
@@ -120,6 +123,20 @@ def Prepare(benchmark_spec):
             model_dir=benchmark_spec.model_dir), should_log=True)
   else:
     benchmark_spec.model_dir = '/tmp'
+
+  if FLAGS.imagenet_data_dir and FLAGS.cloud != 'GCP':
+    vm.Install('google_cloud_sdk')
+    vm.RemoteCommand('echo "export {}" >> ~/.bashrc'.format(GCP_ENV),
+                     login_shell=True)
+    credential_path = os.path.join('~', '.config', 'gcloud')
+    vm.RemoteCommand('mkdir -p {}'.format(credential_path), login_shell=True)
+    credential_file = os.path.join(credential_path,
+                                   'application_default_credentials.json')
+    vm.PushFile(FLAGS.gcp_credential, credential_file)
+    vm.RemoteCommand('{env} gcloud auth '
+                     'activate-service-account --key-file {key_file}'.format(
+                         env=GCP_ENV, key_file=credential_file),
+                     login_shell=True)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -198,14 +215,19 @@ def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
   mnist_benchmark_script = 'tpu/cloud_tpu/models/mnist/mnist.py'
+  if benchmark_spec.data_dir:
+    env = GCP_ENV
+  else:
+    env = ''
   mnist_benchmark_cmd = (
-      'python {script} '
+      '{env} python {script} '
       '--master={master} '
       '--train_file={train_file} '
       '--use_tpu={use_tpu} '
       '--train_steps={train_steps} '
       '--iterations={iterations} '
       '--model_dir={model_dir}'.format(
+          env=env,
           script=mnist_benchmark_script,
           master=benchmark_spec.master,
           train_file=benchmark_spec.train_file,
