@@ -148,6 +148,7 @@
 - Added GPU test for ResNet benchmark.
 - Extended cluster-boot measures to use guest-reported uptime as a second metric
   for starting VMs.
+- Update ResNet testcases.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
