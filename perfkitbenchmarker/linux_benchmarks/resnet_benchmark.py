@@ -23,7 +23,6 @@ except that this can target TPU.
 # measure the other metrics in the future.
 
 import datetime
-import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
