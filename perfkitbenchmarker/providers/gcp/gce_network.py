@@ -503,14 +503,17 @@ class GceNetwork(network.BaseNetwork):
                                                self.project)
 
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
+    # allow 192.168.0.0/16 addresses
+    firewall_name2 = 'default-internal2-%s' % FLAGS.run_uri
     # add support for zone, cidr, and separate networks
     if network_spec.zone and network_spec.cidr:
       firewall_name = 'default-internal-%s-%s' % (network_spec.zone, FLAGS.run_uri)
+      firewall_name2 = 'default-internal2-%s-%s' % (network_spec.zone, FLAGS.run_uri)
       self.NETWORK_RANGE = network_spec.cidr
     self.default_firewall_rule = GceFirewallRule(
         firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE)
     self.default_firewall_rule2 = GceFirewallRule(
-        firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE2)
+        firewall_name2, self.project, ALLOW_ALL, name, NETWORK_RANGE2)
     # add VPNGW to the network
     if network_spec.zone and network_spec.cidr and FLAGS.use_vpn:
       vpngw_name = 'vpngw-%s-%s' % (
