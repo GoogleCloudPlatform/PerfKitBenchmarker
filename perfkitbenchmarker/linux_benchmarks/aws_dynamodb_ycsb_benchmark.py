@@ -93,17 +93,17 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
 
   run_kwargs = {
-    'dynamodb.awsCredentialsFile': AWS_REMOTE_CRED_DIR,
-    'dynamodb.primaryKey': FLAGS.aws_dynamodb_primarykey,
-    'dynamodb.endpoint': benchmark_spec.dynamodb_instance.GetEndPoint(),
-    'table': 'pkb-{0}'.format(FLAGS.run_uri),
+      'dynamodb.awsCredentialsFile': AWS_REMOTE_CRED_DIR,
+      'dynamodb.primaryKey': FLAGS.aws_dynamodb_primarykey,
+      'dynamodb.endpoint': benchmark_spec.dynamodb_instance.GetEndPoint(),
+      'table': 'pkb-{0}'.format(FLAGS.run_uri),
   }
   if FLAGS.aws_dynamodb_use_sort:
     run_kwargs.update({'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
                        'dynamodb.hashKeyName': FLAGS.aws_dynamodb_primarykey,
-                       'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey,})
+                       'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey, })
   if FLAGS.aws_dynamodb_ycsb_consistentReads:
-    run_kwargs.update({'dynamodb.consistentReads': 'true',})
+    run_kwargs.update({'dynamodb.consistentReads': 'true', })
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
