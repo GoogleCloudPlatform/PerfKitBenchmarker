@@ -148,6 +148,7 @@
 - Added GPU test for ResNet benchmark.
 - Update ResNet testcases.
 - Remove unused lib in ResNet benchmark.
+- Added way to run several specsfs benchmarks in a single PKB run.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
