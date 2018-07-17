@@ -32,6 +32,7 @@ DEFAULT_MYSQL_VERSION = '5.7.16'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 
 DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
+DEFAULT_POSTGRES_AURORA_VERSION = '9.6.3'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
@@ -144,7 +145,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     elif engine == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
     elif engine == managed_relational_db.AURORA_POSTGRES:
-      return DEFAULT_POSTGRES_VERSION
+      return DEFAULT_POSTGRES_AURORA_VERSION
     else:
       raise Exception('Unspecified default version for {0}'.format(engine))
 
