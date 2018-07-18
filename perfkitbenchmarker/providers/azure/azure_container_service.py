@@ -17,6 +17,7 @@
 import json
 
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -152,6 +153,19 @@ class AksCluster(container_service.KubernetesCluster):
     """Deletes the AKS cluster."""
     # This will be deleted along with the resource group
     self._deleted = True
+
+  def _PostCreate(self):
+    """Tags the cluster resource group."""
+    super(AksCluster, self)._PostCreate()
+    cluster_resource_group_name = 'MC_%s_%s_%s' % (
+        self.resource_group.name, self.name, self.zone)
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    tags = benchmark_spec.GetResourceTags(self.resource_group.timeout_minutes)
+    set_tags_cmd = [
+        azure.AZURE_PATH, 'group', 'update', '-g', cluster_resource_group_name,
+        '--set', 'tags=%s' % json.dumps(tags)
+    ]
+    vm_util.IssueCommand(set_tags_cmd)
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
