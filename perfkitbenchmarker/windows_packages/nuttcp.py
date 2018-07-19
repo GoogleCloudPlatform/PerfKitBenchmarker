@@ -63,6 +63,8 @@ NUTTCP_DIR = 'nuttcp-8.1.4.win64'
 NUTTCP_ZIP = NUTTCP_DIR + '.zip'
 NUTTCP_URL = 'http://nuttcp.net/nuttcp/nuttcp-8.1.4/binaries/' + NUTTCP_ZIP
 
+_COMMAND_TIMEOUT_BUFFER = 30
+
 
 class NuttcpNotRunningError(Exception):
   """Raised when nuttcp is not running at a time that it is expected to be."""
@@ -98,7 +100,7 @@ def _RunNuttcp(vm, options, exec_path):
       exec_path=exec_path,
       options=options)
   # Timeout after expected duration, 5sec server wait plus 25sec buffer
-  timeout_duration = FLAGS.nuttcp_udp_stream_seconds + 30
+  timeout_duration = FLAGS.nuttcp_udp_stream_seconds + _COMMAND_TIMEOUT_BUFFER
   vm.RemoteCommand(command, timeout=timeout_duration)
 
 
@@ -121,7 +123,10 @@ def _GetCpuUsage(vm, sample_time):
                  exec_path=vm.temp_dir,
                  sample_time=sample_time,
                  out_file=CPU_OUT_FILE)
-  vm.RemoteCommand(command, vm)
+  # returning from the command should never take longer than 30 seconds over
+  # the actual sample time. If it does, it is hung.
+  timeout_duration = FLAGS.nuttcp_cpu_sample_time + _COMMAND_TIMEOUT_BUFFER
+  vm.RemoteCommand(command, timeout=timeout_duration)
   if not vm.IsProcessRunning('nuttcp'):
     raise NuttcpNotRunningError('nuttcp not running after getting CPU usage.')
 
