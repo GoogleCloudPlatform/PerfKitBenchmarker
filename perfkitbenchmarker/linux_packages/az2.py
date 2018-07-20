@@ -28,7 +28,9 @@ def _Install(vm):
       'sudo apt-key adv --keyserver packages.microsoft.com '
       '--recv-keys 417A0893')
   vm.RemoteCommand('sudo apt-get install apt-transport-https')
-  vm.RemoteCommand('sudo apt-get update && sudo apt-get install azure-cli')
+  vm.RemoteCommand(
+      'sudo apt-get update && '
+      'sudo apt-get install azure-cli -y --allow-unauthenticated')
 
 
 # TODO(user): Add install instructions for yum.
