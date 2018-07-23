@@ -796,6 +796,8 @@ def RunBenchmarkTask(spec):
   # By modifying the run_uri, we avoid the collisions.
   if FLAGS.run_processes > 1:
     spec.config.flags['run_uri'] = FLAGS.run_uri + str(spec.sequence_number)
+    # Unset run_uri so the config value takes precedence.
+    FLAGS['run_uri'].present = 0
 
   collector = SampleCollector()
   try:
