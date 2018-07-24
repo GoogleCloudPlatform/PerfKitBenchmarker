@@ -1501,6 +1501,20 @@ class LsCpuResults(object):
       raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
                        lscpu)
 
+    match = re.search(r'Core\(s\)\ per\ socket:\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.cores_per_socket = int(match.group(1))
+    else:
+      raise ValueError('Core(s) per socket could not be found in lscpu '
+                       'value:\n%s' % lscpu)
+
+    match = re.search(r'Socket\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.socket_count = int(match.group(1))
+    else:
+      raise ValueError('Socket(s) count could not be found in lscpu '
+                       'value:\n%s' % lscpu)
+
 
 class JujuMixin(DebianMixin):
   """Class to allow running Juju-deployed workloads.
