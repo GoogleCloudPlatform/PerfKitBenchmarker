@@ -26,13 +26,10 @@ import abc
 import logging
 import os
 import shutil
-
-import pkg_resources
-
 import perfkitbenchmarker
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
+import pkg_resources
 
 FLAGS = flags.FLAGS
 
