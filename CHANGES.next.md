@@ -63,7 +63,7 @@
 - Added Elastic Container Service (EKS) as a container cluster type.
 - Added ResNet benchmark.
 - Added support for ACI (Azure Container Instances).
-- Added support for spec cpu 2017.
+- Added spec cpu 2017 and feedback optimization for peak runs.
 - Added glibc benchmark.
 
 ### Enhancements:

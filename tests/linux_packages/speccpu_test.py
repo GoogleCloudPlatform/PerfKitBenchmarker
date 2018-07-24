@@ -44,7 +44,11 @@ GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
                  'runspec_define': '',
                  'runspec_iterations': '3',
                  'runspec_enable_32bit': 'False',
-                 'runspec_metric': 'rate'}
+                 'runspec_metric': 'rate',
+                 'spec_runmode': 'base',
+                 'spec17_fdo': False,
+                 'spec17_copies': None,
+                 'spec17_threads': None}
 
 EXPECTED_RESULT_SPECINT = [
     sample.Sample(metric='400.perlbench', value=23.4, unit='',
@@ -323,17 +327,91 @@ EXPECTED_SPEED_RESULT_SPECINT = [
                   metadata=SPEED_METADATA),
 ]
 
+TEST_OUTPUT_ALL = """
+================================================================================
+410.bwaves_r      13590        717      19.0  *    12345        710      19.1  *
+507.cactuBSSN_r   19580        923      21.2  *    12346        711      29.0  *
+508.namd_r         9180        480      19.1  *    12347        712      39.0  *
+ Est. SPECrate2017_fp_base             4.90
+ Est. SPECrate2017_fp_peak                                         12.3
+"""
+ALL_METADATA = GOOD_METADATA.copy()
+ALL_METADATA['spec_runmode'] = 'all'
+ALL_METADATA['runspec_metric'] = None
+EXPECTED_ALL_RESULT_SPECINT = [
+    sample.Sample(metric='410.bwaves_r', value=19.0, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='410.bwaves_r:peak', value=19.1, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='507.cactuBSSN_r', value=21.2, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='507.cactuBSSN_r:peak', value=29.0, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='508.namd_r', value=19.1, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='508.namd_r:peak', value=39.0, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='SPECrate2017_fp_base', value=4.90, unit='',
+                  metadata=ALL_METADATA),
+    sample.Sample(metric='SPECrate2017_fp_peak', value=12.3, unit='',
+                  metadata=ALL_METADATA),
+]
+
+
+TEST_OUTPUT_PEAK = """
+================================================================================
+410.bwaves_r                                NR    8        710      19.1  *
+507.cactuBSSN_r                             NR    8        711      29.0  *
+508.namd_r                                  NR    8        712      39.0  *
+ Est. SPECrate2017_fp_base             Not Run
+ Est. SPECrate2017_fp_peak                                         12.3
+"""
+PEAK_METADATA = GOOD_METADATA.copy()
+PEAK_METADATA['spec_runmode'] = 'peak'
+PEAK_METADATA['runspec_metric'] = None
+EXPECTED_PEAK_RESULT_SPECINT = [
+    sample.Sample(metric='410.bwaves_r:peak', value=19.1, unit='',
+                  metadata=PEAK_METADATA),
+    sample.Sample(metric='507.cactuBSSN_r:peak', value=29.0, unit='',
+                  metadata=PEAK_METADATA),
+    sample.Sample(metric='508.namd_r:peak', value=39.0, unit='',
+                  metadata=PEAK_METADATA),
+    sample.Sample(metric='SPECrate2017_fp_peak', value=12.3, unit='',
+                  metadata=PEAK_METADATA),
+]
+
+
+TEST_OUTPUT_PARTIAL_PEAK = """
+================================================================================
+410.bwaves_r                                NR                           NR
+507.cactuBSSN_r                             NR    8        711      29.0  *
+508.namd_r                                  NR                           NR
+ Est. SPECrate2017_fp_base             Not Run
+ Est. SPECrate2017_fp_peak                                         12.3
+"""
+PARTIAL_PEAK_METADATA = GOOD_METADATA.copy()
+PARTIAL_PEAK_METADATA['spec_runmode'] = 'peak'
+PARTIAL_PEAK_METADATA['runspec_metric'] = None
+PARTIAL_PEAK_METADATA.update({
+    'partial': 'true',
+    'missing_results': ('410.bwaves_r,508.namd_r')})
+EXPECTED_PARTIAL_PEAK_RESULT_SPECINT = [
+    sample.Sample(metric='507.cactuBSSN_r:peak', value=29.0, unit='',
+                  metadata=PARTIAL_PEAK_METADATA),
+    sample.Sample(metric='SPECrate2017_fp_peak', value=12.3, unit='',
+                  metadata=PARTIAL_PEAK_METADATA),
+]
+
 
 class Speccpu2006BenchmarkTestCase(unittest.TestCase,
                                    test_util.SamplesTestMixin):
 
   def testParseResultsC(self):
-    self.maxDiff = None
-
     vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    speccpu.FLAGS.spec_runmode = 'base'
     vm.speccpu_vm_state = spec_test_config
 
     samples = speccpu._ExtractScore(TEST_OUTPUT_SPECINT, vm,
@@ -369,7 +447,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_EST)
 
   def testParseSpeedResults(self):
-    self.maxDiff = None
+    speccpu.FLAGS.spec_runmode = 'base'
     vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
@@ -379,3 +457,39 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
                                     False, 'speed')
     self.assertSampleListsEqualUpToTimestamp(
         samples, EXPECTED_SPEED_RESULT_SPECINT)
+
+  def testParseAllResults(self):
+    speccpu.FLAGS.spec_runmode = 'all'
+    vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2017'
+    spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
+    vm.speccpu_vm_state = spec_test_config
+    samples = speccpu._ExtractScore(TEST_OUTPUT_ALL, vm,
+                                    False, None)
+    self.assertSampleListsEqualUpToTimestamp(
+        samples, EXPECTED_ALL_RESULT_SPECINT)
+
+  def testParsePeakResults(self):
+    speccpu.FLAGS.spec_runmode = 'peak'
+    vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2017'
+    spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
+    vm.speccpu_vm_state = spec_test_config
+    samples = speccpu._ExtractScore(TEST_OUTPUT_PEAK, vm,
+                                    False, None)
+    self.assertSampleListsEqualUpToTimestamp(
+        samples, EXPECTED_PEAK_RESULT_SPECINT)
+
+  def testParsePartialPeakResults(self):
+    speccpu.FLAGS.spec_runmode = 'peak'
+    vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2017'
+    spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
+    vm.speccpu_vm_state = spec_test_config
+    samples = speccpu._ExtractScore(TEST_OUTPUT_PARTIAL_PEAK, vm,
+                                    True, None)
+    self.assertSampleListsEqualUpToTimestamp(
+        samples, EXPECTED_PARTIAL_PEAK_RESULT_SPECINT)
