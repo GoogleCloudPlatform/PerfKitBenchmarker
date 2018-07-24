@@ -24,6 +24,7 @@ SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 """
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import speccpu
@@ -46,6 +47,17 @@ flags.DEFINE_list('spec17_subset', ['intspeed', 'fpspeed', 'intrate', 'fprate'],
                   'Specify which speccpu2017 tests to run. Accepts a list of '
                   'benchmark suites (intspeed, fpspeed, intrate, fprate) '
                   'or individual benchmark names. Defaults to all suites.')
+flags.DEFINE_integer('spec17_copies', None,
+                     'Number of copies to run for rate tests. If not set '
+                     'default to number of cpu cores using lscpu.')
+flags.DEFINE_integer('spec17_threads', None,
+                     'Number of threads to run for speed tests. If not set '
+                     'default to number of cpu threads using lscpu.')
+flags.DEFINE_boolean('spec17_fdo', False,
+                     'Run with feedback directed optimization on peak. '
+                     'Default to False.')
+flags.DEFINE_boolean('spec17_interleave_numa', True,
+                     'Run with interleave numa nodes. Default to True.')
 
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -55,7 +67,7 @@ speccpu2017:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      disk_spec: *default_50_gb
+      disk_spec: *default_500_gb
 """
 
 _SPECCPU2017_DIR = 'cpu2017'
@@ -81,8 +93,22 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+def CheckPrerequisites(benchmark_config):
+  """FDO is only allow with peak measurement.
+
+  Args:
+    benchmark_config: benchmark_config
+  Raises:
+    errors.Config.InvalidValue: On invalid flag setting.
+  """
+  del benchmark_config  # unused
+  if FLAGS.spec17_fdo and FLAGS.spec_runmode == 'base':
+    raise errors.Config.InvalidValue(
+        'Feedback Directed Optimization is not allowed with base report.')
+
+
 def Prepare(benchmark_spec):
-  """Installs SPEC CPU2006 on the target vm.
+  """Installs SPEC CPU2017 on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -101,6 +127,8 @@ def Prepare(benchmark_spec):
       INSTALL_DIR, LLVM_TAR_URL, LLVM_TAR))
   vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
       INSTALL_DIR, OPENMP_TAR_URL, OPENMP_TAR))
+  vm.RemoteCommand('sudo apt-get install libjemalloc1 libjemalloc-dev')
+  vm.RemoteCommand('sudo apt-get update && sudo apt-get install -y libomp-dev')
 
 
 def Run(benchmark_spec):
@@ -114,7 +142,33 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
-  speccpu.Run(vm, 'ulimit -s 130000 && runcpu', ' '.join(FLAGS.spec17_subset))
+
+  # swap only if necessary; free local node memory and avoid remote memory;
+  # reset caches; set stack size to unlimited
+  # Also consider setting enable_transparent_hugepages flag to true
+  cmd = ('echo 1 | sudo tee /proc/sys/vm/swappiness && '
+         'echo 1 | sudo tee /proc/sys/vm/zone_reclaim_mode && '
+         'sync ; echo 3 | sudo tee /proc/sys/vm/drop_caches && '
+         'ulimit -s unlimited && ')
+
+  # use numa node interleave policy if running rate
+  if FLAGS.spec17_interleave_numa and (
+      'intrate' in FLAGS.spec17_subset or 'fprate' in FLAGS.spec17_subset):
+    cmd += 'numactl --interleave=all && '
+
+  cmd += 'runcpu '
+
+  lscpu = vm.CheckLsCpu()
+  version_specific_parameters = []
+  version_specific_parameters.append(' --copies=%s ' % (
+      FLAGS.spec17_copies or lscpu.cores_per_socket * lscpu.socket_count))
+  version_specific_parameters.append(' --threads=%s ' %
+                                     (FLAGS.spec17_threads or vm.num_cpus))
+  if FLAGS.spec17_fdo:
+    version_specific_parameters.append('--feedback ')
+
+  speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
+              version_specific_parameters)
 
   log_files = set()
   for test in FLAGS.spec17_subset:
@@ -134,7 +188,7 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  """Cleans up SPEC CPU2006 from the target vm.
+  """Cleans up SPEC CPU2017 from the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
