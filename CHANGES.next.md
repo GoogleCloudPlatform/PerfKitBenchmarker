@@ -65,6 +65,7 @@
 - Added support for ACI (Azure Container Instances).
 - Added spec cpu 2017 and feedback optimization for peak runs.
 - Added glibc benchmark.
+- Added lmbench benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
