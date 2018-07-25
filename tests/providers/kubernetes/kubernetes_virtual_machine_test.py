@@ -41,6 +41,7 @@ _EXPECTED_CALL_BODY_WITHOUT_GPUS = """
         "volumes": [],
         "containers": [{
             "name": "fake_name",
+            "workingDir": "/root",
             "volumeMounts": [],
             "image": "test_image",
             "securityContext": {
@@ -68,6 +69,7 @@ _EXPECTED_CALL_BODY_WITH_2_GPUS = """
         "containers": [{
             "name": "fake_name",
             "volumeMounts": [],
+            "workingDir": "/root",
             "image": "test_image",
             "securityContext": {
                 "privileged": null
@@ -102,6 +104,7 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
         "containers": [{
             "name": "fake_name",
             "volumeMounts": [],
+            "workingDir": "/root",
             "image": "nvidia/cuda:9.0-devel-ubuntu16.04",
             "securityContext": {
                 "privileged": null
