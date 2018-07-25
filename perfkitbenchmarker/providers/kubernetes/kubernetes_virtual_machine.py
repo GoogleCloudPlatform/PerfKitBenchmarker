@@ -45,6 +45,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.KUBERNETES
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
+  HOME_DIR = '/root'
 
   def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
@@ -125,7 +126,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
-    logging.info("Waiting for POD %s" % self.name)
+    logging.info('Waiting for POD %s' % self.name)
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
     if pod_info:
       pod_info = json.loads(pod_info)
@@ -133,10 +134,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       if len(containers) == 1:
         pod_status = pod_info['status']['phase']
         if (containers[0]['name'].startswith(self.name)
-            and pod_status == "Running"):
-          logging.info("POD is up and running.")
+            and pod_status == 'Running'):
+          logging.info('POD is up and running.')
           return
-    raise Exception("POD %s is not running. Retrying to check status." %
+    raise Exception('POD %s is not running. Retrying to check status.' %
                     self.name)
 
   def _DeletePod(self):
@@ -188,7 +189,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         'pods', self.name, '', '.status.podIP')
 
     if not pod_ip:
-      raise Exception("Internal POD IP address not found. Retrying.")
+      raise Exception('Internal POD IP address not found. Retrying.')
 
     self.internal_ip = pod_ip
 
@@ -202,13 +203,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
 
     if FLAGS.http_proxy:
-      http_proxy = "sed -i '1i export http_proxy=%s' /etc/bash.bashrc"
+      http_proxy = 'sed -i \'1i export http_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(http_proxy % FLAGS.http_proxy)
     if FLAGS.https_proxy:
-      https_proxy = "sed -i '1i export https_proxy=%s' /etc/bash.bashrc"
+      https_proxy = 'sed -i \'1i export https_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(https_proxy % FLAGS.http_proxy)
     if FLAGS.ftp_proxy:
-      ftp_proxy = "sed -i '1i export ftp_proxy=%s' /etc/bash.bashrc"
+      ftp_proxy = 'sed -i \'1i export ftp_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _SetupDevicesPaths(self):
@@ -228,36 +229,36 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     volumes = self._BuildVolumesBody()
 
     template = {
-        "kind": "Pod",
-        "apiVersion": "v1",
-        "metadata": {
-            "name": self.name,
-            "labels": {
+        'kind': 'Pod',
+        'apiVersion': 'v1',
+        'metadata': {
+            'name': self.name,
+            'labels': {
                 SELECTOR_PREFIX: self.name
             }
         },
-        "spec": {
-            "volumes": volumes,
-            "containers": [container],
-            "dnsPolicy": "ClusterFirst",
+        'spec': {
+            'volumes': volumes,
+            'containers': [container],
+            'dnsPolicy': 'ClusterFirst',
         }
     }
     if FLAGS.kubernetes_anti_affinity:
-      template["spec"]["affinity"] = {
-          "podAntiAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": [{
-                  "labelSelector": {
-                      "matchExpressions": [{
-                          "key": "pkb_anti_affinity",
-                          "operator": "In",
-                          "values": [""],
+      template['spec']['affinity'] = {
+          'podAntiAffinity': {
+              'requiredDuringSchedulingIgnoredDuringExecution': [{
+                  'labelSelector': {
+                      'matchExpressions': [{
+                          'key': 'pkb_anti_affinity',
+                          'operator': 'In',
+                          'values': [''],
                       }],
                   },
-                  "topologyKey": "kubernetes.io/hostname",
+                  'topologyKey': 'kubernetes.io/hostname',
               }],
           },
       }
-      template["metadata"]["labels"]["pkb_anti_affinity"] = ""
+      template['metadata']['labels']['pkb_anti_affinity'] = ''
 
     return json.dumps(template)
 
@@ -283,12 +284,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       image = self.image
     container = {
-        "image": image,
-        "name": self.name,
-        "securityContext": {
-            "privileged": FLAGS.docker_in_privileged_mode
+        'image': image,
+        'name': self.name,
+        'workingDir': self.HOME_DIR,
+        'securityContext': {
+            'privileged': FLAGS.docker_in_privileged_mode
         },
-        "volumeMounts": [
+        'volumeMounts': [
         ]
     }
 
