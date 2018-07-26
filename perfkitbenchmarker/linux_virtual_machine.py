@@ -275,6 +275,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     pass
 
   def PrepareVMEnvironment(self):
+    super(BaseLinuxMixin, self).PrepareVMEnvironment()
     self.SetupProxy()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()

@@ -66,6 +66,7 @@
 - Added spec cpu 2017 and feedback optimization for peak runs.
 - Added glibc benchmark.
 - Added lmbench benchmark.
+- Added support to `--disable_interrupt_moderation` for Windows VMs on AWS.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
