@@ -291,6 +291,8 @@ flags.DEFINE_integer(
     'benchmark is expected run. Some benchmarks purposefully create resources '
     'for other benchmarks to use.   Persistent timeout guages who long '
     'these shared should live.')
+flags.DEFINE_bool('disable_interrupt_moderation', False,
+                  'Turn off the interrupt moderation networking feature')
 
 
 # Support for using a proxy in the cloud environment.

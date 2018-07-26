@@ -128,6 +128,9 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_type'] = flag_values.gpu_type
     if flag_values['gpu_count'].present:
       config_values['gpu_count'] = flag_values.gpu_count
+    if flag_values['disable_interrupt_moderation'].present:
+      config_values['disable_interrupt_moderation'] = (
+          flag_values.disable_interrupt_moderation)
 
     if 'gpu_count' in config_values and 'gpu_type' not in config_values:
       raise errors.Config.MissingOption(
@@ -150,6 +153,8 @@ class BaseVmSpec(spec.BaseSpec):
     """
     result = super(BaseVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
+        'disable_interrupt_moderation': (option_decoders.BooleanDecoder, {
+            'default': False}),
         'image': (option_decoders.StringDecoder, {'none_ok': True,
                                                   'default': None}),
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
@@ -226,6 +231,7 @@ class BaseVirtualMachine(resource.BaseResource):
       self.instance_number = self._instance_counter
       self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
+    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.gpu_count = vm_spec.gpu_count
@@ -707,7 +713,12 @@ class BaseOsMixin(object):
 
     This will be called once after setting up scratch disks.
     """
-    pass
+    if self.disable_interrupt_moderation:
+      self.DisableInterruptModeration()
+
+  def DisableInterruptModeration(self):
+    """Disables interrupt moderation on the VM."""
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def Install(self, package_name):
