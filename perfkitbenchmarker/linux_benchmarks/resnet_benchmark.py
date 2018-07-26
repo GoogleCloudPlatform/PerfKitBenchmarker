@@ -81,6 +81,12 @@ flags.DEFINE_enum('resnet_data_format', 'channels_last',
                   ', channels_first will improve performance.')
 flags.DEFINE_enum('resnet_precision', 'bfloat16', ['bfloat16', 'float32'],
                   'Precision to use')
+flags.DEFINE_bool('resnet_skip_host_call', False, 'Skip the host_call which is '
+                  'executed every training step. This is generally used for '
+                  'generating training summaries (train loss, learning rate, '
+                  'etc...). When --skip_host_call=false, there could be a '
+                  'performance drop if host_call function is slow and cannot '
+                  'keep up with the TPU-side computation.')
 
 
 def GetConfig(user_config):
@@ -110,6 +116,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.data_format = FLAGS.resnet_data_format
   benchmark_spec.precision = FLAGS.resnet_precision
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
+  benchmark_spec.skip_host_call = FLAGS.resnet_skip_host_call
 
 
 def Prepare(benchmark_spec):
@@ -146,7 +153,8 @@ def _CreateMetadataDict(benchmark_spec):
       'num_cores': benchmark_spec.num_cores,
       'data_format': benchmark_spec.data_format,
       'precision': benchmark_spec.precision,
-      'commit': benchmark_spec.commit
+      'commit': benchmark_spec.commit,
+      'skip_host_call': benchmark_spec.skip_host_call
   }
   return metadata
 
@@ -297,7 +305,8 @@ def Run(benchmark_spec):
       '--iterations_per_loop={iterations} '
       '--num_cores={num_cores} '
       '--data_format={data_format} '
-      '--precision={precision}'.format(
+      '--precision={precision} '
+      '--skip_host_call={skip_host_call}'.format(
           script=resnet_benchmark_script,
           use_tpu=benchmark_spec.use_tpu,
           tpu=benchmark_spec.tpu,
@@ -311,7 +320,8 @@ def Run(benchmark_spec):
           iterations=benchmark_spec.iterations,
           num_cores=benchmark_spec.num_cores,
           data_format=benchmark_spec.data_format,
-          precision=benchmark_spec.precision
+          precision=benchmark_spec.precision,
+          skip_host_call=benchmark_spec.skip_host_call
       ))
   if FLAGS.tf_device == 'gpu':
     resnet_benchmark_cmd = '{env} {cmd}'.format(
