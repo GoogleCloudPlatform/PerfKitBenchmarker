@@ -41,7 +41,7 @@ lmbench:
 
 _LMBENCH_HARDWARE_DEFAULT = 'NO'
 
-flags.DEFINE_string(
+flags.DEFINE_integer(
     'lmbench_mem_size', None,
     'The range of memory on which several benchmarks operate. If not provided, '
     'the memory size should be 8MB as default'
