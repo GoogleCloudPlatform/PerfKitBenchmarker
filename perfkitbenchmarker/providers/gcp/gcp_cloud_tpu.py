@@ -64,6 +64,8 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
       cmd.flags['version'] = self.spec.tpu_tf_version
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
+    if self.spec.tpu_preemptible:
+      cmd.flags['preemptible'] = self.spec.tpu_preemptible
     cmd.flags['project'] = self.project
     _, _, retcode = cmd.Issue()
     if retcode != 0:

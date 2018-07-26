@@ -24,7 +24,8 @@ flags.DEFINE_string('tf_cpu_pip_package',
                     'https://anaconda.org/intel/tensorflow/1.6.0/download/'
                     'tensorflow-1.6.0-cp27-cp27mu-linux_x86_64.whl',
                     'TensorFlow CPU pip package to install. By default, PKB '
-                    'will install an Intel-optimized CPU build when using CPUs.')
+                    'will install an Intel-optimized CPU build when using CPUs.'
+                   )
 flags.DEFINE_string('tf_gpu_pip_package', 'tensorflow-gpu==1.7',
                     'TensorFlow GPU pip package to install. By default, PKB '
                     'will install tensorflow-gpu==1.7 when using GPUs.')
@@ -84,6 +85,7 @@ def Install(vm):
     vm.Install('cudnn')
 
   vm.Install('pip')
+  vm.RemoteCommand('sudo pip install requests')
   vm.RemoteCommand('sudo pip install --upgrade absl-py')
   vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
                    should_log=True)
