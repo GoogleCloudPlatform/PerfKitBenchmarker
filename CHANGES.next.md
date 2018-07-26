@@ -152,6 +152,7 @@
 - Remove unused lib in ResNet benchmark.
 - Added way to run several specsfs benchmarks in a single PKB run.
 - Add --preemptible in TPU creation command.
+- Add --skip_host_call in ResNet benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
