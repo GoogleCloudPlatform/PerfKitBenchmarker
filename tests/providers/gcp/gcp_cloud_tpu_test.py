@@ -39,7 +39,8 @@ class GcpTpuTestCase(unittest.TestCase):
         'tpu_description': 'MyTFNode',
         'tpu_network': 'default',
         'tpu_tf_version': 'nightly',
-        'tpu_zone': 'us-central1-a'
+        'tpu_zone': 'us-central1-a',
+        'tpu_preemptible': True
     }
 
   def CreateCloudTpuFromSpec(self, spec_dict):
@@ -91,6 +92,7 @@ class GcpTpuTestCase(unittest.TestCase):
       self.assertIn('--network default', command_string)
       self.assertIn('--version nightly', command_string)
       self.assertIn('--zone us-central1-a', command_string)
+      self.assertIn('--preemptible', command_string)
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
