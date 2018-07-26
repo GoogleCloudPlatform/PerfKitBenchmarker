@@ -610,9 +610,6 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
         result['groups'][group_name][HISTOGRAM] = CombineHistograms(
             result['groups'][group_name][HISTOGRAM],
             group[HISTOGRAM])
-      elif measurement_type == HDRHISTOGRAM:
-        result['groups'][group_name][HDRHISTOGRAM] = combined_hdr.get(
-            group_name, [])
       elif measurement_type == TIMESERIES:
         result['groups'][group_name][TIMESERIES] = CombineTimeseries(
             result['groups'][group_name][TIMESERIES],
@@ -624,6 +621,10 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
                                        indiv['command_line']))
     if 'target' in result and 'target' in indiv:
       result['target'] += indiv['target']
+
+  if measurement_type == HDRHISTOGRAM:
+    for group_name in combined_hdr:
+      result['groups'][group_name][HDRHISTOGRAM] = combined_hdr[group_name]
 
   return result
 
