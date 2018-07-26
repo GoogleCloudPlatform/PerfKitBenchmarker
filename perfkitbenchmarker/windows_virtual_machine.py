@@ -62,6 +62,10 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
     encoded_command=base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le')))
 
 
+class WaitTimeoutException(Exception):
+  """Exception thrown if a wait operation takes too long."""
+
+
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
   OS_TYPE = os_types.WINDOWS
@@ -319,6 +323,26 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       self.Uninstall(package_name)
     self.RemoteCommand('rm -recurse -force %s' % self.temp_dir)
     self.EnableGuestFirewall()
+
+  def WaitForProcessRunning(self, process, timeout):
+    """Blocks until either the timeout passes or the process is running.
+
+    Args:
+      process: string name of the process.
+      timeout: number of seconds to block while the process is not running.
+
+    Raises:
+      WaitTimeoutException: raised if the process does not run within "timeout"
+                            seconds.
+    """
+    command = ('$count={timeout};'
+               'while( (ps | select-string {process} | measure-object).Count '
+               '-eq 0 -and $count -gt 0) {{sleep 1; $count=$count-1}}; '
+               'if ($count -eq 0) {{echo "FAIL"}}').format(
+                   timeout=timeout, process=process)
+    stdout, _ = self.RemoteCommand(command)
+    if 'FAIL' in stdout:
+      raise WaitTimeoutException()
 
   def IsProcessRunning(self, process):
     """Checks if a given process is running on the system.
