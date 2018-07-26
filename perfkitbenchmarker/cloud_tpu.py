@@ -39,6 +39,8 @@ flags.DEFINE_string('tpu_zone', None,
                     'The zone of the tpu to create. Zone in which TPU lives.')
 flags.DEFINE_string('tpu_name', None,
                     'The name of the cloud TPU to create.')
+flags.DEFINE_boolean('tpu_preemptible', False,
+                     'Use preemptible cloud TPU or not.')
 
 FLAGS = flags.FLAGS
 
@@ -77,8 +79,7 @@ class BaseCloudTpu(resource.BaseResource):
     raise NotImplementedError()
 
   def _Delete(self):
-    """Deletes the cloud TPU.
-    """
+    """Deletes the cloud TPU."""
     raise NotImplementedError()
 
   @abc.abstractmethod
@@ -98,6 +99,7 @@ class BaseCloudTpu(resource.BaseResource):
         'network': self.spec.tpu_network,
         'tf_version': self.spec.tpu_tf_version,
         'zone': self.spec.tpu_zone,
-        'name': self.spec.tpu_name
+        'name': self.spec.tpu_name,
+        'preemptible': self.spec.tpu_preemptible
     }
     return metadata
