@@ -39,11 +39,6 @@ lmbench:
       vm_count: null
 """
 
-# This comment is for code review, will delete it when submitting code.
-# We only want to run the os tests and ignore the hardware tests. Such that we
-# want the default value of the 'lmbench_hardware' flag to be 'NO'.
-
-
 _LMBENCH_HARDWARE_DEFAULT = 'NO'
 
 flags.DEFINE_string(
@@ -80,8 +75,6 @@ def _ConfigureRun(vm):
       'sed -i -e "s/OUTPUT=\\/dev\\/tty/OUTPUT=\\/dev\\/null/" '
       '{0}/bin/x86_64-linux-gnu/CONFIG.*'.format(lmbench.LMBENCH_DIR))
   vm.RemoteCommand(sed_cmd)
-
-  # At this point by default, BENCHMARK_OS=YES and BENCHMARK_HARDWARE=YES
 
   if FLAGS.lmbench_mem_size:
     sed_cmd = (
