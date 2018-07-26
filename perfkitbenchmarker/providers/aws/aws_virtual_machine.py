@@ -92,6 +92,14 @@ class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
 
 
+class AwsDriverDoesntSupportFeatureError(Exception):
+  """Raised if there is an attempt to set a feature not supported."""
+
+
+class AwsUnexpectedWindowsAdapterOutputError(Exception):
+  """Raised when querying the status of a windows adapter failed."""
+
+
 class AwsUnknownStatusError(Exception):
   """Error indicating an unknown status was encountered."""
 
@@ -894,6 +902,55 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
                      vm_util.GetPrivateKeyPath()]
       password, _ = vm_util.IssueRetryableCommand(decrypt_cmd)
       self.password = password
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping metadata key to value.
+    """
+    result = super(WindowsAwsVirtualMachine, self).GetResourceMetadata()
+    result['disable_interrupt_moderation'] = self.disable_interrupt_moderation
+    return result
+
+  @vm_util.Retry(
+      max_retries=10,
+      retryable_exceptions=(AwsUnexpectedWindowsAdapterOutputError,
+                            errors.VirtualMachine.RemoteCommandError))
+  def DisableInterruptModeration(self):
+    """Disable the networking feature 'Interrupt Moderation'."""
+
+    # First ensure that the driver supports interrupt moderation
+    net_adapters, _ = self.RemoteCommand('Get-NetAdapter')
+    if 'Intel(R) 82599 Virtual Function' not in net_adapters:
+      raise AwsDriverDoesntSupportFeatureError(
+          'Driver not tested with Interrupt Moderation in PKB.')
+    aws_int_dis_path = ('HKLM\\SYSTEM\\ControlSet001\\Control\\Class\\'
+                        '{4d36e972-e325-11ce-bfc1-08002be10318}\\0011')
+    command = 'reg add "%s" /v *InterruptModeration /d 0 /f' % aws_int_dis_path
+    self.RemoteCommand(command)
+    try:
+      self.RemoteCommand('Restart-NetAdapter -Name "Ethernet 2"')
+    except IOError:
+      # Restarting the network adapter will always fail because
+      # the winrm connection used to issue the command will be
+      # broken.
+      pass
+    int_dis_value, _ = self.RemoteCommand(
+        'reg query "%s" /v *InterruptModeration' % aws_int_dis_path)
+    # The second line should look like:
+    #     *InterruptModeration    REG_SZ    0
+    registry_query_lines = int_dis_value.splitlines()
+    if len(registry_query_lines) < 3:
+      raise AwsUnexpectedWindowsAdapterOutputError(
+          'registry query failed: %s ' % int_dis_value)
+    registry_query_result = registry_query_lines[2].split()
+    if len(registry_query_result) < 3:
+      raise AwsUnexpectedWindowsAdapterOutputError(
+          'unexpected registry query response: %s' % int_dis_value)
+    if registry_query_result[2] != '0':
+      raise AwsUnexpectedWindowsAdapterOutputError(
+          'InterruptModeration failed to disable')
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
