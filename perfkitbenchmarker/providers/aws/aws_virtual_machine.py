@@ -316,7 +316,7 @@ class AwsKeyFileManager(object):
       import_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'import-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
+          '--key-name=%s' % cls.GetKeyNameForRun(),
           '--public-key-material=%s' % keyfile]
       util.IssueRetryableCommand(import_cmd)
       cls.imported_keyfile_set.add(region)
@@ -332,11 +332,15 @@ class AwsKeyFileManager(object):
       delete_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'delete-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+          '--key-name=%s' % cls.GetKeyNameForRun()]
       util.IssueRetryableCommand(delete_cmd)
       cls.deleted_keyfile_set.add(region)
       if region in cls.imported_keyfile_set:
         cls.imported_keyfile_set.remove(region)
+
+  @classmethod
+  def GetKeyNameForRun(cls):
+    return 'perfkit-key-{0}'.format(FLAGS.run_uri)
 
 
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -566,7 +570,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--client-token=%s' % self.client_token,
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
-        '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+        '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun()]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:
