@@ -268,7 +268,7 @@ class EksCluster(container_service.KubernetesCluster):
         'NodeAutoScalingGroupMaxSize': self.max_nodes,
         'NodeInstanceType': self.machine_type,
         'NodeImageId': self._GetImageId(),
-        'KeyName': 'perfkit-key-%s' % FLAGS.run_uri,
+        'KeyName': aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
         'VpcId': vpc.id,
         'Subnets': ','.join([net.subnet.id for net in self.networks]),
     }
