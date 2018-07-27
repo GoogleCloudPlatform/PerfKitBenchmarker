@@ -293,6 +293,8 @@ flags.DEFINE_integer(
     'these shared should live.')
 flags.DEFINE_bool('disable_interrupt_moderation', False,
                   'Turn off the interrupt moderation networking feature')
+flags.DEFINE_bool('disable_rss', False,
+                  'Whether or not to disable the Receive Side Scaling feature.')
 
 
 # Support for using a proxy in the cloud environment.
