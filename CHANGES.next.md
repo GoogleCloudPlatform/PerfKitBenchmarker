@@ -67,6 +67,7 @@
 - Added glibc benchmark.
 - Added lmbench benchmark.
 - Added support to `--disable_interrupt_moderation` for Windows VMs on AWS.
+- Added support to `--disable_rss` for Windows VMs on GCP.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

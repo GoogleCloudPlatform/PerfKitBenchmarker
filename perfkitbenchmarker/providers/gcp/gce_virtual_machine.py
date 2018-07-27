@@ -70,6 +70,14 @@ _GPU_TYPE_TO_INTERAL_NAME_MAP = {
 }
 
 
+class GceUnexpectedWindowsAdapterOutputError(Exception):
+  """Raised when querying the status of a windows adapter failed."""
+
+
+class GceDriverDoesntSupportFeatureError(Exception):
+  """Raised if there is an attempt to set a feature not supported."""
+
+
 class GceVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a GceVirtualMachine.
 
@@ -729,6 +737,49 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
     self.password = response['password']
+
+  @vm_util.Retry(
+      max_retries=10,
+      retryable_exceptions=(GceUnexpectedWindowsAdapterOutputError,
+                            errors.VirtualMachine.RemoteCommandError))
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping metadata key to value.
+    """
+    result = super(WindowsGceVirtualMachine, self).GetResourceMetadata()
+    result['disable_rss'] = self.disable_rss
+    return result
+
+  def DisableRSS(self):
+    """Disables RSS on the GCE VM.
+
+    Raises:
+      GceDriverDoesntSupportFeatureError: If RSS is not supported.
+      GceUnexpectedWindowsAdapterOutputError: If querying the RSS state
+        returns unexpected output.
+    """
+    # First ensure that the driver supports interrupt moderation
+    net_adapters, _ = self.RemoteCommand('Get-NetAdapter')
+    if 'Red Hat VirtIO Ethernet Adapter' not in net_adapters:
+      raise GceDriverDoesntSupportFeatureError(
+          'Driver not tested with RSS disabled in PKB.')
+
+    command = 'netsh int tcp set global rss=disabled'
+    self.RemoteCommand(command)
+    try:
+      self.RemoteCommand('Restart-NetAdapter -Name "Ethernet"')
+    except IOError:
+      # Restarting the network adapter will always fail because
+      # the winrm connection used to issue the command will be
+      # broken.
+      pass
+
+    # Verify the setting went through
+    stdout, _ = self.RemoteCommand('netsh int tcp show global')
+    if 'Receive-Side Scaling State          : enabled' in stdout:
+      raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
