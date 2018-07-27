@@ -131,6 +131,8 @@ class BaseVmSpec(spec.BaseSpec):
     if flag_values['disable_interrupt_moderation'].present:
       config_values['disable_interrupt_moderation'] = (
           flag_values.disable_interrupt_moderation)
+    if flag_values['disable_rss'].present:
+      config_values['disable_rss'] = flag_values.disable_rss
 
     if 'gpu_count' in config_values and 'gpu_type' not in config_values:
       raise errors.Config.MissingOption(
@@ -155,6 +157,7 @@ class BaseVmSpec(spec.BaseSpec):
     result.update({
         'disable_interrupt_moderation': (option_decoders.BooleanDecoder, {
             'default': False}),
+        'disable_rss': (option_decoders.BooleanDecoder, {'default': False}),
         'image': (option_decoders.StringDecoder, {'none_ok': True,
                                                   'default': None}),
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
@@ -232,6 +235,7 @@ class BaseVirtualMachine(resource.BaseResource):
       self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
     self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
+    self.disable_rss = vm_spec.disable_rss
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.gpu_count = vm_spec.gpu_count
@@ -716,8 +720,15 @@ class BaseOsMixin(object):
     if self.disable_interrupt_moderation:
       self.DisableInterruptModeration()
 
+    if self.disable_rss:
+      self.DisableRSS()
+
   def DisableInterruptModeration(self):
     """Disables interrupt moderation on the VM."""
+    raise NotImplementedError()
+
+  def DisableRSS(self):
+    """Disables RSS on the VM."""
     raise NotImplementedError()
 
   @abc.abstractmethod
