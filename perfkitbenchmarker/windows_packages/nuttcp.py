@@ -119,22 +119,18 @@ def _GetCpuUsage(vm, sample_time):
              "Get-Counter -Counter '\\Processor(*)\\% Processor Time' "
              '-SampleInterval {sample_time} | '
              'select -ExpandProperty CounterSamples | '
-             'select InstanceName,CookedValue > {out_file}').format(
+             'select InstanceName,CookedValue > {out_file};'
+             'if ((ps | select-string nuttcp | measure-object).Count -eq 0) '
+             '{{echo "FAIL"}}').format(
                  exec_path=vm.temp_dir,
                  sample_time=sample_time,
                  out_file=CPU_OUT_FILE)
   # returning from the command should never take longer than 30 seconds over
   # the actual sample time. If it does, it is hung.
   timeout_duration = FLAGS.nuttcp_cpu_sample_time + _COMMAND_TIMEOUT_BUFFER
-  vm.RemoteCommand(command, timeout=timeout_duration)
-  if not vm.IsProcessRunning('nuttcp'):
+  stdout, _ = vm.RemoteCommand(command, timeout=timeout_duration)
+  if 'FAIL' in stdout:
     raise NuttcpNotRunningError('nuttcp not running after getting CPU usage.')
-
-
-@vm_util.Retry(poll_interval=1, max_retries=10)
-def _WaitForNuttcpRunning(vm, machine):
-  if not vm.IsProcessRunning('nuttcp'):
-    raise NuttcpNotRunningError('nuttcp not running on the %s' % machine)
 
 
 @vm_util.Retry(max_retries=15)
@@ -174,7 +170,7 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
       args=(receiving_vm, receiver_args, exec_path))
   server_thread.start()
 
-  _WaitForNuttcpRunning(receiving_vm, 'server')
+  receiving_vm.WaitForProcessRunning('nuttcp', 3)
 
   # Thread to run the nuttcp client
   client_thread = threading.Thread(
@@ -183,7 +179,7 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
       args=(sending_vm, sender_args, exec_path))
   client_thread.start()
 
-  _WaitForNuttcpRunning(sending_vm, 'client')
+  sending_vm.WaitForProcessRunning('nuttcp', 3)
 
   threaded_args = [
       (_GetCpuUsage, (receiving_vm, FLAGS.nuttcp_cpu_sample_time), {}),
