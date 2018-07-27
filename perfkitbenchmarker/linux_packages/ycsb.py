@@ -692,11 +692,7 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
                             value, 'ms', meta)
     if group.get(HDRHISTOGRAM, []):
       histogram = []
-      for percentile, value, bucket_count in group[HDRHISTOGRAM]:
-        yield sample.Sample(' '.join([group_name,
-                                      'p' + str(percentile),
-                                      'latency']),
-                            value, 'ms', meta)
+      for _, value, bucket_count in group[HDRHISTOGRAM]:
         histogram.append({'microsec_latency': int(value * 1000),
                           'count': bucket_count})
       hist_meta = meta.copy()
