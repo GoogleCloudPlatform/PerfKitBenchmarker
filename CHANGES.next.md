@@ -147,7 +147,7 @@
   VMs.
 - Add AWS MySql Aurora support
 - Abandon beta in TPU commands.
-- Update ycsb hdr histograms to output {bucket:count} data set for latencies.
+- Update ycsb hdr histograms to output {bucket:count} data set for latencies, removing percentile:latency_value data set.
 - Added GPU test for ResNet benchmark.
 - Update ResNet testcases.
 - Remove unused lib in ResNet benchmark.
