@@ -155,6 +155,7 @@
 - Added way to run several specsfs benchmarks in a single PKB run.
 - Add --preemptible in TPU creation command.
 - Add --skip_host_call in ResNet benchmark.
+- Update ResNet benchmark test for TensorFlow 1.9.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
