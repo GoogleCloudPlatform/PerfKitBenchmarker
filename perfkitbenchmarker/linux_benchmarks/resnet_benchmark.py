@@ -197,46 +197,26 @@ def _MakeSamplesFromOutput(metadata, output):
     a Sample containing the throughput
   """
   samples = []
-  pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6})'
-  start_time = _ParseDateTime(regex_util.ExtractAllMatches(pattern, output)[0])
-
+  time_pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*'
+  start_time = _ParseDateTime(regex_util.ExtractAllMatches(
+      time_pattern, output)[0])
   if FLAGS.resnet_mode in ('train', 'train_and_eval'):
     # If statement training true, it will parse examples_per_second,
     # global_steps_per_second, loss
-    pattern = (
-        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving checkpoints for (\d+).*\n'
-        r'.*loss = (\d+\.\d+), step = \d+\n')
-    for wall_time, step, loss in regex_util.ExtractAllMatches(pattern, output):
-      metadata_copy = metadata.copy()
-      metadata_copy['step'] = int(step)
-      metadata_copy['duration'] = (
-          _ParseDateTime(wall_time) - start_time).seconds
-      samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
-
-    pattern = (
-        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving checkpoints for (\d+).*\n'
-        r'((.*\n){9})?.*Loss for final step: (\d+\.\d+).')
-    for wall_time, step, _, _, loss in regex_util.ExtractAllMatches(
-        pattern, output):
-      metadata_copy = metadata.copy()
-      metadata_copy['step'] = int(step)
-      metadata_copy['duration'] = (
-          _ParseDateTime(wall_time) - start_time).seconds
-      samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
-
-    pattern = (
-        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving checkpoints for (\d+).*\n'
-        r'.*global_step/sec: (\d+\.\d+)\n'
-        r'(.*examples/sec: (\d+.\d+))?')
-    for wall_time, step, global_step, _, examples_sec in (
+    pattern = (r'{}loss = (\d+\.\d+), step = (\d+).*\n'
+               r'(.*global_step/sec: (\d+\.\d+)\n)?'
+               r'(.*examples/sec: (\d+\.\d+))?'.format(time_pattern))
+    for wall_time, loss, step, _, global_step, _, examples_sec in (
         regex_util.ExtractAllMatches(pattern, output)):
       metadata_copy = metadata.copy()
-      metadata_copy['step'] = int(step)
       metadata_copy['duration'] = (
           _ParseDateTime(wall_time) - start_time).seconds
-      samples.append(sample.Sample(
-          'Global Steps Per Second', float(global_step),
-          'global_steps/sec', metadata_copy))
+      metadata_copy['step'] = int(step)
+      samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
+      if global_step:
+        samples.append(sample.Sample(
+            'Global Steps Per Second', float(global_step),
+            'global_steps/sec', metadata_copy))
       if examples_sec:
         # This benchmark only reports "Examples Per Second" metric when we it
         # using TPU.
@@ -246,16 +226,15 @@ def _MakeSamplesFromOutput(metadata, output):
   if FLAGS.resnet_mode in ('eval', 'train_and_eval'):
     # If statement evaluates true, it will parse top_1_accuracy, top_5_accuracy,
     # and eval_loss.
-    pattern = (
-        r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Saving dict for global step \d+: '
-        r'global_step = (\d+), loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
-        r'top_5_accuracy = (\d+\.\d+)')
+    pattern = (r'{}Saving dict for global step \d+: global_step = (\d+), '
+               r'loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
+               r'top_5_accuracy = (\d+\.\d+)'.format(time_pattern))
     for wall_time, step, loss, top_1_accuracy, top_5_accuracy in (
         regex_util.ExtractAllMatches(pattern, output)):
       metadata_copy = metadata.copy()
-      metadata_copy['step'] = int(step)
       metadata_copy['duration'] = (
           _ParseDateTime(wall_time) - start_time).seconds
+      metadata_copy['step'] = int(step)
       samples.append(
           sample.Sample('Eval Loss', float(loss), '', metadata_copy))
       # In the case of top-1 score, the trained model checks if the top class (
@@ -270,8 +249,8 @@ def _MakeSamplesFromOutput(metadata, output):
           'Top 5 Accuracy', float(top_5_accuracy) * 100, '%',
           metadata_copy))
 
-    pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*Elapsed seconds (\d+)'
-    wall_time, value = regex_util.ExtractExactlyOneMatch(pattern, output)
+    pattern = r'Elapsed seconds (\d+)'
+    value = regex_util.ExtractExactlyOneMatch(pattern, output)
     samples.append(sample.Sample('Elapsed Seconds', int(value), 'seconds',
                                  metadata))
   return samples
