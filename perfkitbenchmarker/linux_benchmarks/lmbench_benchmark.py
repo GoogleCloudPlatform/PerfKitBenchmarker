@@ -245,8 +245,7 @@ def _ParseOutput(lmbench_output):
                            'open/close', 'Signal handler installation',
                            'Signal handler overhead', 'Protection fault',
                            'Pipe latency', r'Process fork\+exit',
-                           r'Process fork\+execve', r'Process fork\+/bin/sh -c',
-                           'Pagefaults on /var/tmp/XXX')
+                           r'Process fork\+execve', r'Process fork\+/bin/sh -c')
   _AddProcessorMetricSamples(lmbench_output, processor_metric_list, metadata,
                              results)
 

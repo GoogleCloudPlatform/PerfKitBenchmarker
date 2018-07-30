@@ -35,7 +35,7 @@ class LmbenchTestCase(unittest.TestCase):
   def testParseLmbench(self):
     samples = lmbench_benchmark._ParseOutput(self.contents)
 
-    self.assertEqual(62, len(samples))
+    self.assertEqual(61, len(samples))
 
     # Test metadata
     metadata = samples[0].metadata
@@ -61,8 +61,6 @@ class LmbenchTestCase(unittest.TestCase):
     self.assertAlmostEqual(318.6445, processor_results['Process fork+execve'])
     self.assertAlmostEqual(800.2188,
                            processor_results['Process fork+/bin/sh -c'])
-    self.assertAlmostEqual(0.1639,
-                           processor_results['Pagefaults on /var/tmp/XXX'])
 
     sample = next(x for x in samples if x.metric == 'context_switching_time' and
                   x.metadata['num_of_processes'] == 96 and
