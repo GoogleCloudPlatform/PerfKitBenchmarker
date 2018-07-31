@@ -20,6 +20,7 @@ See https://github.com/aerospike/act for more info.
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import act
 
 BENCHMARK_NAME = 'aerospike_certification_tool'
@@ -52,7 +53,11 @@ def Prepare(benchmark_spec):
   """Prepares act benchmark."""
   vm = benchmark_spec.vms[0]
   vm.Install('act')
-  act.PrepActConfig(vm)
+  if FLAGS.act_parallel:
+    for i in xrange(len(vm.scratch_disks)):
+      act.PrepActConfig(vm, i)
+  else:
+    act.PrepActConfig(vm)
   for d in vm.scratch_disks:
     vm.RemoteCommand('sudo umount %s' % d.mount_point)
 
@@ -61,7 +66,15 @@ def Run(benchmark_spec):
   """Runs act and reports the results."""
   vm = benchmark_spec.vms[0]
   act.RunActPrep(vm)
-  samples = act.RunAct(vm)
+  samples = []
+
+  def _Run(index):
+    samples.extend(act.RunAct(vm, index))
+
+  if FLAGS.act_parallel:
+    vm_util.RunThreaded(_Run, range(len(vm.scratch_disks)))
+  else:
+    samples = act.RunAct(vm)
   return samples
 
 

@@ -15,6 +15,7 @@
 
 """Module containing aerospike server installation and cleanup functions."""
 
+import logging
 import tempfile
 
 from perfkitbenchmarker import flags
@@ -27,6 +28,8 @@ FLAGS = flags.FLAGS
 GIT_REPO = 'https://github.com/aerospike/act.git'
 ACT_DIR = '%s/act' % INSTALL_DIR
 flags.DEFINE_float('act_load', 1.0, 'Load multiplier for act test per device.')
+flags.DEFINE_boolean('act_parallel', False,
+                     'Run act tools in parallel. One copy per device.')
 flags.DEFINE_integer('act_duration', 86400, 'Duration of act test in seconds.')
 # TODO(user): Support user provided config file.
 ACT_CONFIG_TEMPLATE = """
@@ -81,34 +84,49 @@ def RunActPrep(vm):
   vm_util.RunThreaded(_RunActPrep, vm.scratch_disks)
 
 
-def PrepActConfig(vm):
+def PrepActConfig(vm, index=None):
   """Prepare act config file at remote VM."""
-  device_lst = ','.join([d.GetDevicePath() for d in vm.scratch_disks])
-  num_disk = len(vm.scratch_disks)
+  if index is None:
+    disk_lst = vm.scratch_disks
+    config_file = 'actconfig.txt'
+  else:
+    disk_lst = [vm.scratch_disks[index]]
+    config_file = 'actconfig_{0}.txt'.format(index)
+  devices = ','.join([d.GetDevicePath() for d in disk_lst])
+  num_disk = len(disk_lst)
   # render template:
   content = ACT_CONFIG_TEMPLATE.format(
-      devices=device_lst,
+      devices=devices,
       duration=FLAGS.act_duration,
       read_iops=_CalculateReadIops(num_disk, FLAGS.act_load),
       write_iops=_CalculateWriteIops(num_disk, FLAGS.act_load))
+  logging.info('ACT config: %s', content)
   with tempfile.NamedTemporaryFile(delete=False) as tf:
     tf.write(content)
     tf.close()
-    vm.PushDataFile(tf.name, 'actconfig.txt')
+    vm.PushDataFile(tf.name, config_file)
 
 
-def RunAct(vm):
+def RunAct(vm, index=None):
   """Runs act binary with provided config."""
+  if index is None:
+    config = 'actconfig.txt'
+    output = 'output'
+    act_config_metadata = {'device_index': 'all'}
+  else:
+    config = 'actconfig_{0}.txt'.format(index)
+    output = 'output_{0}'.format(index)
+    act_config_metadata = {'device_index': index}
   # Push config file to remote VM.
   vm.RobustRemoteCommand(
-      'cd {0} && sudo ./act ~/actconfig.txt > ~/output'.format(
-          ACT_DIR))
+      'cd {0} && sudo ./act ~/{1} > ~/{2}'.format(
+          ACT_DIR, config, output))
   # Shows 1,2,4,8,..,64
   out, _ = vm.RemoteCommand(
-      'cd {0} && ./latency_calc/act_latency.py -n 7 -e 1 -l ~/output'.format(
-          ACT_DIR))
+      'cd {0} && ./latency_calc/act_latency.py -n 7 -e 1 -l ~/{1}'.format(
+          ACT_DIR, output))
   samples = ParseRunAct(out)
-  act_config_metadata = GetActMetadata(len(vm.scratch_disks))
+  act_config_metadata.update(GetActMetadata(len(vm.scratch_disks)))
   for s in samples:
     s.metadata.update(act_config_metadata)
   return samples
@@ -178,6 +196,7 @@ def ParseRunAct(out):
 def GetActMetadata(num_disk):
   # TODO(user): Expose more stats and flags.
   return {
+      'act-parallel': FLAGS.act_parallel,
       'device-count': num_disk,
       'num-queues': 8,
       'threads-per-queues': 8,
