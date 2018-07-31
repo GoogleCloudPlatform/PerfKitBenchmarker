@@ -62,6 +62,7 @@ import json
 import logging
 import multiprocessing
 from os.path import isfile
+import random
 import re
 import sys
 import time
@@ -307,6 +308,9 @@ flags.DEFINE_string('https_proxy', '',
 flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
+flags.DEFINE_bool('randomize_run_order', False,
+                  'When running with more than one benchmarks, '
+                  'randomize order of the benchmarks.')
 
 _TEARDOWN_EVENT = multiprocessing.Event()
 
@@ -908,6 +912,8 @@ def RunBenchmarks():
     Exit status for the process.
   """
   benchmark_specs = _CreateBenchmarkSpecs()
+  if FLAGS.randomize_run_order:
+    random.shuffle(benchmark_specs)
   if FLAGS.dry_run:
     print 'PKB will run with the following configurations:'
     for spec in benchmark_specs:
