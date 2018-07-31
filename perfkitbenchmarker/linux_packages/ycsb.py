@@ -624,7 +624,8 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
 
   if measurement_type == HDRHISTOGRAM:
     for group_name in combined_hdr:
-      result['groups'][group_name][HDRHISTOGRAM] = combined_hdr[group_name]
+      if group_name in result['groups']:
+        result['groups'][group_name][HDRHISTOGRAM] = combined_hdr[group_name]
 
   return result
 
