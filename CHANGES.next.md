@@ -156,6 +156,7 @@
 - Add --preemptible in TPU creation command.
 - Add --skip_host_call in ResNet benchmark.
 - Update ResNet benchmark test for TensorFlow 1.9.
+- Removed the flag resnet_num_cores from the resnet benchmark and added the flag tpu_num_shards to MNIST, resnet, and inception3.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

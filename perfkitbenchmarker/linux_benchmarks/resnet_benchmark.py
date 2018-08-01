@@ -70,9 +70,6 @@ flags.DEFINE_integer('resnet_train_batch_size', 1024,
                      'Global (not per-shard) batch size for training')
 flags.DEFINE_integer('resnet_eval_batch_size', 1024,
                      'Global (not per-shard) batch size for evaluation')
-flags.DEFINE_integer('resnet_num_cores', 8, 'Number of TPU cores. For a single '
-                     'TPU device, this is 8 because each TPU has 4 chips each '
-                     'with 2 cores.')
 flags.DEFINE_enum('resnet_data_format', 'channels_last',
                   ['channels_first', 'channels_last'],
                   'A flag to override the data format used in the model. The '
@@ -112,7 +109,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_steps = FLAGS.resnet_train_steps
   benchmark_spec.train_batch_size = FLAGS.resnet_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.resnet_eval_batch_size
-  benchmark_spec.num_cores = FLAGS.resnet_num_cores
   benchmark_spec.data_format = FLAGS.resnet_data_format
   benchmark_spec.precision = FLAGS.resnet_precision
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
@@ -150,7 +146,7 @@ def _CreateMetadataDict(benchmark_spec):
       'train_batch_size': benchmark_spec.train_batch_size,
       'eval_batch_size': benchmark_spec.eval_batch_size,
       'iterations': benchmark_spec.iterations,
-      'num_cores': benchmark_spec.num_cores,
+      'num_shards': benchmark_spec.num_shards,
       'data_format': benchmark_spec.data_format,
       'precision': benchmark_spec.precision,
       'commit': benchmark_spec.commit,
@@ -297,7 +293,7 @@ def Run(benchmark_spec):
           train_batch_size=benchmark_spec.train_batch_size,
           eval_batch_size=benchmark_spec.eval_batch_size,
           iterations=benchmark_spec.iterations,
-          num_cores=benchmark_spec.num_cores,
+          num_cores=benchmark_spec.num_shards,
           data_format=benchmark_spec.data_format,
           precision=benchmark_spec.precision,
           skip_host_call=benchmark_spec.skip_host_call
