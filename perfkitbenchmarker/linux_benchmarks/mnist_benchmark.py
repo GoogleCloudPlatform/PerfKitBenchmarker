@@ -59,6 +59,9 @@ flags.DEFINE_integer('mnist_train_steps', 2000,
                      'Total number of training steps')
 flags.DEFINE_integer('tpu_iterations', 500,
                      'Number of iterations per TPU training loop.')
+flags.DEFINE_integer('tpu_num_shards', 8, 'Number of TPU cores. For a single '
+                     'TPU device, this is 8 because each TPU has 4 chips each '
+                     'with 2 cores.')
 
 
 def GetConfig(user_config):
@@ -92,6 +95,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
   benchmark_spec.data_dir = FLAGS.imagenet_data_dir
+  benchmark_spec.num_shards = FLAGS.tpu_num_shards
 
 
 def Prepare(benchmark_spec):
@@ -157,7 +161,8 @@ def _CreateMetadataDict(benchmark_spec):
       'master': benchmark_spec.master,
       'tpu': benchmark_spec.tpu,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
-      'iterations': benchmark_spec.iterations
+      'iterations': benchmark_spec.iterations,
+      'num_shards': benchmark_spec.num_shards
   }
 
 
@@ -226,7 +231,8 @@ def Run(benchmark_spec):
       '--use_tpu={use_tpu} '
       '--train_steps={train_steps} '
       '--iterations={iterations} '
-      '--model_dir={model_dir}'.format(
+      '--model_dir={model_dir} '
+      '--num_shards={num_shards}'.format(
           env=env,
           script=mnist_benchmark_script,
           master=benchmark_spec.master,
@@ -234,7 +240,8 @@ def Run(benchmark_spec):
           use_tpu=benchmark_spec.use_tpu,
           train_steps=benchmark_spec.train_steps,
           iterations=benchmark_spec.iterations,
-          model_dir=benchmark_spec.model_dir))
+          model_dir=benchmark_spec.model_dir,
+          num_shards=benchmark_spec.num_shards))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)

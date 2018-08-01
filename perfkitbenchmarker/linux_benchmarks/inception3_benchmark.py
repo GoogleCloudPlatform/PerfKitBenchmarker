@@ -136,7 +136,8 @@ def _CreateMetadataDict(benchmark_spec):
       'save_checkpoints_secs': benchmark_spec.save_checkpoints_secs,
       'train_batch_size': benchmark_spec.train_batch_size,
       'eval_batch_size': benchmark_spec.eval_batch_size,
-      'commit': benchmark_spec.commit
+      'commit': benchmark_spec.commit,
+      'num_shards': benchmark_spec.num_shards
   }
   return metadata
 
@@ -169,7 +170,8 @@ def Run(benchmark_spec):
       '--model_dir={model_dir} '
       '--save_checkpoints_secs={save_checkpoints_secs} '
       '--train_batch_size={train_batch_size} '
-      '--eval_batch_size={eval_batch_size}'.format(
+      '--eval_batch_size={eval_batch_size} '
+      '--num_shards={num_shards}'.format(
           script=inception3_benchmark_script,
           tpu=benchmark_spec.tpu,
           learning_rate=benchmark_spec.learning_rate,
@@ -183,7 +185,8 @@ def Run(benchmark_spec):
           model_dir=benchmark_spec.model_dir,
           save_checkpoints_secs=benchmark_spec.save_checkpoints_secs,
           train_batch_size=benchmark_spec.train_batch_size,
-          eval_batch_size=benchmark_spec.eval_batch_size))
+          eval_batch_size=benchmark_spec.eval_batch_size,
+          num_shards=benchmark_spec.num_shards))
   if FLAGS.tf_device == 'gpu':
     inception3_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=inception3_benchmark_cmd)
