@@ -315,6 +315,8 @@ def GetUDPStreamSample(command_out, sender_cpu_results, receiving_cpu_results,
       'packet_loss': packet_loss,
       'bandwidth_requested': request_bandwidth,
       'network_type': network_type,
+      'packet_size': FLAGS.nuttcp_udp_packet_size,
+      'sample_time': FLAGS.nuttcp_udp_stream_seconds,
       'iteration': iteration,
   }
 
