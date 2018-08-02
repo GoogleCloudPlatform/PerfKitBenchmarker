@@ -55,6 +55,8 @@ class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         'packet_loss': packet_loss,
         'bandwidth_requested': bandwidth,
         'network_type': 'external',
+        'packet_size': 1420,
+        'sample_time': 10,
         'iteration': 1,
         'receiver cpu 0': 22.7976893740141,
         'receiver cpu 1': 32.6422793196096,
