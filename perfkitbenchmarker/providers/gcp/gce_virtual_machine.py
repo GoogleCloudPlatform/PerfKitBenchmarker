@@ -57,7 +57,6 @@ NVME = 'NVME'
 SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
-WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
@@ -705,7 +704,8 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
   """Class supporting Windows GCE virtual machines."""
 
-  DEFAULT_IMAGE = WINDOWS_IMAGE
+  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
   BOOT_DISK_SIZE_GB = 50
   BOOT_DISK_TYPE = gce_disk.PD_SSD
 
