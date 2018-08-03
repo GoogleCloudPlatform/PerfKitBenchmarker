@@ -118,35 +118,11 @@ class GcpTpuTestCase(unittest.TestCase):
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
 
-  def testGetCloudTpuIp(self):
-    with self._PatchCriticalObjects(stdout=json.dumps({
-        '@type': 'type.googleapis.com/google.cloud.tpu.v1alpha1.Node',
-        'acceleratorType': 'zones/us-central1-a/acceleratorTypes/tpu-v2',
-        'cidrBlock': '10.240.0.0/29',
-        'createTime': '2017-10-02T20:48:54.421627Z',
-        'greenVmInstanceId': '4423519461898655909',
-        'greenVmSelflink': ('https://www.googleapis.com/compute/alpha/projects/'
-                            'g9250ab742a5cc428-tp/zones/us-central1-a/instances'
-                            '/n-74e6bf72-w-0'),
-        'ipAddress': '196.168.0.2',
-        'machineType': 'zones/us-central1-a/machineTypes/custom-64-425984',
-        'name': ('projects/fakeproject/locations/us-central1-a/nodes/'
-                 'pkb-tpu-123'),
-        'network': 'global/networks/default',
-        'port': '8470',
-        'serviceAccount': '34313586767-compute@developer.gserviceaccount.com',
-        'tensorflowVersion': 'nightly'
-    })) as issue_command:
+  def testGetName(self):
+    with self._PatchCriticalObjects():
       tpu = gcp_cloud_tpu.GcpCloudTpu(self.mock_tpu_spec)
-      tpu_ip = tpu.GetCloudTpuIp()
-      self.assertEqual(issue_command.call_count, 1)
-      command_string = ' '.join(issue_command.call_args[0][0])
-      self.assertTrue(
-          command_string.startswith(
-              'gcloud compute tpus describe pkb-tpu-123'))
-      self.assertIn('--project fakeproject', command_string)
-      self.assertIn('--zone us-central1-a', command_string)
-      self.assertEqual(tpu_ip, '196.168.0.2')
+      name = tpu.GetName()
+      self.assertEqual(name, 'pkb-tpu-123')
 
 if __name__ == '__main__':
   unittest.main()

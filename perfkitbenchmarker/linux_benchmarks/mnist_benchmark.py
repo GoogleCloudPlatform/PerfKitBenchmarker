@@ -49,9 +49,7 @@ mnist:
 """
 GCP_ENV = 'PATH=/tmp/pkb/google-cloud-sdk/bin:$PATH'
 
-flags.DEFINE_string('mnist_train_file',
-                    'gs://tfrc-test-bucket/mnist-records/train.tfrecords',
-                    'mnist train file for tensorflow')
+flags.DEFINE_string('mnist_data_dir', None, 'mnist train file for tensorflow')
 flags.DEFINE_string('imagenet_data_dir',
                     'gs://cloud-tpu-test-datasets/fake_imagenet',
                     'Directory where the input data is stored')
@@ -82,19 +80,15 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   Args:
     benchmark_spec: benchmark specification to update
   """
-  benchmark_spec.train_file = FLAGS.mnist_train_file
+  benchmark_spec.data_dir = FLAGS.mnist_data_dir
   benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
   if benchmark_spec.use_tpu:
-    benchmark_spec.master = 'grpc://{ip}:{port}'.format(
-        ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
-        port=benchmark_spec.cloud_tpu.GetCloudTpuPort())
+    benchmark_spec.tpu = benchmark_spec.cloud_tpu.GetName()
   else:
-    benchmark_spec.master = ''
-  benchmark_spec.tpu = benchmark_spec.master
+    benchmark_spec.tpu = ''
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
-  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
   benchmark_spec.num_shards = FLAGS.tpu_num_shards
 
 
@@ -110,6 +104,8 @@ def Prepare(benchmark_spec):
   if not benchmark_spec.use_tpu:
     vm.Install('tensorflow')
   vm.Install('cloud_tpu_models')
+  vm.RemoteCommand('git clone https://github.com/tensorflow/models.git',
+                   should_log=True)
   if benchmark_spec.use_tpu:
     storage_service = gcs.GoogleCloudStorageService()
     storage_service.PrepareVM(vm)
@@ -154,11 +150,10 @@ def _CreateMetadataDict(benchmark_spec):
     metadata dict
   """
   return {
-      'train_file': benchmark_spec.train_file,
+      'data_dir': benchmark_spec.data_dir,
       'use_tpu': benchmark_spec.use_tpu,
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
-      'master': benchmark_spec.master,
       'tpu': benchmark_spec.tpu,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
@@ -219,24 +214,20 @@ def Run(benchmark_spec):
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  mnist_benchmark_script = 'tpu/cloud_tpu/models/mnist/mnist.py'
-  if benchmark_spec.data_dir:
-    env = GCP_ENV
-  else:
-    env = ''
+  mnist_benchmark_script = 'mnist_tpu.py'
   mnist_benchmark_cmd = (
-      '{env} python {script} '
-      '--master={master} '
-      '--train_file={train_file} '
+      'cd models/official/mnist && '
+      'python {script} '
+      '--tpu={tpu} '
+      '--data_dir={data_dir} '
       '--use_tpu={use_tpu} '
       '--train_steps={train_steps} '
       '--iterations={iterations} '
       '--model_dir={model_dir} '
       '--num_shards={num_shards}'.format(
-          env=env,
           script=mnist_benchmark_script,
-          master=benchmark_spec.master,
-          train_file=benchmark_spec.train_file,
+          tpu=benchmark_spec.tpu,
+          data_dir=benchmark_spec.data_dir,
           use_tpu=benchmark_spec.use_tpu,
           train_steps=benchmark_spec.train_steps,
           iterations=benchmark_spec.iterations,
