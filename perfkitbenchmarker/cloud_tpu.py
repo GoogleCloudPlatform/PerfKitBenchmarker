@@ -83,11 +83,7 @@ class BaseCloudTpu(resource.BaseResource):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def GetCloudTpuIp(self):
-    raise NotImplementedError()
-
-  @abc.abstractmethod
-  def GetCloudTpuPort(self):
+  def GetName(self):
     raise NotImplementedError()
 
   def GetResourceMetadata(self):

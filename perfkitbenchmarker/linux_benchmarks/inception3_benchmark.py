@@ -99,6 +99,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_batch_size = FLAGS.inception3_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.inception3_eval_batch_size
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
+  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
 
 
 def Prepare(benchmark_spec):
@@ -122,7 +123,6 @@ def _CreateMetadataDict(benchmark_spec):
     metadata dict
   """
   metadata = {
-      'master': benchmark_spec.master,
       'tpu': benchmark_spec.tpu,
       'learning_rate': benchmark_spec.learning_rate,
       'train_steps': benchmark_spec.train_steps,
