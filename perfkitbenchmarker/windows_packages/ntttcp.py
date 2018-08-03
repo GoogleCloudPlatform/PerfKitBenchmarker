@@ -37,10 +37,9 @@ flags.DEFINE_integer('ntttcp_threads', 1,
 flags.DEFINE_integer('ntttcp_time', 60,
                      'The number of seconds for NTttcp to run.')
 
-COMMAND_TIMEOUT_BUFFER = 30
 CONTROL_PORT = 6001
 BASE_DATA_PORT = 5001
-NTTTCP_RETRIES = 5
+NTTTCP_RETRIES = 10
 NTTTCP_DIR = 'NTttcp-v5.33'
 NTTTCP_ZIP = NTTTCP_DIR + '.zip'
 NTTTCP_URL = ('https://gallery.technet.microsoft.com/NTttcp-Version-528-'
@@ -77,7 +76,7 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       rm_command, ignore_failure=True, suppress_warning=True)
 
   def _RunNtttcp(vm, options):
-    timeout_duration = FLAGS.ntttcp_time + COMMAND_TIMEOUT_BUFFER
+    timeout_duration = 3 * FLAGS.ntttcp_time
     command = 'cd {ntttcp_exe_dir}; .\\NTttcp.exe {ntttcp_options}'.format(
         ntttcp_exe_dir=ntttcp_exe_dir, ntttcp_options=options)
     vm.RemoteCommand(command, timeout=timeout_duration)
