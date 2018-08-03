@@ -228,7 +228,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), should_log=should_log)
+            ' '.join(wait_command), should_log=should_log, timeout=200)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
