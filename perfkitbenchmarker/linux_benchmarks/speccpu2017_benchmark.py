@@ -56,8 +56,6 @@ flags.DEFINE_integer('spec17_threads', None,
 flags.DEFINE_boolean('spec17_fdo', False,
                      'Run with feedback directed optimization on peak. '
                      'Default to False.')
-flags.DEFINE_boolean('spec17_interleave_numa', True,
-                     'Run with interleave numa nodes. Default to True.')
 
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -150,11 +148,6 @@ def Run(benchmark_spec):
          'echo 1 | sudo tee /proc/sys/vm/zone_reclaim_mode && '
          'sync ; echo 3 | sudo tee /proc/sys/vm/drop_caches && '
          'ulimit -s unlimited && ')
-
-  # use numa node interleave policy if running rate
-  if FLAGS.spec17_interleave_numa and (
-      'intrate' in FLAGS.spec17_subset or 'fprate' in FLAGS.spec17_subset):
-    cmd += 'numactl --interleave=all && '
 
   cmd += 'runcpu '
 
