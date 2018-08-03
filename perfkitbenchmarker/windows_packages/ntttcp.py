@@ -37,6 +37,7 @@ flags.DEFINE_integer('ntttcp_threads', 1,
 flags.DEFINE_integer('ntttcp_time', 60,
                      'The number of seconds for NTttcp to run.')
 
+COMMAND_TIMEOUT_BUFFER = 30
 CONTROL_PORT = 6001
 BASE_DATA_PORT = 5001
 NTTTCP_RETRIES = 5
@@ -76,9 +77,10 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       rm_command, ignore_failure=True, suppress_warning=True)
 
   def _RunNtttcp(vm, options):
+    timeout_duration = FLAGS.ntttcp_time + COMMAND_TIMEOUT_BUFFER
     command = 'cd {ntttcp_exe_dir}; .\\NTttcp.exe {ntttcp_options}'.format(
         ntttcp_exe_dir=ntttcp_exe_dir, ntttcp_options=options)
-    vm.RemoteCommand(command)
+    vm.RemoteCommand(command, timeout=timeout_duration)
 
   args = [((vm, shared_options + options), {}) for vm, options in
           zip([sending_vm, receiving_vm], [client_options, server_options])]
@@ -101,6 +103,13 @@ def ParseNtttcpResults(xml_results, metadata):
 
   The list of samples contains total throughput and per thread throughput
   metrics (if there is more than a single thread).
+
+  Args:
+    xml_results: ntttcp test output.
+    metadata: metadata to be included as part of the samples.
+
+  Returns:
+    list of samples from the results of the ntttcp tests.
   """
   root = xml.etree.ElementTree.fromstring(xml_results)
   samples = []
