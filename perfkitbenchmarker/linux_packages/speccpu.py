@@ -426,7 +426,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec_runmode': FLAGS.spec_runmode,
       'spec17_copies': FLAGS.spec17_copies,
       'spec17_threads': FLAGS.spec17_threads,
-      'spec17_fdo': FLAGS.spec17_fdo
+      'spec17_fdo': FLAGS.spec17_fdo,
+      'spec17_subset': FLAGS.spec17_subset
   }
 
   missing_results = []
