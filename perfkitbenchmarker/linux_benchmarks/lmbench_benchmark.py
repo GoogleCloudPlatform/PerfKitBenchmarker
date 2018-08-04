@@ -274,13 +274,6 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
 
-  vm.RobustRemoteCommand(
-      'cd {0} && cd results/x86_64-linux-gnu && '
-      'if [ -f *.* ]; then '
-      'mkdir -p /tmp/lmbench && '
-      'sudo mv *.* /tmp/lmbench; '
-      'fi'.format(lmbench.LMBENCH_DIR))
-
   # Use the current configuration to run the benchmark tests.
   vm.RobustRemoteCommand(
       'cd {0} && sudo make rerun'.format(lmbench.LMBENCH_DIR))
@@ -288,6 +281,12 @@ def Run(benchmark_spec):
   stdout, _ = vm.RobustRemoteCommand(
       'cd {0} && cd results/x86_64-linux-gnu && cat *.*'.format(
           lmbench.LMBENCH_DIR), should_log=True)
+
+  vm.RobustRemoteCommand(
+      'cd {0} && cd results/x86_64-linux-gnu && '
+      'mkdir -p /tmp/lmbench && '
+      'sudo mv *.* /tmp/lmbench; '.format(
+          lmbench.LMBENCH_DIR))
 
   return _ParseOutput(stdout)
 
