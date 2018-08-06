@@ -102,15 +102,9 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
     _, retcode = self._GetCloudTpuDescription()
     return retcode == 0
 
-  def GetCloudTpuIp(self):
-    """Gets the cloud TPU IP."""
-    result, _ = self._GetCloudTpuDescription()
-    return result.get('ipAddress')
-
-  def GetCloudTpuPort(self):
-    """Gets the cloud TPU port."""
-    result, _ = self._GetCloudTpuDescription()
-    return result.get('port')
+  def GetName(self):
+    """Gets the name of the cloud TPU."""
+    return self.spec.tpu_name
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
