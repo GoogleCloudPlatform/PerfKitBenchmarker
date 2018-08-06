@@ -511,7 +511,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     fstab_options = fstab_options or ''
     mnt_cmd = ('sudo mkdir -p {mount_path};'
                'sudo mount {mount_options} {device_path} {mount_path} && '
-               'sudo chown -R $USER:$USER {mount_path};').format(
+               'sudo chown $USER:$USER {mount_path};').format(
                    mount_path=mount_path,
                    device_path=device_path,
                    mount_options=mount_options)
