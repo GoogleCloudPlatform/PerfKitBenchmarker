@@ -113,6 +113,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.precision = FLAGS.resnet_precision
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
   benchmark_spec.skip_host_call = FLAGS.resnet_skip_host_call
+  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
 
 
 def Prepare(benchmark_spec):
