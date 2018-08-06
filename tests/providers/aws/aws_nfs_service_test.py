@@ -282,7 +282,7 @@ class AwsVirtualMachineTest(BaseTest):
     host = 'FSID.efs.us-east-1.amazonaws.com'
     mount_cmd = ('sudo mkdir -p /scratch;'
                  'sudo mount -t nfs -o {mount_opt} {host}:/ /scratch && '
-                 'sudo chown -R $USER:$USER /scratch;').format(
+                 'sudo chown $USER:$USER /scratch;').format(
                      mount_opt=mount_opt, host=host)
     fstab_cmd = ('echo "{host}:/ /scratch nfs {mount_opt}"'
                  ' | sudo tee -a /etc/fstab').format(
@@ -303,7 +303,7 @@ class AwsVirtualMachineTest(BaseTest):
         '-t ext4 -b 4096 /dev/xvdb')
     mount_cmd = ('sudo mkdir -p /scratch;'
                  'sudo mount -o discard /dev/xvdb /scratch && '
-                 'sudo chown -R $USER:$USER /scratch;')
+                 'sudo chown $USER:$USER /scratch;')
     fstab_cmd = ('echo "/dev/xvdb /scratch ext4 defaults" | sudo tee -a '
                  '/etc/fstab')
 
