@@ -14,7 +14,6 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_cloud_tpu."""
 
 import contextlib
-import json
 import unittest
 import mock
 
