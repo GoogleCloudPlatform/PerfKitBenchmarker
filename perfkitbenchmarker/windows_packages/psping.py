@@ -22,6 +22,7 @@ psping is a tool made for benchmarking Windows networking.
 import json
 import ntpath
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -75,7 +76,7 @@ def _RunPsping(vm, command):
     pass
 
 
-@vm_util.Retry(max_retries=15)
+@vm_util.Retry(max_retries=3)
 def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
   """Run the psping latency test.
 
@@ -113,10 +114,10 @@ def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
           psping_exec_dir=sending_vm.temp_dir,
           port=TEST_PORT)
 
-  threaded_args = [(_RunPsping, (receiving_vm, server_command), {}),
-                   (_RunPsping, (sending_vm, client_command), {})]
+  process_args = [(_RunPsping, (receiving_vm, server_command), {}),
+                  (_RunPsping, (sending_vm, client_command), {})]
 
-  vm_util.RunParallelThreads(threaded_args, 200, 1)
+  background_tasks.RunParallelProcesses(process_args, 200, 1)
 
   cat_command = 'cd {psping_exec_dir}; cat {out_file}'.format(
       psping_exec_dir=sending_vm.temp_dir,
