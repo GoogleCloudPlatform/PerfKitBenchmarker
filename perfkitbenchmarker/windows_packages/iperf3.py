@@ -16,6 +16,7 @@
 
 import ntpath
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -104,7 +105,15 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
                                    FLAGS.tcp_number_of_streams, use_internal_ip)
 
 
-@vm_util.Retry(max_retries=10)
+def _RunIperf3(vm, options):
+  iperf3_exec_dir = ntpath.join(vm.temp_dir, IPERF3_DIR)
+  command = ('cd {iperf3_exec_dir}; '
+             '.\\iperf3.exe {options}').format(
+                 iperf3_exec_dir=iperf3_exec_dir, options=options)
+  vm.RemoteCommand(command, timeout=FLAGS.tcp_stream_seconds + 30)
+
+
+@vm_util.Retry(max_retries=3)
 def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """Create a server-client iperf3 pair.
 
@@ -120,21 +129,13 @@ def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """
 
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
-  timeout_duration = FLAGS.tcp_stream_seconds + 30
-
-  def _RunIperf3(vm, options):
-    command = ('cd {iperf3_exec_dir}; '
-               '.\\iperf3.exe {options}').format(
-                   iperf3_exec_dir=iperf3_exec_dir,
-                   options=options)
-    vm.RemoteCommand(command, timeout=timeout_duration)
 
   receiver_args = '--server -1'
 
-  threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
-                   (_RunIperf3, (sending_vm, sender_args), {})]
+  process_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
+                  (_RunIperf3, (sending_vm, sender_args), {})]
 
-  vm_util.RunParallelThreads(threaded_args, 200, 5)
+  background_tasks.RunParallelProcesses(process_args, 200, 1)
 
   cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
       iperf3_exec_dir=iperf3_exec_dir, out_file=IPERF3_OUT_FILE)
@@ -157,7 +158,7 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
   """
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
 
-  def _RunIperf3(vm, options):
+  def _RunIperf3UDP(vm, options):
     command = 'cd {iperf3_exec_dir}; .\\iperf3.exe {options}'.format(
         iperf3_exec_dir=iperf3_exec_dir,
         options=options)
@@ -185,10 +186,10 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
     # until the command completes, even if it is run as a daemon.
     receiver_args = '--server -1'
 
-    threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
-                     (_RunIperf3, (sending_vm, sender_args), {})]
+    process_args = [(_RunIperf3UDP, (receiving_vm, receiver_args), {}),
+                    (_RunIperf3UDP, (sending_vm, sender_args), {})]
 
-    vm_util.RunParallelThreads(threaded_args, 200, 15)
+    background_tasks.RunParallelProcesses(process_args, 200, 1)
 
     # retrieve the results and parse them
     cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(

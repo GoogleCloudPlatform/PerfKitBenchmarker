@@ -24,6 +24,7 @@ https://gallery.technet.microsoft.com/NTttcp-Version-528-Now-f8b12769
 import ntpath
 import xml.etree.ElementTree
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -53,6 +54,14 @@ def Install(vm):
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
+def _RunNtttcp(vm, options):
+  timeout_duration = 3 * FLAGS.ntttcp_time
+  ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
+  command = 'cd {ntttcp_exe_dir}; .\\NTttcp.exe {ntttcp_options}'.format(
+      ntttcp_exe_dir=ntttcp_exe_dir, ntttcp_options=options)
+  vm.RemoteCommand(command, timeout=timeout_duration)
+
+
 @vm_util.Retry(max_retries=NTTTCP_RETRIES)
 def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   """Run NTttcp and return the samples collected from the run."""
@@ -60,9 +69,9 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   shared_options = '-xml -t {time} -p {port} '.format(time=FLAGS.ntttcp_time,
                                                       port=BASE_DATA_PORT)
 
-  client_options = '-s -m \'{threads},*,{ip}\''.format(
+  sending_options = shared_options + '-s -m \'{threads},*,{ip}\''.format(
       threads=FLAGS.ntttcp_threads, ip=receiving_ip_address)
-  server_options = '-r -m \'{threads},*,0.0.0.0\''.format(
+  receiving_options = shared_options + '-r -m \'{threads},*,0.0.0.0\''.format(
       threads=FLAGS.ntttcp_threads)
 
   ntttcp_exe_dir = ntpath.join(sending_vm.temp_dir, 'x86fre')
@@ -75,15 +84,10 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   sending_vm.RemoteCommand(
       rm_command, ignore_failure=True, suppress_warning=True)
 
-  def _RunNtttcp(vm, options):
-    timeout_duration = 3 * FLAGS.ntttcp_time
-    command = 'cd {ntttcp_exe_dir}; .\\NTttcp.exe {ntttcp_options}'.format(
-        ntttcp_exe_dir=ntttcp_exe_dir, ntttcp_options=options)
-    vm.RemoteCommand(command, timeout=timeout_duration)
+  process_args = [(_RunNtttcp, (sending_vm, sending_options), {}),
+                  (_RunNtttcp, (receiving_vm, receiving_options), {})]
 
-  args = [((vm, shared_options + options), {}) for vm, options in
-          zip([sending_vm, receiving_vm], [client_options, server_options])]
-  vm_util.RunThreaded(_RunNtttcp, args)
+  background_tasks.RunParallelProcesses(process_args, 200)
 
   cat_command = 'cd {ntttcp_exe_dir}; cat xml.txt'.format(
       ntttcp_exe_dir=ntttcp_exe_dir)
