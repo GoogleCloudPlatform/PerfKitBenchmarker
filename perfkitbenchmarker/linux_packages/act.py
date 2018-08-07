@@ -162,9 +162,13 @@ def ParseRunAct(out):
   Returns:
     A list of sample.Sample objects.
   """
+  ret = []
+  if 'could not find 3600 seconds of data' in out:
+    ret.append(sample.Sample('Failed:NotEnoughSample', 0, '',
+                             {}))
+    return ret
   lines = out.split('\n')
   buckets = []
-  ret = []
   for line in lines:
     vals = line.split()
     if not vals or '-' in vals[0]:
