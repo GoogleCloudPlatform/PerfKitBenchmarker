@@ -45,7 +45,10 @@ CLOUD_REDIS_CLASS_NAME = 'CloudRedis'
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites(benchmark_config):
