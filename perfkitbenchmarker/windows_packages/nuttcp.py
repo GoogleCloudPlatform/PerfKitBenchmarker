@@ -17,6 +17,7 @@
 import ntpath
 import threading
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -104,12 +105,11 @@ def _RunNuttcp(vm, options, exec_path):
   vm.RemoteCommand(command, timeout=timeout_duration)
 
 
-def _GetCpuUsage(vm, sample_time):
+def _GetCpuUsage(vm):
   """Gather CPU usage data.
 
   Args:
     vm: the vm to gather cpu usage data on.
-    sample_time: the amount of time to gather the data.
 
   Raises:
     NuttcpNotRunningError: raised if nuttcp is not running when the CPU usage
@@ -123,7 +123,7 @@ def _GetCpuUsage(vm, sample_time):
              'if ((ps | select-string nuttcp | measure-object).Count -eq 0) '
              '{{echo "FAIL"}}').format(
                  exec_path=vm.temp_dir,
-                 sample_time=sample_time,
+                 sample_time=FLAGS.nuttcp_cpu_sample_time,
                  out_file=CPU_OUT_FILE)
   # returning from the command should never take longer than 30 seconds over
   # the actual sample time. If it does, it is hung.
@@ -181,12 +181,10 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
 
   sending_vm.WaitForProcessRunning('nuttcp', 3)
 
-  threaded_args = [
-      (_GetCpuUsage, (receiving_vm, FLAGS.nuttcp_cpu_sample_time), {}),
-      (_GetCpuUsage, (sending_vm, FLAGS.nuttcp_cpu_sample_time), {})
-  ]
+  process_args = [(_GetCpuUsage, (receiving_vm,), {}), (_GetCpuUsage,
+                                                        (sending_vm,), {})]
 
-  vm_util.RunParallelThreads(threaded_args, 200)
+  background_tasks.RunParallelProcesses(process_args, 200)
 
   server_thread.join()
   client_thread.join()
