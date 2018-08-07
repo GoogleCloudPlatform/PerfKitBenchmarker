@@ -14,8 +14,8 @@
 
 """Module containing nuttcp installation and cleanup functions."""
 
+import multiprocessing
 import ntpath
-import threading
 
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
@@ -133,7 +133,7 @@ def _GetCpuUsage(vm):
     raise NuttcpNotRunningError('nuttcp not running after getting CPU usage.')
 
 
-@vm_util.Retry(max_retries=15)
+@vm_util.Retry(max_retries=3)
 def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
   """Create a server-client nuttcp pair.
 
@@ -163,31 +163,32 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
       data_port=UDP_PORT,
       control_port=CONTROL_PORT)
 
-  # Thread to run the nuttcp server
-  server_thread = threading.Thread(
+  # Process to run the nuttcp server
+  server_process = multiprocessing.Process(
       name='server',
       target=_RunNuttcp,
       args=(receiving_vm, receiver_args, exec_path))
-  server_thread.start()
+  server_process.start()
 
   receiving_vm.WaitForProcessRunning('nuttcp', 3)
 
-  # Thread to run the nuttcp client
-  client_thread = threading.Thread(
+  # Process to run the nuttcp client
+  client_process = multiprocessing.Process(
       name='client',
       target=_RunNuttcp,
       args=(sending_vm, sender_args, exec_path))
-  client_thread.start()
+  client_process.start()
 
   sending_vm.WaitForProcessRunning('nuttcp', 3)
 
-  process_args = [(_GetCpuUsage, (receiving_vm,), {}), (_GetCpuUsage,
-                                                        (sending_vm,), {})]
+  process_args = [
+      (_GetCpuUsage, (receiving_vm,), {}),
+      (_GetCpuUsage, (sending_vm,), {})]
 
   background_tasks.RunParallelProcesses(process_args, 200)
 
-  server_thread.join()
-  client_thread.join()
+  server_process.join()
+  client_process.join()
 
 
 def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
