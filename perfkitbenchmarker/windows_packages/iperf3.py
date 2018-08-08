@@ -14,6 +14,7 @@
 
 """Module containing Iperf3 windows installation and cleanup functions."""
 
+import multiprocessing
 import ntpath
 
 from perfkitbenchmarker import background_tasks
@@ -132,10 +133,22 @@ def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
 
   receiver_args = '--server -1'
 
-  process_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
-                  (_RunIperf3, (sending_vm, sender_args), {})]
+  server_process = multiprocessing.Process(
+      name='server',
+      target=_RunIperf3,
+      args=(receiving_vm, receiver_args))
+  server_process.start()
 
-  background_tasks.RunParallelProcesses(process_args, 200, 1)
+  receiving_vm.WaitForProcessRunning('iperf3', 3)
+
+  client_process = multiprocessing.Process(
+      name='client',
+      target=_RunIperf3,
+      args=(sending_vm, sender_args))
+  client_process.start()
+
+  server_process.join()
+  client_process.join()
 
   cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
       iperf3_exec_dir=iperf3_exec_dir, out_file=IPERF3_OUT_FILE)
