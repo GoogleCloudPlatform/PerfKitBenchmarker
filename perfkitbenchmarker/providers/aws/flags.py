@@ -75,3 +75,9 @@ flags.DEFINE_boolean('eks_verify_ssl', True,
                      'Whether to verify the ssl certificate when communicating '
                      'with the EKS service. This requires SNI support which is '
                      'not available in the SSL modules of Python < 2.7.9.')
+flags.DEFINE_enum('efs_throughput_mode', 'provisioned',
+                  ['provisioned', 'bursting'],
+                  'The throughput mode to use for EFS.')
+flags.DEFINE_float('efs_provisioned_throughput', 1024.0,
+                   'The throughput limit of EFS (in MiB/s) when run in '
+                   'provisioned mode.')
