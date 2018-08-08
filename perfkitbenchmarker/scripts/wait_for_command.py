@@ -31,10 +31,12 @@ this script will block until command completion, then print
 
 from __future__ import print_function
 
+import errno
 import fcntl
 import optparse
 import os
 import shutil
+import signal
 import sys
 import threading
 import time
@@ -73,15 +75,26 @@ def main():
 
   start = time.time()
   return_code_str = None
-  while (time.time() < WAIT_TIMEOUT_IN_SEC + start):
+  while time.time() < WAIT_TIMEOUT_IN_SEC + start:
     try:
       with open(options.status, 'r') as status:
-        fcntl.lockf(status, fcntl.LOCK_SH)
-        return_code_str = status.read()
         break
     except IOError:
       print('WARNING: file doesn\'t exist, retrying', file=sys.stderr)
       time.sleep(WAIT_SLEEP_IN_SEC)
+
+  signal.signal(signal.SIGALRM, lambda signum, frame: None)
+  signal.alarm(int(WAIT_TIMEOUT_IN_SEC))
+  with open(options.status, 'r') as status:
+    try:
+      fcntl.lockf(status, fcntl.LOCK_SH)
+    except IOError as e:
+      if e.errno == errno.EINTR:
+        print('Wait timed out. This will be retried with a subsequent wait.')
+        return 0
+      raise e
+    signal.alarm(0)
+    return_code_str = status.read()
 
   if not (options.stdout and options.stderr):
     print('Command finished.')

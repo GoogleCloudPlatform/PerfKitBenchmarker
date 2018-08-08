@@ -39,10 +39,7 @@ class FakeCloudTpu(cloud_tpu.BaseCloudTpu):
   def _Delete(self):
     pass
 
-  def GetCloudTpuIp(self):
-    pass
-
-  def GetCloudTpuPort(self):
+  def GetName(self):
     pass
 
 

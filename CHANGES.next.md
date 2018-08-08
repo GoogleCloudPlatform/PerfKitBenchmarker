@@ -157,6 +157,8 @@
 - Add --skip_host_call in ResNet benchmark.
 - Update ResNet benchmark test for TensorFlow 1.9.
 - Removed the flag resnet_num_cores from the resnet benchmark and added the flag tpu_num_shards to MNIST, resnet, and inception3.
+- Update MNIST benchmark source path.
+- Replace old flags --tpu_name and --master with a new flag, --tpu.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
