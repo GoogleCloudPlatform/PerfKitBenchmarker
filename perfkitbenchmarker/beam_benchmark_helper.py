@@ -30,10 +30,6 @@ BEAM_JAVA_SDK = 'java'
 BEAM_PYTHON_SDK = 'python'
 
 # TODO: For backwards compatibility only. To be deleted when not used.
-flags.DEFINE_string('maven_binary', 'mvn',
-                    'Set to use a different mvn binary than is on the PATH.')
-
-# TODO: For backwards compatibility only. To be deleted when not used.
 flags.DEFINE_string('beam_it_profile', None, 'Profile to activate integration test.')
 
 flags.DEFINE_string('gradle_binary', None,
@@ -56,11 +52,6 @@ flags.DEFINE_string('beam_python_attr', 'IT',
                     'Test decorator that is used in Beam Python to filter a specific category.')
 
 flags.DEFINE_string('beam_extra_properties', None,
-                    'Allows to specify list of key-value pairs that will be '
-                    'forwarded to target mvn command as system properties')
-
-# TODO: For backwards compatibility only. To be replaced by beam_extra_properties flag.
-flags.DEFINE_string('beam_extra_mvn_properties', None,
                     'Allows to specify list of key-value pairs that will be '
                     'forwarded to target mvn command as system properties')
 
@@ -115,13 +106,9 @@ def AddFilesystemArgument(command, filesystem_name):
 
 
 def AddExtraProperties(command, extra_properties):
-
-  # TODO: For backwards compatibility only. Delete when beam_extra_mvn_properties is not used.
-  if extra_properties is None:
-    extra_properties = FLAGS.beam_extra_mvn_properties
-
   if not extra_properties:
     return
+
   if 'integrationTestPipelineOptions=' in extra_properties:
     raise ValueError('integrationTestPipelineOptions must not be in beam_extra_properties')
 
@@ -268,13 +255,12 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
   beam_args = job_arguments if job_arguments else []
 
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    python_binary = _FindFiles(os.path.join(_GetBeamPythonDir(), 'target'),
-                               'apache-beam*.tar.gz')
+    python_binary = _FindFiles(_GetBeamPythonDir(), 'apache-beam*.tar.gz')
     if len(python_binary) == 0:
       raise RuntimeError('No python binary is found')
 
-    beam_args.append('--runner=TestDataflowRunner')
-    beam_args.append('--sdk_location={}'.format(python_binary[0]))
+    beam_args.append('"--runner=TestDataflowRunner"')
+    beam_args.append('"--sdk_location={}"'.format(python_binary[0]))
 
   cmd.append('--test-pipeline-options='
              '{}'.format(' '.join(beam_args)))
