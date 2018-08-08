@@ -159,6 +159,7 @@
 - Removed the flag resnet_num_cores from the resnet benchmark and added the flag tpu_num_shards to MNIST, resnet, and inception3.
 - Update MNIST benchmark source path.
 - Replace old flags --tpu_name and --master with a new flag, --tpu.
+- Added support for EFS provisioned throughput.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

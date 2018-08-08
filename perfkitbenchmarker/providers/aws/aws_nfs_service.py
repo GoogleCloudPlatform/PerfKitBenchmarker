@@ -69,6 +69,8 @@ class AwsNfsService(nfs_service.BaseNfsService):
     self.disk_spec.disk_size = 0
     self.filer_id = None
     self.mount_id = None
+    self.throughput_mode = FLAGS.efs_throughput_mode
+    self.provisioned_throughput = FLAGS.efs_provisioned_throughput
 
   @property
   def network(self):
@@ -129,7 +131,8 @@ class AwsNfsService(nfs_service.BaseNfsService):
             round(filer['SizeInBytes']['Value'] / 10.0 ** 9))
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
-    self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
+    self.filer_id = self.aws_commands.CreateFiler(
+        token, self.nfs_tier, self.throughput_mode, self.provisioned_throughput)
     self.aws_commands.AddTagsToFiler(self.filer_id)
     logging.info('Created filer %s with address %s', self.filer_id,
                  self.GetRemoteAddress())
@@ -192,10 +195,14 @@ class AwsEfsCommands(object):
     assert len(file_systems) < 2, 'Too many file systems.'
     return file_systems[0]
 
-  def CreateFiler(self, token, nfs_tier=None):
+  def CreateFiler(self, token, nfs_tier, throughput_mode,
+                  provisioned_throughput):
     args = ['create-file-system', '--creation-token', token]
     if nfs_tier is not None:
       args += ['--performance-mode', nfs_tier]
+    args += ['--throughput-mode', throughput_mode]
+    if throughput_mode == 'provisioned':
+      args += ['--provisioned-throughput-in-mibps', provisioned_throughput]
     return self._IssueAwsCommand(args)['FileSystemId']
 
   def AddTagsToFiler(self, filer_id):
