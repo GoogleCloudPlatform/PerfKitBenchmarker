@@ -272,3 +272,4 @@
 - Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
 - Moved from ACS to AKS for Azure Kubernetes clusters.
 - AWS Aurora Postgres updated from 9.6.2 to 9.6.3
+- Cleanup and fix Beam bechmark.
