@@ -48,7 +48,7 @@ flags.DEFINE_integer(
     'number of seconds to pause before each client load step')
 flag_util.DEFINE_integerlist(
     'pgbench_client_counts',
-    flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
+    flag_util.IntegerList([1]),
     'array of client counts passed to pgbench', module_name=__name__)
 FLAGS = flags.FLAGS
 
