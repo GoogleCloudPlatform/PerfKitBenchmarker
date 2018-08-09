@@ -108,8 +108,11 @@ def AddTags(resource_id, region, **kwargs):
   IssueRetryableCommand(tag_cmd)
 
 
-def MakeDefaultTags():
+def MakeDefaultTags(timeout_minutes=None):
   """Default tags for an AWS resource created by PerfKitBenchmarker.
+
+  Args:
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
 
   Returns:
     Dict of default tags, contributed from the benchmark spec.
@@ -117,12 +120,12 @@ def MakeDefaultTags():
   benchmark_spec = context.GetThreadBenchmarkSpec()
   if not benchmark_spec:
     return {}
-  return benchmark_spec.GetResourceTags()
+  return benchmark_spec.GetResourceTags(timeout_minutes=timeout_minutes)
 
 
-def MakeFormattedDefaultTags():
+def MakeFormattedDefaultTags(timeout_minutes=None):
   """Get the default tags formatted correctly for --tags parameter."""
-  return FormatTags(MakeDefaultTags())
+  return FormatTags(MakeDefaultTags(timeout_minutes=timeout_minutes))
 
 
 def AddDefaultTags(resource_id, region):
