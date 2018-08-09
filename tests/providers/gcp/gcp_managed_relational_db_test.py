@@ -122,7 +122,6 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--backup', command_string)
       self.assertIn('--backup-start-time=07:00', command_string)
       self.assertIn('--gce-zone=us-west1-b', command_string)
-      self.assertIn('--region=us-west1', command_string)
 
   def testCreateWithBackupDisabled(self):
     with PatchCriticalObjects() as issue_command:
