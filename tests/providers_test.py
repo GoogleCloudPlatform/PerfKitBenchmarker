@@ -32,9 +32,9 @@ class LoadProvidersTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
 
   def testImportAllProviders(self):
-    # Test that all modules can be imported successfully, but mock out the call
-    # to provider_imported event handlers.
-    with mock.patch.object(providers.events.provider_imported, 'send'):
+    # Test that all modules can be imported successfully, but mock out the
+    # import of CloudStack's csapi.
+    with mock.patch.dict('sys.modules', csapi=mock.Mock()):
       for cloud in providers.VALID_CLOUDS:
         providers.LoadProvider(cloud)
 
