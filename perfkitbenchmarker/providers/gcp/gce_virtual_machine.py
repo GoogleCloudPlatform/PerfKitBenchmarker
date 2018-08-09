@@ -148,6 +148,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       else:
         # Specifying gcp_min_cpu_platform explicitly removes any config.
         config_values.pop('min_cpu_platform', None)
+    if flag_values['gce_tags'].present:
+      config_values['gce_tags'] = flag_values.gce_tags
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -173,6 +175,10 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
                       {'default': 'n1-node-96-624'}),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
         'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
+        'gce_tags': (option_decoders.ListDecoder,
+                     {'item_decoder': option_decoders.StringDecoder(),
+                      'default': None
+                     }),
     })
     return result
 
@@ -350,6 +356,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
+    self.gce_tags = vm_spec.gce_tags
 
   @property
   def host_list(self):
@@ -392,7 +399,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.gpu_count:
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
-    cmd.flags['tags'] = 'perfkitbenchmarker'
+    cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
     cmd.flags['no-restart-on-failure'] = True
     if self.node_group:
       cmd.flags['node-group'] = self.node_group.name
@@ -617,6 +624,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gpu_count'] = self.gpu_count
     if self.gce_accelerator_type_override:
       result['accelerator_type_override'] = self.gce_accelerator_type_override
+    if self.gce_tags:
+      result['gce_tags'] = ','.join(self.gce_tags)
     return result
 
   def SimulateMaintenanceEvent(self):
