@@ -703,9 +703,9 @@ class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
-class Ubuntu1710BasedGceVirtualMachine(GceVirtualMachine,
-                                       linux_vm.Ubuntu1710Mixin):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1710'
+class Ubuntu1804BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1804Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 

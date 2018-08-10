@@ -294,9 +294,9 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
-  def testCreateUbuntu1710(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1710)
-    fake_image = 'fake-ubuntu1704'
+  def testCreateUbuntu1804(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    fake_image = 'fake-ubuntu1804'
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
@@ -306,12 +306,12 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
-          '--image-family ubuntu-1710 --image-project ubuntu-os-cloud',
+          '--image-family ubuntu-1804-lts --image-project ubuntu-os-cloud',
           command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'ubuntu-1710',
+                                     'image_family': 'ubuntu-1804-lts',
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
