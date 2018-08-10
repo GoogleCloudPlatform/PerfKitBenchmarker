@@ -154,13 +154,14 @@
 - Update ResNet testcases.
 - Remove unused lib in ResNet benchmark.
 - Added way to run several specsfs benchmarks in a single PKB run.
-- Add --preemptible in TPU creation command.
-- Add --skip_host_call in ResNet benchmark.
+- Add `--preemptible` in TPU creation command.
+- Add `--skip_host_call` in ResNet benchmark.
 - Update ResNet benchmark test for TensorFlow 1.9.
 - Removed the flag resnet_num_cores from the resnet benchmark and added the flag tpu_num_shards to MNIST, resnet, and inception3.
 - Update MNIST benchmark source path.
-- Replace old flags --tpu_name and --master with a new flag, --tpu.
+- Replace old flags `--tpu_name` and `--master` with a new flag, `--tpu`.
 - Added support for EFS provisioned throughput.
+- Added support for `--os_type` ubuntu1804. Removed ubuntu1710 for GCP.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
