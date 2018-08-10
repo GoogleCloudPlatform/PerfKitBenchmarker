@@ -1240,6 +1240,11 @@ class Ubuntu1710Mixin(DebianMixin):
   OS_TYPE = os_types.UBUNTU1710
 
 
+class Ubuntu1804Mixin(DebianMixin):
+  """Class holding Ubuntu1804 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1804
+
+
 class Ubuntu1604Cuda9Mixin(DebianMixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9

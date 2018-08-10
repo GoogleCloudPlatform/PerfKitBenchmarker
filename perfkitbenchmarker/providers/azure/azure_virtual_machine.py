@@ -402,6 +402,11 @@ class Ubuntu1710BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'Canonical:UbuntuServer:17.10:latest'
 
 
+class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1804Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
+
+
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
                                    linux_virtual_machine.RhelMixin):
   IMAGE_URN = 'RedHat:RHEL:7.2:latest'
