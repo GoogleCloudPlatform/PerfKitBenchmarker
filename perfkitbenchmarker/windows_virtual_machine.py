@@ -271,6 +271,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     if FLAGS.log_windows_password:
       logging.info('Password for %s: %s', self, self.password)
 
+  @vm_util.Retry(poll_interval=1, max_retries=15)
   def OnStartup(self):
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
     self.temp_dir = ntpath.join(stdout.strip(), 'pkb')
