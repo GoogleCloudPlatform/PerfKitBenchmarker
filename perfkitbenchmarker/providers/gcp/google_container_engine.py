@@ -117,6 +117,11 @@ class GkeCluster(container_service.KubernetesCluster):
           self, 'container', 'clusters', 'create', self.name)
 
     cmd.flags['cluster-version'] = self.cluster_version
+    if FLAGS.gke_enable_alpha:
+      cmd.args.append('--enable-kubernetes-alpha')
+      cmd.args.append('--no-enable-autorepair')
+      cmd.args.append('--no-enable-autoupgrade')
+
     cmd.flags['scopes'] = 'cloud-platform'
 
     if self.gpu_count:
