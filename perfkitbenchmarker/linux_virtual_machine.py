@@ -168,7 +168,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                             os.path.basename(f)))
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None):
+  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
+                          ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     Executes a command via a pair of scripts on the VM:
@@ -186,6 +187,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       should_log: Whether to log the command's output at the info level. The
           output is always logged at the debug level.
       timeout: The timeout for the command.
+      ignore_failure: Ignore any failure if set to true.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -228,12 +230,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), should_log=should_log, timeout=200)
+            ' '.join(wait_command), should_log=should_log, timeout=1800)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete'])
-      return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
+      return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
+                                ignore_failure=ignore_failure)
 
     try:
       return _WaitForCommand()
