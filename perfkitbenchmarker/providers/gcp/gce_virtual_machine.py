@@ -171,14 +171,21 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'project': (option_decoders.StringDecoder, {'default': None}),
         'image_family': (option_decoders.StringDecoder, {'default': None}),
         'image_project': (option_decoders.StringDecoder, {'default': None}),
-        'node_type': (option_decoders.StringDecoder,
-                      {'default': 'n1-node-96-624'}),
+        'node_type': (
+            option_decoders.StringDecoder,
+            {
+                'default': 'n1-node-96-624'
+            }
+        ),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
         'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
-        'gce_tags': (option_decoders.ListDecoder,
-                     {'item_decoder': option_decoders.StringDecoder(),
-                      'default': None
-                     }),
+        'gce_tags': (
+            option_decoders.ListDecoder,
+            {
+                'item_decoder': option_decoders.StringDecoder(),
+                'default': None
+            }
+        ),
     })
     return result
 
