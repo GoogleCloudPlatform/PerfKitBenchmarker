@@ -263,7 +263,7 @@ def _RunSpecSfs(benchmark_spec):
   """
   prime_client = benchmark_spec.vm_groups['clients'][0]
   prime_client.RobustRemoteCommand(
-      'cd %s && ./sfsmanager -r sfs_rc' % _SPEC_DIR)
+      'cd %s && ./sfsmanager -r sfs_rc' % _SPEC_DIR, ignore_failure=True)
   results_file = posixpath.join(_SPEC_DIR, 'results', 'sfssum_sfs2014.xml')
   output, _ = prime_client.RemoteCommand('cat %s' % results_file)
 
