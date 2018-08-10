@@ -148,11 +148,15 @@ flags.DEFINE_enum('ycsb_requestdistribution',
 flags.DEFINE_float('ycsb_readproportion',
                    None,
                    'The read proportion, '
-                   'default is 0.5 in workloada and 0.95 in YCSB.')
+                   'Default is 0.5 in workloada and 0.95 in YCSB.')
 flags.DEFINE_float('ycsb_updateproportion',
                    None,
                    'The update proportion, '
-                   'default is 0.5 in workloada and 0.05 in YCSB')
+                   'Default is 0.5 in workloada and 0.05 in YCSB.')
+flags.DEFINE_float('ycsb_scanproportion',
+                   None,
+                   'The scan proportion, '
+                   'Default is 0 in workloada and 0 in YCSB.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -974,6 +978,8 @@ class YCSBExecutor(object):
         parameters['readproportion'] = FLAGS.ycsb_readproportion
       if FLAGS.ycsb_updateproportion:
         parameters['updateproportion'] = FLAGS.ycsb_updateproportion
+      if FLAGS.ycsb_scanproportion:
+        parameters['scanproportion'] = FLAGS.ycsb_scanproportion
       parameters.update(kwargs)
       remote_path = posixpath.join(INSTALL_DIR,
                                    os.path.basename(workload_file))
