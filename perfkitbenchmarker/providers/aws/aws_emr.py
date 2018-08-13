@@ -163,14 +163,23 @@ class AwsEMR(spark_service.BaseSparkService):
                              json.dumps(instance_groups),
                              '--application', 'Name=Spark',
                              'Name=Hadoop',
-                             '--log-uri', logs_bucket,
-                             '--tags'] + util.MakeFormattedDefaultTags()
+                             '--log-uri', logs_bucket]
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
     logging.info('Cluster created with id %s', self.cluster_id)
+    for tag_key, tag_value in util.MakeDefaultTags().items():
+      self._AddTag(tag_key, tag_value)
+
+  def _AddTag(self, key, value):
+    """Add the key value pair as a tag to the emr cluster."""
+    cmd = self.cmd_prefix + ['emr', 'add-tags',
+                             '--resource-id', self.cluster_id,
+                             '--tag',
+                             '{}={}'.format(key, value)]
+    vm_util.IssueCommand(cmd)
 
   def _DeleteSecurityGroups(self):
     """Delete the security groups associated with this cluster."""
