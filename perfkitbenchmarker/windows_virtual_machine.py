@@ -273,6 +273,11 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
   @vm_util.Retry(poll_interval=1, max_retries=15)
   def OnStartup(self):
+    # Log driver information so that the user has a record of which drivers
+    # were used.
+    # TODO: put the driver information in the metadata.
+    stdout, _ = self.RemoteCommand('dism /online /get-drivers')
+    logging.info(stdout)
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
     self.temp_dir = ntpath.join(stdout.strip(), 'pkb')
     stdout, _ = self.RemoteCommand('echo $env:USERPROFILE')
