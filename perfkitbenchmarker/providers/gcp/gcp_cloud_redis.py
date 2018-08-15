@@ -75,6 +75,11 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     cmd.flags['size'] = self.size
     cmd.Issue()
 
+  def _IsReady(self):
+    """Returns whether cluster is ready."""
+    instance_details = self.GetInstanceDetails()
+    return instance_details.get('state') == 'READY'
+
   def _Delete(self):
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'beta', 'redis', 'instances', 'delete',
