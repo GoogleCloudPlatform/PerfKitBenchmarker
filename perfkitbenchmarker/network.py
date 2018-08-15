@@ -93,10 +93,10 @@ class BaseNetworkSpec(object):
 
 class BaseVPNGW(object):
   """An object representing the Base VPN GW."""
-  name = None
+  # name = None
   CLOUD = None
-  ZONE = None
-  IP_ADDR = None  # public IP of this gw
+  # ZONE = None
+  # IP_ADDR = None  # public IP of this gw
 
   def __init__(self, zone=None, cidr=None):
     """Initializes the BaseNetworkSpec.

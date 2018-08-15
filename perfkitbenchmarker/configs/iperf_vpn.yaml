@@ -5,17 +5,17 @@ iperf_vpn:
     iperf_vpn_sending_thread_count: 20
     use_vpn: True
   vpn_service:
-    tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
+    tunnel_count: 3  # create multiple tunnels for ecmp load balance testing
   vm_groups:
     vm_1:
       cloud: GCP
       cidr: 10.0.1.0/24
-      zone: us-central1-a
+      zone: us-west1-b
       #vm_spec: 
             #zone: us-central1-a
     vm_2:
       cloud: GCP
       cidr: 192.168.1.0/24
-      zone: us-west1-c
+      zone: us-central1-b
       #vm_spec:
             #zone: us-west1-c

@@ -154,8 +154,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
 
 
 def Run(benchmark_spec):
-  """Run iperf on the target vm.
-
+  """Run iperf on the target vm."""
+  """
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.

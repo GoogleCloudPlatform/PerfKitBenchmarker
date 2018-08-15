@@ -13,8 +13,11 @@
 # limitations under the License.
 from perfkitbenchmarker import errors, context, resource, flags
 import itertools
+import re
+from itertools import ifilter
+import uuid
 
-flags.DEFINE_integer('vpn_service_tunnel_count', 1,
+flags.DEFINE_integer('vpn_service_tunnel_count', 3,
                      'Number of tunnels to create for each VPNGW pair.')
 flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
@@ -72,25 +75,25 @@ class VPN(object):
         benchmark_spec.vpns[key] = self
       return benchmark_spec.vpns[key]
 
-  def ConfigureTunnel(self):
+  def ConfigureTunnel(self, suffix=''):
     #  @TODO thread this
     benchmark_spec = context.GetThreadBenchmarkSpec()
     for vpngw_key in self.GWPair:
       vpngw = benchmark_spec.vpngws[vpngw_key]
       if vpngw.IP_ADDR is None:
         vpngw.AllocateIP()
-    benchmark_spec.vpngws[self.GWPair[0]].SetupForwarding()
-    benchmark_spec.vpngws[self.GWPair[1]].SetupForwarding()
+    benchmark_spec.vpngws[self.GWPair[0]].SetupForwarding(suffix=suffix)
+    benchmark_spec.vpngws[self.GWPair[1]].SetupForwarding(suffix=suffix)
 
     benchmark_spec.vpngws[self.GWPair[0]].SetupTunnel(
-        benchmark_spec.vpngws[self.GWPair[1]], FLAGS.run_uri)
+        benchmark_spec.vpngws[self.GWPair[1]], FLAGS.run_uri, suffix=suffix)
     benchmark_spec.vpngws[self.GWPair[1]].SetupTunnel(
-        benchmark_spec.vpngws[self.GWPair[0]], FLAGS.run_uri)
+        benchmark_spec.vpngws[self.GWPair[0]], FLAGS.run_uri, suffix=suffix)
 
     benchmark_spec.vpngws[self.GWPair[0]].SetupRouting(
-        benchmark_spec.vpngws[self.GWPair[1]])
+        benchmark_spec.vpngws[self.GWPair[1]], suffix=suffix)
     benchmark_spec.vpngws[self.GWPair[1]].SetupRouting(
-        benchmark_spec.vpngws[self.GWPair[0]])
+        benchmark_spec.vpngws[self.GWPair[0]], suffix=suffix)
 
 
 class VPNService(resource.BaseResource):
@@ -119,20 +122,19 @@ class VPNService(resource.BaseResource):
       raise errors.Error('CreateVPN Service called in a thread without a '
                          'BenchmarkSpec.')
     # with benchmark_spec.vpngws_lock:
-      # create a tunnel for each pair of vpngw's
-    self.vpngw_pairs = itertools.combinations(benchmark_spec.vpngws, 2)
+    self.vpngw_pairs = self.GetVPNGWPairs(benchmark_spec.vpngws)
     # with benchmark_spec.vpns_lock:
     for gwpair in self.vpngw_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
+      suffix = format(uuid.uuid4().fields[1], 'x')  # unique enough
       vpn = VPN()
       vpn = vpn.GetVPN(gwpair)
-      vpn.ConfigureTunnel()
+      vpn.ConfigureTunnel(suffix=suffix)
 
   def _Delete(self):
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('CreateVPN Service called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error('CreateVPN Service called in a thread without a BenchmarkSpec.')
     for vpn in benchmark_spec.vpns:
       benchmark_spec.vpns[vpn].Delete()
 
@@ -145,3 +147,13 @@ class VPNService(resource.BaseResource):
     if self.tunnel_count > 1:
       basic_data.update({'ecmp_status': self.name})
     return basic_data
+
+  def GetVPNGWPairs(self, vpngws):
+    # vpngw-us-west1-0-28ed049a <-> vpngw-us-central1-0-28ed049a # yes
+    # vpngw-us-west1-0-28ed049a <-> vpngw-us-central1-1-28ed049a # no
+     # get all gw pairs then filter out the non matching tunnel id's
+    vpngw_pairs = itertools.combinations(vpngws, 2)
+    r = re.compile(r"(?P<gw_prefix>.*-.*-.*)?-(?P<gw_tnum>[0-9])-(?P<run_id>.*)")
+    # function = lambda x: r.search(x[0]).group('gw_tnum') == r.search(x[1]).group('gw_tnum')
+    function = lambda x: r.search(x[0]).group('gw_prefix') != r.search(x[1]).group('gw_prefix')
+    return ifilter(function, vpngw_pairs)

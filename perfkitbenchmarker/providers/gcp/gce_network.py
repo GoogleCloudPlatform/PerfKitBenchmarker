@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import collections
 """Module containing classes related to GCE VM networking.
 
 The Firewall class provides a way of opening VM ports. The Network class allows
@@ -87,6 +89,7 @@ class GceVPNGW(network.BaseVPNGW):
     self.IP_ADDR = None
     self.vpngw_resource = GceVPNGWResource(name, network_name, region, cidr, project)
     self.created = False
+    self.suffix = collections.defaultdict(dict)  # holds uuid tokens for naming/finding things (double dict)
 
   def AllocateIP(self):
     """ Allocates a public IP for the VPN GW """
@@ -127,21 +130,24 @@ class GceVPNGW(network.BaseVPNGW):
     return not retcode
 
 
-  def SetupForwarding(self):
-    """Create IPSec forwarding rules between the source gw and the target gw.
+  def SetupForwarding(self, suffix=''):
+    """Create IPSec forwarding rules
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
 
     Args:
       source_gw: The BaseVPN object to add forwarding rules to.
-      target_gw: The BaseVPN object to point forwarding rules at.
     """
+    if len(self.forwarding_rules) == 3:
+      return  # backout if already set
+
+    self.suffix[suffix]['fr_suffix'] = self.region + '-' + suffix
     # GCP doesnt like uppercase names?!?
     fr_UDP500_name = ('fr-udp500-%s-%s' %
-                      (self.region, FLAGS.run_uri))
+                      (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
     fr_UDP4500_name = ('fr-udp4500-%s-%s' %
-                       (self.region, FLAGS.run_uri))
+                       (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
     fr_ESP_name = ('fr-esp-%s-%s' %
-                   (self.region, FLAGS.run_uri))
+                   (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
     # with self._lock:
     if fr_UDP500_name not in self.forwarding_rules:
       fr_UDP500 = GceForwardingRule(
@@ -159,7 +165,7 @@ class GceVPNGW(network.BaseVPNGW):
       self.forwarding_rules[fr_ESP_name] = fr_ESP
       fr_ESP.Create()
 
-  def SetupTunnel(self, target_gw, psk):
+  def SetupTunnel(self, target_gw, psk, suffix=''):
     """Create IPSec tunnel between the source gw and the target gw.
 
     Args:
@@ -167,7 +173,9 @@ class GceVPNGW(network.BaseVPNGW):
       target_gw: The BaseVPN object to point forwarding rules at.
       psk: preshared key (or run uri for now)
     """
-    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create', 'tunnel' + self.name)
+    self.suffix[suffix]['tun_suffix'] = suffix
+
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create', 'tun-' + self.name + '-' + self.suffix[suffix]['tun_suffix'])
     cmd.flags['peer-address'] = target_gw.IP_ADDR
     cmd.flags['target-vpn-gateway'] = self.name
     cmd.flags['ike-version'] = '2'
@@ -191,16 +199,17 @@ class GceVPNGW(network.BaseVPNGW):
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
-  def SetupRouting(self, target_gw):
+  def SetupRouting(self, target_gw, suffix=''):
     """Create IPSec routing rules between the source gw and the target gw.
 
     Args:
       target_gw: The BaseVPN object to point forwarding rules at.
     """
-    cmd = util.GcloudCommand(self, 'compute', 'routes', 'create', 'route' + self.name)
+    self.suffix[suffix]['route_suffix'] = suffix
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'create', 'route-' + self.name + '-' + self.suffix[suffix]['route_suffix'])
     cmd.flags['destination-range'] = target_gw.cidr
     cmd.flags['network'] = self.network_name
-    cmd.flags['next-hop-vpn-tunnel'] = 'tunnel' + self.name
+    cmd.flags['next-hop-vpn-tunnel'] = 'tun-' + self.name + '-' + self.suffix[suffix]['tun_suffix']
     cmd.flags['next-hop-vpn-tunnel-region'] = self.region
     self.routes['route' + self.name] = cmd.Issue()
 
@@ -483,6 +492,7 @@ class GceNetwork(network.BaseNetwork):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
     name = FLAGS.gce_network_name or 'vpnpkb-network-%s' % FLAGS.run_uri
+    self.vpngw = {}
 
     # add support for zone, cidr, and separate networks
     if network_spec.zone and network_spec.cidr:
@@ -516,11 +526,12 @@ class GceNetwork(network.BaseNetwork):
         firewall_name2, self.project, ALLOW_ALL, name, NETWORK_RANGE2)
     # add VPNGW to the network
     if network_spec.zone and network_spec.cidr and FLAGS.use_vpn:
-      vpngw_name = 'vpngw-%s-%s' % (
-          util.GetRegionFromZone(network_spec.zone), FLAGS.run_uri)
-      self.vpngw = GceVPNGW(
-          vpngw_name, name, util.GetRegionFromZone(network_spec.zone),
-          network_spec.cidr, self.project)
+      for tunnelnum in range(0, FLAGS.vpn_service_tunnel_count):
+        vpngw_name = 'vpngw-%s-%s-%s' % (
+            util.GetRegionFromZone(network_spec.zone), tunnelnum, FLAGS.run_uri)
+        self.vpngw[vpngw_name] = GceVPNGW(
+            vpngw_name, name, util.GetRegionFromZone(network_spec.zone),
+            network_spec.cidr, self.project)
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -543,7 +554,8 @@ class GceNetwork(network.BaseNetwork):
       self.default_firewall_rule.Create()
       self.default_firewall_rule2.Create()
       if getattr(self, 'vpngw', False):
-        self.vpngw.Create()
+        for gw in self.vpngw:
+          self.vpngw[gw].Create()
 
   def Delete(self):
     """Deletes the actual network."""
@@ -553,5 +565,6 @@ class GceNetwork(network.BaseNetwork):
       if self.subnet_resource:
         self.subnet_resource.Delete()
       if getattr(self, 'vpngw', False):
-        self.vpngw.Delete()
+        for gw in self.vpngw:
+          self.vpngw[gw].Delete()
       self.network_resource.Delete()
