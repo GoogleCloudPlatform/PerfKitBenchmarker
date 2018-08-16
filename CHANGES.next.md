@@ -162,6 +162,8 @@
 - Replace old flags `--tpu_name` and `--master` with a new flag, `--tpu`.
 - Added support for EFS provisioned throughput.
 - Added support for `--os_type` ubuntu1804. Removed ubuntu1710 for GCP.
+- Added flag `--iperf3_set_tcp_window_size` to let the user avoid setting the
+  TCP Window size in Iperf3 Windows performance tests.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

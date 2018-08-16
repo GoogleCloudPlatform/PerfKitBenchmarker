@@ -51,8 +51,9 @@ flags.DEFINE_integer('tcp_stream_seconds', 3,
 flags.DEFINE_integer('tcp_number_of_streams', 10,
                      'The number of parrallel streams to run in the TCP test.')
 
-flags.DEFINE_integer('socket_buffer_size', 10,
-                     'The socket buffer size in megabytes.')
+flags.DEFINE_integer('socket_buffer_size', None,
+                     'The socket buffer size in megabytes. If None is '
+                     'specified then the socket buffer size will not be set.')
 
 flags.DEFINE_bool('run_tcp', True,
                   'setting to false will disable the run of the TCP test')
@@ -91,13 +92,18 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
   receiver_ip = (
       receiving_vm.internal_ip if use_internal_ip else receiving_vm.ip_address)
 
+  socket_buffer_string = ''
+  if FLAGS.socket_buffer_size:
+    socket_buffer_string = ' -w {socket_buffer}M '.format(
+        socket_buffer=FLAGS.socket_buffer_size)
+
   sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f m '
-                 ' -w {socket_buffer}M > {out_file}').format(
+                 ' {socket_buffer_arg} > {out_file}').format(
                      ip=receiver_ip,
                      port=IPERF3_TCP_PORT,
                      time=FLAGS.tcp_stream_seconds,
                      num_streams=FLAGS.tcp_number_of_streams,
-                     socket_buffer=FLAGS.socket_buffer_size,
+                     socket_buffer_arg=socket_buffer_string,
                      out_file=IPERF3_OUT_FILE)
 
   output = _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm)
@@ -294,7 +300,8 @@ def ParseTCPMultiStreamOutput(results, sending_vm, receiving_vm, num_streams,
         'sending_machine_type': sending_vm.machine_type,
         'sending_zone': sending_vm.zone,
         'thread_id': thread_id,
-        'internal_ip_used': internal_ip_used
+        'internal_ip_used': internal_ip_used,
+        'tcp_window_size': FLAGS.socket_buffer_size,
     }
     bandwidth = line_data[5]
     units = line_data[6]
