@@ -31,6 +31,8 @@ flags.DEFINE_float('act_load', 1.0, 'Load multiplier for act test per device.')
 flags.DEFINE_boolean('act_parallel', False,
                      'Run act tools in parallel. One copy per device.')
 flags.DEFINE_integer('act_duration', 86400, 'Duration of act test in seconds.')
+flags.DEFINE_integer('act_reserved_partitions', 0,
+                     'Number of partitions reserved (not being used by act).')
 # TODO(user): Support user provided config file.
 ACT_CONFIG_TEMPLATE = """
 device-names: {devices}
@@ -81,13 +83,19 @@ def RunActPrep(vm):
     vm.RobustRemoteCommand('cd {0} && sudo ./actprep {1}'.format(
         ACT_DIR, device.GetDevicePath()))
 
-  vm_util.RunThreaded(_RunActPrep, vm.scratch_disks)
+  assert len(vm.scratch_disks) > FLAGS.act_reserved_partitions, (
+      'More reserved partition than total partitions available.')
+  # Only salt partitions will be used.
+  vm_util.RunThreaded(
+      _RunActPrep, vm.scratch_disks[FLAGS.act_reserved_partitions:])
 
 
 def PrepActConfig(vm, index=None):
   """Prepare act config file at remote VM."""
   if index is None:
     disk_lst = vm.scratch_disks
+    # Treat first few partitions as reserved.
+    disk_lst = disk_lst[FLAGS.act_reserved_partitions:]
     config_file = 'actconfig.txt'
   else:
     disk_lst = [vm.scratch_disks[index]]
@@ -126,7 +134,8 @@ def RunAct(vm, index=None):
       'cd {0} && ./latency_calc/act_latency.py -n 7 -e 1 -l ~/{1}'.format(
           ACT_DIR, output))
   samples = ParseRunAct(out)
-  act_config_metadata.update(GetActMetadata(len(vm.scratch_disks)))
+  act_config_metadata.update(
+      GetActMetadata(len(vm.scratch_disks) - FLAGS.act_reserved_partitions))
   for s in samples:
     s.metadata.update(act_config_metadata)
   return samples
@@ -201,6 +210,7 @@ def GetActMetadata(num_disk):
   # TODO(user): Expose more stats and flags.
   return {
       'act-parallel': FLAGS.act_parallel,
+      'reserved_partition': FLAGS.act_reserved_partitions,
       'device-count': num_disk,
       'num-queues': 8,
       'threads-per-queues': 8,
