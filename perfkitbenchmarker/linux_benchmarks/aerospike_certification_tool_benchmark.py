@@ -54,7 +54,7 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   vm.Install('act')
   if FLAGS.act_parallel:
-    for i in xrange(len(vm.scratch_disks)):
+    for i in range(len(vm.scratch_disks))[FLAGS.act_reserved_partitions:]:
       act.PrepActConfig(vm, i)
   else:
     act.PrepActConfig(vm)
@@ -72,7 +72,8 @@ def Run(benchmark_spec):
     samples.extend(act.RunAct(vm, index))
 
   if FLAGS.act_parallel:
-    vm_util.RunThreaded(_Run, range(len(vm.scratch_disks)))
+    vm_util.RunThreaded(_Run, range(len(vm.scratch_disks))[
+        FLAGS.act_reserved_partitions:])
   else:
     samples = act.RunAct(vm)
   return samples
