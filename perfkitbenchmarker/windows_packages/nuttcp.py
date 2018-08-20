@@ -191,6 +191,24 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
   client_process.join()
 
 
+@vm_util.Retry(max_retries=3)
+def GatherResults(vm, out_file):
+  """Gets the contents of out_file from vm.
+
+  Args:
+    vm: the VM to get the results from.
+    out_file: the name of the file that contains results.
+
+  Returns:
+    The contents of 'out_file' as a string.
+  """
+  cat_command = 'cd {results_dir}; cat {out_file}'
+  results_command = cat_command.format(results_dir=vm.temp_dir,
+                                       out_file=out_file)
+  results, _ = vm.RemoteCommand(results_command)
+  return results
+
+
 def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
               iteration):
   """Run nuttcp tests.
@@ -224,22 +242,14 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
 
     RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path)
 
-    cat_command = 'cd {results_dir}; cat {out_file}'
-
     # retrieve the results and parse them
-    udp_results_command = cat_command.format(
-        results_dir=sending_vm.temp_dir, out_file=NUTTCP_OUT_FILE)
-    udp_results, _ = sending_vm.RemoteCommand(udp_results_command)
+    udp_results = GatherResults(sending_vm, NUTTCP_OUT_FILE)
 
     # get the cpu usage for the sender
-    sender_command = cat_command.format(
-        results_dir=sending_vm.temp_dir, out_file=CPU_OUT_FILE)
-    sender_cpu_results, _ = sending_vm.RemoteCommand(sender_command)
+    sender_cpu_results = GatherResults(sending_vm, CPU_OUT_FILE)
 
     # get the cpu usage for the receiver
-    receiver_command = cat_command.format(
-        results_dir=receiving_vm.temp_dir, out_file=CPU_OUT_FILE)
-    receiving_cpu_results, _ = receiving_vm.RemoteCommand(receiver_command)
+    receiving_cpu_results = GatherResults(receiving_vm, CPU_OUT_FILE)
 
     samples.append(
         GetUDPStreamSample(udp_results, sender_cpu_results,
