@@ -236,6 +236,30 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     except:
       return False
 
+  def _IsDBInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
+    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
+                             instance_id)
+    start_time = datetime.datetime.now()
+
+    while True:
+      if (datetime.datetime.now() - start_time).seconds > timeout:
+        logging.exception('Timeout waiting for sql instance to be ready')
+        return False
+      stdout, _, _ = cmd.Issue(suppress_warning=True)
+
+      try:
+        json_output = json.loads(stdout)
+        state = json_output['state']
+        logging.info('Instance %s state: %s', instance_id, state)
+        if state == 'RUNNABLE':
+          break
+      except:
+        logging.exception('Error attempting to read stdout. Creation failure.')
+        return False
+      time.sleep(5)
+
+    return True
+
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
@@ -243,29 +267,21 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     without being ready.  If the subclass does not implement
     it then it just returns true.
 
+    timeout: how long to wait when checking if the DB is ready.
+
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
-                             self.instance_id)
-    start_time = datetime.datetime.now()
-
-    while True:
-      if (datetime.datetime.now() - start_time).seconds > timeout:
-        logging.exception('Timeout waiting for sql instance to be ready')
+    if not self._IsDBInstanceReady(self.instance_id, timeout):
+      return False
+    if self.spec.high_availability:
+      if not self._IsDBInstanceReady(self.replica_instance_id, timeout):
         return False
-      stdout, _, retcode = cmd.Issue(suppress_warning=True)
 
-      try:
-        json_output = json.loads(stdout)
-        state = json_output['state']
-        logging.info('Instance state: {0}'.format(state))
-        if state == 'RUNNABLE':
-          break
-      except:
-        logging.exception('Error attempting to read stdout. Creation failure.')
-        return False
-      time.sleep(5)
+    cmd = util.GcloudCommand(
+        self, 'sql', 'instances', 'describe', self.instance_id)
+    stdout, _, _ = cmd.Issue()
+    json_output = json.loads(stdout)
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = DEFAULT_MYSQL_PORT
     return True
@@ -345,3 +361,19 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
                               'POSTGRES 9.6')
+
+  def _FailoverHA(self):
+    """Fail over from master to replica."""
+    cmd_string = [
+        self,
+        'sql',
+        'instances',
+        'failover',
+        self.instance_id,
+    ]
+    cmd = util.GcloudCommand(*cmd_string)
+    cmd.flags['project'] = self.project
+    # this command doesnt support the specifier: 'format'
+    del cmd.flags['format']
+    cmd.IssueRetryable()
+

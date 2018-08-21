@@ -33,7 +33,7 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase,
   def testParseSysbenchResult(self):
     results = []
     metadata = {}
-    sysbench_benchmark.ParseSysbenchOutput(
+    sysbench_benchmark.AddMetricsForSysbenchOutput(
         self.contents, results, metadata)
     logging.info('results are, %s', results)
     expected_results = [
