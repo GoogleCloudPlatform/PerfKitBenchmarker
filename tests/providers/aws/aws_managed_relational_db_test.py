@@ -248,14 +248,14 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
       self.assertEqual(
           'pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
-          db._ParseEndpoint(json.loads(test_data)))
+          db._ParseEndpointFromInstance(json.loads(test_data)))
 
   def testParsePort(self):
     test_data = readTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec()
 
-      self.assertEqual(3306, db._ParsePort(json.loads(test_data)))
+      self.assertEqual(3306, db._ParsePortFromInstance(json.loads(test_data)))
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:

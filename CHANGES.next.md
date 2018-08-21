@@ -280,3 +280,4 @@
 - Moved from ACS to AKS for Azure Kubernetes clusters.
 - AWS Aurora Postgres updated from 9.6.2 to 9.6.3
 - Cleanup and fix Beam bechmark.
+- Sysbench failover tests added for GCP and AWS Aurora

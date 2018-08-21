@@ -430,7 +430,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     return True
 
-  def _ParseEndpoint(self, describe_instance_json):
+  def _ParseEndpointFromInstance(self, describe_instance_json):
     """Parses the json output from the CLI and returns the endpoint.
 
     Args:
@@ -442,7 +442,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     return describe_instance_json['DBInstances'][0]['Endpoint']['Address']
 
-  def _ParsePort(self, describe_instance_json):
+  def _ParsePortFromInstance(self, describe_instance_json):
     """Parses the json output from the CLI and returns the port.
 
     Args:
@@ -455,6 +455,32 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if describe_instance_json is None:
       return None
     return int(describe_instance_json['DBInstances'][0]['Endpoint']['Port'])
+
+  def _ParseEndpointFromCluster(self, describe_cluster_json):
+    """Parses the json output from the CLI and returns the endpoint.
+
+    Args:
+      describe_cluster_json: output in json format from calling
+        'aws rds describe-db-clusters'
+
+    Returns:
+      endpoint of the server as a string
+    """
+    return describe_cluster_json['DBClusters'][0]['Endpoint']
+
+  def _ParsePortFromCluster(self, describe_cluster_json):
+    """Parses the json output from the CLI and returns the port.
+
+    Args:
+      describe_cluster_json: output in json format from calling
+        'aws rds describe-db-instances'
+
+    Returns:
+      port on which the server is listening, as an int
+    """
+    if describe_cluster_json is None:
+      return None
+    return int(describe_cluster_json['DBClusters'][0]['Port'])
 
   def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
     """Saves the primary, and secondary (only if HA) zone of the server.
@@ -529,7 +555,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     json_output = self._DescribeInstance(self.instance_id)
     self._SavePrimaryAndSecondaryZones(json_output)
-    self._GetPortsForWriterInstance(self.all_instance_ids[0])
+    if self.cluster_id:
+      self._GetPortsForClusterInstance(self.cluster_id)
+    else:
+      self._GetPortsForWriterInstance(self.all_instance_ids[0])
 
   def _IsInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.
@@ -579,14 +608,34 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     json_output = json.loads(stdout)
     return json_output
 
+  def _DescribeCluster(self, cluster_id):
+    cmd = util.AWS_PREFIX + [
+        'rds',
+        'describe-db-clusters',
+        '--db-cluster-identifier=%s' % cluster_id,
+        '--region=%s' % self.region
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
+    json_output = json.loads(stdout)
+    return json_output
+
   def _GetPortsForWriterInstance(self, instance_id):
     """Assigns the ports and endpoints from the instance_id to self.
 
-    These will be used to communicate with the data base, tje
+    These will be used to communicate with the data base.
     """
     json_output = self._DescribeInstance(instance_id)
-    self.endpoint = self._ParseEndpoint(json_output)
-    self.port = self._ParsePort(json_output)
+    self.endpoint = self._ParseEndpointFromInstance(json_output)
+    self.port = self._ParsePortFromInstance(json_output)
+
+  def _GetPortsForClusterInstance(self, cluster_id):
+    """Assigns the ports and endpoints from the cluster_id to self.
+
+    These will be used to communicate with the data base.
+    """
+    json_output = self._DescribeCluster(cluster_id)
+    self.endpoint = self._ParseEndpointFromCluster(json_output)
+    self.port = self._ParsePortFromCluster(json_output)
 
   def _AssertClientAndDbInSameRegion(self):
     """Asserts that the client vm is in the same region requested by the server.
@@ -616,3 +665,31 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     flexibility in deleting resource dependencies separately from _Delete().
     """
     self._TeardownNetworking()
+
+  def _FailoverHA(self):
+    """Fail over from master to replica."""
+
+    if (self.spec.engine == managed_relational_db.MYSQL or
+        self.spec.engine == managed_relational_db.POSTGRES):
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'reboot-db-instance',
+          '--db-instance-identifier=%s' % self.instance_id,
+          '--force-failover',
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+    elif (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
+          self.spec.engine == managed_relational_db.AURORA_MYSQL):
+      new_primary_id = self.all_instance_ids[1]
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'failover-db-cluster',
+          '--db-cluster-identifier=%s' % self.cluster_id,
+          '--target-db-instance-identifier=%s' % new_primary_id,
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+    else:
+      raise Exception('Unknown how to failover {0}'.format(
+          self.spec.engine))
