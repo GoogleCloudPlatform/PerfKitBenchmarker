@@ -52,6 +52,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 
 FLAGS = flags.FLAGS
@@ -83,6 +84,20 @@ flags.DEFINE_integer('sysbench_latency_percentile', 100,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
+flags.DEFINE_integer('sysbench_pre_failover_seconds', 0,
+                     'If non zero, then after the sysbench workload is '
+                     'complete, a failover test will be performed.  '
+                     'When a failover test is run, the database will be driven '
+                     'using the last entry in sysbench_thread_counts.  After '
+                     'sysbench_pre_failover_seconds, a failover will be '
+                     'triggered.  Time will be measured until sysbench '
+                     'is able to connect again.')
+flags.DEFINE_integer('sysbench_post_failover_seconds', 0,
+                     'When non Zero, will run the benchmark an additional '
+                     'amount of time after failover is complete.  Useful '
+                     'for detecting if there are any differences in TPS because'
+                     'of failover.')
+
 
 BENCHMARK_NAME = 'sysbench'
 BENCHMARK_CONFIG = """
@@ -135,12 +150,15 @@ UNIFORM = 'uniform'
 
 SECONDS_UNIT = 'seconds'
 
+_MAX_FAILOVER_DURATION_SECONDS = 60 * 60  # 1 hour
+_FAILOVER_TEST_TPS_FREQUENCY_SECONDS = 10
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def ParseSysbenchOutput(sysbench_output, results, metadata):
+def _ParseSysbenchOutput(sysbench_output):
   """Parses sysbench output.
 
   Extract relevant TPS and latency numbers, and populate the final result
@@ -151,8 +169,9 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
 
   Args:
     sysbench_output: The output from sysbench.
-    results: The dictionary to store results based on sysbench output.
-    metadata: The metadata to be passed along to the Samples class.
+  Returns:
+    Two arrays, the tps numbers and the latency numbers
+
   """
   tps_numbers = []
   latency_numbers = []
@@ -170,17 +189,63 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
       if line.startswith('SQL statistics:'):
         break
 
+  return tps_numbers, latency_numbers
+
+
+def AddMetricsForSysbenchOutput(
+    sysbench_output, results, metadata, metric_prefix=''):
+  """Parses sysbench output.
+
+  Extract relevant TPS and latency numbers, and populate the final result
+  collection with these information.
+
+  Specifically, we are interested in tps and latency numbers reported by each
+  reporting interval.
+
+  Args:
+    sysbench_output: The output from sysbench.
+    results: The dictionary to store results based on sysbench output.
+    metadata: The metadata to be passed along to the Samples class.
+    metric_prefix:  An optional prefix to append to each metric generated.
+  """
+  tps_numbers, latency_numbers = _ParseSysbenchOutput(sysbench_output)
+
   tps_metadata = metadata.copy()
-  tps_metadata.update({'tps': tps_numbers})
-  tps_sample = sample.Sample('tps_array', -1, 'tps', tps_metadata)
+  tps_metadata.update({metric_prefix + 'tps': tps_numbers})
+  tps_sample = sample.Sample(metric_prefix + 'tps_array', -1,
+                             'tps', tps_metadata)
 
   latency_metadata = metadata.copy()
-  latency_metadata.update({'latency': latency_numbers})
-  latency_sample = sample.Sample('latency_array', -1, 'ms',
+  latency_metadata.update({metric_prefix + 'latency': latency_numbers})
+  latency_sample = sample.Sample(metric_prefix + 'latency_array', -1, 'ms',
                                  latency_metadata)
 
   results.append(tps_sample)
   results.append(latency_sample)
+
+
+def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
+  """Returns the sysbench command as a string."""
+  if duration <= 0:
+    raise ValueError('Duration must be greater than zero.')
+
+  db = benchmark_spec.managed_relational_db
+  run_cmd_tokens = ['sysbench',
+                    FLAGS.sysbench_testname,
+                    '--tables=%d' % FLAGS.sysbench_tables,
+                    '--table_size=%d' % FLAGS.sysbench_table_size,
+                    '--db-ps-mode=%s' % DISABLE,
+                    '--rand-type=%s' % UNIFORM,
+                    '--threads=%d' % sysbench_thread_count,
+                    '--percentile=%d' % FLAGS.sysbench_latency_percentile,
+                    '--report-interval=%d' % FLAGS.sysbench_report_interval,
+                    '--max-requests=0',
+                    '--time=%d' % duration,
+                    '--db-driver=mysql',
+                    db.MakeSysbenchConnectionString(),
+                    'run']
+  run_cmd = ' '.join(run_cmd_tokens)
+  return run_cmd
 
 
 def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
@@ -202,22 +267,10 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   stdout = ''
   stderr = ''
   if duration > 0:
-    db = benchmark_spec.managed_relational_db
-    run_cmd_tokens = ['sysbench',
-                      FLAGS.sysbench_testname,
-                      '--tables=%d' % FLAGS.sysbench_tables,
-                      '--table_size=%d' % FLAGS.sysbench_table_size,
-                      '--db-ps-mode=%s' % DISABLE,
-                      '--rand-type=%s' % UNIFORM,
-                      '--threads=%d' % sysbench_thread_count,
-                      '--percentile=%d' % FLAGS.sysbench_latency_percentile,
-                      '--report-interval=%d' % FLAGS.sysbench_report_interval,
-                      '--max-requests=0',
-                      '--time=%d' % duration,
-                      '--db-driver=mysql',
-                      db.MakeSysbenchConnectionString(),
-                      'run']
-    run_cmd = ' '.join(run_cmd_tokens)
+    run_cmd = _GetSysbenchCommand(
+        duration,
+        benchmark_spec,
+        sysbench_thread_count)
     stdout, stderr = vm.RobustRemoteCommand(run_cmd)
     logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
                  stdout, stderr)
@@ -225,7 +278,49 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   return stdout, stderr
 
 
-def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
+def _IssueSysbenchCommandWithReturnCode(
+    vm, duration, benchmark_spec, sysbench_thread_count, show_results=True):
+  """Run sysbench workload as specified by the benchmark_spec."""
+  stdout = ''
+  stderr = ''
+  retcode = -1
+  if duration > 0:
+    run_cmd = _GetSysbenchCommand(
+        duration,
+        benchmark_spec,
+        sysbench_thread_count)
+    stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
+        run_cmd,
+        should_log=show_results,
+        ignore_failure=True,
+        suppress_warning=True)
+    if show_results:
+      logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
+                   stdout, stderr)
+
+  return stdout, stderr, retcode
+
+
+def _IssueMysqlPingCommandWithReturnCode(vm, benchmark_spec):
+  """Ping mysql with mysqladmin."""
+  db = benchmark_spec.managed_relational_db
+  run_cmd_tokens = ['mysqladmin',
+                    '--count=1',
+                    '--sleep=1',
+                    'status',
+                    db.MakeMysqlConnectionString()]
+  run_cmd = ' '.join(run_cmd_tokens)
+  stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
+      run_cmd,
+      should_log=False,
+      ignore_failure=True,
+      suppress_warning=True)
+
+  return stdout, stderr, retcode
+
+
+def _RunSysbench(
+    vm, metadata, benchmark_spec, sysbench_thread_count):
   """Runs the Sysbench OLTP test.
 
   Args:
@@ -233,6 +328,7 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
     metadata: The PKB metadata to be passed along to the final results.
     benchmark_spec: The benchmark specification. Contains all data that is
                     required to run the benchmark.
+    sysbench_thread_count: The number of client threads that will connect.
 
   Returns:
     Results: A list of results of this run.
@@ -256,7 +352,7 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
                                     sysbench_thread_count)
 
   logging.info('\n Parsing Sysbench Results...\n')
-  ParseSysbenchOutput(stdout, results, metadata)
+  AddMetricsForSysbenchOutput(stdout, results, metadata)
 
   return results
 
@@ -287,6 +383,207 @@ def _GetDatabaseSize(vm, benchmark_spec):
     size_mb += float(word_size_mb)
 
   return size_mb
+
+
+def _PerformFailoverTest(
+    vm, metadata, benchmark_spec, sysbench_thread_count):
+  """Runs the failover test - drive the workload while failing over."""
+  results = []
+  threaded_args = [
+      (_FailoverWorkloadThread, [
+          vm, benchmark_spec, sysbench_thread_count, results, metadata], {}),
+      (_FailOverThread, [benchmark_spec], {})]
+  vm_util.RunParallelThreads(threaded_args, len(threaded_args), 0)
+  return results
+
+
+class _Stopwatch(object):
+  """Stopwatch class for tracking elapsed time."""
+
+  def __init__(self):
+    self.start_time = time.time()
+
+  @property
+  def elapsed_seconds(self):
+    return time.time() - self.start_time
+
+  def ShouldContinue(self):
+    return self.elapsed_seconds < _MAX_FAILOVER_DURATION_SECONDS
+
+
+def _WaitForWorkloadToFail(
+    stopwatch, vm, benchmark_spec, sysbench_thread_count):
+  """Run the sysbench workload continuously until it fails."""
+  retcode = 0
+  did_tps_drop_to_zero = False
+
+  while (retcode == 0 and
+         not did_tps_drop_to_zero and
+         stopwatch.ShouldContinue()):
+    # keep the database busy until the expected time until failover
+    # the command will fail once the database connection is lost
+    stdout, _, retcode = _IssueSysbenchCommandWithReturnCode(
+        vm, _FAILOVER_TEST_TPS_FREQUENCY_SECONDS, benchmark_spec,
+        sysbench_thread_count)
+
+    # the tps will drop to 0 before connection failure on AWS
+    tps_array, _ = _ParseSysbenchOutput(stdout)
+    did_tps_drop_to_zero = any({x == 0 for x in tps_array})
+
+  did_all_succeed = retcode == 0 and not did_tps_drop_to_zero
+  if did_all_succeed:
+    return False
+
+  return True
+
+
+def _WaitForPingToFail(stopwatch, vm, benchmark_spec):
+  """Run a ping workload continuously until it fails."""
+  logging.info('\n Pinging until failure...\n')
+  retcode = 0
+  while retcode == 0 and stopwatch.ShouldContinue():
+    _, _, retcode = _IssueMysqlPingCommandWithReturnCode(
+        vm, benchmark_spec)
+
+  # exited without reaching failure
+  if retcode == 0:
+    return False
+
+  return True
+
+
+def _WaitForPingToSucceed(stopwatch, vm, benchmark_spec):
+  """Run a ping workload continuously until it succeeds."""
+  logging.info('\n Pinging until success...\n')
+  # issue ping while it fails, until it succeeds
+  retcode = 1
+  while retcode != 0 and stopwatch.ShouldContinue():
+    _, _, retcode = _IssueMysqlPingCommandWithReturnCode(
+        vm, benchmark_spec)
+
+  # exited without reaching success
+  if retcode == 1:
+    return False
+
+  return True
+
+
+def _WaitUntilSysbenchWorkloadConnect(
+    stopwatch, vm, benchmark_spec, sysbench_thread_count):
+  """Run the sysbench workload until it connects - and then exit."""
+
+  logging.info('\n Keep trying to connect sysbench until success...\n')
+  # try issuing sysbench command on 1 second intervals until it succeeds
+  retcode = 1
+  while retcode != 0 and stopwatch.ShouldContinue():
+    _, _, retcode = _IssueSysbenchCommandWithReturnCode(
+        vm, 1, benchmark_spec,
+        sysbench_thread_count, show_results=False)
+
+  if retcode == 1:
+    return False
+
+  return True
+
+
+def _GatherPostFailoverTPS(
+    vm, benchmark_spec, sysbench_thread_count, results, metadata):
+  """Gathers metrics on post failover performance."""
+  if not FLAGS.sysbench_post_failover_seconds:
+    return
+  logging.info('\n Gathering Post Failover Data...\n')
+  stdout, _ = _IssueSysbenchCommand(
+      vm, FLAGS.sysbench_post_failover_seconds, benchmark_spec,
+      sysbench_thread_count)
+  logging.info('\n Parsing Sysbench Results...\n')
+  AddMetricsForSysbenchOutput(stdout, results, metadata, 'failover_')
+
+
+def _FailoverWorkloadThread(
+    vm,
+    benchmark_spec,
+    sysbench_thread_count,
+    results,
+    metadata):
+  """Entry point for thraed that drives the workload for failover test.
+
+  The failover test requires 2 threads of execution.   The failover thread
+  will cause a failover after a certain timeout.
+
+  The workload thread is responsible for driving the database while waiting
+  for the failover to occur.   After failover, t then measures how long
+  it takes for the database to become operable again.  Finally, the
+  database is run under the regular workload again to gather statistics
+  on how the database behaves post-failover.
+
+  Args:
+    vm:  The vm of the client driving the database
+    benchmark_spec:  Benchmark spec including the database spec
+    sysbench_thread_count:  How many client threads to drive the database with
+                            while waiting for failover
+    results:  A list to append any sample to
+    metadata:  Metadata to be used in sample construction
+
+  Returns:
+    True if the thread made it through the expected workflow without timeouts
+    False if database failover could not be detected or it timed out.
+  """
+  logging.info('\n Running sysbench to drive database while '
+               'waiting for failover \n')
+
+  stopwatch = _Stopwatch()
+  if not _WaitForWorkloadToFail(
+      stopwatch, vm, benchmark_spec, sysbench_thread_count):
+    return False
+
+  if not _WaitForPingToFail(stopwatch, vm, benchmark_spec):
+    return False
+
+  time_until_failover = stopwatch.elapsed_seconds
+  results.append(sample.Sample('time_until_failover',
+                               time_until_failover, 's',
+                               metadata))
+
+  if not _WaitForPingToSucceed(stopwatch, vm, benchmark_spec):
+    return False
+
+  time_failover_to_ping = stopwatch.elapsed_seconds - time_until_failover
+  results.append(sample.Sample('time_failover_to_ping',
+                               time_failover_to_ping, 's',
+                               metadata))
+
+  if not _WaitUntilSysbenchWorkloadConnect(
+      stopwatch, vm, benchmark_spec, sysbench_thread_count):
+    return False
+
+  time_failover_to_connect = stopwatch.elapsed_seconds - time_until_failover
+  results.append(sample.Sample('time_failover_to_connect',
+                               time_failover_to_connect, 's',
+                               metadata))
+
+  _GatherPostFailoverTPS(
+      vm, benchmark_spec, sysbench_thread_count, results, metadata)
+
+  return True
+
+
+def _FailOverThread(benchmark_spec):
+  """Entry point for thread that performs the db failover.
+
+  The failover test requires 2 threads of execution.   The
+  workload thread waits for the database to fail and then waits for the database
+  to be useful again.   The failover thread is responsible for programmatically
+  making the database fail There is a pause time before failure so that
+  we can make sure the database is under sufficient load at the point of
+  failure. Doing a failover on an idle database would not be as
+  interesting test.
+
+  Args:
+      benchmark_spec:   The benchmark spec of the database to failover
+  """
+  time.sleep(FLAGS.sysbench_pre_failover_seconds)
+  db = benchmark_spec.managed_relational_db
+  db.Failover()
 
 
 def _PrepareSysbench(vm, benchmark_spec):
@@ -369,7 +666,9 @@ def CreateMetadataFromFlags(db):
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
-      'mysql_db_size_MB': db.mysql_db_size_MB
+      'mysql_db_size_MB': db.mysql_db_size_MB,
+      'sysbench_pre_failover_seconds': FLAGS.sysbench_post_failover_seconds,
+      'sysbench_post_failover_seconds': FLAGS.sysbench_pre_failover_seconds
   }
   return metadata
 
@@ -432,6 +731,15 @@ def Run(benchmark_spec):
     run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
     print run_results
     results += run_results
+
+  if (benchmark_spec.managed_relational_db.spec.high_availability and
+      FLAGS.sysbench_pre_failover_seconds):
+    last_client_count = FLAGS.sysbench_thread_counts[
+        len(FLAGS.sysbench_thread_counts)-1]
+    failover_results = _PerformFailoverTest(
+        vm, metadata, benchmark_spec, last_client_count)
+    print failover_results
+    results += failover_results
 
   return results
 

@@ -209,3 +209,15 @@ class BaseManagedRelationalDb(resource.BaseResource):
 
     Returns: default version as a string for the given engine.
     """
+
+  def Failover(self):
+    """Fail over the database.  Throws exception if not high available."""
+    if not self.spec.high_availability:
+      raise Exception('Attempt to fail over a database that isn\'t marked '
+                      'as high available')
+    self._FailoverHA()
+
+  @abstractmethod
+  def _FailoverHA(self):
+    """Fail over from master to replica."""
+    pass
