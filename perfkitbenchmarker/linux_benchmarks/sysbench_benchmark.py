@@ -735,7 +735,7 @@ def Run(benchmark_spec):
   if (benchmark_spec.managed_relational_db.spec.high_availability and
       FLAGS.sysbench_pre_failover_seconds):
     last_client_count = FLAGS.sysbench_thread_counts[
-        len(FLAGS.sysbench_thread_counts)-1]
+        len(FLAGS.sysbench_thread_counts) - 1]
     failover_results = _PerformFailoverTest(
         vm, metadata, benchmark_spec, last_client_count)
     print failover_results
