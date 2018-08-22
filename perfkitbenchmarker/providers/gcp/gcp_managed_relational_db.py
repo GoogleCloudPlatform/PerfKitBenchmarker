@@ -376,4 +376,3 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # this command doesnt support the specifier: 'format'
     del cmd.flags['format']
     cmd.IssueRetryable()
-
