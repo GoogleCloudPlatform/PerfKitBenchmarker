@@ -23,7 +23,6 @@ import os
 
 from perfkitbenchmarker import app_service
 from perfkitbenchmarker import cloud_redis
-from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
