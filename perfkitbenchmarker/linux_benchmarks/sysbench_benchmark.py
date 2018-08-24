@@ -170,11 +170,12 @@ def _ParseSysbenchOutput(sysbench_output):
   Args:
     sysbench_output: The output from sysbench.
   Returns:
-    Two arrays, the tps numbers and the latency numbers
+    Three arrays, the tps, latency and qps numbers.
 
   """
   tps_numbers = []
   latency_numbers = []
+  qps_numbers = []
 
   sysbench_output_io = StringIO.StringIO(sysbench_output)
   for line in sysbench_output_io:
@@ -186,10 +187,12 @@ def _ParseSysbenchOutput(sysbench_output):
       tps_numbers.append(float(match.group(1)))
       match = re.search(r'lat \(.*?\): (.*?) ', line)
       latency_numbers.append(float(match.group(1)))
+      match = re.search(r'qps: (.*?) \(.*?\) ', line)
+      qps_numbers.append(float(match.group(1)))
       if line.startswith('SQL statistics:'):
         break
 
-  return tps_numbers, latency_numbers
+  return tps_numbers, latency_numbers, qps_numbers
 
 
 def AddMetricsForSysbenchOutput(
@@ -208,7 +211,8 @@ def AddMetricsForSysbenchOutput(
     metadata: The metadata to be passed along to the Samples class.
     metric_prefix:  An optional prefix to append to each metric generated.
   """
-  tps_numbers, latency_numbers = _ParseSysbenchOutput(sysbench_output)
+  tps_numbers, latency_numbers, qps_numbers = (
+      _ParseSysbenchOutput(sysbench_output))
 
   tps_metadata = metadata.copy()
   tps_metadata.update({metric_prefix + 'tps': tps_numbers})
@@ -220,8 +224,14 @@ def AddMetricsForSysbenchOutput(
   latency_sample = sample.Sample(metric_prefix + 'latency_array', -1, 'ms',
                                  latency_metadata)
 
+  qps_metadata = metadata.copy()
+  qps_metadata.update({metric_prefix + 'qps': qps_numbers})
+  qps_sample = sample.Sample(metric_prefix + 'qps_array', -1, 'qps',
+                             qps_metadata)
+
   results.append(tps_sample)
   results.append(latency_sample)
+  results.append(qps_sample)
 
 
 def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
@@ -427,7 +437,7 @@ def _WaitForWorkloadToFail(
         sysbench_thread_count)
 
     # the tps will drop to 0 before connection failure on AWS
-    tps_array, _ = _ParseSysbenchOutput(stdout)
+    tps_array, _, _ = _ParseSysbenchOutput(stdout)
     did_tps_drop_to_zero = any({x == 0 for x in tps_array})
 
   did_all_succeed = retcode == 0 and not did_tps_drop_to_zero
