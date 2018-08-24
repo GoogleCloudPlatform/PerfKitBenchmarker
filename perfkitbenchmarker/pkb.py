@@ -489,7 +489,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
-  spec.ConstructCloudTpu()
+  spec.ConstructTpu()
   spec.ConstructEdwService()
   spec.ConstructCloudRedis()
   spec.ConstructNfsService()
