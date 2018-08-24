@@ -81,13 +81,17 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
-  benchmark_spec.use_tpu = benchmark_spec.tpus is not None
+  benchmark_spec.use_tpu = not benchmark_spec.tpus
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
-  benchmark_spec.tpu = ''
+  benchmark_spec.tpu_train = ''
+  benchmark_spec.tpu_eval = ''
   if benchmark_spec.use_tpu:
     tpu_groups = benchmark_spec.tpu_groups
     if 'train' in tpu_groups:
-      benchmark_spec.tpu = tpu_groups['train'].GetName()
+      benchmark_spec.tpu_train = tpu_groups['train'].GetName()
+    if 'eval' in tpu_groups:
+      benchmark_spec.tpu_eval = tpu_groups['eval'].GetName()
+  benchmark_spec.tpu = benchmark_spec.tpu_train
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
   benchmark_spec.num_shards = FLAGS.tpu_num_shards
@@ -156,6 +160,8 @@ def _CreateMetadataDict(benchmark_spec):
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
       'tpu': benchmark_spec.tpu,
+      'tpu_train': benchmark_spec.tpu_train,
+      'tpu_eval': benchmark_spec.tpu_eval,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
       'num_shards': benchmark_spec.num_shards
