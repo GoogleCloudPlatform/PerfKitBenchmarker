@@ -81,12 +81,13 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
-  benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
+  benchmark_spec.use_tpu = benchmark_spec.tpus is not None
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
+  benchmark_spec.tpu = ''
   if benchmark_spec.use_tpu:
-    benchmark_spec.tpu = benchmark_spec.cloud_tpu.GetName()
-  else:
-    benchmark_spec.tpu = ''
+    tpu_groups = benchmark_spec.tpu_groups
+    if 'train' in tpu_groups:
+      benchmark_spec.tpu = tpu_groups['train'].GetName()
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
   benchmark_spec.num_shards = FLAGS.tpu_num_shards

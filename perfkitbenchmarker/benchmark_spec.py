@@ -128,7 +128,8 @@ class BenchmarkSpec(object):
     self.dpb_service = None
     self.container_cluster = None
     self.managed_relational_db = None
-    self.cloud_tpu = None
+    self.tpus = []
+    self.tpu_groups = {}
     self.edw_service = None
     self.cloud_redis = None
     self.nfs_service = None
@@ -206,14 +207,24 @@ class BenchmarkSpec(object):
     self.managed_relational_db = managed_relational_db_class(
         self.config.managed_relational_db)
 
-  def ConstructCloudTpu(self):
+  def ConstructTpuGroup(self, group_spec):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
-    if self.config.cloud_tpu is None:
+    if group_spec is None:
       return
-    cloud = self.config.cloud_tpu.cloud
+    cloud = group_spec.cloud
     providers.LoadProvider(cloud)
-    cloud_tpu_class = cloud_tpu.GetCloudTpuClass(cloud)
-    self.cloud_tpu = cloud_tpu_class(self.config.cloud_tpu)
+    tpu_class = cloud_tpu.GetTpuClass(cloud)
+    return tpu_class(group_spec)
+
+  def ConstructTpu(self):
+    """Constructs the BenchmarkSpec's cloud TPU objects."""
+    tpu_group_specs = self.config.tpu_groups
+
+    for group_name, group_spec in sorted(tpu_group_specs.iteritems()):
+      tpu = self.ConstructTpuGroup(group_spec)
+
+      self.tpu_groups[group_name] = tpu
+      self.tpus.append(tpu)
 
   def ConstructEdwService(self):
     """Create the edw_service object."""
@@ -458,8 +469,8 @@ class BenchmarkSpec(object):
     if self.managed_relational_db:
       self.managed_relational_db.client_vm = self.vms[0]
       self.managed_relational_db.Create()
-    if self.cloud_tpu:
-      self.cloud_tpu.Create()
+    if self.tpus:
+      vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.edw_service:
       if not self.edw_service.user_managed:
         # The benchmark creates the Redshift cluster's subnet group in the
@@ -484,8 +495,8 @@ class BenchmarkSpec(object):
       self.dpb_service.Delete()
     if self.managed_relational_db:
       self.managed_relational_db.Delete()
-    if self.cloud_tpu:
-      self.cloud_tpu.Delete()
+    if self.tpus:
+      vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
     if self.edw_service:
       self.edw_service.Delete()
     if self.nfs_service:

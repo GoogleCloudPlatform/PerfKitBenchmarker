@@ -25,10 +25,10 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-CLOUD_TPU_TIMEOUT = 1200
+TPU_TIMEOUT = 1200
 
 
-class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
+class GcpTpu(cloud_tpu.BaseTpu):
   """class representing a GCP cloud TPU.
 
   Attributes:
@@ -40,13 +40,13 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
   """
 
   CLOUD = providers.GCP
-  SERVICE_NAME = 'cloud_tpu'
+  SERVICE_NAME = 'tpu'
   TPU_IP = '10.240.{}.2'
-  DEFAULT_CLOUD_TPU_VERSION = '1.6'
+  DEFAULT_TPU_VERSION = '1.6'
 
-  def __init__(self, cloud_tpu_spec):
-    super(GcpCloudTpu, self).__init__(cloud_tpu_spec)
-    self.spec = cloud_tpu_spec
+  def __init__(self, tpu_spec):
+    super(GcpTpu, self).__init__(tpu_spec)
+    self.spec = tpu_spec
     self.project = FLAGS.project or util.GetDefaultProject()
 
   def _Create(self):
@@ -78,13 +78,13 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
-    _, _, retcode = cmd.Issue(timeout=CLOUD_TPU_TIMEOUT)
+    _, _, retcode = cmd.Issue(timeout=TPU_TIMEOUT)
     if retcode != 0:
       logging.error('Delete GCP cloud TPU failed.')
     else:
       logging.info('Deleted GCP cloud TPU.')
 
-  def _GetCloudTpuDescription(self):
+  def _GetTpuDescription(self):
     """Gets the cloud TPU description."""
     cmd = util.GcloudCommand(self, 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
@@ -99,7 +99,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Exists(self):
     """Returns true if the cloud TPU exists."""
-    _, retcode = self._GetCloudTpuDescription()
+    _, retcode = self._GetTpuDescription()
     return retcode == 0
 
   def GetName(self):
@@ -109,13 +109,13 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 
-    All keys will be prefaced with cloud_tpu before
+    All keys will be prefaced with tpu before
     being published (done in publisher.py).
 
     Returns:
       metadata: dict of GCP cloud TPU metadata.
     """
-    metadata = super(GcpCloudTpu, self).GetResourceMetadata()
+    metadata = super(GcpTpu, self).GetResourceMetadata()
     metadata.update({
         'project': self.project,
         'cloud': self.CLOUD

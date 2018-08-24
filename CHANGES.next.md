@@ -168,6 +168,7 @@
 - Added flags `--hbase_version` and `--hbase_use_stable` to set the HBase
   version.  Also upped hadoop to version 2.8.4.
 - Updated cuDNN installation methods.
+- Added support to schedule multiple TPUs.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
