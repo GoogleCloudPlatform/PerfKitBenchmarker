@@ -81,7 +81,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
-  benchmark_spec.use_tpu = not benchmark_spec.tpus
+  benchmark_spec.use_tpu = True if benchmark_spec.tpus else False
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
