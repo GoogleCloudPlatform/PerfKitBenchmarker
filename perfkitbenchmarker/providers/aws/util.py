@@ -14,6 +14,7 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+import collections
 import json
 import re
 import string
@@ -63,6 +64,15 @@ def GetRegionFromZones(zones):
                         '%s. zones: %s' %
                         (region, current_region, ','.join(zones)))
   return region
+
+
+def GroupZonesIntoRegions(zones):
+  """Returns a map of regions to zones."""
+  regions_to_zones_map = collections.defaultdict(set)
+  for zone in zones:
+    region = GetRegionFromZone(zone)
+    regions_to_zones_map[region].add(zone)
+  return regions_to_zones_map
 
 
 def EksZonesValidator(value):

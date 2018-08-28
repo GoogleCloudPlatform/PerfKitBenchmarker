@@ -169,6 +169,7 @@
   version.  Also upped hadoop to version 2.8.4.
 - Updated cuDNN installation methods.
 - Added support to schedule multiple TPUs.
+- Added GroupZonesIntoRegions support for providers.aws.util.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
