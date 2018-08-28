@@ -51,6 +51,7 @@ import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
@@ -732,7 +733,6 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
   db = benchmark_spec.managed_relational_db
 
-  results = []
   for thread_count in FLAGS.sysbench_thread_counts:
     metadata = CreateMetadataFromFlags(db)
     metadata['sysbench_thread_count'] = thread_count
@@ -740,7 +740,7 @@ def Run(benchmark_spec):
     # information and states necessary to carry out the run.
     run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
     print run_results
-    results += run_results
+    publisher.PublishRunStageSamples(benchmark_spec, run_results)
 
   if (benchmark_spec.managed_relational_db.spec.high_availability and
       FLAGS.sysbench_pre_failover_seconds):
@@ -749,9 +749,13 @@ def Run(benchmark_spec):
     failover_results = _PerformFailoverTest(
         vm, metadata, benchmark_spec, last_client_count)
     print failover_results
-    results += failover_results
+    publisher.PublishRunStageSamples(benchmark_spec, failover_results)
 
-  return results
+  # all results have already been published
+  # database results take a long time to gather.  If later client counts
+  # or failover tests fail, still want the data from the earlier tests.
+  # so, results are published as they are found.
+  return []
 
 
 def Cleanup(benchmark_spec):
