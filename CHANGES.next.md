@@ -286,3 +286,4 @@
 - Sysbench failover tests added for GCP and AWS Aurora
 - Sysbench qps metric added
 - Fixed a bug of checking TPU exist.
+- Add GetMasterGrpcAddress method to CloudTpu.
