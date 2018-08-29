@@ -86,6 +86,11 @@ class BaseTpu(resource.BaseResource):
   def GetName(self):
     raise NotImplementedError()
 
+  @abc.abstractmethod
+  def GetMasterGrpcAddress(self):
+    """Gets the master grpc address of the TPU."""
+    raise NotImplementedError()
+
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {
