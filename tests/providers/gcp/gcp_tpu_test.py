@@ -123,5 +123,18 @@ class GcpTpuTestCase(unittest.TestCase):
       name = tpu.GetName()
       self.assertEqual(name, 'pkb-tpu-123')
 
+  def testGetMasterGrpcAddress(self):
+    with self._PatchCriticalObjects(stdout="""{
+  "networkEndpoints": [{
+    "ipAddress": "10.199.12.2",
+    "port": 8470
+  }]
+}
+    """):
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
+      ip_address = tpu.GetMasterGrpcAddress()
+      self.assertEqual(ip_address, 'grpc://10.199.12.2:8470')
+
+
 if __name__ == '__main__':
   unittest.main()

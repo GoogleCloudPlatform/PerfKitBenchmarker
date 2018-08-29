@@ -106,6 +106,15 @@ class GcpTpu(cloud_tpu.BaseTpu):
     """Gets the name of the cloud TPU."""
     return self.spec.tpu_name
 
+  def GetMasterGrpcAddress(self):
+    """Gets the grpc address of the 0th NetworkEndpoint."""
+    master_network_endpoint = self._GetTpuDescription()[0]['networkEndpoints'][
+        0]
+
+    return 'grpc://{ip_address}:{port}'.format(
+        ip_address=master_network_endpoint['ipAddress'],
+        port=master_network_endpoint['port'])
+
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 

@@ -43,6 +43,9 @@ class FakeTpu(cloud_tpu.BaseTpu):
   def GetName(self):
     pass
 
+  def GetMasterGrpcAddress(self):
+    pass
+
 
 class TpuSpecTestCase(unittest.TestCase):
 
