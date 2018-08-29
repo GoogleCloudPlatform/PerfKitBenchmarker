@@ -170,6 +170,7 @@
 - Updated cuDNN installation methods.
 - Added support to schedule multiple TPUs.
 - Added GroupZonesIntoRegions support for providers.aws.util.
+- Added function to get the number of TPU cores.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

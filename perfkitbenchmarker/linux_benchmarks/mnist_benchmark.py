@@ -57,9 +57,6 @@ flags.DEFINE_integer('mnist_train_steps', 2000,
                      'Total number of training steps')
 flags.DEFINE_integer('tpu_iterations', 500,
                      'Number of iterations per TPU training loop.')
-flags.DEFINE_integer('tpu_num_shards', 8, 'Number of TPU cores. For a single '
-                     'TPU device, this is 8 because each TPU has 4 chips each '
-                     'with 2 cores.')
 
 
 def GetConfig(user_config):
@@ -85,16 +82,22 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
+  benchmark_spec.num_shards_train = ''
+  benchmark_spec.num_shards_eval = ''
   if benchmark_spec.use_tpu:
     tpu_groups = benchmark_spec.tpu_groups
     if 'train' in tpu_groups:
-      benchmark_spec.tpu_train = tpu_groups['train'].GetName()
+      tpu_train = tpu_groups['train']
+      benchmark_spec.tpu_train = tpu_train.GetName()
+      benchmark_spec.num_shards_train = tpu_train.GetNumShards()
     if 'eval' in tpu_groups:
-      benchmark_spec.tpu_eval = tpu_groups['eval'].GetName()
+      tpu_eval = tpu_groups['eval']
+      benchmark_spec.tpu_eval = tpu_eval.GetName()
+      benchmark_spec.num_shards_eval = tpu_eval.GetNumShards()
   benchmark_spec.tpu = benchmark_spec.tpu_train
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
-  benchmark_spec.num_shards = FLAGS.tpu_num_shards
+  benchmark_spec.num_shards = FLAGS.num_shards_train
 
 
 def Prepare(benchmark_spec):
