@@ -24,6 +24,9 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
+flags.DEFINE_integer('tpu_cores_per_donut', 8,
+                     'The number of cores per TPU donut. This is 8 because each'
+                     ' TPU has 4 chips each with 2 cores.')
 FLAGS = flags.FLAGS
 TPU_TIMEOUT = 1200
 
@@ -114,6 +117,11 @@ class GcpTpu(cloud_tpu.BaseTpu):
     return 'grpc://{ip_address}:{port}'.format(
         ip_address=master_network_endpoint['ipAddress'],
         port=master_network_endpoint['port'])
+
+  def GetNumShards(self):
+    """Gets the number of TPU shards."""
+    num_tpus = len(self._GetTpuDescription()[0]['networkEndpoints'])
+    return num_tpus * FLAGS.tpu_cores_per_donut
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.

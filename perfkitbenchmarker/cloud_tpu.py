@@ -91,6 +91,11 @@ class BaseTpu(resource.BaseResource):
     """Gets the master grpc address of the TPU."""
     raise NotImplementedError()
 
+  @abc.abstractmethod
+  def GetNumShards(self):
+    """Gets the number of TPU shards."""
+    raise NotImplementedError()
+
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {

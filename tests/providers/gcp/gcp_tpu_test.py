@@ -50,7 +50,7 @@ class GcpTpuTestCase(unittest.TestCase):
     return tpu_class
 
   def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None}
+    flag_values = {'run_uri': '123', 'project': None, 'tpu_cores_per_donut': 8}
 
     p = mock.patch(gcp_tpu.__name__ + '.FLAGS')
     flags_mock = p.start()
@@ -122,6 +122,13 @@ class GcpTpuTestCase(unittest.TestCase):
       tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
       name = tpu.GetName()
       self.assertEqual(name, 'pkb-tpu-123')
+
+  def testGetNumShards(self):
+    with self._PatchCriticalObjects(stdout='{"networkEndpoints": [{"ipAddress":'
+                                    ' "10.199.12.2", "port": 8470}]}'):
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
+      num_shards = tpu.GetNumShards()
+      self.assertEqual(num_shards, 8)
 
   def testGetMasterGrpcAddress(self):
     with self._PatchCriticalObjects(stdout="""{

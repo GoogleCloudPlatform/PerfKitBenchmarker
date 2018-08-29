@@ -46,6 +46,9 @@ class FakeTpu(cloud_tpu.BaseTpu):
   def GetMasterGrpcAddress(self):
     pass
 
+  def GetNumShards(self):
+    pass
+
 
 class TpuSpecTestCase(unittest.TestCase):
 
