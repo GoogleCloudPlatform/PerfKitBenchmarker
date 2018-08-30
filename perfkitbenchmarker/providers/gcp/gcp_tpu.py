@@ -24,9 +24,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
-flags.DEFINE_integer('tpu_cores_per_donut', 8,
-                     'The number of cores per TPU donut. This is 8 because each'
-                     ' TPU has 4 chips each with 2 cores.')
 FLAGS = flags.FLAGS
 TPU_TIMEOUT = 1200
 

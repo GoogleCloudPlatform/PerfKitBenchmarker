@@ -288,3 +288,4 @@
 - Sysbench qps metric added
 - Fixed a bug of checking TPU exist.
 - Add GetMasterGrpcAddress method to CloudTpu.
+- Fix a bug of getting the number of TPU cores.
