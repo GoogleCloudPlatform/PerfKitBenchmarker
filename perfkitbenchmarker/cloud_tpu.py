@@ -41,6 +41,9 @@ flags.DEFINE_string('tpu_name', None,
                     'The name of the TPU to create.')
 flags.DEFINE_boolean('tpu_preemptible', False,
                      'Use preemptible TPU or not.')
+flags.DEFINE_integer('tpu_cores_per_donut', 8,
+                     'The number of cores per TPU donut. This is 8 because each'
+                     ' TPU has 4 chips each with 2 cores.')
 
 FLAGS = flags.FLAGS
 
