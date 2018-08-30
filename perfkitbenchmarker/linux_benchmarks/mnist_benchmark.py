@@ -82,8 +82,8 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
-  benchmark_spec.num_shards_train = ''
-  benchmark_spec.num_shards_eval = ''
+  benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
+  benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
   if benchmark_spec.use_tpu:
     tpu_groups = benchmark_spec.tpu_groups
     if 'train' in tpu_groups:
@@ -97,7 +97,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.tpu = benchmark_spec.tpu_train
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
-  benchmark_spec.num_shards = FLAGS.num_shards_train
+  benchmark_spec.num_shards = benchmark_spec.num_shards_train
 
 
 def Prepare(benchmark_spec):
