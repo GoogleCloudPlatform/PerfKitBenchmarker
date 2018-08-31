@@ -78,6 +78,7 @@ LLVM_TAR_URL = 'http://releases.llvm.org/3.9.0/{0}'.format(LLVM_TAR)
 OPENMP_TAR = 'libomp_20160808_oss.tgz'
 OPENMP_TAR_URL = 'https://www.openmprtl.org/sites/default/files/{0}'.format(
     OPENMP_TAR)
+KB_TO_GB_MULTIPLIER = 1000000
 
 LOG_FILENAME = {
     'fprate': 'CPU2017.001.fprate.refrate.txt',
@@ -105,6 +106,30 @@ def CheckPrerequisites(benchmark_config):
         'Feedback Directed Optimization is not allowed with base report.')
 
 
+def CheckVmPrerequisites(vm):
+  """Checks the system memory on this vm.
+
+  Rate runs require 2 GB minimum system memory.
+  Speed runs require 16 GB minimum system memory.
+
+  Args:
+    vm: virtual machine to run spec on.
+  Raises:
+    errors.Config.InvalidValue: On insufficient vm memory.
+  """
+  available_memory = vm.total_free_memory_kb
+  if 'intspeed' in FLAGS.spec17_subset or 'fpspeed' in FLAGS.spec17_subset:
+    if available_memory < 16 * KB_TO_GB_MULTIPLIER:
+      raise errors.Config.InvalidValue(
+          'Available memory of %s GB is insufficient for spec17 speed runs.'
+          % (available_memory / KB_TO_GB_MULTIPLIER))
+  if 'intrate' in FLAGS.spec17_subset or 'fprate' in FLAGS.spec17_subset:
+    if available_memory < 2 * KB_TO_GB_MULTIPLIER:
+      raise errors.Config.InvalidValue(
+          'Available memory of %s GB is insufficient for spec17 rate runs.'
+          % (available_memory / KB_TO_GB_MULTIPLIER))
+
+
 def Prepare(benchmark_spec):
   """Installs SPEC CPU2017 on the target vm.
 
@@ -113,6 +138,7 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
+  CheckVmPrerequisites(vm)
   install_config = speccpu.SpecInstallConfigurations()
   install_config.benchmark_name = BENCHMARK_NAME
   install_config.base_spec_dir = _SPECCPU2017_DIR
@@ -153,8 +179,13 @@ def Run(benchmark_spec):
 
   lscpu = vm.CheckLsCpu()
   version_specific_parameters = []
+  # rate runs require 2 GB minimum system main memory per copy,
+  # not including os overhead
+  # Refer to: https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
+  copies = min(lscpu.cores_per_socket * lscpu.socket_count,
+               vm.total_free_memory_kb / (2 * KB_TO_GB_MULTIPLIER))
   version_specific_parameters.append(' --copies=%s ' % (
-      FLAGS.spec17_copies or lscpu.cores_per_socket * lscpu.socket_count))
+      FLAGS.spec17_copies or copies))
   version_specific_parameters.append(' --threads=%s ' %
                                      (FLAGS.spec17_threads or vm.num_cpus))
   if FLAGS.spec17_fdo:
