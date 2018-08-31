@@ -171,6 +171,7 @@
 - Added support to schedule multiple TPUs.
 - Added GroupZonesIntoRegions support for providers.aws.util.
 - Added function to get the number of TPU cores.
+- Update spec17 copies per run to respect system available memory.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
