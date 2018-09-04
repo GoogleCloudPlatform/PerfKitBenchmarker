@@ -294,7 +294,9 @@ def Run(benchmark_spec):
       '--num_cores={num_cores} '
       '--data_format={data_format} '
       '--precision={precision} '
-      '--skip_host_call={skip_host_call}'.format(
+      '--skip_host_call={skip_host_call} '
+      '--num_train_images={num_train_images} '
+      '--num_eval_images={num_eval_images}'.format(
           script=resnet_benchmark_script,
           use_tpu=benchmark_spec.use_tpu,
           tpu=benchmark_spec.tpu,
@@ -309,7 +311,9 @@ def Run(benchmark_spec):
           num_cores=benchmark_spec.num_shards,
           data_format=benchmark_spec.data_format,
           precision=benchmark_spec.precision,
-          skip_host_call=benchmark_spec.skip_host_call
+          skip_host_call=benchmark_spec.skip_host_call,
+          num_train_images=benchmark_spec.num_train_images,
+          num_eval_images=benchmark_spec.num_eval_images
       ))
   if FLAGS.tf_device == 'gpu':
     resnet_benchmark_cmd = '{env} {cmd}'.format(
