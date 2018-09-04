@@ -52,8 +52,8 @@ inception3:
 """
 
 flags.DEFINE_float('inception3_learning_rate', 0.165, 'Learning rate.')
-flags.DEFINE_integer('inception3_train_steps', 250000,
-                     'Number of steps use for training.')
+flags.DEFINE_integer('inception3_train_epochs', 200,
+                     'Number of epochs use for training.', lower_bound=1)
 flags.DEFINE_enum('inception3_use_data', 'real', ['real', 'fake'],
                   'Whether to use real or fake data. If real, the data is '
                   'downloaded from imagenet_data_dir. Otherwise, synthetic '
@@ -61,8 +61,8 @@ flags.DEFINE_enum('inception3_use_data', 'real', ['real', 'fake'],
 flags.DEFINE_enum('inception3_mode', 'train',
                   ['train', 'eval', 'train_and_eval'],
                   'Mode to run: train, eval, train_and_eval')
-flags.DEFINE_integer('inception3_train_steps_per_eval', 2000,
-                     'Number of training steps to run between evaluations.')
+flags.DEFINE_integer('inception3_train_epochs_per_eval', 2,
+                     'Number of training epochs to run between evaluations.')
 flags.DEFINE_integer('inception3_save_checkpoints_secs', 0, 'Interval (in '
                      'seconds) at which the model data should be checkpointed. '
                      'Set to 0 to disable.')
@@ -91,15 +91,24 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.learning_rate = FLAGS.inception3_learning_rate
-  benchmark_spec.train_steps = FLAGS.inception3_train_steps
   benchmark_spec.use_data = FLAGS.inception3_use_data
   benchmark_spec.mode = FLAGS.inception3_mode
-  benchmark_spec.train_steps_per_eval = FLAGS.inception3_train_steps_per_eval
   benchmark_spec.save_checkpoints_secs = FLAGS.inception3_save_checkpoints_secs
   benchmark_spec.train_batch_size = FLAGS.inception3_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.inception3_eval_batch_size
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
   benchmark_spec.data_dir = FLAGS.imagenet_data_dir
+  benchmark_spec.num_train_images = FLAGS.imagenet_num_train_images
+  benchmark_spec.num_eval_images = FLAGS.imagenet_num_eval_images
+  benchmark_spec.num_examples_per_epoch = (
+      float(benchmark_spec.num_train_images) / benchmark_spec.train_batch_size)
+  benchmark_spec.train_epochs = FLAGS.inception3_train_epochs
+  benchmark_spec.train_steps = int(
+      benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
+  benchmark_spec.train_epochs_per_eval = FLAGS.inception3_train_epochs_per_eval
+  benchmark_spec.train_steps_per_eval = int(
+      benchmark_spec.train_epochs_per_eval *
+      benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -137,7 +146,12 @@ def _CreateMetadataDict(benchmark_spec):
       'train_batch_size': benchmark_spec.train_batch_size,
       'eval_batch_size': benchmark_spec.eval_batch_size,
       'commit': benchmark_spec.commit,
-      'num_shards': benchmark_spec.num_shards
+      'num_shards': benchmark_spec.num_shards,
+      'num_train_images': benchmark_spec.num_train_images,
+      'num_eval_images': benchmark_spec.num_eval_images,
+      'train_epochs': benchmark_spec.train_epochs,
+      'train_epochs_per_eval': benchmark_spec.train_epochs_per_eval,
+      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch
   }
   return metadata
 
