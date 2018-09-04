@@ -292,3 +292,4 @@
 - Fixed a bug of checking TPU exist.
 - Add GetMasterGrpcAddress method to CloudTpu.
 - Fix a bug of getting the number of TPU cores.
+- Set number of images in ResNet benchmark command so it can support other datasets.
