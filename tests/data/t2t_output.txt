@@ -1,0 +1,13 @@
+INFO:tensorflow:Dequeue next (100) batch(es) of data from outfeed.
+INFO:tensorflow:Saving checkpoints for 1000 into gs://22a2f76c/model.ckpt.
+INFO:tensorflow:loss = 4.5408816, step = 1000 (53.828 sec)
+INFO:tensorflow:global_step/sec: 1.85777
+INFO:tensorflow:examples/sec: 118.897
+INFO:tensorflow:Enqueue next (100) batch(es) of data to infeed.
+INFO:tensorflow:Dequeue next (100) batch(es) of data from outfeed.
+INFO:tensorflow:loss = 3.7884176, step = 1100 (19.724 sec)
+INFO:tensorflow:global_step/sec: 5.06989
+INFO:tensorflow:examples/sec: 324.473
+INFO:tensorflow:Saving dict for global step 1000: global_step = 1000, loss = 3.9047337, metrics-translate_ende_wmt32k_packed/accuracy = 0.32064167, metrics-translate_ende_wmt32k_packed/accuracy_per_sequence = 0.0, metrics-translate_ende_wmt32k_packed/accuracy_top5 = 0.5096436, metrics-translate_ende_wmt32k_packed/neg_log_perplexity = -4.501835
+INFO:tensorflow:Saving dict for global step 1200: global_step = 1200, loss = 3.7047337, metrics-translate_ende_wmt32k_packed/accuracy = 0.33064167, metrics-translate_ende_wmt32k_packed/accuracy_per_sequence = 0.0, metrics-translate_ende_wmt32k_packed/accuracy_top5 = 0.5596436, metrics-translate_ende_wmt32k_packed/neg_log_perplexity = -4.101835
+

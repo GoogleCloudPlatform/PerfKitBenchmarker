@@ -29,6 +29,10 @@ flags.DEFINE_string('tf_cpu_pip_package',
 flags.DEFINE_string('tf_gpu_pip_package', 'tensorflow-gpu==1.7',
                     'TensorFlow GPU pip package to install. By default, PKB '
                     'will install tensorflow-gpu==1.7 when using GPUs.')
+flags.DEFINE_string(
+    't2t_pip_package', 'tensor2tensor==1.7',
+    'Tensor2Tensor pip package to install. By default, PKB '
+    'will install tensor2tensor==1.7 .')
 flags.DEFINE_string('tf_benchmarks_commit_hash',
                     'bab8a61aaca3d2b94072ae2b87f0aafe1797b165',
                     'git commit hash of desired tensorflow benchmark commit.')
@@ -89,6 +93,8 @@ def Install(vm):
   vm.RemoteCommand('sudo pip install --upgrade absl-py')
   vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
                    should_log=True)
+  vm.RemoteCommand(
+      'sudo pip install --upgrade %s' % FLAGS.t2t_pip_package, should_log=True)
   vm.InstallPackages('git')
   vm.RemoteCommand(
       'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
