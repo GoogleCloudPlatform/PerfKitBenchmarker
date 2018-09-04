@@ -18,14 +18,11 @@ https://github.com/tensorflow/tensor2tensor
 This benchmark can run any tensor2tensor model, including ones that target TPU's
 """
 
-import datetime
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
-from perfkitbenchmarker.linux_packages import cloud_tpu_models
-from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
 
@@ -119,7 +116,15 @@ def _CreateMetadataDict(benchmark_spec):
 
 
 def _MakeSamplesFromOutput(metadata, output):
+  """Create a sample continaing the measured tensor2tensor throughput.
 
+  Args:
+    metadata: dict contains all the metadata that reports.
+    output: tensor2tensor output
+
+  Returns:
+    a Sample containing the tensor2tensor throughput
+  """
   samples = []
 
   samples.extend(
@@ -136,8 +141,9 @@ def _MakeSamplesFromOutput(metadata, output):
              r'.*accuracy_per_sequence = (\d+\.\d+), '
              r'.*accuracy_top5 = (\d+\.\d+), '
              r'.*neg_log_perplexity = (-?\d+\.\d+)')
-  for step, loss, accuracy, accuracy_per_sequence, accuracy_top5, neg_log_perplexity in (
-      regex_util.ExtractAllMatches(pattern, output)):
+  for (step, loss, accuracy, accuracy_per_sequence, accuracy_top5,
+       neg_log_perplexity) in (
+           regex_util.ExtractAllMatches(pattern, output)):
     metadata_copy = metadata.copy()
     metadata_copy['step'] = int(step)
     samples.append(sample.Sample('Eval Loss', float(loss), '', metadata_copy))

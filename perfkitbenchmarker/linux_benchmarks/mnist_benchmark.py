@@ -56,10 +56,21 @@ flags.DEFINE_string('imagenet_data_dir',
 flags.DEFINE_string(
     't2t_data_dir', None,
     'Directory where the input data is stored for tensor2tensor')
-flags.DEFINE_integer('mnist_train_steps', 2000,
-                     'Total number of training steps')
+flags.DEFINE_integer('imagenet_num_train_images', 1281167,
+                     'Size of ImageNet training data set.')
+flags.DEFINE_integer('imagenet_num_eval_images', 50000,
+                     'Size of ImageNet validation data set.')
+flags.DEFINE_integer('mnist_num_train_images', 55000,
+                     'Size of MNIST training data set.')
+flags.DEFINE_integer('mnist_num_eval_images', 5000,
+                     'Size of MNIST validation data set.')
+flags.DEFINE_integer('mnist_train_epochs', 37,
+                     'Total number of training echos', lower_bound=1)
 flags.DEFINE_integer('tpu_iterations', 500,
                      'Number of iterations per TPU training loop.')
+flags.DEFINE_integer('mnist_batch_size', 1024,
+                     'Mini-batch size for the training. Note that this '
+                     'is the global batch size and not the per-shard batch.')
 
 
 def GetConfig(user_config):
@@ -82,7 +93,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
   benchmark_spec.use_tpu = True if benchmark_spec.tpus else False
-  benchmark_spec.train_steps = FLAGS.mnist_train_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
   benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
@@ -101,6 +111,14 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
   benchmark_spec.num_shards = benchmark_spec.num_shards_train
+  benchmark_spec.batch_size = FLAGS.mnist_batch_size
+  benchmark_spec.num_train_images = FLAGS.mnist_num_train_images
+  benchmark_spec.num_eval_images = FLAGS.mnist_num_eval_images
+  benchmark_spec.num_examples_per_epoch = (
+      float(benchmark_spec.num_train_images) / benchmark_spec.batch_size)
+  benchmark_spec.train_epochs = FLAGS.mnist_train_epochs
+  benchmark_spec.train_steps = int(
+      benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -170,7 +188,11 @@ def _CreateMetadataDict(benchmark_spec):
       'tpu_eval': benchmark_spec.tpu_eval,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
-      'num_shards': benchmark_spec.num_shards
+      'num_shards': benchmark_spec.num_shards,
+      'num_train_images': benchmark_spec.num_train_images,
+      'num_eval_images': benchmark_spec.num_eval_images,
+      'train_epochs': benchmark_spec.train_epochs,
+      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch
   }
 
 

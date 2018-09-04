@@ -61,11 +61,8 @@ flags.DEFINE_enum('resnet_depth', '50', ['18', '34', '50', '101', '152', '200'],
 flags.DEFINE_enum('resnet_mode', 'train_and_eval',
                   ['train', 'eval', 'train_and_eval'],
                   'Mode to run: train, eval, train_and_eval')
-flags.DEFINE_integer('resnet_train_steps', 112603,
-                     'The Number of steps to use for training. Default is '
-                     '112603 steps which is approximately 90 epochs at batch '
-                     'size 1024. This flag should be adjusted according to the '
-                     '--resnet_train_batch_size flag.')
+flags.DEFINE_integer('resnet_train_epochs', 90,
+                     'The Number of epochs to use for training.', lower_bound=1)
 flags.DEFINE_integer('resnet_train_batch_size', 1024,
                      'Global (not per-shard) batch size for training')
 flags.DEFINE_integer('resnet_eval_batch_size', 1024,
@@ -106,7 +103,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   benchmark_spec.depth = FLAGS.resnet_depth
   benchmark_spec.mode = FLAGS.resnet_mode
-  benchmark_spec.train_steps = FLAGS.resnet_train_steps
   benchmark_spec.train_batch_size = FLAGS.resnet_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.resnet_eval_batch_size
   benchmark_spec.data_format = FLAGS.resnet_data_format
@@ -114,6 +110,13 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
   benchmark_spec.skip_host_call = FLAGS.resnet_skip_host_call
   benchmark_spec.data_dir = FLAGS.imagenet_data_dir
+  benchmark_spec.num_train_images = FLAGS.imagenet_num_train_images
+  benchmark_spec.num_eval_images = FLAGS.imagenet_num_eval_images
+  benchmark_spec.num_examples_per_epoch = (
+      float(benchmark_spec.num_train_images) / benchmark_spec.train_batch_size)
+  benchmark_spec.train_epochs = FLAGS.resnet_train_epochs
+  benchmark_spec.train_steps = int(
+      benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -151,7 +154,11 @@ def _CreateMetadataDict(benchmark_spec):
       'data_format': benchmark_spec.data_format,
       'precision': benchmark_spec.precision,
       'commit': benchmark_spec.commit,
-      'skip_host_call': benchmark_spec.skip_host_call
+      'skip_host_call': benchmark_spec.skip_host_call,
+      'num_train_images': benchmark_spec.num_train_images,
+      'num_eval_images': benchmark_spec.num_eval_images,
+      'train_epochs': benchmark_spec.train_epochs,
+      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch
   }
   return metadata
 
@@ -197,6 +204,7 @@ def _MakeSamplesFromOutput(metadata, output):
   time_pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*'
   start_time = _ParseDateTime(regex_util.ExtractAllMatches(
       time_pattern, output)[0])
+  num_examples_per_epoch = metadata['num_examples_per_epoch']
   if FLAGS.resnet_mode in ('train', 'train_and_eval'):
     # If statement training true, it will parse examples_per_second,
     # global_steps_per_second, loss
@@ -208,7 +216,9 @@ def _MakeSamplesFromOutput(metadata, output):
       metadata_copy = metadata.copy()
       metadata_copy['duration'] = (
           _ParseDateTime(wall_time) - start_time).seconds
-      metadata_copy['step'] = int(step)
+      step = int(step)
+      metadata_copy['step'] = step
+      metadata_copy['epoch'] = step / num_examples_per_epoch
       samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
       if global_step:
         samples.append(sample.Sample(
@@ -231,7 +241,9 @@ def _MakeSamplesFromOutput(metadata, output):
       metadata_copy = metadata.copy()
       metadata_copy['duration'] = (
           _ParseDateTime(wall_time) - start_time).seconds
-      metadata_copy['step'] = int(step)
+      step = int(step)
+      metadata_copy['step'] = step
+      metadata_copy['epoch'] = step / num_examples_per_epoch
       samples.append(
           sample.Sample('Eval Loss', float(loss), '', metadata_copy))
       # In the case of top-1 score, the trained model checks if the top class (

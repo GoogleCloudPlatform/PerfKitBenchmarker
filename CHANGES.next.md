@@ -173,6 +173,7 @@
 - Added function to get the number of TPU cores.
 - Update spec17 copies per run to respect system available memory.
 - Add tensor2tensor benchmark.
+- Change train_steps to train_epochs in TPU test.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
