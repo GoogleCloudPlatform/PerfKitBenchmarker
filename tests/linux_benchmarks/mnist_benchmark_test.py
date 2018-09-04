@@ -37,8 +37,8 @@ class MnistBenchmarkTestCase(unittest.TestCase,
     with mock.patch('time.time') as foo:
       regex = r'global_step/sec: (\S+)'
       foo.return_value = 0
-      samples = mnist_benchmark._ExtractThroughput(regex, self.contents,
-                                                   self.metadata, metric, unit)
+      samples = mnist_benchmark.ExtractThroughput(regex, self.contents,
+                                                  self.metadata, metric, unit)
       golden = [sample.Sample(metric, 74.8278, unit, {'index': 0}),
                 sample.Sample(metric, 28.9749, unit, {'index': 1}),
                 sample.Sample(metric, 20.8336, unit, {'index': 2}),

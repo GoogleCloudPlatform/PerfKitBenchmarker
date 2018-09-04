@@ -53,6 +53,9 @@ flags.DEFINE_string('mnist_data_dir', None, 'mnist train file for tensorflow')
 flags.DEFINE_string('imagenet_data_dir',
                     'gs://cloud-tpu-test-datasets/fake_imagenet',
                     'Directory where the input data is stored')
+flags.DEFINE_string(
+    't2t_data_dir', None,
+    'Directory where the input data is stored for tensor2tensor')
 flags.DEFINE_integer('mnist_train_steps', 2000,
                      'Total number of training steps')
 flags.DEFINE_integer('tpu_iterations', 500,
@@ -132,7 +135,7 @@ def Prepare(benchmark_spec):
   else:
     benchmark_spec.model_dir = '/tmp'
 
-  if FLAGS.imagenet_data_dir and FLAGS.cloud != 'GCP':
+  if (FLAGS.imagenet_data_dir or FLAGS.t2t_data_dir) and FLAGS.cloud != 'GCP':
     vm.Install('google_cloud_sdk')
     vm.RemoteCommand('echo "export {}" >> ~/.bashrc'.format(GCP_ENV),
                      login_shell=True)
@@ -171,7 +174,7 @@ def _CreateMetadataDict(benchmark_spec):
   }
 
 
-def _ExtractThroughput(regex, output, metadata, metric, unit):
+def ExtractThroughput(regex, output, metadata, metric, unit):
   """Extract throughput from MNIST output.
 
   Args:
@@ -204,11 +207,12 @@ def MakeSamplesFromOutput(metadata, output):
   Returns:
     a Sample containing the MNIST throughput
   """
-  samples = _ExtractThroughput(r'global_step/sec: (\S+)', output, metadata,
-                               'Global Steps Per Second', 'global_steps/sec')
+  samples = ExtractThroughput(r'global_step/sec: (\S+)', output, metadata,
+                              'Global Steps Per Second', 'global_steps/sec')
   if metadata['use_tpu']:
-    samples.extend(_ExtractThroughput(r'examples/sec: (\S+)', output, metadata,
-                                      'Examples Per Second', 'examples/sec'))
+    samples.extend(
+        ExtractThroughput(r'examples/sec: (\S+)', output, metadata,
+                          'Examples Per Second', 'examples/sec'))
   return samples
 
 
