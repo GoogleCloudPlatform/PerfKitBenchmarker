@@ -69,6 +69,8 @@ flags.DEFINE_integer('sysbench_tables', 4,
                      'The number of tables used in sysbench oltp.lua tests')
 flags.DEFINE_integer('sysbench_table_size', 100000,
                      'The number of rows of each table used in the oltp tests')
+flags.DEFINE_integer('sysbench_scale', 100,
+                     'Scale parameter as used by TPCC benchmark.')
 flags.DEFINE_integer('sysbench_warmup_seconds', 10,
                      'The duration of the warmup run in which results are '
                      'discarded, in seconds.')
@@ -98,6 +100,19 @@ flags.DEFINE_integer('sysbench_post_failover_seconds', 0,
                      'amount of time after failover is complete.  Useful '
                      'for detecting if there are any differences in TPS because'
                      'of failover.')
+
+BENCHMARK_DATA = {
+    'sysbench-tpcc.tar.gz': '23a6cd5d3efeff66b346ba7fe416aa39',
+}
+
+_MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
+    'tpcc': set(
+        'scale'
+    ),
+    'oltp_read_write': set(
+        'table_size'
+    )
+}
 
 
 BENCHMARK_NAME = 'sysbench'
@@ -244,7 +259,10 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
   run_cmd_tokens = ['sysbench',
                     FLAGS.sysbench_testname,
                     '--tables=%d' % FLAGS.sysbench_tables,
-                    '--table_size=%d' % FLAGS.sysbench_table_size,
+                    ('--table_size=%d' % FLAGS.sysbench_table_size
+                     if _IsValidFlag('table_size') else ''),
+                    ('--scale=%d' % FLAGS.sysbench_scale
+                     if _IsValidFlag('scale') else ''),
                     '--db-ps-mode=%s' % DISABLE,
                     '--rand-type=%s' % UNIFORM,
                     '--threads=%d' % sysbench_thread_count,
@@ -607,6 +625,9 @@ def _PrepareSysbench(vm, benchmark_spec):
   Returns:
     results: A list of results of the data loading step.
   """
+
+  _InstallLuaScriptsIfNecessary(vm)
+
   results = []
 
   db = benchmark_spec.managed_relational_db
@@ -639,7 +660,10 @@ def _PrepareSysbench(vm, benchmark_spec):
   data_load_cmd_tokens = ['sysbench',
                           FLAGS.sysbench_testname,
                           '--tables=%d' % FLAGS.sysbench_tables,
-                          '--table-size=%d' % FLAGS.sysbench_table_size,
+                          ('--table_size=%d' % FLAGS.sysbench_table_size
+                           if _IsValidFlag('table_size') else ''),
+                          ('--scale=%d' % FLAGS.sysbench_scale
+                           if _IsValidFlag('scale') else ''),
                           '--threads=%d' % num_threads,
                           '--db-driver=mysql',
                           db.MakeSysbenchConnectionString(),
@@ -667,12 +691,25 @@ def _PrepareSysbench(vm, benchmark_spec):
   return results
 
 
+def _InstallLuaScriptsIfNecessary(vm):
+  if FLAGS.sysbench_testname == 'tpcc':
+    vm.InstallPreprovisionedBenchmarkData(
+        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
+    vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
+
+
+def _IsValidFlag(flag):
+  return (flag in
+          _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname])
+
+
 def CreateMetadataFromFlags(db):
   """Create meta data with all flags for sysbench."""
   metadata = {
       'sysbench_testname': FLAGS.sysbench_testname,
       'sysbench_tables': FLAGS.sysbench_tables,
       'sysbench_table_size': FLAGS.sysbench_table_size,
+      'sysbench_scale': FLAGS.sysbench_scale,
       'sysbench_warmup_seconds': FLAGS.sysbench_warmup_seconds,
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
