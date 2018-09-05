@@ -169,7 +169,7 @@ class ResNetBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
                {'num_examples_per_epoch': 1251.1, 'epoch': 1.5985932379506036,
                 'step': 2000, 'duration': 920}),
         Sample('Top 5 Accuracy', 2.1947023, '%',
-               {'num_examples_per_epoch': 1251.1, 'epoch': 1.5985932379506036, 
+               {'num_examples_per_epoch': 1251.1, 'epoch': 1.5985932379506036,
                 'step': 2000, 'duration': 920}),
         Sample('Elapsed Seconds', 920, 'seconds',
                {'num_examples_per_epoch': 1251.1})
