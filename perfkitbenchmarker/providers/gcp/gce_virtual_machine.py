@@ -590,8 +590,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
                              self.name)
-    cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
-                                     for key, value in kwargs.iteritems())
+    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    if kwargs:
+      cmd.flags['metadata'] = '{metadata},{kwargs}'.format(
+          metadata=cmd.flags['metadata'],
+          kwargs=util.FormatTags(kwargs))
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
