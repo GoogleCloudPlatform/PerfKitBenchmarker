@@ -1,5 +1,7 @@
 PKB VPN Benchmark Usage
 ==================
+[![asciicast](https://asciinema.org/a/bqCl319BJoLcLd4Co4FKVPVEV.png)](https://asciinema.org/a/bqCl319BJoLcLd4Co4FKVPVEV)
+==================
 ## Basic Usage
 `./pkb.py --project=<project> --benchmarks=iperf_vpn --machine_type=f1-micro --benchmark_config_file=iperf_vpn.yaml`
 
