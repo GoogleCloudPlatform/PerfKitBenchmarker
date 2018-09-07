@@ -36,6 +36,15 @@ def GetDefaultProject():
   return result['core']['project']
 
 
+@functools32.lru_cache()
+def GetDefaultUser():
+  """Get the default project."""
+  cmd = [FLAGS.gcloud_path, 'config', 'list', '--format=json']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  result = json.loads(stdout)
+  return result['core']['account']
+
+
 def GetRegionFromZone(zone):
   return zone[:-2]
 
