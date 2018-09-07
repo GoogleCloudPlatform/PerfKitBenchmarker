@@ -47,6 +47,9 @@ def patch_critical_objects(stdout='', stderr='', return_code=0,
     stack.enter_context(
         mock.patch(
             util.__name__ + '.GetDefaultProject', return_value='fakeproject'))
+    stack.enter_context(
+        mock.patch(
+            util.__name__ + '.GetDefaultUser', return_value='fakeuser'))
 
     retval = (stdout, stderr, return_code)
     issue_command = stack.enter_context(
