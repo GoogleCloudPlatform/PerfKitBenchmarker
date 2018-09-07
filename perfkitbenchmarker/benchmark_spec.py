@@ -119,7 +119,7 @@ class BenchmarkSpec(object):
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
     self.vm_groups = {}
-    self.container_specs = benchmark_config.container_specs
+    self.container_specs = benchmark_config.container_specs or {}
     self.container_registry = None
     self.deleted = False
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
@@ -437,7 +437,6 @@ class BenchmarkSpec(object):
     # first when sorted.
     networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
     vm_util.RunThreaded(lambda net: net.Create(), networks)
-
     if self.container_registry:
       self.container_registry.Create()
       for container_spec in self.container_specs.itervalues():
