@@ -81,10 +81,10 @@ class GkeCluster(container_service.KubernetesCluster):
 
   CLOUD = providers.GCP
 
-  @staticmethod
-  def _GetRequiredGkeEnv():
+  def _GetRequiredGkeEnv(self):
     env = os.environ.copy()
-    env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
+    if self.use_application_default_credentials:
+      env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
     return env
 
   def __init__(self, spec):
@@ -94,6 +94,7 @@ class GkeCluster(container_service.KubernetesCluster):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.cluster_version = (FLAGS.container_cluster_version or
                             DEFAULT_CONTAINER_VERSION)
+    self.use_application_default_credentials = True
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -122,7 +123,12 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--no-enable-autorepair')
       cmd.args.append('--no-enable-autoupgrade')
 
-    cmd.flags['scopes'] = 'cloud-platform'
+    user = util.GetDefaultUser()
+    if 'gserviceaccount.com' in user:
+      cmd.flags['service-account'] = user
+      self.use_application_default_credentials = False
+    else:
+      cmd.flags['scopes'] = 'cloud-platform'
 
     if self.gpu_count:
       cmd.flags['accelerator'] = (gce_virtual_machine.
