@@ -150,8 +150,27 @@ flags.DEFINE_string('image', None, 'Default image that will be '
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to %d '
                     'characters in length.' % MAX_RUN_URI_LENGTH)
-flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
-                    'Used to tag created resources and performance records.')
+
+
+def GetCurrentUser():
+  """Get the current user name.
+
+  On some systems the current user information may be unavailable. In these
+  cases we just need a string to tag the created resources with. It should
+  not be a fatal error.
+
+  Returns:
+    User name OR default string if user name not available.
+  """
+  try:
+    return getpass.getuser()
+  except KeyError:
+    return 'user_unknown'
+
+
+flags.DEFINE_string(
+    'owner', GetCurrentUser(), 'Owner name. '
+    'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
     log_util.LOG_LEVELS.keys(),
