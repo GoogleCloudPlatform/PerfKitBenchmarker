@@ -356,6 +356,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if engine == managed_relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
+      elif version == '5.6':
+        return 'MYSQL_5_6'
     elif engine == managed_relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION

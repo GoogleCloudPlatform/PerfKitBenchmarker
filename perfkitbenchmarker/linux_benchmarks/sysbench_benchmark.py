@@ -726,7 +726,6 @@ def UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.tables = FLAGS.sysbench_tables
   benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
 
-
 def Prepare(benchmark_spec):
   """Prepare the MySQL DB Instances, configures it.
 
@@ -747,9 +746,14 @@ def Prepare(benchmark_spec):
 
   UpdateBenchmarkSpecWithFlags(benchmark_spec)
 
+  db_spec = benchmark_spec.managed_relational_db.spec
   # Setup common test tools required on the client VM
   vm.Install('sysbench1')
-  vm.Install('mysql')
+  if (db_spec.engine_version == '5.6' or
+      db_spec.engine_version.startswith('5.6.')):
+    vm.Install('mysqlclient56')
+  else:
+    vm.Install('mysql')
 
   prepare_results = _PrepareSysbench(vm, benchmark_spec)
   print prepare_results
