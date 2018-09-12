@@ -726,6 +726,7 @@ def UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.tables = FLAGS.sysbench_tables
   benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
 
+
 def Prepare(benchmark_spec):
   """Prepare the MySQL DB Instances, configures it.
 
