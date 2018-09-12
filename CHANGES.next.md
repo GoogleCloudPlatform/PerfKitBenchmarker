@@ -175,6 +175,7 @@
 - Add tensor2tensor benchmark.
 - Change train_steps to train_epochs in TPU test.
 - Add default tags like timeout_utc to GCE.
+- Add validation to all the TPU tests.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
