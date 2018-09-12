@@ -19,10 +19,9 @@ Code: https://github.com/tensorflow/tpu/tree/master/models/official/resnet
 This benchmark is equivalent to tensorflow_benchmark with the resnet model
 except that this can target TPU.
 """
-# TODO(tohaowu): We only measure image processing speed for now, and we will
-# measure the other metrics in the future.
 
 import datetime
+import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -81,6 +80,11 @@ flags.DEFINE_bool('resnet_skip_host_call', False, 'Skip the host_call which is '
                   'etc...). When --skip_host_call=false, there could be a '
                   'performance drop if host_call function is slow and cannot '
                   'keep up with the TPU-side computation.')
+flags.DEFINE_integer(
+    'resnet_epochs_per_eval', 2, 'Controls how often evaluation is performed.'
+    ' Since evaluation is fairly expensive, it is advised to evaluate as '
+    'infrequently as possible (i.e. up to --train_steps, which evaluates the '
+    'model only after finishing the entire training regime).', lower_bound=2)
 
 
 def GetConfig(user_config):
@@ -117,6 +121,9 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_epochs = FLAGS.resnet_train_epochs
   benchmark_spec.train_steps = int(
       benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
+  benchmark_spec.epochs_per_eval = FLAGS.resnet_epochs_per_eval
+  benchmark_spec.steps_per_eval = int(
+      benchmark_spec.epochs_per_eval * benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -141,7 +148,8 @@ def _CreateMetadataDict(benchmark_spec):
   """
   metadata = {
       'use_tpu': benchmark_spec.use_tpu,
-      'tpu': benchmark_spec.tpu,
+      'tpu_train': benchmark_spec.tpu_train,
+      'tpu_eval': benchmark_spec.tpu_eval,
       'data_dir': benchmark_spec.data_dir,
       'model_dir': benchmark_spec.model_dir,
       'depth': benchmark_spec.depth,
@@ -158,7 +166,9 @@ def _CreateMetadataDict(benchmark_spec):
       'num_train_images': benchmark_spec.num_train_images,
       'num_eval_images': benchmark_spec.num_eval_images,
       'train_epochs': benchmark_spec.train_epochs,
-      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch
+      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch,
+      'epochs_per_eval': benchmark_spec.epochs_per_eval,
+      'steps_per_eval': benchmark_spec.steps_per_eval
   }
   return metadata
 
@@ -187,82 +197,41 @@ def _ParseDateTime(wall_time):
         '%Y%m%d %H:%M:%S.%f')
 
 
-def _MakeSamplesFromOutput(metadata, output):
-  """Create a sample continaing the measured throughput.
+def MakeSamplesFromEvalOutput(metadata, output, elapsed_seconds):
+  """Create a sample containing evaluation metrics.
 
   Args:
     metadata: dict contains all the metadata that reports.
-    output: output
+    output: string, command output
+    elapsed_seconds: float, elapsed seconds from saved checkpoint.
 
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/resnet_benchmark_test.py
 
   Returns:
-    a Sample containing the throughput
+    a Sample containing evaluation metrics
   """
-  samples = []
-  time_pattern = r'(\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*'
-  start_time = _ParseDateTime(regex_util.ExtractAllMatches(
-      time_pattern, output)[0])
+  pattern = (r'Saving dict for global step \d+: global_step = (\d+), '
+             r'loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
+             r'top_5_accuracy = (\d+\.\d+)')
+  step, loss, top_1_accuracy, top_5_accuracy = (
+      regex_util.ExtractExactlyOneMatch(pattern, output))
+  metadata_copy = metadata.copy()
+  step = int(step)
+  metadata_copy['step'] = step
   num_examples_per_epoch = metadata['num_examples_per_epoch']
-  if FLAGS.resnet_mode in ('train', 'train_and_eval'):
-    # If statement training true, it will parse examples_per_second,
-    # global_steps_per_second, loss
-    pattern = (r'{}loss = (\d+\.\d+), step = (\d+).*\n'
-               r'(.*global_step/sec: (\d+\.\d+)\n)?'
-               r'(.*examples/sec: (\d+\.\d+))?'.format(time_pattern))
-    for wall_time, loss, step, _, global_step, _, examples_sec in (
-        regex_util.ExtractAllMatches(pattern, output)):
-      metadata_copy = metadata.copy()
-      metadata_copy['duration'] = (
-          _ParseDateTime(wall_time) - start_time).seconds
-      step = int(step)
-      metadata_copy['step'] = step
-      metadata_copy['epoch'] = step / num_examples_per_epoch
-      samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
-      if global_step:
-        samples.append(sample.Sample(
-            'Global Steps Per Second', float(global_step),
-            'global_steps/sec', metadata_copy))
-      if examples_sec:
-        # This benchmark only reports "Examples Per Second" metric when we it
-        # using TPU.
-        samples.append(sample.Sample('Examples Per Second', float(examples_sec),
-                                     'examples/sec', metadata_copy))
-
-  if FLAGS.resnet_mode in ('eval', 'train_and_eval'):
-    # If statement evaluates true, it will parse top_1_accuracy, top_5_accuracy,
-    # and eval_loss.
-    pattern = (r'{}Saving dict for global step \d+: global_step = (\d+), '
-               r'loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
-               r'top_5_accuracy = (\d+\.\d+)'.format(time_pattern))
-    for wall_time, step, loss, top_1_accuracy, top_5_accuracy in (
-        regex_util.ExtractAllMatches(pattern, output)):
-      metadata_copy = metadata.copy()
-      metadata_copy['duration'] = (
-          _ParseDateTime(wall_time) - start_time).seconds
-      step = int(step)
-      metadata_copy['step'] = step
-      metadata_copy['epoch'] = step / num_examples_per_epoch
-      samples.append(
-          sample.Sample('Eval Loss', float(loss), '', metadata_copy))
-      # In the case of top-1 score, the trained model checks if the top class (
-      # the one having the highest probability) is the same as the target label.
-      # In the case of top-5 score, the trained model checks if the target label
-      # is one of your top 5 predictions (the 5 ones with the highest
-      # probabilities).
-      samples.append(sample.Sample(
-          'Top 1 Accuracy', float(top_1_accuracy) * 100, '%',
-          metadata_copy))
-      samples.append(sample.Sample(
-          'Top 5 Accuracy', float(top_5_accuracy) * 100, '%',
-          metadata_copy))
-
-    pattern = r'Elapsed seconds (\d+)'
-    value = regex_util.ExtractExactlyOneMatch(pattern, output)
-    samples.append(sample.Sample('Elapsed Seconds', int(value), 'seconds',
-                                 metadata))
-  return samples
+  metadata_copy['epoch'] = step / num_examples_per_epoch
+  metadata_copy['elapsed_seconds'] = elapsed_seconds
+  return [sample.Sample('Eval Loss', float(loss), '', metadata_copy),
+          # In the case of top-1 score, the trained model checks if the top
+          # class (the one having the highest probability) is the same as the
+          # target label. In the case of top-5 score, the trained model checks
+          # if the target label is one of your top 5 predictions (the 5 ones
+          # with the highest probabilities).
+          sample.Sample('Top 1 Accuracy', float(top_1_accuracy) * 100, '%',
+                        metadata_copy),
+          sample.Sample('Top 5 Accuracy', float(top_5_accuracy) * 100, '%',
+                        metadata_copy)]
 
 
 def Run(benchmark_spec):
@@ -282,16 +251,12 @@ def Run(benchmark_spec):
       'cd tpu/models/official/resnet && '
       'python {script} '
       '--use_tpu={use_tpu} '
-      '--tpu={tpu} '
       '--data_dir={data_dir} '
       '--model_dir={model_dir} '
       '--resnet_depth={depth} '
-      '--mode={mode} '
-      '--train_steps={train_steps} '
       '--train_batch_size={train_batch_size} '
       '--eval_batch_size={eval_batch_size} '
       '--iterations_per_loop={iterations} '
-      '--num_cores={num_cores} '
       '--data_format={data_format} '
       '--precision={precision} '
       '--skip_host_call={skip_host_call} '
@@ -299,16 +264,12 @@ def Run(benchmark_spec):
       '--num_eval_images={num_eval_images}'.format(
           script=resnet_benchmark_script,
           use_tpu=benchmark_spec.use_tpu,
-          tpu=benchmark_spec.tpu,
           data_dir=benchmark_spec.data_dir,
           model_dir=benchmark_spec.model_dir,
           depth=benchmark_spec.depth,
-          mode=benchmark_spec.mode,
-          train_steps=benchmark_spec.train_steps,
           train_batch_size=benchmark_spec.train_batch_size,
           eval_batch_size=benchmark_spec.eval_batch_size,
           iterations=benchmark_spec.iterations,
-          num_cores=benchmark_spec.num_shards,
           data_format=benchmark_spec.data_format,
           precision=benchmark_spec.precision,
           skip_host_call=benchmark_spec.skip_host_call,
@@ -318,10 +279,39 @@ def Run(benchmark_spec):
   if FLAGS.tf_device == 'gpu':
     resnet_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=resnet_benchmark_cmd)
-  stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_cmd,
-                                          should_log=True)
-  return _MakeSamplesFromOutput(_CreateMetadataDict(benchmark_spec),
-                                stdout + stderr)
+  samples = []
+  metadata = _CreateMetadataDict(benchmark_spec)
+  elapsed_seconds = 0
+  steps_per_eval = benchmark_spec.steps_per_eval
+  train_steps = benchmark_spec.train_steps
+  for step in range(steps_per_eval, train_steps + steps_per_eval,
+                    steps_per_eval):
+    step = min(step, train_steps)
+    resnet_benchmark_cmd_step = '{cmd} --train_steps={step}'.format(
+        cmd=resnet_benchmark_cmd, step=step)
+    if benchmark_spec.mode in ('train', 'train_and_eval'):
+      resnet_benchmark_train_cmd = (
+          '{cmd} --tpu={tpu} --mode=train --num_cores={num_cores}'.format(
+              cmd=resnet_benchmark_cmd_step,
+              tpu=benchmark_spec.tpu_train,
+              num_cores=benchmark_spec.num_shards_train))
+      start = time.time()
+      stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_train_cmd,
+                                              should_log=True)
+      elapsed_seconds += (time.time() - start)
+      samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
+          metadata, stdout + stderr, elapsed_seconds))
+    if benchmark_spec.mode in ('train_and_eval', 'eval'):
+      resnet_benchmark_eval_cmd = (
+          '{cmd} --tpu={tpu} --mode=eval --num_cores={num_cores}'.format(
+              cmd=resnet_benchmark_cmd_step,
+              tpu=benchmark_spec.tpu_eval,
+              num_cores=benchmark_spec.num_shards_eval))
+      stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_eval_cmd,
+                                              should_log=True)
+      samples.extend(MakeSamplesFromEvalOutput(
+          metadata, stdout + stderr, elapsed_seconds))
+  return samples
 
 
 def Cleanup(benchmark_spec):
