@@ -25,6 +25,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import collections
+import copy
 import itertools
 import json
 import logging
@@ -347,6 +348,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
+    self.early_termination = False
+    self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
     self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
@@ -660,6 +663,43 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # TODO(deitz): Add retry logic.
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
+
+  @vm_util.Retry(max_retries=5)
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    if self.preemptible:
+      # Drop zone since compute operations list takes 'zones', not 'zone', and
+      # the argument is deprecated in favor of --filter.
+      vm_without_zone = copy.copy(self)
+      vm_without_zone.zone = None
+      gcloud_command = util.GcloudCommand(
+          vm_without_zone, 'compute', 'operations', 'list',
+          '--filter=zone:%s targetLink.scope():%s' % (self.zone, self.name))
+      stdout, _, _ = gcloud_command.Issue()
+      self.early_termination = any(
+          operation['operationType'] == 'compute.instances.preempted'
+          for operation in json.loads(stdout))
+
+  def IsInterruptible(self):
+    """Returns whether this vm is an interruptible vm (spot vm).
+
+    Returns: True if this vm is an interruptible vm (spot vm).
+    """
+    return self.preemptible
+
+  def WasInterrupted(self):
+    """Returns whether this spot vm was terminated early by GCP.
+
+    Returns: True if this vm was terminated early by GCP.
+    """
+    return self.early_termination
+
+  def GetVmStatusCode(self):
+    """Returns the early termination code if any.
+
+    Returns: Early termination code.
+    """
+    return self.preemptible_status_code
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,

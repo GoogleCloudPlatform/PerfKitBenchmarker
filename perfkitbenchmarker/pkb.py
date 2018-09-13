@@ -790,12 +790,13 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
   interrupted_vm_count = 0
   vm_status_codes = []
   for vm in spec.vms:
-    # discounted vm metadata
     if vm.IsInterruptible():
       interruptible_vm_count += 1
       if vm.WasInterrupted():
         interrupted_vm_count += 1
-        vm_status_codes.append(vm.GetVmStatusCode())
+        status_code = vm.GetVmStatusCode()
+        if status_code:
+          vm_status_codes.append(status_code)
 
   if interruptible_vm_count:
     metadata.update({'interruptible_vms': interruptible_vm_count,

@@ -119,8 +119,9 @@
 - Added `time_commands` flag to enable diagnostic timing of commands
 - Added image processing speed in mnist.
 - Updated cloud TPU model link.
-- Updated AWS spot instance creation and added
-  spot instance failure metadata support.
+- Updated AWS spot instance creation.
+- Added support for extending the failure sample with metadata if AWS spot VMs
+  or GCP preemptible VMs are interrupted.
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
