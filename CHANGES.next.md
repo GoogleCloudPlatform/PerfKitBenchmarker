@@ -60,6 +60,17 @@
 - Added timeout support for windows vm remote command call.
 - Added IOR benchmark.
 - Added mdtest to IOR benchmark.
+- Added Elastic Container Service (EKS) as a container cluster type.
+- Added ResNet benchmark.
+- Added support for ACI (Azure Container Instances).
+- Added spec cpu 2017 and feedback optimization for peak runs.
+- Added glibc benchmark.
+- Added lmbench benchmark.
+- Added support to `--disable_interrupt_moderation` for Windows VMs on AWS.
+- Added support to `--disable_rss` for Windows VMs on GCP.
+- Added act benchmark.
+- Added `--gce_tags` flag to add --tags when launching VMs on GCP.
+- Added PKB support to publish samples immediately.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -135,6 +146,36 @@
 - Added support for NVIDIA P4 GPUs.
 - Added YCSB timeseries parsing.
 - Added Intel MKL to HPCC benchmark.
+- Added flag support for enabling or disabling transparent hugepages on Linux
+  VMs.
+- Add AWS MySql Aurora support
+- Abandon beta in TPU commands.
+- Update ycsb hdr histograms to output {bucket:count} data set for latencies, removing percentile:latency_value data set.
+- Added GPU test for ResNet benchmark.
+- Update ResNet testcases.
+- Remove unused lib in ResNet benchmark.
+- Added way to run several specsfs benchmarks in a single PKB run.
+- Add `--preemptible` in TPU creation command.
+- Add `--skip_host_call` in ResNet benchmark.
+- Update ResNet benchmark test for TensorFlow 1.9.
+- Removed the flag resnet_num_cores from the resnet benchmark and added the flag tpu_num_shards to MNIST, resnet, and inception3.
+- Update MNIST benchmark source path.
+- Replace old flags `--tpu_name` and `--master` with a new flag, `--tpu`.
+- Added support for EFS provisioned throughput.
+- Added support for `--os_type` ubuntu1804. Removed ubuntu1710 for GCP.
+- Added flag `--iperf3_set_tcp_window_size` to let the user avoid setting the
+  TCP Window size in Iperf3 Windows performance tests.
+- Added flags `--hbase_version` and `--hbase_use_stable` to set the HBase
+  version.  Also upped hadoop to version 2.8.4.
+- Updated cuDNN installation methods.
+- Added support to schedule multiple TPUs.
+- Added GroupZonesIntoRegions support for providers.aws.util.
+- Added function to get the number of TPU cores.
+- Update spec17 copies per run to respect system available memory.
+- Add tensor2tensor benchmark.
+- Change train_steps to train_epochs in TPU test.
+- Add default tags like timeout_utc to GCE.
+- Add validation to all the TPU tests.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -246,3 +287,12 @@
 - Fix PSPing benchmark so that it runs on AWS and Azure.
 - Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
 - Moved from ACS to AKS for Azure Kubernetes clusters.
+- AWS Aurora Postgres updated from 9.6.2 to 9.6.3
+- Cleanup and fix Beam bechmark.
+- Sysbench failover tests added for GCP and AWS Aurora
+- Sysbench qps metric added
+- Fixed a bug of checking TPU exist.
+- Add GetMasterGrpcAddress method to CloudTpu.
+- Fix a bug of getting the number of TPU cores.
+- Set number of images in ResNet benchmark command so it can support other datasets.
+- Sysbench supports benchmarking MySQL 5.6

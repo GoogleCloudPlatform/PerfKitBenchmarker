@@ -50,6 +50,9 @@ class FakeManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def GetDefaultEngineVersion(self, _):
     pass
 
+  def _FailoverHA(self):
+    pass
+
 
 class ManagedRelationalDbSpecTestCase(unittest.TestCase):
 

@@ -116,6 +116,11 @@ flags.DEFINE_integer('num_disable_cpus', None,
 flags.DEFINE_integer('disk_fill_size', 0,
                      'Size of file to create in GBs.')
 
+flags.DEFINE_bool(
+    'enable_transparent_hugepages', None, 'Whether to enable or '
+    'disable transparent hugepages. If unspecified, the setting '
+    'is unchanged from the default in the OS.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -138,6 +143,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
+  def _SetTransparentHugepages(self):
+    """Sets transparent hugepages based on --enable_transparent_hugepages.
+
+    If the flag is unset (None), this is a nop.
+    """
+    if FLAGS.enable_transparent_hugepages is None:
+      return
+    setting = 'always' if FLAGS.enable_transparent_hugepages else 'never'
+    self.RemoteCommand(
+        'echo %s | sudo tee /sys/kernel/mm/transparent_hugepage/enabled' %
+        setting)
+    self.os_metadata['transparent_hugepage'] = setting
+
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
 
@@ -150,7 +168,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                             os.path.basename(f)))
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None):
+  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
+                          ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     Executes a command via a pair of scripts on the VM:
@@ -168,6 +187,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       should_log: Whether to log the command's output at the info level. The
           output is always logged at the debug level.
       timeout: The timeout for the command.
+      ignore_failure: Ignore any failure if set to true.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -210,12 +230,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), should_log=should_log)
+            ' '.join(wait_command), should_log=should_log, timeout=1800)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete'])
-      return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
+      return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
+                                ignore_failure=ignore_failure)
 
     try:
       return _WaitForCommand()
@@ -257,8 +278,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     pass
 
   def PrepareVMEnvironment(self):
+    super(BaseLinuxMixin, self).PrepareVMEnvironment()
     self.SetupProxy()
     self._CreateVmTmpDir()
+    self._SetTransparentHugepages()
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
@@ -491,7 +514,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     fstab_options = fstab_options or ''
     mnt_cmd = ('sudo mkdir -p {mount_path};'
                'sudo mount {mount_options} {device_path} {mount_path} && '
-               'sudo chown -R $USER:$USER {mount_path};').format(
+               'sudo chown $USER:$USER {mount_path};').format(
                    mount_path=mount_path,
                    device_path=device_path,
                    mount_options=mount_options)
@@ -670,6 +693,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     This will be called after every call to Reboot().
     """
     self._CreateVmTmpDir()
+    self._SetTransparentHugepages()
 
   def MoveFile(self, target, source_path, remote_path=''):
     self.MoveHostFile(target, source_path, remote_path)
@@ -1219,6 +1243,11 @@ class Ubuntu1710Mixin(DebianMixin):
   OS_TYPE = os_types.UBUNTU1710
 
 
+class Ubuntu1804Mixin(DebianMixin):
+  """Class holding Ubuntu1804 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1804
+
+
 class Ubuntu1604Cuda9Mixin(DebianMixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
@@ -1481,6 +1510,20 @@ class LsCpuResults(object):
       raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
                        lscpu)
 
+    match = re.search(r'Core\(s\)\ per\ socket:\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.cores_per_socket = int(match.group(1))
+    else:
+      raise ValueError('Core(s) per socket could not be found in lscpu '
+                       'value:\n%s' % lscpu)
+
+    match = re.search(r'Socket\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.socket_count = int(match.group(1))
+    else:
+      raise ValueError('Socket(s) count could not be found in lscpu '
+                       'value:\n%s' % lscpu)
+
 
 class JujuMixin(DebianMixin):
   """Class to allow running Juju-deployed workloads.
@@ -1594,8 +1637,8 @@ class JujuMixin(DebianMixin):
 
       # Accept blocked because the service may be waiting on relation
       if ss not in ['active', 'unknown']:
-          raise errors.Juju.TimeoutException(
-              'Service %s is not ready; status is %s' % (service, ss))
+        raise errors.Juju.TimeoutException(
+            'Service %s is not ready; status is %s' % (service, ss))
 
       if ss in ['error']:
         # The service has failed to deploy.

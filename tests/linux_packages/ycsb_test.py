@@ -251,5 +251,6 @@ class HdrLogsParserTestCase(unittest.TestCase):
       #[Buckets =            8, SubBuckets     =         2048]
     """
     actual = ycsb.ParseHdrLogFile(rawlog)
-    expected = [(0.0, 0.314), (10.0, 0.853), (20.0, 0.949), (30.0, 1.033)]
+    expected = [(0.0, 0.314, 2), (10.0, 0.853, 49953),
+                (20.0, 0.949, 50396), (30.0, 1.033, 49759)]
     self.assertEqual(actual, expected)

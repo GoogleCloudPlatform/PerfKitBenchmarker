@@ -45,6 +45,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.KUBERNETES
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
+  HOME_DIR = '/root'
 
   def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
@@ -125,7 +126,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
-    logging.info("Waiting for POD %s" % self.name)
+    logging.info('Waiting for POD %s' % self.name)
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
     if pod_info:
       pod_info = json.loads(pod_info)
@@ -133,10 +134,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       if len(containers) == 1:
         pod_status = pod_info['status']['phase']
         if (containers[0]['name'].startswith(self.name)
-            and pod_status == "Running"):
-          logging.info("POD is up and running.")
+            and pod_status == 'Running'):
+          logging.info('POD is up and running.')
           return
-    raise Exception("POD %s is not running. Retrying to check status." %
+    raise Exception('POD %s is not running. Retrying to check status.' %
                     self.name)
 
   def _DeletePod(self):
@@ -188,7 +189,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         'pods', self.name, '', '.status.podIP')
 
     if not pod_ip:
-      raise Exception("Internal POD IP address not found. Retrying.")
+      raise Exception('Internal POD IP address not found. Retrying.')
 
     self.internal_ip = pod_ip
 
@@ -202,13 +203,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
 
     if FLAGS.http_proxy:
-      http_proxy = "sed -i '1i export http_proxy=%s' /etc/bash.bashrc"
+      http_proxy = 'sed -i \'1i export http_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(http_proxy % FLAGS.http_proxy)
     if FLAGS.https_proxy:
-      https_proxy = "sed -i '1i export https_proxy=%s' /etc/bash.bashrc"
+      https_proxy = 'sed -i \'1i export https_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(https_proxy % FLAGS.http_proxy)
     if FLAGS.ftp_proxy:
-      ftp_proxy = "sed -i '1i export ftp_proxy=%s' /etc/bash.bashrc"
+      ftp_proxy = 'sed -i \'1i export ftp_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _SetupDevicesPaths(self):
@@ -228,36 +229,36 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     volumes = self._BuildVolumesBody()
 
     template = {
-        "kind": "Pod",
-        "apiVersion": "v1",
-        "metadata": {
-            "name": self.name,
-            "labels": {
+        'kind': 'Pod',
+        'apiVersion': 'v1',
+        'metadata': {
+            'name': self.name,
+            'labels': {
                 SELECTOR_PREFIX: self.name
             }
         },
-        "spec": {
-            "volumes": volumes,
-            "containers": [container],
-            "dnsPolicy": "ClusterFirst",
+        'spec': {
+            'volumes': volumes,
+            'containers': [container],
+            'dnsPolicy': 'ClusterFirst',
         }
     }
     if FLAGS.kubernetes_anti_affinity:
-      template["spec"]["affinity"] = {
-          "podAntiAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": [{
-                  "labelSelector": {
-                      "matchExpressions": [{
-                          "key": "pkb_anti_affinity",
-                          "operator": "In",
-                          "values": [""],
+      template['spec']['affinity'] = {
+          'podAntiAffinity': {
+              'requiredDuringSchedulingIgnoredDuringExecution': [{
+                  'labelSelector': {
+                      'matchExpressions': [{
+                          'key': 'pkb_anti_affinity',
+                          'operator': 'In',
+                          'values': [''],
                       }],
                   },
-                  "topologyKey": "kubernetes.io/hostname",
+                  'topologyKey': 'kubernetes.io/hostname',
               }],
           },
       }
-      template["metadata"]["labels"]["pkb_anti_affinity"] = ""
+      template['metadata']['labels']['pkb_anti_affinity'] = ''
 
     return json.dumps(template)
 
@@ -283,12 +284,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       image = self.image
     container = {
-        "image": image,
-        "name": self.name,
-        "securityContext": {
-            "privileged": FLAGS.docker_in_privileged_mode
+        'image': image,
+        'name': self.name,
+        'workingDir': self.HOME_DIR,
+        'securityContext': {
+            'privileged': FLAGS.docker_in_privileged_mode
         },
-        "volumeMounts": [
+        'volumeMounts': [
         ]
     }
 
@@ -419,7 +421,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # benchmarks require it.
     self.InstallPackages('ssh')
     self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
-    self.RemoteCommand('mkdir ~/.ssh')
+    self.RemoteCommand('mkdir -p ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
@@ -454,8 +456,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     self.RemoteCommand('sudo apt-get update && sudo apt-get install '
                        '-y google-cloud-sdk')
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.
 
     This function works by looking up the VirtualMachine class which matches
@@ -471,31 +472,31 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
 
     Raises:
       NotImplementedError: if this method does not support the specified cloud.
       AttributeError: if the VirtualMachine class does not implement
-        GenerateDownloadPreprovisionedBenchmarkDataCommand.
+        GenerateDownloadPreprovisionedDataCommand.
     """
     cloud = FLAGS.container_cluster_cloud
     if cloud == 'GCP':
       download_function = (gce_virtual_machine.
-                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+                           GenerateDownloadPreprovisionedDataCommand)
     elif cloud == 'AWS':
       download_function = (aws_virtual_machine.
-                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+                           GenerateDownloadPreprovisionedDataCommand)
     elif cloud == 'Azure':
       download_function = (azure_virtual_machine.
-                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+                           GenerateDownloadPreprovisionedDataCommand)
     else:
       raise NotImplementedError(
           'Cloud {0} does not support downloading preprovisioned '
           'data on Kubernetes VMs.'.format(cloud))
 
     self.RemoteCommand(
-        download_function(install_path, benchmark_name, filename))
+        download_function(install_path, module_name, filename))
 
 
 def _install_sudo_command():

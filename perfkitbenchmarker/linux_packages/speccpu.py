@@ -29,8 +29,11 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker.linux_packages import build_tools
 
 
-FLAGS = flags.FLAGS
+BASE_MODE = 'base'
+PEAK_MODE = 'peak'
+ALL_MODE = 'all'
 
+FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     'runspec_config', 'linux64-x64-gcc47.cfg',
@@ -82,6 +85,10 @@ flags.DEFINE_boolean(
     'and PKB samples will be marked with a metadata value of partial=true. If '
     'unset, SPECint(R)_rate_base20** and SPECfp(R)_rate_base20** are listed '
     'in the metadata under missing_results.')
+flags.DEFINE_enum(
+    'spec_runmode', BASE_MODE,
+    [BASE_MODE, PEAK_MODE, ALL_MODE],
+    'Run mode to use. Defaults to base. ')
 
 
 _VM_STATE_ATTR = 'speccpu_vm_state'
@@ -325,12 +332,12 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
         run. See the "runspec_keep_partial_results" flag for more info.
     runspec_metric: String. Indicates whether this is spec speed or rate run.
 
-  Sample input for SPECint:
+  Sample input for SPECint (Refer to unit test for more examples):
       ...
-      ...
-      =============================================
-      400.perlbench    9770        417       23.4 *
-      401.bzip2        9650        565       17.1 *
+      ...Base                                               Peak
+      ============================================= ==========================
+      400.perlbench    9770        417       23.4 * 9770        417       23.4 *
+      401.bzip2        9650        565       17.1 * 9650        565       17.1 *
       403.gcc          8050        364       22.1 *
       429.mcf          9120        364       25.1 *
       445.gobmk       10490        499       21.0 *
@@ -342,12 +349,13 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       473.astar        7020        482       14.6 *
       483.xalancbmk    6900        248       27.8 *
        Est. SPECint(R)_base2006              22.7
+       Est. SPECint(R)_peak2006                                          20
 
   Sample input for SPECfp:
       ...
-      ...
-      =============================================
-      410.bwaves      13590        717      19.0  *
+      ...Base                                              Peak
+      ============================================= ============================
+      410.bwaves      13590        717      19.0  * 13550      710       19.0  *
       416.gamess      19580        923      21.2  *
       433.milc         9180        480      19.1  *
       434.zeusmp       9100        600      15.2  *
@@ -365,6 +373,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       481.wrf         11170        788      14.2  *
       482.sphinx3     19490        668      29.2  *
        Est. SPECfp(R)_base2006              17.5
+       Est. SPECfp(R)_peak2006                                          20
 
   Returns:
       A list of sample.Sample objects.
@@ -375,6 +384,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
   re_end_section = re.compile(speccpu_vm_state.log_format)
   result_section = []
   in_result_section = False
+  at_peak_results_line, peak_name, peak_score = False, None, None
 
   # Extract the summary section
   for line in stdout.splitlines():
@@ -388,6 +398,9 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       continue
     # search for end of result section
     match = re.search(re_end_section, line)
+    if at_peak_results_line:
+      _, peak_name, peak_score = line.split()
+      at_peak_results_line = False
     if match:
       assert in_result_section
       spec_name = str(match.group(1))
@@ -398,6 +411,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       except ValueError:
         # Partial results may get reported as '--' instead of a number.
         spec_score = None
+      if FLAGS.spec_runmode != BASE_MODE:
+        at_peak_results_line = True
       in_result_section = False
       # remove the final SPEC(int|fp) score, which has only 2 columns.
       result_section.pop()
@@ -407,7 +422,12 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'runspec_iterations': str(FLAGS.runspec_iterations),
       'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
       'runspec_define': FLAGS.runspec_define,
-      'runspec_metric': runspec_metric
+      'runspec_metric': runspec_metric,
+      'spec_runmode': FLAGS.spec_runmode,
+      'spec17_copies': FLAGS.spec17_copies,
+      'spec17_threads': FLAGS.spec17_threads,
+      'spec17_fdo': FLAGS.spec17_fdo,
+      'spec17_subset': FLAGS.spec17_subset
   }
 
   missing_results = []
@@ -416,19 +436,36 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
   for benchmark in result_section:
     # Skip over failed runs, but count them since they make the overall
     # result invalid.
-    if 'NR' in benchmark:
+    not_reported = benchmark.count('NR')
+    if not_reported > 1 or (
+        not_reported == 1 and FLAGS.spec_runmode != PEAK_MODE):
       logging.warning('SPEC CPU missing result: %s', benchmark)
       missing_results.append(str(benchmark.split()[0]))
       continue
-    # name, ref_time, time, score, misc
-    name, _, _, score_str, _ = benchmark.split()
+
+    base_score_str, peak_score_str = None, None
+    if FLAGS.spec_runmode == BASE_MODE:
+      # name, copies/threads, time, score, misc
+      name, _, _, base_score_str, _ = benchmark.split()
+    elif FLAGS.spec_runmode == PEAK_MODE:
+      # name, base_not_reported(NR), copies/threads, time, score, misc
+      name, _, _, _, peak_score_str, _ = benchmark.split()
+    else:
+      # name, copies/threads, base time, base score, base misc,
+      #       copies/threads, peak time, peak score, peak misc
+      name, _, _, base_score_str, _, _, _, peak_score_str, _ = benchmark.split()
     if runspec_metric == 'speed':
       name += ':speed'
-    score_float = float(score_str)
-    scores.append(score_float)
-    results.append(sample.Sample(str(name), score_float, '', metadata))
+    if base_score_str:
+      base_score_float = float(base_score_str)
+      scores.append(base_score_float)
+      results.append(sample.Sample(str(name), base_score_float, '', metadata))
+    if peak_score_str:
+      peak_score_float = float(peak_score_str)
+      results.append(
+          sample.Sample(str(name) + ':peak', peak_score_float, '', metadata))
 
-  if spec_score is None:
+  if spec_score is None and FLAGS.spec_runmode != PEAK_MODE:
     missing_results.append(spec_name)
 
   if missing_results:
@@ -439,12 +476,14 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       raise errors.Benchmarks.RunError(
           'speccpu: results missing, see log: ' + ','.join(missing_results))
 
-  if spec_score is not None:
+  if spec_score:
     results.append(sample.Sample(spec_name, spec_score, '', metadata))
   elif FLAGS.runspec_estimate_spec:
     estimated_spec_score = _GeometricMean(scores)
     results.append(sample.Sample('estimated_' + spec_name,
                                  estimated_spec_score, '', metadata))
+  if peak_score:
+    results.append(sample.Sample(peak_name, float(peak_score), '', metadata))
 
   return results
 
@@ -484,11 +523,12 @@ def ParseOutput(vm, log_files, is_partial_results, runspec_metric):
   return results
 
 
-def Run(vm, benchmark_subset, version_specific_parameters=None):
+def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   """Runs SPEC CPU on the target vm.
 
   Args:
     vm: Vm. The vm on which speccpu will run.
+    cmd: command to issue.
     benchmark_subset: List. Subset of the benchmark to run.
     version_specific_parameters: List. List of parameters for specific versions.
 
@@ -498,7 +538,7 @@ def Run(vm, benchmark_subset, version_specific_parameters=None):
   speccpu_vm_state = getattr(vm, _VM_STATE_ATTR, None)
   runspec_flags = [
       ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
-      ('tune', 'base'), ('size', 'ref'),
+      ('tune', FLAGS.spec_runmode), ('size', 'ref'),
       ('iterations', FLAGS.runspec_iterations)]
   if FLAGS.runspec_define:
     for runspec_define in FLAGS.runspec_define.split(','):
@@ -508,8 +548,8 @@ def Run(vm, benchmark_subset, version_specific_parameters=None):
   if version_specific_parameters:
     fl += ' '.join(version_specific_parameters)
 
-  runspec_cmd = 'runspec --noreportable {flags} {subset}'.format(
-      flags=fl, subset=benchmark_subset)
+  runspec_cmd = '{cmd} --noreportable {flags} {subset}'.format(
+      cmd=cmd, flags=fl, subset=benchmark_subset)
 
   cmd = ' && '.join((
       'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',

@@ -294,9 +294,9 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
-  def testCreateUbuntu1710(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1710)
-    fake_image = 'fake-ubuntu1704'
+  def testCreateUbuntu1804(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    fake_image = 'fake-ubuntu1804'
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
@@ -306,12 +306,12 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
-          '--image-family ubuntu-1710 --image-project ubuntu-os-cloud',
+          '--image-family ubuntu-1804-lts --image-project ubuntu-os-cloud',
           command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'ubuntu-1710',
+                                     'image_family': 'ubuntu-1804-lts',
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
@@ -382,101 +382,74 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
-  def testPreemptibleVMFlag(self):
+  def _CreateVmCommand(self, **flag_kwargs):
     with PatchCriticalObjects() as issue_command:
-      self._mocked_flags['gce_preemptible_vms'].parse(True)
+      for key, value in flag_kwargs.items():
+        self._mocked_flags[key].parse(value)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--preemptible', issue_command.call_args[0][0])
+      return ' '.join(issue_command.call_args[0][0]), issue_command.call_count
+
+  def testPreemptibleVMFlag(self):
+    cmd, call_count = self._CreateVmCommand(gce_preemptible_vms=True)
+    self.assertEqual(call_count, 1)
+    self.assertIn('--preemptible', cmd)
 
   def testMigrateOnMaintenanceFlagTrueWithGpus(self):
-    with PatchCriticalObjects():
-      self._mocked_flags['gce_migrate_on_maintenance'].parse(True)
-      vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-
-      with self.assertRaises(errors.Config.InvalidValue) as cm:
-        vm._Create()
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self._CreateVmCommand(
+          gce_migrate_on_maintenance=True, gpu_count=1, gpu_type='k80')
       self.assertEqual(str(cm.exception), (
           'Cannot set flag gce_migrate_on_maintenance on '
           'instances with GPUs, as it is not supported by GCP.'))
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
-    with PatchCriticalObjects() as issue_command:
-      self._mocked_flags['gce_migrate_on_maintenance'].parse(False)
-      vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-      vm._Create()
-      self.assertEqual(issue_command.call_count, 1)
+    _, call_count = self._CreateVmCommand(
+        gce_migrate_on_maintenance=False, gpu_count=1, gpu_type='k80')
+    self.assertEqual(call_count, 1)
 
   def testAcceleratorTypeOverrideFlag(self):
-    with PatchCriticalObjects() as issue_command:
-      self._mocked_flags['gce_accelerator_type_override'].parse('fake_type')
-      vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-      vm._Create()
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--accelerator', issue_command.call_args[0][0])
-      self.assertIn('type=fake_type,count=1',
-                    issue_command.call_args[0][0])
+    cmd, call_count = self._CreateVmCommand(
+        gce_accelerator_type_override='fake_type', gpu_count=1, gpu_type='k80')
+    self.assertEqual(call_count, 1)
+    self.assertIn('--accelerator', cmd)
+    self.assertIn('type=fake_type,count=1', cmd)
 
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
-    with PatchCriticalObjects() as issue_command:
-      self._mocked_flags['image_project'].parse('bar')
-      vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-      vm._Create()
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--image-project bar',
-                    ' '.join(issue_command.call_args[0][0]))
+    cmd, call_count = self._CreateVmCommand(image_project='bar')
+    self.assertEqual(call_count, 1)
+    self.assertIn('--image-project bar', cmd)
 
   def testGcpInstanceMetadataFlag(self):
-    with PatchCriticalObjects() as issue_command:
-      self._mocked_flags.gcp_instance_metadata = ['k1:v1', 'k2:v2,k3:v3']
-      self._mocked_flags.owner = 'test-owner'
-      vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-      vm._Create()
-      self.assertEqual(issue_command.call_count, 1)
-      actual_metadata = re.compile('--metadata\s+(.*)(\s+--)?').search(
-          ' '.join(issue_command.call_args[0][0])).group(1)
-      self.assertIn('k1=v1', actual_metadata)
-      self.assertIn('k2=v2', actual_metadata)
-      self.assertIn('k3=v3', actual_metadata)
-      # Assert that FLAGS.owner is honored and added to instance metadata.
-      self.assertIn('owner=test-owner', actual_metadata)
+    cmd, call_count = self._CreateVmCommand(
+        gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')
+    self.assertEqual(call_count, 1)
+    actual_metadata = re.compile(
+        r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)
+    self.assertIn('k1=v1', actual_metadata)
+    self.assertIn('k2=v2', actual_metadata)
+    self.assertIn('k3=v3', actual_metadata)
+    # Assert that FLAGS.owner is honored and added to instance metadata.
+    self.assertIn('owner=test-owner', actual_metadata)
 
   def testGcpInstanceMetadataFromFileFlag(self):
-    with PatchCriticalObjects() as issue_command:
-      self._mocked_flags.gcp_instance_metadata_from_file = [
-          'k1:p1', 'k2:p2,k3:p3']
-      vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-      vm._Create()
-      self.assertEqual(issue_command.call_count, 1)
-      actual_metadata_from_file = re.compile(
-          '--metadata-from-file\s+(.*)(\s+--)?').search(
-              ' '.join(issue_command.call_args[0][0])).group(1)
-      self.assertIn('k1=p1', actual_metadata_from_file)
-      self.assertIn('k2=p2', actual_metadata_from_file)
-      self.assertIn('k3=p3', actual_metadata_from_file)
+    cmd, call_count = self._CreateVmCommand(
+        gcp_instance_metadata_from_file=['k1:p1', 'k2:p2,k3:p3'])
+    self.assertEqual(call_count, 1)
+    actual_metadata_from_file = re.compile(
+        r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)
+    self.assertIn('k1=p1', actual_metadata_from_file)
+    self.assertIn('k2=p2', actual_metadata_from_file)
+    self.assertIn('k3=p3', actual_metadata_from_file)
+
+  def testGceTags(self):
+    self.assertIn('--tags perfkitbenchmarker ', self._CreateVmCommand()[0])
+    self.assertIn('--tags perfkitbenchmarker,testtag ',
+                  self._CreateVmCommand(gce_tags=['testtag'])[0])
 
 
 class GCEVMCreateTestCase(unittest.TestCase):

@@ -32,6 +32,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -127,6 +128,11 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_type'] = flag_values.gpu_type
     if flag_values['gpu_count'].present:
       config_values['gpu_count'] = flag_values.gpu_count
+    if flag_values['disable_interrupt_moderation'].present:
+      config_values['disable_interrupt_moderation'] = (
+          flag_values.disable_interrupt_moderation)
+    if flag_values['disable_rss'].present:
+      config_values['disable_rss'] = flag_values.disable_rss
 
     if 'gpu_count' in config_values and 'gpu_type' not in config_values:
       raise errors.Config.MissingOption(
@@ -149,6 +155,9 @@ class BaseVmSpec(spec.BaseSpec):
     """
     result = super(BaseVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
+        'disable_interrupt_moderation': (option_decoders.BooleanDecoder, {
+            'default': False}),
+        'disable_rss': (option_decoders.BooleanDecoder, {'default': False}),
         'image': (option_decoders.StringDecoder, {'none_ok': True,
                                                   'default': None}),
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
@@ -225,6 +234,8 @@ class BaseVirtualMachine(resource.BaseResource):
       self.instance_number = self._instance_counter
       self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
+    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
+    self.disable_rss = vm_spec.disable_rss
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.gpu_count = vm_spec.gpu_count
@@ -361,6 +372,39 @@ class BaseVirtualMachine(resource.BaseResource):
     """Simulates a maintenance event on the VM."""
     raise NotImplementedError()
 
+  def _InstallData(self, preprovisioned_data, module_name, filenames,
+                   install_path):
+    """Installs preprovisioned_data on this VM.
+
+    Args:
+      preprovisioned_data: The dict mapping filenames to md5sum hashes.
+      module_name: The name of the module defining the preprovisioned data.
+      filenames: An iterable of preprovisioned data filenames for a particular
+      module.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreProvisionedDataError: If the module or filename are
+          not defined with preprovisioned data, or if the md5sum hash in the
+          code does not match the md5sum of the file.
+    """
+    for filename in filenames:
+      if data.ResourceExists(filename):
+        local_tar_file_path = data.ResourcePath(filename)
+        self.PushFile(local_tar_file_path, install_path)
+        continue
+      md5sum = preprovisioned_data.get(filename)
+      if md5sum:
+        self.DownloadPreprovisionedData(install_path, module_name, filename)
+        self.CheckPreprovisionedData(
+            install_path, module_name, filename, md5sum)
+        continue
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot find md5sum hash for file %s in module %s. See README.md '
+          'for information about preprovisioned data. '
+          'Cannot find file in /data directory either, fail to upload from '
+          'local directory.' % (filename, module_name))
+
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
     """Installs preprovisioned benchmark data on this VM.
@@ -368,7 +412,7 @@ class BaseVirtualMachine(resource.BaseResource):
     Some benchmarks require importing many bytes of data into the virtual
     machine. This data can be staged in a particular cloud and the virtual
     machine implementation can override how the preprovisioned data is
-    installed in the VM by overriding DownloadPreprovisionedBenchmarkData.
+    installed in the VM by overriding DownloadPreprovisionedData.
 
     For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
     bucket that the VMs may access. For a benchmark that requires
@@ -399,31 +443,63 @@ class BaseVirtualMachine(resource.BaseResource):
           'Cannot install preprovisioned data for undefined benchmark %s.' %
           benchmark_name)
     try:
-      benchmark_data = benchmark_module.BENCHMARK_DATA
+      # TODO(yanfeiren): Change BENCHMARK_DATA to PREPROVISIONED_DATA.
+      preprovisioned_data = benchmark_module.BENCHMARK_DATA
     except AttributeError:
       raise errors.Setup.BadPreprovisionedDataError(
           'Benchmark %s does not define a BENCHMARK_DATA dict with '
           'preprovisioned data.' % benchmark_name)
-    for filename in filenames:
-      if data.ResourceExists(filename):
-        local_tar_file_path = data.ResourcePath(filename)
-        self.PushFile(local_tar_file_path, install_path)
-        continue
-      md5sum = benchmark_data.get(filename)
-      if md5sum:
-        self.DownloadPreprovisionedBenchmarkData(install_path, benchmark_name,
-                                                 filename)
-        self.CheckPreprovisionedBenchmarkData(install_path, benchmark_name,
-                                              filename, md5sum)
-        continue
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Cannot find md5sum hash for file %s in benchmark %s. See README.md '
-          'for information about preprovisioned data. '
-          'Cannot find file in /data directory either, fail to upload from '
-          'local directory.' % (filename, benchmark_name))
+    self._InstallData(preprovisioned_data, benchmark_name, filenames,
+                      install_path)
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def InstallPreprovisionedPackageData(self, package_name, filenames,
+                                       install_path):
+    """Installs preprovisioned Package data on this VM.
+
+    Some benchmarks require importing many bytes of data into the virtual
+    machine. This data can be staged in a particular cloud and the virtual
+    machine implementation can override how the preprovisioned data is
+    installed in the VM by overriding DownloadPreprovisionedData.
+
+    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
+    bucket that the VMs may access. For a benchmark that requires
+    preprovisioned data, follow the instructions for that benchmark to download
+    and store the data so that it may be accessed by a VM via this method.
+
+    Before installing from preprovisioned data in the cloud, this function looks
+    for files in the local data directory. If found, they are pushed to the VM.
+    Otherwise, this function attempts to download them from their preprovisioned
+    location onto the VM.
+
+    Args:
+      package_name: The name of the package file defining the preprovisoned
+      data. The default vaule is None. If the package_name is provided, the
+      package file must define the dict PREPROVISIONED_DATA mapping filenames to
+      md5sum hashes.
+      filenames: An iterable of preprovisioned data filenames for a particular
+      package.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreProvisionedDataError: If the package or filename are
+          not defined with preprovisioned data, or if the md5sum hash in the
+          code does not match the md5sum of the file.
+    """
+    package_module = package_lookup.PackageModule(package_name)
+    if not package_module:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot install preprovisioned data for undefined package %s.' %
+          package_name)
+    try:
+      preprovisioned_data = package_module.PREPROVISIONED_DATA
+    except AttributeError:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Package %s does not define a PREPROVISIONED_DATA dict with '
+          'preprovisioned data.' % package_name)
+    self._InstallData(preprovisioned_data, package_name, filenames,
+                      install_path)
+
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads preprovisioned benchmark data.
 
     This function should be overridden by each cloud provider VM. The file
@@ -435,7 +511,7 @@ class BaseVirtualMachine(resource.BaseResource):
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     raise NotImplementedError()
@@ -641,7 +717,19 @@ class BaseOsMixin(object):
 
     This will be called once after setting up scratch disks.
     """
-    pass
+    if self.disable_interrupt_moderation:
+      self.DisableInterruptModeration()
+
+    if self.disable_rss:
+      self.DisableRSS()
+
+  def DisableInterruptModeration(self):
+    """Disables interrupt moderation on the VM."""
+    raise NotImplementedError()
+
+  def DisableRSS(self):
+    """Disables RSS on the VM."""
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def Install(self, package_name):
@@ -868,9 +956,9 @@ class BaseOsMixin(object):
     """
     raise NotImplementedError()
 
-  def CheckPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                       filename, expected_md5sum):
-    """Checks preprovisioned benchmark data for a checksum.
+  def CheckPreprovisionedData(self, install_path, module_name, filename,
+                              expected_md5sum):
+    """Checks preprovisioned data for a checksum.
 
     Checks the expected md5sum against the actual md5sum. Called after the file
     is downloaded.
@@ -880,7 +968,7 @@ class BaseOsMixin(object):
     Args:
       install_path: The install path on this VM. The benchmark is installed at
           this path in a subdirectory of the benchmark name.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the benchmark associated with this data file.
       filename: The name of the file that was downloaded.
       expected_md5sum: The expected md5sum checksum value.
     """
@@ -888,4 +976,4 @@ class BaseOsMixin(object):
     if actual_md5sum != expected_md5sum:
       raise errors.Setup.BadPreprovisionedDataError(
           'Invalid md5sum for %s/%s: %s (actual) != %s (expected)' % (
-              benchmark_name, filename, actual_md5sum, expected_md5sum))
+              module_name, filename, actual_md5sum, expected_md5sum))

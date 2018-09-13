@@ -34,6 +34,7 @@ import time
 import urllib
 import uuid
 
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import log_util
@@ -137,6 +138,28 @@ GCS_OBJECT_NAME_LENGTH = 20
 EXTERNAL_PUBLISHERS = []
 
 
+def PublishRunStageSamples(benchmark_spec, samples):
+  """Publishes benchmark run-stage samples immediately.
+
+  Typically, a benchmark publishes samples by returning them from the Run
+  function so that they can be pubished at set points (publish periods or at the
+  end of a run). This function can be called to publish the samples immediately.
+
+  Note that metadata for the run number will not be added to such samples.
+  TODO(deitz): Can we still add the run number? This will require passing a run
+  number or callback to the benchmark Run functions (or some other mechanism).
+
+  Args:
+    benchmark_spec: The BenchmarkSpec created for the benchmark.
+    samples: A list of samples to publish.
+  """
+  events.samples_created.send(
+      events.RUN_PHASE, benchmark_spec=benchmark_spec, samples=samples)
+  collector = SampleCollector()
+  collector.AddSamples(samples, benchmark_spec.name, benchmark_spec)
+  collector.PublishSamples()
+
+
 def GetLabelsFromDict(metadata):
   """Converts a metadata dictionary to a string of labels sorted by key.
 
@@ -194,10 +217,9 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in managed_db.GetResourceMetadata().iteritems():
         metadata['managed_relational_db_' + k] = v
 
-    if benchmark_spec.cloud_tpu:
-      cloud_tpu = benchmark_spec.cloud_tpu
-      for k, v in cloud_tpu.GetResourceMetadata().iteritems():
-        metadata['cloud_tpu_' + k] = v
+    for name, tpu in benchmark_spec.tpu_groups.iteritems():
+      for k, v in tpu.GetResourceMetadata().iteritems():
+        metadata['tpu_' + k] = v
 
     if benchmark_spec.cloud_redis:
       cloud_redis = benchmark_spec.cloud_redis

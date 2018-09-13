@@ -55,6 +55,9 @@ MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
 
+# Timeout after 4 hours.
+HPCC_TIMEOUT = 4 * 60 * 60
+
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
 BENCHMARK_DATA = {
     # Intel MKL package downloaded from:
@@ -159,6 +162,9 @@ def PrepareBinaries(vms):
     master_vm.MoveFile(vm, 'hpcc', 'hpcc')
     master_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
     vm.RemoteCommand('sudo mv orted /usr/bin/orted')
+    if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
+      master_vm.MoveFile(vm, '/lib/libiomp5.so', 'libiomp5.so')
+      vm.RemoteCommand('sudo mv libiomp5.so /lib/libiomp5.so')
 
 
 def Prepare(benchmark_spec):
@@ -254,7 +260,7 @@ def Run(benchmark_spec):
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
              '"ssh -o StrictHostKeyChecking=no" %s ./hpcc' %
              (num_processes, MACHINEFILE, mpi_env))
-  master_vm.RobustRemoteCommand(mpi_cmd)
+  master_vm.RobustRemoteCommand(mpi_cmd, timeout=HPCC_TIMEOUT)
   logging.info('HPCC Results:')
   stdout, _ = master_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
 

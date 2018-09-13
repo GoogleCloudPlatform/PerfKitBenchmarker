@@ -25,10 +25,10 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-CLOUD_TPU_TIMEOUT = 1200
+TPU_TIMEOUT = 1200
 
 
-class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
+class GcpTpu(cloud_tpu.BaseTpu):
   """class representing a GCP cloud TPU.
 
   Attributes:
@@ -40,18 +40,18 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
   """
 
   CLOUD = providers.GCP
-  SERVICE_NAME = 'cloud_tpu'
+  SERVICE_NAME = 'tpu'
   TPU_IP = '10.240.{}.2'
-  DEFAULT_CLOUD_TPU_VERSION = '1.6'
+  DEFAULT_TPU_VERSION = '1.6'
 
-  def __init__(self, cloud_tpu_spec):
-    super(GcpCloudTpu, self).__init__(cloud_tpu_spec)
-    self.spec = cloud_tpu_spec
+  def __init__(self, tpu_spec):
+    super(GcpTpu, self).__init__(tpu_spec)
+    self.spec = tpu_spec
     self.project = FLAGS.project or util.GetDefaultProject()
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'create',
+    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'create',
                              self.spec.tpu_name)
     cmd.flags['range'] = self.spec.tpu_cidr_range
     if self.spec.tpu_accelerator_type:
@@ -64,6 +64,8 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
       cmd.flags['version'] = self.spec.tpu_tf_version
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
+    if self.spec.tpu_preemptible:
+      cmd.flags['preemptible'] = self.spec.tpu_preemptible
     cmd.flags['project'] = self.project
     _, _, retcode = cmd.Issue()
     if retcode != 0:
@@ -71,20 +73,20 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Delete(self):
     """Deletes the cloud TPU."""
-    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'delete',
+    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'delete',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
-    _, _, retcode = cmd.Issue(timeout=CLOUD_TPU_TIMEOUT)
+    _, _, retcode = cmd.Issue(timeout=TPU_TIMEOUT)
     if retcode != 0:
       logging.error('Delete GCP cloud TPU failed.')
     else:
       logging.info('Deleted GCP cloud TPU.')
 
-  def _GetCloudTpuDescription(self):
+  def _GetTpuDescription(self):
     """Gets the cloud TPU description."""
-    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'describe',
+    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
@@ -97,29 +99,37 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Exists(self):
     """Returns true if the cloud TPU exists."""
-    _, retcode = self._GetCloudTpuDescription()
+    _, retcode = self._GetTpuDescription()
     return retcode == 0
 
-  def GetCloudTpuIp(self):
-    """Gets the cloud TPU IP."""
-    result, _ = self._GetCloudTpuDescription()
-    return result.get('ipAddress')
+  def GetName(self):
+    """Gets the name of the cloud TPU."""
+    return self.spec.tpu_name
 
-  def GetCloudTpuPort(self):
-    """Gets the cloud TPU port."""
-    result, _ = self._GetCloudTpuDescription()
-    return result.get('port')
+  def GetMasterGrpcAddress(self):
+    """Gets the grpc address of the 0th NetworkEndpoint."""
+    master_network_endpoint = self._GetTpuDescription()[0]['networkEndpoints'][
+        0]
+
+    return 'grpc://{ip_address}:{port}'.format(
+        ip_address=master_network_endpoint['ipAddress'],
+        port=master_network_endpoint['port'])
+
+  def GetNumShards(self):
+    """Gets the number of TPU shards."""
+    num_tpus = len(self._GetTpuDescription()[0]['networkEndpoints'])
+    return num_tpus * FLAGS.tpu_cores_per_donut
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 
-    All keys will be prefaced with cloud_tpu before
+    All keys will be prefaced with tpu before
     being published (done in publisher.py).
 
     Returns:
       metadata: dict of GCP cloud TPU metadata.
     """
-    metadata = super(GcpCloudTpu, self).GetResourceMetadata()
+    metadata = super(GcpTpu, self).GetResourceMetadata()
     metadata.update({
         'project': self.project,
         'cloud': self.CLOUD

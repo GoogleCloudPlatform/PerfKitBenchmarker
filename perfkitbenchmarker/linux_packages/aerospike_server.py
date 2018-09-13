@@ -49,8 +49,13 @@ def _Install(vm):
   vm.Install('lua5_1')
   vm.Install('openssl')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, AEROSPIKE_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1} && git submodule update --init '
-                   '&& make'.format(AEROSPIKE_DIR, GIT_TAG))
+  # Comment out Werror flag and compile. With newer compilers gcc7xx,
+  # compilation is broken due to warnings.
+  vm.RemoteCommand(
+      'cd {0} && git checkout {1} && git submodule update --init '
+      '&& sed -i "s/COMMON_CFLAGS += -Werror/# $COMMON_CFLAGS += -Werror/" '
+      '{0}/make_in/Makefile.in '
+      '&& make'.format(AEROSPIKE_DIR, GIT_TAG))
 
 
 def YumInstall(vm):

@@ -62,6 +62,7 @@ import json
 import logging
 import multiprocessing
 from os.path import isfile
+import random
 import re
 import sys
 import time
@@ -83,6 +84,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
@@ -148,8 +150,27 @@ flags.DEFINE_string('image', None, 'Default image that will be '
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to %d '
                     'characters in length.' % MAX_RUN_URI_LENGTH)
-flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
-                    'Used to tag created resources and performance records.')
+
+
+def GetCurrentUser():
+  """Get the current user name.
+
+  On some systems the current user information may be unavailable. In these
+  cases we just need a string to tag the created resources with. It should
+  not be a fatal error.
+
+  Returns:
+    User name OR default string if user name not available.
+  """
+  try:
+    return getpass.getuser()
+  except KeyError:
+    return 'user_unknown'
+
+
+flags.DEFINE_string(
+    'owner', GetCurrentUser(), 'Owner name. '
+    'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
     log_util.LOG_LEVELS.keys(),
@@ -290,6 +311,10 @@ flags.DEFINE_integer(
     'benchmark is expected run. Some benchmarks purposefully create resources '
     'for other benchmarks to use.   Persistent timeout guages who long '
     'these shared should live.')
+flags.DEFINE_bool('disable_interrupt_moderation', False,
+                  'Turn off the interrupt moderation networking feature')
+flags.DEFINE_bool('disable_rss', False,
+                  'Whether or not to disable the Receive Side Scaling feature.')
 
 
 # Support for using a proxy in the cloud environment.
@@ -302,6 +327,9 @@ flags.DEFINE_string('https_proxy', '',
 flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
+flags.DEFINE_bool('randomize_run_order', False,
+                  'When running with more than one benchmarks, '
+                  'randomize order of the benchmarks.')
 
 _TEARDOWN_EVENT = multiprocessing.Event()
 
@@ -480,7 +508,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
-  spec.ConstructCloudTpu()
+  spec.ConstructTpu()
   spec.ConstructEdwService()
   spec.ConstructCloudRedis()
   spec.ConstructNfsService()
@@ -795,6 +823,8 @@ def RunBenchmarkTask(spec):
   # By modifying the run_uri, we avoid the collisions.
   if FLAGS.run_processes > 1:
     spec.config.flags['run_uri'] = FLAGS.run_uri + str(spec.sequence_number)
+    # Unset run_uri so the config value takes precedence.
+    FLAGS['run_uri'].present = 0
 
   collector = SampleCollector()
   try:
@@ -879,6 +909,7 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
   benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
+  package_lookup.SetPackageModuleFunction(benchmark_sets.PackageModule)
 
 
 def RunBenchmarkTasksInSeries(tasks):
@@ -900,6 +931,8 @@ def RunBenchmarks():
     Exit status for the process.
   """
   benchmark_specs = _CreateBenchmarkSpecs()
+  if FLAGS.randomize_run_order:
+    random.shuffle(benchmark_specs)
   if FLAGS.dry_run:
     print 'PKB will run with the following configurations:'
     for spec in benchmark_specs:

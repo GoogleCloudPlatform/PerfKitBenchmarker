@@ -19,10 +19,10 @@ import posixpath
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 
-CUDNN_6 = 'libcudnn6_6.0.21-1+cuda8.0_amd64.deb'
-CUDNN_7 = 'libcudnn7_7.0.5.15-1+cuda9.0_amd64.deb'
+CUDNN_6 = 'libcudnn6=6.0.21-1+cuda8.0'
+CUDNN_7 = 'libcudnn7=7.0.5.15-1+cuda9.0'
 
-flags.DEFINE_string('cudnn', CUDNN_7,
+flags.DEFINE_string('cudnn', None,
                     'The NVIDIA CUDA Deep Neural Network library. '
                     'Please put in data directory and specify the name')
 FLAGS = flags.FLAGS
@@ -41,14 +41,7 @@ def _CopyLib(vm):
   # use that value for the cudnn path. Otherwise, chose
   # an intelligent default given the cuda toolkit version
   # specified.
-  if FLAGS['cudnn'].present:
-    cudnn_path = FLAGS.cudnn
-  else:
-    if FLAGS.cuda_toolkit_version == '8.0':
-      cudnn_path = CUDNN_6
-    elif FLAGS.cuda_toolkit_version == '9.0':
-      cudnn_path = CUDNN_7
-
+  cudnn_path = FLAGS.cudnn
   src_path = data.ResourcePath(cudnn_path)
   dest_path = posixpath.join('/tmp', cudnn_path)
   vm.RemoteCopy(src_path, dest_path)
@@ -56,11 +49,21 @@ def _CopyLib(vm):
 
 
 def AptInstall(vm):
-  dest_path = _CopyLib(vm)
-  if dest_path.endswith('.deb'):
-    vm.RemoteCommand('sudo dpkg -i %s' % dest_path, should_log=True)
+  """Installs the cudnn package on the VM."""
+  if FLAGS['cudnn'].present:
+    _Install(vm, _CopyLib(vm))
   else:
-    _Install(vm, dest_path)
+    if FLAGS.cuda_toolkit_version == '8.0':
+      cudnn_version = CUDNN_6
+    elif FLAGS.cuda_toolkit_version == '9.0':
+      cudnn_version = CUDNN_7
+    vm.RemoteCommand(
+        'sudo bash -c \'echo "deb http://developer.download.nvidia.com/compute/'
+        'machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/'
+        'nvidia-ml.list\'', should_log=True)
+    vm.RemoteCommand('sudo apt-get update', should_log=True)
+    vm.RemoteCommand('sudo apt-get install -y --no-install-recommends '
+                     '{}'.format(cudnn_version), should_log=True)
 
 
 def YumInstall(vm):

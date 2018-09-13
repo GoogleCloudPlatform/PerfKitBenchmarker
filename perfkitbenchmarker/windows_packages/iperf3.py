@@ -14,8 +14,10 @@
 
 """Module containing Iperf3 windows installation and cleanup functions."""
 
+import multiprocessing
 import ntpath
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -49,8 +51,9 @@ flags.DEFINE_integer('tcp_stream_seconds', 3,
 flags.DEFINE_integer('tcp_number_of_streams', 10,
                      'The number of parrallel streams to run in the TCP test.')
 
-flags.DEFINE_integer('socket_buffer_size', 10,
-                     'The socket buffer size in megabytes.')
+flags.DEFINE_integer('socket_buffer_size', None,
+                     'The socket buffer size in megabytes. If None is '
+                     'specified then the socket buffer size will not be set.')
 
 flags.DEFINE_bool('run_tcp', True,
                   'setting to false will disable the run of the TCP test')
@@ -89,13 +92,18 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
   receiver_ip = (
       receiving_vm.internal_ip if use_internal_ip else receiving_vm.ip_address)
 
+  socket_buffer_string = ''
+  if FLAGS.socket_buffer_size:
+    socket_buffer_string = ' -w {socket_buffer}M '.format(
+        socket_buffer=FLAGS.socket_buffer_size)
+
   sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f m '
-                 ' -w {socket_buffer}M > {out_file}').format(
+                 ' {socket_buffer_arg} > {out_file}').format(
                      ip=receiver_ip,
                      port=IPERF3_TCP_PORT,
                      time=FLAGS.tcp_stream_seconds,
                      num_streams=FLAGS.tcp_number_of_streams,
-                     socket_buffer=FLAGS.socket_buffer_size,
+                     socket_buffer_arg=socket_buffer_string,
                      out_file=IPERF3_OUT_FILE)
 
   output = _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm)
@@ -104,7 +112,15 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
                                    FLAGS.tcp_number_of_streams, use_internal_ip)
 
 
-@vm_util.Retry(max_retries=10)
+def _RunIperf3(vm, options):
+  iperf3_exec_dir = ntpath.join(vm.temp_dir, IPERF3_DIR)
+  command = ('cd {iperf3_exec_dir}; '
+             '.\\iperf3.exe {options}').format(
+                 iperf3_exec_dir=iperf3_exec_dir, options=options)
+  vm.RemoteCommand(command, timeout=FLAGS.tcp_stream_seconds + 30)
+
+
+@vm_util.Retry(max_retries=3)
 def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """Create a server-client iperf3 pair.
 
@@ -120,21 +136,25 @@ def _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm):
   """
 
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
-  timeout_duration = FLAGS.tcp_stream_seconds + 30
-
-  def _RunIperf3(vm, options):
-    command = ('cd {iperf3_exec_dir}; '
-               '.\\iperf3.exe {options}').format(
-                   iperf3_exec_dir=iperf3_exec_dir,
-                   options=options)
-    vm.RemoteCommand(command, timeout=timeout_duration)
 
   receiver_args = '--server -1'
 
-  threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
-                   (_RunIperf3, (sending_vm, sender_args), {})]
+  server_process = multiprocessing.Process(
+      name='server',
+      target=_RunIperf3,
+      args=(receiving_vm, receiver_args))
+  server_process.start()
 
-  vm_util.RunParallelThreads(threaded_args, 200, 5)
+  receiving_vm.WaitForProcessRunning('iperf3', 3)
+
+  client_process = multiprocessing.Process(
+      name='client',
+      target=_RunIperf3,
+      args=(sending_vm, sender_args))
+  client_process.start()
+
+  server_process.join()
+  client_process.join()
 
   cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
       iperf3_exec_dir=iperf3_exec_dir, out_file=IPERF3_OUT_FILE)
@@ -157,7 +177,7 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
   """
   iperf3_exec_dir = ntpath.join(sending_vm.temp_dir, IPERF3_DIR)
 
-  def _RunIperf3(vm, options):
+  def _RunIperf3UDP(vm, options):
     command = 'cd {iperf3_exec_dir}; .\\iperf3.exe {options}'.format(
         iperf3_exec_dir=iperf3_exec_dir,
         options=options)
@@ -185,10 +205,10 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
     # until the command completes, even if it is run as a daemon.
     receiver_args = '--server -1'
 
-    threaded_args = [(_RunIperf3, (receiving_vm, receiver_args), {}),
-                     (_RunIperf3, (sending_vm, sender_args), {})]
+    process_args = [(_RunIperf3UDP, (receiving_vm, receiver_args), {}),
+                    (_RunIperf3UDP, (sending_vm, sender_args), {})]
 
-    vm_util.RunParallelThreads(threaded_args, 200, 15)
+    background_tasks.RunParallelProcesses(process_args, 200, 1)
 
     # retrieve the results and parse them
     cat_command = 'cd {iperf3_exec_dir}; cat {out_file}'.format(
@@ -280,7 +300,8 @@ def ParseTCPMultiStreamOutput(results, sending_vm, receiving_vm, num_streams,
         'sending_machine_type': sending_vm.machine_type,
         'sending_zone': sending_vm.zone,
         'thread_id': thread_id,
-        'internal_ip_used': internal_ip_used
+        'internal_ip_used': internal_ip_used,
+        'tcp_window_size': FLAGS.socket_buffer_size,
     }
     bandwidth = line_data[5]
     units = line_data[6]

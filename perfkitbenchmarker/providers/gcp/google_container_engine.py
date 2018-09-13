@@ -77,13 +77,14 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
 
 
 class GkeCluster(container_service.KubernetesCluster):
+  """Class representing a Google Container Engine cluster."""
 
   CLOUD = providers.GCP
 
-  @staticmethod
-  def _GetRequiredGkeEnv():
+  def _GetRequiredGkeEnv(self):
     env = os.environ.copy()
-    env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
+    if self.use_application_default_credentials:
+      env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
     return env
 
   def __init__(self, spec):
@@ -93,6 +94,7 @@ class GkeCluster(container_service.KubernetesCluster):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.cluster_version = (FLAGS.container_cluster_version or
                             DEFAULT_CONTAINER_VERSION)
+    self.use_application_default_credentials = True
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -116,7 +118,17 @@ class GkeCluster(container_service.KubernetesCluster):
           self, 'container', 'clusters', 'create', self.name)
 
     cmd.flags['cluster-version'] = self.cluster_version
-    cmd.flags['scopes'] = 'cloud-platform'
+    if FLAGS.gke_enable_alpha:
+      cmd.args.append('--enable-kubernetes-alpha')
+      cmd.args.append('--no-enable-autorepair')
+      cmd.args.append('--no-enable-autoupgrade')
+
+    user = util.GetDefaultUser()
+    if 'gserviceaccount.com' in user:
+      cmd.flags['service-account'] = user
+      self.use_application_default_credentials = False
+    else:
+      cmd.flags['scopes'] = 'cloud-platform'
 
     if self.gpu_count:
       cmd.flags['accelerator'] = (gce_virtual_machine.
@@ -125,16 +137,15 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
-    if self.enable_autoscaling:
+    if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
 
-
     cmd.flags['num-nodes'] = self.num_nodes
 
     if self.machine_type is None:
-      cmd.flags['machine-type'] = "custom-{0}-{1}".format(
+      cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
           self.cpus, self.memory)
     else:
       cmd.flags['machine-type'] = self.machine_type

@@ -142,6 +142,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'database_username': 'fakeusername',
         'machine_type': 'db.r4.4xlarge',
         'zones': ['us-east-1a', 'us-east-1d'],
+        'engine_version': '9.6.2',
         'high_availability': True
     }
     spec_dict.update(additional_spec_items)
@@ -247,14 +248,14 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
       self.assertEqual(
           'pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
-          db._ParseEndpoint(json.loads(test_data)))
+          db._ParseEndpointFromInstance(json.loads(test_data)))
 
   def testParsePort(self):
     test_data = readTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec()
 
-      self.assertEqual(3306, db._ParsePort(json.loads(test_data)))
+      self.assertEqual(3306, db._ParsePortFromInstance(json.loads(test_data)))
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:

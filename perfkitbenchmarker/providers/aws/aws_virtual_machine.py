@@ -92,6 +92,14 @@ class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
 
 
+class AwsDriverDoesntSupportFeatureError(Exception):
+  """Raised if there is an attempt to set a feature not supported."""
+
+
+class AwsUnexpectedWindowsAdapterOutputError(Exception):
+  """Raised when querying the status of a windows adapter failed."""
+
+
 class AwsUnknownStatusError(Exception):
   """Error indicating an unknown status was encountered."""
 
@@ -308,7 +316,7 @@ class AwsKeyFileManager(object):
       import_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'import-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
+          '--key-name=%s' % cls.GetKeyNameForRun(),
           '--public-key-material=%s' % keyfile]
       util.IssueRetryableCommand(import_cmd)
       cls.imported_keyfile_set.add(region)
@@ -324,11 +332,15 @@ class AwsKeyFileManager(object):
       delete_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'delete-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+          '--key-name=%s' % cls.GetKeyNameForRun()]
       util.IssueRetryableCommand(delete_cmd)
       cls.deleted_keyfile_set.add(region)
       if region in cls.imported_keyfile_set:
         cls.imported_keyfile_set.remove(region)
+
+  @classmethod
+  def GetKeyNameForRun(cls):
+    return 'perfkit-key-{0}'.format(FLAGS.run_uri)
 
 
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -558,7 +570,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--client-token=%s' % self.client_token,
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
-        '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+        '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun()]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:
@@ -729,22 +741,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_spot_instance:
       util.AddDefaultTags(self.spot_instance_request_id, self.region)
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
 
     Use --aws_preprovisioned_data_bucket to specify the name of the bucket.
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     self.Install('aws_credentials')
     self.Install('awscli')
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
-        install_path, benchmark_name, filename))
+    self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
+        install_path, module_name, filename))
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -789,6 +800,12 @@ class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+
+
+class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1804Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-amd64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
@@ -896,11 +913,59 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
       password, _ = vm_util.IssueRetryableCommand(decrypt_cmd)
       self.password = password
 
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
 
-def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
-                                                       benchmark_name,
-                                                       filename):
+    Returns:
+      dict mapping metadata key to value.
+    """
+    result = super(WindowsAwsVirtualMachine, self).GetResourceMetadata()
+    result['disable_interrupt_moderation'] = self.disable_interrupt_moderation
+    return result
+
+  @vm_util.Retry(
+      max_retries=10,
+      retryable_exceptions=(AwsUnexpectedWindowsAdapterOutputError,
+                            errors.VirtualMachine.RemoteCommandError))
+  def DisableInterruptModeration(self):
+    """Disable the networking feature 'Interrupt Moderation'."""
+
+    # First ensure that the driver supports interrupt moderation
+    net_adapters, _ = self.RemoteCommand('Get-NetAdapter')
+    if 'Intel(R) 82599 Virtual Function' not in net_adapters:
+      raise AwsDriverDoesntSupportFeatureError(
+          'Driver not tested with Interrupt Moderation in PKB.')
+    aws_int_dis_path = ('HKLM\\SYSTEM\\ControlSet001\\Control\\Class\\'
+                        '{4d36e972-e325-11ce-bfc1-08002be10318}\\0011')
+    command = 'reg add "%s" /v *InterruptModeration /d 0 /f' % aws_int_dis_path
+    self.RemoteCommand(command)
+    try:
+      self.RemoteCommand('Restart-NetAdapter -Name "Ethernet 2"')
+    except IOError:
+      # Restarting the network adapter will always fail because
+      # the winrm connection used to issue the command will be
+      # broken.
+      pass
+    int_dis_value, _ = self.RemoteCommand(
+        'reg query "%s" /v *InterruptModeration' % aws_int_dis_path)
+    # The second line should look like:
+    #     *InterruptModeration    REG_SZ    0
+    registry_query_lines = int_dis_value.splitlines()
+    if len(registry_query_lines) < 3:
+      raise AwsUnexpectedWindowsAdapterOutputError(
+          'registry query failed: %s ' % int_dis_value)
+    registry_query_result = registry_query_lines[2].split()
+    if len(registry_query_result) < 3:
+      raise AwsUnexpectedWindowsAdapterOutputError(
+          'unexpected registry query response: %s' % int_dis_value)
+    if registry_query_result[2] != '0':
+      raise AwsUnexpectedWindowsAdapterOutputError(
+          'InterruptModeration failed to disable')
+
+
+def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                              filename):
   """Returns a string used to download preprovisioned data."""
   return 'aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
-      FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
+      FLAGS.aws_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))
