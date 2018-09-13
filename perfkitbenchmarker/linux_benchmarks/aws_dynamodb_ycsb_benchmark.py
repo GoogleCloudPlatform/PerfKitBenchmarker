@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,17 +15,17 @@
 """Run YCSB benchmark against AWS DynamoDB.
 This benchmark does not provision VMs for the corresponding DynamboDB database.
 The only VM group is client group that sends requests to specifiedDB.
-TODO: add RANGE option.
 TODO: add DAX option.
 TODO: add global table option.
 """
 
-import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
+
+FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'aws_dynamodb_ycsb'
 BENCHMARK_CONFIG = """
@@ -38,101 +38,94 @@ aws_dynamodb_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-AWS_CREDENTIAL_DIR = '/tmp/AWSCredentials.properties'
-FLAGS = flags.FLAGS
+AWS_REMOTE_CRED_DIR = '/tmp/AWSCredentials.properties'
 
 flags.DEFINE_string('aws_dynamodb_ycsb_awscredentials_properties',
                     './AWSCredentials.properties',
                     'The AWS credential location. Defaults to PKB top folder')
-flags.DEFINE_string('aws_dynamodb_ycsb_dynamodb_primarykey',
-                    'primary_key',
-                    'The primaryKey of dynamodb table.')
-flags.DEFINE_string('aws_dynamodb_ycsb_table',
-                    'pkb',
-                    'The dynamodb table name precursor.')
-flags.DEFINE_enum('aws_dynamodb_ycsb_consistentReads',
-                  'false', ['false', 'true'],
-                  "Consistent reads cost 2x eventual reads. "
-                  "'false' is default which is eventual")
+flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
+                     False,
+                     "Consistent reads cost 2x eventual reads. "
+                     "'false' is default which is eventual")
 
 
 def GetConfig(user_config):
-    config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-    if FLAGS['ycsb_client_vms'].present:
-        config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
-    return config
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites(benchmark_config):
-    """Verifies that the required resources are present.
-    Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-    """
-    ycsb.CheckPrerequisites()
+  """Verifies that the required resources are present.
+  Raises:
+  perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  ycsb.CheckPrerequisites()
 
 
 def Prepare(benchmark_spec):
-    """Install YCSB on the target vm.
-    Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-    """
-    benchmark_spec.always_call_cleanup = True
-    benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
-        region=FLAGS.zones[0],
-        table_name='{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri),
-        primary_key=FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey)
-    if benchmark_spec.dynamodb_instance.Exists():
-      logging.warning('DynamoDB table {0} exists, delete it first.'
-                      .format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri)),
-    benchmark_spec.dynamodb_instance._Delete()
-    benchmark_spec.dynamodb_instance._Create()
-    if not benchmark_spec.dynamodb_instance.Exists():
-      logging.warning('Failed to create DynamoDB table.')
-    benchmark_spec.dynamodb_instance._Delete()
-    vms = benchmark_spec.vms
-    # Install required packages.
-    vm_util.RunThreaded(_Install, vms)
-    benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
+  """Install YCSB on the target vm.
+  Args:
+  benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
+  """
+  benchmark_spec.always_call_cleanup = True
+
+  benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
+      table_name='pkb-{0}'.format(FLAGS.run_uri))
+  benchmark_spec.dynamodb_instance._Create()
+
+  vms = benchmark_spec.vms
+  # Install required packages.
+  vm_util.RunThreaded(_Install, vms)
+  benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
 
 
 def Run(benchmark_spec):
-    """Run YCSB on the target vm.
-    Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
-    Returns:
-    A list of sample.Sample objects.
-    """
-    vms = benchmark_spec.vms
+  """Run YCSB on the target vm.
+  Args:
+  benchmark_spec: The benchmark specification. Contains all data that is
+  required to run the benchmark.
+  Returns:
+  A list of sample.Sample objects.
+  """
+  vms = benchmark_spec.vms
 
-    run_kwargs = {
-        'dynamodb.awsCredentialsFile': AWS_CREDENTIAL_DIR,
-        'dynamodb.primaryKey': FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey,
-        'dynamodb.endpoint': 'http://dynamodb.{0}.amazonaws.com'
-                             .format(FLAGS.zones[0]),
-        'table': '{0}-{1}'.format(FLAGS.aws_dynamodb_ycsb_table, FLAGS.run_uri),
-        'dynamodb.consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
-    }
-    load_kwargs = run_kwargs.copy()
-    if FLAGS['ycsb_preload_threads'].present:
-        load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
-    samples = list(benchmark_spec.executor.LoadAndRun(
-        vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
-    return samples
+  run_kwargs = {
+      'dynamodb.awsCredentialsFile': AWS_REMOTE_CRED_DIR,
+      'dynamodb.primaryKey': FLAGS.aws_dynamodb_primarykey,
+      'dynamodb.endpoint': benchmark_spec.dynamodb_instance.GetEndPoint(),
+      'table': 'pkb-{0}'.format(FLAGS.run_uri),
+  }
+  if FLAGS.aws_dynamodb_use_sort:
+    run_kwargs.update({'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
+                       'dynamodb.hashKeyName': FLAGS.aws_dynamodb_primarykey,
+                       'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey, })
+  if FLAGS.aws_dynamodb_ycsb_consistentReads:
+    run_kwargs.update({'dynamodb.consistentReads': 'true', })
+  load_kwargs = run_kwargs.copy()
+  if FLAGS['ycsb_preload_threads'].present:
+    load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
+  samples = list(benchmark_spec.executor.LoadAndRun(
+      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  return samples
 
 
 def Cleanup(benchmark_spec):
-    """Cleanup YCSB on the target vm.
-    Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
-    """
-    benchmark_spec.dynamodb_instance._Delete()
+  """Cleanup YCSB on the target vm.
+  Args:
+  benchmark_spec: The benchmark specification. Contains all data that is
+  required to run the benchmark.
+  """
+
+
+  benchmark_spec.dynamodb_instance._Delete()
 
 
 def _Install(vm):
-    """Install YCSB on client 'vm'."""
-    vm.Install('ycsb')
-    # copy AWS creds
-    vm.RemoteCopy(FLAGS.aws_dynamodb_ycsb_awscredentials_properties, AWS_CREDENTIAL_DIR)
+  """Install YCSB on client 'vm'."""
+  vm.Install('ycsb')
+  # copy AWS creds
+  vm.RemoteCopy(FLAGS.aws_dynamodb_ycsb_awscredentials_properties,
+                AWS_REMOTE_CRED_DIR)

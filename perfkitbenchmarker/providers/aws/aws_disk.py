@@ -82,7 +82,7 @@ LOCAL_HDD_METADATA = {
 }
 
 LOCAL_HDD_PREFIXES = ['d2', 'hs']
-EBS_NVME_TYPES = ['c5', 'm5']
+EBS_NVME_TYPES = ['c5', 'm5', 'r5']
 LOCAL_NVME_TYPES = ['i3', 'f1']
 
 

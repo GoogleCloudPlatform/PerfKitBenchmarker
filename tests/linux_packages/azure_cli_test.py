@@ -97,7 +97,7 @@ class AzureCliTest(unittest.TestCase):
         'sudo apt-get update'
     ])
     self.assertInstallPackageCommandsEqual(['apt-transport-https', 'azure-cli'])
-    self.assertVmInstallCommandsEqual(['python', 'lsb_release'])
+    self.assertVmInstallCommandsEqual(['python', 'lsb_release', 'curl'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand', 'Install',
                                       'InstallPackages')
 

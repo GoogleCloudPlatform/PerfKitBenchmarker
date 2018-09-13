@@ -21,8 +21,10 @@ import itertools
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import windows_benchmarks
+from perfkitbenchmarker import windows_packages
 
 FLAGS = flags.FLAGS
 
@@ -137,6 +139,7 @@ BENCHMARK_SETS = {
             'pgbench',
             'ping',
             'redis_ycsb',
+            'resnet',
             'stencil2d',
             'speccpu2006',
             'sysbench',
@@ -259,9 +262,16 @@ class FlagZipNotFoundException(Exception):
 
 def _GetValidBenchmarks():
   """Returns a dict mapping valid benchmark names to their modules."""
-  if FLAGS.os_type == os_types.WINDOWS:
+  if FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
     return windows_benchmarks.VALID_BENCHMARKS
   return linux_benchmarks.VALID_BENCHMARKS
+
+
+def _GetValidPackages():
+  """Returns a dict mapping valid package names to their modules."""
+  if FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+    return windows_packages.PACKAGES
+  return linux_packages.PACKAGES
 
 
 def BenchmarkModule(benchmark_name):
@@ -275,6 +285,19 @@ def BenchmarkModule(benchmark_name):
   """
   valid_benchmarks = _GetValidBenchmarks()
   return valid_benchmarks.get(benchmark_name)
+
+
+def PackageModule(package_name):
+  """Finds the module for a package by name.
+
+  Args:
+    package_name: The name of the package.
+
+  Returns:
+    The package's module, or None if the package_name is invalid.
+  """
+  packages = _GetValidPackages()
+  return packages.get(package_name)
 
 
 def _GetBenchmarksFromUserConfig(user_config):
@@ -427,7 +450,7 @@ def GetBenchmarksFromFlags():
       crossed_axes.append([benchmark_tuple[1]['flags'] for
                            benchmark_tuple in zipped_axes])
 
-    for flag, values in flag_matrix.iteritems():
+    for flag, values in sorted(flag_matrix.iteritems()):
       crossed_axes.append([{flag: v} for v in values])
 
     for flag_config in itertools.product(*crossed_axes):

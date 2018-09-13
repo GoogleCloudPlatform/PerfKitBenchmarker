@@ -1,0 +1,17 @@
+{
+ "timing_type": "hp_timing",
+ "functions": {
+  "malloc": {
+   "": {
+    "duration": 1.2e+11,
+    "iterations": 2.82979e+09,
+    "time_per_iteration": 42.406,
+    "max_rss": 1800,
+    "threads": 1,
+    "min_size": 4,
+    "max_size": 32768,
+    "random_seed": 88
+   }
+  }
+ }
+}

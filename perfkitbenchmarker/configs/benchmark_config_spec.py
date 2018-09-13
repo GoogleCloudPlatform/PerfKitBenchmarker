@@ -30,11 +30,11 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import spark_service
-from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -107,8 +107,7 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verifies dpb(data processing backend) service dictionary of a
-    benchmark config object.
+    """Verifies dpb service dictionary of a benchmark config object.
 
     Args:
       value: dict Dpb Service config dictionary
@@ -125,9 +124,9 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
         value, component_full_name, flag_values)
 
     if (dpb_service_config['service_type'] == dpb_service.EMR and
-            component_full_name == 'dpb_wordcount_benchmark'):
-        if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
-            raise errors.Config.InvalidValue('EMR service requires S3.')
+        component_full_name == 'dpb_wordcount_benchmark'):
+      if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
+        raise errors.Config.InvalidValue('EMR service requires S3.')
     result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
                              flag_values, **dpb_service_config)
     return result
@@ -154,11 +153,12 @@ class _DpbServiceSpec(spec.BaseSpec):
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     """Gets decoder classes and constructor args for each configurable option.
-        Returns:
-          dict. Maps option name string to a (ConfigOptionDecoder class, dict)
-           pair. The pair specifies a decoder class and its __init__() keyword
-           arguments to construct in order to decode the named option.
-        """
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict)
+      pair. The pair specifies a decoder class and its __init__() keyword
+      arguments to construct in order to decode the named option.
+    """
     result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'static_dpb_service_instance': (option_decoders.StringDecoder, {
@@ -185,36 +185,37 @@ class _DpbServiceSpec(spec.BaseSpec):
   def _ApplyFlags(cls, config_values, flag_values):
     """Modifies config options based on runtime flag values.
 
-        Can be overridden by derived classes to add support for specific flags.
+    Can be overridden by derived classes to add support for specific flags.
 
-        Args:
-          config_values: dict mapping config option names to provided values.
-            May be modified by this function.
-          flag_values: flags.FlagValues. Runtime flags that may override the
-              provided config values.
-        """
+    Args:
+      config_values: dict mapping config option names to provided values.
+      May be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+      provided config values.
+    """
     super(_DpbServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['static_dpb_service_instance'].present:
       config_values['static_dpb_service_instance'] = (
           flag_values.static_dpb_service_instance)
     # TODO(saksena): Update the documentation for zones assignment
     if flag_values['zones'].present:
-      for group in ('worker_group'):
-        if group in config_values:
-          for cloud in config_values[group]['vm_spec']:
-            config_values[group]['vm_spec'][cloud]['zone'] = (
-                flag_values.zones[0])
+      group = 'worker_group'
+      if group in config_values:
+        for cloud in config_values[group]['vm_spec']:
+          config_values[group]['vm_spec'][cloud]['zone'] = (
+              flag_values.zones[0])
 
 
-class _CloudTpuSpec(spec.BaseSpec):
-  """Configurable options of a cloud TPU.
-  """
+class _TpuGroupSpec(spec.BaseSpec):
+  """Configurable options of a TPU."""
 
-  def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_CloudTpuSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+  def __init__(self, component_full_name, group_name, flag_values=None,
+               **kwargs):
+    super(_TpuGroupSpec, self).__init__('{0}.{1}'.format(
+        component_full_name, group_name), flag_values=flag_values, **kwargs)
     if not self.tpu_name:
-      self.tpu_name = 'pkb-tpu-%s' % flag_values.run_uri
+      self.tpu_name = 'pkb-tpu-{group_name}-{run_uri}'.format(
+          group_name=group_name, run_uri=flag_values.run_uri)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -225,7 +226,7 @@ class _CloudTpuSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_CloudTpuSpec, cls)._GetOptionDecoderConstructions()
+    result = super(_TpuGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
@@ -250,6 +251,9 @@ class _CloudTpuSpec(spec.BaseSpec):
         }),
         'tpu_name': (option_decoders.StringDecoder, {
             'default': None
+        }),
+        'tpu_preemptible': (option_decoders.BooleanDecoder, {
+            'default': False
         })
     })
     return result
@@ -266,7 +270,7 @@ class _CloudTpuSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    super(_CloudTpuSpec, cls)._ApplyFlags(config_values, flag_values)
+    super(_TpuGroupSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present:
       config_values['cloud'] = flag_values.cloud
     if flag_values['tpu_cidr_range'].present:
@@ -283,6 +287,8 @@ class _CloudTpuSpec(spec.BaseSpec):
       config_values['tpu_zone'] = flag_values.tpu_zone
     if flag_values['tpu_name'].present:
       config_values['tpu_name'] = flag_values.tpu_name
+    if flag_values['tpu_preemptible'].present:
+      config_values['tpu_preemptible'] = flag_values.tpu_preemptible
 
 
 class _EdwServiceDecoder(option_decoders.TypeVerifier):
@@ -293,7 +299,7 @@ class _EdwServiceDecoder(option_decoders.TypeVerifier):
         valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verifies edw service dictionary of a benchmark config object
+    """Verifies edw service dictionary of a benchmark config object.
 
     Args:
       value: dict edw service config dictionary
@@ -398,7 +404,8 @@ class _EdwServiceSpec(spec.BaseSpec):
     if flag_values['edw_service_cluster_snapshot'].present:
       config_values['snapshot'] = flag_values.edw_service_cluster_snapshot
     if flag_values['edw_service_cluster_identifier'].present:
-      config_values['cluster_identifier'] = flag_values.edw_service_cluster_identifier
+      config_values['cluster_identifier'] = (
+          flag_values.edw_service_cluster_identifier)
     if flag_values['edw_service_endpoint'].present:
       config_values['endpoint'] = flag_values.edw_service_endpoint
     if flag_values['edw_service_cluster_concurrency'].present:
@@ -521,6 +528,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                 managed_relational_db.MYSQL,
                 managed_relational_db.POSTGRES,
                 managed_relational_db.AURORA_POSTGRES,
+                managed_relational_db.AURORA_MYSQL,
             ]
         }),
         'zones': (option_decoders.ListDecoder, {
@@ -559,6 +567,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Modifies config options based on runtime flag values.
+
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
@@ -608,7 +617,7 @@ class _SparkServiceSpec(spec.BaseSpec):
   We may add more options here, such as disk specs, as necessary.
   When there are flags for these attributes, the convention is that
   the flag is prefixed with spark.  For example, the static_cluster_id
-  is overriden by the flag spark_static_cluster_id
+  is overridden by the flag spark_static_cluster_id
 
   Attributes:
     service_type: string.  pkb_managed or managed_service
@@ -950,15 +959,14 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'default': _DEFAULT_VM_COUNT,
             'min': 0
         }),
-        'enable_autoscaling': (option_decoders.BooleanDecoder, {
-            'default': False
-        }),
         'min_vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
+            'default': None,
+            'none_ok': True,
             'min': 0
         }),
         'max_vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
+            'default': None,
+            'none_ok': True,
             'min': 0
         }),
         'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
@@ -1065,15 +1073,14 @@ class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
     return result
 
 
-class _CloudTpuDecoder(option_decoders.TypeVerifier):
-  """Validate the cloud_tpu dictionary of a benchmark config object.
-  """
+class _TpuGroupsDecoder(option_decoders.TypeVerifier):
+  """Validate the tpu dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(_CloudTpuDecoder, self).__init__(valid_types=(dict,), **kwargs)
+    super(_TpuGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verify cloud_tpu dict of a benchmark config object.
+    """Verify tpu dict of a benchmark config object.
 
     Args:
       value: dict. Config dictionary
@@ -1083,23 +1090,27 @@ class _CloudTpuDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-      _CloudTpu built from the config passed in in value.
+      _Tpu built from the config passed in in value.
 
     Raises:
       errors.Config.InvalidateValue upon invalid input value.
     """
-    cloud_tpu_config = super(
-        _CloudTpuDecoder, self).Decode(value, component_full_name,
-                                       flag_values)
-    result = _CloudTpuSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **cloud_tpu_config)
+    tpu_group_configs = super(_TpuGroupsDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = {}
+    for tpu_group_name, tpu_group_config in tpu_group_configs.iteritems():
+      result[tpu_group_name] = _TpuGroupSpec(
+          self._GetOptionFullName(component_full_name),
+          tpu_group_name,
+          flag_values,
+          **tpu_group_config)
     return result
 
 
 class _CloudRedisSpec(spec.BaseSpec):
   """Specs needed to configure a cloud redis instance
   """
+
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_CloudRedisSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
@@ -1361,8 +1372,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'managed_relational_db': (_ManagedRelationalDbDecoder, {
             'default': None
         }),
-        'cloud_tpu': (_CloudTpuDecoder, {
-            'default': None
+        'tpu_groups': (_TpuGroupsDecoder, {
+            'default': {}
         }),
         'edw_service': (_EdwServiceDecoder, {
             'default': None
@@ -1383,11 +1394,11 @@ class BenchmarkConfigSpec(spec.BaseSpec):
       component_full_name: string. Fully qualified name of the configurable
           component containing the config options.
       config: dict mapping option name string to option value.
+      decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
       flag_values: flags.FlagValues. Runtime flags that may override provided
           config option values. These flags have already been applied to the
           current config, but they may be passed to the decoders for propagation
           to deeper spec constructors.
-      decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
     """
     # Decode benchmark-specific flags first and use them while decoding the
     # rest of the BenchmarkConfigSpec's options.
@@ -1404,7 +1415,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     Args:
       flag_values: flags.FlagValues object. Within the enclosed code block,
           reads and writes to this object are redirected to self.flags.
+    Yields:
+      context manager that redirects flag reads and writes.
     """
-    flags = FlagsDecoder().Decode(self.flags, 'flags', flag_values)
-    with flag_util.FlagDictSubstitution(flag_values, lambda: flags):
+    flgs = FlagsDecoder().Decode(self.flags, 'flags', flag_values)
+    with flag_util.FlagDictSubstitution(flag_values, lambda: flgs):
       yield

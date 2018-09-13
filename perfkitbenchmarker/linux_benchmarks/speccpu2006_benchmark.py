@@ -110,7 +110,8 @@ def Run(benchmark_spec):
     version_specific_parameters.append(' --rate=%s ' % vm.num_cpus)
   else:
     version_specific_parameters.append(' --speed ')
-  speccpu.Run(vm, FLAGS.benchmark_subset, version_specific_parameters)
+  speccpu.Run(vm, 'runspec',
+              FLAGS.benchmark_subset, version_specific_parameters)
 
   log_files = []
   # FIXME(liquncheng): Only reference runs generate SPEC scores. The log

@@ -41,6 +41,7 @@ import copy
 import csv
 import io
 import itertools
+import json
 import logging
 import math
 import operator
@@ -147,11 +148,15 @@ flags.DEFINE_enum('ycsb_requestdistribution',
 flags.DEFINE_float('ycsb_readproportion',
                    None,
                    'The read proportion, '
-                   'default is 0.5 in workloada and 0.95 in YCSB.')
+                   'Default is 0.5 in workloada and 0.95 in YCSB.')
 flags.DEFINE_float('ycsb_updateproportion',
                    None,
                    'The update proportion, '
-                   'default is 0.5 in workloada and 0.05 in YCSB')
+                   'Default is 0.5 in workloada and 0.05 in YCSB.')
+flags.DEFINE_float('ycsb_scanproportion',
+                   None,
+                   'The scan proportion, '
+                   'Default is 0 in workloada and 0 in YCSB.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -362,7 +367,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
 
 
 def ParseHdrLogFile(logfile):
-  """Parse a hdrhistogram log file into a list of (percentile, latency) value.
+  """Parse a hdrhistogram log file into a list of (percentile, latency, count).
 
   Example decrypted hdrhistogram logfile (value measures latency in microsec):
 
@@ -387,20 +392,24 @@ def ParseHdrLogFile(logfile):
     logfile: Hdrhistogram log file.
 
   Returns:
-    List of (percent, value) tuples
+    List of (percent, value, count) tuples
   """
   result = []
   last_percent_value = -1
+  prev_total_count = 0
   for row in logfile.split('\n'):
     if re.match(r'( *)(\d|\.)( *)', row):
       row_vals = row.split()
       # convert percentile to 100 based and round up to 3 decimal places
       percentile = math.floor(float(row_vals[1]) * 100000) / 1000.0
+      current_total_count = int(row_vals[2])
       if percentile > last_percent_value:
         # convert latency to millisec based and percentile to 100 based.
         latency = float(row_vals[0]) / 1000
-        result.append((percentile, latency))
+        count = current_total_count - prev_total_count
+        result.append((percentile, latency, count))
         last_percent_value = percentile
+        prev_total_count = current_total_count
   return result
 
 
@@ -415,8 +424,8 @@ def ParseHdrLogs(hdrlogs):
   """
   parsed_hdr_histograms = {}
   for group, logfile in hdrlogs.iteritems():
-    values_at_percent = ParseHdrLogFile(logfile)
-    parsed_hdr_histograms[group] = values_at_percent
+    values = ParseHdrLogFile(logfile)
+    parsed_hdr_histograms[group] = values
   return parsed_hdr_histograms
 
 
@@ -605,9 +614,6 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
         result['groups'][group_name][HISTOGRAM] = CombineHistograms(
             result['groups'][group_name][HISTOGRAM],
             group[HISTOGRAM])
-      elif measurement_type == HDRHISTOGRAM:
-        result['groups'][group_name][HDRHISTOGRAM] = combined_hdr.get(
-            group_name, [])
       elif measurement_type == TIMESERIES:
         result['groups'][group_name][TIMESERIES] = CombineTimeseries(
             result['groups'][group_name][TIMESERIES],
@@ -619,6 +625,11 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
                                        indiv['command_line']))
     if 'target' in result and 'target' in indiv:
       result['target'] += indiv['target']
+
+  if measurement_type == HDRHISTOGRAM:
+    for group_name in combined_hdr:
+      if group_name in result['groups']:
+        result['groups'][group_name][HDRHISTOGRAM] = combined_hdr[group_name]
 
   return result
 
@@ -685,11 +696,14 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
         yield sample.Sample(' '.join([group_name, label, 'latency']),
                             value, 'ms', meta)
     if group.get(HDRHISTOGRAM, []):
-      for percentile, value in group[HDRHISTOGRAM]:
-        yield sample.Sample(' '.join([group_name,
-                                      'p' + str(percentile),
-                                      'latency']),
-                            value, 'ms', meta)
+      histogram = []
+      for _, value, bucket_count in group[HDRHISTOGRAM]:
+        histogram.append({'microsec_latency': int(value * 1000),
+                          'count': bucket_count})
+      hist_meta = meta.copy()
+      hist_meta.update({'histogram': json.dumps(histogram)})
+      yield sample.Sample('{0} latency histogram'.format(group_name),
+                          0, '', hist_meta)
     if group.get(TIMESERIES):
       for sample_time, average_latency in group[TIMESERIES]:
         timeseries_meta = meta.copy()
@@ -964,6 +978,8 @@ class YCSBExecutor(object):
         parameters['readproportion'] = FLAGS.ycsb_readproportion
       if FLAGS.ycsb_updateproportion:
         parameters['updateproportion'] = FLAGS.ycsb_updateproportion
+      if FLAGS.ycsb_scanproportion:
+        parameters['scanproportion'] = FLAGS.ycsb_scanproportion
       parameters.update(kwargs)
       remote_path = posixpath.join(INSTALL_DIR,
                                    os.path.basename(workload_file))

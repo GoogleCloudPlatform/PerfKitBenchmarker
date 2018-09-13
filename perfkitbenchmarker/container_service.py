@@ -409,9 +409,8 @@ class BaseContainerCluster(resource.BaseResource):
     self.gpu_type = cluster_spec.vm_spec.gpu_type
     self.zone = cluster_spec.vm_spec.zone
     self.num_nodes = cluster_spec.vm_count
-    self.enable_autoscaling = cluster_spec.enable_autoscaling
-    self.min_nodes = cluster_spec.min_vm_count
-    self.max_nodes = cluster_spec.max_vm_count
+    self.min_nodes = cluster_spec.min_vm_count or self.num_nodes
+    self.max_nodes = cluster_spec.max_vm_count or self.num_nodes
     self.containers = collections.defaultdict(list)
     self.services = {}
 
@@ -434,6 +433,12 @@ class BaseContainerCluster(resource.BaseResource):
         'zone': self.zone,
         'size': self.num_nodes,
     }
+    if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
+      metadata.update({
+          'max_size': self.max_nodes,
+          'min_size': self.min_nodes,
+      })
+
     if self.gpu_count:
       metadata.update({
           'gpu_type': self.gpu_type,

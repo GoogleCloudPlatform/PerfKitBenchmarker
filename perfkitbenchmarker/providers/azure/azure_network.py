@@ -455,7 +455,8 @@ class AzureNetwork(network.BaseNetwork):
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
-    self.avail_set = AzureAvailSet(self.resource_group.name, self.zone)
+    avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
+    self.avail_set = AzureAvailSet(avail_set_name, self.zone)
 
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri

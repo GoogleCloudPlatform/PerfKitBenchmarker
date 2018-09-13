@@ -66,10 +66,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the OpenBLAS package on the VM."""
+  """Installs the MKL package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the OpenBLAS package on the VM."""
+  """Installs the MKL package on the VM."""
   _Install(vm)

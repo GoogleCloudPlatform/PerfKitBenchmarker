@@ -23,6 +23,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import service_principal
 
 FLAGS = flags.FLAGS
 
@@ -39,6 +40,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     self.sku = 'Basic'
     self._deleted = False
     self.acr_id = None
+    self.service_principal = service_principal.ServicePrincipal.GetInstance()
 
   def _Exists(self):
     """Returns True if the registry exists."""
@@ -70,13 +72,25 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     # This will be deleted along with the resource group
     self._deleted = True
 
+  def _PostCreate(self):
+    """Allow the service principle to read from the repository."""
+    create_role_assignment_cmd = [
+        azure.AZURE_PATH, 'role', 'assignment', 'create',
+        '--assignee', self.service_principal.app_id,
+        '--role', 'Reader',
+        '--scope', self.acr_id,
+    ]
+    vm_util.IssueRetryableCommand(create_role_assignment_cmd)
+
   def _CreateDependencies(self):
     """Creates the resource group."""
     self.resource_group.Create()
+    self.service_principal.Create()
 
   def _DeleteDependencies(self):
     """Deletes the resource group."""
     self.resource_group.Delete()
+    self.service_principal.Delete()
 
   def Login(self):
     """Logs in to the registry."""
@@ -102,7 +116,7 @@ class AksCluster(container_service.KubernetesCluster):
     super(AksCluster, self).__init__(spec)
     self.resource_group = azure_network.GetResourceGroup(self.zone)
     self.name = 'pkbcluster%s' % FLAGS.run_uri
-    self.service_principal_id = None
+    self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self._deleted = False
 
   # TODO(ferneyhough): Consider adding
@@ -118,6 +132,8 @@ class AksCluster(container_service.KubernetesCluster):
         '--location', self.zone,
         '--dns-name-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
+        '--service-principal', self.service_principal.app_id,
+        '--client-secret', self.service_principal.password,
     ] + self.resource_group.args, timeout=1800)
 
   def _Exists(self):
@@ -128,29 +144,28 @@ class AksCluster(container_service.KubernetesCluster):
         azure.AZURE_PATH, 'aks', 'show', '--name', self.name,
     ] + self.resource_group.args)
     try:
-      result = json.loads(stdout)
-      self.service_principal_id = result['servicePrincipalProfile']['clientId']
+      json.loads(stdout)
       return True
     except ValueError:
       return False
-
-  def _PostCreate(self):
-    """Authorize the cluster to pull images from ACR."""
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    registry = benchmark_spec.container_registry
-    if registry and registry.CLOUD == providers.AZURE:
-      create_role_assignment_cmd = [
-          azure.AZURE_PATH, 'role', 'assignment', 'create',
-          '--assignee', self.service_principal_id,
-          '--role', 'Reader',
-          '--scope', registry.acr_id,
-      ]
-      vm_util.IssueRetryableCommand(create_role_assignment_cmd)
 
   def _Delete(self):
     """Deletes the AKS cluster."""
     # This will be deleted along with the resource group
     self._deleted = True
+
+  def _PostCreate(self):
+    """Tags the cluster resource group."""
+    super(AksCluster, self)._PostCreate()
+    cluster_resource_group_name = 'MC_%s_%s_%s' % (
+        self.resource_group.name, self.name, self.zone)
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    tags = benchmark_spec.GetResourceTags(self.resource_group.timeout_minutes)
+    set_tags_cmd = [
+        azure.AZURE_PATH, 'group', 'update', '-g', cluster_resource_group_name,
+        '--set', 'tags=%s' % json.dumps(tags)
+    ]
+    vm_util.IssueCommand(set_tags_cmd)
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
@@ -175,7 +190,9 @@ class AksCluster(container_service.KubernetesCluster):
   def _CreateDependencies(self):
     """Creates the resource group."""
     self.resource_group.Create()
+    self.service_principal.Create()
 
   def _DeleteDependencies(self):
     """Deletes the resource group."""
     self.resource_group.Delete()
+    self.service_principal.Delete()

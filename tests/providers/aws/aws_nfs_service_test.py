@@ -52,6 +52,8 @@ _OWNER = 'joe'
 _NFS_TOKEN = 'nfs-token-%s' % _RUN_URI
 
 _TIER = 'generalPurpose'
+_THROUGHPUT_MODE = 'bursting'
+_PROVISIONED_THROUGHPUT = 100.0
 
 AwsResponses = collections.namedtuple('Responses', 'create describe')
 
@@ -129,6 +131,8 @@ class BaseTest(unittest.TestCase):
     self.mock_flags['temp_dir'].parse('/non/existent/temp/dir')
     self.mock_flags['aws_efs_token'].parse(None)
     self.mock_flags['aws_delete_file_system'].parse(True)
+    self.mock_flags['efs_throughput_mode'].parse(_THROUGHPUT_MODE)
+    self.mock_flags['efs_provisioned_throughput'].parse(_PROVISIONED_THROUGHPUT)
     for key, value in kwargs.iteritems():
       self.mock_flags[key].parse(value)
 
@@ -197,7 +201,8 @@ class AwsNfsServiceTest(BaseTest):
   def testCreateFiler(self):
     nfs = self._CreateFiler()
     self.assertEqual(_FILE_ID, nfs.filer_id)
-    self.issue_cmd.CreateFiler.assert_called_with(_NFS_TOKEN, _TIER)
+    self.issue_cmd.CreateFiler.assert_called_with(
+        _NFS_TOKEN, _TIER, _THROUGHPUT_MODE, _PROVISIONED_THROUGHPUT)
 
   def testDeleteFiler(self):
     nfs = self._CreateFiler()
@@ -239,7 +244,8 @@ class AwsNfsServiceTest(BaseTest):
     self.issue_cmd.CreateMount.return_value = _MOUNT_ID
     nfs.Create()
     nfs.Delete()
-    self.issue_cmd.CreateFiler.assert_called_with(_NFS_TOKEN, _TIER)
+    self.issue_cmd.CreateFiler.assert_called_with(
+        _NFS_TOKEN, _TIER, _THROUGHPUT_MODE, _PROVISIONED_THROUGHPUT)
     self.issue_cmd.AddTagsToFiler.assert_called_with(_FILE_ID)
     self.issue_cmd.WaitUntilFilerAvailable.assert_called_with(_FILE_ID)
     self.issue_cmd.CreateMount.assert_called_with(_FILE_ID, _SUBNET_ID,
@@ -282,7 +288,7 @@ class AwsVirtualMachineTest(BaseTest):
     host = 'FSID.efs.us-east-1.amazonaws.com'
     mount_cmd = ('sudo mkdir -p /scratch;'
                  'sudo mount -t nfs -o {mount_opt} {host}:/ /scratch && '
-                 'sudo chown -R $USER:$USER /scratch;').format(
+                 'sudo chown $USER:$USER /scratch;').format(
                      mount_opt=mount_opt, host=host)
     fstab_cmd = ('echo "{host}:/ /scratch nfs {mount_opt}"'
                  ' | sudo tee -a /etc/fstab').format(
@@ -303,7 +309,7 @@ class AwsVirtualMachineTest(BaseTest):
         '-t ext4 -b 4096 /dev/xvdb')
     mount_cmd = ('sudo mkdir -p /scratch;'
                  'sudo mount -o discard /dev/xvdb /scratch && '
-                 'sudo chown -R $USER:$USER /scratch;')
+                 'sudo chown $USER:$USER /scratch;')
     fstab_cmd = ('echo "/dev/xvdb /scratch ext4 defaults" | sudo tee -a '
                  '/etc/fstab')
 
@@ -327,20 +333,17 @@ class AwsEfsCommandsTest(BaseTest):
     self.issue_cmd.return_value = (txt, '', 0)
 
   def assertCalled(self, *args):
-    cmd = ['aws', '--output', 'json', '--region', _AWS_REGION, 'efs'
-           ] + list(args)
+    cmd = ['aws', '--output', 'json', '--region', _AWS_REGION,
+           'efs'] + list(args)
     self.issue_cmd.assert_called_with(cmd)
 
-  def testCreateFilerNoTier(self):
+  def testCreateFiler(self):
     self._SetResponse(_FILER.create)
-    self.aws.CreateFiler(_NFS_TOKEN)
-    self.assertCalled('create-file-system', '--creation-token', _NFS_TOKEN)
-
-  def testCreateFilerWithTier(self):
-    self._SetResponse(_FILER.create)
-    self.aws.CreateFiler(_NFS_TOKEN, _TIER)
+    self.aws.CreateFiler(_NFS_TOKEN, _TIER, _THROUGHPUT_MODE,
+                         _PROVISIONED_THROUGHPUT)
     self.assertCalled('create-file-system', '--creation-token', _NFS_TOKEN,
-                      '--performance-mode', _TIER)
+                      '--performance-mode', _TIER, '--throughput-mode',
+                      _THROUGHPUT_MODE)
 
   def testAddTags(self):
     self._SetResponse()

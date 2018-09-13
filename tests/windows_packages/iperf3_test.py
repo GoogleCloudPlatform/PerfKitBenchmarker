@@ -109,7 +109,7 @@ class Iperf3TestCase(unittest.TestCase, test_util.SamplesTestMixin):
         'receiving_zone': receiving_vm.zone,
         'sending_machine_type': sending_vm.machine_type,
         'sending_zone': sending_vm.zone,
-        'internal_ip_used': internal_ip_used
+        'internal_ip_used': internal_ip_used,
     }
 
     expected_samples = [
@@ -141,7 +141,8 @@ class Iperf3TestCase(unittest.TestCase, test_util.SamplesTestMixin):
           'sending_machine_type': sending_vm.machine_type,
           'sending_zone': sending_vm.zone,
           'thread_id': thread_id,
-          'internal_ip_used': True
+          'internal_ip_used': True,
+          'tcp_window_size': None,
       }
 
     expected_samples = [

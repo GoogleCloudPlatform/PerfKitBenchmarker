@@ -103,3 +103,6 @@ flags.DEFINE_string('gcp_service_account', None, 'Service account to use for '
 flags.DEFINE_string('gcp_service_account_key_file', None,
                     'Local path to file that contains a private authorization '
                     'key, used to activate gcloud.')
+flags.DEFINE_list('gce_tags', None, 'List of --tags when creating a VM')
+flags.DEFINE_boolean('gke_enable_alpha', False,
+                     'Whether to enable alpha kubernetes clusters.')

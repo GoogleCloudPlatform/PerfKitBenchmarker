@@ -57,7 +57,6 @@ NVME = 'NVME'
 SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
-WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
@@ -68,6 +67,14 @@ _GPU_TYPE_TO_INTERAL_NAME_MAP = {
     'p100': 'nvidia-tesla-p100',
     'v100': 'nvidia-tesla-v100',
 }
+
+
+class GceUnexpectedWindowsAdapterOutputError(Exception):
+  """Raised when querying the status of a windows adapter failed."""
+
+
+class GceDriverDoesntSupportFeatureError(Exception):
+  """Raised if there is an attempt to set a feature not supported."""
 
 
 class GceVmSpec(virtual_machine.BaseVmSpec):
@@ -141,6 +148,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       else:
         # Specifying gcp_min_cpu_platform explicitly removes any config.
         config_values.pop('min_cpu_platform', None)
+    if flag_values['gce_tags'].present:
+      config_values['gce_tags'] = flag_values.gce_tags
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -162,10 +171,21 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'project': (option_decoders.StringDecoder, {'default': None}),
         'image_family': (option_decoders.StringDecoder, {'default': None}),
         'image_project': (option_decoders.StringDecoder, {'default': None}),
-        'node_type': (option_decoders.StringDecoder,
-                      {'default': 'n1-node-96-624'}),
+        'node_type': (
+            option_decoders.StringDecoder,
+            {
+                'default': 'n1-node-96-624'
+            }
+        ),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
         'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
+        'gce_tags': (
+            option_decoders.ListDecoder,
+            {
+                'item_decoder': option_decoders.StringDecoder(),
+                'default': None
+            }
+        ),
     })
     return result
 
@@ -343,6 +363,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
+    self.gce_tags = vm_spec.gce_tags
 
   @property
   def host_list(self):
@@ -385,7 +406,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.gpu_count:
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
-    cmd.flags['tags'] = 'perfkitbenchmarker'
+    cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
     cmd.flags['no-restart-on-failure'] = True
     if self.node_group:
       cmd.flags['node-group'] = self.node_group.name
@@ -569,8 +590,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
                              self.name)
-    cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
-                                     for key, value in kwargs.iteritems())
+    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    if kwargs:
+      cmd.flags['metadata'] = '{metadata},{kwargs}'.format(
+          metadata=cmd.flags['metadata'],
+          kwargs=util.FormatTags(kwargs))
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
@@ -610,6 +634,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gpu_count'] = self.gpu_count
     if self.gce_accelerator_type_override:
       result['accelerator_type_override'] = self.gce_accelerator_type_override
+    if self.gce_tags:
+      result['gce_tags'] = ','.join(self.gce_tags)
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -621,20 +647,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.')
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 
     Use --gce_preprovisioned_data_bucket to specify the name of the bucket.
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
-        install_path, benchmark_name, filename))
+    self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
+        install_path, module_name, filename))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
@@ -688,9 +713,9 @@ class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
-class Ubuntu1710BasedGceVirtualMachine(GceVirtualMachine,
-                                       linux_vm.Ubuntu1710Mixin):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1710'
+class Ubuntu1804BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1804Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
@@ -698,7 +723,8 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
   """Class supporting Windows GCE virtual machines."""
 
-  DEFAULT_IMAGE = WINDOWS_IMAGE
+  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
   BOOT_DISK_SIZE_GB = 50
   BOOT_DISK_TYPE = gce_disk.PD_SSD
 
@@ -731,11 +757,53 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     response = json.loads(stdout)
     self.password = response['password']
 
+  @vm_util.Retry(
+      max_retries=10,
+      retryable_exceptions=(GceUnexpectedWindowsAdapterOutputError,
+                            errors.VirtualMachine.RemoteCommandError))
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
 
-def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
-                                                       benchmark_name,
-                                                       filename):
+    Returns:
+      dict mapping metadata key to value.
+    """
+    result = super(WindowsGceVirtualMachine, self).GetResourceMetadata()
+    result['disable_rss'] = self.disable_rss
+    return result
+
+  def DisableRSS(self):
+    """Disables RSS on the GCE VM.
+
+    Raises:
+      GceDriverDoesntSupportFeatureError: If RSS is not supported.
+      GceUnexpectedWindowsAdapterOutputError: If querying the RSS state
+        returns unexpected output.
+    """
+    # First ensure that the driver supports interrupt moderation
+    net_adapters, _ = self.RemoteCommand('Get-NetAdapter')
+    if 'Red Hat VirtIO Ethernet Adapter' not in net_adapters:
+      raise GceDriverDoesntSupportFeatureError(
+          'Driver not tested with RSS disabled in PKB.')
+
+    command = 'netsh int tcp set global rss=disabled'
+    self.RemoteCommand(command)
+    try:
+      self.RemoteCommand('Restart-NetAdapter -Name "Ethernet"')
+    except IOError:
+      # Restarting the network adapter will always fail because
+      # the winrm connection used to issue the command will be
+      # broken.
+      pass
+
+    # Verify the setting went through
+    stdout, _ = self.RemoteCommand('netsh int tcp show global')
+    if 'Receive-Side Scaling State          : enabled' in stdout:
+      raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
+
+
+def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                              filename):
   """Returns a string used to download preprovisioned data."""
   return 'gsutil -q cp gs://%s/%s/%s %s' % (
-      FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+      FLAGS.gcp_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))

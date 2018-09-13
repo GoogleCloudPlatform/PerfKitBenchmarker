@@ -62,16 +62,15 @@ VM specs, disk specs, or any component of the benchmark configuration
 dictionary.
 """
 
-import contextlib2
 import copy
-import functools32
 import logging
 import re
-import yaml
-
+import contextlib2
+import functools32
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+import yaml
 
 FLAGS = flags.FLAGS
 CONFIG_CONSTANTS = 'default_config_constants.yaml'
@@ -242,6 +241,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
     the override_config.
   """
   def _Merge(d1, d2):
+    """Merge two nested dicts."""
     merged_dict = copy.deepcopy(d1)
     for k, v in d2.iteritems():
       if k not in d1:
@@ -249,7 +249,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
         if warn_new_key:
           logging.warning('The key "%s" was not in the default config, '
                           'but was in user overrides. This may indicate '
-                          'a typo.' % k)
+                          'a typo.', k)
       elif isinstance(d1[k], dict) and isinstance(v, dict):
         merged_dict[k] = _Merge(d1[k], v)
       else:

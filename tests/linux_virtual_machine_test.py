@@ -117,7 +117,7 @@ class TestDiskOperations(unittest.TestCase):
   def testMountDisk(self):
     mkdir_cmd = ('sudo mkdir -p mp;'
                  'sudo mount -o discard dp mp && '
-                 'sudo chown -R $USER:$USER mp;')
+                 'sudo chown $USER:$USER mp;')
     fstab_cmd = 'echo "dp mp ext4 defaults" | sudo tee -a /etc/fstab'
     self.vm.MountDisk('dp', 'mp')
     self.assertRemoteHostCalled(mkdir_cmd, fstab_cmd)
@@ -132,7 +132,7 @@ class TestDiskOperations(unittest.TestCase):
   def testNfsMountDisk(self):
     mkdir_cmd = ('sudo mkdir -p mp;'
                  'sudo mount -t nfs -o hard,ro dp mp && '
-                 'sudo chown -R $USER:$USER mp;')
+                 'sudo chown $USER:$USER mp;')
     fstab_cmd = 'echo "dp mp nfs ro" | sudo tee -a /etc/fstab'
     self.vm.MountDisk('dp', 'mp',
                       disk_type='nfs', mount_options='hard,ro',
