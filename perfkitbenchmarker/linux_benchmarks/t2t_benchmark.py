@@ -18,6 +18,8 @@ https://github.com/tensorflow/tensor2tensor
 This benchmark can run any tensor2tensor model, including ones that target TPU's
 """
 
+import logging
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -131,10 +133,16 @@ def _MakeSamplesFromOutput(metadata, output):
       mnist_benchmark.ExtractThroughput(r'global_step/sec: (\S+)', output,
                                         metadata, 'Global Steps Per Second',
                                         'global_steps/sec'))
-  samples.extend(
-      mnist_benchmark.ExtractThroughput(r'examples/sec: (\S+)', output,
-                                        metadata, 'Examples Per Second',
-                                        'examples/sec'))
+
+  # TODO(b/115633403) Workaround until t2t can use TPUEstimator on a GPU
+  try:
+    samples.extend(
+        mnist_benchmark.ExtractThroughput(r'examples/sec: (\S+)', output,
+                                          metadata, 'Examples Per Second',
+                                          'examples/sec'))
+  except regex_util.NoMatchError:
+    logging.info('examples/sec sample not collected')
+
   pattern = (r'Saving dict for global step \d+: .*global_step = (\d+), '
              r'.*loss = (\d+\.\d+), '
              r'.*accuracy = (\d+\.\d+), '
