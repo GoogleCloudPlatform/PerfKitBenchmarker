@@ -198,7 +198,7 @@ def _Install(vm):
   install_cmd = ('mkdir -p {0} && curl -L {1} | '
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
-  if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
+  if FLAGS.ycsb_version >= '0.11.0':
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
     vm.RemoteCommand('sudo apt-get --assume-yes install maven > /dev/null 2>&1')
     vm.RemoteCommand('cd {0}; mvn install > /dev/null 2>&1'.format(
