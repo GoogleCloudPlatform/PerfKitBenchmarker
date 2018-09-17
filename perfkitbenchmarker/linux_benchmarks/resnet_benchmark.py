@@ -159,6 +159,8 @@ def _CreateMetadataDict(benchmark_spec):
       'eval_batch_size': benchmark_spec.eval_batch_size,
       'iterations': benchmark_spec.iterations,
       'num_shards': benchmark_spec.num_shards,
+      'num_shards_train': benchmark_spec.num_shards_train,
+      'num_shards_eval': benchmark_spec.num_shards_eval,
       'data_format': benchmark_spec.data_format,
       'precision': benchmark_spec.precision,
       'commit': benchmark_spec.commit,
