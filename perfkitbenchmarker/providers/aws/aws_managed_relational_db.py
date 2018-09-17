@@ -28,7 +28,7 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-DEFAULT_MYSQL_VERSION = '5.7.22'
+DEFAULT_MYSQL_VERSION = '5.7.16'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 
 DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
