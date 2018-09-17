@@ -285,7 +285,7 @@ def Run(benchmark_spec):
     metadata['range_step'] = transfer_size_range[2]
 
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all' %
-                 cuda_toolkit.CUDA_TOOLKIT_INSTALL_DIR)
+                 metadata['cuda_toolkit_installation_dir'])
   if mode == 'range':
     run_command += (' --mode=range --start={0} --end={1} --increment={2}'
                     .format(transfer_size_range[0], transfer_size_range[1],

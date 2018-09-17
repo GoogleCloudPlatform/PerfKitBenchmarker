@@ -15,6 +15,7 @@
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
 - Updated GCP sole tenancy support.  Removed `gcp_host_type` added
   `gcp_node_type`.
+- Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
