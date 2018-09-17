@@ -297,3 +297,4 @@
 - Fix a bug of getting the number of TPU cores.
 - Set number of images in ResNet benchmark command so it can support other datasets.
 - Sysbench supports benchmarking MySQL 5.6
+- Update memcached server to install from a pre-built package provided by the operating system.
