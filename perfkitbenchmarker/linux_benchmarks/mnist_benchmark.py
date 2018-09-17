@@ -100,10 +100,12 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.eval_steps = FLAGS.mnist_eval_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
-  benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
-  benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
+  benchmark_spec.num_shards_train = 0
+  benchmark_spec.num_shards_eval = 0
   if benchmark_spec.use_tpu:
     tpu_groups = benchmark_spec.tpu_groups
+    benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
+    benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
     if 'train' in tpu_groups:
       tpu_train = tpu_groups['train']
       benchmark_spec.tpu_train = tpu_train.GetName()
@@ -194,6 +196,8 @@ def _CreateMetadataDict(benchmark_spec):
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
       'num_shards': benchmark_spec.num_shards,
+      'num_shards_train': benchmark_spec.num_shards_train,
+      'num_shards_eval': benchmark_spec.num_shards_eval,
       'num_train_images': benchmark_spec.num_train_images,
       'num_eval_images': benchmark_spec.num_eval_images,
       'train_epochs': benchmark_spec.train_epochs,
