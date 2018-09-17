@@ -29,27 +29,29 @@ from perfkitbenchmarker import vm_util
 BEAM_JAVA_SDK = 'java'
 BEAM_PYTHON_SDK = 'python'
 
-# TODO: For backwards compatibility only. To be deleted when not used.
-flags.DEFINE_string('beam_it_profile', None, 'Profile to activate integration test.')
-
 flags.DEFINE_string('gradle_binary', None,
                     'Set to use a different gradle binary than gradle wrapper from the repository')
 flags.DEFINE_string('python_binary', 'python',
                     'Set to use a different python binary that is on the PATH.')
-flags.DEFINE_string('beam_location', None, 'Location of already checked out Beam codebase.')
+flags.DEFINE_string('beam_location', None,
+                    'Location of already checked out Beam codebase.')
 flags.DEFINE_string('beam_it_module', None,
                     'Module containing integration test. For Python SDK, use '
                     'comma-separated list to include multiple modules.')
-flags.DEFINE_boolean('beam_prebuilt', False, 'Set this to indicate that the repo in beam_location '
-                                             'does not need to be rebuilt before being used')
+flags.DEFINE_boolean('beam_prebuilt', False,
+                     'Set this to indicate that the repo in beam_location '
+                     'does not need to be rebuilt before being used')
 flags.DEFINE_integer('beam_it_timeout', 600, 'Integration Test Timeout.')
 flags.DEFINE_string('git_binary', 'git', 'Path to git binary.')
-flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use tag from Github '
-                                          'as value. If not specified, will use HEAD.')
+flags.DEFINE_string('beam_version', None,
+                    'Version of Beam to download. Use tag from Github '
+                    'as value. If not specified, will use HEAD.')
 flags.DEFINE_enum('beam_sdk', None, [BEAM_JAVA_SDK, BEAM_PYTHON_SDK],
                   'Which BEAM SDK is used to build the benchmark pipeline.')
 flags.DEFINE_string('beam_python_attr', 'IT',
                     'Test decorator that is used in Beam Python to filter a specific category.')
+flags.DEFINE_string('beam_python_sdk_location', None,
+                    'Python SDK tar ball location. It is a required option to run Python pipeline.')
 
 flags.DEFINE_string('beam_extra_properties', None,
                     'Allows to specify list of key-value pairs that will be '
@@ -59,8 +61,9 @@ flags.DEFINE_string('beam_runner', 'dataflow', 'Defines runner which will be use
 flags.DEFINE_string('beam_runner_option', None,
                     'Overrides any pipeline options to specify the runner.')
 
-flags.DEFINE_string('beam_filesystem', None, 'Defines filesystem which will be used in tests. '
-                                             'If not specified it will use runner\'s local filesystem.')
+flags.DEFINE_string('beam_filesystem', None,
+                    'Defines filesystem which will be used in tests. '
+                    'If not specified it will use runner\'s local filesystem.')
 
 FLAGS = flags.FLAGS
 
@@ -183,7 +186,6 @@ def BuildBeamCommand(benchmark_spec, classname, job_arguments):
     cmd = _BuildGradleCommand(classname, job_arguments)
   elif FLAGS.beam_sdk == BEAM_PYTHON_SDK:
     cmd = _BuildPythonCommand(benchmark_spec, classname, job_arguments)
-    base_dir = _GetBeamPythonDir()
   else:
     raise NotImplementedError('Unsupported Beam SDK: %s.' % FLAGS.beam_sdk)
 
@@ -229,7 +231,16 @@ def _BuildGradleCommand(classname, job_arguments):
 
 
 def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
-  """ Constructs a Python command for the benchmark.
+  """ Constructs Gradle command for Python benchmark.
+
+  Python integration tests can be invoked from Gradle task
+  `beam-sdks-python:integrationTest`. How Python Gradle command constructs
+  is different from Java. In order to run tests, we can use following
+  project properties:
+
+    -Pattr: a nose flag that filters tests by attributes
+    -Ptests: a nose flag that filters tests by name
+    -PpipelineOptions: a set of pipeline options needed to run Beam job
 
   Args:
     benchmark_spec: The PKB spec for the benchmark to run.
@@ -242,28 +253,23 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
 
   cmd = []
 
-  python_executable = FLAGS.python_binary
-  if not vm_util.ExecutableOnPath(python_executable):
-    raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % python_executable)
-  cmd.append(python_executable)
+  gradle_executable = _GetGradleCommand()
 
-  cmd.append('setup.py')
-  cmd.append('nosetests')
-  cmd.append('--tests={}'.format(modulename))
-  cmd.append('--attr={}'.format(FLAGS.beam_python_attr))
+  if not vm_util.ExecutableOnPath(gradle_executable):
+    raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % gradle_executable)
+
+  cmd.append(gradle_executable)
+  cmd.append('beam-sdks-python:integrationTest')
+  cmd.append('-Ptests={}'.format(modulename))
+  cmd.append('-Pattr={}'.format(FLAGS.beam_python_attr))
 
   beam_args = job_arguments if job_arguments else []
 
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    python_binary = _FindFiles(_GetBeamPythonDir(), 'apache-beam*.tar.gz')
-    if len(python_binary) == 0:
-      raise RuntimeError('No python binary is found')
+    beam_args.append('--runner={}'.format(FLAGS.beam_runner))
+    beam_args.append('--sdk_location={}'.format(FLAGS.beam_python_sdk_location))
 
-    beam_args.append('"--runner=TestDataflowRunner"')
-    beam_args.append('"--sdk_location={}"'.format(python_binary[0]))
-
-  cmd.append('--test-pipeline-options='
-             '{}'.format(' '.join(beam_args)))
+  cmd.append('-PpipelineOptions={}'.format(' '.join(beam_args)))
 
   return cmd
 
