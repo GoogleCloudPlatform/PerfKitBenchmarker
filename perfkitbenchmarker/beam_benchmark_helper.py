@@ -71,6 +71,8 @@ SUPPORTED_RUNNERS = [dpb_service.DATAFLOW]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 
+DEFAULT_PYTHON_TAR_PATTERN = 'apache-beam-*.tar.gz'
+
 
 def AddModuleArgument(command, module):
   if module:
@@ -267,7 +269,15 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
 
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
     beam_args.append('--runner={}'.format(FLAGS.beam_runner))
-    beam_args.append('--sdk_location={}'.format(FLAGS.beam_python_sdk_location))
+
+    sdk_location = FLAGS.beam_python_sdk_location
+    if not sdk_location:
+      tar_list = _FindFiles(_GetBeamPythonDir(), DEFAULT_PYTHON_TAR_PATTERN)
+      if not tar_list:
+        raise RuntimeError('No python sdk tar file is available.')
+      else:
+        sdk_location = tar_list[0]
+    beam_args.append('--sdk_location={}'.format(sdk_location))
 
   cmd.append('-PpipelineOptions={}'.format(' '.join(beam_args)))
 
