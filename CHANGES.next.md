@@ -179,6 +179,7 @@
 - Add default tags like timeout_utc to GCE.
 - Add validation to all the TPU tests.
 - Add number of Train/Eval TPU shards in metadata.
+- The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

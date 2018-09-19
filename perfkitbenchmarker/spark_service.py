@@ -38,6 +38,9 @@ from perfkitbenchmarker import vm_util
 flags.DEFINE_string('spark_static_cluster_id', None,
                     'If set, the name of the Spark cluster, assumed to be '
                     'ready.')
+flags.DEFINE_enum('spark_service_log_level', 'INFO', ['DEBUG', 'INFO', 'FATAL'],
+                  'Supported log levels when submitting jobs to spark service'
+                  ' clusters.')
 
 
 # Cloud to use for pkb-created Spark service.

@@ -133,10 +133,11 @@ class GcpDataproc(spark_service.BaseSparkService):
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
-    # stdout of the job.  We set the driver log level to FATAL
+    # stdout of the job.  We can set the driver log level to FATAL
     # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
-    cmd.flags['driver-log-levels'] = 'root=FATAL'
+    cmd.flags['driver-log-levels'] = 'root={}'.format(
+        FLAGS.spark_service_log_level)
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
