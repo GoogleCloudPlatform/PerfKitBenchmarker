@@ -1,0 +1,27 @@
+INFO:tensorflow:Running local_init_op.
+INFO:tensorflow:Done running local_init_op.
+INFO:tensorflow:Saving checkpoints for 1 into /tmp/model.ckpt.
+INFO:tensorflow:loss = 9.658998, step = 0
+INFO:tensorflow:global_step/sec: 3.04983
+INFO:tensorflow:loss = 8.562329, step = 100 (32.790 sec)
+INFO:tensorflow:global_step/sec: 4.12771
+INFO:tensorflow:loss = 7.942729, step = 200 (24.226 sec)
+INFO:tensorflow:global_step/sec: 4.11027
+INFO:tensorflow:loss = 7.4658012, step = 300 (24.329 sec)
+INFO:tensorflow:global_step/sec: 4.10924
+INFO:tensorflow:loss = 7.042727, step = 400 (24.335 sec)
+INFO:tensorflow:global_step/sec: 4.12186
+INFO:tensorflow:loss = 7.112401, step = 500 (24.261 sec)
+INFO:tensorflow:global_step/sec: 4.08434
+INFO:tensorflow:loss = 6.8120637, step = 600 (24.484 sec)
+INFO:tensorflow:global_step/sec: 4.10174
+INFO:tensorflow:loss = 6.7845583, step = 700 (24.380 sec)
+INFO:tensorflow:global_step/sec: 4.11809
+INFO:tensorflow:loss = 6.710977, step = 800 (24.283 sec)
+INFO:tensorflow:global_step/sec: 4.10496
+INFO:tensorflow:loss = 6.4642797, step = 900 (24.361 sec)
+INFO:tensorflow:Saving checkpoints for 1000 into /tmp/model.ckpt.
+INFO:tensorflow:Loss for final step: 6.1643744.
+INFO:tensorflow:Saving dict for global step 1000: global_step = 1000, loss = 7.2263174, metrics-translate_ende_wmt32k_packed/targets/accuracy = 0.13972056, metrics-translate_ende_wmt32k_packed/targets/accuracy_per_sequence = 0.0, metrics-translate_ende_wmt32k_packed/targets/accuracy_top5 = 0.24800399, metrics-translate_ende_wmt32k_packed/targets/approx_bleu_score = 0.012195683, metrics-translate_ende_wmt32k_packed/targets/neg_log_perplexity = -7.2263174, metrics-translate_ende_wmt32k_packed/targets/rouge_2_fscore = 0.044406824, metrics-translate_ende_wmt32k_packed/targets/rouge_L_fscore = 0.22107843
+
+

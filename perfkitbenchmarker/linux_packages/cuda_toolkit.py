@@ -118,6 +118,7 @@ def GetMetadata(vm):
   metadata = {}
   clock_speeds = QueryGpuClockSpeed(vm, 0)
   autoboost_policy = QueryAutoboostPolicy(vm, 0)
+  metadata['cuda_toolkit_installation_dir'] = FLAGS.cuda_toolkit_installation_dir
   metadata['cuda_toolkit_version'] = FLAGS.cuda_toolkit_version
   metadata['gpu_memory_clock'] = clock_speeds[0]
   metadata['gpu_graphics_clock'] = clock_speeds[1]

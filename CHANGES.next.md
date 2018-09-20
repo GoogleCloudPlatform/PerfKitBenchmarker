@@ -15,6 +15,7 @@
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
 - Updated GCP sole tenancy support.  Removed `gcp_host_type` added
   `gcp_node_type`.
+- Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -119,8 +120,9 @@
 - Added `time_commands` flag to enable diagnostic timing of commands
 - Added image processing speed in mnist.
 - Updated cloud TPU model link.
-- Updated AWS spot instance creation and added
-  spot instance failure metadata support.
+- Updated AWS spot instance creation.
+- Added support for extending the failure sample with metadata if AWS spot VMs
+  or GCP preemptible VMs are interrupted.
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
@@ -176,6 +178,8 @@
 - Change train_steps to train_epochs in TPU test.
 - Add default tags like timeout_utc to GCE.
 - Add validation to all the TPU tests.
+- Add number of Train/Eval TPU shards in metadata.
+- The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -296,3 +300,4 @@
 - Fix a bug of getting the number of TPU cores.
 - Set number of images in ResNet benchmark command so it can support other datasets.
 - Sysbench supports benchmarking MySQL 5.6
+- Update memcached server to install from a pre-built package provided by the operating system.
