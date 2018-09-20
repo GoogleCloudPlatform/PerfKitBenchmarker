@@ -182,6 +182,11 @@
 - The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
 - Updated openjdk 8 installation to support newer ycsb versions (after 0.13.0);
   Improved hdrhistogram result reporting in ycsb.py.
+- Added flag `--ntttcp_udp` to allow the user to run UDP tests with ntttcp.
+- Added flag `--ntttcp_packet_size` to allow user to set the packet size in
+  ntttcp tests.
+- Extract more data from the ntttcp results file and put into the metadata of
+  the samples.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
