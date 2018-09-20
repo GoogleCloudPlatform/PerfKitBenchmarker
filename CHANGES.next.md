@@ -180,6 +180,8 @@
 - Add validation to all the TPU tests.
 - Add number of Train/Eval TPU shards in metadata.
 - The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
+- Updated openjdk 8 installation to support newer ycsb versions (after 0.13.0);
+  Improved hdrhistogram result reporting in ycsb.py.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
