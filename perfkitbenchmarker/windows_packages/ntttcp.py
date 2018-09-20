@@ -38,6 +38,11 @@ flags.DEFINE_integer('ntttcp_threads', 1,
 flags.DEFINE_integer('ntttcp_time', 60,
                      'The number of seconds for NTttcp to run.')
 
+flags.DEFINE_bool('ntttcp_udp', False, 'Whether to run a UDP test.')
+
+flags.DEFINE_integer('ntttcp_packet_size', None,
+                     'The size of the packet being used in the test.')
+
 CONTROL_PORT = 6001
 BASE_DATA_PORT = 5001
 NTTTCP_RETRIES = 10
@@ -62,75 +67,111 @@ def _RunNtttcp(vm, options):
   vm.RemoteCommand(command, timeout=timeout_duration)
 
 
+def _RemoveXml(vm):
+  ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
+  rm_command = 'cd {ntttcp_exe_dir}; rm xml.txt'.format(
+      ntttcp_exe_dir=ntttcp_exe_dir)
+  vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
+
+
+def _CatXml(vm):
+  ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
+  cat_command = 'cd {ntttcp_exe_dir}; cat xml.txt'.format(
+      ntttcp_exe_dir=ntttcp_exe_dir)
+  ntttcp_xml, _ = vm.RemoteCommand(cat_command)
+  return ntttcp_xml
+
+
 @vm_util.Retry(max_retries=NTTTCP_RETRIES)
 def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   """Run NTttcp and return the samples collected from the run."""
 
-  shared_options = '-xml -t {time} -p {port} '.format(time=FLAGS.ntttcp_time,
-                                                      port=BASE_DATA_PORT)
+  packet_size_string = ''
+  if FLAGS.ntttcp_packet_size:
+    packet_size_string = ' -l %d ' % FLAGS.ntttcp_packet_size
 
-  sending_options = shared_options + '-s -m \'{threads},*,{ip}\''.format(
-      threads=FLAGS.ntttcp_threads, ip=receiving_ip_address)
-  receiving_options = shared_options + '-r -m \'{threads},*,0.0.0.0\''.format(
-      threads=FLAGS.ntttcp_threads)
+  shared_options = '-xml -t {time} -p {port} {packet_size}'.format(
+      time=FLAGS.ntttcp_time,
+      port=BASE_DATA_PORT,
+      packet_size=packet_size_string)
 
-  ntttcp_exe_dir = ntpath.join(sending_vm.temp_dir, 'x86fre')
+  udp_string = '-u' if FLAGS.ntttcp_udp else ''
+  sending_options = shared_options + '-s {udp} -m \'{threads},*,{ip}\''.format(
+      udp=udp_string, threads=FLAGS.ntttcp_threads, ip=receiving_ip_address)
+  receiving_options = shared_options + (
+      '-r {udp} -m \'{threads},*,0.0.0.0\'').format(
+          udp=udp_string, threads=FLAGS.ntttcp_threads)
 
   # NTttcp will append to the xml file when it runs, which causes parsing
   # to fail if there was a preexisting xml file. To be safe, try deleting
   # the xml file.
-  rm_command = 'cd {ntttcp_exe_dir}; rm xml.txt'.format(
-      ntttcp_exe_dir=ntttcp_exe_dir)
-  sending_vm.RemoteCommand(
-      rm_command, ignore_failure=True, suppress_warning=True)
+  _RemoveXml(sending_vm)
+  _RemoveXml(receiving_vm)
 
   process_args = [(_RunNtttcp, (sending_vm, sending_options), {}),
                   (_RunNtttcp, (receiving_vm, receiving_options), {})]
 
   background_tasks.RunParallelProcesses(process_args, 200)
 
-  cat_command = 'cd {ntttcp_exe_dir}; cat xml.txt'.format(
-      ntttcp_exe_dir=ntttcp_exe_dir)
-  stdout, _ = sending_vm.RemoteCommand(cat_command)
+  sender_xml = _CatXml(sending_vm)
+  receiver_xml = _CatXml(receiving_vm)
 
   metadata = {'ip_type': ip_type}
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
     for k, v in vm.GetResourceMetadata().iteritems():
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
-  return ParseNtttcpResults(stdout, metadata)
+  return ParseNtttcpResults(sender_xml, receiver_xml, metadata)
 
 
-def ParseNtttcpResults(xml_results, metadata):
+def ParseNtttcpResults(sender_xml_results, receiver_xml_results, metadata):
   """Parses the xml output from NTttcp and returns a list of samples.
 
   The list of samples contains total throughput and per thread throughput
   metrics (if there is more than a single thread).
 
   Args:
-    xml_results: ntttcp test output.
+    sender_xml_results: ntttcp test output from the sender.
+    receiver_xml_results: ntttcp test output from the receiver.
     metadata: metadata to be included as part of the samples.
 
   Returns:
     list of samples from the results of the ntttcp tests.
   """
-  root = xml.etree.ElementTree.fromstring(xml_results)
+  sender_xml_root = xml.etree.ElementTree.fromstring(sender_xml_results)
+  receiver_xml_root = xml.etree.ElementTree.fromstring(receiver_xml_results)
   samples = []
   metadata = metadata.copy()
 
-  for element in root.findall('parameters/*'):
-    if element.tag and element.text:
-      metadata[element.tag] = element.text
+  # Get the parameters from the sender XML output, but skip the throughput and
+  # thread info. Those will be used in the samples, not the metadata.
+  for item in list(sender_xml_root):
+    if item.tag == 'parameters':
+      for param in list(item):
+        metadata[param.tag] = param.text
+    elif item.tag == 'throughput' or item.tag == 'thread':
+      continue
+    else:
+      metadata['sender %s' % item.tag] = item.text
 
-  # TODO(ehankland): There is more interesting metadata that we can
-  # extract from the xml file such as the number of retransmits and
-  # cpu usage.
+  # We do not want the parameters from the receiver (we already got those
+  # from the sender), but we do want everything else and have it marked as
+  # coming from the receiver.
+  for item in list(receiver_xml_root):
+    if item.tag == 'parameters' or item.tag == 'thread':
+      continue
+    elif item.tag == 'throughput':
+      if item.attrib['metric'] == 'mbps':
+        metadata['receiver throughput'] = item.text
+    else:
+      metadata['receiver %s' % item.tag] = item.text
 
-  throughput_element = root.find('./throughput[@metric="mbps"]')
-  samples.append(sample.Sample(
-      'Total Throughput', float(throughput_element.text), 'Mbps', metadata))
+  throughput_element = sender_xml_root.find('./throughput[@metric="mbps"]')
+  samples.append(
+      sample.Sample('Total Throughput', float(throughput_element.text), 'Mbps',
+                    metadata))
 
-  thread_elements = root.findall('./thread')
+  thread_elements = sender_xml_root.findall('./thread')
   if len(thread_elements) > 1:
     for element in thread_elements:
       throughput_element = element.find('./throughput[@metric="mbps"]')
