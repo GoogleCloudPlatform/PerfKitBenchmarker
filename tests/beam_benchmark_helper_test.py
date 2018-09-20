@@ -14,9 +14,16 @@
 
 """Tests for beam_benchmark_helper."""
 
+import mock
+import tempfile
 import unittest
 
 from perfkitbenchmarker import beam_benchmark_helper
+from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
+
+FLAGS = flags.FLAGS
 
 
 class BeamBenchmarkHelperTestCase(unittest.TestCase):
@@ -105,6 +112,128 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
     actual_command = []
     beam_benchmark_helper.AddModuleArgument(actual_command, testOptionVal)
     self.assertListEqual([], actual_command)
+
+  def test_initialize_beam_repo_beam_exists(self):
+    FLAGS.beam_location = tempfile.mkdtemp()
+
+    with mock.patch.object(beam_benchmark_helper, '_PrebuildBeam') as mock_prebuild, \
+        mock.patch.object(vm_util, 'GenTempDir'):
+
+      mock_spec = mock.MagicMock()
+      mock_spec.dpb_service.SERVICE_TYPE = dpb_service.DATAFLOW
+
+      beam_benchmark_helper.InitializeBeamRepo(mock_spec)
+      mock_prebuild.assert_called_once()
+
+  def test_initialize_beam_repo_beam_not_exists(self):
+    FLAGS.beam_location = None
+
+    with mock.patch.object(beam_benchmark_helper, '_PrebuildBeam') as mock_prebuild, \
+        mock.patch.object(vm_util, 'GenTempDir'), \
+        mock.patch.object(vm_util, 'GetTempDir'), \
+        mock.patch.object(vm_util, 'IssueCommand') as mock_run:
+
+      mock_spec = mock.MagicMock()
+      mock_spec.dpb_service.SERVICE_TYPE = dpb_service.DATAFLOW
+
+      beam_benchmark_helper.InitializeBeamRepo(mock_spec)
+
+      expected_cmd = ['git', 'clone', 'https://github.com/apache/beam.git']
+      mock_run.assert_called_once_with(expected_cmd,
+                                       cwd=vm_util.GetTempDir())
+      mock_prebuild.assert_called_once()
+
+  def test_beam_prebuild(self):
+    FLAGS.beam_prebuilt = False
+    FLAGS.beam_it_module = 'sdks/java'
+    FLAGS.beam_runner = 'dataflow'
+    FLAGS.beam_filesystem = 'hdfs'
+    FLAGS.beam_extra_properties = '[extra_key=extra_value]'
+
+    with mock.patch.object(beam_benchmark_helper, '_GetGradleCommand') as mock_gradle, \
+        mock.patch.object(beam_benchmark_helper, '_GetBeamDir'), \
+        mock.patch.object(vm_util, 'IssueCommand') as mock_run:
+
+      mock_gradle.return_value = 'gradlew'
+      beam_benchmark_helper._PrebuildBeam()
+
+      expected_cmd = [
+          'gradlew',
+          'clean',
+          'assemble',
+          '--stacktrace',
+          '--info',
+          '-p',
+          'sdks/java',
+          '-DintegrationTestRunner=dataflow',
+          '-Dfilesystem=hdfs',
+          '-Dextra_key=extra_value'
+      ]
+      mock_run.assert_called_once_with(expected_cmd,
+                                       cwd=beam_benchmark_helper._GetBeamDir(),
+                                       timeout=1500)
+
+  def test_build_python_command(self):
+    FLAGS.beam_python_attr = 'IT'
+    FLAGS.beam_runner = 'TestRunner'
+    FLAGS.beam_python_sdk_location = 'py/location.tar'
+    FLAGS.beam_sdk = beam_benchmark_helper.BEAM_PYTHON_SDK
+
+    with mock.patch.object(beam_benchmark_helper, '_GetGradleCommand') as mock_gradle, \
+        mock.patch.object(beam_benchmark_helper, '_GetBeamDir'), \
+        mock.patch.object(vm_util, 'ExecutableOnPath', return_value=True) as exec_check:
+
+      mock_gradle.return_value = 'gradlew'
+      mock_spec = mock.MagicMock()
+      mock_spec.service_type = dpb_service.DATAFLOW
+
+      actual_cmd, _ = beam_benchmark_helper.BuildBeamCommand(mock_spec,
+                                                             'apache_beam.py',
+                                                             ['--args'])
+      expected_cmd = [
+          'gradlew',
+          'beam-sdks-python:integrationTest',
+          '-Ptests=apache_beam.py',
+          '-Pattr=IT',
+          '-PpipelineOptions=--args --runner=TestRunner --sdk_location=py/location.tar',
+      ]
+      self.assertListEqual(expected_cmd, actual_cmd)
+      exec_check.assert_called_once()
+
+  def test_build_java_gradle_command(self):
+    FLAGS.beam_it_module = 'sdks/java'
+    FLAGS.beam_runner = 'dataflow'
+    FLAGS.beam_filesystem = 'hdfs'
+    FLAGS.beam_extra_properties = '["extra_key=extra_value"]'
+    FLAGS.beam_sdk = beam_benchmark_helper.BEAM_JAVA_SDK
+
+    with mock.patch.object(beam_benchmark_helper, '_GetGradleCommand') as mock_gradle, \
+        mock.patch.object(beam_benchmark_helper, '_GetBeamDir'), \
+        mock.patch.object(vm_util, 'ExecutableOnPath', return_value=True) as exec_check:
+
+      mock_gradle.return_value = 'gradlew'
+      mock_spec = mock.MagicMock()
+      mock_spec.service_type = dpb_service.DATAFLOW
+
+      actual_cmd, _ = beam_benchmark_helper.BuildBeamCommand(mock_spec,
+                                                             'org.apache.beam.sdk.java',
+                                                             ['--args'])
+      expected_cmd = [
+          'gradlew',
+          'integrationTest',
+          '--tests=org.apache.beam.sdk.java',
+          '-p',
+          'sdks/java',
+          '-DintegrationTestRunner=dataflow',
+          '-Dfilesystem=hdfs',
+          '-Dextra_key=extra_value',
+          '-DintegrationTestPipelineOptions=[--args,"--runner=TestDataflowRunner"]',
+          '--stacktrace',
+          '--info',
+      ]
+      self.assertListEqual(expected_cmd, actual_cmd)
+      exec_check.assert_called_once()
+
 
 if __name__ == '__main__':
   unittest.main()
