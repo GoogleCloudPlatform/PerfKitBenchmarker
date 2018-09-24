@@ -247,7 +247,7 @@ def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
   step = int(regex_util.ExtractAllMatches(r'step = (\d+)', output).pop())
   metadata_copy['step'] = int(step)
   metadata_copy['epoch'] = step / metadata['num_examples_per_epoch']
-  metadata_copy['elapsed seconds'] = elapsed_seconds
+  metadata_copy['elapsed_seconds'] = elapsed_seconds
 
   get_mean = lambda matches: sum(float(x) for x in matches) / len(matches)
   loss = get_mean(regex_util.ExtractAllMatches(
