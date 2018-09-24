@@ -187,6 +187,8 @@
   ntttcp tests.
 - Extract more data from the ntttcp results file and put into the metadata of
   the samples.
+- Updated the default of Cloud Bigtable client version to 1.4.0. Added
+  `--hbase_bin_url` to allow bypassing GetHBaseURL().
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
