@@ -30,45 +30,31 @@ class ResNetBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     with open(path) as fp:
       self.contents = fp.read()
 
-    self.metadata = {'num_examples_per_epoch': 1251.1}
+    self.metadata_input = {'num_examples_per_epoch': 1251.1}
+    self.metadata_output = {'epoch': 4.000479577971386, 'elapsed_seconds': 0,
+                            'num_examples_per_epoch': 1251.1, 'step': 5005}
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testTrainResults(self):
     samples = mnist_benchmark.MakeSamplesFromTrainOutput(
-        self.metadata, self.contents, 0)
+        self.metadata_input, self.contents, 0)
     golden = [
-        Sample(
-            'Loss', 3.6859958, '',
-            {'epoch': 4.000479577971386, 'elapsed seconds': 0,
-             'num_examples_per_epoch': 1251.1, 'step': 5005}),
-        Sample(
-            'Global Steps Per Second', 3.6699466666666667, 'global_steps/sec',
-            {'epoch': 4.000479577971386, 'elapsed seconds': 0,
-             'num_examples_per_epoch': 1251.1, 'step': 5005}),
-        Sample(
-            'Examples Per Second', 3758.023333333333, 'examples/sec',
-            {'epoch': 4.000479577971386, 'elapsed seconds': 0,
-             'num_examples_per_epoch': 1251.1, 'step': 5005})
+        Sample('Loss', 3.6859958, '', self.metadata_output),
+        Sample('Global Steps Per Second', 3.6699466666666667,
+               'global_steps/sec', self.metadata_output),
+        Sample('Examples Per Second', 3758.023333333333,
+               'examples/sec', self.metadata_output)
     ]
     self.assertEqual(samples, golden)
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testEvalResults(self):
     samples = resnet_benchmark.MakeSamplesFromEvalOutput(
-        self.metadata, self.contents, 0)
+        self.metadata_input, self.contents, 0)
     golden = [
-        Sample(
-            'Eval Loss', 3.86324, '',
-            {'epoch': 4.000479577971386, 'elapsed_seconds': 0, 'step': 5005,
-             'num_examples_per_epoch': 1251.1}),
-        Sample(
-            'Top 1 Accuracy', 32.751465, '%',
-            {'epoch': 4.000479577971386, 'elapsed_seconds': 0, 'step': 5005,
-             'num_examples_per_epoch': 1251.1}),
-        Sample(
-            'Top 5 Accuracy', 58.825684, '%',
-            {'epoch': 4.000479577971386, 'elapsed_seconds': 0, 'step': 5005,
-             'num_examples_per_epoch': 1251.1})
+        Sample('Eval Loss', 3.86324, '', self.metadata_output),
+        Sample('Top 1 Accuracy', 32.751465, '%', self.metadata_output),
+        Sample('Top 5 Accuracy', 58.825684, '%', self.metadata_output)
     ]
     self.assertEqual(samples, golden)
 
