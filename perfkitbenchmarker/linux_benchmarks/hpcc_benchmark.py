@@ -194,6 +194,7 @@ def UpdateMetadata(metadata):
   if FLAGS['hpcc_mpi_env'].present:
     metadata['mpi_env'] = FLAGS.hpcc_mpi_env
   metadata['hpcc_math_library'] = FLAGS.hpcc_math_library
+  metadata['hpcc_version'] = hpcc.HPCC_VERSION
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
