@@ -189,6 +189,8 @@
   the samples.
 - Updated the default of Cloud Bigtable client version to 1.4.0. Added
   `--hbase_bin_url` to allow bypassing GetHBaseURL().
+- Remove flag tf_benchmarks_commit_hash, and add tf_cnn_benchmarks_branch.
+  Branch cnn_tf_vX.Y_compatible is compatible with TensorFlow version X.Y.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
