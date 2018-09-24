@@ -260,7 +260,7 @@ class BenchmarkSpec(object):
       logging.info('NFS service already created: %s', self.nfs_service)
       return
     for group_spec in self.config.vm_groups.values():
-      if not group_spec.disk_spec:
+      if not group_spec.disk_spec or not group_spec.vm_count:
         continue
       disk_spec = group_spec.disk_spec
       if disk_spec.disk_type != disk.NFS:
