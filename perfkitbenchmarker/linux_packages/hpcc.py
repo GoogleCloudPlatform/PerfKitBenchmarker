@@ -22,14 +22,15 @@ http://icl.cs.utk.edu/hpcc/
 
 import re
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import openblas
 
-HPCC_TAR = 'hpcc-1.4.3.tar.gz'
+HPCC_TAR = 'hpcc-1.5.0.tar.gz'
 HPCC_URL = 'http://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
-HPCC_DIR = '%s/hpcc-1.4.3' % INSTALL_DIR
+HPCC_DIR = '%s/hpcc-1.5.0' % INSTALL_DIR
+HPCC_VERSION = '1.5.0'
 
 MAKE_FLAVOR_CBLAS = 'Linux_PII_CBLAS'
 MAKE_FLAVOR_MKL = 'intel64'
@@ -48,8 +49,8 @@ HPCC_MATH_LIBRARY_MKL = 'mkl'
 flags.DEFINE_enum(
     'hpcc_math_library', HPCC_MATH_LIBRARY_OPEN_BLAS,
     [HPCC_MATH_LIBRARY_OPEN_BLAS, HPCC_MATH_LIBRARY_MKL],
-    'The math library to use when compiling hpcc: openBlas or MKL. '
-    'The default is openBlas')
+    'The math library to use when compiling hpcc: openblas or mkl. '
+    'The default is openblas.')
 FLAGS = flags.FLAGS
 
 
@@ -78,6 +79,7 @@ def _CompileHpccOpenblas(vm):
       'sed -i -e "/^MP/d" -e "s/gcc/mpicc/" -e "s/g77/mpicc/" '
       '-e "s/\\$(HOME)\\/netlib\\/ARCHIVES\\/Linux_PII/%s/" '
       '-e "s/libcblas.*/libopenblas.a/" '
+      '-e "s/-funroll-loops/-funroll-loops -std=c99/" '
       '-e "s/\\-lm/\\-lgfortran \\-lm/" %s' %
       (re.escape(openblas.OPENBLAS_DIR), HPCC_MAKEFILE_PATH_OPEN_BLAS))
   vm.RemoteCommand(sed_cmd)
