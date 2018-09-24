@@ -56,6 +56,7 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 AURORA_MYSQL = 'aurora-mysql'
+AURORA_MYSQL56 = 'aurora'
 
 FLAGS = flags.FLAGS
 
