@@ -95,13 +95,30 @@ def ConfigureAndStart(vm):
   for scratch_disk in vm.scratch_disks:
     vm.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
 
-  # stop the default running memcached to run it with custom configurations.
-  StopMemcached(vm)
-  vm.RemoteCommand('memcached -m {size} -p {port} -l 0.0.0.0 '
-                   '&> /dev/null &'.format(size=FLAGS.memcached_size_mb,
-                                           port=MEMCACHED_PORT))
+  # update security config to allow incoming network
+  vm.RemoteCommand(
+      'sudo sed -i "s/-l .*/-l 0.0.0.0/g" /etc/memcached.conf')
+  # update memory size
+  vm.RemoteCommand(
+      'sudo sed -i "s/-m .*/-m {size}/g" /etc/memcached.conf'.format(
+          size=FLAGS.memcached_size_mb))
+  # update default port
+  vm.RemoteCommand(
+      'sudo sed -i "s/-p .*/-m {port}/g" /etc/memcached.conf'.format(
+          port=MEMCACHED_PORT))
+
+  # restart the default running memcached to run it with custom configurations.
+  vm.RemoteCommand('sudo service memcached restart')
+
   _WaitForServerUp(vm)
   logging.info('memcached server configured and started.')
+
+
+def GetVersion(vm):
+  """Returns the version of the memcached server installed."""
+  results, _ = vm.RemoteCommand('memcached -help |grep -m 1 "memcached"'
+                                '| tr -d "\n"')
+  return results
 
 
 def StopMemcached(vm):
