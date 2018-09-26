@@ -72,6 +72,7 @@
 - Added act benchmark.
 - Added `--gce_tags` flag to add --tags when launching VMs on GCP.
 - Added PKB support to publish samples immediately.
+- Adding benchmarking of Memcached on cloud VMs using memtier benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
