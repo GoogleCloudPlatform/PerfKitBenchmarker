@@ -43,6 +43,22 @@ flags.DEFINE_bool('ntttcp_udp', False, 'Whether to run a UDP test.')
 flags.DEFINE_integer('ntttcp_packet_size', None,
                      'The size of the packet being used in the test.')
 
+flags.DEFINE_integer('ntttcp_sender_sb', -1,
+                     'The size of the send buffer, in Kilo Bytes, on the '
+                     'sending VM. The default is the OS default.')
+
+flags.DEFINE_integer('ntttcp_sender_rb', -1,
+                     'The size of the receive buffer, in Kilo Bytes, on the '
+                     'sending VM. The default is the OS default.')
+
+flags.DEFINE_integer('ntttcp_receiver_sb', -1,
+                     'The size of the send buffer, in Kilo Bytes, on the '
+                     'receiving VM. The default is the OS default.')
+
+flags.DEFINE_integer('ntttcp_receiver_rb', -1,
+                     'The size of the receive buffer, in Kilo Bytes, on the '
+                     'receiving VM. The default is the OS default.')
+
 CONTROL_PORT = 6001
 BASE_DATA_PORT = 5001
 NTTTCP_RETRIES = 10
@@ -82,6 +98,10 @@ def _CatXml(vm):
   return ntttcp_xml
 
 
+def  _GetSockBufferSize(sock_buff_size):
+  return '%dK' % sock_buff_size if sock_buff_size != -1 else sock_buff_size
+
+
 @vm_util.Retry(max_retries=NTTTCP_RETRIES)
 def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   """Run NTttcp and return the samples collected from the run."""
@@ -96,11 +116,19 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       packet_size=packet_size_string)
 
   udp_string = '-u' if FLAGS.ntttcp_udp else ''
-  sending_options = shared_options + '-s {udp} -m \'{threads},*,{ip}\''.format(
-      udp=udp_string, threads=FLAGS.ntttcp_threads, ip=receiving_ip_address)
+  sending_options = shared_options + (
+      '-s {udp} -m \'{threads},*,{ip}\' -rb {rb} -sb {sb}').format(
+          udp=udp_string,
+          threads=FLAGS.ntttcp_threads,
+          ip=receiving_ip_address,
+          rb=_GetSockBufferSize(FLAGS.ntttcp_sender_rb),
+          sb=_GetSockBufferSize(FLAGS.ntttcp_sender_sb))
   receiving_options = shared_options + (
-      '-r {udp} -m \'{threads},*,0.0.0.0\'').format(
-          udp=udp_string, threads=FLAGS.ntttcp_threads)
+      '-r {udp} -m \'{threads},*,0.0.0.0\' -rb {rb} -sb {sb}').format(
+          udp=udp_string,
+          threads=FLAGS.ntttcp_threads,
+          rb=_GetSockBufferSize(FLAGS.ntttcp_receiver_rb),
+          sb=_GetSockBufferSize(FLAGS.ntttcp_receiver_sb))
 
   # NTttcp will append to the xml file when it runs, which causes parsing
   # to fail if there was a preexisting xml file. To be safe, try deleting
@@ -165,6 +193,11 @@ def ParseNtttcpResults(sender_xml_results, receiver_xml_results, metadata):
         metadata['receiver throughput'] = item.text
     else:
       metadata['receiver %s' % item.tag] = item.text
+
+  metadata['sender rb'] = FLAGS.ntttcp_sender_rb
+  metadata['sender sb'] = FLAGS.ntttcp_sender_rb
+  metadata['receiver rb'] = FLAGS.ntttcp_receiver_rb
+  metadata['receiver sb'] = FLAGS.ntttcp_receiver_sb
 
   throughput_element = sender_xml_root.find('./throughput[@metric="mbps"]')
   samples.append(
