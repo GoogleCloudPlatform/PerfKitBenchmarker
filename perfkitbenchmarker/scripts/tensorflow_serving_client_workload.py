@@ -34,11 +34,11 @@ import time
 
 from absl import app
 from absl import flags
-from grpc.beta import implementations
+import grpc
 from grpc.framework.interfaces.face.face import ExpirationError
 import tensorflow as tf
 from tensorflow_serving.apis import predict_pb2
-from tensorflow_serving.apis import prediction_service_pb2
+from tensorflow_serving.apis import prediction_service_pb2_grpc
 
 ILSVRC_VALIDATION_IMAGES = 'ILSVRC2012_img_val'
 MODEL_NAME = 'inception'
@@ -46,7 +46,7 @@ RANDOM_SEED = 98103
 DEFAULT_TIMEOUT = 3600  # one hour "infinite" timeout
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('server', 'localhost:9000', 'PredictionService host:port')
+flags.DEFINE_string('server', 'localhost:8500', 'PredictionService host:port')
 flags.DEFINE_string(
     'image_directory', ILSVRC_VALIDATION_IMAGES,
     'Path to a directory containing images to be classified. '
@@ -84,10 +84,8 @@ class TfServingClientWorkload(object):
     self.file_list = get_files_in_directory_sorted(FLAGS.image_directory)
     self.num_images = len(self.file_list)
 
-    host, port = FLAGS.server.split(':')
-    channel = implementations.insecure_channel(host, int(port))
-    self.stub = prediction_service_pb2.beta_create_PredictionService_stub(
-        channel)
+    channel = grpc.insecure_channel(FLAGS.server)
+    self.stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
 
     # Fix random seed so that sequence of images sent to server is
     # deterministic.
