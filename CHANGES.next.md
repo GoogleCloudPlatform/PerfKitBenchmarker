@@ -191,6 +191,9 @@
   `--hbase_bin_url` to allow bypassing GetHBaseURL().
 - Remove flag tf_benchmarks_commit_hash, and add tf_cnn_benchmarks_branch.
   Branch cnn_tf_vX.Y_compatible is compatible with TensorFlow version X.Y.
+- Added flags `--ntttcp_sender_rb`, `--ntttcp_sender_sb`,
+  `--ntttcp_receiver_rb`, `--ntttcp_receiver_sb` to control the socket buffer
+  sizes in ntttcp tests.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
