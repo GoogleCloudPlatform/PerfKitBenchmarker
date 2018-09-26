@@ -98,7 +98,7 @@ def _CatXml(vm):
   return ntttcp_xml
 
 
-def  _GetSockBufferSize(sock_buff_size):
+def _GetSockBufferSize(sock_buff_size):
   return '%dK' % sock_buff_size if sock_buff_size != -1 else sock_buff_size
 
 
