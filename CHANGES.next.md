@@ -313,3 +313,4 @@
 - Sysbench supports benchmarking MySQL 5.6
 - Update memcached server to install from a pre-built package provided by the operating system.
 - Updated HPCC benchmark to version 1.5.0.
+- Psping benchmark no longer report histogram for every sample metadata.

@@ -220,8 +220,10 @@ def ParsePspingResults(results, client_vm, server_vm, internal_ip_used):
 
     index += 1
 
-  metadata.update({'histogram': json.dumps(histogram)})
+  histogram_metadata = metadata.copy()
+  histogram_metadata.update({'histogram': json.dumps(histogram)})
 
-  samples.append(sample.Sample('latency:histogram', 0, 'ms', metadata))
+  samples.append(
+      sample.Sample('latency:histogram', 0, 'ms', histogram_metadata))
 
   return samples
