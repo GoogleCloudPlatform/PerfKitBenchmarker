@@ -109,30 +109,31 @@ def Run(vm, server_ip, server_port):
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
 
-  vm.RemoteCommand('memtier_benchmark '
-                   '-s {server_ip} '
-                   '-p {server_port} '
-                   '-P {protocol} '
-                   '--run-count {run_count} '
-                   '--requests {requests} '
-                   '--clients {clients} '
-                   '--threads {threads} '
-                   '--ratio {ratio} '
-                   '--data-size {data_size} '
-                   '--key-pattern {key_pattern} '
-                   '--random-data > {output_file}'.format(
-                       server_ip=server_ip,
-                       server_port=server_port,
-                       protocol=FLAGS.memtier_protocol,
-                       run_count=FLAGS.memtier_run_count,
-                       requests=FLAGS.memtier_requests,
-                       clients=FLAGS.memtier_clients,
-                       threads=FLAGS.memtier_threads,
-                       ratio=memtier_ratio,
-                       data_size=FLAGS.memtier_data_size,
-                       key_pattern=FLAGS.memtier_key_pattern,
-                       output_file=MEMTIER_RESULTS)
-                  )
+  vm.RemoteCommand(
+      'memtier_benchmark '
+      '-s {server_ip} '
+      '-p {server_port} '
+      '-P {protocol} '
+      '--run-count {run_count} '
+      '--requests {requests} '
+      '--clients {clients} '
+      '--threads {threads} '
+      '--ratio {ratio} '
+      '--data-size {data_size} '
+      '--key-pattern {key_pattern} '
+      '--random-data > {output_file}'.format(
+          server_ip=server_ip,
+          server_port=server_port,
+          protocol=FLAGS.memtier_protocol,
+          run_count=FLAGS.memtier_run_count,
+          requests=FLAGS.memtier_requests,
+          clients=FLAGS.memtier_clients,
+          threads=FLAGS.memtier_threads,
+          ratio=memtier_ratio,
+          data_size=FLAGS.memtier_data_size,
+          key_pattern=FLAGS.memtier_key_pattern,
+          output_file=MEMTIER_RESULTS))
+
   results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
   samples = []
   samples.extend(ParseResults(results, GetMetadata()))
