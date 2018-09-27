@@ -294,6 +294,13 @@ def Run(benchmark_spec):
           env=mxnet.GetEnvironmentVars(vm),
           cmd=mx_benchmark_cmd,
           gpus=','.join(str(n) for n in range(num_gpus)))
+    elif benchmark_spec.device == CPU:
+      # Specifies the number of threads to use in CPU test.
+      # https://mxnet.incubator.apache.org/faq/perf.html
+      mx_benchmark_cmd = 'OMP_NUM_THREADS={omp_num_threads} {cmd}'.format(
+          omp_num_threads=vm.num_cpus / 2,
+          cmd=mx_benchmark_cmd)
+
     if num_layers:
       mx_benchmark_cmd = '%s --num-layers %s' % (mx_benchmark_cmd, num_layers)
     run_command = 'cd %s && %s' % (mx_benchmark_dir,
