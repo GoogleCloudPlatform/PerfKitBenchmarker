@@ -21,7 +21,7 @@
 workload=com.yahoo.ycsb.workloads.CoreWorkload
 
 readallfields=true
-operationcount=1000
+operationcount=10000
 
 fieldlength = 5000
 fieldcount = 10
