@@ -195,6 +195,7 @@
 - Added flags `--ntttcp_sender_rb`, `--ntttcp_sender_sb`,
   `--ntttcp_receiver_rb`, `--ntttcp_receiver_sb` to control the socket buffer
   sizes in ntttcp tests.
+- Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
