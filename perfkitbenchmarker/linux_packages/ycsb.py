@@ -135,7 +135,7 @@ flags.DEFINE_integer('ycsb_record_count', None, 'Pre-load with a total '
                      'all workloads of this run. Defaults to None, where '
                      'recordcount value in each workload is used. If neither '
                      'is not set, ycsb default of 0 is used.')
-flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
+flags.DEFINE_integer('ycsb_operation_count', None, 'Number of operations '
                      '*per client VM*.')
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
@@ -1005,8 +1005,10 @@ class YCSBExecutor(object):
       List of sample.Sample objects.
     """
     all_results = []
+    parameters = {}
     for workload_index, workload_file in enumerate(workloads):
-      parameters = {'operationcount': FLAGS.ycsb_operation_count}
+      if FLAGS.ycsb_operation_count:
+        parameters = {'operationcount': FLAGS.ycsb_operation_count}
       if FLAGS.ycsb_record_count:
         parameters['recordcount'] = FLAGS.ycsb_record_count
       if FLAGS.ycsb_field_count:

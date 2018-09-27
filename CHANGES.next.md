@@ -195,6 +195,7 @@
 - Added flags `--ntttcp_sender_rb`, `--ntttcp_sender_sb`,
   `--ntttcp_receiver_rb`, `--ntttcp_receiver_sb` to control the socket buffer
   sizes in ntttcp tests.
+- Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -319,3 +320,4 @@
 - TensorFlow Serving benchmark now runs off master branch with optimized binaries
 - Updated HPCC benchmark to version 1.5.0.
 - Psping benchmark no longer report histogram for every sample metadata.
+- Specifies the number of threads to use in MXNet CPU test.
