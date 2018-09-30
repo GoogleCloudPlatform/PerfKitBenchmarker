@@ -100,12 +100,10 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.eval_steps = FLAGS.mnist_eval_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
-  benchmark_spec.num_shards_train = 0
-  benchmark_spec.num_shards_eval = 0
+  benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
+  benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
   if benchmark_spec.use_tpu:
     tpu_groups = benchmark_spec.tpu_groups
-    benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
-    benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
     if 'train' in tpu_groups:
       tpu_train = tpu_groups['train']
       benchmark_spec.tpu_train = tpu_train.GetName()
