@@ -16,6 +16,7 @@
 
 import copy
 import os
+import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -53,13 +54,27 @@ flags.DEFINE_string('mnist_data_dir', None, 'mnist train file for tensorflow')
 flags.DEFINE_string('imagenet_data_dir',
                     'gs://cloud-tpu-test-datasets/fake_imagenet',
                     'Directory where the input data is stored')
-flags.DEFINE_integer('mnist_train_steps', 2000,
-                     'Total number of training steps')
+flags.DEFINE_string(
+    't2t_data_dir', None,
+    'Directory where the input data is stored for tensor2tensor')
+flags.DEFINE_integer('imagenet_num_train_images', 1281167,
+                     'Size of ImageNet training data set.')
+flags.DEFINE_integer('imagenet_num_eval_images', 50000,
+                     'Size of ImageNet validation data set.')
+flags.DEFINE_integer('mnist_num_train_images', 55000,
+                     'Size of MNIST training data set.')
+flags.DEFINE_integer('mnist_num_eval_images', 5000,
+                     'Size of MNIST validation data set.')
+flags.DEFINE_integer('mnist_train_epochs', 37,
+                     'Total number of training echos', lower_bound=1)
+flags.DEFINE_integer('mnist_eval_steps', 0,
+                     'Total number of evaluation steps. If `0`, evaluation '
+                     'after training is skipped.')
 flags.DEFINE_integer('tpu_iterations', 500,
                      'Number of iterations per TPU training loop.')
-flags.DEFINE_integer('tpu_num_shards', 8, 'Number of TPU cores. For a single '
-                     'TPU device, this is 8 because each TPU has 4 chips each '
-                     'with 2 cores.')
+flags.DEFINE_integer('mnist_batch_size', 1024,
+                     'Mini-batch size for the training. Note that this '
+                     'is the global batch size and not the per-shard batch.')
 
 
 def GetConfig(user_config):
@@ -81,15 +96,34 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
-  benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
-  benchmark_spec.train_steps = FLAGS.mnist_train_steps
+  benchmark_spec.use_tpu = True if benchmark_spec.tpus else False
+  benchmark_spec.eval_steps = FLAGS.mnist_eval_steps
+  benchmark_spec.tpu_train = ''
+  benchmark_spec.tpu_eval = ''
+  benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
+  benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
   if benchmark_spec.use_tpu:
-    benchmark_spec.tpu = benchmark_spec.cloud_tpu.GetName()
-  else:
-    benchmark_spec.tpu = ''
+    tpu_groups = benchmark_spec.tpu_groups
+    if 'train' in tpu_groups:
+      tpu_train = tpu_groups['train']
+      benchmark_spec.tpu_train = tpu_train.GetName()
+      benchmark_spec.num_shards_train = tpu_train.GetNumShards()
+    if 'eval' in tpu_groups:
+      tpu_eval = tpu_groups['eval']
+      benchmark_spec.tpu_eval = tpu_eval.GetName()
+      benchmark_spec.num_shards_eval = tpu_eval.GetNumShards()
+  benchmark_spec.tpu = benchmark_spec.tpu_train
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
-  benchmark_spec.num_shards = FLAGS.tpu_num_shards
+  benchmark_spec.num_shards = benchmark_spec.num_shards_train
+  benchmark_spec.batch_size = FLAGS.mnist_batch_size
+  benchmark_spec.num_train_images = FLAGS.mnist_num_train_images
+  benchmark_spec.num_eval_images = FLAGS.mnist_num_eval_images
+  benchmark_spec.num_examples_per_epoch = (
+      float(benchmark_spec.num_train_images) / benchmark_spec.batch_size)
+  benchmark_spec.train_epochs = FLAGS.mnist_train_epochs
+  benchmark_spec.train_steps = int(
+      benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -124,7 +158,7 @@ def Prepare(benchmark_spec):
   else:
     benchmark_spec.model_dir = '/tmp'
 
-  if FLAGS.imagenet_data_dir and FLAGS.cloud != 'GCP':
+  if (FLAGS.imagenet_data_dir or FLAGS.t2t_data_dir) and FLAGS.cloud != 'GCP':
     vm.Install('google_cloud_sdk')
     vm.RemoteCommand('echo "export {}" >> ~/.bashrc'.format(GCP_ENV),
                      login_shell=True)
@@ -155,13 +189,21 @@ def _CreateMetadataDict(benchmark_spec):
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
       'tpu': benchmark_spec.tpu,
+      'tpu_train': benchmark_spec.tpu_train,
+      'tpu_eval': benchmark_spec.tpu_eval,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
-      'num_shards': benchmark_spec.num_shards
+      'num_shards': benchmark_spec.num_shards,
+      'num_shards_train': benchmark_spec.num_shards_train,
+      'num_shards_eval': benchmark_spec.num_shards_eval,
+      'num_train_images': benchmark_spec.num_train_images,
+      'num_eval_images': benchmark_spec.num_eval_images,
+      'train_epochs': benchmark_spec.train_epochs,
+      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch
   }
 
 
-def _ExtractThroughput(regex, output, metadata, metric, unit):
+def ExtractThroughput(regex, output, metadata, metric, unit):
   """Extract throughput from MNIST output.
 
   Args:
@@ -184,22 +226,71 @@ def _ExtractThroughput(regex, output, metadata, metric, unit):
   return samples
 
 
-def MakeSamplesFromOutput(metadata, output):
-  """Create a sample continaing the measured MNIST throughput.
+def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
+  """Create a sample containing training metrics.
 
   Args:
     metadata: dict contains all the metadata that reports.
-    output: MNIST output
+    output: string, command output
+    elapsed_seconds: float, elapsed seconds from saved checkpoint.
+
+  Example output:
+    perfkitbenchmarker/tests/linux_benchmarks/mnist_benchmark_test.py
 
   Returns:
-    a Sample containing the MNIST throughput
+    a Sample containing training metrics, current step, elapsed seconds
   """
-  samples = _ExtractThroughput(r'global_step/sec: (\S+)', output, metadata,
-                               'Global Steps Per Second', 'global_steps/sec')
-  if metadata['use_tpu']:
-    samples.extend(_ExtractThroughput(r'examples/sec: (\S+)', output, metadata,
-                                      'Examples Per Second', 'examples/sec'))
+  samples = []
+  metadata_copy = metadata.copy()
+  step = int(regex_util.ExtractAllMatches(r'step = (\d+)', output).pop())
+  metadata_copy['step'] = int(step)
+  metadata_copy['epoch'] = step / metadata['num_examples_per_epoch']
+  metadata_copy['elapsed_seconds'] = elapsed_seconds
+
+  get_mean = lambda matches: sum(float(x) for x in matches) / len(matches)
+  loss = get_mean(regex_util.ExtractAllMatches(
+      r'Loss for final step: (\d+\.\d+)', output))
+  samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
+
+  if 'global_step/sec: ' in output:
+    global_step_sec = regex_util.ExtractAllMatches(
+        r'global_step/sec: (\S+)', output)
+    samples.append(sample.Sample(
+        'Global Steps Per Second', get_mean(global_step_sec),
+        'global_steps/sec', metadata_copy))
+  if 'examples/sec: ' in output:
+    examples_sec = regex_util.ExtractAllMatches(
+        r'examples/sec: (\S+)', output)
+    samples.append(sample.Sample('Examples Per Second', get_mean(examples_sec),
+                                 'examples/sec', metadata_copy))
   return samples
+
+
+def MakeSamplesFromEvalOutput(metadata, output, elapsed_seconds):
+  """Create a sample containing evaluation metrics.
+
+  Args:
+    metadata: dict contains all the metadata that reports.
+    output: string, command output
+    elapsed_seconds: float, elapsed seconds from saved checkpoint.
+
+  Example output:
+    perfkitbenchmarker/tests/linux_benchmarks/mnist_benchmark_test.py
+
+  Returns:
+    a Sample containing evaluation metrics
+  """
+  pattern = (r'Saving dict for global step \d+: accuracy = (\d+\.\d+), '
+             r'global_step = (\d+), loss = (\d+\.\d+)')
+  accuracy, step, loss = regex_util.ExtractAllMatches(pattern, output).pop()
+  metadata_copy = metadata.copy()
+  step = int(step)
+  metadata_copy['step'] = step
+  num_examples_per_epoch = metadata['num_examples_per_epoch']
+  metadata_copy['epoch'] = step / num_examples_per_epoch
+  metadata_copy['elapsed_seconds'] = elapsed_seconds
+  return [sample.Sample('Eval Loss', float(loss), '', metadata_copy),
+          sample.Sample('Accuracy', float(accuracy) * 100, '%', metadata_copy)]
 
 
 def Run(benchmark_spec):
@@ -218,28 +309,42 @@ def Run(benchmark_spec):
   mnist_benchmark_cmd = (
       'cd models/official/mnist && '
       'python {script} '
-      '--tpu={tpu} '
       '--data_dir={data_dir} '
-      '--use_tpu={use_tpu} '
-      '--train_steps={train_steps} '
       '--iterations={iterations} '
-      '--model_dir={model_dir} '
-      '--num_shards={num_shards}'.format(
+      '--model_dir={model_dir}'.format(
           script=mnist_benchmark_script,
-          tpu=benchmark_spec.tpu,
           data_dir=benchmark_spec.data_dir,
-          use_tpu=benchmark_spec.use_tpu,
-          train_steps=benchmark_spec.train_steps,
           iterations=benchmark_spec.iterations,
-          model_dir=benchmark_spec.model_dir,
-          num_shards=benchmark_spec.num_shards))
+          model_dir=benchmark_spec.model_dir))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)
-  stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_cmd,
-                                          should_log=True)
-  return MakeSamplesFromOutput(_CreateMetadataDict(benchmark_spec),
-                               stdout + stderr)
+  samples = []
+  metadata = _CreateMetadataDict(benchmark_spec)
+  if benchmark_spec.train_steps:
+    mnist_benchmark_train_cmd = (
+        '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
+        '--num_shards={num_shards}'.format(
+            cmd=mnist_benchmark_cmd,
+            tpu=benchmark_spec.tpu_train,
+            use_tpu=benchmark_spec.use_tpu,
+            train_steps=benchmark_spec.train_steps,
+            num_shards=benchmark_spec.num_shards_train))
+    start = time.time()
+    stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd,
+                                            should_log=True)
+    elapsed_seconds = (time.time() - start)
+    samples.extend(MakeSamplesFromTrainOutput(metadata, stdout + stderr,
+                                              elapsed_seconds))
+  if benchmark_spec.eval_steps:
+    mnist_benchmark_eval_cmd = (
+        '{cmd} --tpu="" --use_tpu=False --eval_steps={eval_steps}'.format(
+            cmd=mnist_benchmark_cmd, eval_steps=benchmark_spec.eval_steps))
+    stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_eval_cmd,
+                                            should_log=True)
+    samples.extend(MakeSamplesFromEvalOutput(metadata, stdout + stderr,
+                                             elapsed_seconds))
+  return samples
 
 
 def Cleanup(benchmark_spec):

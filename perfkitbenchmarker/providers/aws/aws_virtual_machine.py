@@ -298,6 +298,17 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     return result
 
 
+def _GetKeyfileSetKey(region):
+  """Returns a key to use for the keyfile set.
+
+  This prevents other runs in the same process from reusing the key.
+
+  Args:
+    region: The region the keyfile is in.
+  """
+  return (region, FLAGS.run_uri)
+
+
 class AwsKeyFileManager(object):
   """Object for managing AWS Keyfiles."""
   _lock = threading.Lock()
@@ -308,7 +319,7 @@ class AwsKeyFileManager(object):
   def ImportKeyfile(cls, region):
     """Imports the public keyfile to AWS."""
     with cls._lock:
-      if region in cls.imported_keyfile_set:
+      if _GetKeyfileSetKey(region) in cls.imported_keyfile_set:
         return
       cat_cmd = ['cat',
                  vm_util.GetPublicKeyPath()]
@@ -319,24 +330,24 @@ class AwsKeyFileManager(object):
           '--key-name=%s' % cls.GetKeyNameForRun(),
           '--public-key-material=%s' % keyfile]
       util.IssueRetryableCommand(import_cmd)
-      cls.imported_keyfile_set.add(region)
-      if region in cls.deleted_keyfile_set:
-        cls.deleted_keyfile_set.remove(region)
+      cls.imported_keyfile_set.add(_GetKeyfileSetKey(region))
+      if _GetKeyfileSetKey(region) in cls.deleted_keyfile_set:
+        cls.deleted_keyfile_set.remove(_GetKeyfileSetKey(region))
 
   @classmethod
   def DeleteKeyfile(cls, region):
     """Deletes the imported keyfile for a region."""
     with cls._lock:
-      if region in cls.deleted_keyfile_set:
+      if _GetKeyfileSetKey(region) in cls.deleted_keyfile_set:
         return
       delete_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'delete-key-pair',
           '--key-name=%s' % cls.GetKeyNameForRun()]
       util.IssueRetryableCommand(delete_cmd)
-      cls.deleted_keyfile_set.add(region)
-      if region in cls.imported_keyfile_set:
-        cls.imported_keyfile_set.remove(region)
+      cls.deleted_keyfile_set.add(_GetKeyfileSetKey(region))
+      if _GetKeyfileSetKey(region) in cls.imported_keyfile_set:
+        cls.imported_keyfile_set.remove(_GetKeyfileSetKey(region))
 
   @classmethod
   def GetKeyNameForRun(cls):

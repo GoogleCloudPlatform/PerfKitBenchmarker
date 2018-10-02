@@ -717,7 +717,7 @@ Flag | Notes
 -----|------
 `--helpmatch=pkb`         | see all global flags
 `--helpmatch=hpcc` | see all flags associated with the hpcc benchmark. You can substitute any benchmark name to see the associated flags.
-`--benchmarks`   | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
+`--benchmarks`   | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --helpmatch=benchmarks \| grep perfkitbenchmarker`
 `--cloud`        | Cloud where the benchmarks are run. See the table below for choices.
 `--machine_type` | Type of machine to provision if pre-provisioned machines are not used. Most cloud providers accept the names of pre-defined provider-specific machine types (for example, GCP supports `--machine_type=n1-standard-8` for a GCE n1-standard-8 VM). Some cloud providers support YAML expressions that match the corresponding VM spec machine_type property in the [YAML configs](#configurations-and-configuration-overrides) (for example, GCP supports `--machine_type="{cpus: 1, memory: 4.5GiB}"` for a GCE custom VM with 1 vCPU and 4.5GiB memory). Note that the value provided by this flag will affect all provisioned machines; users who wish to provision different machine types for different roles within a single benchmark run should use the [YAML configs](#configurations-and-configuration-overrides) for finer control.
 `--zones`         | This flag allows you to override the default zone. See the table below.

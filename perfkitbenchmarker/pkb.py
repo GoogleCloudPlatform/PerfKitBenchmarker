@@ -150,8 +150,27 @@ flags.DEFINE_string('image', None, 'Default image that will be '
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to %d '
                     'characters in length.' % MAX_RUN_URI_LENGTH)
-flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
-                    'Used to tag created resources and performance records.')
+
+
+def GetCurrentUser():
+  """Get the current user name.
+
+  On some systems the current user information may be unavailable. In these
+  cases we just need a string to tag the created resources with. It should
+  not be a fatal error.
+
+  Returns:
+    User name OR default string if user name not available.
+  """
+  try:
+    return getpass.getuser()
+  except KeyError:
+    return 'user_unknown'
+
+
+flags.DEFINE_string(
+    'owner', GetCurrentUser(), 'Owner name. '
+    'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
     log_util.LOG_LEVELS.keys(),
@@ -489,7 +508,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
-  spec.ConstructCloudTpu()
+  spec.ConstructTpu()
   spec.ConstructEdwService()
   spec.ConstructCloudRedis()
   spec.ConstructNfsService()
@@ -771,12 +790,13 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
   interrupted_vm_count = 0
   vm_status_codes = []
   for vm in spec.vms:
-    # discounted vm metadata
     if vm.IsInterruptible():
       interruptible_vm_count += 1
       if vm.WasInterrupted():
         interrupted_vm_count += 1
-        vm_status_codes.append(vm.GetVmStatusCode())
+        status_code = vm.GetVmStatusCode()
+        if status_code:
+          vm_status_codes.append(status_code)
 
   if interruptible_vm_count:
     metadata.update({'interruptible_vms': interruptible_vm_count,

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.gcp.gcp_cloud_tpu."""
+"""Tests for perfkitbenchmarker.providers.gcp.gcp_tpu."""
 
 import contextlib
 import unittest
@@ -19,7 +19,7 @@ import mock
 
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.providers.gcp import gcp_cloud_tpu
+from perfkitbenchmarker.providers.gcp import gcp_tpu
 from perfkitbenchmarker.providers.gcp import util
 
 
@@ -30,7 +30,7 @@ ZONE = 'testzone'
 
 class GcpTpuTestCase(unittest.TestCase):
 
-  def CreateCloudTpuSpecDict(self):
+  def CreateTpuSpecDict(self):
     return {
         'tpu_name': 'pkb-tpu-123',
         'tpu_cidr_range': '192.168.0.0/29',
@@ -42,23 +42,23 @@ class GcpTpuTestCase(unittest.TestCase):
         'tpu_preemptible': True
     }
 
-  def CreateCloudTpuFromSpec(self, spec_dict):
+  def CreateTpuFromSpec(self, spec_dict):
     mock_tpu_spec = mock.Mock(
-        spec=benchmark_config_spec._CloudTpuSpec)
+        spec=benchmark_config_spec._TpuGroupSpec)
     mock_tpu_spec.configure_mock(**spec_dict)
-    tpu_class = gcp_cloud_tpu.GcpCloudTpu(mock_tpu_spec)
+    tpu_class = gcp_tpu.GcpTpu(mock_tpu_spec)
     return tpu_class
 
   def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None}
+    flag_values = {'run_uri': '123', 'project': None, 'tpu_cores_per_donut': 8}
 
-    p = mock.patch(gcp_cloud_tpu.__name__ + '.FLAGS')
+    p = mock.patch(gcp_tpu.__name__ + '.FLAGS')
     flags_mock = p.start()
     flags_mock.configure_mock(**flag_values)
     self.addCleanup(p.stop)
-    mock_tpu_spec_attrs = self.CreateCloudTpuSpecDict()
+    mock_tpu_spec_attrs = self.CreateTpuSpecDict()
     self.mock_tpu_spec = mock.Mock(
-        spec=benchmark_config_spec._CloudTpuSpec)
+        spec=benchmark_config_spec._TpuGroupSpec)
     self.mock_tpu_spec.configure_mock(**mock_tpu_spec_attrs)
 
   @contextlib.contextmanager
@@ -76,7 +76,7 @@ class GcpTpuTestCase(unittest.TestCase):
 
   def testCreate(self):
     with self._PatchCriticalObjects() as issue_command:
-      tpu = gcp_cloud_tpu.GcpCloudTpu(self.mock_tpu_spec)
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
       tpu._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -95,7 +95,7 @@ class GcpTpuTestCase(unittest.TestCase):
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
-      tpu = gcp_cloud_tpu.GcpCloudTpu(self.mock_tpu_spec)
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
       tpu._Delete()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -107,7 +107,7 @@ class GcpTpuTestCase(unittest.TestCase):
 
   def testExists(self):
     with self._PatchCriticalObjects() as issue_command:
-      tpu = gcp_cloud_tpu.GcpCloudTpu(self.mock_tpu_spec)
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
       tpu._Exists()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -119,9 +119,29 @@ class GcpTpuTestCase(unittest.TestCase):
 
   def testGetName(self):
     with self._PatchCriticalObjects():
-      tpu = gcp_cloud_tpu.GcpCloudTpu(self.mock_tpu_spec)
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
       name = tpu.GetName()
       self.assertEqual(name, 'pkb-tpu-123')
+
+  def testGetNumShards(self):
+    with self._PatchCriticalObjects(stdout='{"networkEndpoints": [{"ipAddress":'
+                                    ' "10.199.12.2", "port": 8470}]}'):
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
+      num_shards = tpu.GetNumShards()
+      self.assertEqual(num_shards, 8)
+
+  def testGetMasterGrpcAddress(self):
+    with self._PatchCriticalObjects(stdout="""{
+  "networkEndpoints": [{
+    "ipAddress": "10.199.12.2",
+    "port": 8470
+  }]
+}
+    """):
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
+      ip_address = tpu.GetMasterGrpcAddress()
+      self.assertEqual(ip_address, 'grpc://10.199.12.2:8470')
+
 
 if __name__ == '__main__':
   unittest.main()

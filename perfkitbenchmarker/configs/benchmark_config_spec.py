@@ -206,15 +206,16 @@ class _DpbServiceSpec(spec.BaseSpec):
               flag_values.zones[0])
 
 
-class _CloudTpuSpec(spec.BaseSpec):
-  """Configurable options of a cloud TPU.
-  """
+class _TpuGroupSpec(spec.BaseSpec):
+  """Configurable options of a TPU."""
 
-  def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_CloudTpuSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+  def __init__(self, component_full_name, group_name, flag_values=None,
+               **kwargs):
+    super(_TpuGroupSpec, self).__init__('{0}.{1}'.format(
+        component_full_name, group_name), flag_values=flag_values, **kwargs)
     if not self.tpu_name:
-      self.tpu_name = 'pkb-tpu-%s' % flag_values.run_uri
+      self.tpu_name = 'pkb-tpu-{group_name}-{run_uri}'.format(
+          group_name=group_name, run_uri=flag_values.run_uri)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -225,7 +226,7 @@ class _CloudTpuSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_CloudTpuSpec, cls)._GetOptionDecoderConstructions()
+    result = super(_TpuGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
@@ -269,7 +270,7 @@ class _CloudTpuSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    super(_CloudTpuSpec, cls)._ApplyFlags(config_values, flag_values)
+    super(_TpuGroupSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present:
       config_values['cloud'] = flag_values.cloud
     if flag_values['tpu_cidr_range'].present:
@@ -528,6 +529,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                 managed_relational_db.POSTGRES,
                 managed_relational_db.AURORA_POSTGRES,
                 managed_relational_db.AURORA_MYSQL,
+                managed_relational_db.AURORA_MYSQL56,
             ]
         }),
         'zones': (option_decoders.ListDecoder, {
@@ -1072,15 +1074,14 @@ class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
     return result
 
 
-class _CloudTpuDecoder(option_decoders.TypeVerifier):
-  """Validate the cloud_tpu dictionary of a benchmark config object.
-  """
+class _TpuGroupsDecoder(option_decoders.TypeVerifier):
+  """Validate the tpu dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(_CloudTpuDecoder, self).__init__(valid_types=(dict,), **kwargs)
+    super(_TpuGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verify cloud_tpu dict of a benchmark config object.
+    """Verify tpu dict of a benchmark config object.
 
     Args:
       value: dict. Config dictionary
@@ -1090,17 +1091,20 @@ class _CloudTpuDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-      _CloudTpu built from the config passed in in value.
+      _Tpu built from the config passed in in value.
 
     Raises:
       errors.Config.InvalidateValue upon invalid input value.
     """
-    cloud_tpu_config = super(
-        _CloudTpuDecoder, self).Decode(value, component_full_name,
-                                       flag_values)
-    result = _CloudTpuSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **cloud_tpu_config)
+    tpu_group_configs = super(_TpuGroupsDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = {}
+    for tpu_group_name, tpu_group_config in tpu_group_configs.iteritems():
+      result[tpu_group_name] = _TpuGroupSpec(
+          self._GetOptionFullName(component_full_name),
+          tpu_group_name,
+          flag_values,
+          **tpu_group_config)
     return result
 
 
@@ -1369,8 +1373,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'managed_relational_db': (_ManagedRelationalDbDecoder, {
             'default': None
         }),
-        'cloud_tpu': (_CloudTpuDecoder, {
-            'default': None
+        'tpu_groups': (_TpuGroupsDecoder, {
+            'default': {}
         }),
         'edw_service': (_EdwServiceDecoder, {
             'default': None

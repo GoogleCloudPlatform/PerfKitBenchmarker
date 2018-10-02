@@ -1,0 +1,61 @@
+<ntttcps computername="PKB-FA69C90E-0" version="5.33">
+  <parameters>
+    <send_socket_buff>8192</send_socket_buff>
+    <recv_socket_buff>-1</recv_socket_buff>
+    <port>5003</port>
+    <sync_port>False</sync_port>
+    <no_sync>False</no_sync>
+    <wait_timeout_milliseconds>600000</wait_timeout_milliseconds>
+    <async>False</async>
+    <verbose>False</verbose>
+    <wsa>False</wsa>
+    <use_ipv6>False</use_ipv6>
+    <udp>True</udp>
+    <verify_data>False</verify_data>
+    <wait_all>False</wait_all>
+    <run_time>60000</run_time>
+    <warmup_time>30000</warmup_time>
+    <cooldown_time>30000</cooldown_time>
+    <dash_n_timeout>10800000</dash_n_timeout>
+    <bind_sender>False</bind_sender>
+    <sender_name></sender_name>
+    <max_active_threads>2</max_active_threads>
+  </parameters>
+  <thread index="0">
+    <realtime metric="s">60.016</realtime>
+    <throughput metric="KB/s">14789.988</throughput>
+    <throughput metric="MB/s">14.443</throughput>
+    <throughput metric="mbps">121.160</throughput>
+    <avg_bytes_per_compl metric="B">128.000</avg_bytes_per_compl>
+  </thread>
+  <thread index="1">
+    <realtime metric="s">60.016</realtime>
+    <throughput metric="KB/s">15135.883</throughput>
+    <throughput metric="MB/s">14.781</throughput>
+    <throughput metric="mbps">123.993</throughput>
+    <avg_bytes_per_compl metric="B">128.000</avg_bytes_per_compl>
+  </thread>
+  <total_bytes metric="MB">1753.907349</total_bytes>
+  <realtime metric="s">60.015000</realtime>
+  <avg_bytes_per_compl metric="B">128.000</avg_bytes_per_compl>
+  <threads_avg_bytes_per_compl metric="B">128.000</threads_avg_bytes_per_compl>
+  <avg_frame_size metric="B">128.000</avg_frame_size>
+  <throughput metric="MB/s">29.224</throughput>
+  <throughput metric="mbps">245.153</throughput>
+  <total_buffers>14368009.000</total_buffers>
+  <throughput metric="buffers/s">239406.965</throughput>
+  <avg_packets_per_interrupt metric="packets/interrupt">0.000</avg_packets_per_interrupt>
+  <interrupts metric="count/sec">1669.516</interrupts>
+  <dpcs metric="count/sec">250.737</dpcs>
+  <avg_packets_per_dpc metric="packets/dpc">0.000</avg_packets_per_dpc>
+  <cycles metric="cycles/byte">196.108</cycles>
+  <packets_sent>14368008</packets_sent>
+  <packets_received>0</packets_received>
+  <packets_retransmitted>0</packets_retransmitted>
+  <errors>0</errors>
+  <cpu metric="%">68.290</cpu>
+  <bufferCount>9223372036854775807</bufferCount>
+  <bufferLen>128</bufferLen>
+  <io>2</io>
+</ntttcps>
+

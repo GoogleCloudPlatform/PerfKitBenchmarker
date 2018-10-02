@@ -409,7 +409,7 @@ class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
 
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
                                    linux_virtual_machine.RhelMixin):
-  IMAGE_URN = 'RedHat:RHEL:7.2:latest'
+  IMAGE_URN = 'RedHat:RHEL:7.4:latest'
 
   def __init__(self, vm_spec):
     super(RhelBasedAzureVirtualMachine, self).__init__(vm_spec)

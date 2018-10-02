@@ -15,6 +15,7 @@
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
 - Updated GCP sole tenancy support.  Removed `gcp_host_type` added
   `gcp_node_type`.
+- Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -71,6 +72,7 @@
 - Added act benchmark.
 - Added `--gce_tags` flag to add --tags when launching VMs on GCP.
 - Added PKB support to publish samples immediately.
+- Adding benchmarking of Memcached on cloud VMs using memtier benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -119,8 +121,9 @@
 - Added `time_commands` flag to enable diagnostic timing of commands
 - Added image processing speed in mnist.
 - Updated cloud TPU model link.
-- Updated AWS spot instance creation and added
-  spot instance failure metadata support.
+- Updated AWS spot instance creation.
+- Added support for extending the failure sample with metadata if AWS spot VMs
+  or GCP preemptible VMs are interrupted.
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
@@ -168,6 +171,31 @@
 - Added flags `--hbase_version` and `--hbase_use_stable` to set the HBase
   version.  Also upped hadoop to version 2.8.4.
 - Updated cuDNN installation methods.
+- Added support to schedule multiple TPUs.
+- Added GroupZonesIntoRegions support for providers.aws.util.
+- Added function to get the number of TPU cores.
+- Update spec17 copies per run to respect system available memory.
+- Add tensor2tensor benchmark.
+- Change train_steps to train_epochs in TPU test.
+- Add default tags like timeout_utc to GCE.
+- Add validation to all the TPU tests.
+- Add number of Train/Eval TPU shards in metadata.
+- The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
+- Updated openjdk 8 installation to support newer ycsb versions (after 0.13.0);
+  Improved hdrhistogram result reporting in ycsb.py.
+- Added flag `--ntttcp_udp` to allow the user to run UDP tests with ntttcp.
+- Added flag `--ntttcp_packet_size` to allow user to set the packet size in
+  ntttcp tests.
+- Extract more data from the ntttcp results file and put into the metadata of
+  the samples.
+- Updated the default of Cloud Bigtable client version to 1.4.0. Added
+  `--hbase_bin_url` to allow bypassing GetHBaseURL().
+- Remove flag tf_benchmarks_commit_hash, and add tf_cnn_benchmarks_branch.
+  Branch cnn_tf_vX.Y_compatible is compatible with TensorFlow version X.Y.
+- Added flags `--ntttcp_sender_rb`, `--ntttcp_sender_sb`,
+  `--ntttcp_receiver_rb`, `--ntttcp_receiver_sb` to control the socket buffer
+  sizes in ntttcp tests.
+- Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -282,3 +310,14 @@
 - AWS Aurora Postgres updated from 9.6.2 to 9.6.3
 - Cleanup and fix Beam bechmark.
 - Sysbench failover tests added for GCP and AWS Aurora
+- Sysbench qps metric added
+- Fixed a bug of checking TPU exist.
+- Add GetMasterGrpcAddress method to CloudTpu.
+- Fix a bug of getting the number of TPU cores.
+- Set number of images in ResNet benchmark command so it can support other datasets.
+- Sysbench supports benchmarking MySQL 5.6
+- Update memcached server to install from a pre-built package provided by the operating system.
+- TensorFlow Serving benchmark now runs off master branch with optimized binaries
+- Updated HPCC benchmark to version 1.5.0.
+- Psping benchmark no longer report histogram for every sample metadata.
+- Specifies the number of threads to use in MXNet CPU test.

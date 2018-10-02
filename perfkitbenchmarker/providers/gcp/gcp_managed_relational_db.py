@@ -95,12 +95,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
-        '--enable-bin-log',
         '--gce-zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size,
     ]
+    if self.spec.engine == managed_relational_db.MYSQL:
+      cmd_string.append('--enable-bin-log')
     # TODO(ferneyhough): add tier machine types support for Postgres
     if self.spec.engine == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
@@ -274,7 +275,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     if not self._IsDBInstanceReady(self.instance_id, timeout):
       return False
-    if self.spec.high_availability:
+    if self.spec.high_availability and hasattr(self, 'replica_instance_id'):
       if not self._IsDBInstanceReady(self.replica_instance_id, timeout):
         return False
 
@@ -356,6 +357,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if engine == managed_relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
+      elif version == '5.6':
+        return 'MYSQL_5_6'
     elif engine == managed_relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION

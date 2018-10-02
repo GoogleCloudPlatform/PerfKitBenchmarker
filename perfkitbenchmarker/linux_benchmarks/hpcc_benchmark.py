@@ -55,9 +55,6 @@ MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
 
-# Timeout after 4 hours.
-HPCC_TIMEOUT = 4 * 60 * 60
-
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
 BENCHMARK_DATA = {
     # Intel MKL package downloaded from:
@@ -79,6 +76,8 @@ hpcc:
       vm_count: null
 """
 
+SECONDS_PER_HOUR = 60 * 60
+
 flags.DEFINE_integer('memory_size_mb',
                      None,
                      'The amount of memory in MB on each machine to use. By '
@@ -90,6 +89,9 @@ flags.DEFINE_list('hpcc_mpi_env', [],
                   'Comma separated list containing environment variables '
                   'to use with mpirun command. e.g. '
                   'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512')
+flags.DEFINE_integer('hpcc_timeout_hours', 4,
+                     'The number of hours to wait for the HPCC binary to '
+                     'complete before timing out and assuming it failed.')
 
 
 def GetConfig(user_config):
@@ -192,6 +194,7 @@ def UpdateMetadata(metadata):
   if FLAGS['hpcc_mpi_env'].present:
     metadata['mpi_env'] = FLAGS.hpcc_mpi_env
   metadata['hpcc_math_library'] = FLAGS.hpcc_math_library
+  metadata['hpcc_version'] = hpcc.HPCC_VERSION
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
@@ -260,7 +263,8 @@ def Run(benchmark_spec):
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
              '"ssh -o StrictHostKeyChecking=no" %s ./hpcc' %
              (num_processes, MACHINEFILE, mpi_env))
-  master_vm.RobustRemoteCommand(mpi_cmd, timeout=HPCC_TIMEOUT)
+  master_vm.RobustRemoteCommand(
+      mpi_cmd, timeout=FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR)
   logging.info('HPCC Results:')
   stdout, _ = master_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
 

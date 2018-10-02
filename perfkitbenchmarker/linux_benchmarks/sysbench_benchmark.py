@@ -51,6 +51,7 @@ import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
@@ -68,6 +69,8 @@ flags.DEFINE_integer('sysbench_tables', 4,
                      'The number of tables used in sysbench oltp.lua tests')
 flags.DEFINE_integer('sysbench_table_size', 100000,
                      'The number of rows of each table used in the oltp tests')
+flags.DEFINE_integer('sysbench_scale', 100,
+                     'Scale parameter as used by TPCC benchmark.')
 flags.DEFINE_integer('sysbench_warmup_seconds', 10,
                      'The duration of the warmup run in which results are '
                      'discarded, in seconds.')
@@ -97,6 +100,19 @@ flags.DEFINE_integer('sysbench_post_failover_seconds', 0,
                      'amount of time after failover is complete.  Useful '
                      'for detecting if there are any differences in TPS because'
                      'of failover.')
+
+BENCHMARK_DATA = {
+    'sysbench-tpcc.tar.gz': '23a6cd5d3efeff66b346ba7fe416aa39',
+}
+
+_MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
+    'tpcc': set(
+        ['scale']
+    ),
+    'oltp_read_write': set(
+        ['table_size']
+    )
+}
 
 
 BENCHMARK_NAME = 'sysbench'
@@ -170,11 +186,12 @@ def _ParseSysbenchOutput(sysbench_output):
   Args:
     sysbench_output: The output from sysbench.
   Returns:
-    Two arrays, the tps numbers and the latency numbers
+    Three arrays, the tps, latency and qps numbers.
 
   """
   tps_numbers = []
   latency_numbers = []
+  qps_numbers = []
 
   sysbench_output_io = StringIO.StringIO(sysbench_output)
   for line in sysbench_output_io:
@@ -186,10 +203,12 @@ def _ParseSysbenchOutput(sysbench_output):
       tps_numbers.append(float(match.group(1)))
       match = re.search(r'lat \(.*?\): (.*?) ', line)
       latency_numbers.append(float(match.group(1)))
+      match = re.search(r'qps: (.*?) \(.*?\) ', line)
+      qps_numbers.append(float(match.group(1)))
       if line.startswith('SQL statistics:'):
         break
 
-  return tps_numbers, latency_numbers
+  return tps_numbers, latency_numbers, qps_numbers
 
 
 def AddMetricsForSysbenchOutput(
@@ -208,7 +227,8 @@ def AddMetricsForSysbenchOutput(
     metadata: The metadata to be passed along to the Samples class.
     metric_prefix:  An optional prefix to append to each metric generated.
   """
-  tps_numbers, latency_numbers = _ParseSysbenchOutput(sysbench_output)
+  tps_numbers, latency_numbers, qps_numbers = (
+      _ParseSysbenchOutput(sysbench_output))
 
   tps_metadata = metadata.copy()
   tps_metadata.update({metric_prefix + 'tps': tps_numbers})
@@ -220,8 +240,14 @@ def AddMetricsForSysbenchOutput(
   latency_sample = sample.Sample(metric_prefix + 'latency_array', -1, 'ms',
                                  latency_metadata)
 
+  qps_metadata = metadata.copy()
+  qps_metadata.update({metric_prefix + 'qps': qps_numbers})
+  qps_sample = sample.Sample(metric_prefix + 'qps_array', -1, 'qps',
+                             qps_metadata)
+
   results.append(tps_sample)
   results.append(latency_sample)
+  results.append(qps_sample)
 
 
 def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
@@ -233,7 +259,10 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
   run_cmd_tokens = ['sysbench',
                     FLAGS.sysbench_testname,
                     '--tables=%d' % FLAGS.sysbench_tables,
-                    '--table_size=%d' % FLAGS.sysbench_table_size,
+                    ('--table_size=%d' % FLAGS.sysbench_table_size
+                     if _IsValidFlag('table_size') else ''),
+                    ('--scale=%d' % FLAGS.sysbench_scale
+                     if _IsValidFlag('scale') else ''),
                     '--db-ps-mode=%s' % DISABLE,
                     '--rand-type=%s' % UNIFORM,
                     '--threads=%d' % sysbench_thread_count,
@@ -427,7 +456,7 @@ def _WaitForWorkloadToFail(
         sysbench_thread_count)
 
     # the tps will drop to 0 before connection failure on AWS
-    tps_array, _ = _ParseSysbenchOutput(stdout)
+    tps_array, _, _ = _ParseSysbenchOutput(stdout)
     did_tps_drop_to_zero = any({x == 0 for x in tps_array})
 
   did_all_succeed = retcode == 0 and not did_tps_drop_to_zero
@@ -596,6 +625,9 @@ def _PrepareSysbench(vm, benchmark_spec):
   Returns:
     results: A list of results of the data loading step.
   """
+
+  _InstallLuaScriptsIfNecessary(vm)
+
   results = []
 
   db = benchmark_spec.managed_relational_db
@@ -628,7 +660,10 @@ def _PrepareSysbench(vm, benchmark_spec):
   data_load_cmd_tokens = ['sysbench',
                           FLAGS.sysbench_testname,
                           '--tables=%d' % FLAGS.sysbench_tables,
-                          '--table-size=%d' % FLAGS.sysbench_table_size,
+                          ('--table_size=%d' % FLAGS.sysbench_table_size
+                           if _IsValidFlag('table_size') else ''),
+                          ('--scale=%d' % FLAGS.sysbench_scale
+                           if _IsValidFlag('scale') else ''),
                           '--threads=%d' % num_threads,
                           '--db-driver=mysql',
                           db.MakeSysbenchConnectionString(),
@@ -656,12 +691,25 @@ def _PrepareSysbench(vm, benchmark_spec):
   return results
 
 
+def _InstallLuaScriptsIfNecessary(vm):
+  if FLAGS.sysbench_testname == 'tpcc':
+    vm.InstallPreprovisionedBenchmarkData(
+        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
+    vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
+
+
+def _IsValidFlag(flag):
+  return (flag in
+          _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname])
+
+
 def CreateMetadataFromFlags(db):
   """Create meta data with all flags for sysbench."""
   metadata = {
       'sysbench_testname': FLAGS.sysbench_testname,
       'sysbench_tables': FLAGS.sysbench_tables,
       'sysbench_table_size': FLAGS.sysbench_table_size,
+      'sysbench_scale': FLAGS.sysbench_scale,
       'sysbench_warmup_seconds': FLAGS.sysbench_warmup_seconds,
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
@@ -699,9 +747,14 @@ def Prepare(benchmark_spec):
 
   UpdateBenchmarkSpecWithFlags(benchmark_spec)
 
+  db_spec = benchmark_spec.managed_relational_db.spec
   # Setup common test tools required on the client VM
   vm.Install('sysbench1')
-  vm.Install('mysql')
+  if (db_spec.engine_version == '5.6' or
+      db_spec.engine_version.startswith('5.6.')):
+    vm.Install('mysqlclient56')
+  else:
+    vm.Install('mysql')
 
   prepare_results = _PrepareSysbench(vm, benchmark_spec)
   print prepare_results
@@ -722,7 +775,6 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
   db = benchmark_spec.managed_relational_db
 
-  results = []
   for thread_count in FLAGS.sysbench_thread_counts:
     metadata = CreateMetadataFromFlags(db)
     metadata['sysbench_thread_count'] = thread_count
@@ -730,7 +782,7 @@ def Run(benchmark_spec):
     # information and states necessary to carry out the run.
     run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
     print run_results
-    results += run_results
+    publisher.PublishRunStageSamples(benchmark_spec, run_results)
 
   if (benchmark_spec.managed_relational_db.spec.high_availability and
       FLAGS.sysbench_pre_failover_seconds):
@@ -739,9 +791,13 @@ def Run(benchmark_spec):
     failover_results = _PerformFailoverTest(
         vm, metadata, benchmark_spec, last_client_count)
     print failover_results
-    results += failover_results
+    publisher.PublishRunStageSamples(benchmark_spec, failover_results)
 
-  return results
+  # all results have already been published
+  # database results take a long time to gather.  If later client counts
+  # or failover tests fail, still want the data from the earlier tests.
+  # so, results are published as they are found.
+  return []
 
 
 def Cleanup(benchmark_spec):

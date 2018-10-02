@@ -43,4 +43,13 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the OpenJDK package on the VM."""
-  vm.InstallPackages(_OpenJdkPackage(vm, 'openjdk-{0}-jdk'))
+  package_name = _OpenJdkPackage(vm, 'openjdk-{0}-jdk')
+
+  if not vm.HasPackage(package_name):
+    vm.RemoteCommand(
+        'sudo add-apt-repository ppa:openjdk-r/ppa && sudo apt-get update')
+  vm.InstallPackages(package_name)
+
+  # Populate the ca-certificates-java's trustAnchors parameter.
+  vm.RemoteCommand(
+      'sudo /var/lib/dpkg/info/ca-certificates-java.postinst configure')
