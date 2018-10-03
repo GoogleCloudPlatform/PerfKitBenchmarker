@@ -284,6 +284,10 @@ flags.DEFINE_boolean(
     'This sample will include metadata specifying the run stage that '
     'failed, the exception that occurred, as well as all the flags that '
     'were provided to PKB on the command line.')
+flags.DEFINE_boolean(
+    'create_started_run_sample', False,
+    'Whether PKB will create a sample at the start of the provision phase of '
+    'the benchmark run.')
 flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
     'If create_failed_run_samples is true, PKB will truncate any error '
@@ -500,6 +504,8 @@ def DoProvisionPhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of resource
       provisioning.
   """
+  if FLAGS.create_started_run_sample:
+    PublishRunStartedSample(spec)
   logging.info('Provisioning resources for benchmark %s', spec.name)
   spec.ConstructContainerCluster()
   spec.ConstructContainerRegistry()
@@ -652,6 +658,25 @@ def RegisterSkipPendingRunsCheck(func):
     func: A function which returns True if pending runs should be skipped.
   """
   _SKIP_PENDING_RUNS_CHECKS.append(func)
+
+
+def PublishRunStartedSample(spec):
+  """Publishes a sample indicating that a run has started.
+
+  This sample is published immediately so that there exists some metric for any
+  run (even if the process dies).
+
+  Args:
+    spec: The BenchmarkSpec object with run information.
+  """
+  collector = SampleCollector()
+  metadata = {
+      'flags': str(flag_util.GetProvidedCommandLineFlags())
+  }
+  collector.AddSamples(
+      [sample.Sample('Run Started', 1, 'Run Started', metadata)],
+      spec.name, spec)
+  collector.PublishSamples()
 
 
 def RunBenchmark(spec, collector):
