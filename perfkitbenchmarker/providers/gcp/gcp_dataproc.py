@@ -94,6 +94,10 @@ class GcpDataproc(spark_service.BaseSparkService):
         disk_flag = group_type + '-boot-disk-size'
         cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
 
+    if FLAGS.gcp_dataproc_subnet:
+      cmd.flags['subnet'] = FLAGS.gcp_dataproc_subnet
+      cmd.additional_flags.append('--no-address')
+
     cmd.Issue()
 
   def _Delete(self):
@@ -114,7 +118,6 @@ class GcpDataproc(spark_service.BaseSparkService):
     cmd.flags['zone'] = []
     _, _, retcode = cmd.Issue()
     return retcode == 0
-
 
   def SubmitJob(self, jarfile, classname, job_poll_interval=None,
                 job_arguments=None, job_stdout_file=None,
