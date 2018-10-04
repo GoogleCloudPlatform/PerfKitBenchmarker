@@ -200,6 +200,7 @@
 - Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
 - Introducing a new flag gcp_dataproc_subnet which allows a user to specify the subnet that a dataproc cluster will be part of.
 - Added support for running a subset of HPCC benchmarks.
+- Introducing a new multi string flag 'gcp_dataproc_property' which allows a user to modify many common configuration files when creating a Dataproc cluster.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

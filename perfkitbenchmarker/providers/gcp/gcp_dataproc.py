@@ -98,6 +98,9 @@ class GcpDataproc(spark_service.BaseSparkService):
       cmd.flags['subnet'] = FLAGS.gcp_dataproc_subnet
       cmd.additional_flags.append('--no-address')
 
+    if FLAGS.gcp_dataproc_property:
+      cmd.flags['properties'] = ','.join(FLAGS.gcp_dataproc_property)
+
     cmd.Issue()
 
   def _Delete(self):
