@@ -16,6 +16,8 @@
 - Updated GCP sole tenancy support.  Removed `gcp_host_type` added
   `gcp_node_type`.
 - Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
+- Removed duplicated metrics from the HPCC benchmark. Metrics now use the name
+  from the summary section of the benchmark-produced output.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -197,6 +199,7 @@
   sizes in ntttcp tests.
 - Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
 - Introducing a new flag gcp_dataproc_subnet which allows a user to specify the subnet that a dataproc cluster will be part of.
+- Added support for running a subset of HPCC benchmarks.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

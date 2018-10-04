@@ -195,6 +195,8 @@ def UpdateMetadata(metadata):
     metadata['mpi_env'] = FLAGS.hpcc_mpi_env
   metadata['hpcc_math_library'] = FLAGS.hpcc_math_library
   metadata['hpcc_version'] = hpcc.HPCC_VERSION
+  if FLAGS.hpcc_benchmarks:
+    metadata['hpcc_benchmarks'] = FLAGS.hpcc_benchmarks
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
@@ -209,36 +211,28 @@ def ParseOutput(hpcc_output, benchmark_spec):
     A list of samples to be published (in the same format as Run() returns).
   """
   results = []
-  metadata = dict()
-  metadata['num_machines'] = len(benchmark_spec.vms)
-  UpdateMetadata(metadata)
+  base_metadata = {
+      'num_machines': len(benchmark_spec.vms)
+  }
+  UpdateMetadata(base_metadata)
 
   # Parse all metrics from metric=value lines in the HPCC output.
-  metric_values = regex_util.ExtractAllFloatMetrics(
-      hpcc_output)
-  for metric, value in metric_values.iteritems():
-    results.append(sample.Sample(metric, value, '', metadata))
+  metric_values = regex_util.ExtractAllFloatMetrics(hpcc_output)
 
-  # Parse some metrics separately and add units. Although these metrics are
-  # parsed above and added to results, this handling is left so that existing
-  # uses of these metric names will continue to work.
-  value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
-  results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))
+  # For each benchmark that is run, collect the metrics and metadata for that
+  # benchmark from the metric_values map.
+  benchmarks_run = FLAGS.hpcc_benchmarks or hpcc.HPCC_METRIC_MAP
+  for benchmark in benchmarks_run:
+    for metric, units in hpcc.HPCC_METRIC_MAP[benchmark].iteritems():
+      value = metric_values[metric]
 
-  value = regex_util.ExtractFloat('SingleRandomAccess_GUPs=([0-9]*\\.[0-9]*)',
-                                  hpcc_output)
-  results.append(
-      sample.Sample('Random Access Throughput', value, 'GigaUpdates/sec',
-                    metadata))
+      # Copy metadata reported in the HPCC summary statistics to the metadata.
+      metadata = base_metadata.copy()
+      for metadata_item in hpcc.HPCC_METADATA_MAP[benchmark]:
+        metadata[metadata_item] = metric_values[metadata_item]
 
-  for metric in STREAM_METRICS:
-    regex = 'SingleSTREAM_%s=([0-9]*\\.[0-9]*)' % metric
-    value = regex_util.ExtractFloat(regex, hpcc_output)
-    results.append(
-        sample.Sample('STREAM %s Throughput' % metric, value, 'GB/s', metadata))
+      results.append(sample.Sample(metric, value, units, metadata))
 
-  value = regex_util.ExtractFloat(r'PTRANS_GBs=([0-9]*\.[0-9]*)', hpcc_output)
-  results.append(sample.Sample('PTRANS Throughput', value, 'GB/s', metadata))
   return results
 
 
