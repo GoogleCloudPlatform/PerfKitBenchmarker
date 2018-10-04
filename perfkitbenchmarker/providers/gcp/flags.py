@@ -108,3 +108,11 @@ flags.DEFINE_boolean('gke_enable_alpha', False,
                      'Whether to enable alpha kubernetes clusters.')
 flags.DEFINE_string('gcp_dataproc_subnet', None,
                     'Specifies the subnet that the cluster will be part of.')
+flags.DEFINE_multi_string('gcp_dataproc_property', [],
+                          'Specifies configuration properties for installed '
+                          'packages, such as Hadoop and Spark. Properties are '
+                          'mapped to configuration files by specifying a prefix'
+                          ', such as "core:io.serializations". '
+                          'See https://cloud.google.com/dataproc/docs/concepts/'
+                          'configuring-clusters/cluster-properties '
+                          'for details.')
