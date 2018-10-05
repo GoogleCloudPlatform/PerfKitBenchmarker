@@ -41,6 +41,14 @@ from perfkitbenchmarker.linux_packages import memtier
 FLAGS = flags.FLAGS
 
 
+flags.DEFINE_string('memcached_memtier_client_machine_type', None,
+                    'Machine type to use for the memtier client if different '
+                    'from memcached server machine type.')
+flags.DEFINE_string('memcached_memtier_server_machine_type', None,
+                    'Machine type to use for the memtier server if different '
+                    'from memcached client machine type.')
+
+
 BENCHMARK_NAME = 'memcached_memtier'
 BENCHMARK_CONFIG = """
 memcached_memtier:
@@ -50,13 +58,31 @@ memcached_memtier:
       vm_spec: *default_single_core
       vm_count: 1
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 
 
 def GetConfig(user_config):
+  """Load and return benchmark config.
+
+  Args:
+    user_config: user supplied configuration (flags and config file)
+
+  Returns:
+    loaded benchmark configuration
+  """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS.memcached_memtier_client_machine_type:
+    vm_spec = config['vm_groups']['client']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = (
+          FLAGS.memcached_memtier_client_machine_type)
+  if FLAGS.memcached_memtier_server_machine_type:
+    vm_spec = config['vm_groups']['server']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = (
+          FLAGS.memcached_memtier_server_machine_type)
   return config
 
 
