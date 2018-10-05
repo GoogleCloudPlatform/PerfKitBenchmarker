@@ -49,8 +49,10 @@ flags.DEFINE_integer('memtier_run_count', 1,
                      'Defaults to 1.')
 flags.DEFINE_integer('memtier_requests', 10000,
                      'Number of total requests per client. Defaults to 10000.')
-flags.DEFINE_integer('memtier_clients', 50,
-                     'Number of clients per thread. Defaults to 50.')
+flags.DEFINE_list('memtier_clients', [50],
+                  'Comma separated list of number of clients per thread. '
+                  'Specify more than 1 value to vary the number of clients. '
+                  'Defaults to [50].')
 flags.DEFINE_integer('memtier_threads', 4,
                      'Number of threads. Defaults to 4.')
 flags.DEFINE_integer('memtier_ratio', 9,
@@ -108,35 +110,40 @@ def AptUninstall(vm):
 def Run(vm, server_ip, server_port):
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
-
-  vm.RemoteCommand(
-      'memtier_benchmark '
-      '-s {server_ip} '
-      '-p {server_port} '
-      '-P {protocol} '
-      '--run-count {run_count} '
-      '--requests {requests} '
-      '--clients {clients} '
-      '--threads {threads} '
-      '--ratio {ratio} '
-      '--data-size {data_size} '
-      '--key-pattern {key_pattern} '
-      '--random-data > {output_file}'.format(
-          server_ip=server_ip,
-          server_port=server_port,
-          protocol=FLAGS.memtier_protocol,
-          run_count=FLAGS.memtier_run_count,
-          requests=FLAGS.memtier_requests,
-          clients=FLAGS.memtier_clients,
-          threads=FLAGS.memtier_threads,
-          ratio=memtier_ratio,
-          data_size=FLAGS.memtier_data_size,
-          key_pattern=FLAGS.memtier_key_pattern,
-          output_file=MEMTIER_RESULTS))
-
-  results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
   samples = []
-  samples.extend(ParseResults(results, GetMetadata()))
+
+  for client_count in FLAGS.memtier_clients:
+    vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
+    vm.RemoteCommand(
+        'memtier_benchmark '
+        '-s {server_ip} '
+        '-p {server_port} '
+        '-P {protocol} '
+        '--run-count {run_count} '
+        '--requests {requests} '
+        '--clients {clients} '
+        '--threads {threads} '
+        '--ratio {ratio} '
+        '--data-size {data_size} '
+        '--key-pattern {key_pattern} '
+        '--random-data > {output_file}'.format(
+            server_ip=server_ip,
+            server_port=server_port,
+            protocol=FLAGS.memtier_protocol,
+            run_count=FLAGS.memtier_run_count,
+            requests=FLAGS.memtier_requests,
+            clients=client_count,
+            threads=FLAGS.memtier_threads,
+            ratio=memtier_ratio,
+            data_size=FLAGS.memtier_data_size,
+            key_pattern=FLAGS.memtier_key_pattern,
+            output_file=MEMTIER_RESULTS))
+
+    results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
+    metadata = GetMetadata()
+    metadata['memtier_clients'] = client_count
+    samples.extend(ParseResults(results, metadata))
+
   return samples
 
 
@@ -144,7 +151,6 @@ def GetMetadata():
   meta = {'memtier_protocol': FLAGS.memtier_protocol,
           'memtier_run_count': FLAGS.memtier_run_count,
           'memtier_requests': FLAGS.memtier_requests,
-          'memtier_clients': FLAGS.memtier_clients,
           'memtier_threads': FLAGS.memtier_threads,
           'memtier_ratio': FLAGS.memtier_ratio,
           'memtier_data_size': FLAGS.memtier_data_size,

@@ -72,7 +72,7 @@ def _WaitForServerUp(vm):
   logging.info('Trying to connect to memcached at %s:%s', address, port)
   try:
     out, _ = vm.RemoteCommand(
-        '(echo -e "stats\n" ; sleep 1)| netcat %s %s' % (address, port))
+        '(echo -e "stats\n")| netcat -q 1 %s %s' % (address, port))
     if out.startswith('STAT '):
       logging.info('memcached server stats received. Server up and running.')
       return
