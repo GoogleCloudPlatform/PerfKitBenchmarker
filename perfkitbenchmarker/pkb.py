@@ -827,6 +827,10 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
     metadata.update({'interruptible_vms': interruptible_vm_count,
                      'interrupted_vms': interrupted_vm_count,
                      'vm_status_codes': vm_status_codes})
+  if interrupted_vm_count:
+    logging.error(
+        '%d interruptible VMs were interrupted in this failed PKB run.',
+        interrupted_vm_count)
   return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
