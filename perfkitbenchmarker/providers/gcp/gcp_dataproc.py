@@ -94,6 +94,10 @@ class GcpDataproc(spark_service.BaseSparkService):
         disk_flag = group_type + '-boot-disk-size'
         cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
 
+      if group_spec.vm_spec.boot_disk_type:
+        disk_flag = group_type + '-boot-disk-type'
+        cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_type
+
     if FLAGS.gcp_dataproc_subnet:
       cmd.flags['subnet'] = FLAGS.gcp_dataproc_subnet
       cmd.additional_flags.append('--no-address')
