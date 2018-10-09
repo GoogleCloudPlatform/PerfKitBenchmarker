@@ -266,7 +266,7 @@ def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
     if 'examples/sec: ' in output:
       examples_sec_log = get_mean(regex_util.ExtractAllMatches(
           r'examples/sec: (\S+)', output))
-      precision = abs(examples_sec_log -  examples_sec) / examples_sec_log
+      precision = abs(examples_sec_log - examples_sec) / examples_sec_log
       assert precision < EXAMPLES_PER_SECOND_PRECISION, 'examples/sec is wrong.'
       examples_sec = examples_sec_log
     samples.append(sample.Sample('Examples Per Second', examples_sec,
