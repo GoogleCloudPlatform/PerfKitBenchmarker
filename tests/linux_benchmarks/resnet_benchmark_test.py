@@ -30,8 +30,10 @@ class ResNetBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     with open(path) as fp:
       self.contents = fp.read()
 
-    self.metadata_input = {'num_examples_per_epoch': 1251.1}
+    self.metadata_input = {'num_examples_per_epoch': 1251.1,
+                           'train_batch_size': 1024}
     self.metadata_output = {'epoch': 4.000479577971386, 'elapsed_seconds': 0,
+                            'train_batch_size': 1024,
                             'num_examples_per_epoch': 1251.1, 'step': 5005}
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))

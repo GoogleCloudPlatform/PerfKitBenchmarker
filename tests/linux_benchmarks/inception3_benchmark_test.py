@@ -30,8 +30,10 @@ class Inception3BenchmarkTestCase(unittest.TestCase,
     with open(path) as fp:
       self.contents = fp.read()
 
-    self.metadata_input = {'num_examples_per_epoch': 1251.1}
-    self.metadata_output = {'num_examples_per_epoch': 1251.1, 'step': 4000,
+    self.metadata_input = {'num_examples_per_epoch': 1251.1,
+                           'train_batch_size': 1024}
+    self.metadata_output = {'num_examples_per_epoch': 1251.1,
+                            'train_batch_size': 1024, 'step': 4000,
                             'epoch': 3.197186475901207, 'elapsed_seconds': 0}
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))

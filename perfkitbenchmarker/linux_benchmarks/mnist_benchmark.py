@@ -76,6 +76,8 @@ flags.DEFINE_integer('mnist_batch_size', 1024,
                      'Mini-batch size for the training. Note that this '
                      'is the global batch size and not the per-shard batch.')
 
+EXAMPLES_PER_SECOND_PRECISION = 0.01
+
 
 def GetConfig(user_config):
   """Load and return benchmark config.
@@ -199,7 +201,9 @@ def _CreateMetadataDict(benchmark_spec):
       'num_train_images': benchmark_spec.num_train_images,
       'num_eval_images': benchmark_spec.num_eval_images,
       'train_epochs': benchmark_spec.train_epochs,
-      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch
+      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch,
+      'train_batch_size': benchmark_spec.batch_size,
+      'eval_batch_size': benchmark_spec.batch_size
   }
 
 
@@ -253,15 +257,19 @@ def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
   samples.append(sample.Sample('Loss', float(loss), '', metadata_copy))
 
   if 'global_step/sec: ' in output:
-    global_step_sec = regex_util.ExtractAllMatches(
-        r'global_step/sec: (\S+)', output)
+    global_step_sec = get_mean(regex_util.ExtractAllMatches(
+        r'global_step/sec: (\S+)', output))
     samples.append(sample.Sample(
-        'Global Steps Per Second', get_mean(global_step_sec),
+        'Global Steps Per Second', global_step_sec,
         'global_steps/sec', metadata_copy))
-  if 'examples/sec: ' in output:
-    examples_sec = regex_util.ExtractAllMatches(
-        r'examples/sec: (\S+)', output)
-    samples.append(sample.Sample('Examples Per Second', get_mean(examples_sec),
+    examples_sec = global_step_sec * metadata['train_batch_size']
+    if 'examples/sec: ' in output:
+      examples_sec_log = get_mean(regex_util.ExtractAllMatches(
+          r'examples/sec: (\S+)', output))
+      precision = abs(examples_sec_log -  examples_sec) / examples_sec_log
+      assert precision < EXAMPLES_PER_SECOND_PRECISION, 'examples/sec is wrong.'
+      examples_sec = examples_sec_log
+    samples.append(sample.Sample('Examples Per Second', examples_sec,
                                  'examples/sec', metadata_copy))
   return samples
 
@@ -311,11 +319,13 @@ def Run(benchmark_spec):
       'python {script} '
       '--data_dir={data_dir} '
       '--iterations={iterations} '
-      '--model_dir={model_dir}'.format(
+      '--model_dir={model_dir} '
+      '--batch_size={batch_size}'.format(
           script=mnist_benchmark_script,
           data_dir=benchmark_spec.data_dir,
           iterations=benchmark_spec.iterations,
-          model_dir=benchmark_spec.model_dir))
+          model_dir=benchmark_spec.model_dir,
+          batch_size=benchmark_spec.batch_size))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)

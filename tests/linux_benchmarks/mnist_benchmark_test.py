@@ -30,8 +30,10 @@ class MnistBenchmarkTestCase(unittest.TestCase,
     with open(path) as fp:
       self.contents = fp.read()
 
-    self.metadata_input = {'num_examples_per_epoch': 1251.1}
-    self.metadata_output = {'num_examples_per_epoch': 1251.1, 'step': 2000,
+    self.metadata_input = {'num_examples_per_epoch': 1251.1,
+                           'train_batch_size': 1024}
+    self.metadata_output = {'num_examples_per_epoch': 1251.1,
+                            'train_batch_size': 1024, 'step': 2000,
                             'elapsed_seconds': 0, 'epoch': 1.5985932379506036}
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
