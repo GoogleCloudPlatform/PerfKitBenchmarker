@@ -116,6 +116,22 @@ class AzureResourceGroup(resource.BaseResource):
     """
     return [self._FormatTag(k, v) for k, v in tags_dict.iteritems()]
 
+  def AddTag(self, key, value):
+    """Add a single tag to an existing Resource Group.
+
+    Args:
+      key: tag key
+      value: tag value
+
+    Raises:
+      errors.resource.CreationError on failure.
+    """
+    _, _, retcode = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
+         '--set', 'tags.' + self._FormatTag(key, value)])
+    if retcode:
+      raise errors.resource.CreationError('Error tagging Azure resource group.')
+
   def _GetTags(self):
     """Gets a list of tags to be used with the --tags param of Azure CLI."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
