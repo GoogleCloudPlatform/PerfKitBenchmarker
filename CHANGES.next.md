@@ -205,6 +205,7 @@
 - Added support for running a subset of HPCC benchmarks.
 - Introducing a new multi string flag 'gcp_dataproc_property' which allows a user to modify many common configuration files when creating a Dataproc cluster.
 - Added configuration support for specifying type of the boot disk for a Dataproc cluster.
+- Added AddTag method to AzureResourceGroup.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
