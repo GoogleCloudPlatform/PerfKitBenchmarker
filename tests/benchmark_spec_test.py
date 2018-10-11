@@ -33,6 +33,7 @@ from tests import mock_flags
 
 
 flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
+flags.DEFINE_string('run_uri', '', '')
 
 FLAGS = flags.FLAGS
 
@@ -106,7 +107,7 @@ NEVER_SUPPORTED = 'sysbench'
 class _BenchmarkSpecTestCase(unittest.TestCase):
 
   def setUp(self):
-    self._mocked_flags = mock_flags.MockFlags()
+    self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
     self._mocked_flags.temp_dir = 'tmp'
@@ -221,7 +222,10 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
       self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
 
 
-class RedirectGlobalFlagsTestCase(_BenchmarkSpecTestCase):
+class RedirectGlobalFlagsTestCase(unittest.TestCase):
+
+  def setUp(self):
+    FLAGS.mark_as_parsed()
 
   def testNoFlagOverride(self):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(

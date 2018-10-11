@@ -23,6 +23,7 @@ from tests import mock_flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('test_flag', 0, 'Test flag.')
+FLAGS.mark_as_parsed()
 
 
 class MockFlagsTestCase(unittest.TestCase):

@@ -18,6 +18,7 @@ import unittest
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker.sample import Sample
+from tests import mock_flags
 from perfkitbenchmarker.traces import dstat
 
 
@@ -25,6 +26,8 @@ class DstatTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+
     directory = os.path.join(os.path.dirname(__file__), '..', 'data')
     path = os.path.join(directory, 'dstat-result.csv')
     self.collector = dstat._DStatCollector(output_directory=directory)

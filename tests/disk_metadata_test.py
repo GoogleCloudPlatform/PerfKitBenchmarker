@@ -20,6 +20,7 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -38,9 +39,15 @@ _COMPONENT = 'test_component'
 class _DiskMetadataTestCase(unittest.TestCase):
 
   def setUp(self):
+    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+    p = mock.patch(vm_util.__name__ + '.GetTempDir')
+    p.start()
+    self.addCleanup(p.stop)
+
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=mock_flags.MockFlags(), vm_groups={})
+        _BENCHMARK_NAME, flag_values=self.mock_flags, vm_groups={})
     self.benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 

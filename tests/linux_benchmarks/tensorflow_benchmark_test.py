@@ -15,18 +15,14 @@
 import unittest
 import mock
 from perfkitbenchmarker.linux_benchmarks import tensorflow_benchmark
+from tests import mock_flags
 
 
 class TensorflowBenchmarkBatchSizesTestCase(unittest.TestCase):
 
   def setUp(self):
-    flag_values = {
-        'tf_batch_sizes': [99]
-    }
-    p = mock.patch(tensorflow_benchmark.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+    self.flags.tf_batch_sizes = [99]
 
   def testFlagOverridesDefaultBatchSize(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(

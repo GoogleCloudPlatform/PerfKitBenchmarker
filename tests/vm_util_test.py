@@ -24,19 +24,15 @@ import unittest
 import mock
 
 from perfkitbenchmarker import vm_util
+from tests import mock_flags
 
 
 class ShouldRunOnInternalIpAddressTestCase(unittest.TestCase):
 
   def setUp(self):
-    p = mock.patch(vm_util.__name__ + '.FLAGS')
-    self.flags = p.start()
-    self.flags_patch = p
+    self.flags = mock_flags.PatchTestCaseFlags(self)
     self.sending_vm = mock.MagicMock()
     self.receiving_vm = mock.MagicMock()
-
-  def tearDown(self):
-    self.flags_patch.stop()
 
   def _RunTest(self, expectation, ip_addresses, is_reachable=True):
     self.flags.ip_addresses = ip_addresses
@@ -121,6 +117,10 @@ class WaitUntilSleepTimer(threading.Thread):
 
 
 class IssueCommandTestCase(unittest.TestCase):
+
+  def setUp(self):
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+    self.flags.time_commands = True
 
   def testTimeoutNotReached(self):
     _, _, retcode = vm_util.IssueCommand(['sleep', '0s'])

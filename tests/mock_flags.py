@@ -144,6 +144,13 @@ def PatchTestCaseFlags(testcase):
   Returns:
     MockFlags. The mocked FlagValues object.
   """
+  # TODO(ferneyhough): This is a convienence for a number of unittests that
+  # use both mock_flags and real flags. When using real flags in unittests,
+  # the flags must be marked as parsed before attempting to read any of them.
+  # The best way to use flags in unittests will likely change due to
+  # b/116248223, and this module may no longer be necessary.
+  FLAGS.mark_as_parsed()
+
   mock_flags = MockFlags()
   substitution = flag_util.FlagDictSubstitution(FLAGS, mock_flags.FlagDict)
   substitution.__enter__()

@@ -21,9 +21,11 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import pkb
+# The pkb import below is needed so that some required flags are available.
+from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_emr
 from perfkitbenchmarker.providers.gcp import gcp_dataproc
@@ -70,13 +72,17 @@ name:
 class _BenchmarkSpecTestCase(unittest.TestCase):
 
   def setUp(self):
-    self._mocked_flags = mock_flags.MockFlags()
+    self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+    p = mock.patch(vm_util.__name__ + '.GetTempDir')
+    p.start()
+    self.addCleanup(p.stop)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
     config = configs.LoadConfig(yaml_string, {}, benchmark_name)
@@ -89,10 +95,6 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
 
 
 class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
-
-  def setUp(self):
-    super(ConstructSparkServiceTestCase, self).setUp()
-    pkb._InitializeRunUri()
 
   def testDataprocConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(SERVICE_CONFIG)
