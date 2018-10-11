@@ -22,7 +22,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 # The pkb import below is needed so that some required flags are available.
-from perfkitbenchmarker import pkb  # pylint: disable=unused-import
+from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util

@@ -20,6 +20,7 @@ import unittest
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
@@ -37,6 +38,11 @@ class _DiskTypeRenamingTestCase(unittest.TestCase):
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)
+
+    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
+
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpec(self, config_dict):
