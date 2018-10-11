@@ -21,16 +21,16 @@ from mock import ANY
 from mock import call
 
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import stencil2d_benchmark
+
+
+flags.FLAGS.mark_as_parsed()
 
 
 class Stencil2DBenchmarkTestCase(unittest.TestCase):
 
   def setUp(self):
-    p = mock.patch(stencil2d_benchmark.__name__ + '.FLAGS')
-    p.start()
-    self.addCleanup(p.stop)
-
     path = os.path.join(os.path.dirname(__file__), '../data',
                         'stencil2d_output.txt')
     with open(path) as fp:

@@ -18,6 +18,7 @@ import unittest
 
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from perfkitbenchmarker.providers.gcp import util
+from tests import mock_flags
 
 
 NAME = 'testcluster'
@@ -45,6 +46,7 @@ class GcpBigtableTestCase(unittest.TestCase):
     super(GcpBigtableTestCase, self).setUp()
     self.bigtable = gcp_bigtable.GcpBigtableInstance(NAME, NUM_NODES, PROJECT,
                                                      ZONE)
+    self.flags = mock_flags.PatchTestCaseFlags(self)
 
   def testEmptyTableList(self):
     with mock.patch.object(util.GcloudCommand, 'Issue',

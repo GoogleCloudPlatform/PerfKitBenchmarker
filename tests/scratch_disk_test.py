@@ -25,6 +25,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -77,6 +78,7 @@ class ScratchDiskTestMixin(object):
     # Patch subprocess.Popen to make sure we don't issue any commands to spin up
     # resources.
     self.patches.append(mock.patch('subprocess.Popen'))
+    self.patches.append(mock.patch(vm_util.__name__ + '.GetTempDir'))
 
     self._PatchCloudSpecific()
 

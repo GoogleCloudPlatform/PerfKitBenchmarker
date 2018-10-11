@@ -21,7 +21,6 @@ import re
 import unittest
 
 import mock
-import mock_flags
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
@@ -33,7 +32,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-
+from tests import mock_flags
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -144,6 +143,8 @@ class GceVmSpecTestCase(unittest.TestCase):
 class GceVirtualMachineTestCase(unittest.TestCase):
 
   def setUp(self):
+    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
+
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceNetwork.GetNetwork')
     self.mock_get_network = p.start()
@@ -152,6 +153,10 @@ class GceVirtualMachineTestCase(unittest.TestCase):
                    '.gce_network.GceFirewall.GetFirewall')
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
+
+    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
 
   def testVmWithMachineTypeNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -216,12 +221,18 @@ def _CreateFakeDiskMetadata(image):
 class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
 
   def setUp(self):
+    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
+    self.mock_flags.gcp_instance_metadata_from_file = ''
+    self.mock_flags.gcp_instance_metadata = ''
+    self.mock_flags.gcloud_path = 'gcloud'
+
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceNetwork.GetNetwork')
     self.mock_get_network = p.start()
     self.addCleanup(p.stop)
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceFirewall.GetFirewall')
+
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
     self.spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
@@ -230,6 +241,10 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
                    '.linux_vm.BaseLinuxMixin._GetNumCpus')
     self.mock_get_num_cpus = p.start()
     self.addCleanup(p.stop)
+
+    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
 
   def _CreateFakeReturnValues(self, fake_image=''):
     fake_rets = [('', '', 0), (json.dumps(_FAKE_INSTANCE_METADATA), '', 0)]
@@ -382,6 +397,10 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
+    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
+
   def _CreateVmCommand(self, **flag_kwargs):
     with PatchCriticalObjects() as issue_command:
       for key, value in flag_kwargs.items():
@@ -455,6 +474,10 @@ class GCEVMFlagsTestCase(unittest.TestCase):
 class GCEVMCreateTestCase(unittest.TestCase):
 
   def setUp(self):
+    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
+    self.mock_flags.gcp_instance_metadata_from_file = ''
+    self.mock_flags.gcp_instance_metadata = ''
+
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceNetwork.GetNetwork')
     self.mock_get_network = p.start()
@@ -463,6 +486,10 @@ class GCEVMCreateTestCase(unittest.TestCase):
                    '.gce_network.GceFirewall.GetFirewall')
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
+
+    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
 
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:

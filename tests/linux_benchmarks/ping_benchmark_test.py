@@ -17,8 +17,11 @@
 import unittest
 import os
 import mock
-from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+
+flags.FLAGS.mark_as_parsed()
 
 
 class TestGenerateJobFileString(unittest.TestCase):

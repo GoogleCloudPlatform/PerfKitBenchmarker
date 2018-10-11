@@ -25,7 +25,7 @@ from tests import mock_flags
 class GcpCloudRedisTestCase(unittest.TestCase):
 
   def setUp(self):
-    mocked_flags = mock_flags.MockFlags()
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
     mocked_flags.project = 'project'
     mocked_flags.redis_failover_style = cloud_redis.Failover.FAILOVER_NONE
     mock_spec = mock.Mock(

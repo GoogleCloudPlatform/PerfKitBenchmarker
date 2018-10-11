@@ -486,6 +486,9 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
 
   def setUp(self):
     super(BenchmarkConfigSpecTestCase, self).setUp()
+    self._flags = mock_flags.MockFlags()
+    self._flags['cloud'].value = providers.GCP
+
     self._spec_class = benchmark_config_spec.BenchmarkConfigSpec
     self._description = 'Test description.'
     self._vm_groups = {'default': {'cloud': providers.GCP,
@@ -495,8 +498,8 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
                     'vm_groups': self._vm_groups}
 
   def testValidInput(self):
-    result = self._spec_class(_COMPONENT, flag_values=flags.FLAGS,
-                              **self._kwargs)
+    result = self._spec_class(
+        _COMPONENT, flag_values=self._flags, **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
     self.assertIsNot(result.flags, _GetFlagDict(flags.FLAGS))
@@ -513,7 +516,7 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
     self._kwargs['vm_groups']['default']['static_vms'] = [{'disk_specs': [{
         'disk_size': 0.5}]}]
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._spec_class(_COMPONENT, flag_values=flags.FLAGS, **self._kwargs)
+      self._spec_class(_COMPONENT, flag_values=self._flags, **self._kwargs)
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.vm_groups.default.static_vms[0].disk_specs[0]'
         '.disk_size value: "0.5" (of type "float"). Value must be one of the '
@@ -525,8 +528,11 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
         for os_type in (os_types.DEBIAN, os_types.RHEL, os_types.WINDOWS)}
     expected_os_types = os_types.JUJU, os_types.WINDOWS
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._spec_class(_COMPONENT, expected_os_types=expected_os_types,
-                       flag_values=flags.FLAGS, **self._kwargs)
+      self._spec_class(
+          _COMPONENT,
+          expected_os_types=expected_os_types,
+          flag_values=self._flags,
+          **self._kwargs)
     self.assertEqual(str(cm.exception), (
         "VM groups in test_component may only have the following OS types: "
         "'juju', 'windows'. The following VM group options are invalid:{sep}"
@@ -537,14 +543,14 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
   def testFlagOverridesPropagate(self):
     self._kwargs['flags'] = {'cloud': providers.AWS,
                              'ignore_package_requirements': True}
-    result = self._spec_class(_COMPONENT, flag_values=flags.FLAGS,
-                              **self._kwargs)
+    result = self._spec_class(
+        _COMPONENT, flag_values=self._flags, **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
     self.assertIsInstance(result.flags, dict)
     self.assertIsNot(result.flags, _GetFlagDict(flags.FLAGS))
     self.assertEqual(result.flags['cloud'], 'AWS')
-    self.assertEqual(flags.FLAGS['cloud'].value, 'GCP')
+    self.assertEqual(self._flags['cloud'].value, 'GCP')
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
     self.assertIsInstance(result.vm_groups['default'],

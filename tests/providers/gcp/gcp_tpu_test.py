@@ -21,6 +21,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_tpu
 from perfkitbenchmarker.providers.gcp import util
+from tests import mock_flags
 
 
 NAME = 'testname'
@@ -50,12 +51,12 @@ class GcpTpuTestCase(unittest.TestCase):
     return tpu_class
 
   def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None, 'tpu_cores_per_donut': 8}
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+    self.flags.run_uri = '123'
+    self.flags.project = ''
+    self.flags.tpu_cores_per_donut = 8
+    self.flags.gcloud_path = 'gcloud'
 
-    p = mock.patch(gcp_tpu.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
     mock_tpu_spec_attrs = self.CreateTpuSpecDict()
     self.mock_tpu_spec = mock.Mock(
         spec=benchmark_config_spec._TpuGroupSpec)

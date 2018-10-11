@@ -331,3 +331,5 @@
 - Updated HPCC benchmark to version 1.5.0.
 - Psping benchmark no longer report histogram for every sample metadata.
 - Specifies the number of threads to use in MXNet CPU test.
+- Fixed the way several unittests are using flags and mock_flags.
+- Fixed linter issues in several unittests.
