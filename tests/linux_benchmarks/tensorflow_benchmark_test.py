@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for the Tensorflow benchmark."""
 import unittest
-import mock
 from perfkitbenchmarker.linux_benchmarks import tensorflow_benchmark
 from tests import mock_flags
 

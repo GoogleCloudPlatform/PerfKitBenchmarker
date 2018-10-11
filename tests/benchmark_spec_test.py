@@ -22,6 +22,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -33,7 +34,6 @@ from tests import mock_flags
 
 
 flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
-flags.DEFINE_string('run_uri', '', '')
 
 FLAGS = flags.FLAGS
 
