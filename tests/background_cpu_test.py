@@ -30,7 +30,6 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from tests import mock_flags
 
-
 NAME = 'ping'
 UID = 'name0'
 
@@ -58,9 +57,11 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def setUp(self):
     self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    self._mocked_flags.run_uri = 'fake_run_uri'
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
     self._mocked_flags.temp_dir = 'tmp'
+
     p = patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)

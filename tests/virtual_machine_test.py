@@ -14,11 +14,10 @@
 """Tests for perfkitbenchmarker.virtual_machine."""
 
 import unittest
-import mock_flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-
+from tests import mock_flags
 
 _COMPONENT = 'test_component'
 

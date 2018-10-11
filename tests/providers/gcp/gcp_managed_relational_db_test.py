@@ -34,17 +34,13 @@ from tests import mock_flags
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
-_FLAGS = None
 
 
 def CreateManagedDbFromSpec(spec_dict):
   mock_db_spec = mock.Mock(
       spec=benchmark_config_spec._ManagedRelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
-  mocked_flags = mock_flags.MockFlags()
-  mocked_flags.run_uri = 'mock-run-uri'
-  with mock_flags.PatchFlags(mocked_flags):
-    db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
+  db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
   return db_class
 
 
@@ -84,12 +80,11 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
     }
 
   def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None}
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+    self.flags.project = ''
+    self.flags.run_uri = '123'
+    self.flags.gcloud_path = 'gcloud'
 
-    p = mock.patch(gcp_managed_relational_db.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
     mock_db_spec_attrs = self.createMySQLSpecDict()
     self.mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
@@ -200,6 +195,12 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
 
 
 class GcpPostgresManagedRelationlDbTestCase(unittest.TestCase):
+
+  def setUp(self):
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+    self.flags.project = ''
+    self.flags.run_uri = ''
+    self.flags.gcloud_path = ''
 
   def createPostgresSpecDict(self):
     machine_type = {

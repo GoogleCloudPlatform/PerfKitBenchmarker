@@ -18,11 +18,14 @@ import unittest
 import mock
 
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
+from tests import mock_flags
 
 
 class HPCCTestCase(unittest.TestCase):
 
   def setUp(self):
+    self.flags = mock_flags.PatchTestCaseFlags(self)
+    self.flags.hpcc_math_library = 'openblas'
     path = os.path.join(os.path.dirname(__file__), '../data', 'hpcc-sample.txt')
     with open(path) as fp:
       self.contents = fp.read()

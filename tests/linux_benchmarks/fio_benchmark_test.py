@@ -21,10 +21,12 @@ import mock
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
+from tests import mock_flags
 
 
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
+    self.flags = mock_flags.PatchTestCaseFlags(self)
     self.filename = '/test/filename'
 
   def testBasicGeneration(self):

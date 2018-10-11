@@ -21,6 +21,8 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import timing_util
 
+flags.FLAGS.mark_as_parsed()
+
 
 class ValidateMeasurementsFlagTestCase(unittest.TestCase):
   """Tests exercising ValidateMeasurementsFlag."""

@@ -21,6 +21,7 @@ import mock
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
 
 BASE_METADATA = {'foo': 'bar'}
@@ -51,8 +52,10 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     job_file_path = os.path.join(self.data_dir, 'fio.job')
     self.job_contents = _ReadFileToString(job_file_path)
 
-  def tearDown(self):
-    pass
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='tmp')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
 
   def testParseFioJobFile(self):
     parameter_dict = fio.ParseJobFile(self.job_contents)
