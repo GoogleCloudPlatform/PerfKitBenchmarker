@@ -223,6 +223,10 @@ class BaseVirtualMachine(resource.BaseResource):
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
+  # Supports overriding the PIP package version based on the provider image.
+  # By default, the latest PIP version is used.
+  PYTHON_PIP_PACKAGE_VERSION = None
+
   def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 

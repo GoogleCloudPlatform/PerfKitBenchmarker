@@ -792,14 +792,18 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
+  """Class with configuration for AWS Debian virtual machines."""
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
 class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1404Mixin):
+  """Class with configuration for AWS Ubuntu1404 virtual machines."""
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -822,8 +826,10 @@ class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
+  """Class with configuration for AWS Juju virtual machines."""
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,

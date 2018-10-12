@@ -25,7 +25,12 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 def Install(vm, package_name='python-pip'):
   """Install pip on the VM."""
   vm.InstallPackages(package_name)
-  vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
+  if vm.PYTHON_PIP_PACKAGE_VERSION:
+    vm.RemoteCommand(
+        'sudo pip install --upgrade '
+        '--force-reinstall pip=={0}'.format(vm.PYTHON_PIP_PACKAGE_VERSION))
+  else:
+    vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
 
   # Add a symbolic link to /usr/local/bin/pip if pip ends up there. This lets
   # us run pip under sudo since /usr/local/bin is not typically available to
