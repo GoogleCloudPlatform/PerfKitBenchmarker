@@ -333,3 +333,7 @@
 - Specifies the number of threads to use in MXNet CPU test.
 - Fixed the way several unittests are using flags and mock_flags.
 - Fixed linter issues in several unittests.
+- Add python_pip_package_version as a class attribute of
+  BaseVirtualMachine. Children classes that have the problem of
+  https://github.com/pypa/pip/issues/5247 can use an older pip package.
+
