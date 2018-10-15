@@ -317,7 +317,6 @@
 - Fix PSPing benchmark so that it runs on AWS and Azure.
 - Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
 - Moved from ACS to AKS for Azure Kubernetes clusters.
-- AWS Aurora Postgres updated from 9.6.2 to 9.6.3
 - Cleanup and fix Beam bechmark.
 - Sysbench failover tests added for GCP and AWS Aurora
 - Sysbench qps metric added
@@ -336,4 +335,4 @@
 - Add python_pip_package_version as a class attribute of
   BaseVirtualMachine. Children classes that have the problem of
   https://github.com/pypa/pip/issues/5247 can use an older pip package.
-
+- Update AWS Aurora Postgres default version from 9.6.2 to 9.6.8
