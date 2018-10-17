@@ -24,3 +24,4 @@ functools32
 contextlib2>=0.5.1
 pywinrm
 timeout-decorator
+tornado
