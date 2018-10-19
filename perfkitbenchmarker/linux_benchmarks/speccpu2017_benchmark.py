@@ -188,8 +188,10 @@ def Run(benchmark_spec):
       FLAGS.spec17_copies or copies))
   version_specific_parameters.append(' --threads=%s ' %
                                      (FLAGS.spec17_threads or vm.num_cpus))
+
   if FLAGS.spec17_fdo:
     version_specific_parameters.append('--feedback ')
+    vm.RemoteCommand('cd /scratch/cpu2017; mkdir fdo_profiles')
 
   speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
               version_specific_parameters)
