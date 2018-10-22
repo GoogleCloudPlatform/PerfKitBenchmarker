@@ -337,3 +337,4 @@
   https://github.com/pypa/pip/issues/5247 can use an older pip package.
 - Update AWS Aurora Postgres default version from 9.6.2 to 9.6.8
 - Update speccpu17 to write profiles in different files for each benchmark.
+- Avoid installing unnecessary MySQL server for sysbench when client tools suffice.
