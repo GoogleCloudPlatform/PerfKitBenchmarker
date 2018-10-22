@@ -754,7 +754,7 @@ def Prepare(benchmark_spec):
       db_spec.engine_version.startswith('5.6.')):
     vm.Install('mysqlclient56')
   else:
-    vm.Install('mysql')
+    vm.Install('mysqlclient')
 
   prepare_results = _PrepareSysbench(vm, benchmark_spec)
   print prepare_results
