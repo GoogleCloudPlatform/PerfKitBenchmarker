@@ -338,3 +338,5 @@
 - Update AWS Aurora Postgres default version from 9.6.2 to 9.6.8
 - Update speccpu17 to write profiles in different files for each benchmark.
 - Avoid installing unnecessary MySQL server for sysbench when client tools suffice.
+- Added support for running the object service benchmark with a GCP service
+  account.
