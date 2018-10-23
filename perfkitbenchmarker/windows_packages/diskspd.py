@@ -149,7 +149,7 @@ def Install(vm):
 
 def _RunDiskSpd(vm, options):
   total_runtime = FLAGS.diskspd_warmup + FLAGS.diskspd_cooldown + \
-                  FLAGS.diskspd_duration
+      FLAGS.diskspd_duration
   timeout_duration = total_runtime * DISKSPD_TIMEOUT_MULTIPLIER
 
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
@@ -190,10 +190,10 @@ def RunDiskSpd(running_vm):
   software_cache_string = '-Su' if FLAGS.diskspd_software_cache else ''
   write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
   block_size_string = str(FLAGS.diskspd_block_size) + \
-                      str(FLAGS.diskspd_block_unit)
+      str(FLAGS.diskspd_block_unit)
   access_pattern_string = str(FLAGS.diskspd_access_pattern) + \
-                          str(FLAGS.diskspd_stride_or_alignment) + \
-                         str(FLAGS.diskspd_stride_or_alignment_unit)
+      str(FLAGS.diskspd_stride_or_alignment) + \
+      str(FLAGS.diskspd_stride_or_alignment_unit)
   throughput_per_ms_string = ''
   if FLAGS.diskspd_throughput_per_ms:
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
