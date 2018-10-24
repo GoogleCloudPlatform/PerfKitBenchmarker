@@ -438,7 +438,8 @@ def ParseHdrLogFile(logfile):
       # convert percentile to 100 based and round up to 3 decimal places
       percentile = math.floor(float(row_vals[1]) * 100000) / 1000.0
       current_total_count = int(row_vals[2])
-      if percentile > last_percent_value:
+      if (percentile > last_percent_value and
+          current_total_count > prev_total_count):
         # convert latency to millisec based and percentile to 100 based.
         latency = float(row_vals[0]) / 1000
         count = current_total_count - prev_total_count
