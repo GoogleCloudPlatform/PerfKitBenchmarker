@@ -548,9 +548,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         file_path = file_path.split(':', 1)[1]
       # Replace the last instance of '\' with '/' to make scp happy.
       file_path = '/'.join(file_path.rsplit('\\', 1))
-
+    remote_ip = '[%s]' % self.ip_address if FLAGS.use_ipv6 else self.ip_address
     remote_location = '%s@%s:%s' % (
-        self.user_name, self.ip_address, remote_path)
+        self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     # An scp is not retried, so increase the connection timeout.
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key,
