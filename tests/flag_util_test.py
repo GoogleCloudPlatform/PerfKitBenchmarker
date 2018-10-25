@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 
 """Tests for flag_util.py."""
 
-import copy
 import sys
 import unittest
 
@@ -242,7 +241,7 @@ class TestIntegerListSerializer(unittest.TestCase):
                      '1,2-5-2,9')
 
 
-class FlagDictSubstitutionTestCase(unittest.TestCase):
+class OverrideFlagsTestCase(unittest.TestCase):
 
   def assertFlagState(self, flag_values, value, present):
     self.assertEqual(flag_values.test_flag, value)
@@ -253,26 +252,32 @@ class FlagDictSubstitutionTestCase(unittest.TestCase):
     flag_values = flags.FlagValues()
     flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
     flag_values([sys.argv[0]])
-    flag_values_copy = copy.deepcopy(flag_values)
-    flag_values_copy.test_flag = 1
+    flag_values_overrides = {}
+    flag_values_overrides['test_flag'] = 1
     self.assertFlagState(flag_values, 0, False)
-    self.assertFlagState(flag_values_copy, 1, False)
-    if hasattr(flag_values_copy, '_flags'):
-      flag_dict_func = flag_values_copy._flags
-    else:
-      flag_dict_func = flag_values_copy.FlagDict
-    with flag_util.FlagDictSubstitution(flag_values, flag_dict_func):
-      self.assertFlagState(flag_values, 1, False)
-      self.assertFlagState(flag_values_copy, 1, False)
-      flag_values.test_flag = 2
-      flag_values['test_flag'].present += 1
-      self.assertFlagState(flag_values, 2, True)
-      self.assertFlagState(flag_values_copy, 2, True)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
+    with flag_util.OverrideFlags(flag_values, flag_values_overrides):
+      self.assertFlagState(flag_values, 1, True)
+      self.assertEqual(flag_values_overrides['test_flag'], 1)
     self.assertFlagState(flag_values, 0, False)
-    self.assertFlagState(flag_values_copy, 2, True)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
     flag_values.test_flag = 3
     self.assertFlagState(flag_values, 3, False)
-    self.assertFlagState(flag_values_copy, 2, True)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
+
+  def testFlagChangesAreNotReflectedInConfigDict(self):
+    flag_values = flags.FlagValues()
+    flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
+    flag_values([sys.argv[0]])
+    flag_values_overrides = {}
+    flag_values_overrides['test_flag'] = 1
+    self.assertFlagState(flag_values, 0, False)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
+    with flag_util.OverrideFlags(flag_values, flag_values_overrides):
+      self.assertFlagState(flag_values, 1, True)
+      flag_values.test_flag = 2
+      self.assertFlagState(flag_values, 2, True)
+      self.assertEqual(flag_values_overrides['test_flag'], 1)
 
 
 class TestUnitsParser(unittest.TestCase):

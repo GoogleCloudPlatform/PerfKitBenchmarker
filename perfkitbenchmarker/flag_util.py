@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,13 +15,14 @@
 """Utility functions for working with user-supplied flags."""
 
 import logging
+import os
 import re
 
-import yaml
-
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -232,6 +233,54 @@ def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
 
 
+class OverrideFlags(object):
+  """Context manager that applies any config_dict overrides to flag_values."""
+
+  def __init__(self, flag_values, config_dict):
+    """Initializes an OverrideFlags context manager.
+
+    Args:
+      flag_values: FlagValues that is temporarily modified so that any options
+        in override_dict that are not 'present' in flag_values are applied to
+        flag_values.
+        Upon exit, flag_values will be restored to its original state.
+      config_dict: Merged config flags from the benchmark config and benchmark
+        configuration yaml file.
+    """
+    self._flag_values = flag_values
+    self._config_dict = config_dict
+    self._flags_to_reapply = {}
+
+  def __enter__(self):
+    """Overrides flag_values with options in override_dict."""
+    if not self._config_dict:
+      return
+
+    for key, value in self._config_dict.iteritems():
+      if key not in self._flag_values:
+        raise errors.Config.UnrecognizedOption(
+            'Unrecognized option {0}.{1}. Each option within {0} must '
+            'correspond to a valid command-line flag.'.format('flags', key))
+      if not self._flag_values[key].present:
+        self._flags_to_reapply[key] = self._flag_values[key].value
+        try:
+          self._flag_values[key].parse(value)  # Set 'present' to True.
+        except flags.IllegalFlagValueError as e:
+          raise errors.Config.InvalidValue(
+              'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
+                  'flags', key, value,
+                  value.__class__.__name__, os.linesep, e))
+
+  def __exit__(self, *unused_args, **unused_kwargs):
+    """Restores flag_values to its original state."""
+    if not self._flags_to_reapply:
+      return
+    for key, value in self._flags_to_reapply.iteritems():
+      self._flag_values[key].value = value
+      self._flag_values[key].present = 0
+
+
+# TODO(b/118177033): Deprecate this as it is abusing internals of FlagValues.
 class FlagDictSubstitution(object):
   """Context manager that redirects flag reads and writes."""
 
