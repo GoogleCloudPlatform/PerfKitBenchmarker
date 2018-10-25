@@ -189,6 +189,8 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
       '-o', 'ServerAliveCountMax=10',
       '-i', ssh_key_filename
   ]
+  if FLAGS.use_ipv6:
+    options.append('-6')
   options.extend(FLAGS.ssh_options)
 
   return options

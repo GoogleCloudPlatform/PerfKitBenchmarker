@@ -107,6 +107,7 @@ MAX_RUN_URI_LENGTH = 8
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
+flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
                   'Benchmarks and/or benchmark sets that should be run. The '
                   'default is the standard set. For more information about '
