@@ -121,3 +121,7 @@ class AwsScratchDiskIntegrationTest(unittest.TestCase):
             }
         }
     }, MOUNT_POINT)
+
+
+if __name__ == '__main__':
+  unittest.main()

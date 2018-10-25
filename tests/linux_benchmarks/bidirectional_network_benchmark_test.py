@@ -191,3 +191,7 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
     total_metrics = num_tests * metrics_per_test + summary_metrics
 
     self.assertEqual(total_metrics, len(results))
+
+
+if __name__ == '__main__':
+  unittest.main()

@@ -254,3 +254,7 @@ class HdrLogsParserTestCase(unittest.TestCase):
     expected = [(0.0, 0.314, 2), (10.0, 0.853, 49953),
                 (20.0, 0.949, 50396), (30.0, 1.033, 49759)]
     self.assertEqual(actual, expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

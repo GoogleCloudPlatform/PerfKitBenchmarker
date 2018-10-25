@@ -17,9 +17,13 @@
 import os
 import unittest
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import ntttcp
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
@@ -207,3 +211,7 @@ class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     ]
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+
+if __name__ == '__main__':
+  unittest.main()

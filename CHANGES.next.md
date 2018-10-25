@@ -340,3 +340,6 @@
 - Avoid installing unnecessary MySQL server for sysbench when client tools suffice.
 - Added support for running the object service benchmark with a GCP service
   account.
+- Add missing if __name__ == '__main__' stanza to some unittests, and fix those
+  that were broken.
+
