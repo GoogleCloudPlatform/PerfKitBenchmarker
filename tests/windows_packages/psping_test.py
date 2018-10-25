@@ -92,3 +92,7 @@ class PspingBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
                                           expected_histogram_metadata))
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+
+if __name__ == '__main__':
+  unittest.main()

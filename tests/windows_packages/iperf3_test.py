@@ -15,9 +15,13 @@
 from collections import namedtuple
 import unittest
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import iperf3
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 # Command generating these results:
 # ./iperf3.exe --client 10.129.0.3 --port 5201 --udp -t 3 -b 5G
@@ -159,3 +163,7 @@ class Iperf3TestCase(unittest.TestCase, test_util.SamplesTestMixin):
                                                tcp_number_of_streams, True)
 
     self.assertSampleListsEqualUpToTimestamp(samples, expected_samples)
+
+
+if __name__ == '__main__':
+  unittest.main()

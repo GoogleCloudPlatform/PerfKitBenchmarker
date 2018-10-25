@@ -48,3 +48,7 @@ class ProviderBenchmarkChecks(unittest.TestCase):
     for cloud, support_expected in expected.iteritems():
       self._VerifyProviderBenchmarkSupport(cloud, 'mysql_service',
                                            support_expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

@@ -89,3 +89,7 @@ class DiskspdBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         sample.Sample('ReadSpeed', 189, 'MB/s', expected_metadata),
     ]
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+
+if __name__ == '__main__':
+  unittest.main()

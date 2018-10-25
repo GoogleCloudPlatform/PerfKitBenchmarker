@@ -14,9 +14,13 @@
 
 import collections
 import unittest
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import nuttcp
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 # 1416.3418 MB /  10.00 sec = 1188.1121 Mbps 85 %TX 26 %RX 104429 / 1554763
 #  drop/pkt 6.72 %loss
@@ -75,3 +79,7 @@ class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     ]
 
     self.assertSampleListsEqualUpToTimestamp(result_sample, expected_sample)
+
+
+if __name__ == '__main__':
+  unittest.main()

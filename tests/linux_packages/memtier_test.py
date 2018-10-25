@@ -6,9 +6,13 @@ from __future__ import print_function
 
 import json
 import unittest
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import memtier
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 TEST_OUTPUT = """
   4         Threads
@@ -86,3 +90,7 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     samples = []
     samples.extend(memtier.ParseResults(TEST_OUTPUT, METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
+
+
+if __name__ == '__main__':
+  unittest.main()
