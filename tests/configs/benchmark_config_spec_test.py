@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,67 +41,6 @@ _GCP_AWS_DISK_CONFIG = {'GCP': {}, 'AWS': {}}
 
 def _GetFlagDict(flag_values):
   return {name: flag_values[name] for name in flag_values}
-
-
-class FlagsDecoderTestCase(unittest.TestCase):
-
-  def setUp(self):
-    super(FlagsDecoderTestCase, self).setUp()
-    self._decoder = benchmark_config_spec.FlagsDecoder(option=_OPTION)
-    self._flag_values = flags.FlagValues()
-    flags.DEFINE_integer('test_flag', 0, 'Test flag.',
-                         flag_values=self._flag_values)
-
-  def assertResultIsCorrect(self, result, expected_flag_value,
-                            expected_flag_present):
-    self.assertIsInstance(result, dict)
-    self.assertEqual(len(result), 1)
-    self.assertEqual(result['test_flag'].value, expected_flag_value)
-    self.assertEqual(result['test_flag'].present, expected_flag_present)
-    self.assertIsNot(result, _GetFlagDict(self._flag_values))
-
-  def testNone(self):
-    result = self._decoder.Decode(None, _COMPONENT, self._flag_values)
-    self.assertResultIsCorrect(result, 0, False)
-
-  def testEmptyDict(self):
-    result = self._decoder.Decode({}, _COMPONENT, self._flag_values)
-    self.assertResultIsCorrect(result, 0, False)
-
-  def testValidFlagOverride(self):
-    result = self._decoder.Decode({'test_flag': 1}, _COMPONENT,
-                                  self._flag_values)
-    self.assertResultIsCorrect(result, 1, True)
-
-  def testPresentFlagNotOverridden(self):
-    self._flag_values['test_flag'].present = True
-    result = self._decoder.Decode({'test_flag': 1}, _COMPONENT,
-                                  self._flag_values)
-    self.assertResultIsCorrect(result, 0, True)
-
-  def testInvalidValueType(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._decoder.Decode(0, _COMPONENT, self._flag_values)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "0" (of type "int"). Value '
-        'must be one of the following types: NoneType, dict.'))
-
-  def testInvalidFlagName(self):
-    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      self._decoder.Decode({'flag': 1}, _COMPONENT, self._flag_values)
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized option test_component.test_option.flag. Each option '
-        'within test_component.test_option must correspond to a valid '
-        'command-line flag.'))
-
-  def testInvalidFlagValue(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._decoder.Decode({'test_flag': 'two'}, _COMPONENT, self._flag_values)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option.test_flag value: "two" (of type '
-        '"str").{0}flag --test_flag=two: invalid literal for int() with base '
-        "10: 'two'".format(os.linesep)))
-
 
 class PerCloudConfigSpecTestCase(unittest.TestCase):
 

@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -234,8 +234,6 @@ class RedirectGlobalFlagsTestCase(unittest.TestCase):
     self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
     with spec.RedirectGlobalFlags():
       self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
-      FLAGS.benchmark_spec_test_flag = 2
-      self.assertEqual(FLAGS.benchmark_spec_test_flag, 2)
     self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
 
   def testFlagOverride(self):

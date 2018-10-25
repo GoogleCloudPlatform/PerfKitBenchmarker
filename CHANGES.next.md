@@ -18,6 +18,9 @@
 - Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
 - Removed duplicated metrics from the HPCC benchmark. Metrics now use the name
   from the summary section of the benchmark-produced output.
+- Benchmarks are expected to not modify FLAGS in any way. If FLAGS are modified
+  and multiple run configurations are run in a single PKB invocation, benchmark
+  configurations may be incorrect.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -342,4 +345,5 @@
   account.
 - Add missing if __name__ == '__main__' stanza to some unittests, and fix those
   that were broken.
-
+- Consolidate FlagDictSubstitution and FlagsDecoder into a simpler context manager,
+  OverrideFlags, which does not abuse the internals of FlagValues.

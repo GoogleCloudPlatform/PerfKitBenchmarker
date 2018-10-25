@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -436,9 +436,7 @@ def _CreateBenchmarkSpecs():
     expected_os_types = (
         os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
         else os_types.LINUX_OS_TYPES)
-    merged_flags = benchmark_config_spec.FlagsDecoder().Decode(
-        user_config.get('flags'), 'flags', FLAGS)
-    with flag_util.FlagDictSubstitution(FLAGS, lambda: merged_flags):
+    with flag_util.OverrideFlags(FLAGS, user_config.get('flags')):
       config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
         benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
