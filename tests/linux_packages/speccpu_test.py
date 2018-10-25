@@ -18,10 +18,15 @@ import unittest
 import mock
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker.linux_benchmarks import speccpu2017_benchmark  # pylint: disable=unused-import
 from perfkitbenchmarker.linux_packages import speccpu
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 TEST_OUTPUT_SPECINT = """
 =============================================
@@ -494,3 +499,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
                                     True, None)
     self.assertSampleListsEqualUpToTimestamp(
         samples, EXPECTED_PARTIAL_PEAK_RESULT_SPECINT)
+
+
+if __name__ == '__main__':
+  unittest.main()
