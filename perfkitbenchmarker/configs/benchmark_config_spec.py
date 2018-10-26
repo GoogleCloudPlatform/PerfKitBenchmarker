@@ -18,7 +18,6 @@ configuration files.
 """
 
 import contextlib
-import copy
 import os
 
 from perfkitbenchmarker import app_service
@@ -29,7 +28,6 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers

@@ -42,6 +42,7 @@ _GCP_AWS_DISK_CONFIG = {'GCP': {}, 'AWS': {}}
 def _GetFlagDict(flag_values):
   return {name: flag_values[name] for name in flag_values}
 
+
 class PerCloudConfigSpecTestCase(unittest.TestCase):
 
   def setUp(self):

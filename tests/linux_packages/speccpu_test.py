@@ -22,7 +22,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker.linux_benchmarks import speccpu2017_benchmark  # pylint: disable=unused-import
+from perfkitbenchmarker.linux_benchmarks import speccpu2017_benchmark  # noqa
 from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
