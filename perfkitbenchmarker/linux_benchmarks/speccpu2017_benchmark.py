@@ -177,7 +177,6 @@ def Run(benchmark_spec):
 
   cmd += 'runcpu '
 
-  lscpu = vm.CheckLsCpu()
   version_specific_parameters = []
   # rate runs require 2 GB minimum system main memory per copy,
   # not including os overhead
