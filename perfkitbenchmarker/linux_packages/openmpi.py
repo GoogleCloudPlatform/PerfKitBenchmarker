@@ -17,9 +17,10 @@
 
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-MPI_DIR = '%s/openmpi-1.6.5' % INSTALL_DIR
-MPI_TAR = 'openmpi-1.6.5.tar.gz'
-MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
+MPI_DIR = '%s/openmpi-3.1.2' % INSTALL_DIR
+MPI_TAR = 'openmpi-3.1.2.tar.gz'
+MPI_URL = 'https://download.open-mpi.org/release/open-mpi/v3.1/' + MPI_TAR
+MPI_VERSION = '3.1.2'
 
 
 def _Install(vm):
@@ -29,8 +30,7 @@ def _Install(vm):
   vm.RemoteCommand('wget %s -P %s' % (MPI_URL, INSTALL_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, MPI_TAR))
   make_jobs = vm.num_cpus
-  config_cmd = ('./configure --enable-static --disable-shared --disable-dlopen '
-                '--prefix=/usr')
+  config_cmd = ('./configure --enable-static --disable-shared --prefix=/usr')
   vm.RobustRemoteCommand(
       'cd %s && %s && make -j %s && sudo make install' %
       (MPI_DIR, config_cmd, make_jobs))
