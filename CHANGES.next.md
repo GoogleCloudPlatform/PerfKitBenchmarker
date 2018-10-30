@@ -349,3 +349,4 @@
 - Consolidate FlagDictSubstitution and FlagsDecoder into a simpler context manager,
   OverrideFlags, which does not abuse the internals of FlagValues.
 - Changed GkeCluster so that it adds PKB metadata to all VMs that it creates.
+- Upgraded OpenMPI from 1.6.5 to 3.1.2.

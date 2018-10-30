@@ -48,6 +48,9 @@ from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import hpcc
+from perfkitbenchmarker.linux_packages import mkl
+from perfkitbenchmarker.linux_packages import openblas
+from perfkitbenchmarker.linux_packages import openmpi
 
 FLAGS = flags.FLAGS
 HPCCINF_FILE = 'hpccinf.txt'
@@ -197,6 +200,11 @@ def UpdateMetadata(metadata):
   metadata['hpcc_version'] = hpcc.HPCC_VERSION
   if FLAGS.hpcc_benchmarks:
     metadata['hpcc_benchmarks'] = FLAGS.hpcc_benchmarks
+  if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
+    metadata['math_library_version'] = mkl.MKL_VERSION
+  elif FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_OPEN_BLAS:
+    metadata['math_library_version'] = openblas.GIT_TAG
+  metadata['openmpi_version'] = openmpi.MPI_VERSION
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
