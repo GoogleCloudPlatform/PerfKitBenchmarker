@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,10 +24,15 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
@@ -521,3 +526,7 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     self.test_db._Publish(formatted_samples)
     mock_create_db.assert_called_once()
     mock_write_data.assert_called_once_with(expected_output)
+
+
+if __name__ == '__main__':
+  unittest.main()
