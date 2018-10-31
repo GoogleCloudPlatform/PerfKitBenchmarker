@@ -332,3 +332,7 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
     actual = aws_virtual_machine.GetRootBlockDeviceSpecForImage(image_id,
                                                                 region)
     self.assertEqual(actual, expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

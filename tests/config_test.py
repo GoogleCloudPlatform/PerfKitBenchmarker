@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,13 @@ import mock
 
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import windows_benchmarks
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 CONFIG_NAME = 'a'
 INVALID_NAME = 'b'
@@ -137,3 +142,7 @@ class ConfigsTestCase(unittest.TestCase):
     mock_flags.configure_mock(benchmark_config_file="test_import.yml")
     config = configs.GetUserConfig()
     self.assertEqual(config['flags']['num_vms'], 3)
+
+
+if __name__ == '__main__':
+  unittest.main()

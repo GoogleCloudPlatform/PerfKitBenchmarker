@@ -109,3 +109,7 @@ class ResourcePathTestCase(unittest.TestCase):
   def testDoNotSearchUserPaths(self):
     with self.assertRaises(data.ResourceNotFound):
       data.ResourcePath('resource', False)
+
+
+if __name__ == '__main__':
+  unittest.main()

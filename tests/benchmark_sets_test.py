@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,18 @@
 
 import unittest
 from mock import patch
-import yaml
 
+from perfkitbenchmarker import benchmark_sets
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_benchmarks
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
-from perfkitbenchmarker import configs
-from perfkitbenchmarker import linux_benchmarks
-from perfkitbenchmarker import benchmark_sets
+
+import yaml
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 USER_CONFIG = """
 internal_iprf:
@@ -137,7 +142,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # create set of valid benchmark names from the benchmark directory
     self.valid_benchmark_names = set()
     for benchmark_module in linux_benchmarks.BENCHMARKS:
-        self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
+      self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
 
     self.valid_benchmark_set_names = set()
     # include the benchmark_set names since these can also appear
@@ -351,3 +356,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
                return_value=yaml.load(USER_CONFIG)):
       with self.assertRaises(benchmark_sets.FlagZipNotFoundException):
         benchmark_sets.GetBenchmarksFromFlags()
+
+
+if __name__ == '__main__':
+  unittest.main()
