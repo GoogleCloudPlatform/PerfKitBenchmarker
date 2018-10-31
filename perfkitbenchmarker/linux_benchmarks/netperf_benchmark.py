@@ -250,6 +250,12 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
+  if 'TCP' in benchmark_name:
+    meta_keys.extend([
+        ('Local Transport Retransmissions', 'netperf_retransmissions'),
+        ('Remote Transport Retransmissions', 'netserver_retransmissions'),
+    ])
+
   metadata.update({meta_key: results[netperf_key]
                    for netperf_key, meta_key in meta_keys})
 
@@ -329,7 +335,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
-                 'CONFIDENCE_ITERATION,THROUGHPUT_CONFID').format(
+                 'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
+                 'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS').format(
                      netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
