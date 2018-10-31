@@ -20,8 +20,13 @@ import unittest
 import mock
 
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
+
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class NetperfBenchmarkTestCase(unittest.TestCase):
@@ -46,7 +51,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnInternalIpAddress')
     self.should_run_internal = p.start()
     self.addCleanup(p.stop)
-    netperf_benchmark.FLAGS.netperf_enable_histograms = False
+    FLAGS.netperf_enable_histograms = False
 
   def _ConfigureIpTypes(self, run_external=True, run_internal=True):
     self.should_run_external.return_value = run_external
@@ -132,3 +137,6 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
       self.assertDictContainsSubset(meta, result[i][3])
+
+if __name__ == '__main__':
+  unittest.main()
