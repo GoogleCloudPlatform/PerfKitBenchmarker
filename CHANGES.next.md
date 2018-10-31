@@ -21,6 +21,7 @@
 - Benchmarks are expected to not modify FLAGS in any way. If FLAGS are modified
   and multiple run configurations are run in a single PKB invocation, benchmark
   configurations may be incorrect.
+- Changed TF Serving benchmark to use ResNet instead of Inception
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.

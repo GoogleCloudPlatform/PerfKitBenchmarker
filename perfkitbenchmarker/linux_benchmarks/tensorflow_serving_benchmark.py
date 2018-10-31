@@ -26,13 +26,10 @@ a significant amount of time (45 minutes on an n1-standard-8).
 Note that both client and server VMs build the code. This is necessary to build
 an optimized binary for the CPU it will be running on.
 
-Once the code is built, the server prepares an inception model
-for serving. It prepares a pre-trained inception model using a publicly
-available checkpoint file. This model has been trained to ~75% accuracy
-on the imagenet 2012 dataset, so is relatively useless; however, measuring
-the accuracy of the model is beyond the scope of this benchmark.
-The server then starts the standard tensorflow_model_server binary using
-the prepared model.
+Once the code is built, the server prepares an ResNet model
+for serving. It prepares a pre-trained ResNet model using a publicly
+available SavedModel. The server then starts a platform-optimized
+tensorflow_model_server binary using the prepared model.
 
 The client VM downloads the imagenet 2012 validation images from cloud storage
 and begins running a client-side load generator script which does the
@@ -60,16 +57,17 @@ from perfkitbenchmarker.linux_packages import tensorflow_serving
 
 FLAGS = flags.FLAGS
 CLIENT_SCRIPT = 'tensorflow_serving_client_workload.py'
-INCEPTION_MODEL_CHECKPOINT = 'inception-v3-2016-03-01.tar.gz'
+RESNET_NHWC_SAVEDMODEL_TGZ = 'resnet_v2_fp32_savedmodel_NHWC_jpg.tar.gz'
 ILSVRC_VALIDATION_IMAGES_TAR = 'ILSVRC2012_img_val.tar'
 SERVER_PORT = 8500
 TF_SERVING_BASE_DIRECTORY = tensorflow_serving.TF_SERVING_BASE_DIRECTORY
 
 BENCHMARK_DATA = {
-    # This is a pre-trained (to ~75% accuracy on imagenet)
-    # inception model checkpoint available here:
-    # http://download.tensorflow.org/models/image/imagenet/inception-v3-2016-03-01.tar.gz
-    INCEPTION_MODEL_CHECKPOINT: '57e9eb71006424f5e7ad5345565b503e',
+    # This ResNet SavedModel (ResNet-50 v2, fp32, Accuracy 76.47%) is from the
+    # official TF models repo. It takes in JPG as input and is channels-last
+    # (NHWC), which is generally better for CPU. It is available here:
+    # http://download.tensorflow.org/models/official/20181001_resnet/savedmodels/resnet_v2_fp32_savedmodel_NHWC_jpg.tar.gz
+    RESNET_NHWC_SAVEDMODEL_TGZ: 'a354fb68325f75b1510e2f6868680d8d',
 
     # Collection of 50,000 imagenet 2012 validation images.
     # Available here:
@@ -155,33 +153,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   del benchmark_spec
 
 
-def _ExportCheckpointedInceptionModel(vm):
-  """Exports a trained inception3 model.
-
-  This model has been pre-trained on the imagenet 2012
-  dataset to about 75% accuracy.
-
-  Args:
-    vm: vm to operate on
-  """
-  vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, [INCEPTION_MODEL_CHECKPOINT], TF_SERVING_BASE_DIRECTORY)
-
-  logging.info('Exporting pre-trained inception3 model')
-  vm.RemoteCommand('cd {0} && tar xvf {1}'.format(TF_SERVING_BASE_DIRECTORY,
-                                                  INCEPTION_MODEL_CHECKPOINT))
-
-  vm.RemoteCommand(
-      'cd {0} && sudo docker run --rm --name inception_builder '
-      '-v $(pwd):$(pwd) benchmarks/tensorflow-serving-devel '
-      'bash -c "bazel build --config=nativeopt --verbose_failures '
-      'tensorflow_serving/example:inception_saved_model && '
-      'bazel run --config=nativeopt '
-      'tensorflow_serving/example:inception_saved_model '
-      '-- --checkpoint_dir={0}/inception-v3 '
-      '--output_dir={0}/inception-export"'.format(TF_SERVING_BASE_DIRECTORY))
-
-
 def _PrepareClient(vm):
   """Installs Tensorflow Serving on a single client vm.
 
@@ -213,8 +184,16 @@ def _PrepareServer(vm):
   """
   logging.info('Installing Tensorflow Serving on server %s', vm)
   vm.Install('tensorflow_serving')
-  _ExportCheckpointedInceptionModel(vm)
+  vm.InstallPreprovisionedBenchmarkData(
+     BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY)
 
+  extract_dir = posixpath.join(
+      TF_SERVING_BASE_DIRECTORY, "resnet")
+  vm.RemoteCommand('mkdir {0}'.format(extract_dir))
+
+  vm.RemoteCommand('cd {0} && tar --strip-components=2 --directory {1} -xvzf '
+                   '{2}'.format(TF_SERVING_BASE_DIRECTORY, extract_dir,
+                                RESNET_NHWC_SAVEDMODEL_TGZ))
 
 def Prepare(benchmark_spec):
   """Installs and prepares Tensorflow Serving on the target vms.
@@ -260,18 +239,15 @@ def _StartServer(vm):
   Args:
     vm: The server VM.
   """
-  model_export_directory = posixpath.join(TF_SERVING_BASE_DIRECTORY,
-                                          'inception-export')
+  model_download_directory = posixpath.join(TF_SERVING_BASE_DIRECTORY, 'resnet')
 
-  # TODO(user): Restarting docker might not be necessary, remove if so
-  vm.RemoteCommand('sudo service docker restart', should_log=True)
   # Use the docker development image to build the inception model
   vm.RemoteCommand(
       'sudo docker run -d --rm --name tfserving-server --network host '
-      '--mount type=bind,source={0},target=/models/inception '
-      '-e MODEL_NAME=inception '
+      '--mount type=bind,source={0},target=/models/resnet '
+      '-e MODEL_NAME=resnet '
       '-t benchmarks/tensorflow-serving --port={1}'.format(
-          model_export_directory, SERVER_PORT),
+          model_download_directory, SERVER_PORT),
       should_log=True)
 
 
