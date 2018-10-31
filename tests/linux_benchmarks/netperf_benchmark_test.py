@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 FLAGS = flags.FLAGS
@@ -137,6 +140,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
       self.assertDictContainsSubset(meta, result[i][3])
+
 
 if __name__ == '__main__':
   unittest.main()

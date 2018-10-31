@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import json
 import unittest
 import contextlib2
 import mock
+from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
@@ -26,6 +27,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
 from tests import mock_flags
+
+FLAGS = flgs.FLAGS
+FLAGS.mark_as_parsed()
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake_run_uri'
@@ -459,3 +463,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
           write_mock.call_args[0][0],
           _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE
       )
+
+
+if __name__ == '__main__':
+  unittest.main()
