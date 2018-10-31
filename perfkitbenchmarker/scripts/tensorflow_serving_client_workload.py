@@ -2,7 +2,7 @@
 
 Performs image classification requests against a Tensorflow Model Server.
 Inspired by
-https://github.com/tensorflow/serving/blob/master/tensorflow_serving/example/inception_client.py
+https://github.com/tensorflow/serving/blob/master/tensorflow_serving/example/resnet_client_grpc.py
 
 This client-side load generator does the following:
   * launches a specified number of worker threads (FLAGS.num_threads).
@@ -41,7 +41,7 @@ from tensorflow_serving.apis import predict_pb2
 from tensorflow_serving.apis import prediction_service_pb2_grpc
 
 ILSVRC_VALIDATION_IMAGES = 'ILSVRC2012_img_val'
-MODEL_NAME = 'inception'
+MODEL_NAME = 'resnet'
 RANDOM_SEED = 98103
 DEFAULT_TIMEOUT = 3600  # one hour "infinite" timeout
 
@@ -109,8 +109,8 @@ class TfServingClientWorkload(object):
       data = f.read()
       request = predict_pb2.PredictRequest()
       request.model_spec.name = MODEL_NAME
-      request.model_spec.signature_name = 'predict_images'
-      request.inputs['images'].CopyFrom(
+      request.model_spec.signature_name = 'serving_default'
+      request.inputs['image_bytes'].CopyFrom(
           tf.contrib.util.make_tensor_proto(data, shape=[1]))
 
       try:
