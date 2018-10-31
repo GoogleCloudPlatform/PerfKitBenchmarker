@@ -352,3 +352,4 @@
   OverrideFlags, which does not abuse the internals of FlagValues.
 - Changed GkeCluster so that it adds PKB metadata to all VMs that it creates.
 - Upgraded OpenMPI from 1.6.5 to 3.1.2.
+- Upgraded OpenBLAS from 0.2.15 to 0.3.3.
