@@ -185,7 +185,7 @@ def _PrepareServer(vm):
   logging.info('Installing Tensorflow Serving on server %s', vm)
   vm.Install('tensorflow_serving')
   vm.InstallPreprovisionedBenchmarkData(
-     BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY)
+      BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY)
 
   extract_dir = posixpath.join(
       TF_SERVING_BASE_DIRECTORY, "resnet")
@@ -194,6 +194,7 @@ def _PrepareServer(vm):
   vm.RemoteCommand('cd {0} && tar --strip-components=2 --directory {1} -xvzf '
                    '{2}'.format(TF_SERVING_BASE_DIRECTORY, extract_dir,
                                 RESNET_NHWC_SAVEDMODEL_TGZ))
+
 
 def Prepare(benchmark_spec):
   """Installs and prepares Tensorflow Serving on the target vms.
