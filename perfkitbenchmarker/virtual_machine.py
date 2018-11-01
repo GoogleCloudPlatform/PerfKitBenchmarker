@@ -49,6 +49,13 @@ flags.DEFINE_boolean(
     'dedicated_hosts', False,
     'If True, use hosts that only have VMs from the same '
     'benchmark running on them.')
+flags.DEFINE_integer(
+    'num_cpus_override', None,
+    'Rather than detecting the number of CPUs present on the machine, use this '
+    'value if set. Some benchmarks will use this number to automatically '
+    'scale their configurations; this can be used as a method to control '
+    'benchmark scaling. It will also change the num_cpus metadata '
+    'published along with the benchmark data.')
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
@@ -848,7 +855,10 @@ class BaseOsMixin(object):
       The number of CPUs on the VM.
     """
     if self._num_cpus is None:
-      self._num_cpus = self._GetNumCpus()
+      if FLAGS.num_cpus_override:
+        self._num_cpus = FLAGS.num_cpus_override
+      else:
+        self._num_cpus = self._GetNumCpus()
     return self._num_cpus
 
   @abc.abstractmethod
