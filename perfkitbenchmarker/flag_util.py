@@ -95,9 +95,13 @@ class IntegerList(object):
       return self.groups[group_idx]
 
   def __eq__(self, other):
+    if other is None:
+      return False
     return tuple(self) == tuple(other)
 
   def __ne__(self, other):
+    if other is None:
+      return True
     return tuple(self) != tuple(other)
 
   def __iter__(self):
