@@ -222,7 +222,7 @@ class SpecInstallConfigurations(object):
     self.log_format = None
 
 
-def Install(vm, speccpu_vm_state):
+def InstallSPECCPU(vm, speccpu_vm_state):
   """Installs SPEC CPU2006 or 2017 on the target vm.
 
   Args:
@@ -244,7 +244,11 @@ def Install(vm, speccpu_vm_state):
   except errors.Setup.BadPreprovisionedDataError:
     _CheckIsoAndCfgFile(FLAGS.runspec_config, speccpu_vm_state.iso_dir)
     _PrepareWithIsoFile(vm, speccpu_vm_state)
+  vm.Install('speccpu')
 
+
+def Install(vm):
+  """Installs SPECCPU dependencies."""
   vm.Install('wget')
   vm.Install('fortran')
   vm.Install('build_tools')
