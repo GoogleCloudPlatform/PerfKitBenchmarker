@@ -212,6 +212,9 @@
 - Added AddTag method to AzureResourceGroup.
 - Added some support for IPv6 (on static machines).
 - Added retransmit count to netperf metadata.
+- Added a common base class to PKB, PkbCommonTestCase,
+  which uses absl.testing.flagsaver to save and restore
+  flag values on test setUp / tearDown.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
