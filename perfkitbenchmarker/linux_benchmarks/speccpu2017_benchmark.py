@@ -145,7 +145,7 @@ def Prepare(benchmark_spec):
   install_config.base_tar_file_path = _SPECCPU2017_TAR
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
-  speccpu.Install(vm, install_config)
+  speccpu.InstallSPECCPU(vm, install_config)
 
   vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
       INSTALL_DIR, LLVM_TAR_URL, LLVM_TAR))
