@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,15 +16,15 @@
 
 import abc
 import unittest
+from absl.testing import flagsaver
 import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -35,8 +35,9 @@ from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+from tests import pkb_common_test_case  # pylint:disable=unused-import
 
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'uid'
@@ -62,9 +63,7 @@ class ScratchDiskTestMixin(object):
     pass
 
   def setUp(self):
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.cloud = providers.GCP
-    mocked_flags.os_type = os_types.DEBIAN
+    self.saved_flag_values = flagsaver.save_flag_values()
     self.patches = []
 
     vm_prefix = linux_virtual_machine.__name__ + '.BaseLinuxMixin'
@@ -93,10 +92,11 @@ class ScratchDiskTestMixin(object):
 
     # VM Creation depends on there being a BenchmarkSpec.
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=mocked_flags, vm_groups={})
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
     self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
                                              _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+    self.addCleanup(flagsaver.restore_flag_values, self.saved_flag_values)
 
   def testScratchDisks(self):
     """Test for creating and deleting scratch disks.

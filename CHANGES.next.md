@@ -215,6 +215,7 @@
 - Added a common base class to PKB, PkbCommonTestCase,
   which uses absl.testing.flagsaver to save and restore
   flag values on test setUp / tearDown.
+- Remove all usage of mock_flags and replace with PkbCommonTestCase.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

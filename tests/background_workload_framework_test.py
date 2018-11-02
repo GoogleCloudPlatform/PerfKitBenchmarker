@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import providers
@@ -29,22 +30,22 @@ from perfkitbenchmarker import timing_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 
 NAME = 'ping'
 UID = 'name0'
 
 
-class TestBackgroundWorkloadFramework(unittest.TestCase):
+class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     self.last_call = 0
     super(TestBackgroundWorkloadFramework, self).setUp()
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.os_type = os_types.DEBIAN
-    self.mocked_flags.cloud = providers.GCP
-    self.mocked_flags.temp_dir = 'tmp'
+    FLAGS.os_type = os_types.DEBIAN
+    FLAGS.cloud = providers.GCP
+    FLAGS.temp_dir = 'tmp'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
@@ -60,7 +61,7 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
 
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=self.mocked_flags, **config)
+        NAME, flag_values=FLAGS, **config)
     spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()

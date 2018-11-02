@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,19 +23,23 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class ShouldRunOnInternalIpAddressTestCase(unittest.TestCase):
+class ShouldRunOnInternalIpAddressTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.PatchTestCaseFlags(self)
+    super(ShouldRunOnInternalIpAddressTestCase, self).setUp()
     self.sending_vm = mock.MagicMock()
     self.receiving_vm = mock.MagicMock()
 
   def _RunTest(self, expectation, ip_addresses, is_reachable=True):
-    self.flags.ip_addresses = ip_addresses
+    FLAGS.ip_addresses = ip_addresses
     self.sending_vm.IsReachable.return_value = is_reachable
     self.assertEqual(
         expectation,
@@ -116,11 +120,11 @@ class WaitUntilSleepTimer(threading.Thread):
     self.finished.set()
 
 
-class IssueCommandTestCase(unittest.TestCase):
+class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.PatchTestCaseFlags(self)
-    self.flags.time_commands = True
+    super(IssueCommandTestCase, self).setUp()
+    FLAGS.time_commands = True
 
   def testTimeoutNotReached(self):
     _, _, retcode = vm_util.IssueCommand(['sleep', '0s'])
