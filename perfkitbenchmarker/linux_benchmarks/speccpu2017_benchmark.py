@@ -26,7 +26,6 @@ SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import speccpu
 
 
@@ -73,11 +72,6 @@ _SPECCPU2017_TAR = 'speccpu2017.tgz'
 _TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
 _LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
 BENCHMARK_DATA = {_SPECCPU2017_TAR: None}
-LLVM_TAR = 'clang+llvm-3.9.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
-LLVM_TAR_URL = 'http://releases.llvm.org/3.9.0/{0}'.format(LLVM_TAR)
-OPENMP_TAR = 'libomp_20160808_oss.tgz'
-OPENMP_TAR_URL = 'https://www.openmprtl.org/sites/default/files/{0}'.format(
-    OPENMP_TAR)
 KB_TO_GB_MULTIPLIER = 1000000
 
 LOG_FILENAME = {
@@ -146,13 +140,7 @@ def Prepare(benchmark_spec):
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
   speccpu.InstallSPECCPU(vm, install_config)
-
-  vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
-      INSTALL_DIR, LLVM_TAR_URL, LLVM_TAR))
-  vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
-      INSTALL_DIR, OPENMP_TAR_URL, OPENMP_TAR))
-  vm.RemoteCommand('sudo apt-get install libjemalloc1 libjemalloc-dev')
-  vm.RemoteCommand('sudo apt-get update && sudo apt-get install -y libomp-dev')
+  vm.Install('speccpu2017_dependencies')
 
 
 def Run(benchmark_spec):
