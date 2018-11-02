@@ -26,10 +26,10 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
-from tests import mock_flags
+from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
-FLAGS.mark_as_parsed()
+FLAGS.kubernetes_anti_affinity = False
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake_run_uri'
@@ -49,7 +49,7 @@ _EXPECTED_CALL_BODY_WITHOUT_GPUS = """
             "volumeMounts": [],
             "image": "test_image",
             "securityContext": {
-                "privileged": null
+                "privileged": true
             }
         }]
     },
@@ -76,7 +76,7 @@ _EXPECTED_CALL_BODY_WITH_2_GPUS = """
             "workingDir": "/root",
             "image": "test_image",
             "securityContext": {
-                "privileged": null
+                "privileged": true
             },
             "resources" : {
               "limits": {
@@ -111,7 +111,7 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
             "workingDir": "/root",
             "image": "nvidia/cuda:9.0-devel-ubuntu16.04",
             "securityContext": {
-                "privileged": null
+                "privileged": true
             },
             "command": [
               "bash",
@@ -149,8 +149,7 @@ def get_write_mock_from_temp_file_mock(temp_file_mock):
 
 
 @contextlib2.contextmanager
-def patch_critical_objects(stdout='', stderr='', return_code=0,
-                           flags=mock_flags.MockFlags()):
+def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
   with contextlib2.ExitStack() as stack:
     retval = (stdout, stderr, return_code)
 
@@ -159,7 +158,6 @@ def patch_critical_objects(stdout='', stderr='', return_code=0,
     flags.kubectl = _KUBECTL
     flags.kubeconfig = _KUBECONFIG
 
-    stack.enter_context(mock_flags.PatchFlags(flags))
     stack.enter_context(mock.patch('__builtin__.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
 
@@ -176,7 +174,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0,
     yield issue_command, temp_file
 
 
-class BaseKubernetesVirtualMachineTestCase(unittest.TestCase):
+class BaseKubernetesVirtualMachineTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def assertJsonEqual(self, str1, str2):
     json1 = json.loads(str1)
@@ -347,9 +346,8 @@ class KubernetesVirtualMachineTestCase(
 
   def testDownloadPreprovisionedDataAws(self):
     spec = self.create_virtual_machine_spec()
-    flags = mock_flags.MockFlags()
-    flags.container_cluster_cloud = 'AWS'
-    with patch_critical_objects(flags=flags) as (issue_command, _):
+    FLAGS.container_cluster_cloud = 'AWS'
+    with patch_critical_objects(flags=FLAGS) as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
@@ -360,9 +358,8 @@ class KubernetesVirtualMachineTestCase(
 
   def testDownloadPreprovisionedDataAzure(self):
     spec = self.create_virtual_machine_spec()
-    flags = mock_flags.MockFlags()
-    flags.container_cluster_cloud = 'Azure'
-    with patch_critical_objects(flags=flags) as (issue_command, _):
+    FLAGS.container_cluster_cloud = 'Azure'
+    with patch_critical_objects() as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
@@ -373,9 +370,8 @@ class KubernetesVirtualMachineTestCase(
 
   def testDownloadPreprovisionedDataGcp(self):
     spec = self.create_virtual_machine_spec()
-    flags = mock_flags.MockFlags()
-    flags.container_cluster_cloud = 'GCP'
-    with patch_critical_objects(flags=flags) as (issue_command, _):
+    FLAGS.container_cluster_cloud = 'GCP'
+    with patch_critical_objects() as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')

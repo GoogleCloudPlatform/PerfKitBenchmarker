@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,15 +17,18 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class HPCCTestCase(unittest.TestCase):
+class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.PatchTestCaseFlags(self)
-    self.flags.hpcc_math_library = 'openblas'
+    super(HPCCTestCase, self).setUp()
+    FLAGS.hpcc_math_library = 'openblas'
     path = os.path.join(os.path.dirname(__file__), '../data', 'hpcc-sample.txt')
     with open(path) as fp:
       self.contents = fp.read()

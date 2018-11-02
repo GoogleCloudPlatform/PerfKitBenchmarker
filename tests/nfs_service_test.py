@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@ import unittest
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import nfs_service
-from tests import mock_flags
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 _DEFAULT_NFS_TIER = 'foo'
 
 
@@ -49,14 +51,13 @@ class _DemoNfsServiceWithDefaultNfsVersion(_DemoNfsService):
   DEFAULT_NFS_VERSION = '4.1'
 
 
-class NfsServiceTest(unittest.TestCase):
+class NfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def _SetFlags(self, nfs_tier=None):
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags['default_timeout'].parse(10)
-    mocked_flags['nfs_tier'].parse(nfs_tier)
+  def _SetFlags(self, nfs_tier=''):
+    FLAGS['default_timeout'].parse(10)
+    FLAGS['nfs_tier'].parse(nfs_tier)
 
-  def _NewNfsResource(self, nfs_tier=None):
+  def _NewNfsResource(self, nfs_tier=''):
     self._SetFlags(nfs_tier=nfs_tier)
     return _DemoNfsService(disk.BaseDiskSpec('test_component'), 'us-west1-a')
 

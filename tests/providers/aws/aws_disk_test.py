@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,14 +16,15 @@
 import unittest
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.aws import aws_disk
-from tests import mock_flags
+from tests import pkb_common_test_case
 
-
+FLAGS = flags.FLAGS
 _COMPONENT = 'test_component'
 
 
-class AwsDiskSpecTestCase(unittest.TestCase):
+class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     spec = aws_disk.AwsDiskSpec(_COMPONENT)
@@ -57,18 +58,16 @@ class AwsDiskSpecTestCase(unittest.TestCase):
       aws_disk.AwsDiskSpec(_COMPONENT, iops='ten')
 
   def testNonPresentFlagsDoNotOverrideConfigs(self):
-    flags = mock_flags.MockFlags()
-    flags['aws_provisioned_iops'].value = 2000
-    flags['data_disk_size'].value = 100
-    spec = aws_disk.AwsDiskSpec(_COMPONENT, flags, disk_size=75, iops=1000)
+    FLAGS.aws_provisioned_iops = 2000
+    FLAGS.data_disk_size = 100
+    spec = aws_disk.AwsDiskSpec(_COMPONENT, FLAGS, disk_size=75, iops=1000)
     self.assertEqual(spec.disk_size, 75)
     self.assertEqual(spec.iops, 1000)
 
   def testPresentFlagsOverrideConfigs(self):
-    flags = mock_flags.MockFlags()
-    flags['aws_provisioned_iops'].parse(2000)
-    flags['data_disk_size'].parse(100)
-    spec = aws_disk.AwsDiskSpec(_COMPONENT, flags, disk_size=75, iops=1000)
+    FLAGS['aws_provisioned_iops'].parse(2000)
+    FLAGS['data_disk_size'].parse(100)
+    spec = aws_disk.AwsDiskSpec(_COMPONENT, FLAGS, disk_size=75, iops=1000)
     self.assertEqual(spec.disk_size, 100)
     self.assertEqual(spec.iops, 2000)
 

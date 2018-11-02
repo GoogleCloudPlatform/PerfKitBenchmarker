@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,12 +23,15 @@ from mock import patch
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 NAME = 'ping'
 UID = 'name0'
@@ -53,14 +56,14 @@ _GROUP_2 = 'vm_2'
 _MOCKED_VM_FUNCTIONS = 'Install', 'RemoteCommand'
 
 
-class TestBackgroundWorkload(unittest.TestCase):
+class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self._mocked_flags.run_uri = 'fake_run_uri'
-    self._mocked_flags.cloud = providers.GCP
-    self._mocked_flags.os_type = os_types.DEBIAN
-    self._mocked_flags.temp_dir = 'tmp'
+    super(TestBackgroundWorkload, self).setUp()
+    FLAGS.run_uri = 'fake_run_uri'
+    FLAGS.cloud = providers.GCP
+    FLAGS.os_type = os_types.DEBIAN
+    FLAGS.temp_dir = 'tmp'
 
     p = patch(util.__name__ + '.GetDefaultProject')
     p.start()
@@ -70,7 +73,7 @@ class TestBackgroundWorkload(unittest.TestCase):
   def _CreateBenchmarkSpec(self, benchmark_config_yaml):
     config = configs.LoadConfig(benchmark_config_yaml, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=self._mocked_flags, **config)
+        NAME, flag_values=FLAGS, **config)
     return benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
 
   def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,
@@ -116,8 +119,8 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testWindowsVMCausesError(self):
     """ windows vm with background_cpu_threads raises exception """
-    self._mocked_flags['background_cpu_threads'].parse(1)
-    self._mocked_flags['os_type'].parse(os_types.WINDOWS)
+    FLAGS['background_cpu_threads'].parse(1)
+    FLAGS['os_type'].parse(os_types.WINDOWS)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
@@ -129,7 +132,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVM(self):
     """ Check that the background_cpu_threads causes calls """
-    self._mocked_flags['background_cpu_threads'].parse(1)
+    FLAGS['background_cpu_threads'].parse(1)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
@@ -145,7 +148,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadWindows(self):
     """ Test that nothing happens with the vanilla config """
-    self._mocked_flags['os_type'].parse(os_types.WINDOWS)
+    FLAGS['os_type'].parse(os_types.WINDOWS)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     for vm in spec.vms:
@@ -155,7 +158,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
     """ Check that the background_cpu_threads flags overrides the config """
-    self._mocked_flags['background_cpu_threads'].parse(2)
+    FLAGS['background_cpu_threads'].parse(2)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     for vm in spec.vms:

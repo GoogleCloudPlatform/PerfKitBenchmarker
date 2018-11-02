@@ -16,16 +16,19 @@
 import unittest
 import urllib2
 import mock
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import hbase
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class HbaseTest(unittest.TestCase):
+class HbaseTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mock_flags['hbase_use_stable'].parse(False)
-    self.mock_flags['hbase_version'].parse('1.3.2.1')
+    super(HbaseTest, self).setUp()
+    FLAGS['hbase_use_stable'].parse(False)
+    FLAGS['hbase_version'].parse('1.3.2.1')
     p = mock.patch.object(urllib2, 'urlopen')
     self.mock_url_open = p.start()
     self.addCleanup(p.stop)
@@ -37,7 +40,7 @@ class HbaseTest(unittest.TestCase):
     response.getcode.return_value = http_code
 
   def testGetUrlStable(self):
-    self.mock_flags['hbase_use_stable'].parse(True)
+    FLAGS['hbase_use_stable'].parse(True)
     self.SetUrlOpenResponse(MakeHbaseUrl('1.4.6'))
     url = hbase._GetHBaseURL()
     self.assertRegexpMatches(url, 'hbase-1.4.6-bin.tar.gz$')
