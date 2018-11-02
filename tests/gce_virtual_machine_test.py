@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
@@ -32,7 +33,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -78,7 +81,7 @@ def PatchCriticalObjects(retvals=None):
     yield issue_command
 
 
-class GceVmSpecTestCase(unittest.TestCase):
+class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testStringMachineType(self):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT,
@@ -121,30 +124,31 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.gpu_count, 2)
 
   def testStringMachineTypeFlagOverride(self):
-    flags = mock_flags.MockFlags()
-    flags['machine_type'].parse('n1-standard-8')
+    FLAGS['machine_type'].parse('n1-standard-8')
     result = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, flag_values=flags,
-        machine_type={'cpus': 1, 'memory': '7.5GiB'})
+        _COMPONENT,
+        flag_values=FLAGS,
+        machine_type={
+            'cpus': 1,
+            'memory': '7.5GiB'
+        })
     self.assertEqual(result.machine_type, 'n1-standard-8')
     self.assertEqual(result.cpus, None)
     self.assertEqual(result.memory, None)
 
   def testCustomMachineTypeFlagOverride(self):
-    flags = mock_flags.MockFlags()
-    flags['machine_type'].parse('{cpus: 1, memory: 7.5GiB}')
+    FLAGS['machine_type'].parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, flag_values=flags, machine_type='n1-standard-8')
+        _COMPONENT, flag_values=FLAGS, machine_type='n1-standard-8')
     self.assertEqual(result.machine_type, None)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
 
-class GceVirtualMachineTestCase(unittest.TestCase):
+class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
-
+    super(GceVirtualMachineTestCase, self).setUp()
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceNetwork.GetNetwork')
     self.mock_get_network = p.start()
@@ -218,13 +222,13 @@ def _CreateFakeDiskMetadata(image):
   return fake_disk
 
 
-class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
+class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mock_flags.gcp_instance_metadata_from_file = ''
-    self.mock_flags.gcp_instance_metadata = ''
-    self.mock_flags.gcloud_path = 'gcloud'
+    super(GceVirtualMachineOsTypesTestCase, self).setUp()
+    FLAGS.gcp_instance_metadata_from_file = ''
+    FLAGS.gcp_instance_metadata = ''
+    FLAGS.gcloud_path = 'gcloud'
 
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceNetwork.GetNetwork')
@@ -379,21 +383,21 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertNotIn('image_family', vm_metadata)
 
 
-class GCEVMFlagsTestCase(unittest.TestCase):
+class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self._mocked_flags.cloud = providers.GCP
-    self._mocked_flags.gcloud_path = 'test_gcloud'
-    self._mocked_flags.os_type = os_types.DEBIAN
-    self._mocked_flags.run_uri = 'aaaaaa'
-    self._mocked_flags.gcp_instance_metadata = []
-    self._mocked_flags.gcp_instance_metadata_from_file = []
+    super(GCEVMFlagsTestCase, self).setUp()
+    FLAGS.cloud = providers.GCP
+    FLAGS.gcloud_path = 'test_gcloud'
+    FLAGS.os_type = os_types.DEBIAN
+    FLAGS.run_uri = 'aaaaaa'
+    FLAGS.gcp_instance_metadata = []
+    FLAGS.gcp_instance_metadata_from_file = []
     # Creating a VM object causes network objects to be added to the current
     # thread's benchmark spec. Create such a benchmark spec for these tests.
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=self._mocked_flags, vm_groups={})
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
@@ -404,9 +408,11 @@ class GCEVMFlagsTestCase(unittest.TestCase):
   def _CreateVmCommand(self, **flag_kwargs):
     with PatchCriticalObjects() as issue_command:
       for key, value in flag_kwargs.items():
-        self._mocked_flags[key].parse(value)
+        FLAGS[key].parse(value)
       vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          'test_vm_spec.GCP',
+          FLAGS,
+          image='image',
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
@@ -471,13 +477,10 @@ class GCEVMFlagsTestCase(unittest.TestCase):
                   self._CreateVmCommand(gce_tags=['testtag'])[0])
 
 
-class GCEVMCreateTestCase(unittest.TestCase):
+class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mock_flags.gcp_instance_metadata_from_file = ''
-    self.mock_flags.gcp_instance_metadata = ''
-
+    super(GCEVMCreateTestCase, self).setUp()
     p = mock.patch(gce_virtual_machine.__name__ +
                    '.gce_network.GceNetwork.GetNetwork')
     self.mock_get_network = p.start()
