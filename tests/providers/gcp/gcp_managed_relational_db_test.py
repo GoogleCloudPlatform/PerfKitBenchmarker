@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import json
 import mock
 import os
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -29,7 +30,9 @@ from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import disk
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -57,7 +60,8 @@ def PatchCriticalObjects(stdout='', stderr='', return_code=0):
     yield issue_command
 
 
-class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
+class GcpMysqlManagedRelationalDbTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def createMySQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
@@ -80,10 +84,10 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
     }
 
   def setUp(self):
-    self.flags = mock_flags.PatchTestCaseFlags(self)
-    self.flags.project = ''
-    self.flags.run_uri = '123'
-    self.flags.gcloud_path = 'gcloud'
+    super(GcpMysqlManagedRelationalDbTestCase, self).setUp()
+    FLAGS.project = ''
+    FLAGS.run_uri = '123'
+    FLAGS.gcloud_path = 'gcloud'
 
     mock_db_spec_attrs = self.createMySQLSpecDict()
     self.mock_db_spec = mock.Mock(
@@ -194,13 +198,14 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
                     db._ParseEndpoint(json.loads(test_output)))
 
 
-class GcpPostgresManagedRelationlDbTestCase(unittest.TestCase):
+class GcpPostgresManagedRelationlDbTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.PatchTestCaseFlags(self)
-    self.flags.project = ''
-    self.flags.run_uri = ''
-    self.flags.gcloud_path = ''
+    super(GcpPostgresManagedRelationlDbTestCase, self).setUp()
+    FLAGS.project = ''
+    FLAGS.run_uri = ''
+    FLAGS.gcloud_path = ''
 
   def createPostgresSpecDict(self):
     machine_type = {

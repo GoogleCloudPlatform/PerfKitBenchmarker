@@ -18,15 +18,20 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.configs import benchmark_config_spec
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class LoadProvidersTestCase(unittest.TestCase):
+class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(LoadProvidersTestCase, self).setUp()
+    FLAGS.ignore_package_requirements = True
     p = mock.patch.object(providers, '_imported_providers', new=set())
     p.start()
     self.addCleanup(p.stop)
@@ -70,9 +75,8 @@ class LoadProvidersTestCase(unittest.TestCase):
             }
         }
     }
-    with mock_flags.PatchFlags() as mocked_flags:
-      benchmark_config_spec.BenchmarkConfigSpec(
-          'name', flag_values=mocked_flags, **config)
+    benchmark_config_spec.BenchmarkConfigSpec(
+        'name', flag_values=FLAGS, **config)
     providers.LoadProvider.assert_called_with('AWS', True)
 
 

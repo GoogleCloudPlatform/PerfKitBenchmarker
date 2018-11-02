@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,18 +20,20 @@ import unittest
 import mock
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
 from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
+from tests import pkb_common_test_case
 
-from tests import mock_flags
+FLAGS = flags.FLAGS
 
 _COMPONENT = 'test_static_vm_spec'
 _DISK_SPEC_DICTS = [{'device_path': '/test_device_path'},
                     {'mount_point': '/test_mount_point'}]
 
 
-class StaticVmSpecTest(unittest.TestCase):
+class StaticVmSpecTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     spec = StaticVmSpec(_COMPONENT)
@@ -55,19 +57,20 @@ class StaticVmSpecTest(unittest.TestCase):
     self.assertEqual(spec.disk_specs[1].mount_point, '/test_mount_point')
 
 
-class StaticVirtualMachineTest(unittest.TestCase):
+class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(StaticVirtualMachineTest, self).setUp()
     self._initial_pool = StaticVirtualMachine.vm_pool
     StaticVirtualMachine.vm_pool.clear()
     p = mock.patch(vm_util.__name__ + '.GetTempDir')
     p.start()
     self.addCleanup(p.stop)
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.image = 'test_image'
-    mocked_flags.os_type = 'debian'
+    FLAGS.image = 'test_image'
+    FLAGS.os_type = 'debian'
 
   def tearDown(self):
+    super(StaticVirtualMachineTest, self).tearDown()
     StaticVirtualMachine.vm_pool = self._initial_pool
 
   def _AssertStaticVMsEqual(self, vm1, vm2):
@@ -137,8 +140,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
                       fp)
 
   def testReadFromFile_UnknownOsTypeDefaultsToLinuxRequiredKeys(self):
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.os_type = 'unknown_os_type'
+    FLAGS.os_type = 'unknown_os_type'
     s = ('[{'
          '  "ip_address": "174.12.14.1", '
          '  "user_name": "perfkitbenchmarker", '

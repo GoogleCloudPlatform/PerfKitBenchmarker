@@ -480,5 +480,6 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         _ReadFileToString(os.path.join(hist_dir, 'expected_write.json')))
     self.assertEqual(expected_write_hist, actual_write_hist)
 
+
 if __name__ == '__main__':
   unittest.main()

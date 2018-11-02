@@ -30,7 +30,7 @@ from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
-from tests import mock_flags
+from tests import pkb_common_test_case
 
 
 flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
@@ -104,13 +104,13 @@ ALWAYS_SUPPORTED = 'iperf'
 NEVER_SUPPORTED = 'sysbench'
 
 
-class _BenchmarkSpecTestCase(unittest.TestCase):
+class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self._mocked_flags.cloud = providers.GCP
-    self._mocked_flags.os_type = os_types.DEBIAN
-    self._mocked_flags.temp_dir = 'tmp'
+    super(_BenchmarkSpecTestCase, self).setUp()
+    FLAGS.cloud = providers.GCP
+    FLAGS.os_type = os_types.DEBIAN
+    FLAGS.temp_dir = 'tmp'
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)
@@ -122,7 +122,7 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name, flag_values=self._mocked_flags, **config_dict)
+        benchmark_name, flag_values=FLAGS, **config_dict)
     benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
                              if b.BENCHMARK_NAME == benchmark_name))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, UID)
@@ -177,14 +177,13 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
                           for disk_spec in vm.disk_specs))
 
   def testZonesFlag(self):
-    with mock_flags.PatchFlags(self._mocked_flags):
-      self._mocked_flags.zones = ['us-east-1b', 'zone2']
-      self._mocked_flags.extra_zones = []
-      spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
-      spec.ConstructVirtualMachines()
-      self.assertEqual(len(spec.vms), 2)
-      self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
-      self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
+    FLAGS.zones = ['us-east-1b', 'zone2']
+    FLAGS.extra_zones = []
+    spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+    spec.ConstructVirtualMachines()
+    self.assertEqual(len(spec.vms), 2)
+    self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
+    self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
 
 
 class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
@@ -202,30 +201,26 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
     unsupported benchmarks (IsBenchmarkSupported returns false)
     and returns None if the benchmark isn't in either list.
     """
+    FLAGS.cloud = 'Kubernetes'
+    config = configs.LoadConfig(iperf_benchmark.BENCHMARK_CONFIG, {},
+                                ALWAYS_SUPPORTED)
+    self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
+    with self.assertRaises(ValueError):
+      self.createBenchmarkSpec(config, NEVER_SUPPORTED)
 
-    with mock_flags.PatchFlags(self._mocked_flags):
-      self._mocked_flags.cloud = 'Kubernetes'
-      config = configs.LoadConfig(iperf_benchmark.BENCHMARK_CONFIG,
-                                  {}, ALWAYS_SUPPORTED)
-      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
-      with self.assertRaises(ValueError):
-        self.createBenchmarkSpec(config, NEVER_SUPPORTED)
+    FLAGS.benchmark_compatibility_checking = 'permissive'
+    self.assertTrue(
+        self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
+        'benchmark is supported, mode is permissive')
+    with self.assertRaises(ValueError):
+      self.createBenchmarkSpec(config, NEVER_SUPPORTED)
 
-      self._mocked_flags.benchmark_compatibility_checking = 'permissive'
-      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
-                      'benchmark is supported, mode is permissive')
-      with self.assertRaises(ValueError):
-        self.createBenchmarkSpec(config, NEVER_SUPPORTED)
-
-      self._mocked_flags.benchmark_compatibility_checking = 'none'
-      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
-      self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
+    FLAGS.benchmark_compatibility_checking = 'none'
+    self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
+    self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
 
 
-class RedirectGlobalFlagsTestCase(unittest.TestCase):
-
-  def setUp(self):
-    FLAGS.mark_as_parsed()
+class RedirectGlobalFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNoFlagOverride(self):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(

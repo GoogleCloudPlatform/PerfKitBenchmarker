@@ -27,7 +27,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import google_container_engine
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flgs.FLAGS
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake-urn-uri'
@@ -39,19 +41,14 @@ _INSTANCE_GROUPS_LIST_OUTPUT = (
 _NODE_POOLS_LIST_OUTPUT = (
     '../../../tests/data/gcloud_container_node_pools_list.json')
 
-FLAGS = flgs.FLAGS
-FLAGS.mark_as_parsed()
-
 
 @contextlib2.contextmanager
-def patch_critical_objects(stdout='', stderr='', return_code=0,
-                           flags=mock_flags.MockFlags()):
+def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
   with contextlib2.ExitStack() as stack:
     flags.gcloud_path = 'gcloud'
     flags.run_uri = _RUN_URI
     flags.data_search_paths = ''
 
-    stack.enter_context(mock_flags.PatchFlags(flags))
     stack.enter_context(mock.patch('__builtin__.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
@@ -68,7 +65,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0,
     yield issue_command
 
 
-class GoogleContainerEngineMinCpuPlatformTestCase(unittest.TestCase):
+class GoogleContainerEngineMinCpuPlatformTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
   def create_container_engine_spec():
@@ -97,7 +95,8 @@ class GoogleContainerEngineMinCpuPlatformTestCase(unittest.TestCase):
       self.assertIn('--min-cpu-platform skylake', command_string)
 
 
-class GoogleContainerEngineCustomMachineTypeTestCase(unittest.TestCase):
+class GoogleContainerEngineCustomMachineTypeTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
   def create_container_engine_spec():
@@ -127,7 +126,7 @@ class GoogleContainerEngineCustomMachineTypeTestCase(unittest.TestCase):
       self.assertIn('--machine-type custom-4-1024', command_string)
 
 
-class GoogleContainerEngineTestCase(unittest.TestCase):
+class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
   def create_container_engine_spec():
@@ -197,7 +196,8 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
           command_string)
 
 
-class GoogleContainerEngineVersionFlagTestCase(unittest.TestCase):
+class GoogleContainerEngineVersionFlagTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
   def create_container_engine_spec():
@@ -214,9 +214,8 @@ class GoogleContainerEngineVersionFlagTestCase(unittest.TestCase):
 
   def testCreateCustomVersion(self):
     spec = self.create_container_engine_spec()
-    flags = mock_flags.MockFlags()
-    flags.container_cluster_version = 'fake-version'
-    with patch_critical_objects(flags=flags) as issue_command:
+    FLAGS.container_cluster_version = 'fake-version'
+    with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -235,7 +234,8 @@ class GoogleContainerEngineVersionFlagTestCase(unittest.TestCase):
       self.assertIn('--cluster-version latest', command_string)
 
 
-class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
+class GoogleContainerEngineWithGpusTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
   def create_container_engine_spec():

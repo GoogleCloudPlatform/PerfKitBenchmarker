@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,15 @@ import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from tests import mock_flags
+from perfkitbenchmarker import flags
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 
 _COMPONENT = 'test_component'
 
 
-class BaseDiskSpecTestCase(unittest.TestCase):
+class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     spec = disk.BaseDiskSpec(_COMPONENT)
@@ -84,14 +86,18 @@ class BaseDiskSpecTestCase(unittest.TestCase):
       disk.BaseDiskSpec(_COMPONENT, num_striped_disks=0)
 
   def testNonPresentFlagsDoNotOverrideConfigs(self):
-    flags = mock_flags.MockFlags()
-    flags['data_disk_size'].value = 100
-    flags['data_disk_type'].value = 'flag_disk_type'
-    flags['num_striped_disks'].value = 3
-    flags['scratch_dir'].value = '/flag_scratch_dir'
+    FLAGS['data_disk_size'].value = 100
+    FLAGS['data_disk_type'].value = 'flag_disk_type'
+    FLAGS['num_striped_disks'].value = 3
+    FLAGS['scratch_dir'].value = '/flag_scratch_dir'
     spec = disk.BaseDiskSpec(
-        _COMPONENT, flags, device_path='config_device_path', disk_number=1,
-        disk_size=75, disk_type='config_disk_type', mount_point='/mountpoint',
+        _COMPONENT,
+        FLAGS,
+        device_path='config_device_path',
+        disk_number=1,
+        disk_size=75,
+        disk_type='config_disk_type',
+        mount_point='/mountpoint',
         num_striped_disks=2)
     self.assertEqual(spec.device_path, 'config_device_path')
     self.assertEqual(spec.disk_number, 1)
@@ -101,14 +107,18 @@ class BaseDiskSpecTestCase(unittest.TestCase):
     self.assertEqual(spec.num_striped_disks, 2)
 
   def testPresentFlagsOverrideConfigs(self):
-    flags = mock_flags.MockFlags()
-    flags['data_disk_size'].parse(100)
-    flags['data_disk_type'].parse('flag_disk_type')
-    flags['num_striped_disks'].parse(3)
-    flags['scratch_dir'].parse('/flag_scratch_dir')
+    FLAGS['data_disk_size'].parse(100)
+    FLAGS['data_disk_type'].parse('flag_disk_type')
+    FLAGS['num_striped_disks'].parse(3)
+    FLAGS['scratch_dir'].parse('/flag_scratch_dir')
     spec = disk.BaseDiskSpec(
-        _COMPONENT, flags, device_path='config_device_path', disk_number=1,
-        disk_size=75, disk_type='config_disk_type', mount_point='/mountpoint',
+        _COMPONENT,
+        FLAGS,
+        device_path='config_device_path',
+        disk_number=1,
+        disk_size=75,
+        disk_type='config_disk_type',
+        mount_point='/mountpoint',
         num_striped_disks=2)
     self.assertEqual(spec.device_path, 'config_device_path')
     self.assertEqual(spec.disk_number, 1)
@@ -129,7 +139,7 @@ class _NfsDisk(disk.NfsDisk):
                                    default_nfs_version)
 
 
-class NfsDiskTestCase(unittest.TestCase):
+class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def MountOptions(self, **overrides):
     mount_options = {
@@ -166,14 +176,13 @@ class NfsDiskTestCase(unittest.TestCase):
     self.assertTrue(nfs_disk._IsReady())
 
   def testNfsFlags(self):
-    flags = mock_flags.MockFlags()
-    flags['nfs_version'].parse('4.1')
-    flags['nfs_rsize'].parse(1)
-    flags['nfs_wsize'].parse(2)
-    flags['nfs_timeout'].parse(3)
-    flags['nfs_timeout_hard'].parse(False)
-    flags['nfs_retries'].parse(4)
-    nfs_disk = _NfsDisk(flags)
+    FLAGS['nfs_version'].parse('4.1')
+    FLAGS['nfs_rsize'].parse(1)
+    FLAGS['nfs_wsize'].parse(2)
+    FLAGS['nfs_timeout'].parse(3)
+    FLAGS['nfs_timeout_hard'].parse(False)
+    FLAGS['nfs_retries'].parse(4)
+    nfs_disk = _NfsDisk(FLAGS)
     mount_options = self.MountOptions(soft=None, retrans=4, rsize=1, timeo=30,
                                       wsize=2, nfsvers='4.1')
     mount_options.pop('hard')
@@ -185,9 +194,8 @@ class NfsDiskTestCase(unittest.TestCase):
     self.assertEqual('4.1', nfs_disk.nfs_version)
 
   def testFlagsOverrideDefaultNfsVersion(self):
-    flags = mock_flags.MockFlags()
-    flags['nfs_version'].parse('3.0')
-    nfs_disk = _NfsDisk(flags=flags, default_nfs_version='4.1')
+    FLAGS['nfs_version'].parse('3.0')
+    nfs_disk = _NfsDisk(flags=FLAGS, default_nfs_version='4.1')
     self.assertEqual('3.0', nfs_disk.nfs_version)
 
   def testAttach(self):
@@ -198,9 +206,8 @@ class NfsDiskTestCase(unittest.TestCase):
 
   def testDetach(self):
     vm = mock.Mock()
-    flags = mock_flags.MockFlags()
-    flags['scratch_dir'].parse('/mnt')
-    nfs_disk = _NfsDisk(flags)
+    FLAGS['scratch_dir'].parse('/mnt')
+    nfs_disk = _NfsDisk(FLAGS)
     nfs_disk.Attach(vm)  # to set the vm on the disk
     nfs_disk.Detach()
     vm.RemoteCommand.assert_called_with('sudo umount /mnt')
