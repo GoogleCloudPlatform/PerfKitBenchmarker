@@ -216,8 +216,12 @@ def _Install(vm):
   if _GetVersionIndex(FLAGS.ycsb_version) >= 11:
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
     vm.RemoteCommand('sudo apt-get --assume-yes install maven > /dev/null 2>&1')
-    vm.RemoteCommand('cd {0}; mvn install > /dev/null 2>&1'.format(
-        HDRHISTOGRAM_DIR))
+    # _JAVA_OPTIONS needed to work around this issue:
+    # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
+    vm.RemoteCommand('cd {0}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
+                     'disableClassPathURLCheck=true  '
+                     'mvn install > /dev/null 2>&1'.format(
+                         HDRHISTOGRAM_DIR))
 
 
 def YumInstall(vm):
