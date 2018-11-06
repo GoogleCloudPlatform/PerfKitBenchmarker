@@ -93,10 +93,7 @@ class BaseNetworkSpec(object):
 
 class BaseVPNGW(object):
   """An object representing the Base VPN GW."""
-  # name = None
   CLOUD = None
-  # ZONE = None
-  # IP_ADDR = None  # public IP of this gw
 
   def __init__(self, zone=None, cidr=None):
     """Initializes the BaseNetworkSpec.
@@ -105,6 +102,7 @@ class BaseVPNGW(object):
       zone: The zone in which to create the network.
     """
     self.ZONE = zone
+    self.require_target_to_init = False  # True if we need taget GW up front (AWS)
 
   @classmethod
   def GetVPNGW(cls):
@@ -135,7 +133,6 @@ class BaseVPNGW(object):
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
 
     Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
       target_gw: The BaseVPN object to point forwarding rules at.
     """
     pass

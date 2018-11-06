@@ -90,6 +90,9 @@ class GceVPNGW(network.BaseVPNGW):
     self.vpngw_resource = GceVPNGWResource(name, network_name, region, cidr, project)
     self.created = False
     self.suffix = collections.defaultdict(dict)  # holds uuid tokens for naming/finding things (double dict)
+    self.require_target_to_init = False
+    self.routing = None
+    self.psk = None
 
   def AllocateIP(self):
     """ Allocates a public IP for the VPN GW """
@@ -122,13 +125,12 @@ class GceVPNGW(network.BaseVPNGW):
     cmd.Issue()
 
   def IPExists(self):
-    """Returns True if the Route exists."""
+    """Returns True if the IP address exists."""
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
                              self.name)
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
-
 
   def SetupForwarding(self, suffix=''):
     """Create IPSec forwarding rules
@@ -178,12 +180,12 @@ class GceVPNGW(network.BaseVPNGW):
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create', 'tun-' + self.name + '-' + self.suffix[suffix]['tun_suffix'])
     cmd.flags['peer-address'] = target_gw.IP_ADDR
     cmd.flags['target-vpn-gateway'] = self.name
-    cmd.flags['ike-version'] = '2'
+    cmd.flags['ike-version'] = '1'
     cmd.flags['local-traffic-selector'] = '0.0.0.0/0'
     cmd.flags['remote-traffic-selector'] = '0.0.0.0/0'
-    cmd.flags['shared-secret'] = psk
+    cmd.flags['shared-secret'] = 'key' + FLAGS.run_uri
     cmd.flags['region'] = self.region
-    self.tunnels['tunnel' + self.name] = cmd.Issue()
+    self.tunnels['tun-' + self.name + '-' + self.suffix[suffix]['tun_suffix']] = cmd.Issue()
 
   def DeleteTunnel(self, tunnel):
     """Delete IPSec tunnel
@@ -198,6 +200,24 @@ class GceVPNGW(network.BaseVPNGW):
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
+
+  def DeleteTunnels(self):
+    """Delete IPSec tunnels for this GW
+    """
+    for tun in self.tunnels:
+      if self.TunnelExists(tun):
+        self.DeleteTunnel(tun)
+    self.tunnels = None
+
+  def IsTunnelReady(self):
+    for tun in self.tunnels:
+      if self.TunnelExists(tun):
+        cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe', tun)
+        cmd.flags['region'] = self.region
+        response = cmd.Issue(suppress_warning=True)
+        logging.info('GCP Tunnel Status: %s' % repr(response))
+        logging.info('GCP Tunnel response type: %s' % type(response))
+        return 'established' in str(response).lower()
 
   def SetupRouting(self, target_gw, suffix=''):
     """Create IPSec routing rules between the source gw and the target gw.
@@ -245,22 +265,23 @@ class GceVPNGW(network.BaseVPNGW):
     # with benchmark_spec.vpngws_lock:
     if key not in benchmark_spec.vpngws:
       benchmark_spec.vpngws[key] = self
-    return benchmark_spec.vpngws[key]
+
     self.created = True
+    return benchmark_spec.vpngws[key]
 
   def Delete(self):
     """Deletes the actual VPNGW."""
     if self.IP_ADDR and self.IPExists():
       self.DeleteIP()
 
-    if self.forwarding_rules:
-      for fr in self.forwarding_rules:
-        self.forwarding_rules[fr].Delete()
-
     if self.tunnels:
       for tun in self.tunnels:
         if self.TunnelExists(tun):
           self.DeleteTunnel(tun)
+
+    if self.forwarding_rules:
+      for fr in self.forwarding_rules:
+        self.forwarding_rules[fr].Delete()
 
     if self.routes:
       for route in self.routes:
@@ -516,6 +537,7 @@ class GceNetwork(network.BaseNetwork):
     # allow 192.168.0.0/16 addresses
     firewall_name2 = 'default-internal2-%s' % FLAGS.run_uri
     # add support for zone, cidr, and separate networks
+    # @TODO alias RFC1918 private networks in a single rule
     if network_spec.zone and network_spec.cidr:
       firewall_name = 'default-internal-%s-%s' % (network_spec.zone, FLAGS.run_uri)
       firewall_name2 = 'default-internal2-%s-%s' % (network_spec.zone, FLAGS.run_uri)
@@ -560,6 +582,9 @@ class GceNetwork(network.BaseNetwork):
   def Delete(self):
     """Deletes the actual network."""
     if not FLAGS.gce_network_name:
+      if getattr(self, 'vpngw', False):
+        for gw in self.vpngw:
+          self.vpngw[gw].DeleteTunnels()
       self.default_firewall_rule.Delete()
       self.default_firewall_rule2.Delete()
       if self.subnet_resource:

@@ -1234,16 +1234,16 @@ class _VPNServiceSpec(spec.BaseSpec):
           provided config values.
     """
     super(_VPNServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['vpn_service_tunnel_count'].present:
-      config_values['tunnel_count'] = flag_values.tunnel_count
+#     if flag_values['vpn_service_tunnel_count'].present:
+#       config_values['tunnel_count'] = flag_values.vpn_service_tunnel_count
     if flag_values['vpn_service_name'].present:
-      config_values['name'] = flag_values.name
+      config_values['name'] = flag_values.vpn_service_name
     if flag_values['vpn_service_shared_key'].present:
-      config_values['shared_key'] = flag_values.shared_key
+      config_values['shared_key'] = flag_values.vpn_service_shared_key
 
 
 class _VPNServiceDecoder(option_decoders.TypeVerifier):
-  """Validate the cloud_redis dictionary of a benchmark config object.
+  """Validate the vpn_service dictionary of a benchmark config object.
   """
 
   def __init__(self, **kwargs):

@@ -16,13 +16,17 @@ import itertools
 import re
 from itertools import ifilter
 import uuid
+import time
+import logging
 
-flags.DEFINE_integer('vpn_service_tunnel_count', 3,
+flags.DEFINE_integer('vpn_service_tunnel_count', 1,
                      'Number of tunnels to create for each VPNGW pair.')
 flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
 flags.DEFINE_string('vpn_service_shared_key', None,
                     'If set, use this PSK for VPNs.')
+flags.DEFINE_string('vpn_service_routing_type', 'static',
+                    'static or dynamic(BGP)')
 
 FLAGS = flags.FLAGS
 
@@ -33,6 +37,8 @@ class VPN(object):
   def __init__(self, *args, **kwargs):
       self.GWPair = None  # pair of vpngw's to create tunnel between
       self.name = None  # name of the vpn created
+      self.routing = 'static'  # @TODO add to flags
+      self.psk = None
       return object.__init__(self, *args, **kwargs)
 
   def getKeyFromGWPair(self, gwpair):
@@ -75,13 +81,60 @@ class VPN(object):
         benchmark_spec.vpns[key] = self
       return benchmark_spec.vpns[key]
 
+  def PreConfigureTunnel(self, suffix=''):
+    ''' Since AWS requires target GW to be known before releasing it's own
+    VPN GW IP we add a preconfig step here to sort this out
+    '''
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    vpngw0 = benchmark_spec.vpngws[self.GWPair[0]]
+    vpngw1 = benchmark_spec.vpngws[self.GWPair[1]]
+    assert not (vpngw0.require_target_to_init and vpngw1.require_target_to_init), 'Cant connect 2 passive VPN GWs'
+    if vpngw0.require_target_to_init or vpngw1.require_target_to_init:  # if at least one is passive
+      if vpngw0.require_target_to_init:
+        if vpngw1.IP_ADDR is None:
+          vpngw1.AllocateIP()
+        vpngw0.preConfig(vpngw1)
+      else:
+        if vpngw0.IP_ADDR is None:
+          vpngw0.AllocateIP()
+        vpngw1.preConfig(vpngw0)
+
+#
+#     for vpngw_key in self.GWPair:
+#       vpngw = benchmark_spec.vpngws[vpngw_key]
+#       # 1st set the gw public ip if we can
+#       if not vpngw.require_target_to_init and vpngw.IP_ADDR is None:
+#         vpngw.AllocateIP()
+#
+
+  def PostConfigureTunnel(self, suffix=''):
+    ''' Since AWS requires target GW to be known before releasing it's own
+    VPN GW IP we add a postconfig step here to sort this out
+    '''
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    vpngw0 = benchmark_spec.vpngws[self.GWPair[0]]
+    vpngw1 = benchmark_spec.vpngws[self.GWPair[1]]
+    assert not (vpngw0.require_target_to_init and vpngw1.require_target_to_init), 'Cant connect 2 passive VPN GWs'
+    if vpngw0.require_target_to_init or vpngw1.require_target_to_init:  # if at least one is passive
+      if vpngw0.require_target_to_init:
+        vpngw0.postConfig(vpngw1)
+      else:
+        vpngw1.postConfig(vpngw0)
+
   def ConfigureTunnel(self, suffix=''):
+
+    # AWS workaround
+    self.PreConfigureTunnel(suffix)
+
     #  @TODO thread this
     benchmark_spec = context.GetThreadBenchmarkSpec()
     for vpngw_key in self.GWPair:
       vpngw = benchmark_spec.vpngws[vpngw_key]
       if vpngw.IP_ADDR is None:
         vpngw.AllocateIP()
+
+    self.PostConfigureTunnel(suffix)
+
     benchmark_spec.vpngws[self.GWPair[0]].SetupForwarding(suffix=suffix)
     benchmark_spec.vpngws[self.GWPair[1]].SetupForwarding(suffix=suffix)
 
@@ -94,6 +147,21 @@ class VPN(object):
         benchmark_spec.vpngws[self.GWPair[1]], suffix=suffix)
     benchmark_spec.vpngws[self.GWPair[1]].SetupRouting(
         benchmark_spec.vpngws[self.GWPair[0]], suffix=suffix)
+
+    tunnel_status = self.isTunnelReady()
+    logging.info('Tunnel is ready?: %s ' % tunnel_status)
+
+  # tunnel should be up now, just wait for all clear
+  # blocking here for now
+  def isTunnelReady(self):
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    ready = False
+    timeout = time.time() + 60 * 5  # give up after 5 mins
+    while(not ready and time.time() < timeout):
+      ready = benchmark_spec.vpngws[self.GWPair[0]].IsTunnelReady() and benchmark_spec.vpngws[self.GWPair[1]].IsTunnelReady()
+      time.sleep(5)
+
+    return ready
 
 
 class VPNService(resource.BaseResource):
@@ -108,6 +176,8 @@ class VPNService(resource.BaseResource):
     self.shared_key = spec.vpn_service_spec.shared_key
     self.name = spec.vpn_service_spec.name
     self.tunnel_count = spec.vpn_service_spec.tunnel_count
+    self.routing = FLAGS.vpn_service_routing_type  # static/dynamic
+    self.psk = FLAGS.run_uri
 
     # update metadata
     self.metadata.update({'t_count': self.tunnel_count,
@@ -127,8 +197,10 @@ class VPNService(resource.BaseResource):
     for gwpair in self.vpngw_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
       suffix = format(uuid.uuid4().fields[1], 'x')  # unique enough
-      vpn = VPN()
-      vpn = vpn.GetVPN(gwpair)
+
+      vpn = VPN().GetVPN(gwpair)
+      vpn.psk = self.shared_key
+      vpn.routing = self.routing  # @TODO need mixed static/dynamic tunnels?
       vpn.ConfigureTunnel(suffix=suffix)
 
   def _Delete(self):
