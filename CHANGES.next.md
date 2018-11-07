@@ -104,8 +104,8 @@
   to 1 and using --run_with_pdb flag to simplify debugging.
 - Added a sample benchmark for descriptive purposes.
 - Added GPU peer to peer topology information to metadata.
-- Added a flag, `hpcg_run_as_root` which allows OpenMPI to run HPCG in the case
-  that the user is root.
+- Added a flag, `mpirun_allow_run_as_root` which allows OpenMPI to run in the
+  case that the user is root.
 - Modified KubernetesVirtualMachine to ensure that ssh is installed on the
   container.
 - Added `container_cluster_num_vms` flag.
