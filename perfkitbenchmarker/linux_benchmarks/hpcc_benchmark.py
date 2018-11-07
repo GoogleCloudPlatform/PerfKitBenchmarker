@@ -262,9 +262,10 @@ def Run(benchmark_spec):
                            'fi'))
   num_processes = len(vms) * master_vm.num_cpus
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
+  run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
-             '"ssh -o StrictHostKeyChecking=no" %s ./hpcc' %
-             (num_processes, MACHINEFILE, mpi_env))
+             '"ssh -o StrictHostKeyChecking=no" %s %s ./hpcc' %
+             (num_processes, MACHINEFILE, run_as_root, mpi_env))
   master_vm.RobustRemoteCommand(
       mpi_cmd, timeout=FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR)
   logging.info('HPCC Results:')
