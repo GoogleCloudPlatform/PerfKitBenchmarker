@@ -22,10 +22,10 @@ import os
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import sample
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
@@ -71,11 +71,6 @@ flag_util.DEFINE_integerlist(
     flag_util.IntegerList([256, 256, 256]),
     'three dimensional problem size for each node. Must contain '
     'three integers', module_name=__name__)
-
-flags.DEFINE_boolean(
-    'hpcg_run_as_root', False, 'If true, pass --allow-run-as-root '
-    'to mpirun.')
-
 
 
 class HpcgParseOutputException(Exception):
@@ -138,7 +133,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.total_gpus = total_gpus
   benchmark_spec.hpcg_problem_size = FLAGS.hpcg_problem_size
   benchmark_spec.hpcg_runtime = FLAGS.hpcg_runtime
-  benchmark_spec.run_as_root = FLAGS.hpcg_run_as_root
+  benchmark_spec.run_as_root = FLAGS.mpirun_allow_run_as_root
 
 
 def _CopyAndUpdateRunScripts(vm, benchmark_spec):
