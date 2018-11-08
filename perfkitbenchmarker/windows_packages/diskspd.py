@@ -31,7 +31,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('diskspd_duration', 30,
+flags.DEFINE_integer('diskspd_duration', 20,
                      'The number of seconds to run diskspd test.'
                      'Defaults to 30s. Unit: seconds.')
 
@@ -58,23 +58,6 @@ flags.DEFINE_integer('diskspd_block_size', 64,
 flags.DEFINE_enum('diskspd_block_unit', 'K', ['K', 'M', 'G'],
                   'The unit of the block size, available option: K|M|G. '
                   'Defaults: K.')
-
-flags.DEFINE_enum('diskspd_access_hint', 's', ['s', 'r', 't'],
-                  'The access hint specified to the OS, '
-                  'available option: r|s|t, '
-                  'r : the FILE_FLAG_RANDOM_ACCESS hint, '
-                  's : the FILE_FLAG_SEQUENTIAL_SCAN hint, '
-                  't : the FILE_ATTRIBUTE_TEMPORARY hint. '
-                  'Defaults: s.')
-
-flags.DEFINE_enum('diskspd_access_pattern', 's', ['s', 'r'],
-                  'the access patten of the read and write'
-                  'the performance will be downgrade a little bit if use'
-                  'different hints'
-                  'available option: r|s, '
-                  'r: random access'
-                  's: sequential access. '
-                  'Defaults: s.')
 
 flags.DEFINE_integer('diskspd_stride_or_alignment', 64,
                      'If the access pattern is sequential, then this value'
@@ -122,13 +105,6 @@ flags.DEFINE_integer('diskspd_file_size', 819200,
                      'The file size DiskSpd will create when testing. '
                      'Defaults: 819200. Unit: KB.')
 
-flags.DEFINE_integer('diskspd_write_read_ratio', 0,
-                     'The ratio of write workload to read workload.'
-                     'Example: 50 means 50%, and write and read each takes'
-                     '50% of the total I/O data.'
-                     'To test read speed, set this value to 0. '
-                     'To test write speed, set this value to 100. '
-                     'Defaults: 0. Unit: percent.')
 
 DISKSPD_RETRIES = 10
 DISKSPD_DIR = 'DiskSpd-2.0.21a'
@@ -138,6 +114,7 @@ DISKSPD_URL = ('https://gallery.technet.microsoft.com/DiskSpd-A-Robust-Storage'
 DISKSPD_TMPFILE = 'testfile.dat'
 DISKSPD_XMLFILE = 'result.xml'
 DISKSPD_TIMEOUT_MULTIPLIER = 3
+DISKSPD_CONFIG_LIST = [('s', 0), ('s', 100), ('r', 0), ('r', 100)]
 
 
 def Install(vm):
@@ -147,7 +124,7 @@ def Install(vm):
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
-def _RunDiskSpd(vm, options):
+def _RunDiskSpdWithOptions(vm, options):
   total_runtime = FLAGS.diskspd_warmup + FLAGS.diskspd_cooldown + \
       FLAGS.diskspd_duration
   timeout_duration = total_runtime * DISKSPD_TIMEOUT_MULTIPLIER
@@ -180,9 +157,29 @@ def _RemoveTempFile(vm):
   vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
 
 
-@vm_util.Retry(max_retries=DISKSPD_RETRIES)
-def RunDiskSpd(running_vm):
-  """Run Diskspd and return the samples collected from the run."""
+def _RunDiskSpd(running_vm, access_pattern, diskspd_write_read_ratio, metadata):
+  sending_options = _GenerateOption(access_pattern,
+                                    diskspd_write_read_ratio)
+  process_args = [(_RunDiskSpdWithOptions, (running_vm, sending_options), {})]
+  background_tasks.RunParallelProcesses(process_args, 200)
+  result_xml = _CatXml(running_vm)
+  _RemoveTempFile(running_vm)
+  _RemoveXml(running_vm)
+  main_metric = 'ReadSpeed' if diskspd_write_read_ratio == 0 else 'WriteSpeed'
+
+  return ParseDiskSpdResults(result_xml, metadata, main_metric)
+
+
+def _GenerateOption(access_pattern, diskspd_write_read_ratio):
+  """Generate running options from the given flags.
+
+  Args:
+    access_pattern: the access pattern of diskspd, 's' or 'r'
+    diskspd_write_read_ratio: the ratio of writing compared to reading.
+
+  Returns:
+    list of samples from the results of the diskspd tests.
+  """
 
   large_page_string = '-l' if FLAGS.diskspd_large_page else ''
   latency_stats_string = '-L' if FLAGS.diskspd_latency_stats else ''
@@ -191,7 +188,7 @@ def RunDiskSpd(running_vm):
   write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
   block_size_string = str(FLAGS.diskspd_block_size) + \
       str(FLAGS.diskspd_block_unit)
-  access_pattern_string = str(FLAGS.diskspd_access_pattern) + \
+  access_pattern_string = str(access_pattern) + \
       str(FLAGS.diskspd_stride_or_alignment) + \
       str(FLAGS.diskspd_stride_or_alignment_unit)
   throughput_per_ms_string = ''
@@ -210,7 +207,7 @@ def RunDiskSpd(running_vm):
                          threadcount=FLAGS.diskspd_thread_number_per_file,
                          warmup=FLAGS.diskspd_warmup,
                          cooldown=FLAGS.diskspd_cooldown,
-                         ratio=FLAGS.diskspd_write_read_ratio,
+                         ratio=diskspd_write_read_ratio,
                          tempfile=DISKSPD_TMPFILE,
                          xmlfile=DISKSPD_XMLFILE,
                          large_page=large_page_string,
@@ -220,30 +217,23 @@ def RunDiskSpd(running_vm):
                          write_through=write_through_string,
                          access_pattern=access_pattern_string,
                          block_size=block_size_string,
-                         hint_string=FLAGS.diskspd_access_hint,
+                         hint_string=access_pattern,
                          throughput=throughput_per_ms_string,
                          outstanding_io=FLAGS.diskspd_outstanding_io)
+  return sending_options
 
-  process_args = [(_RunDiskSpd, (running_vm, sending_options), {})]
-
-  # run diskspd
-  background_tasks.RunParallelProcesses(process_args, 200)
-
-  result_xml = _CatXml(running_vm)
-  _RemoveTempFile(running_vm)
-  _RemoveXml(running_vm)
+@vm_util.Retry(max_retries=DISKSPD_RETRIES)
+def RunDiskSpd(running_vm):
+  """Run Diskspd and return the samples collected from the run."""
 
   metadata = {}
   for k, v in running_vm.GetResourceMetadata().iteritems():
     metadata['{0}'.format(k)] = v
 
-
   # add the flag information to the metadata
   # some of the flags information has been included in the xml file
   metadata['diskspd_block_size'] = FLAGS.diskspd_block_size
   metadata['diskspd_block_size_unit'] = FLAGS.diskspd_block_unit
-  metadata['diskspd_access_hint'] = FLAGS.diskspd_access_hint
-  metadata['diskspd_access_pattern'] = FLAGS.diskspd_access_pattern
   metadata['diskspd_stride_or_alignment'] = FLAGS.diskspd_stride_or_alignment
   metadata['diskspd_stride_or_alignment_unit'] = FLAGS.diskspd_stride_or_alignment_unit
   metadata['diskspd_large_page'] = FLAGS.diskspd_large_page
@@ -254,10 +244,17 @@ def RunDiskSpd(running_vm):
   metadata['diskspd_outstanding_io'] = FLAGS.diskspd_outstanding_io
   metadata['diskspd_throughput'] = FLAGS.diskspd_throughput_per_ms
 
-  return ParseDiskSpdResults(result_xml, metadata)
+  sample_list = []
+
+  # run diskspd in four different scenario, will generate a metadata list
+  for access_pattern, diskspd_write_read_ratio in DISKSPD_CONFIG_LIST:
+    sample_list.append(_RunDiskSpd(running_vm, access_pattern,
+                                     diskspd_write_read_ratio, metadata))
+
+  return sample_list
 
 
-def ParseDiskSpdResults(result_xml, metadata):
+def ParseDiskSpdResults(result_xml, metadata, main_metric):
   """Parses the xml output from DiskSpd and returns a list of samples.
 
   each list of sample only have one sample with read speed as value
@@ -271,7 +268,6 @@ def ParseDiskSpdResults(result_xml, metadata):
     list of samples from the results of the diskspd tests.
   """
   xml_root = xml.etree.ElementTree.fromstring(result_xml)
-  samples = []
   metadata = metadata.copy()
 
   # Get the parameters from the sender XML output. Add all the
@@ -334,8 +330,5 @@ def ParseDiskSpdResults(result_xml, metadata):
   metadata['TotalSpeed'] = total_speed
   metadata['TotalIops'] = total_iops
 
-  samples.append(
-      sample.Sample('ReadSpeed', read_speed, 'MB/s',
-                    metadata))
-
-  return samples
+  return sample.Sample(main_metric, metadata[main_metric], 'MB/s',
+                    metadata)
