@@ -222,6 +222,7 @@ def _GenerateOption(access_pattern, diskspd_write_read_ratio):
                          outstanding_io=FLAGS.diskspd_outstanding_io)
   return sending_options
 
+
 @vm_util.Retry(max_retries=DISKSPD_RETRIES)
 def RunDiskSpd(running_vm):
   """Run Diskspd and return the samples collected from the run."""
@@ -249,7 +250,7 @@ def RunDiskSpd(running_vm):
   # run diskspd in four different scenario, will generate a metadata list
   for access_pattern, diskspd_write_read_ratio in DISKSPD_CONFIG_LIST:
     sample_list.append(_RunDiskSpd(running_vm, access_pattern,
-                                     diskspd_write_read_ratio, metadata))
+                                   diskspd_write_read_ratio, metadata))
 
   return sample_list
 
@@ -331,4 +332,4 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
   metadata['TotalIops'] = total_iops
 
   return sample.Sample(main_metric, metadata[main_metric], 'MB/s',
-                    metadata)
+                       metadata)
