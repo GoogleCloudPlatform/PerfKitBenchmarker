@@ -67,8 +67,8 @@ flags.DEFINE_integer('mnist_num_eval_images', 5000,
                      'Size of MNIST validation data set.')
 flags.DEFINE_integer('mnist_train_epochs', 37,
                      'Total number of training echos', lower_bound=1)
-flags.DEFINE_integer('mnist_eval_steps', 0,
-                     'Total number of evaluation steps. If `0`, evaluation '
+flags.DEFINE_integer('mnist_eval_epochs', 1,
+                     'Total number of evaluation epochs. If `0`, evaluation '
                      'after training is skipped.')
 flags.DEFINE_integer('tpu_iterations', 500,
                      'Number of iterations per TPU training loop.')
@@ -99,7 +99,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
   benchmark_spec.use_tpu = True if benchmark_spec.tpus else False
-  benchmark_spec.eval_steps = FLAGS.mnist_eval_steps
   benchmark_spec.tpu_train = ''
   benchmark_spec.tpu_eval = ''
   benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
@@ -126,6 +125,9 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_epochs = FLAGS.mnist_train_epochs
   benchmark_spec.train_steps = int(
       benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
+  benchmark_spec.eval_epochs = FLAGS.mnist_eval_epochs
+  benchmark_spec.eval_steps = int(
+      benchmark_spec.eval_epochs * benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -190,6 +192,7 @@ def _CreateMetadataDict(benchmark_spec):
       'use_tpu': benchmark_spec.use_tpu,
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
+      'eval_steps': benchmark_spec.eval_steps,
       'tpu': benchmark_spec.tpu,
       'tpu_train': benchmark_spec.tpu_train,
       'tpu_eval': benchmark_spec.tpu_eval,
@@ -201,6 +204,7 @@ def _CreateMetadataDict(benchmark_spec):
       'num_train_images': benchmark_spec.num_train_images,
       'num_eval_images': benchmark_spec.num_eval_images,
       'train_epochs': benchmark_spec.train_epochs,
+      'eval_epochs': benchmark_spec.eval_epochs,
       'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch,
       'train_batch_size': benchmark_spec.batch_size,
       'eval_batch_size': benchmark_spec.batch_size
