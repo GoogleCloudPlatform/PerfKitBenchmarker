@@ -87,8 +87,8 @@ class DiskspdBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
                          'DisableOSCache': 'true',
                          'WriteIops': 0}
     sample_list = [
-       sample.Sample('ReadSpeed', 189, 'MB/s',
-                    expected_metadata)
+        sample.Sample('ReadSpeed', 189, 'MB/s',
+                      expected_metadata)
     ]
     self.assertSampleListsEqualUpToTimestamp([single_sample], sample_list)
 
