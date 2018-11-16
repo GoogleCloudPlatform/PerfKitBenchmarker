@@ -216,6 +216,7 @@
   which uses absl.testing.flagsaver to save and restore
   flag values on test setUp / tearDown.
 - Remove all usage of mock_flags and replace with PkbCommonTestCase.
+- Upgraded memtier benchmark to version 1.2.15.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

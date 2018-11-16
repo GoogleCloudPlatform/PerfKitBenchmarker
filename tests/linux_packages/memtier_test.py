@@ -50,21 +50,21 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   def testParseResults(self):
     get_metadata = {
         'histogram': json.dumps([
-            {'count': 4500, 'millisec': 0},
-            {'count': 4500, 'millisec': 2}])}
+            {'count': 4500, 'microsec': 0.0},
+            {'count': 4500, 'microsec': 2000.0}])}
     get_metadata.update(METADATA)
     set_metadata = {
         'histogram': json.dumps([
-            {'count': 50, 'millisec': 0},
-            {'count': 50, 'millisec': 1},
-            {'count': 50, 'millisec': 2},
-            {'count': 150, 'millisec': 3},
-            {'count': 200, 'millisec': 4},
-            {'count': 200, 'millisec': 5},
-            {'count': 200, 'millisec': 6},
-            {'count': 50, 'millisec': 7},
-            {'count': 40, 'millisec': 8},
-            {'count': 10, 'millisec': 9}])}
+            {'count': 50, 'microsec': 0.0},
+            {'count': 50, 'microsec': 1000.0},
+            {'count': 50, 'microsec': 2000.0},
+            {'count': 150, 'microsec': 3000.0},
+            {'count': 200, 'microsec': 4000.0},
+            {'count': 200, 'microsec': 5000.0},
+            {'count': 200, 'microsec': 6000.0},
+            {'count': 50, 'microsec': 7000.0},
+            {'count': 40, 'microsec': 8000.0},
+            {'count': 10, 'microsec': 9000.0}])}
     set_metadata.update(METADATA)
     expected_result = [
         sample.Sample(
