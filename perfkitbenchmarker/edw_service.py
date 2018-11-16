@@ -49,10 +49,13 @@ FLAGS = flags.FLAGS
 
 
 TYPE_2_PROVIDER = dict([('redshift', 'aws'),
+                        ('spectrum', 'aws'),
                         ('bigquery', 'gcp'),
                         ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([('redshift',
                        'perfkitbenchmarker.providers.aws.redshift'),
+                      ('spectrum',
+                       'perfkitbenchmarker.providers.aws.spectrum'),
                       ('bigquery',
                        'perfkitbenchmarker.providers.gcp.bigquery'),
                       ('azuresqldatawarehouse',
@@ -89,18 +92,13 @@ class EdwService(resource.BaseResource):
     # Cluster related attributes
     self.concurrency = edw_service_spec.concurrency
     self.node_type = edw_service_spec.node_type
-
-    if edw_service_spec.node_count:
-      self.node_count = edw_service_spec.node_count
-    else:
-      self.node_count = 0
+    self.node_count = edw_service_spec.node_count
 
     # Interaction related attributes
     if edw_service_spec.endpoint:
       self.endpoint = edw_service_spec.endpoint
     else:
       self.endpoint = ''
-
     self.db = edw_service_spec.db
     self.user = edw_service_spec.user
     self.password = edw_service_spec.password
@@ -108,16 +106,6 @@ class EdwService(resource.BaseResource):
     self.spec = edw_service_spec
     # resource workflow management
     self.supports_wait_on_delete = True
-
-    if edw_service_spec.server_name:
-      self.server_name = edw_service_spec.server_name
-    else:
-      self.server_name = ''
-
-    if edw_service_spec.resource_group:
-      self.resource_group = edw_service_spec.resource_group
-    else:
-      self.resource_group = ''
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this edw service."""
