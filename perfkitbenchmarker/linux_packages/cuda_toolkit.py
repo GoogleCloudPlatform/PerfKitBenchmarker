@@ -402,8 +402,8 @@ def _InstallCudaPatch(vm, patch_url):
   # Need to be extra careful on the command below because without these
   # precautions, it was brining up a menu option about grub's menu.lst
   # on AWS Ubuntu16.04 and thus causing the RemoteCommand to hang and fail.
-  vm.RemoteCommand(
-      'sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -yq cuda')
+  vm.RemoteCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get --only-upgrade '
+                   'install -yq cuda')
 
 
 def _InstallCuda8(vm):
