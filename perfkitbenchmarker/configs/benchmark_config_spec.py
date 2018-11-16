@@ -342,6 +342,9 @@ class _EdwServiceSpec(spec.BaseSpec):
             'none_ok': True}),
         'server_name': (option_decoders.StringDecoder, {
             'default': None,
+            'none_ok': True}),
+        'iam_role': (option_decoders.StringDecoder, {
+            'default': None,
             'none_ok': True})
     })
     return result
