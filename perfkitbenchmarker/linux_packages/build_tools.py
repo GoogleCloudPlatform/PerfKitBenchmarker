@@ -49,8 +49,7 @@ def Reinstall(vm, version='4.7'):
       continue
     else:
       new_pkg = pkg + '-' + version
-      vm.RemoteCommand('sudo apt-get remove {pkg} -y'.format(pkg=pkg),
-                       ignore_failure=True)
       vm.InstallPackages(new_pkg)
+      vm.RemoteCommand('sudo rm /usr/bin/{pkg}'.format(pkg=pkg))
       vm.RemoteCommand('sudo ln -s /usr/bin/{new_pkg} /usr/bin/{pkg}'.format(
           new_pkg=new_pkg, pkg=pkg))

@@ -26,7 +26,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
-GIT_TAG = '1.2.0'
+GIT_TAG = '1.2.15'
 LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
 LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
 LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % INSTALL_DIR
@@ -154,7 +154,8 @@ def GetMetadata():
           'memtier_threads': FLAGS.memtier_threads,
           'memtier_ratio': FLAGS.memtier_ratio,
           'memtier_data_size': FLAGS.memtier_data_size,
-          'memtier_key_pattern': FLAGS.memtier_key_pattern}
+          'memtier_key_pattern': FLAGS.memtier_key_pattern,
+          'memtier_version': GIT_TAG}
   return meta
 
 
@@ -239,7 +240,7 @@ def _ParseLine(pattern, line, approx_total, last_total, histogram):
   counts = _ConvertPercentToAbsolute(approx_total, float(percent))
   bucket_counts = int(round(counts - last_total))
   if bucket_counts > 0:
-    histogram.append({'millisec': int(msec),
+    histogram.append({'microsec': float(msec) * 1000,
                       'count': bucket_counts})
   return counts
 

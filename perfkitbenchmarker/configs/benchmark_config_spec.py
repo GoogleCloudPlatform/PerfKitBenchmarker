@@ -336,6 +336,12 @@ class _EdwServiceSpec(spec.BaseSpec):
             'none_ok': True}),
         'cluster_parameter_group': (option_decoders.StringDecoder, {
             'default': None,
+            'none_ok': True}),
+        'resource_group': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'server_name': (option_decoders.StringDecoder, {
+            'default': None,
             'none_ok': True})
     })
     return result
