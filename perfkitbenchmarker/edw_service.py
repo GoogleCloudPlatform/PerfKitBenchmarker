@@ -42,15 +42,22 @@ flags.DEFINE_string('edw_service_cluster_password', None,
 flags.DEFINE_enum('edw_query_execution_mode', 'sequential', ['sequential',
                                                              'concurrent'],
                   'The mode for executing the queries on the edw cluster.')
+flags.DEFINE_string('edw_service_resource_group', None,
+                    'Needed to manage Azure clusters.')
 
 FLAGS = flags.FLAGS
 
 
-TYPE_2_PROVIDER = dict([('redshift', 'aws'), ('bigquery', 'gcp')])
+TYPE_2_PROVIDER = dict([('redshift', 'aws'),
+                        ('bigquery', 'gcp'),
+                        ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([('redshift',
                        'perfkitbenchmarker.providers.aws.redshift'),
                       ('bigquery',
-                       'perfkitbenchmarker.providers.gcp.bigquery')])
+                       'perfkitbenchmarker.providers.gcp.bigquery'),
+                      ('azuresqldatawarehouse',
+                       'perfkitbenchmarker.providers.azure.'
+                       'azure_sql_data_warehouse')])
 DEFAULT_NUMBER_OF_NODES = 2
 
 
@@ -82,13 +89,18 @@ class EdwService(resource.BaseResource):
     # Cluster related attributes
     self.concurrency = edw_service_spec.concurrency
     self.node_type = edw_service_spec.node_type
-    self.node_count = edw_service_spec.node_count
+
+    if edw_service_spec.node_count:
+      self.node_count = edw_service_spec.node_count
+    else:
+      self.node_count = 0
 
     # Interaction related attributes
     if edw_service_spec.endpoint:
       self.endpoint = edw_service_spec.endpoint
     else:
       self.endpoint = ''
+
     self.db = edw_service_spec.db
     self.user = edw_service_spec.user
     self.password = edw_service_spec.password
@@ -96,6 +108,16 @@ class EdwService(resource.BaseResource):
     self.spec = edw_service_spec
     # resource workflow management
     self.supports_wait_on_delete = True
+
+    if edw_service_spec.server_name:
+      self.server_name = edw_service_spec.server_name
+    else:
+      self.server_name = ''
+
+    if edw_service_spec.resource_group:
+      self.resource_group = edw_service_spec.resource_group
+    else:
+      self.resource_group = ''
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this edw service."""
