@@ -172,4 +172,3 @@ class Azuresqldatawarehouse(edw_service.EdwService):
       vm: Client vm on which the script will be run.
     """
     vm.Install('mssql_tools')
-
