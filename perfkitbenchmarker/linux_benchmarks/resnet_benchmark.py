@@ -72,8 +72,6 @@ flags.DEFINE_enum('resnet_data_format', 'channels_last',
                   'value is either channels_first or channels_last. To run the '
                   'network on CPU or TPU, channels_last should be used. For GPU'
                   ', channels_first will improve performance.')
-flags.DEFINE_enum('resnet_precision', 'bfloat16', ['bfloat16', 'float32'],
-                  'Precision to use')
 flags.DEFINE_bool('resnet_skip_host_call', False, 'Skip the host_call which is '
                   'executed every training step. This is generally used for '
                   'generating training summaries (train loss, learning rate, '
@@ -110,7 +108,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.train_batch_size = FLAGS.resnet_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.resnet_eval_batch_size
   benchmark_spec.data_format = FLAGS.resnet_data_format
-  benchmark_spec.precision = FLAGS.resnet_precision
   benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
   benchmark_spec.skip_host_call = FLAGS.resnet_skip_host_call
   benchmark_spec.data_dir = FLAGS.imagenet_data_dir

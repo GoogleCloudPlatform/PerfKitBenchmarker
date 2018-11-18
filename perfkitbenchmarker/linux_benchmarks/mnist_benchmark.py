@@ -75,6 +75,8 @@ flags.DEFINE_integer('tpu_iterations', 500,
 flags.DEFINE_integer('mnist_batch_size', 1024,
                      'Mini-batch size for the training. Note that this '
                      'is the global batch size and not the per-shard batch.')
+flags.DEFINE_enum('tpu_precision', 'bfloat16', ['bfloat16', 'float32'],
+                  'Precision to use')
 
 EXAMPLES_PER_SECOND_PRECISION = 0.01
 
@@ -128,6 +130,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.eval_epochs = FLAGS.mnist_eval_epochs
   benchmark_spec.eval_steps = int(
       benchmark_spec.eval_epochs * benchmark_spec.num_examples_per_epoch)
+  benchmark_spec.precision = FLAGS.tpu_precision
 
 
 def Prepare(benchmark_spec):
