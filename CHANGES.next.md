@@ -217,6 +217,7 @@
   flag values on test setUp / tearDown.
 - Remove all usage of mock_flags and replace with PkbCommonTestCase.
 - Upgraded memtier benchmark to version 1.2.15.
+- Add precision flag in Inception3 benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
