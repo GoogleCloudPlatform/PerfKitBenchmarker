@@ -228,6 +228,7 @@ def _BuildGradleCommand(classname, job_arguments):
 
   cmd.append('--stacktrace')
   cmd.append('--info')
+  cmd.append('--scan')
 
   return cmd
 
@@ -280,6 +281,8 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
     beam_args.append('--sdk_location={}'.format(sdk_location))
 
   cmd.append('-PpipelineOptions={}'.format(' '.join(beam_args)))
+  cmd.append('--info')
+  cmd.append('--scan')
 
   return cmd
 
