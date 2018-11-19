@@ -172,8 +172,9 @@ def _RunSingleIteration(master_vm, problem_size, num_processes, num_iterations,
   stencil2d_path = os.path.join(shoc_benchmark_suite.SHOC_BIN_DIR, 'TP', 'CUDA',
                                 'Stencil2D')
   current_problem_size = '%s,%s' % (problem_size, problem_size)
-  run_command = ('mpirun --hostfile %s -np %s %s --customSize %s -n %s' %
-                 (MACHINEFILE, num_processes, stencil2d_path,
+  run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
+  run_command = ('mpirun --hostfile %s -np %s %s %s --customSize %s -n %s' %
+                 (MACHINEFILE, num_processes, run_as_root, stencil2d_path,
                   current_problem_size, num_iterations))
   metadata['run_command'] = run_command
   metadata['problem_size'] = current_problem_size

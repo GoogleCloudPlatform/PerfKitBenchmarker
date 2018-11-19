@@ -33,8 +33,9 @@ class DiskspdBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   def setUp(self):
     self.result_xml = self.getDataContents('diskspd_result.xml')
 
-  def testNtttcpTcpParsing(self):
-    samples = diskspd.ParseDiskSpdResults(self.result_xml, {})
+  def testDiskSpdParsing(self):
+    single_sample = diskspd.ParseDiskSpdResults(self.result_xml, {},
+                                                'ReadSpeed')
     expected_metadata = {'DisableAffinity': 'false',
                          'MaxFileSize': '0',
                          'BlockSize': '65536',
@@ -85,10 +86,11 @@ class DiskspdBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
                          'Throughput': '0',
                          'DisableOSCache': 'true',
                          'WriteIops': 0}
-    expected_samples = [
-        sample.Sample('ReadSpeed', 189, 'MB/s', expected_metadata),
+    sample_list = [
+        sample.Sample('ReadSpeed', 189, 'MB/s',
+                      expected_metadata)
     ]
-    self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+    self.assertSampleListsEqualUpToTimestamp([single_sample], sample_list)
 
 
 if __name__ == '__main__':

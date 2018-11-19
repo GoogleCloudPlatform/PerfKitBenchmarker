@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""HPC utility functions"""
+"""HPC utility functions."""
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+
+flags.DEFINE_boolean('mpirun_allow_run_as_root', False,
+                     'Whether to allow mpirun to be run by the root user.')
 
 
 def CreateMachineFile(vms, num_slots=lambda vm: vm.num_cpus,

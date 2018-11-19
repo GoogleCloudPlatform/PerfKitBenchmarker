@@ -42,15 +42,25 @@ flags.DEFINE_string('edw_service_cluster_password', None,
 flags.DEFINE_enum('edw_query_execution_mode', 'sequential', ['sequential',
                                                              'concurrent'],
                   'The mode for executing the queries on the edw cluster.')
+flags.DEFINE_string('edw_service_resource_group', None,
+                    'Needed to manage Azure clusters.')
 
 FLAGS = flags.FLAGS
 
 
-TYPE_2_PROVIDER = dict([('redshift', 'aws'), ('bigquery', 'gcp')])
+TYPE_2_PROVIDER = dict([('redshift', 'aws'),
+                        ('spectrum', 'aws'),
+                        ('bigquery', 'gcp'),
+                        ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([('redshift',
                        'perfkitbenchmarker.providers.aws.redshift'),
+                      ('spectrum',
+                       'perfkitbenchmarker.providers.aws.spectrum'),
                       ('bigquery',
-                       'perfkitbenchmarker.providers.gcp.bigquery')])
+                       'perfkitbenchmarker.providers.gcp.bigquery'),
+                      ('azuresqldatawarehouse',
+                       'perfkitbenchmarker.providers.azure.'
+                       'azure_sql_data_warehouse')])
 DEFAULT_NUMBER_OF_NODES = 2
 
 
