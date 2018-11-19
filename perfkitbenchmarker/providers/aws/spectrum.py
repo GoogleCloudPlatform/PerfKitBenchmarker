@@ -135,4 +135,3 @@ class Spectrum(redshift.Redshift):
                                                           self.
                                                           cluster_identifier)
     AddTags(self.arn, self.region)
-
