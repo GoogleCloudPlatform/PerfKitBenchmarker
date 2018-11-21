@@ -152,8 +152,6 @@ class GkeCluster(container_service.KubernetesCluster):
     else:
       cmd.flags['machine-type'] = self.machine_type
 
-    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
-
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
     cmd.Issue(timeout=900, env=self._GetRequiredGkeEnv())
