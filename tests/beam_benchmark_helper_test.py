@@ -201,6 +201,8 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
           '-Ptests=apache_beam.py',
           '-Pattr=IT',
           '-PpipelineOptions=--args --runner=TestRunner --sdk_location=py/location.tar',
+          '--info',
+          '--scan',
       ]
       self.assertListEqual(expected_cmd, actual_cmd)
       exec_check.assert_called_once()
@@ -235,6 +237,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
           '-DintegrationTestPipelineOptions=[--args,"--runner=TestDataflowRunner"]',
           '--stacktrace',
           '--info',
+          '--scan',
       ]
       self.assertListEqual(expected_cmd, actual_cmd)
       exec_check.assert_called_once()
