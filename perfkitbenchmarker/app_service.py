@@ -1,8 +1,12 @@
 """Module containing class for BaseAppService and BaseAppServiceSpec."""
 import threading
+import time
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
@@ -84,8 +88,9 @@ class BaseAppService(resource.BaseResource):
     # update metadata
     self.metadata.update({'backend': self.backend,
                           'region': self.region})
+    self.samples = []
 
-  def _UpdateDepenencies(self):
+  def _UpdateDependencies(self):
     """Update dependencies for AppService."""
     self.builder.Mutate()
 
@@ -94,8 +99,31 @@ class BaseAppService(resource.BaseResource):
 
   def Update(self):
     """Update a deployed app instance."""
-    self._UpdateDepenencies()
+
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
+                   timeout=self.READY_TIMEOUT,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableCreationError,))
+    def WaitUntilReady():
+      if not self._IsReady():
+        raise errors.Resource.RetryableCreationError('Not yet ready')
+
+    if self.user_managed:
+      return
+    self._UpdateDependencies()
+    self.update_start_time = time.time()
     self._Update()
+    self.update_end_time = time.time()
+    WaitUntilReady()
+    self.update_ready_time = time.time()
+    self.samples.append(
+        sample.Sample('update latency',
+                      self.update_end_time - self.update_start_time,
+                      'seconds', {}))
+    self.samples.append(
+        sample.Sample('update ready latency',
+                      self.update_ready_time - self.update_start_time,
+                      'seconds', {}))
 
   def Invoke(self, args=None):
     """Invoke a deployed app instance.
@@ -122,9 +150,22 @@ class BaseAppService(resource.BaseResource):
 
   def GetLifeCycleMetrics(self):
     """Export internal lifecycle metrics."""
-    return []
+    for s in self.samples:
+      s.metadata.update(self.metadata)
+    return self.samples
 
   def _PostCreate(self):
     """Method called after _CreateResource."""
     if self.builder:
       self.metadata.update(self.builder.GetResourceMetadata())
+
+  def Create(self):
+    super(BaseAppService, self).Create()
+    self.samples.append(
+        sample.Sample('create latency',
+                      self.create_end_time - self.create_start_time,
+                      'seconds', {}))
+    self.samples.append(
+        sample.Sample('create ready latency',
+                      self.resource_ready_time - self.create_start_time,
+                      'seconds', {}))
