@@ -326,6 +326,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = gce_disk.PD_STANDARD
 
+  NVME_START_INDEX = 1
+
   _host_lock = threading.Lock()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
@@ -568,11 +570,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         name = ''
         if FLAGS.gce_ssd_interface == SCSI:
           name = 'local-ssd-%d' % self.local_disk_counter
+          disk_number = self.local_disk_counter + 1
         elif FLAGS.gce_ssd_interface == NVME:
           name = 'nvme0n%d' % (self.local_disk_counter + 1)
+          disk_number = self.local_disk_counter + self.NVME_START_INDEX
+        else:
+          raise errors.Error('Unknown Local SSD Interface.')
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
-        # Local disk numbers start at 1 (0 is the system disk).
-        data_disk.disk_number = self.local_disk_counter + 1
+        data_disk.disk_number = disk_number
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
@@ -768,6 +773,8 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
   BOOT_DISK_SIZE_GB = 50
   BOOT_DISK_TYPE = gce_disk.PD_SSD
+
+  NVME_START_INDEX = 0
 
   def __init__(self, vm_spec):
     """Initialize a Windows GCE virtual machine.
