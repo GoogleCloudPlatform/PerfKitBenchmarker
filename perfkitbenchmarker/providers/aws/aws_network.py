@@ -764,59 +764,26 @@ class AwsVPNGW(network.BaseVPNGW):
     self.vpn_connection = None
     self.route_table_id = None
 
-  def AllocateIP(self):
-    # aws uses endpoint address, not ip
-    #     raise NotImplementedError()
-    pass
+#   def AllocateIP(self):
+#     # aws uses endpoint address, not ip
+#     #     raise NotImplementedError()
+#     pass
+#
+#   def DeleteIP(self):
+#         # aws uses endpoint address, not ip
+#         #     raise NotImplementedError()
+#     pass
+#
+#   def IPExists(self):
+#     # aws uses endpoint address, not ip
+#     #     raise NotImplementedError()
+#     pass
 
-  def DeleteIP(self):
-        # aws uses endpoint address, not ip
-        #     raise NotImplementedError()
-    pass
-
-  def IPExists(self):
-    # aws uses endpoint address, not ip
-    #     raise NotImplementedError()
-    pass
+  def ConfigureTunnel(self, tunnel_config):
+    network.BaseVPNGW.ConfigureTunnel(self, tunnel_config)
 
   def IsTunnelReady(self):
     return True
-
-  def SetupForwarding(self, suffix=''):
-    """Create IPSec forwarding rules between the source gw and the target gw.
-    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
-
-
-    Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
-      target_gw: The BaseVPN object to point forwarding rules at.
-    """
-    pass
-#
-#     # GCP doesnt like uppercase names?!?
-#     fr_UDP500_name = ('fr-udp500-%s-%s' %
-#                       (self.region, FLAGS.run_uri))
-#     fr_UDP4500_name = ('fr-udp4500-%s-%s' %
-#                        (self.region, FLAGS.run_uri))
-#     fr_ESP_name = ('fr-esp-%s-%s' %
-#                    (self.region, FLAGS.run_uri))
-#     with self._lock:
-#       if fr_UDP500_name not in self.forwarding_rules:
-#         fr_UDP500 = AwsForwardingRule(
-#             fr_UDP500_name, 'UDP', self, 500)
-#         self.forwarding_rules[fr_UDP500_name] = fr_UDP500
-#         fr_UDP500.Create()
-#       if fr_UDP4500_name not in self.forwarding_rules:
-#         fr_UDP4500 = AwsForwardingRule(
-#             fr_UDP4500_name, 'UDP', self, 4500)
-#         self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
-#         fr_UDP4500.Create()
-#       if fr_ESP_name not in self.forwarding_rules:
-#         fr_ESP = AwsForwardingRule(
-#             fr_ESP_name, 'ESP', self)
-#         self.forwarding_rules[fr_ESP_name] = fr_ESP
-#         fr_ESP.Create()
-#
 
   def SetupTunnel(self, target_gw, psk, suffix=''):
     """Create IPSec tunnel between the source gw and the target gw.
@@ -826,16 +793,16 @@ class AwsVPNGW(network.BaseVPNGW):
       psk: preshared key (or run uri for now)
     """
     # self.SetupForwarding(suffix)
-    self.psk = psk
+#     self.psk = psk
 
-  def DeleteTunnel(self, tunnel):
-    """Delete IPSec tunnel
-    """
-    raise NotImplementedError()
-
-  def TunnelExists(self, tunnel):
-    """Returns True if the tunnel exists."""
-    raise NotImplementedError()
+#   def DeleteTunnel(self, tunnel):
+#     """Delete IPSec tunnel
+#     """
+#     raise NotImplementedError()
+#
+#   def TunnelExists(self, tunnel):
+#     """Returns True if the tunnel exists."""
+#     raise NotImplementedError()
 
   def preConfig(self, target_gw):
     """ used to setup CGW before knowing target """
@@ -861,27 +828,27 @@ class AwsVPNGW(network.BaseVPNGW):
       self.cgw_id = self.customer_gw.id
       logging.info("Created customer gw with id: %s" % self.customer_gw.id)
 
-  def SetupRouting(self, target_gw, suffix=''):
-    """Create IPSec forwarding rules between the source gw and the target gw.
-    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+#   def SetupRouting(self, target_gw, suffix=''):
+#     """Create IPSec forwarding rules between the source gw and the target gw.
+#     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+#
+#     Args:
+#       source_gw: The BaseVPN object to add forwarding rules to.
+#       target_gw: The BaseVPN object to point forwarding rules at.
+#     """
+#     pass
 
-    Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
-      target_gw: The BaseVPN object to point forwarding rules at.
-    """
-    pass
+#   def DeleteRoute(self, route):
+#     """Delete route
+#
+#     Args:
+#       route: The route name to delete
+#     """
+#     raise NotImplementedError()
 
-  def DeleteRoute(self, route):
-    """Delete route
-
-    Args:
-      route: The route name to delete
-    """
-    raise NotImplementedError()
-
-  def RouteExists(self, route):
-    """Returns True if the Route exists."""
-    raise NotImplementedError()
+#   def RouteExists(self, route):
+#     """Returns True if the Route exists."""
+#     raise NotImplementedError()
 
   def Create(self):
     """Creates the actual VPNGW."""

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# from perfkitbenchmarker.configs.spec import BaseSpec
 
 """Module containing abstract classes related to VM networking.
 
@@ -96,12 +97,13 @@ class BaseVPNGW(object):
   CLOUD = None
 
   def __init__(self, zone=None, cidr=None):
-    """Initializes the BaseNetworkSpec.
+    """Initializes the BaseVPNGW.
 
     Args:
-      zone: The zone in which to create the network.
+      zone: The zone in which to create the VPNGW.
     """
     self.ZONE = zone
+    self.cidr = cidr
     self.require_target_to_init = False  # True if we need taget GW up front (AWS)
 
   @classmethod
@@ -125,35 +127,41 @@ class BaseVPNGW(object):
         benchmark_spec.vpngws[key] = cls()
       return benchmark_spec.vpngws[key]
 
-  def AllocateIP(self):
+  def IsTunnelConfigured(self):
     pass
 
-  def SetupForwarding(self, target_gw):
-    """Create IPSec forwarding rules between the source gw and the target gw.
-    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
-
-    Args:
-      target_gw: The BaseVPN object to point forwarding rules at.
-    """
+  def ConfigureTunnel(self, tunnel_config):
     pass
 
-  def SetupTunnel(self, target_gw, psk):
-    """Create IPSec tunnels  between the source gw and the target gw.
-
-    Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
-      target_gw: The BaseVPN object to point forwarding rules at.
-    """
-    pass
-
-  def SetupRouting(self, target_gw):
-    """Create IPSec routes  between the source gw and the target gw.
-
-    Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
-      target_gw: The BaseVPN object to point forwarding rules at.
-    """
-    pass
+#   def AllocateIP(self):
+#     pass
+#
+#   def SetupForwarding(self, target_gw):
+#     """Create IPSec forwarding rules between the source gw and the target gw.
+#     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+#
+#     Args:
+#       target_gw: The BaseVPN object to point forwarding rules at.
+#     """
+#     pass
+#
+#   def SetupTunnel(self, target_gw, psk):
+#     """Create IPSec tunnels  between the source gw and the target gw.
+#
+#     Args:
+#       source_gw: The BaseVPN object to add forwarding rules to.
+#       target_gw: The BaseVPN object to point forwarding rules at.
+#     """
+#     pass
+#
+#   def SetupRouting(self, target_gw):
+#     """Create IPSec routes  between the source gw and the target gw.
+#
+#     Args:
+#       source_gw: The BaseVPN object to add forwarding rules to.
+#       target_gw: The BaseVPN object to point forwarding rules at.
+#     """
+#     pass
 
   def Create(self):
     """Creates the actual VPNGW."""

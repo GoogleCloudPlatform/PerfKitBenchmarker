@@ -45,14 +45,42 @@ FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'iperf_vpn'
 BENCHMARK_CONFIG = """
+# VPN iperf config.
 iperf_vpn:
-  description: Run iperf through vpn
+  description: Run iperf over vpn
+  flags:
+    iperf_vpn_sending_thread_count: 5
+    use_vpn: True
+  vpn_service:
+    tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
   vm_groups:
     vm_1:
-      vm_spec: *default_single_core
+      cloud: GCP
+      cidr: 10.0.1.0/24
+      zone: us-west1-b
+      vm_spec:
+        GCP:
+            machine_type: n1-standard-4
+            #zone: us-central1-a
     vm_2:
-      vm_spec: *default_single_core
+      cloud: AWS
+      cidr: 192.168.1.0/24
+      zone: us-east-1b
+      vm_spec:
+        AWS:
+            machine_type: t2.micro
+            #zone: us-west1-c
 """
+
+# """
+# iperf_vpn:
+#   description: Run iperf through vpn
+#   vm_groups:
+#     vm_1:
+#       vm_spec: *default_single_core
+#     vm_2:
+#       vm_spec: *default_single_core
+# """
 
 IPERF_PORT = 20000
 IPERF_RETRIES = 5

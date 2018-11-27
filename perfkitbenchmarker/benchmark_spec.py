@@ -477,6 +477,9 @@ class BenchmarkSpec(object):
       return
     self.vpn_service_spec = self.config.vpn_service
     self.vpn_service = VPNService(self)
+#     vpn_service_class = vpn_service.GetVPNServiceClass(
+#         self.config.dpb_service.service_type)
+#     self.vpn_service = vpn_service_class()
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

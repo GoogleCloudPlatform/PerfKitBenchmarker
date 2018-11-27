@@ -11,11 +11,15 @@ iperf_vpn:
       cloud: GCP
       cidr: 10.0.1.0/24
       zone: us-west1-b
-      #vm_spec: 
+      vm_spec: 
+        GCP:
+            machine_type: n1-standard-4
             #zone: us-central1-a
     vm_2:
       cloud: GCP
       cidr: 192.168.1.0/24
-      zone: us-west1-c
-      #vm_spec:
+      zone: us-central1-b
+      vm_spec:
+        GCP:
+            machine_type: n1-standard-4
             #zone: us-west1-c
