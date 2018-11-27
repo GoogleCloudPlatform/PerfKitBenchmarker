@@ -66,7 +66,7 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
 
   def _Create(self):
     """Creates the instance."""
-    cmd = util.GcloudCommand(self, 'beta', 'redis', 'instances', 'create',
+    cmd = util.GcloudCommand(self, 'redis', 'instances', 'create',
                              self.spec.redis_name)
     cmd.flags['region'] = self.redis_region
     cmd.flags['zone'] = self.spec.client_vm.zone
@@ -82,7 +82,7 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
 
   def _Delete(self):
     """Deletes the instance."""
-    cmd = util.GcloudCommand(self, 'beta', 'redis', 'instances', 'delete',
+    cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete',
                              self.spec.redis_name)
     cmd.flags['region'] = self.redis_region
     cmd.Issue()
@@ -98,7 +98,7 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     Returns:
       stdout, stderr, and retcode.
     """
-    cmd = util.GcloudCommand(self, 'beta', 'redis', 'instances', 'describe',
+    cmd = util.GcloudCommand(self, 'redis', 'instances', 'describe',
                              self.spec.redis_name)
     cmd.flags['region'] = self.redis_region
     stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
