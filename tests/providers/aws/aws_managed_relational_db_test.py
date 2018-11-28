@@ -134,13 +134,17 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
   def createAuroraMockSpec(self, additional_spec_items={}):
 
+    default_server_vm_spec = virtual_machine.BaseVmSpec(
+        'NAME', **{'machine_type': 'db.t1.micro',
+                   'zone': 'us-west-2b'})
+
     spec_dict = {
         'engine': AURORA_POSTGRES,
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
         'database_username': 'fakeusername',
-        'machine_type': 'db.r4.4xlarge',
+        'vm_spec': default_server_vm_spec,
         'zones': ['us-east-1a', 'us-east-1d'],
         'engine_version': '9.6.2',
         'high_availability': True
