@@ -35,7 +35,7 @@ flags.DEFINE_string('hadoop_version', '2.8.4', 'Version of hadoop.')
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml',
-              'hadoop/hadoop-env.sh.j2', 'hadoop/slaves.j2']
+              'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
 HADOOP_DIR = posixpath.join(INSTALL_DIR, 'hadoop')
@@ -94,11 +94,15 @@ def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
       'scratch_dir': scratch_dir,
       'vcpus': vm.num_cpus,
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
+      'user': vm.user_name,
       'yarn_memory_mb': yarn_memory_mb
   }
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
+    if (file_name == 'hadoop/workers.j2' and
+        FLAGS.hadoop_version.split('.')[0] == '2'):
+      file_name = 'hadoop/slaves.j2'
     remote_path = posixpath.join(HADOOP_CONF_DIR,
                                  os.path.basename(file_name))
     if file_name.endswith('.j2'):
