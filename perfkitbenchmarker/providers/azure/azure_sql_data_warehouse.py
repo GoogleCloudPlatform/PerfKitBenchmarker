@@ -42,6 +42,8 @@ class Azuresqldatawarehouse(edw_service.EdwService):
   def __init__(self, edw_service_spec):
     super(Azuresqldatawarehouse, self).__init__(edw_service_spec)
     self.whitelist_ip = None
+    self.resource_group = edw_service_spec.resource_group
+    self.server_name = edw_service_spec.server_name
 
   def WhitelistIPAddress(self, ip_address):
     """To whitelist the IP address on the cluster."""
