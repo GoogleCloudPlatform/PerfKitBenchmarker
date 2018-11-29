@@ -64,17 +64,6 @@ class VPN(object):
 
   def Delete(self):
     pass
-#     benchmark_spec = context.GetThreadBenchmarkSpec()
-#     if benchmark_spec is None:
-#       raise errors.Error('DeleteVPN called in a thread without a '
-#                          'BenchmarkSpec.')
-#     for vpngw_key in self.GWPair:
-#       vpngw = benchmark_spec.vpngws[vpngw_key]
-#       vpngw.Delete()
-#     with benchmark_spec.vpngws_lock:
-#       key = self.getKeyFromGWPair(self.GWPair).copy()
-#       if key in benchmark_spec.vpns:
-#         benchmark_spec.vpns.pop(key)
 
   def GetVPN(self, gwpair):
     ''' gets a VPN object for the gwpair or creates one if none exists
@@ -124,7 +113,7 @@ class VPN(object):
     ready = False
     timeout = time.time() + 60 * 5  # give up after 5 mins
     while(not ready and time.time() < timeout):
-      ready = benchmark_spec.vpngws[self.GWPair[0]].IsTunnelReady() and benchmark_spec.vpngws[self.GWPair[1]].IsTunnelReady()
+      ready = benchmark_spec.vpngws[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpngws[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
       time.sleep(5)
 
     return ready
@@ -148,6 +137,7 @@ class TunnelConfig(object):
     require_target_to_init = t/f
     tunnel_id = ''
 
+  }
   }
 
   """
