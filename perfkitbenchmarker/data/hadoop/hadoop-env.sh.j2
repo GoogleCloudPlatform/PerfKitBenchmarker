@@ -20,3 +20,8 @@ export HADOOP_SSH_OPTS="-o IdentitiesOnly=yes \
   -o UserKnownHostsFile=/dev/null \
   -o IdentityFile={{ hadoop_private_key }} \
   -o BatchMode=yes"
+export HDFS_NAMENODE_USER="{{user}}"
+export HDFS_DATANODE_USER="{{user}}"
+export HDFS_SECONDARYNAMENODE_USER="{{user}}"
+export YARN_RESOURCEMANAGER_USER="{{user}}"
+export YARN_NODEMANAGER_USER="{{user}}"

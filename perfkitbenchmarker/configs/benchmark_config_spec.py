@@ -499,9 +499,6 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
             'item_decoder': option_decoders.StringDecoder(),
             'default': None
         }),
-        'machine_type': (option_decoders.StringDecoder, {
-            'default': None
-        }),
         'engine_version': (option_decoders.StringDecoder, {
             'default': None
         }),
@@ -540,8 +537,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    # TODO(ferneyhough): Add flags for vm_spec.machine_type and disk_spec.
-    # Currently the only way to modify the vm_spec or disk_spec of the
+    # TODO(ferneyhough): Add flags for disk_spec.
+    # Currently the only way to modify the disk_spec of the
     # managed_db is to change the benchmark spec in the benchmark source code
     # itself.
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
@@ -573,6 +570,9 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if flag_values['managed_db_zone'].present:
       config_values['vm_spec'][cloud]['zone'] = (
           flag_values.managed_db_zone)
+    if flag_values['managed_db_machine_type'].present:
+      config_values['vm_spec'][cloud]['machine_type'] = (
+          flag_values.managed_db_machine_type)
 
 
 class _SparkServiceSpec(spec.BaseSpec):

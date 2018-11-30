@@ -218,6 +218,7 @@
 - Remove all usage of mock_flags and replace with PkbCommonTestCase.
 - Upgraded memtier benchmark to version 1.2.15.
 - Add precision flag in Inception3 benchmark.
+- Support Hadoop 3.x.x in hadoop_terasort
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -359,3 +360,4 @@
 - Changed GkeCluster so that it adds PKB metadata to all VMs that it creates.
 - Upgraded OpenMPI from 1.6.5 to 3.1.2.
 - Upgraded OpenBLAS from 0.2.15 to 0.3.3.
+- Add flag to control database machine type for managed relational databases

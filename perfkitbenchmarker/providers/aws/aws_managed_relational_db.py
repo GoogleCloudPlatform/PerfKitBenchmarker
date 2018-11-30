@@ -29,11 +29,11 @@ FLAGS = flags.FLAGS
 
 
 DEFAULT_MYSQL_VERSION = '5.7.16'
-DEFAULT_POSTGRES_VERSION = '9.6.2'
+DEFAULT_POSTGRES_VERSION = '9.6.9'
 
 DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
 DEFAULT_MYSQL56_AURORA_VERSION = '5.6.10a'
-DEFAULT_POSTGRES_AURORA_VERSION = '9.6.8'
+DEFAULT_POSTGRES_AURORA_VERSION = '9.6.9'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
@@ -379,7 +379,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
             '--engine=%s' % self.spec.engine,
             '--engine-version=%s' % self.spec.engine_version,
             '--no-auto-minor-version-upgrade',
-            '--db-instance-class=%s' % self.spec.machine_type,
+            '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
             '--region=%s' % self.region,
             '--availability-zone=%s' % zone,
             '--tags'] + util.MakeFormattedDefaultTags()
