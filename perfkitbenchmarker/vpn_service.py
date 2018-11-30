@@ -103,6 +103,10 @@ class VPN(object):
     is_tunnel_configured = False
     if len(self.tunnel_config.endpoints) == 2:
       if self.tunnel_config.endpoints[self.GWPair[0]]['is_configured'] and self.tunnel_config.endpoints[self.GWPair[1]]['is_configured']:
+        logging.info('is configured: True')
+#         print self.tunnel_config.endpoints[self.GWPair[0]]['is_configured']
+#         print self.tunnel_config.endpoints[self.GWPair[1]]['is_configured']
+#         print self.tunnel_config.endpoints[self.GWPair[0]]['is_configured'] and self.tunnel_config.endpoints[self.GWPair[1]]['is_configured']
         is_tunnel_configured = True
     return is_tunnel_configured
 
@@ -113,6 +117,7 @@ class VPN(object):
     ready = False
     timeout = time.time() + 60 * 5  # give up after 5 mins
     while(not ready and time.time() < timeout):
+      logging.info('Tunnel endpoints configured. Waiting for tunnel...')
       ready = benchmark_spec.vpngws[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpngws[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
       time.sleep(5)
 
@@ -147,7 +152,7 @@ class TunnelConfig(object):
     self.tunnel_name = kwargs.get('tunnel_name', 'unnamed_tunnel')  # uniquely id this tunnel
     self.endpoints = {}
     self.routing = kwargs.get('routing', 'static')  # @TODO static/dynamic
-    self.ike_version = kwargs.get('ike_version', '2')  # @TODO static/dynamic
+    self.ike_version = kwargs.get('ike_version', '1')  # @TODO static/dynamic
 #     self.require_target_to_init = kwargs.get('require_target_to_init')
     self.psk = kwargs.get('psk', 'key' + FLAGS.run_uri)
 #     self.name = kwargs.get('name') # name of this endpoint
@@ -168,7 +173,7 @@ class TunnelConfig(object):
         setattr(self, key, kwargs[key])
 
   def __str__(self):
-    print json.dumps(self.__dict__)
+    #     print json.dumps(self.__dict__)
     return str(json.dumps(self.__dict__))
 
 

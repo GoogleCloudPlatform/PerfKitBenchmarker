@@ -52,6 +52,9 @@ iperf_vpn:
     iperf_vpn_sending_thread_count: 5
     use_vpn: True
   vpn_service:
+    shared_key: DEADBEEF
+    ike_version: 1
+    routing_type: static
     tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
   vm_groups:
     vm_1:

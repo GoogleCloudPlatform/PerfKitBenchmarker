@@ -7,6 +7,8 @@ iperf_vpn:
   vpn_service:
     tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
     shared_key: DEADBEEF
+    ike_version: 1
+    routing_type: static
   vm_groups:
     vm_1:
       cloud: GCP
@@ -22,5 +24,6 @@ iperf_vpn:
       zone: us-east-1b
       vm_spec:
         AWS:
-            machine_type: t2.micro
+            machine_type: m5.large
+            #machine_type: t2.micro
             #zone: us-west1-c
