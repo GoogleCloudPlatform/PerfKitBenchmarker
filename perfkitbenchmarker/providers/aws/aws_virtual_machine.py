@@ -87,6 +87,12 @@ AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
 USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
     ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
+ARM_PROCESSOR_PREFIXES = ['a1']
+
+# Processor architectures
+ARM = 'arm64'
+X86 = 'x86_64'
+
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -188,6 +194,15 @@ def IsPlacementGroupCompatible(machine_type):
   """Returns True if VMs of 'machine_type' can be put in a placement group."""
   prefix = machine_type.split('.')[0]
   return prefix not in NON_PLACEMENT_GROUP_PREFIXES
+
+
+def GetProcessorArchitecture(machine_type):
+  """Returns the processor architecture of the VM."""
+  prefix = machine_type.split('.')[0]
+  if prefix in ARM_PROCESSOR_PREFIXES:
+    return ARM
+  else:
+    return X86
 
 
 class AwsDedicatedHost(resource.BaseResource):
@@ -374,6 +389,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # images considered.
   IMAGE_NAME_REGEX = None
 
+  ARCHITECTURE_TO_GENERATION_MAP = None
+
   IMAGE_OWNER = None
   IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
@@ -459,6 +476,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     prefix = machine_type.split('.')[0]
     virt_type = PV if prefix in NON_HVM_PREFIXES else HVM
+    processor_architecture = GetProcessorArchitecture(machine_type)
 
     describe_cmd = util.AWS_PREFIX + [
         '--region=%s' % region,
@@ -469,7 +487,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'Name=name,Values=%s' % cls.IMAGE_NAME_FILTER,
         'Name=block-device-mapping.volume-type,Values=%s' %
         cls.DEFAULT_ROOT_DISK_TYPE,
-        'Name=virtualization-type,Values=%s' % virt_type]
+        'Name=virtualization-type,Values=%s' % virt_type,
+        'Name=architecture,Values=%s' % processor_architecture]
     if cls.IMAGE_PRODUCT_CODE_FILTER:
       describe_cmd.extend(['Name=product-code,Values=%s' %
                            cls.IMAGE_PRODUCT_CODE_FILTER])
@@ -482,8 +501,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if cls.IMAGE_NAME_REGEX:
       # Further filter images by the IMAGE_NAME_REGEX filter.
+      if not cls.ARCHITECTURE_TO_GENERATION_MAP:
+        raise errors.Setup.InvalidConfigurationError(
+            '%s must define an ARCHITECTURE_TO_GENERATION_MAP to parse '
+            'IMAGE_NAME_REGEX.' % cls)
+      generation = cls.ARCHITECTURE_TO_GENERATION_MAP[processor_architecture]
+
       image_name_regex = cls.IMAGE_NAME_REGEX.format(
-          virt_type=virt_type, disk_type=cls.DEFAULT_ROOT_DISK_TYPE)
+          virt_type=virt_type, disk_type=cls.DEFAULT_ROOT_DISK_TYPE,
+          generation=generation, architecture=processor_architecture)
       images = []
       excluded_images = []
       for image in json.loads(stdout):
@@ -600,6 +626,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options))
     _, stderr, retcode = vm_util.IssueCommand(create_cmd)
+    if GetProcessorArchitecture(self.machine_type) == ARM:
+      self.host_arch = ARM
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
@@ -793,7 +821,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   """Class with configuration for AWS Debian virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
@@ -801,33 +829,33 @@ class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
 class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1404Mixin):
   """Class with configuration for AWS Ubuntu1404 virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-amd64-server-20*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-amd64-server-20*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
 class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-amd64-server-20*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
   """Class with configuration for AWS Juju virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
@@ -835,12 +863,20 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
   """Class with configuration for AWS Redhat virtual machines."""
-  IMAGE_NAME_FILTER = 'amzn-ami-*-x86_64-*'
+  IMAGE_NAME_FILTER = 'amzn*-ami-*-*-*'
   # IMAGE_NAME_REGEX tightens up the image filter for Amazon Linux to avoid
   # non-standard Amazon Linux images. This fixes a bug in which we were
   # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
   IMAGE_NAME_REGEX = (
-      r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-x86_64-{disk_type}$')
+      r'^amzn{generation}-ami-{virt_type}-\d+\.\d+\.\d+.\d+-'
+      '{architecture}-{disk_type}$')
+
+  # Amazon Linux currently has 2 generations.
+  # See documentation at https://aws.amazon.com/amazon-linux-2/
+  ARCHITECTURE_TO_GENERATION_MAP = {
+      X86: '',
+      ARM: '2',
+  }
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
