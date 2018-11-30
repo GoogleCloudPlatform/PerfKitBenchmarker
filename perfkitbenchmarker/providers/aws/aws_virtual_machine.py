@@ -48,6 +48,8 @@ HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3'])
+# Following dictionary based on
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
 NUM_LOCAL_VOLUMES = {
     'c1.medium': 1, 'c1.xlarge': 4,
     'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
@@ -60,8 +62,20 @@ NUM_LOCAL_VOLUMES = {
     'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
     'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
     'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
-    'd2.8xlarge': 24, 'x1.32xlarge': 2, 'i3.large': 1, 'i3.xlarge': 1,
-    'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8
+    'd2.8xlarge': 24, 'i3.large': 1, 'i3.xlarge': 1,
+    'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8,
+    'c5d.large': 1, 'c5d.xlarge': 1, 'c5d.2xlarge': 1, 'c5d.4xlarge': 1,
+    'c5d.9xlarge': 1, 'c5d.18xlarge': 2,
+    'm5d.large': 1, 'm5d.xlarge': 1, 'm5d.2xlarge': 1, 'm5d.4xlarge': 2,
+    'm5d.12xlarge': 2, 'm5d.24xlarge': 4,
+    'r5d.large': 1, 'r5d.xlarge': 1, 'r5d.2xlarge': 1, 'r5d.4xlarge': 2,
+    'r5d.12xlarge': 2, 'r5d.24xlarge': 4,
+    'z1d.large': 1, 'z1d.xlarge': 1, 'z1d.2xlarge': 1, 'z1d.3xlarge': 2,
+    'z1d.6xlarge': 1, 'z1d.12xlarge': 2,
+    'x1.16xlarge': 1, 'x1.32xlarge': 2,
+    'x1e.xlarge': 1, 'x1e.2xlarge': 1, 'x1e.4xlarge': 1, 'x1e.8xlarge': 1,
+    'x1e.16xlarge': 1, 'x1e.32xlarge': 2,
+    'f1.2xlarge': 1, 'f1.4xlarge': 1, 'f1.16xlarge': 4
 }
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
