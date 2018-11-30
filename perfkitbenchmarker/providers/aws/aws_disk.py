@@ -82,8 +82,8 @@ LOCAL_HDD_METADATA = {
 }
 
 LOCAL_HDD_PREFIXES = ['d2', 'hs']
-EBS_NVME_TYPES = ['c5', 'm5', 'r5', 't3']
-LOCAL_NVME_TYPES = ['i3', 'f1']
+EBS_NVME_TYPES = ['c5', 'm5', 'r5', 't3', 'z1']
+LOCAL_NVME_TYPES = ['i3', 'f1', 'z1']
 
 
 def LocalDiskIsHDD(machine_type):
