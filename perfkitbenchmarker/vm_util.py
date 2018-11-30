@@ -541,16 +541,17 @@ def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
   # that we can safely use. See
   # https://github.com/Azure/azure-xplat-cli/blob/master/lib/commands/arm/vm/vmOsProfile._js#L145
   special_chars = '*!@#$%+='
+  # Ensure that the password contains at least one of each 4 required
+  # character types starting with letters to avoid starting with chars which
+  # are problematic on the command line e.g. @.
+  prefix = [random.choice(string.ascii_lowercase),
+            random.choice(string.ascii_uppercase),
+            random.choice(string.digits),
+            random.choice(special_chars)]
   password = [
       random.choice(string.ascii_letters + string.digits + special_chars)
       for _ in range(password_length - 4)]
-  # Ensure that the password contains at least one of each 4 required
-  # character types.
-  password.append(random.choice(string.ascii_lowercase))
-  password.append(random.choice(string.ascii_uppercase))
-  password.append(random.choice(string.digits))
-  password.append(random.choice(special_chars))
-  return ''.join(password)
+  return ''.join(prefix + password)
 
 
 def StartSimulatedMaintenance():
