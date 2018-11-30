@@ -100,8 +100,8 @@
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
 - Add `os_type` support to KubernetesVirtualMachine.
-- Avoid setting up thread pool etc when run_processes is set
-  to 1 and using --run_with_pdb flag to simplify debugging.
+- Avoid setting up thread pool etc when run_processes is not set (to simplify
+  debugging).
 - Added a sample benchmark for descriptive purposes.
 - Added GPU peer to peer topology information to metadata.
 - Added a flag, `mpirun_allow_run_as_root` which allows OpenMPI to run in the
