@@ -364,3 +364,5 @@
 - Upgraded OpenBLAS from 0.2.15 to 0.3.3.
 - Add flag to control database machine type for managed relational databases.
 - Ensure randomly generated windows passwords start with a character.
+- Upgrade Tensorflow version to 1.12.
+- Install NCCL when installing Tensorflow with GPU support.

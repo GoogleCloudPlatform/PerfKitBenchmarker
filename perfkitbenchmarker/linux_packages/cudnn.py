@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ from perfkitbenchmarker import flags
 
 CUDNN_6 = 'libcudnn6=6.0.21-1+cuda8.0'
 CUDNN_7 = 'libcudnn7=7.0.5.15-1+cuda9.0'
+CUDNN_7_3_9 = 'libcudnn7=7.3.1.20-1+cuda9.0'
+CUDNN_7_3_10 = 'libcudnn7=7.3.1.20-1+cuda10.0'
 
 flags.DEFINE_string('cudnn', None,
                     'The NVIDIA CUDA Deep Neural Network library. '
@@ -56,7 +58,9 @@ def AptInstall(vm):
     if FLAGS.cuda_toolkit_version == '8.0':
       cudnn_version = CUDNN_6
     elif FLAGS.cuda_toolkit_version == '9.0':
-      cudnn_version = CUDNN_7
+      cudnn_version = CUDNN_7_3_9
+    elif FLAGS.cuda_toolkit_version == '10.0':
+      cudnn_version = CUDNN_7_3_10
     vm.RemoteCommand(
         'sudo bash -c \'echo "deb http://developer.download.nvidia.com/compute/'
         'machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/'
