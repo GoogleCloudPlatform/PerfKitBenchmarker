@@ -260,7 +260,7 @@ flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
 flags.DEFINE_integer(
-    'run_processes', 1,
+    'run_processes', None,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
 flags.DEFINE_float(
@@ -973,7 +973,7 @@ def RunBenchmarks():
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    if FLAGS.run_with_pdb and FLAGS.run_processes == 1:
+    if FLAGS.run_processes is None:
       spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(
