@@ -219,6 +219,7 @@
 - Upgraded memtier benchmark to version 1.2.15.
 - Add precision flag in Inception3 benchmark.
 - Support Hadoop 3.x.x in hadoop_terasort
+- Add z1 support for NVME disks.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
