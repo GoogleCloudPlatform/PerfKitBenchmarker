@@ -82,6 +82,7 @@
 - Adding support for different client/server machine types on memcached-memtier.
 - Adding functionality in memtier benchmark to run a variable number of threads
   counts in each run.
+- Adding support for AWS ARM machine types.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
