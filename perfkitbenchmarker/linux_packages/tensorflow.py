@@ -41,6 +41,7 @@ flags.DEFINE_string('tf_cnn_benchmarks_branch',
 NCCL_URL = 'https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64/nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb'
 NCCL_PACKAGE = 'nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb'
 
+
 def GetEnvironmentVars(vm):
   """Return a string containing TensorFlow-related environment variables.
 
