@@ -49,6 +49,7 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+# from perfkitbenchmarker import vpn_service
 import six
 from six.moves import range
 import six.moves._thread
@@ -475,11 +476,9 @@ class BenchmarkSpec(object):
     """Create the VPNService object."""
     if self.config.vpn_service is None:
       return
-    self.vpn_service_spec = self.config.vpn_service
-    self.vpn_service = VPNService(self)
-#     vpn_service_class = vpn_service.GetVPNServiceClass(
-#         self.config.dpb_service.service_type)
-#     self.vpn_service = vpn_service_class()
+    vpn_service_spec = self.config.vpn_service
+#     vpn_service_class = vpn_service.GetVPNServiceClass()
+    self.vpn_service = VPNService(vpn_service_spec)
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

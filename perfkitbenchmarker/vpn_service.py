@@ -190,11 +190,11 @@ class VPNService(resource.BaseResource):
     """
     super(VPNService, self).__init__()
 #     self.shared_key = spec.vpn_service_spec.shared_key
-#     self.name = spec.vpn_service_spec.name
-#     self.tunnel_count = spec.vpn_service_spec.tunnel_count
-#     self.routing = spec.vpn_service_spec.routing_type
-#     self.psk = FLAGS.run_uri
-    self.spec = spec.vpn_service_spec
+    self.name = spec.name
+    self.tunnel_count = spec.tunnel_count
+    self.routing = spec.routing_type
+    self.psk = FLAGS.run_uri
+    self.spec = spec
     self.vpns = {}
 
 #     # update metadata
@@ -223,11 +223,12 @@ class VPNService(resource.BaseResource):
       self.vpns[vpn_id].ConfigureTunnel()
 
   def _Delete(self):
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    if benchmark_spec is None:
-      raise errors.Error('CreateVPN Service called in a thread without a BenchmarkSpec.')
-    for vpn in benchmark_spec.vpns:
-      benchmark_spec.vpns[vpn].Delete()
+    #     benchmark_spec = context.GetThreadBenchmarkSpec()
+    #     if benchmark_spec is None:
+    #       raise errors.Error('CreateVPN Service called in a thread without a BenchmarkSpec.')
+    #     for vpn in benchmark_spec.vpns:
+    #       benchmark_spec.vpns[vpn].Delete()
+    pass
 
   def GetNewSuffix(self):
     # Names for tunnels, fr's, routes, etc need to be unique
@@ -236,11 +237,8 @@ class VPNService(resource.BaseResource):
   def GetMetadata(self):
     """Return a dictionary of the metadata for VPNs created."""
     basic_data = {'vpn_service': self.name,
-                  'managed_vpns': self.name,
+                  'routing_type': self.routing,
                   'tunnel_count': self.tunnel_count}
-    # TODO grab this information for user_managed clusters.
-    if self.tunnel_count > 1:
-      basic_data.update({'ecmp_status': self.name})
     return basic_data
 
   def GetVPNGWPairs(self, vpngws):

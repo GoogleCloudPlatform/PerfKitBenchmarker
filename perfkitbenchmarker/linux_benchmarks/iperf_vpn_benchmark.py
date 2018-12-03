@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 
 """Runs plain Iperf over vpn.
 
@@ -194,6 +195,7 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
+  vpn_metadata = copy.copy(benchmark_spec.vpn_service.GetMetadata())
   vms = benchmark_spec.vms
   results = []
 
@@ -216,6 +218,8 @@ def Run(benchmark_spec):
                                receiving_vm.internal_ip,
                                'internal'))
 
+  for r in results:
+    r.metadata.update(vpn_metadata)
   return results
 
 
