@@ -20,14 +20,17 @@ import logging
 import json
 import uuid
 
-flags.DEFINE_integer('vpn_service_tunnel_count', 1,
+flags.DEFINE_integer('vpn_service_tunnel_count', None,
                      'Number of tunnels to create for each VPNGW pair.')
+flags.DEFINE_integer('vpn_service_gateway_count', None,
+                     'Number of VPN GWs to create for each VPNGW pair.')
 flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
 flags.DEFINE_string('vpn_service_shared_key', None,
                     'If set, use this PSK for VPNs.')
-flags.DEFINE_string('vpn_service_routing_type', 'static',
+flags.DEFINE_string('vpn_service_routing_type', None,
                     'static or dynamic(BGP)')
+flags.DEFINE_integer('vpn_service_ike_version', None, 'IKE version')
 
 FLAGS = flags.FLAGS
 
@@ -192,9 +195,13 @@ class VPNService(resource.BaseResource):
 #     self.shared_key = spec.vpn_service_spec.shared_key
     self.name = spec.name
     self.tunnel_count = spec.tunnel_count
+#     self.gateway_count = spec.gateway_count
+    self.gateway_count = FLAGS.vpn_service_gateway_count
     self.routing = spec.routing_type
+    self.ike_version = spec.ike_version
     self.psk = FLAGS.run_uri
     self.spec = spec
+#     print self.gateway_count
     self.vpns = {}
 
 #     # update metadata
@@ -209,6 +216,7 @@ class VPNService(resource.BaseResource):
     if benchmark_spec is None:
       raise errors.Error('CreateVPN Service. called in a thread without a '
                          'BenchmarkSpec.')
+
     # with benchmark_spec.vpngws_lock:
     self.vpngw_pairs = self.GetVPNGWPairs(benchmark_spec.vpngws)  # @TODO change to endpoint pair
     # with benchmark_spec.vpns_lock:
@@ -238,7 +246,9 @@ class VPNService(resource.BaseResource):
     """Return a dictionary of the metadata for VPNs created."""
     basic_data = {'vpn_service': self.name,
                   'routing_type': self.routing,
-                  'tunnel_count': self.tunnel_count}
+                  'ike_version': self.ike_version,
+                  'tunnel_count': self.tunnel_count,
+                  'gateway_count': self.gateway_count}
     return basic_data
 
   def GetVPNGWPairs(self, vpngws):

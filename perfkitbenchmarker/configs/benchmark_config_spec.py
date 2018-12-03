@@ -1245,16 +1245,16 @@ class _VPNServiceSpec(spec.BaseSpec):
     super(_VPNServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['vpn_service_tunnel_count'].present:
       config_values['tunnel_count'] = flag_values.vpn_service_tunnel_count
-#     if flag_values['vpn_service_gateway_count'].present:
-#       config_values['gateway_count'] = flag_values.vpn_service_gateway_count
+    if flag_values['vpn_service_gateway_count'].present:
+      config_values['gateway_count'] = flag_values.vpn_service_gateway_count
     if flag_values['vpn_service_name'].present:
       config_values['name'] = flag_values.vpn_service_name
     if flag_values['vpn_service_shared_key'].present:
       config_values['shared_key'] = flag_values.vpn_service_shared_key
     if flag_values['vpn_service_routing_type'].present:
       config_values['routing_type'] = flag_values.vpn_service_routing_type
-#     if flag_values['vpn_service_ike_version'].present:
-#       config_values['ike_version'] = flag_values.vpn_service_ike_version
+    if flag_values['vpn_service_ike_version'].present:
+      config_values['ike_version'] = flag_values.vpn_service_ike_version
 
 
 class _VPNServiceDecoder(option_decoders.TypeVerifier):

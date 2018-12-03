@@ -4,8 +4,12 @@ iperf_vpn:
   flags:
     iperf_vpn_sending_thread_count: 5
     use_vpn: True
+    vpn_service_gateway_count: 2 # gw_count needs to be in global flags so it's available to network setup
   vpn_service:
-    tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
+    tunnel_count: 1
+    gateway_count: 1
+    ike_version: 2
+    routing_type: static
   vm_groups:
     vm_1:
       cloud: GCP

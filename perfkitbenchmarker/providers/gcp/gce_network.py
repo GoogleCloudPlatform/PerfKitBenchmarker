@@ -668,9 +668,9 @@ class GceNetwork(network.BaseNetwork):
         firewall_name2, self.project, ALLOW_ALL, name, NETWORK_RANGE2)
     # add VPNGW to the network
     if network_spec.zone and network_spec.cidr and FLAGS.use_vpn:
-      for tunnelnum in range(0, FLAGS.vpn_service_tunnel_count):
+      for gwnum in range(0, FLAGS.vpn_service_gateway_count):
         vpngw_name = 'vpngw-%s-%s-%s' % (
-            util.GetRegionFromZone(network_spec.zone), tunnelnum, FLAGS.run_uri)
+            util.GetRegionFromZone(network_spec.zone), gwnum, FLAGS.run_uri)
         self.vpngw[vpngw_name] = GceVPNGW(
             vpngw_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
