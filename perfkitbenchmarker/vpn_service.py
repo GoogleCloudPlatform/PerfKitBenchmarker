@@ -18,6 +18,7 @@ from itertools import ifilter
 import time
 import logging
 import json
+import uuid
 
 flags.DEFINE_integer('vpn_service_tunnel_count', 1,
                      'Number of tunnels to create for each VPNGW pair.')
@@ -53,19 +54,19 @@ class VPN(object):
       #       self.psk = None
       return object.__init__(self, *args, **kwargs)
 
-  def getKeyFromGWPair(self, gwpair):
-    key = 'vpn' + ''.join(gw for gw in gwpair) + FLAGS.run_uri
+  def getKeyFromGWPair(self, gwpair, suffix=''):
+    key = 'vpn' + ''.join(gw for gw in gwpair) + suffix + FLAGS.run_uri
     return key
 
-  def Create(self, gwpair):
+  def Create(self, gwpair, suffix=''):
     self.GWPair = gwpair
     self.name = self.getKeyFromGWPair(gwpair)
-    self.tunnel_config = TunnelConfig(name=self.name)
+    self.tunnel_config = TunnelConfig(name=self.name, suffix=suffix)
 
   def Delete(self):
     pass
 
-  def GetVPN(self, gwpair):
+  def GetVPN(self, gwpair, suffix=''):
     ''' gets a VPN object for the gwpair or creates one if none exists
 
     Args:
@@ -74,12 +75,12 @@ class VPN(object):
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetFirewall called in a thread without a '
+      raise errors.Error('GetVPN called in a thread without a '
                          'BenchmarkSpec.')
     with benchmark_spec.vpngws_lock:
-      key = self.getKeyFromGWPair(gwpair)
+      key = self.getKeyFromGWPair(gwpair, suffix)
       if key not in benchmark_spec.vpns:
-        self.Create(gwpair)
+        self.Create(gwpair, suffix)
         benchmark_spec.vpns[key] = self
       return benchmark_spec.vpns[key]
 
@@ -152,9 +153,9 @@ class TunnelConfig(object):
     self.tunnel_name = kwargs.get('tunnel_name', 'unnamed_tunnel')  # uniquely id this tunnel
     self.endpoints = {}
     self.routing = kwargs.get('routing', 'static')  # @TODO static/dynamic
-    self.ike_version = kwargs.get('ike_version', '1')  # @TODO static/dynamic
-#     self.require_target_to_init = kwargs.get('require_target_to_init')
+    self.ike_version = kwargs.get('ike_version', '1')
     self.psk = kwargs.get('psk', 'key' + FLAGS.run_uri)
+    self.suffix = kwargs.get('suffix', '')
 #     self.name = kwargs.get('name') # name of this endpoint
 #     self.target_name = kwargs.get('target_name')
 #     self.ip_address = kwargs.get('ip_address') # public IP of this endpoint
@@ -213,9 +214,9 @@ class VPNService(resource.BaseResource):
     # with benchmark_spec.vpns_lock:
     for gwpair in self.vpngw_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
-      # suffix = format(uuid.uuid4().fields[1], 'x')  # unique enough
-      vpn_id = VPN().getKeyFromGWPair(gwpair)
-      self.vpns[vpn_id] = VPN().GetVPN(gwpair)
+      suffix = self.GetNewSuffix()
+      vpn_id = VPN().getKeyFromGWPair(gwpair, suffix)
+      self.vpns[vpn_id] = VPN().GetVPN(gwpair, suffix)
 #       vpn.psk = self.shared_key
 #       vpn.routing = self.routing  # @TODO need mixed static/dynamic tunnels?
 #       vpn.ConfigureTunnel(suffix=suffix)
@@ -227,6 +228,10 @@ class VPNService(resource.BaseResource):
       raise errors.Error('CreateVPN Service called in a thread without a BenchmarkSpec.')
     for vpn in benchmark_spec.vpns:
       benchmark_spec.vpns[vpn].Delete()
+
+  def GetNewSuffix(self):
+    # Names for tunnels, fr's, routes, etc need to be unique
+    return format(uuid.uuid4().fields[1], 'x')
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for VPNs created."""

@@ -64,7 +64,7 @@ class GceVPNGW(network.BaseVPNGW):
 
     self.ip_address = None
     self.created = False
-    self.suffix = collections.defaultdict(dict)  # @TODO remove - holds uuid tokens for naming/finding things (double dict)
+#     self.suffix = collections.defaultdict(dict)  # @TODO remove - holds uuid tokens for naming/finding things (double dict)
     self.require_target_to_init = False
     self.routing = None
     self.psk = None
@@ -104,7 +104,7 @@ class GceVPNGW(network.BaseVPNGW):
       logging.info('tunnel_config: Forwarding already configured, skipping')
     else:
       logging.info('tunnel_config: Setting up forwarding')
-      self._SetupForwarding()
+      self._SetupForwarding(tunnel_config)
 
     # Abort if we don't have a target info configured yet
     if len(tunnel_config.endpoints) < 2:
@@ -122,8 +122,8 @@ class GceVPNGW(network.BaseVPNGW):
     if not hasattr(tunnel_config, 'psk'):
       logging.info('tunnel_config: PSK not provided... setting to runid')
       tunnel_config.psk = 'key' + FLAGS.run_uri
-    if 'suffix' not in tunnel_config.endpoints[self.name]:
-      tunnel_config.endpoints[self.name]['suffix'] = format(uuid.uuid4().fields[1], 'x')  # unique enough
+#     if 'suffix' not in tunnel_config.endpoints[self.name]:
+#       tunnel_config.endpoints[self.name]['suffix'] = format(uuid.uuid4().fields[1], 'x')  # unique enough
 #       logging.info('tunnel_config: setting suffix to %s, %s' % (tunnel_config.endpoints[self.name]['suffix'], type(tunnel_config.endpoints[self.name]['suffix'])))
 
 #     if 'ike_version' not in tunnel_config.endpoints[self.name]:
@@ -138,7 +138,7 @@ class GceVPNGW(network.BaseVPNGW):
       logging.info('tunnel_config: destination CIDR needed... waiting for target to configure')
       return
     self._SetupRouting(
-        tunnel_config.endpoints[self.name]['suffix'],
+        tunnel_config.suffix,
         tunnel_config.endpoints[self.name]['tunnel_id'],
         tunnel_config.endpoints[target_endpoint]['cidr'])
 
@@ -155,13 +155,14 @@ class GceVPNGW(network.BaseVPNGW):
     target_ip = tunnel_config.endpoints[target_endpoint]['ip_address']
     psk = tunnel_config.psk
     ike_version = tunnel_config.ike_version
-    suffix = tunnel_config.endpoints[self.name]['suffix']
+    suffix = tunnel_config.suffix
     name = 'tun-' + self.name + '-' + suffix
-    self.tunnels[name] = GceStaticTunnel(project, region, name, vpngw_id, target_ip, ike_version, psk)
-    self.tunnels[name].Create()
-    tunnel_config.endpoints[self.name]['tunnel_id'] = name
+    if name not in self.tunnels:
+      self.tunnels[name] = GceStaticTunnel(project, region, name, vpngw_id, target_ip, ike_version, psk)
+      self.tunnels[name].Create()
+      tunnel_config.endpoints[self.name]['tunnel_id'] = name
 
-  def _SetupForwarding(self, suffix=''):
+  def _SetupForwarding(self, tunnel_config):
     """Create IPSec forwarding rules
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup
 
@@ -171,14 +172,23 @@ class GceVPNGW(network.BaseVPNGW):
     if len(self.forwarding_rules) == 3:
       return  # backout if already set
 
-    self.suffix[suffix]['fr_suffix'] = self.region + '-' + suffix
+#     self.suffix[suffix]['fr_suffix'] = self.region + '-' + suffix
+#     # GCP doesnt like uppercase names?!?
+#     fr_UDP500_name = ('fr-udp500-%s-%s' %
+#                       (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
+#     fr_UDP4500_name = ('fr-udp4500-%s-%s' %
+#                        (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
+#     fr_ESP_name = ('fr-esp-%s-%s' %
+#                    (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
+    suffix = tunnel_config.suffix
     # GCP doesnt like uppercase names?!?
     fr_UDP500_name = ('fr-udp500-%s-%s' %
-                      (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
+                      (suffix, FLAGS.run_uri))
     fr_UDP4500_name = ('fr-udp4500-%s-%s' %
-                       (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
+                       (suffix, FLAGS.run_uri))
     fr_ESP_name = ('fr-esp-%s-%s' %
-                   (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
+                   (suffix, FLAGS.run_uri))
+
     # with self._lock:
     if fr_UDP500_name not in self.forwarding_rules:
       fr_UDP500 = GceForwardingRule(
@@ -204,8 +214,9 @@ class GceVPNGW(network.BaseVPNGW):
     """
 
     route_name = 'route-' + self.name + '-' + suffix
-    self.routes[route_name] = GceRoute(route_name, dest_cidr, self.network_name, next_hop_tun, self.region, self.project, self.region)
-    self.routes[route_name].Create()
+    if route_name not in self.routes:
+      self.routes[route_name] = GceRoute(route_name, dest_cidr, self.network_name, next_hop_tun, self.region, self.project, self.region)
+      self.routes[route_name].Create()
 
   def Create(self):
     """Creates the actual VPNGW."""
