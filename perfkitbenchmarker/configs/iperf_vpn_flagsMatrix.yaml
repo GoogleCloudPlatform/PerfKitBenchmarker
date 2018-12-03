@@ -1,0 +1,35 @@
+# VPN iperf config.
+iperf_vpn:
+  description: Run iperf over vpn 
+  flag_matrix: cross_zone
+  flag_matrix_filters:
+    cross_zone: "zones < extra_zones"
+  flag_matrix_defs:
+    cross_zone:
+      zones: [us-central1-b, us-west1-b, us-east1-b]
+      extra_zones: [us-central1-b, us-west1-b, us-east1-b]
+      machine_type: [n1-standard-4, n1-standard-8, n1-standard-16]
+      vpn_service_gateway_count: [1, 2, 3]
+      iperf_vpn_sending_thread_count: [5, 10, 15, 20]
+  flags:
+    iperf_vpn_sending_thread_count: 5
+    use_vpn: True
+  vpn_service:
+    tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
+  vm_groups:
+    vm_1:
+      cloud: GCP
+      cidr: 10.0.1.0/24
+      zone: us-west1-b
+      vm_spec: 
+        GCP:
+            machine_type: n1-standard-4
+            #zone: us-central1-a
+    vm_2:
+      cloud: GCP
+      cidr: 192.168.1.0/24
+      zone: us-central1-b
+      vm_spec:
+        GCP:
+            machine_type: n1-standard-4
+            #zone: us-west1-c
