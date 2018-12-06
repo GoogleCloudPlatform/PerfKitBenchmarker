@@ -107,6 +107,11 @@ ARM_PROCESSOR_PREFIXES = ['a1']
 ARM = 'arm64'
 X86 = 'x86_64'
 
+# Machine type to host architecture.
+_MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
+    'a1': 'cortex-a72',
+}
+
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -640,8 +645,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options))
     _, stderr, retcode = vm_util.IssueCommand(create_cmd)
-    if GetProcessorArchitecture(self.machine_type) == ARM:
-      self.host_arch = ARM
+
+    machine_type_prefix = self.machine_type.split('.')[0]
+    host_arch = _MACHINE_TYPE_PREFIX_TO_HOST_ARCH.get(machine_type_prefix)
+    if host_arch:
+      self.host_arch = host_arch
+
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
