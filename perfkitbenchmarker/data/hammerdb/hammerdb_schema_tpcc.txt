@@ -1,0 +1,11 @@
+#!/bin/tclsh
+puts "SETTING CONFIGURATION"
+dbset db mssqls
+diset connection mssqls_host 127.0.0.1
+diset connection mssqls_port 1433
+diset tpcc mssqls_dbase tpcc
+diset tpcc mssqls_count_ware *ware_house_num*
+diset tpcc mssqls_partition true
+diset tpcc mssqls_num_vu *virtual_user_num*
+diset tpcc
+print dict
