@@ -1,0 +1,8 @@
+#!/bin/tclsh
+puts "SETTING CONFIGURATION"
+dbset db mssqls
+dbset bm tpc-H
+diset connection mssqls_host 127.0.0.1
+diset connection mssqls_port 1433
+diset tpch mssqls_tpch_dbase tpch
+print dict

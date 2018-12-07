@@ -1,0 +1,4 @@
+@echo off
+set path=.\bin;%PATH%
+tclsh86t hammerdbcli
+exit

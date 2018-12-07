@@ -1,0 +1,76 @@
+#!/bin/sh
+#########################################################################
+## \
+export LD_LIBRARY_PATH=./lib:`$LD_LIBRARY_PATH
+## \
+export PATH=./bin:`$PATH
+## \
+exec ./bin/tclsh8.6 "`$0" `${1+"`$@"}
+
+global hdb_version
+set hdb_version "v3.1"
+set UserDefaultDir [ file dirname [ info script ] ]
+::tcl::tm::path add "`$UserDefaultDir/modules"
+
+append modulelist { Thread msgcat xml tclreadline }
+for { set modcount 0 } { `$modcount < [llength `$modulelist] } { incr modcount } {
+    set m [lindex `$modulelist `$modcount]
+		set loadtext `$m
+	if [catch { package require `$m }] {
+                exit 1
+        }
+    }
+
+append loadlist { gendict.tcl genvu.tcl gentpcc.tcl gentpch.tcl gengen.tcl genxml.tcl geninitcli.tcl gencli.tcl }
+for { set loadcount 0 } { `$loadcount < [llength `$loadlist] } { incr loadcount } {
+    set f [lindex `$loadlist `$loadcount]
+		set loadtext `$f
+	if [catch {source [ file join `$UserDefaultDir src generic `$f ]}] {
+                exit 1
+        }
+    }
+
+for { set dbsrccount 0 } { `$dbsrccount < [llength `$dbsrclist] } { incr dbsrccount } {
+    set f [lindex `$dbsrclist `$dbsrccount]
+		set loadtext `$f
+	if [catch {source [ file join `$UserDefaultDir src `$f ]}] {
+                exit 1
+        }
+    }
+
+close stdout
+set fp [open tmp_log.txt "w+"]
+if {*whether_run_tpcc*} {
+
+  source *schema_file_name*
+  buildschema
+  set linenum 0
+  set substring "ALL VIRTUAL USERS COMPLETE"
+
+  while {True} {
+      # read will try to flush the text into file first
+      read `$fp
+
+      # check whether have the ending symbol
+      if {[string first `$substring [read [open tmp_log.txt r]]] != -1} {
+          break
+      }
+      after 2000 set end 1
+      vwait end
+  }
+
+  source *sqlrun_file_name*
+  set substring "TEST SEQUENCE COMPLETE"
+
+  while {True} {
+      read `$fp
+      if {[string first `$substring [read [open tmp_log.txt r]]] != -1} {
+          break
+      }
+      after 2000 set end 1
+      vwait end
+  }
+
+  after 5000 set end 1
+  vwait end
+}
