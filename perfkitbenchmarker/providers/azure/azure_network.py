@@ -65,8 +65,8 @@ class AzureResourceGroup(resource.BaseResource):
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
-    self.location = (FLAGS.zones[0] if FLAGS.zones else
-                     zone or DEFAULT_LOCATION)
+    self.location = (
+        FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_LOCATION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
