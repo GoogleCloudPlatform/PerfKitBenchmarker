@@ -1,0 +1,39 @@
+#!/usr/bin/tclsh
+proc runtimer { seconds } {
+set x 0
+set timerstop 0
+while {!`$timerstop} {
+ incr x
+ after 1000
+  if { ![ expr {`$x % 60} ] } {
+  set y [ expr `$x / 60 ]
+  puts "Timer: `$y minutes elapsed"
+  }
+ update
+ if {  [ vucomplete ] || `$x eq `$seconds } { set timerstop 1 }
+    }
+return
+}
+puts "SETTING CONFIGURATION"
+vudestroy
+dbset db mssqls
+diset connection mssqls_host 192.168.1.1
+diset connection mssqls_port 1433
+diset tpcc mssqls_driver timed
+diset tpcc mssqls_rampup 0
+diset tpcc mssqls_duration *duration*
+vuset logtotemp 1
+loadscript
+puts "SEQUENCE STARTED"
+
+foreach z { *virtual_user_seq* } {
+  puts "`$z VU TEST"
+  vuset vu `$z
+  vucreate
+  vurun
+  runtimer *timer*
+  vudestroy
+  after 5000
+}
+
+puts "TEST SEQUENCE COMPLETE"
