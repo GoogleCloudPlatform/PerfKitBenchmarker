@@ -83,6 +83,7 @@
 - Adding functionality in memtier benchmark to run a variable number of threads
   counts in each run.
 - Adding support for AWS ARM machine types.
+- Adding support for AWS ARM machines on SPECCPU.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
