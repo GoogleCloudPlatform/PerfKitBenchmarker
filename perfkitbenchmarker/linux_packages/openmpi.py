@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,14 @@
 
 """Module containing OpenMPI installation and cleanup functions."""
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_bool('openmpi_enable_shared', False,
+                  'Whether openmpi should build shared libraries '
+                  'in addition to static ones.')
 
 MPI_DIR = '%s/openmpi-3.1.2' % INSTALL_DIR
 MPI_TAR = 'openmpi-3.1.2.tar.gz'
@@ -30,7 +37,12 @@ def _Install(vm):
   vm.RemoteCommand('wget %s -P %s' % (MPI_URL, INSTALL_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, MPI_TAR))
   make_jobs = vm.num_cpus
-  config_cmd = ('./configure --enable-static --disable-shared --prefix=/usr')
+  if FLAGS.openmpi_enable_shared:
+    shared_lib_command = '--enable-shared'
+  else:
+    shared_lib_command = '--disable-shared'
+  config_cmd = ('./configure --enable-static %s --prefix=/usr'
+                % shared_lib_command)
   vm.RobustRemoteCommand(
       'cd %s && %s && make -j %s && sudo make install' %
       (MPI_DIR, config_cmd, make_jobs))

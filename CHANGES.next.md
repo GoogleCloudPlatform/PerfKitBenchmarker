@@ -84,6 +84,7 @@
   counts in each run.
 - Adding support for AWS ARM machine types.
 - Adding support for AWS ARM machines on SPECCPU.
+- Added Horovod distributed Tensorflow traning benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
