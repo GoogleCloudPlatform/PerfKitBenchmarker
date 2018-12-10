@@ -124,6 +124,7 @@ BENCHMARK_SETS = {
             'fio',
             'gpu_pcie_bandwidth',
             'hadoop_terasort',
+            'horovod',
             'hpcc',
             'hpcg',
             'inception3',
