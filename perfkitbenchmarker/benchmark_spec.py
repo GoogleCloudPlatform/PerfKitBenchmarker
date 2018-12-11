@@ -66,7 +66,7 @@ NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
 # GCP labels only allow hyphens (-), underscores (_), lowercase characters, and
 # numbers and International characters.
-LABEL_TIME_FORMAT = '%Y%m%dT%H%M%SZ'
+LABEL_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
 # metadata allow all characters and numbers.
 METADATA_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 FLAGS = flags.FLAGS
