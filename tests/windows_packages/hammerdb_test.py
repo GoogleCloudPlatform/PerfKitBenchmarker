@@ -60,4 +60,3 @@ class HammerDBBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
 if __name__ == '__main__':
   unittest.main()
-
