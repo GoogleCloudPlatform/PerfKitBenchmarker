@@ -111,7 +111,7 @@ HAMMERDB_SCALE_TO_STREAMS = {
 
 def _GetDataContents(file_name):
   """Cet the files in the data folder."""
-  path = data.ResourcePath('hammerdb/' + filename)
+  path = data.ResourcePath('hammerdb/' + file_name)
   with open(path) as fp:
     contents = fp.read()
   return contents
@@ -343,7 +343,7 @@ def ParseHammerDBResultTPCH(result, metadata, scale_fact):
   query_time_list = []
   refresh_time_list = []
   for i in range(22):
-    result_prefix = 'query {0} completed in '.format(str(i+1))
+    result_prefix = 'query {0} completed in '.format(str(i + 1))
     result_suffix = ' seconds'
     start_pos = result.find(result_prefix) + len(result_prefix)
     end_pos = result.find(result_suffix, start_pos)

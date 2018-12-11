@@ -253,9 +253,9 @@ def Run(benchmark_spec):
                  'LD_LIBRARY_PATH -x PATH -mca pml ob1 -mca btl ^openib '
                  'python nvcnn_hvd.py --batch_size={batch_size} --fp16 '
                  '--model {model} --log_dir results --display_every 100'
-                ).format(num_gpus=benchmark_spec.total_gpus,
-                         batch_size=benchmark_spec.batch_size,
-                         model=benchmark_spec.model)
+                 ).format(num_gpus=benchmark_spec.total_gpus,
+                          batch_size=benchmark_spec.batch_size,
+                          model=benchmark_spec.model)
 
   stdout, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
   return _MakeSamplesFromOutput(benchmark_spec, stdout)
