@@ -105,6 +105,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     if FLAGS.gcp_dataproc_property:
       cmd.flags['properties'] = ','.join(FLAGS.gcp_dataproc_property)
 
+    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
 
   def _Delete(self):
@@ -131,6 +132,7 @@ class GcpDataproc(spark_service.BaseSparkService):
                 job_type=spark_service.SPARK_JOB_TYPE):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
     # If we don't put this here, zone is auotmatically added to the command
     # which breaks dataproc jobs submit
     cmd.flags['zone'] = []
