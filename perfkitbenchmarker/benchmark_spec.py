@@ -64,7 +64,11 @@ copy_reg.pickle(thread.LockType, PickleLock)
 SUPPORTED = 'strict'
 NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
-
+# GCP labels only allow hyphens (-), underscores (_), lowercase characters, and
+# numbers and International characters.
+LABEL_TIME_FORMAT = '%Y%m%dT%H%M%SZ'
+# metadata allow all characters and numbers.
+METADATA_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', providers.GCP, providers.VALID_CLOUDS,
@@ -546,7 +550,7 @@ class BenchmarkSpec(object):
     targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
 
-  def GetResourceTags(self, timeout_minutes=None):
+  def _GetResourceDict(self, time_format, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
     now_utc = datetime.datetime.utcnow()
 
@@ -557,8 +561,6 @@ class BenchmarkSpec(object):
         now_utc +
         datetime.timedelta(minutes=timeout_minutes))
 
-    time_format = '%Y-%m-%d %H:%M:%S'
-
     tags = {
         'timeout_utc': timeout_utc.strftime(time_format),
         'create_time_utc': now_utc.strftime(time_format),
@@ -568,6 +570,14 @@ class BenchmarkSpec(object):
     }
 
     return tags
+
+  def GetResourceTags(self, timeout_minutes=None):
+    """Gets a list of tags to be used to tag resources."""
+    return self._GetResourceDict(METADATA_TIME_FORMAT, timeout_minutes)
+
+  def GetResourceLabels(self, timeout_minutes=None):
+    """Gets a list of labels to be used to tag resources."""
+    return self._GetResourceDict(LABEL_TIME_FORMAT, timeout_minutes)
 
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
@@ -604,7 +614,7 @@ class BenchmarkSpec(object):
         'perfkit_uuid': self.uuid,
         'benchmark_uid': self.uid,
         'create_time_utc':
-        datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'),
+        datetime.datetime.utcnow().strftime(METADATA_TIME_FORMAT),
         'owner': FLAGS.owner
     }
     for item in FLAGS.vm_metadata:
