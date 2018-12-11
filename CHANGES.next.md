@@ -223,6 +223,7 @@
 - Add precision flag in Inception3 benchmark.
 - Support Hadoop 3.x.x in hadoop_terasort
 - Add z1 support for NVME disks.
+- Add default tags to dataproc.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
