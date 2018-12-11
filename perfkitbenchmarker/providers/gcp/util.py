@@ -203,21 +203,6 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud'):
   vm.RemoteCommand(activate_cmd)
 
 
-def MakeDefaultTags(timeout_minutes=None):
-  """Default tags for an GCP resource created by PerfKitBenchmarker.
-
-  Args:
-    timeout_minutes: Timeout used for setting the timeout_utc tag.
-
-  Returns:
-    Dict of default tags, contributed from the benchmark spec.
-  """
-  benchmark_spec = context.GetThreadBenchmarkSpec()
-  if not benchmark_spec:
-    return {}
-  return benchmark_spec.GetResourceTags(timeout_minutes)
-
-
 def FormatTags(tags_dict):
   """Format a dict of tags into arguments.
 
@@ -239,4 +224,22 @@ def MakeFormattedDefaultTags(timeout_minutes=None):
   Returns:
     A string contains tags, contributed from the benchmark spec.
   """
-  return FormatTags(MakeDefaultTags(timeout_minutes))
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if not benchmark_spec:
+    return {}
+  return FormatTags(benchmark_spec.GetResourceTags(timeout_minutes))
+
+
+def MakeFormattedDefaultLabels(timeout_minutes=None):
+  """Get the default labels formatted.
+
+  Args:
+    timeout_minutes: Timeout used for setting the timeout_utc label.
+
+  Returns:
+    A string contains labels, contributed from the benchmark spec.
+  """
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if not benchmark_spec:
+    return {}
+  return FormatTags(benchmark_spec.GetResourceLabels(timeout_minutes))
