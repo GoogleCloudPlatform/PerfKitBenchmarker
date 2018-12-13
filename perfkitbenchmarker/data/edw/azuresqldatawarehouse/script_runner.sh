@@ -38,7 +38,7 @@ export SCRIPT_ERROR=$7
 
 pids=""
 
-/opt/mssql-tools/bin/sqlcmd -S ${SQL_SERVER}.database.windows.net -d $SQL_DB -U $SQL_USER -P $SQL_PASSWORD -I -i $SQL_SCRIPT 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
+/opt/mssql-tools/bin/sqlcmd -S ${SQL_SERVER}.database.windows.net -d $SQL_DB -U $SQL_USER -P $SQL_PASSWORD -I -b -i $SQL_SCRIPT 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
 
 pid=$!
 
