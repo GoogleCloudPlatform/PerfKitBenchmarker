@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ configuration files.
 """
 
 import contextlib
-import copy
 import os
 
 from perfkitbenchmarker import app_service
@@ -29,7 +28,6 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
@@ -42,50 +40,6 @@ from perfkitbenchmarker.dpb_service import BaseDpbService
 
 _DEFAULT_DISK_COUNT = 1
 _DEFAULT_VM_COUNT = 1
-
-
-class FlagsDecoder(option_decoders.TypeVerifier):
-  """Processes the flags override dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super(FlagsDecoder, self).__init__(
-        default=None, none_ok=True, valid_types=(dict,), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Processes the flags override dictionary of a benchmark config object.
-
-    Args:
-      value: None or dict mapping flag name string to flag override value.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Command-line flag values.
-
-    Returns:
-      dict mapping flag name string to Flag object. The flag values to use
-      when running the benchmark.
-    """
-    config_flags = super(FlagsDecoder, self).Decode(value, component_full_name,
-                                                    flag_values)
-    merged_flag_values = copy.deepcopy(flag_values)
-    if config_flags:
-      for key, value in config_flags.iteritems():
-        if key not in merged_flag_values:
-          raise errors.Config.UnrecognizedOption(
-              'Unrecognized option {0}.{1}. Each option within {0} must '
-              'correspond to a valid command-line flag.'.format(
-                  self._GetOptionFullName(component_full_name), key))
-        if not merged_flag_values[key].present:
-          try:
-            merged_flag_values[key].parse(value)
-          except flags.IllegalFlagValueError as e:
-            raise errors.Config.InvalidValue(
-                'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
-                    self._GetOptionFullName(component_full_name), key, value,
-                    value.__class__.__name__, os.linesep, e))
-    if hasattr(merged_flag_values, '_flags'):
-      return merged_flag_values._flags()  # pylint: disable=protected-access
-    else:
-      return merged_flag_values.FlagDict()
 
 
 class _DpbApplicationListDecoder(option_decoders.ListDecoder):
@@ -382,6 +336,15 @@ class _EdwServiceSpec(spec.BaseSpec):
             'none_ok': True}),
         'cluster_parameter_group': (option_decoders.StringDecoder, {
             'default': None,
+            'none_ok': True}),
+        'resource_group': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'server_name': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'iam_role': (option_decoders.StringDecoder, {
+            'default': None,
             'none_ok': True})
     })
     return result
@@ -529,13 +492,11 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                 managed_relational_db.POSTGRES,
                 managed_relational_db.AURORA_POSTGRES,
                 managed_relational_db.AURORA_MYSQL,
+                managed_relational_db.AURORA_MYSQL56,
             ]
         }),
         'zones': (option_decoders.ListDecoder, {
             'item_decoder': option_decoders.StringDecoder(),
-            'default': None
-        }),
-        'machine_type': (option_decoders.StringDecoder, {
             'default': None
         }),
         'engine_version': (option_decoders.StringDecoder, {
@@ -576,8 +537,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    # TODO(ferneyhough): Add flags for vm_spec.machine_type and disk_spec.
-    # Currently the only way to modify the vm_spec or disk_spec of the
+    # TODO(ferneyhough): Add flags for disk_spec.
+    # Currently the only way to modify the disk_spec of the
     # managed_db is to change the benchmark spec in the benchmark source code
     # itself.
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
@@ -609,6 +570,9 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if flag_values['managed_db_zone'].present:
       config_values['vm_spec'][cloud]['zone'] = (
           flag_values.managed_db_zone)
+    if flag_values['managed_db_machine_type'].present:
+      config_values['vm_spec'][cloud]['machine_type'] = (
+          flag_values.managed_db_machine_type)
 
 
 class _SparkServiceSpec(spec.BaseSpec):
@@ -1418,6 +1382,5 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     Yields:
       context manager that redirects flag reads and writes.
     """
-    flgs = FlagsDecoder().Decode(self.flags, 'flags', flag_values)
-    with flag_util.FlagDictSubstitution(flag_values, lambda: flgs):
+    with flag_util.OverrideFlags(flag_values, self.flags):
       yield

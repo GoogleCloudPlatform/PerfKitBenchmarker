@@ -127,6 +127,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if self.dpb_dataproc_image_version:
       cmd.flags['image-version'] = self.dpb_dataproc_image_version
 
+    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
@@ -161,6 +162,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """See base class."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
 
     if classname:
       cmd.flags['jars'] = jarfile

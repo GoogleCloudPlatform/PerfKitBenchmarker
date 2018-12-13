@@ -85,7 +85,6 @@ class SimpleResultParserTestCase(unittest.TestCase):
         self.results['groups']['overall'])
 
 
-
 class DetailedResultParserTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -245,6 +244,7 @@ class HdrLogsParserTestCase(unittest.TestCase):
          314.000 0.000000000000          2           1.00
          853.000 0.100000000000      49955           1.11
          949.000 0.200000000000     100351           1.25
+         949.000 0.210000000000     100351           1.27
          1033.000 0.300000000000     150110           1.43
       #[Mean    =     1651.145, StdDeviation   =      851.707]
       #[Max     =   203903.000, Total count    =       499019]
@@ -254,3 +254,7 @@ class HdrLogsParserTestCase(unittest.TestCase):
     expected = [(0.0, 0.314, 2), (10.0, 0.853, 49953),
                 (20.0, 0.949, 50396), (30.0, 1.033, 49759)]
     self.assertEqual(actual, expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

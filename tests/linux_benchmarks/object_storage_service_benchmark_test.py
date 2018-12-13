@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,19 +19,22 @@ import time
 import unittest
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import object_storage_service_benchmark
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class TestBuildCommands(unittest.TestCase):
+class TestBuildCommands(pkb_common_test_case.PkbCommonTestCase):
+
   def setUp(self):
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-
-    mocked_flags.object_storage_multistream_objects_per_stream = 100
-    mocked_flags.object_storage_object_sizes = {'1KB': '100%'}
-    mocked_flags.object_storage_streams_per_vm = 1
-    mocked_flags.num_vms = 1
-    mocked_flags.object_storage_object_naming_scheme = 'sequential_by_stream'
+    super(TestBuildCommands, self).setUp()
+    FLAGS.object_storage_multistream_objects_per_stream = 100
+    FLAGS.object_storage_object_sizes = {'1KB': '100%'}
+    FLAGS.object_storage_streams_per_vm = 1
+    FLAGS.num_vms = 1
+    FLAGS.object_storage_object_naming_scheme = 'sequential_by_stream'
 
   def testBuildCommands(self):
     vm = mock.MagicMock()
@@ -71,7 +74,8 @@ class TestBuildCommands(unittest.TestCase):
                    '--stream_num_start=0']))
 
 
-class TestDistributionToBackendFormat(unittest.TestCase):
+class TestDistributionToBackendFormat(pkb_common_test_case.PkbCommonTestCase):
+
   def testPointDistribution(self):
     dist = {'100KB': '100%'}
 
@@ -104,23 +108,26 @@ class TestDistributionToBackendFormat(unittest.TestCase):
       object_storage_service_benchmark._DistributionToBackendFormat(dist)
 
 
-class TestColdObjectsWrittenFiles(unittest.TestCase):
+class TestColdObjectsWrittenFiles(pkb_common_test_case.PkbCommonTestCase):
 
   def testFilename(self):
     """Tests the objects written filename can be parsed for an age."""
-    with mock_flags.PatchFlags() as mocked_flags:
-      mocked_flags.object_storage_region = 'us-central1-a'
-      mocked_flags.object_storage_objects_written_file_prefix = 'prefix'
-      write_time = datetime.datetime.now() - datetime.timedelta(hours=72)
-      with mock.patch.object(object_storage_service_benchmark, '_DatetimeNow',
-                             return_value=write_time):
-        filename = (
-            object_storage_service_benchmark._ColdObjectsWrittenFilename())
-      read_time = datetime.datetime.now()
-      with mock.patch.object(object_storage_service_benchmark, '_DatetimeNow',
-                             return_value=read_time):
-        age = object_storage_service_benchmark._ColdObjectsWrittenFileAgeHours(
-            filename)
+    FLAGS.object_storage_region = 'us-central1-a'
+    FLAGS.object_storage_objects_written_file_prefix = 'prefix'
+    write_time = datetime.datetime.now() - datetime.timedelta(hours=72)
+    with mock.patch.object(
+        object_storage_service_benchmark,
+        '_DatetimeNow',
+        return_value=write_time):
+      filename = (
+          object_storage_service_benchmark._ColdObjectsWrittenFilename())
+    read_time = datetime.datetime.now()
+    with mock.patch.object(
+        object_storage_service_benchmark,
+        '_DatetimeNow',
+        return_value=read_time):
+      age = object_storage_service_benchmark._ColdObjectsWrittenFileAgeHours(
+          filename)
       # Verify that the age is between 72 and 73 hours.
       self.assertLessEqual(72, age)
       self.assertLessEqual(age, 73)

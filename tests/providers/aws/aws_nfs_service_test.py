@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,13 +25,16 @@ import mock
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_nfs_service
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 _COMPONENT = 'test_component'
 
@@ -104,37 +107,37 @@ _MOUNT = AwsResponses({
 })
 
 
-class BaseTest(unittest.TestCase):
+class BaseTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(BaseTest, self).setUp()
     self.issue_cmd = mock.Mock()
     self.aws_network_spec = self._CreatePatched(aws_network, 'AwsNetwork')
-    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
     mock_network = mock.Mock()
     mock_network.subnet.id = 'subnet1'
     mock_network.vpc.default_security_group_id = 'group1'
     self.aws_network_spec.GetNetworkFromNetworkSpec.return_value = mock_network
 
   def SetFlags(self, **kwargs):
-    self.mock_flags['aws_user_name'].parse('aws_user')
-    self.mock_flags['nfs_timeout_hard'].parse(True)
-    self.mock_flags['benchmarks'].parse([_BENCHMARK])
-    self.mock_flags['nfs_rsize'].parse(1048576)
-    self.mock_flags['nfs_wsize'].parse(1048576)
-    self.mock_flags['nfs_tier'].parse('generalPurpose')
-    self.mock_flags['nfs_timeout'].parse(60)
-    self.mock_flags['default_timeout'].parse(10)
-    self.mock_flags['owner'].parse(_OWNER)
-    self.mock_flags['nfs_retries'].parse(2)
-    self.mock_flags['run_uri'].parse(_RUN_URI)
-    self.mock_flags['nfs_version'].parse('4.1')
-    self.mock_flags['temp_dir'].parse('/non/existent/temp/dir')
-    self.mock_flags['aws_efs_token'].parse(None)
-    self.mock_flags['aws_delete_file_system'].parse(True)
-    self.mock_flags['efs_throughput_mode'].parse(_THROUGHPUT_MODE)
-    self.mock_flags['efs_provisioned_throughput'].parse(_PROVISIONED_THROUGHPUT)
+    FLAGS['aws_user_name'].parse('aws_user')
+    FLAGS['nfs_timeout_hard'].parse(True)
+    FLAGS['benchmarks'].parse([_BENCHMARK])
+    FLAGS['nfs_rsize'].parse(1048576)
+    FLAGS['nfs_wsize'].parse(1048576)
+    FLAGS['nfs_tier'].parse('generalPurpose')
+    FLAGS['nfs_timeout'].parse(60)
+    FLAGS['default_timeout'].parse(10)
+    FLAGS['owner'].parse(_OWNER)
+    FLAGS['nfs_retries'].parse(2)
+    FLAGS['run_uri'].parse(_RUN_URI)
+    FLAGS['nfs_version'].parse('4.1')
+    FLAGS['temp_dir'].parse('/non/existent/temp/dir')
+    FLAGS['aws_efs_token'].parse('')
+    FLAGS['aws_delete_file_system'].parse(True)
+    FLAGS['efs_throughput_mode'].parse(_THROUGHPUT_MODE)
+    FLAGS['efs_provisioned_throughput'].parse(_PROVISIONED_THROUGHPUT)
     for key, value in kwargs.iteritems():
-      self.mock_flags[key].parse(value)
+      FLAGS[key].parse(value)
 
   def _CreatePatched(self, module, method_name):
     patcher = mock.patch.object(module, method_name)
@@ -155,7 +158,7 @@ class BaseTest(unittest.TestCase):
     mock_network.vpc.default_security_group_id = _SECURITY_GROUP_ID
     return mock_network
 
-  def _CreateNfsService(self, nfs_tier=None):
+  def _CreateNfsService(self, nfs_tier=''):
     self.SetFlags(nfs_tier=nfs_tier)
     disk_spec = self._CreateDiskSpec(disk.NFS)
     nfs = aws_nfs_service.AwsNfsService(disk_spec, _AWS_ZONE)
@@ -323,7 +326,7 @@ class AwsVirtualMachineTest(BaseTest):
 class AwsEfsCommandsTest(BaseTest):
 
   def setUp(self):
-    self.mock_flags = mock_flags.PatchTestCaseFlags(self)
+    super(AwsEfsCommandsTest, self).setUp()
     self.SetFlags()
     self.issue_cmd = self._CreatePatched(vm_util, 'IssueCommand')
     self.aws = aws_nfs_service.AwsEfsCommands(_AWS_REGION)

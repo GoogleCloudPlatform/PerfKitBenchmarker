@@ -13,20 +13,19 @@
 # limitations under the License.
 """Tests for the Tensorflow benchmark."""
 import unittest
-import mock
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import tensorflow_benchmark
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class TensorflowBenchmarkBatchSizesTestCase(unittest.TestCase):
+class TensorflowBenchmarkBatchSizesTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    flag_values = {
-        'tf_batch_sizes': [99]
-    }
-    p = mock.patch(tensorflow_benchmark.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
+    super(TensorflowBenchmarkBatchSizesTestCase, self).setUp()
+    FLAGS.tf_batch_sizes = [99]
 
   def testFlagOverridesDefaultBatchSize(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
@@ -34,7 +33,8 @@ class TensorflowBenchmarkBatchSizesTestCase(unittest.TestCase):
     self.assertEqual([99], batch_size)
 
 
-class TensorflowBenchmarkDefaultBatchSizesTestCase(unittest.TestCase):
+class TensorflowBenchmarkDefaultBatchSizesTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def testUnknownGpuTypeReturnsDefaultBatchSize(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(

@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,18 +17,21 @@ import contextlib
 import unittest
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_tpu
 from perfkitbenchmarker.providers.gcp import util
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 
 NAME = 'testname'
 PROJECT = 'testproject'
 ZONE = 'testzone'
 
 
-class GcpTpuTestCase(unittest.TestCase):
+class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def CreateTpuSpecDict(self):
     return {
@@ -50,12 +53,12 @@ class GcpTpuTestCase(unittest.TestCase):
     return tpu_class
 
   def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None, 'tpu_cores_per_donut': 8}
+    super(GcpTpuTestCase, self).setUp()
+    FLAGS.run_uri = '123'
+    FLAGS.project = ''
+    FLAGS.tpu_cores_per_donut = 8
+    FLAGS.gcloud_path = 'gcloud'
 
-    p = mock.patch(gcp_tpu.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
     mock_tpu_spec_attrs = self.CreateTpuSpecDict()
     self.mock_tpu_spec = mock.Mock(
         spec=benchmark_config_spec._TpuGroupSpec)

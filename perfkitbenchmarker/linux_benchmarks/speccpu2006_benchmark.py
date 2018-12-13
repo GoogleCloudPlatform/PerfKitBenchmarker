@@ -90,7 +90,7 @@ def Prepare(benchmark_spec):
   install_config.base_tar_file_path = _SPECCPU2006_TAR
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
-  speccpu.Install(vm, install_config)
+  speccpu.InstallSPECCPU(vm, install_config)
 
 
 def Run(benchmark_spec):

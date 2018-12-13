@@ -25,6 +25,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import collections
+import copy
 import itertools
 import json
 import logging
@@ -162,7 +163,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {}),
+        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder,
+                         {'default': None}),
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
@@ -324,6 +326,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = gce_disk.PD_STANDARD
 
+  NVME_START_INDEX = 1
+
   _host_lock = threading.Lock()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
@@ -347,6 +351,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
+    self.early_termination = False
+    self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
     self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
@@ -564,11 +570,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         name = ''
         if FLAGS.gce_ssd_interface == SCSI:
           name = 'local-ssd-%d' % self.local_disk_counter
+          disk_number = self.local_disk_counter + 1
         elif FLAGS.gce_ssd_interface == NVME:
           name = 'nvme0n%d' % (self.local_disk_counter + 1)
+          disk_number = self.local_disk_counter + self.NVME_START_INDEX
+        else:
+          raise errors.Error('Unknown Local SSD Interface.')
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
-        # Local disk numbers start at 1 (0 is the system disk).
-        data_disk.disk_number = self.local_disk_counter + 1
+        data_disk.disk_number = disk_number
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
@@ -661,6 +670,43 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
 
+  @vm_util.Retry(max_retries=5)
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    if self.preemptible:
+      # Drop zone since compute operations list takes 'zones', not 'zone', and
+      # the argument is deprecated in favor of --filter.
+      vm_without_zone = copy.copy(self)
+      vm_without_zone.zone = None
+      gcloud_command = util.GcloudCommand(
+          vm_without_zone, 'compute', 'operations', 'list',
+          '--filter=zone:%s targetLink.scope():%s' % (self.zone, self.name))
+      stdout, _, _ = gcloud_command.Issue()
+      self.early_termination = any(
+          operation['operationType'] == 'compute.instances.preempted'
+          for operation in json.loads(stdout))
+
+  def IsInterruptible(self):
+    """Returns whether this vm is an interruptible vm (spot vm).
+
+    Returns: True if this vm is an interruptible vm (spot vm).
+    """
+    return self.preemptible
+
+  def WasInterrupted(self):
+    """Returns whether this spot vm was terminated early by GCP.
+
+    Returns: True if this vm was terminated early by GCP.
+    """
+    return self.early_termination
+
+  def GetVmStatusCode(self):
+    """Returns the early termination code if any.
+
+    Returns: Early termination code.
+    """
+    return self.preemptible_status_code
+
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
                                      linux_vm.ContainerizedDebianMixin):
@@ -727,6 +773,8 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
   BOOT_DISK_SIZE_GB = 50
   BOOT_DISK_TYPE = gce_disk.PD_SSD
+
+  NVME_START_INDEX = 0
 
   def __init__(self, vm_spec):
     """Initialize a Windows GCE virtual machine.

@@ -133,3 +133,7 @@ class MachineTypeDecoderTestCase(unittest.TestCase):
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.machine_type.cpus value: "0". Value must be at '
         'least 1.'))
+
+
+if __name__ == '__main__':
+  unittest.main()

@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,12 +14,13 @@
 """Tests for perfkitbenchmarker.virtual_machine."""
 
 import unittest
-import mock_flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
+from tests import pkb_common_test_case
 
-
+FLAGS = flags.FLAGS
 _COMPONENT = 'test_component'
 
 
@@ -35,7 +36,7 @@ class TestVmSpec(virtual_machine.BaseVmSpec):
     return result
 
 
-class BaseVmSpecTestCase(unittest.TestCase):
+class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     spec = virtual_machine.BaseVmSpec(_COMPONENT)
@@ -94,31 +95,22 @@ class BaseVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.gpu_count, 2)
 
   def testMissingGpuCount(self):
-    flags = mock_flags.MockFlags()
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      virtual_machine.BaseVmSpec(_COMPONENT,
-                                 flag_values=flags,
-                                 gpu_type='k80')
+      virtual_machine.BaseVmSpec(_COMPONENT, flag_values=FLAGS, gpu_type='k80')
     self.assertEqual(str(cm.exception), (
         'gpu_count must be specified if gpu_type is set'))
 
   def testMissingGpuType(self):
-    flags = mock_flags.MockFlags()
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      virtual_machine.BaseVmSpec(_COMPONENT,
-                                 flag_values=flags,
-                                 gpu_count=1)
+      virtual_machine.BaseVmSpec(_COMPONENT, flag_values=FLAGS, gpu_count=1)
 
     self.assertEqual(str(cm.exception), (
         'gpu_type must be specified if gpu_count is set'))
 
   def testInvalidGpuType(self):
-    flags = mock_flags.MockFlags()
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      virtual_machine.BaseVmSpec(_COMPONENT,
-                                 flag_values=flags,
-                                 gpu_count=1,
-                                 gpu_type='bad_type')
+      virtual_machine.BaseVmSpec(
+          _COMPONENT, flag_values=FLAGS, gpu_count=1, gpu_type='bad_type')
 
     self.assertIn((
         'Invalid test_component.gpu_type value: "bad_type". '
@@ -128,12 +120,9 @@ class BaseVmSpecTestCase(unittest.TestCase):
     self.assertIn('p100', str(cm.exception))
 
   def testInvalidGpuCount(self):
-    flags = mock_flags.MockFlags()
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      virtual_machine.BaseVmSpec(_COMPONENT,
-                                 flag_values=flags,
-                                 gpu_count=0,
-                                 gpu_type='k80')
+      virtual_machine.BaseVmSpec(
+          _COMPONENT, flag_values=FLAGS, gpu_count=0, gpu_type='k80')
 
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.gpu_count value: "0". '

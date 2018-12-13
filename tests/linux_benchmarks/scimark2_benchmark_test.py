@@ -115,3 +115,7 @@ class Scimark2BenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     self.assertSampleListsEqualUpToTimestamp(
         samples,
         EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA)
+
+
+if __name__ == '__main__':
+  unittest.main()

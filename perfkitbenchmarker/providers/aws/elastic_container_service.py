@@ -270,7 +270,7 @@ class EksCluster(container_service.KubernetesCluster):
         'NodeImageId': self._GetImageId(),
         'KeyName': aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
         'VpcId': vpc.id,
-        'Subnets': ','.join([net.subnet.id for net in self.networks]),
+        'Subnets': self.networks[0].subnet.id,
     }
     self.eks_workers.Create()
     self._AuthorizeNodes()

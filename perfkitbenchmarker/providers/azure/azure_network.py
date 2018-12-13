@@ -65,8 +65,8 @@ class AzureResourceGroup(resource.BaseResource):
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
-    self.location = (FLAGS.zones[0] if FLAGS.zones else
-                     zone or DEFAULT_LOCATION)
+    self.location = (
+        FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_LOCATION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
@@ -115,6 +115,22 @@ class AzureResourceGroup(resource.BaseResource):
       A list of tags formatted as arguments for 'tag' parameter.
     """
     return [self._FormatTag(k, v) for k, v in tags_dict.iteritems()]
+
+  def AddTag(self, key, value):
+    """Add a single tag to an existing Resource Group.
+
+    Args:
+      key: tag key
+      value: tag value
+
+    Raises:
+      errors.resource.CreationError on failure.
+    """
+    _, _, retcode = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
+         '--set', 'tags.' + self._FormatTag(key, value)])
+    if retcode:
+      raise errors.resource.CreationError('Error tagging Azure resource group.')
 
   def _GetTags(self):
     """Gets a list of tags to be used with the --tags param of Azure CLI."""

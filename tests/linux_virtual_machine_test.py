@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +18,11 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
 # Need to provide implementations for all of the abstract methods in
@@ -33,7 +36,7 @@ class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
     pass
 
 
-class TestSetFiles(unittest.TestCase):
+class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
 
   def runTest(self, set_files, calls):
     """Run a SetFiles test.
@@ -43,9 +46,7 @@ class TestSetFiles(unittest.TestCase):
       calls: a list of mock.call() objects giving the expected calls to
         vm.RemoteCommand() for the test.
     """
-
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags['set_files'].parse(set_files)
+    FLAGS['set_files'].parse(set_files)
 
     vm = LinuxVM()
 
@@ -74,11 +75,10 @@ class TestSetFiles(unittest.TestCase):
                             '/sys/kernel/mm/transparent_hugepage/defrag')])
 
 
-class TestSysctl(unittest.TestCase):
+class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
 
   def runTest(self, sysctl, calls):
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags['sysctl'].parse(sysctl)
+    FLAGS['sysctl'].parse(sysctl)
     vm = LinuxVM()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
@@ -99,11 +99,11 @@ class TestSysctl(unittest.TestCase):
                  [])
 
 
-class TestDiskOperations(unittest.TestCase):
+class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags['default_timeout'].parse(0)  # due to @retry
+    super(TestDiskOperations, self).setUp()
+    FLAGS['default_timeout'].parse(0)  # due to @retry
     patcher = mock.patch.object(LinuxVM, 'RemoteHostCommand')
     self.remote_command = patcher.start()
     self.addCleanup(patcher.stop)

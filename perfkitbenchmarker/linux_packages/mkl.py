@@ -19,6 +19,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 MKL_DIR = '%s/MKL' % INSTALL_DIR
 MKL_TAG = 'l_mkl_2018.2.199'
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
+MKL_VERSION = '2018.2.199'
 
 # TODO(yanfeiren): InstallPreprovisionedBenchmarkData currently assumes that
 # BENCHMARK_NAME is associated with a benchmark. Once it is expanded to include
