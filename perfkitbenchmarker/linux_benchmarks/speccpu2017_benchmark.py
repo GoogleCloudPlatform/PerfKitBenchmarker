@@ -65,6 +65,9 @@ speccpu2017:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
+      os_type: ubuntu1604
+  speccpu:
+    runspec_config: pkb-crosstool-llvm-linux-x86-fdo.cfg
 """
 
 _SPECCPU2017_DIR = 'cpu2017'
@@ -139,6 +142,7 @@ def Prepare(benchmark_spec):
   install_config.base_tar_file_path = _SPECCPU2017_TAR
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
+  install_config.runspec_config = benchmark_spec.config.speccpu.runspec_config
   speccpu.InstallSPECCPU(vm, install_config)
   vm.Install('speccpu2017_dependencies')
 
@@ -183,6 +187,12 @@ def Run(benchmark_spec):
   speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
               version_specific_parameters)
 
+  partial_results = True
+  # Do not allow partial results if any benchmark subset is a full suite.
+  for benchmark_subset in FLAGS.benchmark_subset:
+    if benchmark_subset in ['intspeed', 'fpspeed', 'intrate', 'fprate']:
+      partial_results = False
+
   log_files = set()
   for test in FLAGS.spec17_subset:
     if test in LOG_FILENAME:
@@ -197,7 +207,7 @@ def Run(benchmark_spec):
       elif test in FPRATE_SUITE:
         log_files.add(LOG_FILENAME['fprate'])
 
-  return speccpu.ParseOutput(vm, log_files, False, None)
+  return speccpu.ParseOutput(vm, log_files, partial_results, None)
 
 
 def Cleanup(benchmark_spec):

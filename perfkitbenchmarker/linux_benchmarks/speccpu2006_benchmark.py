@@ -55,6 +55,8 @@ speccpu2006:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_50_gb
+  speccpu:
+    runspec_config: linux64-x64-gcc47.cfg
 """
 
 _MOUNT_DIR = 'cpu2006_mnt'
@@ -90,6 +92,7 @@ def Prepare(benchmark_spec):
   install_config.base_tar_file_path = _SPECCPU2006_TAR
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
+  install_config.runspec_config = benchmark_spec.config.speccpu.runspec_config
   speccpu.InstallSPECCPU(vm, install_config)
 
 
