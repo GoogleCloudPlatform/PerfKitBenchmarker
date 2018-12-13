@@ -56,3 +56,7 @@ class TestPercentileCalculator(unittest.TestCase):
   def testWrongTypePercentile(self):
     with self.assertRaises(ValueError):
       sample.PercentileCalculator([3], percentiles=["a"])
+
+
+if __name__ == '__main__':
+  unittest.main()

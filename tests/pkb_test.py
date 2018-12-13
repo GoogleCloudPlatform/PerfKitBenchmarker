@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,12 @@
 
 import unittest
 import mock
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import stages
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class TestCreateFailedRunSampleFlag(unittest.TestCase):
@@ -131,3 +135,7 @@ class TestMakeFailedRunSample(unittest.TestCase):
         'run_stage': stages.PROVISION,
         'flags': '{}'
     })
+
+
+if __name__ == '__main__':
+  unittest.main()

@@ -1,0 +1,10 @@
+[
+  {
+    "instance": "https://www.googleapis.com/compute/v1/projects/artemis-prod/zones/us-west1-b/instances/gke-pkb-0c47e6fa-default-pool-167d73ee-hmwk",
+    "status": "RUNNING"
+  },
+  {
+    "instance": "https://www.googleapis.com/compute/v1/projects/artemis-prod/zones/us-west1-b/instances/gke-pkb-0c47e6fa-default-pool-167d73ee-t854",
+    "status": "RUNNING"
+  }
+]

@@ -37,6 +37,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('hbase_version', '1.3.2.1', 'HBase version.')
 flags.DEFINE_boolean('hbase_use_stable', False,
                      'Whether to use the current stable release of HBase.')
+flags.DEFINE_string('hbase_bin_url', None,
+                    'Specify to override url from HBASE_URL_BASE.')
 
 HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase'
 HBASE_PATTERN = r'>(hbase-([\d\.]+)-bin.tar.gz)<'
@@ -54,7 +56,7 @@ def _GetHBaseURL():
   """Gets the HBase download url based on flags.
 
   The default is to look for the version `--hbase_version` to download.
-  If `--hbase_stable` is set will look for the latest stable version.
+  If `--hbase_use_stable` is set will look for the latest stable version.
 
   Returns:
     The HBase download url.
@@ -103,7 +105,7 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('hadoop')
   vm.Install('curl')
-  hbase_url = _GetHBaseURL()
+  hbase_url = FLAGS.hbase_bin_url or _GetHBaseURL()
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         HBASE_DIR, hbase_url))

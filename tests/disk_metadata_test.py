@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -27,20 +29,27 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
-from tests import mock_flags
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
-class _DiskMetadataTestCase(unittest.TestCase):
+class _DiskMetadataTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(_DiskMetadataTestCase, self).setUp()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+    p = mock.patch(vm_util.__name__ + '.GetTempDir')
+    p.start()
+    self.addCleanup(p.stop)
+
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=mock_flags.MockFlags(), vm_groups={})
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
     self.benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 

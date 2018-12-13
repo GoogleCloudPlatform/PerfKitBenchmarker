@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,15 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 
 NAME = 'ping'
 UID = 'name0'
@@ -88,14 +90,13 @@ _GROUP_2 = 'vm_2'
 _MOCKED_VM_FUNCTIONS = 'AllowPort', 'Install', 'RemoteCommand'
 
 
-class TestBackgroundNetworkWorkload(unittest.TestCase):
+class TestBackgroundNetworkWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(TestBackgroundNetworkWorkload, self).setUp()
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.os_type = os_types.DEBIAN
-    self.mocked_flags.cloud = providers.GCP
-    self.mocked_flags.temp_dir = 'tmp'
+    FLAGS.os_type = os_types.DEBIAN
+    FLAGS.cloud = providers.GCP
+    FLAGS.temp_dir = 'tmp'
     p = patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)
@@ -146,15 +147,15 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
   def makeSpec(self, yaml_benchmark_config=ping_benchmark.BENCHMARK_CONFIG):
     config = configs.LoadConfig(yaml_benchmark_config, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=self.mocked_flags, **config)
+        NAME, flag_values=FLAGS, **config)
     spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     spec.ConstructVirtualMachines()
     return spec
 
   def testWindowsVMCausesError(self):
     """ windows vm with background_network_mbits_per_sec raises exception """
-    self.mocked_flags['background_network_mbits_per_sec'].parse(200)
-    self.mocked_flags['os_type'].parse(os_types.WINDOWS)
+    FLAGS['background_network_mbits_per_sec'].parse(200)
+    FLAGS['os_type'].parse(os_types.WINDOWS)
     spec = self.makeSpec()
     with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
       spec.Prepare()
@@ -165,7 +166,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVM(self):
     """ Check that the vm background workload calls work """
-    self.mocked_flags['background_network_mbits_per_sec'].parse(200)
+    FLAGS['background_network_mbits_per_sec'].parse(200)
     spec = self.makeSpec()
     self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
@@ -179,7 +180,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadWindows(self):
     """ Test that nothing happens with the vanilla config """
-    self.mocked_flags.os_type = os_types.WINDOWS
+    FLAGS.os_type = os_types.WINDOWS
     # background_network_mbits_per_sec defaults to None.
     spec = self.makeSpec()
 
@@ -189,7 +190,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
     """ Check that the flag overrides the config """
-    self.mocked_flags['background_network_mbits_per_sec'].parse(200)
+    FLAGS['background_network_mbits_per_sec'].parse(200)
     spec = self.makeSpec()
     for vm in spec.vms:
       self.assertEqual(vm.background_network_mbits_per_sec, 200)
@@ -198,8 +199,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigFlagIpType(self):
     """ Check that the flag overrides the config """
-    self.mocked_flags['background_network_mbits_per_sec'].parse(200)
-    self.mocked_flags['background_network_ip_type'].parse('INTERNAL')
+    FLAGS['background_network_mbits_per_sec'].parse(200)
+    FLAGS['background_network_ip_type'].parse('INTERNAL')
     spec = self.makeSpec()
     for vm in spec.vms:
       self.assertEqual(vm.background_network_mbits_per_sec, 200)
@@ -207,13 +208,9 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfigBadIpTypeFlag(self):
-    """ Check that the flag overrides the config """
-    self.mocked_flags['background_network_mbits_per_sec'].parse(200)
-    self.mocked_flags['background_network_ip_type'].parse('IAMABADFLAGVALUE')
-    config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
-    with self.assertRaises(errors.Config.InvalidValue):
-      benchmark_config_spec.BenchmarkConfigSpec(
-          NAME, flag_values=self.mocked_flags, **config)
+    """Check that the flag only accepts valid values."""
+    with self.assertRaises(flags.IllegalFlagValueError):
+      FLAGS['background_network_ip_type'].parse('IAMABADFLAGVALUE')
 
   def testBackgroundWorkloadConfig(self):
     """ Check that the config can be used to set the background iperf """
@@ -233,7 +230,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
                                 {}, NAME)
     with self.assertRaises(errors.Config.InvalidValue):
       benchmark_config_spec.BenchmarkConfigSpec(
-          NAME, flag_values=self.mocked_flags, **config)
+          NAME, flag_values=FLAGS, **config)
 
   def testBackgroundWorkloadConfigGoodIp(self):
     """ Check that the config can be used with an internal ip address """

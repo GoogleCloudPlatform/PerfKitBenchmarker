@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,19 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class TestGenerateJobFileString(unittest.TestCase):
+class TestGenerateJobFileString(pkb_common_test_case.PkbCommonTestCase):
+
   def setUp(self):
+    super(TestGenerateJobFileString, self).setUp()
     self.filename = '/test/filename'
 
   def testBasicGeneration(self):
@@ -119,7 +125,8 @@ numjobs=1"""
                      orig_blocksize)
 
 
-class TestProcessedJobFileString(unittest.TestCase):
+class TestProcessedJobFileString(pkb_common_test_case.PkbCommonTestCase):
+
   def testReplaceFilenames(self):
     file_contents = """
 [global]

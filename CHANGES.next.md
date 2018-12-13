@@ -15,6 +15,13 @@
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
 - Updated GCP sole tenancy support.  Removed `gcp_host_type` added
   `gcp_node_type`.
+- Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
+- Removed duplicated metrics from the HPCC benchmark. Metrics now use the name
+  from the summary section of the benchmark-produced output.
+- Benchmarks are expected to not modify FLAGS in any way. If FLAGS are modified
+  and multiple run configurations are run in a single PKB invocation, benchmark
+  configurations may be incorrect.
+- Changed TF Serving benchmark to use ResNet instead of Inception
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -71,6 +78,13 @@
 - Added act benchmark.
 - Added `--gce_tags` flag to add --tags when launching VMs on GCP.
 - Added PKB support to publish samples immediately.
+- Adding benchmarking of Memcached on cloud VMs using memtier benchmark.
+- Adding support for different client/server machine types on memcached-memtier.
+- Adding functionality in memtier benchmark to run a variable number of threads
+  counts in each run.
+- Adding support for AWS ARM machine types.
+- Adding support for AWS ARM machines on SPECCPU.
+- Added Horovod distributed Tensorflow traning benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -89,12 +103,12 @@
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
 - Add `os_type` support to KubernetesVirtualMachine.
-- Avoid setting up thread pool etc when run_processes is set
-  to 1 and using --run_with_pdb flag to simplify debugging.
+- Avoid setting up thread pool etc when run_processes is not set (to simplify
+  debugging).
 - Added a sample benchmark for descriptive purposes.
 - Added GPU peer to peer topology information to metadata.
-- Added a flag, `hpcg_run_as_root` which allows OpenMPI to run HPCG in the case
-  that the user is root.
+- Added a flag, `mpirun_allow_run_as_root` which allows OpenMPI to run in the
+  case that the user is root.
 - Modified KubernetesVirtualMachine to ensure that ssh is installed on the
   container.
 - Added `container_cluster_num_vms` flag.
@@ -119,8 +133,9 @@
 - Added `time_commands` flag to enable diagnostic timing of commands
 - Added image processing speed in mnist.
 - Updated cloud TPU model link.
-- Updated AWS spot instance creation and added
-  spot instance failure metadata support.
+- Updated AWS spot instance creation.
+- Added support for extending the failure sample with metadata if AWS spot VMs
+  or GCP preemptible VMs are interrupted.
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
@@ -176,6 +191,39 @@
 - Change train_steps to train_epochs in TPU test.
 - Add default tags like timeout_utc to GCE.
 - Add validation to all the TPU tests.
+- Add number of Train/Eval TPU shards in metadata.
+- The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
+- Updated openjdk 8 installation to support newer ycsb versions (after 0.13.0);
+  Improved hdrhistogram result reporting in ycsb.py.
+- Added flag `--ntttcp_udp` to allow the user to run UDP tests with ntttcp.
+- Added flag `--ntttcp_packet_size` to allow user to set the packet size in
+  ntttcp tests.
+- Extract more data from the ntttcp results file and put into the metadata of
+  the samples.
+- Updated the default of Cloud Bigtable client version to 1.4.0. Added
+  `--hbase_bin_url` to allow bypassing GetHBaseURL().
+- Remove flag tf_benchmarks_commit_hash, and add tf_cnn_benchmarks_branch.
+  Branch cnn_tf_vX.Y_compatible is compatible with TensorFlow version X.Y.
+- Added flags `--ntttcp_sender_rb`, `--ntttcp_sender_sb`,
+  `--ntttcp_receiver_rb`, `--ntttcp_receiver_sb` to control the socket buffer
+  sizes in ntttcp tests.
+- Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
+- Introducing a new flag gcp_dataproc_subnet which allows a user to specify the subnet that a dataproc cluster will be part of.
+- Added support for running a subset of HPCC benchmarks.
+- Introducing a new multi string flag 'gcp_dataproc_property' which allows a user to modify many common configuration files when creating a Dataproc cluster.
+- Added configuration support for specifying type of the boot disk for a Dataproc cluster.
+- Added AddTag method to AzureResourceGroup.
+- Added some support for IPv6 (on static machines).
+- Added retransmit count to netperf metadata.
+- Added a common base class to PKB, PkbCommonTestCase,
+  which uses absl.testing.flagsaver to save and restore
+  flag values on test setUp / tearDown.
+- Remove all usage of mock_flags and replace with PkbCommonTestCase.
+- Upgraded memtier benchmark to version 1.2.15.
+- Add precision flag in Inception3 benchmark.
+- Support Hadoop 3.x.x in hadoop_terasort
+- Add z1 support for NVME disks.
+- Add default tags to dataproc.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -287,7 +335,6 @@
 - Fix PSPing benchmark so that it runs on AWS and Azure.
 - Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
 - Moved from ACS to AKS for Azure Kubernetes clusters.
-- AWS Aurora Postgres updated from 9.6.2 to 9.6.3
 - Cleanup and fix Beam bechmark.
 - Sysbench failover tests added for GCP and AWS Aurora
 - Sysbench qps metric added
@@ -296,3 +343,29 @@
 - Fix a bug of getting the number of TPU cores.
 - Set number of images in ResNet benchmark command so it can support other datasets.
 - Sysbench supports benchmarking MySQL 5.6
+- Update memcached server to install from a pre-built package provided by the operating system.
+- TensorFlow Serving benchmark now runs off master branch with optimized binaries
+- Updated HPCC benchmark to version 1.5.0.
+- Psping benchmark no longer report histogram for every sample metadata.
+- Specifies the number of threads to use in MXNet CPU test.
+- Fixed the way several unittests are using flags and mock_flags.
+- Fixed linter issues in several unittests.
+- Add python_pip_package_version as a class attribute of
+  BaseVirtualMachine. Children classes that have the problem of
+  https://github.com/pypa/pip/issues/5247 can use an older pip package.
+- Update AWS Aurora Postgres default version from 9.6.2 to 9.6.8
+- Update speccpu17 to write profiles in different files for each benchmark.
+- Avoid installing unnecessary MySQL server for sysbench when client tools suffice.
+- Added support for running the object service benchmark with a GCP service
+  account.
+- Add missing if __name__ == '__main__' stanza to some unittests, and fix those
+  that were broken.
+- Consolidate FlagDictSubstitution and FlagsDecoder into a simpler context manager,
+  OverrideFlags, which does not abuse the internals of FlagValues.
+- Changed GkeCluster so that it adds PKB metadata to all VMs that it creates.
+- Upgraded OpenMPI from 1.6.5 to 3.1.2.
+- Upgraded OpenBLAS from 0.2.15 to 0.3.3.
+- Add flag to control database machine type for managed relational databases.
+- Ensure randomly generated windows passwords start with a character.
+- Upgrade Tensorflow version to 1.12.
+- Install NCCL when installing Tensorflow with GPU support.

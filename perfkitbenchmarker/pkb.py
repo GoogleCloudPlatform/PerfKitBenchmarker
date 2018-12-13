@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,10 +103,11 @@ LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
-MAX_RUN_URI_LENGTH = 8
+MAX_RUN_URI_LENGTH = 12
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
+flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
                   'Benchmarks and/or benchmark sets that should be run. The '
                   'default is the standard set. For more information about '
@@ -259,7 +260,7 @@ flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
 flags.DEFINE_integer(
-    'run_processes', 1,
+    'run_processes', None,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
 flags.DEFINE_float(
@@ -284,6 +285,10 @@ flags.DEFINE_boolean(
     'This sample will include metadata specifying the run stage that '
     'failed, the exception that occurred, as well as all the flags that '
     'were provided to PKB on the command line.')
+flags.DEFINE_boolean(
+    'create_started_run_sample', False,
+    'Whether PKB will create a sample at the start of the provision phase of '
+    'the benchmark run.')
 flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
     'If create_failed_run_samples is true, PKB will truncate any error '
@@ -432,9 +437,7 @@ def _CreateBenchmarkSpecs():
     expected_os_types = (
         os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
         else os_types.LINUX_OS_TYPES)
-    merged_flags = benchmark_config_spec.FlagsDecoder().Decode(
-        user_config.get('flags'), 'flags', FLAGS)
-    with flag_util.FlagDictSubstitution(FLAGS, lambda: merged_flags):
+    with flag_util.OverrideFlags(FLAGS, user_config.get('flags')):
       config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
         benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
@@ -500,6 +503,8 @@ def DoProvisionPhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of resource
       provisioning.
   """
+  if FLAGS.create_started_run_sample:
+    PublishRunStartedSample(spec)
   logging.info('Provisioning resources for benchmark %s', spec.name)
   spec.ConstructContainerCluster()
   spec.ConstructContainerRegistry()
@@ -654,6 +659,25 @@ def RegisterSkipPendingRunsCheck(func):
   _SKIP_PENDING_RUNS_CHECKS.append(func)
 
 
+def PublishRunStartedSample(spec):
+  """Publishes a sample indicating that a run has started.
+
+  This sample is published immediately so that there exists some metric for any
+  run (even if the process dies).
+
+  Args:
+    spec: The BenchmarkSpec object with run information.
+  """
+  collector = SampleCollector()
+  metadata = {
+      'flags': str(flag_util.GetProvidedCommandLineFlags())
+  }
+  collector.AddSamples(
+      [sample.Sample('Run Started', 1, 'Run Started', metadata)],
+      spec.name, spec)
+  collector.PublishSamples()
+
+
 def RunBenchmark(spec, collector):
   """Runs a single benchmark and adds the results to the collector.
 
@@ -790,17 +814,22 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
   interrupted_vm_count = 0
   vm_status_codes = []
   for vm in spec.vms:
-    # discounted vm metadata
     if vm.IsInterruptible():
       interruptible_vm_count += 1
       if vm.WasInterrupted():
         interrupted_vm_count += 1
-        vm_status_codes.append(vm.GetVmStatusCode())
+        status_code = vm.GetVmStatusCode()
+        if status_code:
+          vm_status_codes.append(status_code)
 
   if interruptible_vm_count:
     metadata.update({'interruptible_vms': interruptible_vm_count,
                      'interrupted_vms': interrupted_vm_count,
                      'vm_status_codes': vm_status_codes})
+  if interrupted_vm_count:
+    logging.error(
+        '%d interruptible VMs were interrupted in this failed PKB run.',
+        interrupted_vm_count)
   return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
@@ -944,7 +973,7 @@ def RunBenchmarks():
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    if FLAGS.run_with_pdb and FLAGS.run_processes == 1:
+    if FLAGS.run_processes is None:
       spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(

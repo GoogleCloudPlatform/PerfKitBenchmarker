@@ -61,3 +61,7 @@ class SpecSfs2014BenchmarkTestCase(unittest.TestCase,
     ]
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+
+if __name__ == '__main__':
+  unittest.main()

@@ -45,6 +45,9 @@ flags.DEFINE_string('managed_db_backup_start_time', '07:00',
 flags.DEFINE_string('managed_db_zone', None,
                     'zone or region to launch the database in. '
                     'Defaults to the client vm\'s zone.')
+flags.DEFINE_string('managed_db_machine_type', None,
+                    'Machine type of the database.')
+
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
 flags.register_validator(
@@ -56,6 +59,7 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 AURORA_MYSQL = 'aurora-mysql'
+AURORA_MYSQL56 = 'aurora'
 
 FLAGS = flags.FLAGS
 

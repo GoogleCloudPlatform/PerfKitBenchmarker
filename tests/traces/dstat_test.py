@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +17,18 @@ import os
 import unittest
 
 from perfkitbenchmarker import events
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.sample import Sample
+from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import dstat
 
+FLAGS = flags.FLAGS
 
-class DstatTestCase(unittest.TestCase):
-  maxDiff = None
+
+class DstatTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(DstatTestCase, self).setUp()
     directory = os.path.join(os.path.dirname(__file__), '..', 'data')
     path = os.path.join(directory, 'dstat-result.csv')
     self.collector = dstat._DStatCollector(output_directory=directory)

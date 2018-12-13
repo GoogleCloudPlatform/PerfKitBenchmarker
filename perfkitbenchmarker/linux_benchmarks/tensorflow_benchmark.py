@@ -238,7 +238,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.data_name = FLAGS.tf_data_name
   benchmark_spec.variable_update = FLAGS.tf_variable_update
   benchmark_spec.distortions = FLAGS.tf_distortions
-  benchmark_spec.benchmarks_commit_hash = FLAGS.tf_benchmarks_commit_hash
+  benchmark_spec.cnn_benchmarks_branch = FLAGS.tf_cnn_benchmarks_branch
   benchmark_spec.tensorflow_cpu_pip_package = FLAGS.tf_cpu_pip_package
   benchmark_spec.tensorflow_gpu_pip_package = FLAGS.tf_gpu_pip_package
   benchmark_spec.distributed = FLAGS.tf_distributed
@@ -250,8 +250,9 @@ def _PrepareVm(vm):
   """Install and set up TensorFlow on the target vm.
 
   The TensorFlow benchmarks are also installed.
-  A specific commit of the benchmarks which works best with TensorFlow
-  1.3 is used and can be overridden with the flag tf_benchmarks_commit_hash.
+  A specific branch of the benchmarks cnn_tf_v1.10_compatible which works best
+  with TensorFlow 1.10 is used and can be overridden with the flag
+  tf_cnn_benchmarks_branch.
 
   Args:
     vm: virtual machine on which to install TensorFlow
@@ -323,7 +324,7 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size):
     metadata.update(cuda_toolkit.GetMetadata(vm))
 
   metadata['command_line'] = benchmark_spec.tf_cnn_benchmark_cmd
-  metadata['benchmarks_commit_hash'] = benchmark_spec.benchmarks_commit_hash
+  metadata['cnn_benchmarks_branch'] = benchmark_spec.cnn_benchmarks_branch
   metadata['tensorflow_version'] = benchmark_spec.tensorflow_version
   metadata['tensorflow_cpu_pip_package'] = (
       benchmark_spec.tensorflow_cpu_pip_package)

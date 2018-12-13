@@ -48,15 +48,15 @@ from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import hpcc
+from perfkitbenchmarker.linux_packages import mkl
+from perfkitbenchmarker.linux_packages import openblas
+from perfkitbenchmarker.linux_packages import openmpi
 
 FLAGS = flags.FLAGS
 HPCCINF_FILE = 'hpccinf.txt'
 MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
-
-# Timeout after 4 hours.
-HPCC_TIMEOUT = 4 * 60 * 60
 
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
 BENCHMARK_DATA = {
@@ -79,6 +79,8 @@ hpcc:
       vm_count: null
 """
 
+SECONDS_PER_HOUR = 60 * 60
+
 flags.DEFINE_integer('memory_size_mb',
                      None,
                      'The amount of memory in MB on each machine to use. By '
@@ -90,6 +92,9 @@ flags.DEFINE_list('hpcc_mpi_env', [],
                   'Comma separated list containing environment variables '
                   'to use with mpirun command. e.g. '
                   'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512')
+flags.DEFINE_integer('hpcc_timeout_hours', 4,
+                     'The number of hours to wait for the HPCC binary to '
+                     'complete before timing out and assuming it failed.')
 
 
 def GetConfig(user_config):
@@ -192,6 +197,14 @@ def UpdateMetadata(metadata):
   if FLAGS['hpcc_mpi_env'].present:
     metadata['mpi_env'] = FLAGS.hpcc_mpi_env
   metadata['hpcc_math_library'] = FLAGS.hpcc_math_library
+  metadata['hpcc_version'] = hpcc.HPCC_VERSION
+  if FLAGS.hpcc_benchmarks:
+    metadata['hpcc_benchmarks'] = FLAGS.hpcc_benchmarks
+  if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
+    metadata['math_library_version'] = mkl.MKL_VERSION
+  elif FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_OPEN_BLAS:
+    metadata['math_library_version'] = openblas.GIT_TAG
+  metadata['openmpi_version'] = openmpi.MPI_VERSION
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
@@ -206,36 +219,28 @@ def ParseOutput(hpcc_output, benchmark_spec):
     A list of samples to be published (in the same format as Run() returns).
   """
   results = []
-  metadata = dict()
-  metadata['num_machines'] = len(benchmark_spec.vms)
-  UpdateMetadata(metadata)
+  base_metadata = {
+      'num_machines': len(benchmark_spec.vms)
+  }
+  UpdateMetadata(base_metadata)
 
   # Parse all metrics from metric=value lines in the HPCC output.
-  metric_values = regex_util.ExtractAllFloatMetrics(
-      hpcc_output)
-  for metric, value in metric_values.iteritems():
-    results.append(sample.Sample(metric, value, '', metadata))
+  metric_values = regex_util.ExtractAllFloatMetrics(hpcc_output)
 
-  # Parse some metrics separately and add units. Although these metrics are
-  # parsed above and added to results, this handling is left so that existing
-  # uses of these metric names will continue to work.
-  value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
-  results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))
+  # For each benchmark that is run, collect the metrics and metadata for that
+  # benchmark from the metric_values map.
+  benchmarks_run = FLAGS.hpcc_benchmarks or hpcc.HPCC_METRIC_MAP
+  for benchmark in benchmarks_run:
+    for metric, units in hpcc.HPCC_METRIC_MAP[benchmark].iteritems():
+      value = metric_values[metric]
 
-  value = regex_util.ExtractFloat('SingleRandomAccess_GUPs=([0-9]*\\.[0-9]*)',
-                                  hpcc_output)
-  results.append(
-      sample.Sample('Random Access Throughput', value, 'GigaUpdates/sec',
-                    metadata))
+      # Copy metadata reported in the HPCC summary statistics to the metadata.
+      metadata = base_metadata.copy()
+      for metadata_item in hpcc.HPCC_METADATA_MAP[benchmark]:
+        metadata[metadata_item] = metric_values[metadata_item]
 
-  for metric in STREAM_METRICS:
-    regex = 'SingleSTREAM_%s=([0-9]*\\.[0-9]*)' % metric
-    value = regex_util.ExtractFloat(regex, hpcc_output)
-    results.append(
-        sample.Sample('STREAM %s Throughput' % metric, value, 'GB/s', metadata))
+      results.append(sample.Sample(metric, value, units, metadata))
 
-  value = regex_util.ExtractFloat(r'PTRANS_GBs=([0-9]*\.[0-9]*)', hpcc_output)
-  results.append(sample.Sample('PTRANS Throughput', value, 'GB/s', metadata))
   return results
 
 
@@ -257,10 +262,12 @@ def Run(benchmark_spec):
                            'fi'))
   num_processes = len(vms) * master_vm.num_cpus
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
+  run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
-             '"ssh -o StrictHostKeyChecking=no" %s ./hpcc' %
-             (num_processes, MACHINEFILE, mpi_env))
-  master_vm.RobustRemoteCommand(mpi_cmd, timeout=HPCC_TIMEOUT)
+             '"ssh -o StrictHostKeyChecking=no" %s %s ./hpcc' %
+             (num_processes, MACHINEFILE, run_as_root, mpi_env))
+  master_vm.RobustRemoteCommand(
+      mpi_cmd, timeout=FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR)
   logging.info('HPCC Results:')
   stdout, _ = master_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
 

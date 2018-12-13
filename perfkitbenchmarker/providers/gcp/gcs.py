@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import posixpath
 import re
 
 from perfkitbenchmarker import errors
@@ -28,7 +29,7 @@ flags.DEFINE_string('google_cloud_sdk_version', None,
 
 FLAGS = flags.FLAGS
 
-GCS_CREDENTIAL_LOCATION = '.config/gcloud/credentials'
+_DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
 DEFAULT_GCP_REGION = 'us-central1'
 GCLOUD_CONFIG_PATH = '.config/gcloud'
 
@@ -97,8 +98,24 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
                      '--bash-completion=true')
 
     vm.RemoteCommand('mkdir -p .config')
-    vm.PushFile(object_storage_service.FindBotoFile(),
-                object_storage_service.DEFAULT_BOTO_LOCATION)
+    boto_file = object_storage_service.FindBotoFile()
+    vm.PushFile(boto_file, object_storage_service.DEFAULT_BOTO_LOCATION)
+
+    # If the boto file specifies a service key file, copy that service key file
+    # to the VM and modify the .boto file on the VM to point to the copied file.
+    with open(boto_file) as f:
+      boto_contents = f.read()
+    match = re.search(r'gs_service_key_file\s*=\s*(.*)', boto_contents)
+    if match:
+      service_key_file = match.group(1)
+      vm.PushFile(service_key_file, _DEFAULT_GCP_SERVICE_KEY_FILE)
+      vm_pwd, _ = vm.RemoteCommand('pwd')
+      vm.RemoteCommand(
+          'sed -i '
+          '-e "s/^gs_service_key_file.*/gs_service_key_file = %s/" %s' % (
+              re.escape(posixpath.join(vm_pwd.strip(),
+                                       _DEFAULT_GCP_SERVICE_KEY_FILE)),
+              object_storage_service.DEFAULT_BOTO_LOCATION))
 
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
     vm.gsutil_path = vm.gsutil_path.split()[0]

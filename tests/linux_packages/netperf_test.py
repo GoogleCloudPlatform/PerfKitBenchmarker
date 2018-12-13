@@ -37,3 +37,7 @@ class NetperfParseHistogramTestCase(unittest.TestCase):
 
     hist = netperf.ParseHistogram(self.netperf_output)
     self.assertEqual(hist, expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

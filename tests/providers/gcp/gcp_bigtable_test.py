@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import unittest
 
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from perfkitbenchmarker.providers.gcp import util
-
+from tests import pkb_common_test_case
 
 NAME = 'testcluster'
 NUM_NODES = 3
@@ -39,7 +39,7 @@ VALID_JSON_BASE = """[
 ]"""
 
 
-class GcpBigtableTestCase(unittest.TestCase):
+class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GcpBigtableTestCase, self).setUp()

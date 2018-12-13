@@ -28,16 +28,34 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-DEFAULT_MYSQL_VERSION = '5.7.22'
-DEFAULT_POSTGRES_VERSION = '9.6.2'
+DEFAULT_MYSQL_VERSION = '5.7.16'
+DEFAULT_POSTGRES_VERSION = '9.6.9'
 
 DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
-DEFAULT_POSTGRES_AURORA_VERSION = '9.6.3'
+DEFAULT_MYSQL56_AURORA_VERSION = '5.6.10a'
+DEFAULT_POSTGRES_AURORA_VERSION = '9.6.9'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
+
+_MAP_ENGINE_TO_DEFAULT_VERSION = {
+    managed_relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
+    managed_relational_db.AURORA_MYSQL: DEFAULT_MYSQL_AURORA_VERSION,
+    managed_relational_db.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
+    managed_relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
+    managed_relational_db.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
+}
+
+_AURORA_ENGINES = set([
+    managed_relational_db.AURORA_MYSQL56,
+    managed_relational_db.AURORA_MYSQL,
+    managed_relational_db.AURORA_POSTGRES])
+
+_RDS_ENGINES = set([
+    managed_relational_db.MYSQL,
+    managed_relational_db.POSTGRES])
 
 
 class AwsManagedRelationalDbCrossRegionException(Exception):
@@ -138,16 +156,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Raises:
       Exception: If unrecognized engine is specified.
     """
-    if engine == managed_relational_db.MYSQL:
-      return DEFAULT_MYSQL_VERSION
-    elif engine == managed_relational_db.AURORA_MYSQL:
-      return DEFAULT_MYSQL_AURORA_VERSION
-    elif engine == managed_relational_db.POSTGRES:
-      return DEFAULT_POSTGRES_VERSION
-    elif engine == managed_relational_db.AURORA_POSTGRES:
-      return DEFAULT_POSTGRES_AURORA_VERSION
-    else:
+    if engine not in _MAP_ENGINE_TO_DEFAULT_VERSION:
       raise Exception('Unspecified default version for {0}'.format(engine))
+    return _MAP_ENGINE_TO_DEFAULT_VERSION[engine]
 
   def _GetNewZones(self):
     """Returns a list of zones, excluding the one that the client VM is in."""
@@ -248,12 +259,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _SetupNetworking(self):
     """Sets up the networking required for the RDS database."""
-    if (self.spec.engine == managed_relational_db.MYSQL or
-        self.spec.engine == managed_relational_db.POSTGRES):
+    if self.spec.engine in _RDS_ENGINES:
       self.subnets_used_by_db.append(self.client_vm.network.subnet)
       self._CreateSubnetInAdditionalZone()
-    elif (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
-          self.spec.engine == managed_relational_db.AURORA_MYSQL):
+    elif self.spec.engine in _AURORA_ENGINES:
       self._CreateSubnetInAllZonesAssumeClientZoneExists()
     else:
       raise Exception('Unknown how to create network for {0}'.format(
@@ -293,8 +302,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       Exception: if unknown how to create self.spec.engine.
 
     """
-    if (self.spec.engine == managed_relational_db.MYSQL or
-        self.spec.engine == managed_relational_db.POSTGRES):
+    if self.spec.engine in _RDS_ENGINES:
 
       instance_identifier = self.instance_id
       self.all_instance_ids.append(instance_identifier)
@@ -322,9 +330,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
       vm_util.IssueCommand(cmd)
 
-    elif (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
-          self.spec.engine == managed_relational_db.AURORA_MYSQL):
-
+    elif self.spec.engine in _AURORA_ENGINES:
       zones_needed_for_high_availability = len(self.zones) > 1
       if zones_needed_for_high_availability != self.spec.high_availability:
         raise Exception('When managed_db_high_availability is true, multiple '
@@ -373,7 +379,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
             '--engine=%s' % self.spec.engine,
             '--engine-version=%s' % self.spec.engine_version,
             '--no-auto-minor-version-upgrade',
-            '--db-instance-class=%s' % self.spec.machine_type,
+            '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
             '--region=%s' % self.region,
             '--availability-zone=%s' % zone,
             '--tags'] + util.MakeFormattedDefaultTags()
@@ -490,8 +496,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'aws rds describe-db-instances'
     """
 
-    if (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
-        self.spec.engine == managed_relational_db.AURORA_MYSQL):
+    if self.spec.engine in _AURORA_ENGINES:
       self.primary_zone = self.zones[0]
       if len(self.zones) > 1:
         self.secondary_zone = ','.join(self.zones[1:])
@@ -533,8 +538,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                    multi-az.
     """
 
-    need_ha_modification = (self.spec.engine == managed_relational_db.MYSQL or
-                            self.spec.engine == managed_relational_db.POSTGRES)
+    need_ha_modification = self.spec.engine in _RDS_ENGINES
 
     if self.spec.high_availability and need_ha_modification:
       # When extending the database to be multi-az, the second region
@@ -669,8 +673,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _FailoverHA(self):
     """Fail over from master to replica."""
 
-    if (self.spec.engine == managed_relational_db.MYSQL or
-        self.spec.engine == managed_relational_db.POSTGRES):
+    if self.spec.engine in _RDS_ENGINES:
       cmd = util.AWS_PREFIX + [
           'rds',
           'reboot-db-instance',
@@ -679,8 +682,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--region=%s' % self.region
       ]
       vm_util.IssueCommand(cmd)
-    elif (self.spec.engine == managed_relational_db.AURORA_POSTGRES or
-          self.spec.engine == managed_relational_db.AURORA_MYSQL):
+    elif self.spec.engine in _AURORA_ENGINES:
       new_primary_id = self.all_instance_ids[1]
       cmd = util.AWS_PREFIX + [
           'rds',

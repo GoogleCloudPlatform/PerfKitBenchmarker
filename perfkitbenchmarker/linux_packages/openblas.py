@@ -18,7 +18,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 OPENBLAS_DIR = '%s/OpenBLAS' % INSTALL_DIR
 GIT_REPO = 'https://github.com/xianyi/OpenBLAS'
-GIT_TAG = 'v0.2.15'
+GIT_TAG = 'v0.3.3'
 
 
 def _Install(vm):

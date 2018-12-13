@@ -85,9 +85,14 @@ class PspingBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         sample.Sample('latency:minimum', minimum, 'ms', expected_metadata),
     ]
 
-    expected_metadata['histogram'] = histogram
+    expected_histogram_metadata = expected_metadata.copy()
+    expected_histogram_metadata['histogram'] = histogram
 
     expected_samples.append(sample.Sample('latency:histogram', 0, 'ms',
-                                          expected_metadata))
+                                          expected_histogram_metadata))
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+
+if __name__ == '__main__':
+  unittest.main()

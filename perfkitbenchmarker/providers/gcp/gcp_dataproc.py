@@ -94,6 +94,18 @@ class GcpDataproc(spark_service.BaseSparkService):
         disk_flag = group_type + '-boot-disk-size'
         cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
 
+      if group_spec.vm_spec.boot_disk_type:
+        disk_flag = group_type + '-boot-disk-type'
+        cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_type
+
+    if FLAGS.gcp_dataproc_subnet:
+      cmd.flags['subnet'] = FLAGS.gcp_dataproc_subnet
+      cmd.additional_flags.append('--no-address')
+
+    if FLAGS.gcp_dataproc_property:
+      cmd.flags['properties'] = ','.join(FLAGS.gcp_dataproc_property)
+
+    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
 
   def _Delete(self):
@@ -115,12 +127,12 @@ class GcpDataproc(spark_service.BaseSparkService):
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
-
   def SubmitJob(self, jarfile, classname, job_poll_interval=None,
                 job_arguments=None, job_stdout_file=None,
                 job_type=spark_service.SPARK_JOB_TYPE):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
     # If we don't put this here, zone is auotmatically added to the command
     # which breaks dataproc jobs submit
     cmd.flags['zone'] = []
@@ -133,10 +145,11 @@ class GcpDataproc(spark_service.BaseSparkService):
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
-    # stdout of the job.  We set the driver log level to FATAL
+    # stdout of the job.  We can set the driver log level to FATAL
     # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
-    cmd.flags['driver-log-levels'] = 'root=FATAL'
+    cmd.flags['driver-log-levels'] = 'root={}'.format(
+        FLAGS.spark_service_log_level)
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)

@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to GKE (Google Container Engine)."""
 
+import json
 import os
 
 from perfkitbenchmarker import container_service
@@ -26,6 +27,7 @@ from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
+FLAGS.kubernetes_anti_affinity = False
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
@@ -156,16 +158,52 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def _PostCreate(self):
     """Acquire cluster authentication."""
+    super(GkeCluster, self)._PostCreate()
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'get-credentials', self.name)
     env = self._GetRequiredGkeEnv()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
+    self._AddTags()
+
     if self.gpu_count:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
       kubernetes_helper.CreateFromFile(
           data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))
+
+  def _AddTags(self):
+    """Tags all VMs in the cluster."""
+    vms_in_cluster = []
+    for instance_group in self._GetInstanceGroups():
+      vms_in_cluster.extend(self._GetInstancesFromInstanceGroup(instance_group))
+
+    for vm_name in vms_in_cluster:
+      cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
+                               vm_name)
+      cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+      cmd.Issue()
+
+  def _GetInstanceGroups(self):
+    cmd = util.GcloudCommand(self, 'container', 'node-pools', 'list')
+    cmd.flags['cluster'] = self.name
+    stdout, _, _ = cmd.Issue()
+    json_output = json.loads(stdout)
+    instance_groups = []
+    for node_pool in json_output:
+      for group_url in node_pool['instanceGroupUrls']:
+        instance_groups.append(group_url.split('/')[-1])  # last url part
+    return instance_groups
+
+  def _GetInstancesFromInstanceGroup(self, instance_group_name):
+    cmd = util.GcloudCommand(self, 'compute', 'instance-groups',
+                             'list-instances', instance_group_name)
+    stdout, _, _ = cmd.Issue()
+    json_output = json.loads(stdout)
+    instances = []
+    for instance in json_output:
+      instances.append(instance['instance'].split('/')[-1])
+    return instances
 
   def _Delete(self):
     """Deletes the cluster."""

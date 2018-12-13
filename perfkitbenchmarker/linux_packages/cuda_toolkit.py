@@ -69,11 +69,13 @@ flags.DEFINE_string('cuda_toolkit_installation_dir', '/usr/local/cuda',
                     'here. If it is already installed, the installation at '
                     'this path will be used.')
 
-flags.DEFINE_enum('cuda_toolkit_version', '9.0', ['8.0', '9.0'],
+flags.DEFINE_enum('cuda_toolkit_version', '9.0', ['8.0', '9.0', '10.0'],
                   'Version of CUDA Toolkit to install', module_name=__name__)
 
 FLAGS = flags.FLAGS
 
+
+CUDA_10_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda-repo-ubuntu1604-10-0-local-10.0.130-410.48_1.0-1_amd64'
 
 CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb'
 CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-ubuntu1604-9-0-local-cublas-performance-update_1.0-1_amd64-deb'
@@ -118,6 +120,7 @@ def GetMetadata(vm):
   metadata = {}
   clock_speeds = QueryGpuClockSpeed(vm, 0)
   autoboost_policy = QueryAutoboostPolicy(vm, 0)
+  metadata['cuda_toolkit_installation_dir'] = FLAGS.cuda_toolkit_installation_dir
   metadata['cuda_toolkit_version'] = FLAGS.cuda_toolkit_version
   metadata['gpu_memory_clock'] = clock_speeds[0]
   metadata['gpu_graphics_clock'] = clock_speeds[1]
@@ -438,6 +441,21 @@ def _InstallCuda90(vm):
   _InstallCudaPatch(vm, CUDA_9_0_PATCH)
 
 
+def _InstallCuda10(vm):
+  """Installs CUDA Toolkit 10.0 from NVIDIA.
+
+  args:
+    vm: VM to install CUDA on
+  """
+  basename = posixpath.basename(CUDA_10_0_TOOLKIT) + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_10_0_TOOLKIT,
+                                         basename))
+  vm.RemoteCommand('sudo dpkg -i %s' % basename)
+  vm.RemoteCommand('sudo apt-key add /var/cuda-repo-10-0-local-10.0.130-410.48/7fa2af80.pub')
+  vm.RemoteCommand('sudo apt-get update')
+  vm.RemoteCommand('sudo apt-get install -y cuda')
+
+
 def AptInstall(vm):
   """Installs CUDA toolkit on the VM if not already installed"""
   if _CheckNvidiaSmiExists(vm):
@@ -450,6 +468,8 @@ def AptInstall(vm):
     _InstallCuda8(vm)
   elif FLAGS.cuda_toolkit_version == '9.0':
     _InstallCuda90(vm)
+  elif FLAGS.cuda_toolkit_version == '10.0':
+    _InstallCuda10(vm)
   else:
     raise UnsupportedCudaVersionException()
   DoPostInstallActions(vm)

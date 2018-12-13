@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import json
 import mock
 import os
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -29,22 +30,20 @@ from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import disk
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
-_FLAGS = None
 
 
 def CreateManagedDbFromSpec(spec_dict):
   mock_db_spec = mock.Mock(
       spec=benchmark_config_spec._ManagedRelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
-  mocked_flags = mock_flags.MockFlags()
-  mocked_flags.run_uri = 'mock-run-uri'
-  with mock_flags.PatchFlags(mocked_flags):
-    db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
+  db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
   return db_class
 
 
@@ -61,7 +60,8 @@ def PatchCriticalObjects(stdout='', stderr='', return_code=0):
     yield issue_command
 
 
-class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
+class GcpMysqlManagedRelationalDbTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def createMySQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
@@ -84,12 +84,11 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
     }
 
   def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None}
+    super(GcpMysqlManagedRelationalDbTestCase, self).setUp()
+    FLAGS.project = ''
+    FLAGS.run_uri = '123'
+    FLAGS.gcloud_path = 'gcloud'
 
-    p = mock.patch(gcp_managed_relational_db.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
     mock_db_spec_attrs = self.createMySQLSpecDict()
     self.mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
@@ -199,7 +198,14 @@ class GcpMysqlManagedRelationalDbTestCase(unittest.TestCase):
                     db._ParseEndpoint(json.loads(test_output)))
 
 
-class GcpPostgresManagedRelationlDbTestCase(unittest.TestCase):
+class GcpPostgresManagedRelationlDbTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(GcpPostgresManagedRelationlDbTestCase, self).setUp()
+    FLAGS.project = ''
+    FLAGS.run_uri = ''
+    FLAGS.gcloud_path = ''
 
   def createPostgresSpecDict(self):
     machine_type = {
