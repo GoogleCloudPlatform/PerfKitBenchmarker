@@ -226,6 +226,8 @@
 - Add default tags to dataproc.
 - Adding default run configurations for spec17 when none
   of os_type, runspec_config or is_partial_results flags is set.
+- Add a flag to control the number of worker threads used by the
+  memcached server
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
