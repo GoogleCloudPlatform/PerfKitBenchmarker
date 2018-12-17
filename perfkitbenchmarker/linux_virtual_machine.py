@@ -478,6 +478,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.numa_node_count = lscpu_results.numa_node_count
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = self.kernel_release
+    self.os_metadata['cpu_family'] = lscpu_results.cpu_family
+    self.os_metadata['cpu_mhz'] = lscpu_results.cpu_mhz
+    self.os_metadata['cpu_model'] = lscpu_results.cpu_model
+    self.os_metadata['cpu_bogomips'] = lscpu_results.cpu_bogomips
+    self.os_metadata['cpu_vendor'] = lscpu_results.cpu_vendor
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -1571,6 +1576,42 @@ class LsCpuResults(object):
       self.numa_node_count = int(match.group(1))
     else:
       raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
+                       lscpu)
+    # get more infos
+    # CPU MHz
+    match_mhz = re.search(r'CPU\ MHz:\s*(\d*\.\d+|\d+)$', lscpu, re.MULTILINE)
+    if match_mhz:
+      self.cpu_mhz = float(match_mhz.group(1))
+    else:
+      raise ValueError('CPU MHz could not be found in lscpu value:\n%s' %
+                       lscpu)
+    # Vendor ID
+    match_cpu_vendor = re.search(r'Vendor\ ID:\s*(\w+)$', lscpu, re.MULTILINE)
+    if match_cpu_vendor:
+      self.cpu_vendor = str(match_cpu_vendor.group(1))
+    else:
+      raise ValueError('CPU Vendor could not be found in lscpu value:\n%s' %
+                       lscpu)
+    # CPU family
+    match_cpu_family = re.search(r'CPU\ family:\s*(\d+)$', lscpu, re.MULTILINE)
+    if match_cpu_family:
+      self.cpu_family = int(match_cpu_family.group(1))
+    else:
+      raise ValueError('CPU family could not be found in lscpu value:\n%s' %
+                       lscpu)
+    # CPU Model
+    match_cpu_model = re.search(r'Model:\s*(\d+)$', lscpu, re.MULTILINE)
+    if match_cpu_model:
+      self.cpu_model = int(match_cpu_model.group(1))
+    else:
+      raise ValueError('CPU model could not be found in lscpu value:\n%s' %
+                       lscpu)
+    # BogoMIPS
+    match_cpu_bogomips = re.search(r'BogoMIPS:\s*(\d*\.\d+|\d+)$', lscpu, re.MULTILINE)
+    if match_cpu_bogomips:
+      self.cpu_bogomips = float(match_cpu_bogomips.group(1))
+    else:
+      raise ValueError('CPU bogomips could not be found in lscpu value:\n%s' %
                        lscpu)
 
     match = re.search(r'Core\(s\)\ per\ socket:\s*(\d+)$', lscpu, re.MULTILINE)
