@@ -339,7 +339,7 @@
 - Fix PSPing benchmark so that it runs on AWS and Azure.
 - Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
 - Moved from ACS to AKS for Azure Kubernetes clusters.
-- Cleanup and fix Beam bechmark.
+- Cleanup and fix Beam benchmark.
 - Sysbench failover tests added for GCP and AWS Aurora
 - Sysbench qps metric added
 - Fixed a bug of checking TPU exist.
@@ -373,3 +373,4 @@
 - Ensure randomly generated windows passwords start with a character.
 - Upgrade Tensorflow version to 1.12.
 - Install NCCL when installing Tensorflow with GPU support.
+- Update AzureBlobStorageService to persist for max of `--timeout_minutes` and `--persistent_timeout_minutes`.
