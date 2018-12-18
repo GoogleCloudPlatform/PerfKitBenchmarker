@@ -203,6 +203,19 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud'):
   vm.RemoteCommand(activate_cmd)
 
 
+def InstallGcloudComponents(vm, vm_gcloud_path='gcloud', component='alpha'):
+  """Install gcloud components on the target vm.
+
+  Args:
+    vm: vm on which the gcloud's alpha components need to be installed.
+    vm_gcloud_path: Optional path to the gcloud binary on the vm.
+    component: Gcloud component to install.
+  """
+  install_cmd = '{} components install {} --quiet'.format(vm_gcloud_path,
+                                                          component)
+  vm.RemoteCommand(install_cmd)
+
+
 def FormatTags(tags_dict):
   """Format a dict of tags into arguments.
 
