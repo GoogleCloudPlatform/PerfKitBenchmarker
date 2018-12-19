@@ -55,7 +55,7 @@ def _Install(vm):
   vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
                    NETPERF_SRC_DIR)
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-                   './configure --enable-histogram=yes '
+                   './configure --enable-histogram=yes --enable-demo '
                    '&& make' % (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
 
 
