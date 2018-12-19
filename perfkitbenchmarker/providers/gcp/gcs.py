@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains classes/functions related to Google Cloud Storage."""
+
 import logging
 import posixpath
 import re
@@ -51,6 +53,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       command.extend(['-c', 'regional'])
     elif FLAGS.object_storage_storage_class is not None:
       command.extend(['-c', FLAGS.object_storage_storage_class])
+    if FLAGS.project:
+      command.extend(['-p', FLAGS.project])
     command.extend(['gs://%s' % bucket])
 
     vm_util.IssueCommand(command)
@@ -126,7 +130,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     logging.info('gsutil version -l raw result is %s', raw_result)
     search_string = 'compiled crcmod: True'
     result_string = re.findall(search_string, raw_result)
-    if len(result_string) == 0:
+    if not result_string:
       logging.info('compiled crcmod is not available, installing now...')
       try:
         # Try uninstall first just in case there is a pure python version of
@@ -137,7 +141,6 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       except errors.VirtualMachine.RemoteCommandError:
         logging.info('pip uninstall crcmod failed, could be normal if crcmod '
                      'is not available at all.')
-        pass
       vm.Install('crcmod')
       vm.installed_crcmod = True
     else:
