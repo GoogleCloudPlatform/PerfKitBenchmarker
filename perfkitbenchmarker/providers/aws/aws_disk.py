@@ -269,10 +269,18 @@ class AwsDisk(disk.BaseDisk):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
       if LocalDriveIsNvme(self.machine_type):
-        return '/dev/nvme%sn1' % str(ord(self.device_letter) - ord('b'))
+        first_device_letter = 'b'
+        if EbsDriveIsNvme(self.machine_type):
+          # If the root drive is also NVME, assume the second drive is the
+          # local drive.
+          first_device_letter = 'a'
+        return '/dev/nvme%sn1' % str(
+            ord(self.device_letter) - ord(first_device_letter))
       return '/dev/xvd%s' % self.device_letter
     else:
       if EbsDriveIsNvme(self.machine_type):
-        return '/dev/nvme%sn1' % (1 + ord(self.device_letter) - ord('a'))
+        first_device_letter = 'a'
+        return '/dev/nvme%sn1' % (
+            1 + ord(self.device_letter) - ord(first_device_letter))
       else:
         return '/dev/xvdb%s' % self.device_letter
