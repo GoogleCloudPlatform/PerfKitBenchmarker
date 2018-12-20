@@ -24,6 +24,7 @@ SDK_DIR = '%s/google-cloud-sdk' % vm_util.VM_TMP_DIR
 SDK_INSTALL_FILE = '%s/install.sh' % SDK_DIR
 GCLOUD_PATH = '%s/bin/gcloud' % SDK_DIR
 GSUTIL_PATH = '%s/bin/gsutil' % SDK_DIR
+KUBECTL_PATH = '%s/bin/kubectl' % SDK_DIR
 
 
 def RunGcloud(vm, cmd):
