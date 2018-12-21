@@ -60,9 +60,6 @@ flags.DEFINE_integer('netperf_thinktime_array_size', 0,
 flags.DEFINE_integer('netperf_thinktime_run_length', 0,
                      'The number of contiguous numbers to sum at a time in the '
                      'thinktime array.')
-flags.DEFINE_float('netperf_demo_interval', 0.0,
-                   'The interval in seconds for netperf to output '
-                   'interim results.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -224,9 +221,6 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
   """
   # Don't modify the metadata dict that was passed in
   metadata = metadata.copy()
-  # Interim results collected using netperf's demo option.
-  timeseries = []
-  timeseries_samples = []
 
   # Extract stats from stdout
   # Sample output:
@@ -245,14 +239,10 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     # "-o" flag above specifies CSV output, but there is one extra header line:
     banner = next(fp)
     assert banner.startswith('MIGRATED'), stdout
-    line = next(fp).strip()
-    while not line.startswith('Throughput'):
-      timeseries.append(line.split(','))
-      line = next(fp).strip()
-    fieldnames = line.split(',')
-    r = csv.DictReader(fp, fieldnames=fieldnames)
+    r = csv.DictReader(fp)
     results = next(r)
     logging.info('Netperf Results: %s', results)
+    assert 'Throughput' in results
   except:
     raise Exception('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
                     stdout)
@@ -285,12 +275,6 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
                      % throughput_units)
   throughput_sample = sample.Sample(metric, throughput, unit, metadata)
 
-  for result in timeseries:
-    value, _, _, timestamp = result
-    timeseries_samples.append(sample.Sample(
-        '%s_Timeseries' % metric, float(value), unit, metadata,
-        float(timestamp)))
-
   latency_hist = None
   latency_samples = []
   if enable_latency_histograms:
@@ -315,7 +299,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
             sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
                           float(results[metric_key]), 'us', metadata))
 
-  return (throughput_sample, latency_samples, latency_hist, timeseries_samples)
+  return (throughput_sample, latency_samples, latency_hist)
 
 
 def RunNetperf(vm, benchmark_name, server_ip, num_streams):
@@ -344,13 +328,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if enable_latency_histograms else ''
-  if FLAGS.netperf_demo_interval:
-    demo = ' -D %s ' % FLAGS.netperf_demo_interval
-  else:
-    demo = ''
   netperf_cmd = ('{netperf_path} -p {{command_port}} -j {verbosity} '
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
-                 '{demo}'
                  ' -- '
                  '-P ,{{data_port}} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
@@ -362,7 +341,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
-                     confidence=confidence, verbosity=verbosity, demo=demo)
+                     confidence=confidence, verbosity=verbosity)
   if FLAGS.netperf_thinktime != 0:
     netperf_cmd += (' -X {thinktime},{thinktime_array_size},'
                     '{thinktime_run_length} ').format(
@@ -397,9 +376,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
   if len(parsed_output) == 1:
     # Only 1 netperf thread
-    (throughput_sample, latency_samples,
-     histogram, timeseries_samples) = parsed_output[0]
-    return [throughput_sample] + latency_samples + timeseries_samples
+    throughput_sample, latency_samples, histogram = parsed_output[0]
+    return [throughput_sample] + latency_samples
   else:
     # Multiple netperf threads
 
@@ -408,8 +386,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # Unzip parsed output
     # Note that latency_samples are invalid with multiple threads because stats
     # are computed per-thread by netperf, so we don't use them here.
-    throughput_samples, _, latency_histograms, _ = [
-        list(t) for t in zip(*parsed_output)]
+    throughput_samples, _, latency_histograms = [list(t)
+                                                 for t in zip(*parsed_output)]
     # They should all have the same units
     throughput_unit = throughput_samples[0].unit
     # Extract the throughput values from the samples
