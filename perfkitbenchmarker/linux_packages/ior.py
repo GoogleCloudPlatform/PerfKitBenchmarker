@@ -51,7 +51,8 @@ def RunIOR(master_vm, num_tasks, script_path):
   directory = master_vm.scratch_disks[0].mount_point
   ior_cmd = (
       'cd {directory} && '
-      'mpiexec -machinefile ~/MACHINEFILE -n {num_tasks} ior -f {script_path}'
+      'mpiexec -oversubscribe -machinefile ~/MACHINEFILE -n {num_tasks} '
+      'ior -f {script_path}'
   ).format(directory=directory, num_tasks=num_tasks, script_path=script_path)
 
   stdout, _ = master_vm.RobustRemoteCommand(ior_cmd)
@@ -84,7 +85,7 @@ def RunMdtest(master_vm, num_tasks, mdtest_args):
   """Run mdtest against the master vm."""
   directory = posixpath.join(master_vm.scratch_disks[0].mount_point, 'mdtest')
   mdtest_cmd = (
-      'mpiexec -machinefile MACHINEFILE -n {num_tasks} '
+      'mpiexec -oversubscribe -machinefile MACHINEFILE -n {num_tasks} '
       'mdtest -d {directory} {additional_args}'
   ).format(
       directory=directory, num_tasks=num_tasks, additional_args=mdtest_args
