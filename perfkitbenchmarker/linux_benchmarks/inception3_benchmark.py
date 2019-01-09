@@ -177,7 +177,7 @@ def Run(benchmark_spec):
   inception3_benchmark_script = (
       'tpu/models/experimental/inception/inception_v3.py')
   inception3_benchmark_cmd = (
-      'python {script} '
+      '{env_cmd} && python {script} '
       '--learning_rate={learning_rate} '
       '--train_steps={train_steps} '
       '--iterations={iterations} '
@@ -190,6 +190,7 @@ def Run(benchmark_spec):
       '--train_batch_size={train_batch_size} '
       '--eval_batch_size={eval_batch_size} '
       '--precision={precision}'.format(
+          env_cmd=benchmark_spec.env_cmd,
           script=inception3_benchmark_script,
           learning_rate=benchmark_spec.learning_rate,
           train_steps=benchmark_spec.train_steps,
