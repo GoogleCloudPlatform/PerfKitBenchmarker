@@ -131,6 +131,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.eval_steps = int(
       benchmark_spec.eval_epochs * benchmark_spec.num_examples_per_epoch)
   benchmark_spec.precision = FLAGS.tpu_precision
+  benchmark_spec.env_cmd = 'export PYTHONPATH=$PYTHONPATH:$PWD/tpu/models'
 
 
 def Prepare(benchmark_spec):
@@ -253,7 +254,11 @@ def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
   """
   samples = []
   metadata_copy = metadata.copy()
-  step = int(regex_util.ExtractAllMatches(r'step = (\d+)', output).pop())
+  if 'Saving checkpoints' in output:
+    step = int(regex_util.ExtractAllMatches(
+        r'Saving checkpoints for (\d+) into', output).pop())
+  else:
+    step = int(regex_util.ExtractAllMatches(r'step = (\d+)', output).pop())
   metadata_copy['step'] = int(step)
   metadata_copy['epoch'] = step / metadata['num_examples_per_epoch']
   metadata_copy['elapsed_seconds'] = elapsed_seconds

@@ -247,7 +247,7 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
   resnet_benchmark_script = 'resnet_main.py'
   resnet_benchmark_cmd = (
-      'cd tpu/models/official/resnet && '
+      '{env_cmd} && cd tpu/models/official/resnet && '
       'python {script} '
       '--use_tpu={use_tpu} '
       '--data_dir={data_dir} '
@@ -261,6 +261,7 @@ def Run(benchmark_spec):
       '--skip_host_call={skip_host_call} '
       '--num_train_images={num_train_images} '
       '--num_eval_images={num_eval_images}'.format(
+          env_cmd=benchmark_spec.env_cmd,
           script=resnet_benchmark_script,
           use_tpu=benchmark_spec.use_tpu,
           data_dir=benchmark_spec.data_dir,
