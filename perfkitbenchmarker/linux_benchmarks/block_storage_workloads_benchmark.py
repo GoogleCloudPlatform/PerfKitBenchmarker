@@ -121,6 +121,7 @@ def UpdateWorkloadMetadata(results):
 
 def RunSimulatedLogging(vm):
   """Spawn fio to simulate logging and gather the results.
+
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
   Returns:
