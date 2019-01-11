@@ -414,6 +414,7 @@ def GetConfig(user_config):
 
 
 def GetLogFlags(log_file_base):
+  """Gets fio log files."""
   collect_logs = FLAGS.fio_lat_log or FLAGS.fio_bw_log or FLAGS.fio_iops_log
   fio_log_flags = [(FLAGS.fio_lat_log, '--write_lat_log=%(filename)s',),
                    (FLAGS.fio_bw_log, '--write_bw_log=%(filename)s',),
