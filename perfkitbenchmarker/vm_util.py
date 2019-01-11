@@ -570,3 +570,13 @@ def SetupSimulatedMaintenance(vm):
     t = threading.Thread(target=_SimulateMaintenance)
     t.daemon = True
     t.start()
+
+
+def CopyFileBetweenVms(filename, src_vm, src_path, dest_vm, dest_path):
+  """Copies a file from the src_vm to the dest_vm."""
+  with tempfile.NamedTemporaryFile() as tf:
+    temp_path = tf.name
+    src_vm.RemoteCopy(
+        temp_path, os.path.join(src_path, filename), copy_to=False)
+    dest_vm.RemoteCopy(
+        temp_path, os.path.join(dest_path, filename), copy_to=True)
