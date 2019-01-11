@@ -153,6 +153,7 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['machine-type'] = self.machine_type
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
