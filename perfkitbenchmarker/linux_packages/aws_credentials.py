@@ -46,6 +46,7 @@ flags.DEFINE_boolean(
     'When set, if an AWS credential file already exists at the destination '
     'specified by --aws_credentials_remote_path, it will be overwritten during '
     'AWS credential file installation.')
+flags.DEFINE_string('aws_s3_region', None, 'Region for the S3 bucket')
 
 
 def _GetLocalPath():
