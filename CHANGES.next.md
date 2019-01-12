@@ -229,6 +229,8 @@
 - Add a flag to control the number of worker threads used by the
   memcached server
 - Add default tags to GKE.
+- Add support for using real data from GCS and add support to download GCS data
+  to vm in the Tensorflow benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

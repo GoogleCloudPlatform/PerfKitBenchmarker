@@ -51,18 +51,20 @@ def GetEnvironmentVars(vm):
   Returns:
     string of environment variables
   """
-  if not cuda_toolkit.CheckNvidiaGpuExists(vm):
-    return ''
-  output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
-  long_bit = output.strip()
-  lib_name = 'lib' if long_bit == '32' else 'lib64'
-  return ' '.join([
-      'PATH=%s${PATH:+:${PATH}}' %
-      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
-      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
-      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
-  ])
+  env_vars = []
+  if cuda_toolkit.CheckNvidiaGpuExists(vm):
+    output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
+    long_bit = output.strip()
+    lib_name = 'lib' if long_bit == '32' else 'lib64'
+    env_vars.extend([
+        'PATH=%s${PATH:+:${PATH}}' %
+        posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
+        'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
+        'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
+        posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name)])
+  if FLAGS.aws_s3_region:
+    env_vars.append('AWS_REGION={}'.format(FLAGS.aws_s3_region))
+  return ' '.join(env_vars)
 
 
 def GetTensorFlowVersion(vm):
@@ -111,6 +113,9 @@ def Install(vm):
   vm.RemoteCommand(
       'cd benchmarks && git checkout {}'.format(FLAGS.tf_cnn_benchmarks_branch)
   )
+  if FLAGS.cloud == 'AWS' and FLAGS.tf_data_dir and (
+      not FLAGS.tf_use_local_data):
+    vm.Install('aws_credentials')
 
 
 def Uninstall(vm):
