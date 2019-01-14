@@ -16,7 +16,7 @@ flags.DEFINE_string('bq_dataset_id', None, 'Dataset Id which contains the query'
 flags.DEFINE_string('bq_job_id_prefix', None, 'Job id prefix used for the'
                                               ' request.')
 flags.DEFINE_string('bq_job_id_postfix', None, 'Job id postfix used for the'
-                                              ' request.')
+                                               ' request.')
 flags.DEFINE_boolean('collect_output', False, 'Flag indicating if query results'
                                               ' should be collected.')
 flags.DEFINE_string('output_table', 'result_table', 'Table for query output.')
