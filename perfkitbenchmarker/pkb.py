@@ -612,6 +612,9 @@ def DoRunPhase(spec, collector, timer):
 def DoCleanupPhase(spec, timer):
   """Performs the Cleanup phase of benchmark execution.
 
+  Cleanup phase work should be delegated to spec.BenchmarkCleanup to allow
+  non-PKB based cleanup if needed.
+
   Args:
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of the
@@ -627,6 +630,9 @@ def DoCleanupPhase(spec, timer):
 
 def DoTeardownPhase(spec, timer):
   """Performs the Teardown phase of benchmark execution.
+
+  Teardown phase work should be delegated to spec.Delete to allow non-PKB based
+  teardown if needed.
 
   Args:
     spec: The BenchmarkSpec created for the benchmark.
