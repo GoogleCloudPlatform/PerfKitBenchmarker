@@ -31,6 +31,14 @@ flags.DEFINE_integer('nfs_rsize', 1048576, 'NFS read size.')
 flags.DEFINE_integer('nfs_wsize', 1048576, 'NFS write size.')
 flags.DEFINE_integer('nfs_timeout', 60, 'NFS timeout.')
 flags.DEFINE_integer('nfs_retries', 2, 'NFS Retries.')
+flags.DEFINE_string('nfs_ip_address', None,
+                    'If specified, PKB will target this ip address when '
+                    'mounting NFS "disks" rather than provisioning an NFS '
+                    'Service for the corresponding cloud.')
+flags.DEFINE_string('nfs_directory', None,
+                    'Directory to mount if using a StaticNfsService. This '
+                    'corresponds to the "VOLUME_NAME" of other NfsService '
+                    'classes.')
 
 FLAGS = flags.FLAGS
 
@@ -216,6 +224,10 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['nfs_timeout'] = flag_values.nfs_timeout
     if flag_values['nfs_retries'].present:
       config_values['nfs_retries'] = flag_values.nfs_retries
+    if flag_values['nfs_ip_address'].present:
+      config_values['nfs_ip_address'] = flag_values.nfs_ip_address
+    if flag_values['nfs_directory'].present:
+      config_values['nfs_directory'] = flag_values.nfs_directory
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -244,6 +256,8 @@ class BaseDiskSpec(spec.BaseSpec):
         'num_striped_disks': (option_decoders.IntDecoder, {'default': 1,
                                                            'min': 1}),
         'nfs_version': (option_decoders.StringDecoder, {'default': None}),
+        'nfs_ip_address': (option_decoders.StringDecoder, {'default': None}),
+        'nfs_directory': (option_decoders.StringDecoder, {'default': None}),
         'nfs_rsize': (option_decoders.IntDecoder, {'default': 1048576}),
         'nfs_wsize': (option_decoders.IntDecoder, {'default': 1048576}),
         'nfs_timeout': (option_decoders.IntDecoder, {'default': 60}),

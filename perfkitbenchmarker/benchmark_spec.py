@@ -269,11 +269,14 @@ class BenchmarkSpec(object):
       disk_spec = group_spec.disk_spec
       if disk_spec.disk_type != disk.NFS:
         continue
-      cloud = group_spec.cloud
-      providers.LoadProvider(cloud)
-      nfs_class = nfs_service.GetNfsServiceClass(cloud)
-      self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
-      logging.info('NFS service %s', self.nfs_service)
+      if disk_spec.nfs_ip_address:
+        self.nfs_service = nfs_service.StaticNfsService(disk_spec)
+      else:
+        cloud = group_spec.cloud
+        providers.LoadProvider(cloud)
+        nfs_class = nfs_service.GetNfsServiceClass(cloud)
+        self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
+      logging.debug('NFS service %s', self.nfs_service)
       break
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
