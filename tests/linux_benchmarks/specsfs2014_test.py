@@ -44,7 +44,8 @@ class SpecSfs2014BenchmarkTestCase(unittest.TestCase,
         'maximum file space (MiB)': '4687', 'file size (KB)': '16',
         'run time (seconds)': '300', 'benchmark': 'SWBUILD',
         'business_metric': '1', 'op rate (ops/s)': '500.00',
-        'processes per client': '5', 'initial file space (MiB)': '4296'
+        'processes per client': '5', 'initial file space (MiB)': '4296',
+        'valid_run': True
     }
 
     expected_samples = [
