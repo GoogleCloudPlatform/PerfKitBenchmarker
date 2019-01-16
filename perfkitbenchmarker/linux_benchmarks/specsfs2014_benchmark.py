@@ -241,6 +241,11 @@ def _ParseSpecSfsOutput(output, extra_metadata=None):
       label = '%s (%s)' % (key, units) if units else key
       metadata[label] = element.text
 
+    if run.find('valid_run').text == 'INVALID_RUN':
+      metadata['valid_run'] = False
+    else:
+      metadata['valid_run'] = True
+
     for metric in run.findall('metric'):
       name = metric.attrib['name']
       if name in _PUBLISHED_METRICS:
