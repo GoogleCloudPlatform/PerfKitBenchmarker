@@ -49,6 +49,7 @@ scheduler-mode: noop
 """
 _READ_1X_1D = 2000
 _WRITE_1X_1D = 1000
+ACT_COMMIT = '2cca4113a273cbcf40c30e94fe2f755e50b8ae77'  # ACT 5.0
 
 
 def _Install(vm):
@@ -57,7 +58,7 @@ def _Install(vm):
   vm.Install('openssl')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, ACT_DIR))
   vm.RemoteCommand(
-      'cd {0} && make && make -f Makesalt '.format(ACT_DIR))
+      'cd {0} && git checkout {1} && make'.format(ACT_DIR, ACT_COMMIT))
 
 
 def YumInstall(vm):
@@ -80,7 +81,7 @@ def RunActPrep(vm):
   """Runs actprep binary to initialize the drive."""
 
   def _RunActPrep(device):
-    vm.RobustRemoteCommand('cd {0} && sudo ./actprep {1}'.format(
+    vm.RobustRemoteCommand('cd {0} && sudo ./target/bin/act_prep {1}'.format(
         ACT_DIR, device.GetDevicePath()))
 
   assert len(vm.scratch_disks) > FLAGS.act_reserved_partitions, (
@@ -127,11 +128,11 @@ def RunAct(vm, index=None):
     act_config_metadata = {'device_index': index}
   # Push config file to remote VM.
   vm.RobustRemoteCommand(
-      'cd {0} && sudo ./act ~/{1} > ~/{2}'.format(
+      'cd {0} && sudo ./target/bin/act_storage ~/{1} > ~/{2}'.format(
           ACT_DIR, config, output))
   # Shows 1,2,4,8,..,64
   out, _ = vm.RemoteCommand(
-      'cd {0} && ./latency_calc/act_latency.py -n 7 -e 1 -l ~/{1}'.format(
+      'cd {0} && ./analysis/act_latency.py -n 7 -e 1 -l ~/{1}'.format(
           ACT_DIR, output))
   samples = ParseRunAct(out)
   act_config_metadata.update(
@@ -209,6 +210,7 @@ def ParseRunAct(out):
 def GetActMetadata(num_disk):
   # TODO(user): Expose more stats and flags.
   return {
+      'act-version': '5.0',
       'act-parallel': FLAGS.act_parallel,
       'reserved_partition': FLAGS.act_reserved_partitions,
       'device-count': num_disk,
