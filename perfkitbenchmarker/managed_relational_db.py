@@ -177,7 +177,8 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
     }
-    if hasattr(self.spec.vm_spec, 'machine_type'):
+    if (hasattr(self.spec.vm_spec, 'machine_type') and
+        self.spec.vm_spec.machine_type):
       metadata.update({
           'machine_type': self.spec.vm_spec.machine_type,
       })
