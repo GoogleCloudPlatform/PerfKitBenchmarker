@@ -352,6 +352,8 @@ class BaseVirtualMachine(resource.BaseResource):
     Returns:
       dict mapping string property key to value.
     """
+    if not self.created:
+      return {}
     result = self.metadata.copy()
     result.update({
         'image': self.image,
