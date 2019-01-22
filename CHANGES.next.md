@@ -378,3 +378,5 @@
 - Install NCCL when installing Tensorflow with GPU support.
 - Update AzureBlobStorageService to persist for max of `--timeout_minutes` and `--persistent_timeout_minutes`.
 - Add --project flag to GoogleCloudStorageService MakeBucket command.
+- Fix virtual_machine.GetResourceMetadata() so that it does not try to gather
+  metadata from a VM that has not been provisioned yet.
