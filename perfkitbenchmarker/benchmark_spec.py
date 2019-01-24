@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import threading
 import uuid
 
 from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
@@ -139,6 +140,7 @@ class BenchmarkSpec(object):
     self.nfs_service = None
     self.app_groups = {}
     self._zone_index = 0
+    self.capacity_reservations = []
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -339,6 +341,18 @@ class BenchmarkSpec(object):
 
     return vms
 
+  def ConstructCapacityReservations(self):
+    """Construct capacity reservations for each VM group."""
+    if not FLAGS.use_capacity_reservations:
+      return
+    for vm_group in self.vm_groups.itervalues():
+      cloud = vm_group[0].CLOUD
+      providers.LoadProvider(cloud)
+      capacity_reservation_class = capacity_reservation.GetResourceClass(
+          cloud)
+      self.capacity_reservations.append(
+          capacity_reservation_class(vm_group))
+
   def _CheckBenchmarkSupport(self, cloud):
     """Throw an exception if the benchmark isn't supported."""
 
@@ -433,6 +447,17 @@ class BenchmarkSpec(object):
 
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
+    # Create capacity reservations if the cloud supports it. Note that the
+    # capacity reservation class may update the VMs themselves. This is true
+    # on AWS, because the VM needs to be aware of the capacity resrevation id
+    # before its Create() method is called. Furthermore, if the user does not
+    # specify an AWS zone, but a region instead, the AwsCapacityReservation
+    # class will make a reservation in a zone that has sufficient capacity.
+    # In this case the VM's zone attribute, and the VMs network instance
+    # need to be updated as well.
+    if self.capacity_reservations:
+      vm_util.RunThreaded(lambda res: res.Create(), self.capacity_reservations)
+
     # Sort networks into a guaranteed order of creation based on dict key.
     # There is a finite limit on the number of threads that are created to
     # provision networks. Until support is added to provision resources in an
@@ -507,6 +532,16 @@ class BenchmarkSpec(object):
       self.edw_service.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
+
+    # Note: It is ok to delete capacity reservations before deleting the VMs,
+    # and will actually save money (mere seconds of usage).
+    if self.capacity_reservations:
+      try:
+        vm_util.RunThreaded(lambda reservation: reservation.Delete(),
+                            self.capacity_reservations)
+      except Exception:  # pylint: disable=broad-except
+        logging.exception('Got an exception deleting CapacityReservations. '
+                          'Attempting to continue tearing down.')
 
     if self.vms:
       try:

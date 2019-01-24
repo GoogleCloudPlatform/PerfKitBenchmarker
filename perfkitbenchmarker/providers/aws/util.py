@@ -66,6 +66,20 @@ def GetRegionFromZones(zones):
   return region
 
 
+def GetZonesInRegion(region):
+  """Returns all available zones in a given region."""
+  get_zones_cmd = AWS_PREFIX + [
+      'ec2',
+      'describe-availability-zones',
+      '--region={0}'.format(region)
+  ]
+  stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
+  response = json.loads(stdout)
+  zones = [item['ZoneName'] for item in response['AvailabilityZones']
+           if item['State'] == 'available']
+  return zones
+
+
 def GroupZonesIntoRegions(zones):
   """Returns a map of regions to zones."""
   regions_to_zones_map = collections.defaultdict(set)
