@@ -275,6 +275,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.tcp_congestion_control = None
     self.numa_node_count = None
     self.num_disable_cpus = None
+    self.capacity_reservation_id = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
