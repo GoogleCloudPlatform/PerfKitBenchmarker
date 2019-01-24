@@ -162,18 +162,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _GetNewZones(self):
     """Returns a list of zones, excluding the one that the client VM is in."""
-    zones = self.zones
-    region = self.region
-    get_zones_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-availability-zones',
-        '--region={0}'.format(region)
-    ]
-    stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
-    response = json.loads(stdout)
-    all_zones = [item['ZoneName'] for item in response['AvailabilityZones']
-                 if item['State'] == 'available']
-    for zone in zones:
+    all_zones = util.GetZonesInRegion(self.region)
+    for zone in self.zones:
       all_zones.remove(zone)
     return all_zones
 
