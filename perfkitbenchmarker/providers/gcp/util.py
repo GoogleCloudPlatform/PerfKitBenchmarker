@@ -63,6 +63,61 @@ def GetMultiRegionFromRegion(region):
     raise Exception('Unknown region "%s".' % region)
 
 
+def IssueCommandFunction(cmd, **kwargs):
+  """Use vm_util to issue the given command.
+
+  Args:
+    cmd: the gcloud command to run
+    **kwargs: additional arguments for the gcloud command
+
+  Returns:
+    stdout, stderr, retcode tuple from running the command
+  """
+  return vm_util.IssueCommand(cmd.GetCommand(), **kwargs)
+
+
+def IssueRetryableCommandFunction(cmd, **kwargs):
+  """Use vm_util to issue the given retryable command.
+
+  Args:
+    cmd: the gcloud command to run
+    **kwargs: additional arguments for the gcloud command
+
+  Returns:
+    stdout, stderr, tuple from running the command
+  """
+  return vm_util.IssueRetryableCommand(cmd.GetCommand(), **kwargs)
+
+
+# The function that is used to issue a command, when given a GcloudCommand
+# object and additional arguments. Can be overridden.
+_issue_command_function = IssueCommandFunction
+
+# The function that is used to issue a retryable command, when given a
+# GcloudCommand object and additional arguments. Can be overridden.
+_issue_retryable_command_function = IssueRetryableCommandFunction
+
+
+def SetIssueCommandFunction(func):
+  """Set the issue command function to be the given function.
+
+  Args:
+    func: the function to run when issuing a GcloudCommand.
+  """
+  global _issue_command_function
+  _issue_command_function = func
+
+
+def SetIssueRetryableCommandFunction(func):
+  """Set the issue retryable command function to be the given function.
+
+  Args:
+    func: the function to run when issuing a GcloudCommand.
+  """
+  global _issue_retryable_command_function
+  _issue_retryable_command_function = func
+
+
 class GcloudCommand(object):
   """A gcloud command.
 
@@ -93,7 +148,7 @@ class GcloudCommand(object):
     self.additional_flags = []
     self._AddCommonFlags(resource)
 
-  def _GetCommand(self):
+  def GetCommand(self):
     """Generates the gcloud command.
 
     Returns:
@@ -114,19 +169,19 @@ class GcloudCommand(object):
     return cmd
 
   def __repr__(self):
-    return '{0}({1})'.format(type(self).__name__, ' '.join(self._GetCommand()))
+    return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
   def Issue(self, **kwargs):
-    """Tries running the gcloud command once.
+    """Tries to run the gcloud command once.
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
-          issuing the gcloud command.
+        issuing the gcloud command.
 
     Returns:
       A tuple of stdout, stderr, and retcode from running the gcloud command.
     """
-    return vm_util.IssueCommand(self._GetCommand(), **kwargs)
+    return _issue_command_function(self, **kwargs)
 
   def IssueRetryable(self, **kwargs):
     """Tries running the gcloud command until it succeeds or times out.
@@ -138,7 +193,7 @@ class GcloudCommand(object):
     Returns:
       (stdout, stderr) pair of strings from running the gcloud command.
     """
-    return vm_util.IssueRetryableCommand(self._GetCommand(), **kwargs)
+    return _issue_retryable_command_function(self, **kwargs)
 
   def _AddCommonFlags(self, resource):
     """Adds common flags to the command.

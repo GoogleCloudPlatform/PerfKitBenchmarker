@@ -48,25 +48,28 @@ class GcloudCommandTestCase(unittest.TestCase):
   def testCommonFlagsWithoutOptionalFlags(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    self.assertEqual(cmd._GetCommand(), [
+    self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-        '--quiet'])
+        '--quiet'
+    ])
 
   def testCommonFlagsWithOptionalFlags(self):
     gce_resource = GceResource(project='test-project', zone='test-zone')
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    self.assertEqual(cmd._GetCommand(), [
+    self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-        '--quiet', '--project', 'test-project', '--zone', 'test-zone'])
+        '--quiet', '--project', 'test-project', '--zone', 'test-zone'
+    ])
 
   def testListValue(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'instances', 'create')
     cmd.flags['local-ssd'] = ['interface=nvme', 'interface=SCSI']
-    self.assertEqual(cmd._GetCommand(), [
+    self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'instances', 'create', '--format', 'json',
         '--quiet', '--local-ssd', 'interface=nvme', '--local-ssd',
-        'interface=SCSI'])
+        'interface=SCSI'
+    ])
 
   def testIssue(self):
     gce_resource = GceResource(project=None)
