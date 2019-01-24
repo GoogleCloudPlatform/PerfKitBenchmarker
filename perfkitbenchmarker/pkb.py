@@ -312,10 +312,10 @@ flags.DEFINE_integer(
     'providers.')
 flags.DEFINE_integer(
     'persistent_timeout_minutes', 240,
-    'An upper bound on the time in minutes that resources left behind by the  '
-    'benchmark is expected run. Some benchmarks purposefully create resources '
-    'for other benchmarks to use.   Persistent timeout guages who long '
-    'these shared should live.')
+    'An upper bound on the time in minutes that resources left behind by the '
+    'benchmark. Some benchmarks purposefully create resources for other '
+    'benchmarks to use. Persistent timeout specifies how long these shared '
+    'resources should live.')
 flags.DEFINE_bool('disable_interrupt_moderation', False,
                   'Turn off the interrupt moderation networking feature')
 flags.DEFINE_bool('disable_rss', False,
@@ -513,6 +513,10 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
+  # CapacityReservations need to be constructed after VirtualMachines because
+  # it needs information about the VMs (machine type, count, zone, etc). The
+  # CapacityReservations will be provisioned before VMs.
+  spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
   spec.ConstructCloudRedis()
@@ -761,10 +765,9 @@ def RunBenchmark(spec, collector):
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
         if FLAGS.create_failed_run_samples:
-          collector.AddSamples(MakeFailedRunSample(spec, str(e),
-                                                   current_run_stage),
-                               spec.name,
-                               spec)
+          collector.AddSamples(MakeFailedRunSample(
+              spec, str(e), current_run_stage), spec.name, spec)
+
         # If the particular benchmark requests us to always call cleanup, do it
         # here.
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:

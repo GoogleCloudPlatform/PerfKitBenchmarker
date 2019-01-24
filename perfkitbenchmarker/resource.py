@@ -42,8 +42,9 @@ def GetResourceClass(base_class, **kwargs):
   key = [base_class.__name__]
   key += sorted(kwargs.items())
   if tuple(key) not in _RESOURCE_REGISTRY:
-    raise Exception('No %s subclass defined with the attributes: %s' %
-                    (base_class.__name__, kwargs))
+    raise errors.Resource.SubclassNotFoundError(
+        'No %s subclass defined with the attributes: %s' %
+        (base_class.__name__, kwargs))
   return _RESOURCE_REGISTRY.get(tuple(key))
 
 
