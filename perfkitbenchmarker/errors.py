@@ -184,6 +184,9 @@ class Resource(object):
   class RetryableGetError(Error):
     pass
 
+  class SubclassNotFoundError(Error):
+    pass
+
 
 class Config(object):
   """Errors related to configs."""

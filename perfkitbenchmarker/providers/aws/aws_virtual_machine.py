@@ -633,6 +633,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append('--placement=%s' % placement)
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
+    if self.capacity_reservation_id:
+      create_cmd.append(
+          '--capacity-reservation-specification=CapacityReservationTarget='
+          '{CapacityReservationId=%s}' % self.capacity_reservation_id)
     if self.use_spot_instance:
       instance_market_options = OrderedDict()
       spot_options = OrderedDict()
