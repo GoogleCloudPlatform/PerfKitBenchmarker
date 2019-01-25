@@ -311,7 +311,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # The hostname '%' means unrestricted access from any host.
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.spec.database_username,
-        '--host=%', '--instance={0}'.format(self.instance_id),
+        '%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     _, _, _ = cmd.Issue()
 
