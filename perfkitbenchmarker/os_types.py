@@ -49,7 +49,7 @@ BASE_OS_TYPES = [
     WINDOWS]
 
 flags.DEFINE_enum(
-    'os_type', DEBIAN, ALL,
+    'os_type', UBUNTU1604, ALL,
     'The VM\'s OS type. Ubuntu\'s os_type can also be specified as "debian" '
     'because it is largely built on Debian and uses the same package manager. '
     'Likewise, CentOS\'s os_type can be "rhel". In general if two OS\'s use '
