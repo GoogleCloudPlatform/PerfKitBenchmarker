@@ -59,19 +59,21 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(AwsCapacityReservationTest, self).setUp()
 
-    self._create_patch(util.__name__ + '.MakeDefaultTags',
-                       return_val={'timeout_utc': TIMEOUT_UTC})
-    self._create_patch(util.__name__ + '.GetZonesInRegion',
-                       return_val=['us-west-1a', 'us-west-1b'])
+    self._create_patch(
+        util.__name__ + '.MakeDefaultTags',
+        return_val={'timeout_utc': TIMEOUT_UTC})
+    self._create_patch(
+        util.__name__ + '.GetZonesInRegion',
+        return_val=['us-west-1a', 'us-west-1b'])
 
   def test_create(self):
     vm_group = [FakeAwsVirtualMachine()]
     capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(
         vm_group)
 
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=(CREATE_STDOUT_SUCCESSFUL, '', 0)
-                   ) as issue_command:
+    with mock.patch(
+        vm_util.__name__ + '.IssueCommand',
+        return_value=(CREATE_STDOUT_SUCCESSFUL, '', 0)) as issue_command:
       capacity_reservation._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -80,8 +82,8 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
           '--instance-type=fake_machine_type '
           '--instance-platform=Linux/UNIX --availability-zone=us-west-1a '
           '--instance-count=1 --instance-match-criteria=targeted '
-          '--region=us-west-1 --end-date-type=limited --end-date=%s'
-          % TIMEOUT_UTC)
+          '--region=us-west-1 --end-date-type=limited --end-date=%s' %
+          TIMEOUT_UTC)
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(expected_command, command_string)
