@@ -569,10 +569,17 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     cloud = config_values['cloud']
     if flag_values['managed_db_zone'].present:
       config_values['vm_spec'][cloud]['zone'] = (
-          flag_values.managed_db_zone)
+          flag_values.managed_db_zone[0])
+      config_values['zones'] = flag_values.managed_db_zone
     if flag_values['managed_db_machine_type'].present:
       config_values['vm_spec'][cloud]['machine_type'] = (
           flag_values.managed_db_machine_type)
+    if flag_values['managed_db_disk_size'].present:
+      config_values['disk_spec'][cloud]['disk_size'] = (
+          flag_values.managed_db_disk_size)
+    if flag_values['managed_db_disk_type'].present:
+      config_values['disk_spec'][cloud]['disk_type'] = (
+          flag_values.managed_db_disk_type)
 
 
 class _SparkServiceSpec(spec.BaseSpec):
