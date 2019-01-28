@@ -42,10 +42,14 @@ flags.DEFINE_string('managed_db_backup_start_time', '07:00',
                     'Time in UTC that automated backups (if enabled) '
                     'will be scheduled. In the form HH:MM UTC. '
                     'Defaults to 07:00 UTC')
-flags.DEFINE_string('managed_db_zone', None,
-                    'zone or region to launch the database in. '
-                    'Defaults to the client vm\'s zone.')
+flags.DEFINE_list('managed_db_zone', None,
+                  'zone or region to launch the database in. '
+                  'Defaults to the client vm\'s zone.')
 flags.DEFINE_string('managed_db_machine_type', None,
+                    'Machine type of the database.')
+flags.DEFINE_integer('managed_db_disk_size', None,
+                     'Size of the database disk in GB.')
+flags.DEFINE_string('managed_db_disk_type', None,
                     'Machine type of the database.')
 
 

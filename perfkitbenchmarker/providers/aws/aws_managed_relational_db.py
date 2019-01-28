@@ -491,11 +491,15 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       if len(self.zones) > 1:
         self.secondary_zone = ','.join(self.zones[1:])
     else:
+      db_instance = describe_instance_json['DBInstances'][0]
       self.primary_zone = (
-          describe_instance_json['DBInstances'][0]['AvailabilityZone'])
+          db_instance['AvailabilityZone'])
       if self.spec.high_availability:
-        self.secondary_zone = (describe_instance_json['DBInstances'][0]
-                               ['SecondaryAvailabilityZone'])
+        if 'SecondaryAvailabilityZone' in db_instance:
+          self.secondary_zone = db_instance['SecondaryAvailabilityZone']
+        else:
+          # the secondary DB for RDS is in the second subnet.
+          self.secondary_zone = self.subnets_used_by_db[1].zone
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
@@ -511,7 +515,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         or an Exception occurred.
     """
 
-    if len(self.all_instance_ids) == 0:
+    if not self.all_instance_ids:
       return False
 
     for instance_id in self.all_instance_ids:
