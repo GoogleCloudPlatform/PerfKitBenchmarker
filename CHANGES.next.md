@@ -232,6 +232,8 @@
 - Add default tags to GKE.
 - Add support for using real data from GCS and add support to download GCS data
   to vm in the Tensorflow benchmark.
+- Added flag `nttcp_config_list` to allow the user to supply a list of test
+  configurations, all to be run in a single run phase.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
