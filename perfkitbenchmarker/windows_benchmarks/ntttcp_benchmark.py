@@ -14,11 +14,19 @@
 
 """Run NTttcp between two VMs."""
 
+import itertools
+import logging
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import publisher
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.windows_packages import ntttcp
+
+
+# When adding new configs to ntttcp_config_list, increase this value
+_NUM_PARAMS_IN_CONFIG = 3
 
 FLAGS = flags.FLAGS
 
@@ -38,14 +46,32 @@ def GetConfig(user_config):
 
 
 def Prepare(benchmark_spec):
+  """Install ntttcp and open any ports we need."""
   vms = benchmark_spec.vms
 
   for vm in vms:
     vm.Install('ntttcp')
     vm.AllowPort(ntttcp.CONTROL_PORT)
+    # get the number of ports needed based on the flags
+    num_ports = max([c.threads for c in ntttcp.ParseConfigList()])
     for port in xrange(ntttcp.BASE_DATA_PORT,
-                       ntttcp.BASE_DATA_PORT + FLAGS.ntttcp_threads):
+                       ntttcp.BASE_DATA_PORT + num_ports):
       vm.AllowPort(port)
+
+
+def _RunTest(benchmark_spec, sender, receiver, dest_ip, ip_type, conf,
+             cooldown_s):
+  """Run a single NTTTCP test, and publish the results."""
+  try:
+    results = ntttcp.RunNtttcp(sender, receiver, dest_ip, ip_type, conf.udp,
+                               conf.threads, conf.time_s, conf.packet_size,
+                               cooldown_s)
+    publisher.PublishRunStageSamples(benchmark_spec, results)
+    return True
+  except IOError:
+    logging.info('Failed to publish %s IP results for config %s', ip_type,
+                 str(conf))
+    return False
 
 
 def Run(benchmark_spec):
@@ -59,28 +85,34 @@ def Run(benchmark_spec):
     A list of sample.Sample objects with the benchmark results.
   """
 
-  vms = benchmark_spec.vms
-  results = []
+  vm_sets = [(benchmark_spec.vms[0], benchmark_spec.vms[1]),
+             (benchmark_spec.vms[1], benchmark_spec.vms[0])]
+
+  parsed_configs = ntttcp.ParseConfigList()
+
+  # Keep accounting of failed configs.
+  failed_confs = []
 
   # Send traffic in both directions
-  for originator in [0, 1]:
-    sending_vm = vms[originator]
-    receiving_vm = vms[originator ^ 1]
+  for ((sender, receiver), conf) in itertools.product(vm_sets, parsed_configs):
     # Send using external IP addresses
-    if vm_util.ShouldRunOnExternalIpAddress():
-      results.extend(ntttcp.RunNtttcp(sending_vm,
-                                      receiving_vm,
-                                      receiving_vm.ip_address,
-                                      'external'))
+    if vm_util.ShouldRunOnExternalIpAddress(conf.ip_type):
+      if not _RunTest(benchmark_spec, sender, receiver, receiver.ip_address,
+                      'external', conf, True):
+        failed_confs.append(('external', conf))
 
     # Send using internal IP addresses
-    if vm_util.ShouldRunOnInternalIpAddress(sending_vm,
-                                            receiving_vm):
-      results.extend(ntttcp.RunNtttcp(sending_vm,
-                                      receiving_vm,
-                                      receiving_vm.internal_ip,
-                                      'internal'))
-  return results
+    if vm_util.ShouldRunOnInternalIpAddress(sender, receiver, conf.ip_type):
+      if not _RunTest(benchmark_spec, sender, receiver, receiver.internal_ip,
+                      'internal', conf,
+                      len(parsed_configs) > 1):
+        failed_confs.append(('internal', conf))
+
+  if failed_confs:
+    logging.info('Failed to run test and/or gather results for %s',
+                 str(failed_confs))
+
+  return []
 
 
 def Cleanup(unused_benchmark_spec):

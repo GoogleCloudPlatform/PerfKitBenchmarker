@@ -21,7 +21,9 @@ More information about NTttcp may be found here:
 https://gallery.technet.microsoft.com/NTttcp-Version-528-Now-f8b12769
 """
 
+import collections
 import ntpath
+import time
 import xml.etree.ElementTree
 
 from perfkitbenchmarker import background_tasks
@@ -39,6 +41,9 @@ flags.DEFINE_integer('ntttcp_time', 60,
                      'The number of seconds for NTttcp to run.')
 
 flags.DEFINE_bool('ntttcp_udp', False, 'Whether to run a UDP test.')
+
+flags.DEFINE_integer('ntttcp_cooldown_time', 60,
+                     'Time to wait between the test runs.')
 
 flags.DEFINE_integer('ntttcp_packet_size', None,
                      'The size of the packet being used in the test.')
@@ -59,6 +64,15 @@ flags.DEFINE_integer('ntttcp_receiver_rb', -1,
                      'The size of the receive buffer, in Kilo Bytes, on the '
                      'receiving VM. The default is the OS default.')
 
+flags.DEFINE_list(
+    'ntttcp_config_list', '',
+    'comma separated list of configs to run with ntttcp. The '
+    'format for a single config is UDP:THREADS:RUNTIME_S:IP_TYPE:PACKET_SIZE, '
+    'for example True:4:60:INTERNAL:0,False:8:60:EXTERNAL:150')
+
+# When adding new configs to ntttcp_config_list, increase this value
+_NUM_PARAMS_IN_CONFIG = 5
+
 CONTROL_PORT = 6001
 BASE_DATA_PORT = 5001
 NTTTCP_RETRIES = 10
@@ -67,12 +81,97 @@ NTTTCP_ZIP = NTTTCP_DIR + '.zip'
 NTTTCP_URL = ('https://gallery.technet.microsoft.com/NTttcp-Version-528-'
               'Now-f8b12769/file/159655/1/' + NTTTCP_ZIP)
 
+TRUE_VALS = ['True', 'true', 't']
+FALSE_VALS = ['False', 'false', 'f']
+
+# named tuple used in passing configs around
+NtttcpConf = collections.namedtuple('NtttcpConf',
+                                    'udp threads time_s ip_type packet_size')
+
+
+def NtttcpConfigListValidator(value):
+  """Returns whether or not the config list flag is valid."""
+  if len(value) == 1 and not value[0]:
+    # not using the config list here
+    return True
+  for config in value:
+    config_vals = config.split(':')
+    if len(config_vals) < _NUM_PARAMS_IN_CONFIG:
+      return False
+
+    try:
+      udp = config_vals[0]
+      threads = int(config_vals[1])
+      time_s = int(config_vals[2])
+      ip_type = config_vals[3]
+      packet_size = int(config_vals[4])
+    except ValueError:
+      return False
+
+    if udp not in TRUE_VALS + FALSE_VALS:
+      return False
+
+    if threads < 1:
+      return False
+
+    if time_s < 1:
+      return False
+
+    if packet_size < 0:
+      return False
+
+    # verify the ip type
+    if ip_type not in [
+        vm_util.IpAddressSubset.EXTERNAL, vm_util.IpAddressSubset.INTERNAL
+    ]:
+      return False
+
+  return True
+
+
+flags.register_validator('ntttcp_config_list', NtttcpConfigListValidator,
+                         'malformed config list')
+
+
+def ParseConfigList():
+  """Get the list of configs for the test from the flags."""
+  if not FLAGS.ntttcp_config_list:
+    # config is the empty string.
+    return [
+        NtttcpConf(
+            udp=FLAGS.ntttcp_udp,
+            threads=FLAGS.ntttcp_threads,
+            time_s=FLAGS.ntttcp_time,
+            ip_type=FLAGS.ip_addresses,
+            packet_size=FLAGS.ntttcp_packet_size)
+    ]
+
+  conf_list = []
+  for config in FLAGS.ntttcp_config_list:
+    confs = config.split(':')
+
+    conf_list.append(
+        NtttcpConf(
+            udp=(confs[0] in TRUE_VALS),
+            threads=int(confs[1]),
+            time_s=int(confs[2]),
+            ip_type=confs[3],
+            packet_size=int(confs[4])))
+
+  return conf_list
+
 
 def Install(vm):
   """Installs the NTttcp package on the VM."""
   zip_path = ntpath.join(vm.temp_dir, NTTTCP_ZIP)
   vm.DownloadFile(NTTTCP_URL, zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
+
+
+@vm_util.Retry(poll_interval=60, fuzz=1, max_retries=NTTTCP_RETRIES)
+def _TaskKillNtttcp(vm):
+  kill_command = 'taskkill /IM ntttcp /F'
+  vm.RemoteCommand(kill_command, ignore_failure=True, suppress_warning=True)
 
 
 def _RunNtttcp(vm, options):
@@ -103,30 +202,36 @@ def _GetSockBufferSize(sock_buff_size):
 
 
 @vm_util.Retry(max_retries=NTTTCP_RETRIES)
-def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
+def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type, udp,
+              threads, time_s, packet_size, cooldown):
   """Run NTttcp and return the samples collected from the run."""
 
+  if cooldown:
+    time.sleep(FLAGS.ntttcp_cooldown_time)
+
+  # Clean up any stray ntttcp processes in case this is retry.
+  _TaskKillNtttcp(sending_vm)
+  _TaskKillNtttcp(receiving_vm)
+
   packet_size_string = ''
-  if FLAGS.ntttcp_packet_size:
-    packet_size_string = ' -l %d ' % FLAGS.ntttcp_packet_size
+  if packet_size:
+    packet_size_string = ' -l %d ' % packet_size
 
   shared_options = '-xml -t {time} -p {port} {packet_size}'.format(
-      time=FLAGS.ntttcp_time,
-      port=BASE_DATA_PORT,
-      packet_size=packet_size_string)
+      time=time_s, port=BASE_DATA_PORT, packet_size=packet_size_string)
 
-  udp_string = '-u' if FLAGS.ntttcp_udp else ''
+  udp_string = '-u' if udp else ''
   sending_options = shared_options + (
       '-s {udp} -m \'{threads},*,{ip}\' -rb {rb} -sb {sb}').format(
           udp=udp_string,
-          threads=FLAGS.ntttcp_threads,
+          threads=threads,
           ip=receiving_ip_address,
           rb=_GetSockBufferSize(FLAGS.ntttcp_sender_rb),
           sb=_GetSockBufferSize(FLAGS.ntttcp_sender_sb))
   receiving_options = shared_options + (
       '-r {udp} -m \'{threads},*,0.0.0.0\' -rb {rb} -sb {sb}').format(
           udp=udp_string,
-          threads=FLAGS.ntttcp_threads,
+          threads=threads,
           rb=_GetSockBufferSize(FLAGS.ntttcp_receiver_rb),
           sb=_GetSockBufferSize(FLAGS.ntttcp_receiver_sb))
 
