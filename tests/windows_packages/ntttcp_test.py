@@ -16,6 +16,7 @@
 
 import os
 import unittest
+import parameterized
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -24,6 +25,8 @@ from perfkitbenchmarker.windows_packages import ntttcp
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
+
+NtttcpConf = ntttcp.NtttcpConf
 
 
 class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
@@ -35,6 +38,7 @@ class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     return contents
 
   def setUp(self):
+    super(NtttcpBenchmarkTestCase, self).setUp()
     self.xml_tcp_send_results = self.getDataContents('ntttcp_tcp_sender.xml')
     self.xml_tcp_rec_results = self.getDataContents('ntttcp_tcp_receiver.xml')
     self.xml_udp_send_results = self.getDataContents('ntttcp_udp_sender.xml')
@@ -211,6 +215,56 @@ class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     ]
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+  def testSingleConfigParse(self):
+    ntttcp.FLAGS.ntttcp_config_list = ['True:7:800:INTERNAL:1']
+    expected_list = [
+        NtttcpConf(
+            udp=True, threads=7, time_s=800, ip_type='INTERNAL', packet_size=1)
+    ]
+    conf_list = ntttcp.ParseConfigList()
+    self.assertListEqual(conf_list, expected_list)
+
+  def testEmptyConfig(self):
+    ntttcp.FLAGS.ntttcp_config_list = []
+    expected_list = [
+        NtttcpConf(
+            udp=FLAGS.ntttcp_udp,
+            threads=FLAGS.ntttcp_threads,
+            time_s=FLAGS.ntttcp_time,
+            ip_type=FLAGS.ip_addresses,
+            packet_size=FLAGS.ntttcp_packet_size)
+    ]
+    conf_list = ntttcp.ParseConfigList()
+    self.assertListEqual(conf_list, expected_list)
+
+  def testMultiConfigParse(self):
+    ntttcp.FLAGS.ntttcp_config_list = [
+        'True:7:800:INTERNAL:1', 'False:1:2:EXTERNAL:2',
+        'True:44:1001:INTERNAL:3'
+    ]
+    expected_list = [
+        NtttcpConf(
+            udp=True, threads=7, time_s=800, ip_type='INTERNAL', packet_size=1),
+        NtttcpConf(
+            udp=False, threads=1, time_s=2, ip_type='EXTERNAL', packet_size=2),
+        NtttcpConf(
+            udp=True,
+            threads=44,
+            time_s=1001,
+            ip_type='INTERNAL',
+            packet_size=3),
+    ]
+    conf_list = ntttcp.ParseConfigList()
+    self.assertListEqual(conf_list, expected_list)
+
+  @parameterized.parameterized.expand(
+      [('MissingVal', ['True:7:800:INTERNAL:1', 'False::2:EXTERNAL:2']),
+       ('Misspell', ['rue:7:800:INTERNAL:3', 'True:44:1001:EXTERNAL:4']),
+       ('WrongOrder', ['True:7:INTERNAL:800:1', '44:True:1001:EXTERNAL:6'])])
+  def testMalformedConfig(self, name, conf):
+    with self.assertRaises(flags.IllegalFlagValueError):
+      ntttcp.FLAGS.ntttcp_config_list = conf
 
 
 if __name__ == '__main__':

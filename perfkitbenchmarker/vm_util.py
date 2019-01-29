@@ -408,14 +408,14 @@ def ParseTimeCommandResult(command_result):
   return time_in_seconds
 
 
-def ShouldRunOnExternalIpAddress():
+def ShouldRunOnExternalIpAddress(ip_type=None):
   """Returns whether a test should be run on an instance's external IP."""
-  return FLAGS.ip_addresses in (IpAddressSubset.EXTERNAL,
-                                IpAddressSubset.BOTH,
-                                IpAddressSubset.REACHABLE)
+  ip_type_to_check = ip_type or FLAGS.ip_addresses
+  return ip_type_to_check in (IpAddressSubset.EXTERNAL, IpAddressSubset.BOTH,
+                              IpAddressSubset.REACHABLE)
 
 
-def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
+def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm, ip_type=None):
   """Returns whether a test should be run on an instance's internal IP.
 
   Based on the command line flag --ip_addresses. Internal IP addresses are used
@@ -428,14 +428,15 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
   Args:
     sending_vm: VirtualMachine. The client.
     receiving_vm: VirtualMachine. The server.
+    ip_type: optional ip_type to use instead of what is set in the FLAGS
 
   Returns:
     Whether a test should be run on an instance's internal IP.
   """
-  return (FLAGS.ip_addresses in (IpAddressSubset.BOTH,
-                                 IpAddressSubset.INTERNAL) or
-          (FLAGS.ip_addresses == IpAddressSubset.REACHABLE and
-           sending_vm.IsReachable(receiving_vm)))
+  ip_type_to_check = ip_type or FLAGS.ip_addresses
+  return (ip_type_to_check in (IpAddressSubset.BOTH, IpAddressSubset.INTERNAL)
+          or (ip_type_to_check == IpAddressSubset.REACHABLE and
+              sending_vm.IsReachable(receiving_vm)))
 
 
 def GetLastRunUri():
