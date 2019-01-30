@@ -34,8 +34,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark \
-    as hbase_ycsb
+from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
 from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
