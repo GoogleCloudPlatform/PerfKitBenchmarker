@@ -384,3 +384,4 @@
 - Add --project flag to GoogleCloudStorageService MakeBucket command.
 - Fix virtual_machine.GetResourceMetadata() so that it does not try to gather
   metadata from a VM that has not been provisioned yet.
+- TPU Pod doesn't support eval. Stop Evaluation in train phrase in MNIST benchmark.
