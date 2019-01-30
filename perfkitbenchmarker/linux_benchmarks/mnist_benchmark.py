@@ -346,7 +346,7 @@ def Run(benchmark_spec):
   if benchmark_spec.train_steps:
     mnist_benchmark_train_cmd = (
         '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
-        '--num_shards={num_shards}'.format(
+        '--num_shards={num_shards} --noenable_predict'.format(
             cmd=mnist_benchmark_cmd,
             tpu=benchmark_spec.tpu_train,
             use_tpu=benchmark_spec.use_tpu,
