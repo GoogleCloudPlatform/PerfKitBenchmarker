@@ -151,6 +151,9 @@ flags.DEFINE_string('image', None, 'Default image that will be '
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to %d '
                     'characters in length.' % MAX_RUN_URI_LENGTH)
+flags.DEFINE_boolean('use_pkb_logging', True, 'Whether to use PKB-specific '
+                     'logging handlers. Disabling this will use the standard '
+                     'ABSL logging directly.')
 
 
 def GetCurrentUser():
@@ -909,11 +912,12 @@ def SetUpPKB():
 
   # Initialize logging.
   vm_util.GenTempDir()
-  log_util.ConfigureLogging(
-      stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri,
-      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
+  if FLAGS.use_pkb_logging:
+    log_util.ConfigureLogging(
+        stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
+        log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
+        run_uri=FLAGS.run_uri,
+        file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   # Translate deprecated flags and log all provided flag values.

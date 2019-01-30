@@ -234,6 +234,7 @@
   to vm in the Tensorflow benchmark.
 - Added flag `nttcp_config_list` to allow the user to supply a list of test
   configurations, all to be run in a single run phase.
+- Add support for --nouse_pkb_logging to use standard ABSL logging instead.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
