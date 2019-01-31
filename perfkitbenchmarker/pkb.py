@@ -1054,6 +1054,16 @@ def SetUpPKB():
   benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
   package_lookup.SetPackageModuleFunction(benchmark_sets.PackageModule)
 
+  # Update max_concurrent_threads to use at least as many threads as VMs. This
+  # is important for the cluster_boot benchmark where we want to launch the VMs
+  # in parallel.
+  if not FLAGS.max_concurrent_threads:
+    FLAGS.max_concurrent_threads = max(
+        background_tasks.MAX_CONCURRENT_THREADS,
+        FLAGS.num_vms)
+    logging.info('Setting --max_concurrent_threads=%d.',
+                 FLAGS.max_concurrent_threads)
+
 
 def RunBenchmarkTasksInSeries(tasks):
   """Runs benchmarks in series.
