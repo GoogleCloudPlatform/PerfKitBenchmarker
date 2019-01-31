@@ -19,9 +19,10 @@ import unittest
 
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import vm_util
+from tests import pkb_common_test_case
 
 
-class LogUtilTestCase(unittest.TestCase):
+class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Tests exercising the utilities in log_util."""
 
   def testThreadLogContextExtendLabel(self):

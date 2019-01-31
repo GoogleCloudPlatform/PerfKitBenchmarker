@@ -66,8 +66,8 @@ from concurrent import futures
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
-
 
 # For situations where an interruptable wait is necessary, a loop of waits with
 # long timeouts is used instead. This is because some of Python's built-in wait
@@ -81,6 +81,18 @@ _WAIT_MAX_RECHECK_DELAY = 0.050  # 50 ms
 # Values sent to child threads that have special meanings.
 _THREAD_STOP_PROCESSING = 0
 _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT = 1
+
+# The default value for max_concurrent_threads.
+MAX_CONCURRENT_THREADS = 200
+
+# The default value is set in pkb.py. It is the greater of
+# MAX_CONCURRENT_THREADS or the value passed to --num_vms. This is particularly
+# important for the cluster_boot benchmark where we want to launch all of the
+# VMs in parallel.
+flags.DEFINE_integer(
+    'max_concurrent_threads', None, 'Maximum number of concurrent threads to '
+    'use when running a benchmark.')
+FLAGS = flags.FLAGS
 
 
 def _GetCallString(target_arg_tuple):
@@ -569,7 +581,7 @@ def RunParallelThreads(target_arg_tuples, max_concurrency, post_task_delay=0):
       errors.VmUtil.ThreadException, post_task_delay)
 
 
-def RunThreaded(target, thread_params, max_concurrent_threads=200):
+def RunThreaded(target, thread_params, max_concurrent_threads=None):
   """Runs the target method in parallel threads.
 
   The method starts up threads with one arg from thread_params as the first arg.
@@ -605,6 +617,10 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
             for i in range(0, 10)]
     RunThreaded(MyThreadedTargetMethod, args)
   """
+  if max_concurrent_threads is None:
+    max_concurrent_threads = (
+        FLAGS.max_concurrent_threads or MAX_CONCURRENT_THREADS)
+
   if not isinstance(thread_params, list):
     raise ValueError('Param "thread_params" must be a list')
 

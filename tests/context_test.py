@@ -20,9 +20,10 @@ import mock
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
+from tests import pkb_common_test_case
 
 
-class ThreadLocalBenchmarkSpecTestCase(unittest.TestCase):
+class ThreadLocalBenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     # Reset the current benchmark spec.
