@@ -521,17 +521,33 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           self.node_group.Delete()
           self.deleted_hosts.add(self.node_group)
 
+  def _ParseDescribeResponse(self, describe_response):
+    """Sets the ID and IP addresses from a response to the describe command.
+
+    Args:
+      describe_response: JSON-loaded response to the describe gcloud command.
+
+    Raises:
+      KeyError, IndexError: If the ID and IP addresses cannot be parsed.
+    """
+    self.id = describe_response['id']
+    network_interface = describe_response['networkInterfaces'][0]
+    self.internal_ip = network_interface['networkIP']
+    self.ip_address = network_interface['accessConfigs'][0]['natIP']
+
+  def _NeedsToParseDescribeResponse(self):
+    """Returns whether the ID and IP addresses still need to be set."""
+    return not self.id or not self.internal_ip or not self.ip_address
+
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
-    getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
-                                         'describe', self.name)
-    stdout, _, _ = getinstance_cmd.Issue()
-    response = json.loads(stdout)
-    self.id = response['id']
-    network_interface = response['networkInterfaces'][0]
-    self.internal_ip = network_interface['networkIP']
-    self.ip_address = network_interface['accessConfigs'][0]['natIP']
+    if self._NeedsToParseDescribeResponse():
+      getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
+                                           'describe', self.name)
+      stdout, _, _ = getinstance_cmd.Issue()
+      response = json.loads(stdout)
+      self._ParseDescribeResponse(response)
     if not self.image:
       getdisk_cmd = util.GcloudCommand(
           self, 'compute', 'disks', 'describe', self.name)
@@ -552,9 +568,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                          'describe', self.name)
     stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True)
     try:
-      json.loads(stdout)
+      response = json.loads(stdout)
     except ValueError:
       return False
+    try:
+      # The VM may exist before we can fully parse the describe response for the
+      # IP address or ID of the VM. For example, if the VM has a status of
+      # provisioning, we can't yet parse the IP address. If this is the case, we
+      # will continue to invoke the describe command in _PostCreate above.
+      # However, if we do have this information now, it's better to stash it and
+      # avoid invoking the describe command again.
+      self._ParseDescribeResponse(response)
+    except (KeyError, IndexError):
+      pass
     return True
 
   def CreateScratchDisk(self, disk_spec):
