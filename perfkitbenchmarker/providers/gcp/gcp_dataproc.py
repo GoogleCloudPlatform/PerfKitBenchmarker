@@ -105,6 +105,9 @@ class GcpDataproc(spark_service.BaseSparkService):
     if FLAGS.gcp_dataproc_property:
       cmd.flags['properties'] = ','.join(FLAGS.gcp_dataproc_property)
 
+    if FLAGS.gcp_dataproc_image:
+          cmd.flags['image'] = FLAGS.gcp_dataproc_image
+
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
 
