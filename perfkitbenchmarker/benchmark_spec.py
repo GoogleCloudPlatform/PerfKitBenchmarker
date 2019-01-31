@@ -485,7 +485,13 @@ class BenchmarkSpec(object):
       self.nfs_service.Create()
 
     if self.vms:
-      vm_util.RunThreaded(self.PrepareVm, self.vms)
+
+      # We separate out creating, booting, and preparing the VMs into two phases
+      # so that we don't slow down the creation of all the VMs by running
+      # commands on the VMs that booted.
+      vm_util.RunThreaded(self.CreateAndBootVm, self.vms)
+      vm_util.RunThreaded(self.PrepareVmAfterBoot, self.vms)
+
       sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
       sshable_vm_groups = {}
       for group_name, group_vms in self.vm_groups.iteritems():
@@ -641,32 +647,46 @@ class BenchmarkSpec(object):
 
     return vm_class(vm_spec)
 
-  def PrepareVm(self, vm):
-    """Creates a single VM and prepares a scratch disk if required.
+  def CreateAndBootVm(self, vm):
+    """Creates a single VM and waits for boot to complete.
 
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
+    vm.Create()
+    logging.info('VM: %s', vm.ip_address)
+    logging.info('Waiting for boot completion.')
+    vm.AllowRemoteAccessPorts()
+    vm.WaitForBootCompletion()
+
+  def PrepareVmAfterBoot(self, vm):
+    """Prepares a VM after it has booted.
+
+    This function will prepare a scratch disk if required.
+
+    Args:
+        vm: The BaseVirtualMachine object representing the VM.
+
+    Raises:
+        Exception: If --vm_metadata is malformed.
+    """
     vm_metadata = {
-        'benchmark': self.name,
-        'perfkit_uuid': self.uuid,
-        'benchmark_uid': self.uid,
+        'benchmark':
+            self.name,
+        'perfkit_uuid':
+            self.uuid,
+        'benchmark_uid':
+            self.uid,
         'create_time_utc':
-        datetime.datetime.utcnow().strftime(METADATA_TIME_FORMAT),
-        'owner': FLAGS.owner
+            datetime.datetime.utcfromtimestamp(vm.create_start_time),
+        'owner':
+            FLAGS.owner
     }
     for item in FLAGS.vm_metadata:
       if ':' not in item:
         raise Exception('"%s" not in expected key:value format' % item)
       key, value = item.split(':', 1)
       vm_metadata[key] = value
-
-    vm.Create()
-
-    logging.info('VM: %s', vm.ip_address)
-    logging.info('Waiting for boot completion.')
-    vm.AllowRemoteAccessPorts()
-    vm.WaitForBootCompletion()
     vm.AddMetadata(**vm_metadata)
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
