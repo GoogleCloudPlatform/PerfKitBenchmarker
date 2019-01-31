@@ -34,7 +34,8 @@ class Bigquery(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super(Bigquery, self).__init__(edw_service_spec)
-    self.job_id_prefix = FLAGS.run_uri
+    bq = self.cluster_identifier.split('.')
+    self.job_id_prefix = '{}_{}'.format(FLAGS.run_uri, bq[1])
 
   def _Create(self):
     """Create a BigQuery cluster.
