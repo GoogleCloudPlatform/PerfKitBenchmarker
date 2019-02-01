@@ -620,7 +620,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def AddMetadata(self, **kwargs):
-    """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
+    """Adds metadata to the VM and disk."""
     if not kwargs:
       return
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
@@ -630,6 +630,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['metadata'] = '{metadata},{kwargs}'.format(
           metadata=cmd.flags['metadata'],
           kwargs=util.FormatTags(kwargs))
+    cmd.Issue()
+
+    cmd = util.GcloudCommand(
+        self, 'compute', 'disks', 'add-labels',
+        '--labels={}'.format(util.MakeFormattedDefaultLabels()), self.name)
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
