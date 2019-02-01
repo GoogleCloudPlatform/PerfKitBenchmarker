@@ -696,7 +696,10 @@ class BenchmarkSpec(object):
         vm.CreateRamDisk(disk_spec)
       else:
         vm.CreateScratchDisk(disk_spec)
-
+      # TODO(user): Simplify disk logic.
+      if disk_spec.num_striped_disks > 1:
+        # scratch disks has already been created and striped together.
+        break
     # This must come after Scratch Disk creation to support the
     # Containerized VM case
     vm.PrepareVMEnvironment()
