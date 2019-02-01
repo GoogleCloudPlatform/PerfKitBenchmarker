@@ -56,7 +56,7 @@ def GetTimeToBoot(vms):
   max_create_delay_sec = 0
   max_boot_time_sec = 0
   samples = []
-  os_types = {}
+  os_types = set()
   for i, vm in enumerate(vms):
     assert vm.bootable_time
     assert vm.create_start_time
