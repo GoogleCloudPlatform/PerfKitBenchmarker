@@ -116,3 +116,6 @@ flags.DEFINE_multi_string('gcp_dataproc_property', [],
                           'See https://cloud.google.com/dataproc/docs/concepts/'
                           'configuring-clusters/cluster-properties '
                           'for details.')
+flags.DEFINE_string('gcp_dataproc_image', None,
+                    'Specifies the custom image URI or the custom image name '
+                    'that will be used to create a cluster.')
