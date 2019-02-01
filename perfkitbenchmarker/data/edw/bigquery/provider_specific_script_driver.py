@@ -40,8 +40,8 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
   """
   script_name = script.split('.')
   cmd_list = [driver, FLAGS.bq_project_id, FLAGS.bq_dataset_id,
-              '%s_%s_%s' % (FLAGS.bq_job_id_prefix, script_name[0],
-                            FLAGS.bq_job_id_postfix),
+              '%s_q%s_%s' % (FLAGS.bq_job_id_prefix, script_name[0].zfill(2),
+                             FLAGS.bq_job_id_postfix),
               script, output, error]
   if FLAGS.collect_output:
     cmd_list.extend(['true', FLAGS.output_table])
