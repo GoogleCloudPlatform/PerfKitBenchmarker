@@ -51,6 +51,9 @@ def GetTimeToBoot(vms):
   Returns:
     List of Samples containing the boot time.
   """
+  if not vms:
+    return []
+
   min_create_start_time = min(vm.create_start_time for vm in vms)
 
   max_create_delay_sec = 0
