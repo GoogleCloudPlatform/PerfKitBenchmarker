@@ -39,6 +39,10 @@ flags.DEFINE_string('nfs_directory', None,
                     'Directory to mount if using a StaticNfsService. This '
                     'corresponds to the "VOLUME_NAME" of other NfsService '
                     'classes.')
+flags.DEFINE_list('mount_options', [],
+                  'Additional arguments to supply when mounting.')
+flags.DEFINE_list('fstab_options', [],
+                  'Additional arguments to supply to fstab.')
 
 FLAGS = flags.FLAGS
 
@@ -307,7 +311,11 @@ class BaseDisk(resource.BaseResource):
     See `man 8 mount` for usage.  For example, returning "ro" will cause the
     mount command to be "mount ... -o ro ..." mounting the disk as read only.
     """
-    return DEFAULT_MOUNT_OPTIONS
+    opts = DEFAULT_MOUNT_OPTIONS
+    if FLAGS.mount_options:
+      opts = ','.join(FLAGS.mount_options)
+    self.metadata.update({'mount_options': opts})
+    return opts
 
   @property
   def fstab_options(self):
@@ -317,7 +325,11 @@ class BaseDisk(resource.BaseResource):
 
     See `man fstab` for usage.
     """
-    return DEFAULT_FSTAB_OPTIONS
+    opts = DEFAULT_FSTAB_OPTIONS
+    if FLAGS.fstab_options:
+      opts = ','.join(FLAGS.fstab_options)
+    self.metadata.update({'fstab_options': opts})
+    return opts
 
   @abc.abstractmethod
   def Attach(self, vm):
@@ -441,6 +453,7 @@ class NfsDisk(BaseDisk):
       self.metadata['nfs_{}'.format(key)] = value
     if nfs_tier:
       self.metadata['nfs_tier'] = nfs_tier
+    super(NfsDisk, self).GetResourceMetadata()
 
   def _GetNfsMountOptionsDict(self):
     """Default NFS mount options as a dict."""
