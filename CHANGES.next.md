@@ -86,6 +86,7 @@
 - Adding support for AWS ARM machines on SPECCPU.
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
+- Added support for adding additional flags to mount and /etc/fstab.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
