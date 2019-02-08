@@ -24,24 +24,31 @@ flags.DEFINE_integer('redis_total_num_processes', 1,
                      lower_bound=1)
 flags.DEFINE_boolean('redis_enable_aof', False,
                      'Enable append-only file (AOF) with appendfsync always.')
+flags.DEFINE_string('redis_server_version', '2.8.9',
+                    'Version of redis server to use.')
 
 
-REDIS_VERSION = '2.8.9'
-REDIS_TAR = 'redis-%s.tar.gz' % REDIS_VERSION
-REDIS_DIR = '%s/redis-%s' % (INSTALL_DIR, REDIS_VERSION)
-REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
 REDIS_FIRST_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
+
+
+def _GetRedisTarName():
+  return 'redis-%s.tar.gz' % FLAGS.redis_server_version
+
+
+def _GetRedisDir():
+  return '%s/redis-%s' % (INSTALL_DIR, FLAGS.redis_server_version)
 
 
 def _Install(vm):
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand('wget %s -P %s' % (REDIS_URL, INSTALL_DIR))
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, REDIS_TAR))
-  vm.RemoteCommand('cd %s && make' % REDIS_DIR)
+  redis_url = 'http://download.redis.io/releases/' + _GetRedisTarName()
+  vm.RemoteCommand('wget %s -P %s' % (redis_url, INSTALL_DIR))
+  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, _GetRedisTarName()))
+  vm.RemoteCommand('cd %s && make' % _GetRedisDir())
 
 
 def YumInstall(vm):
@@ -60,27 +67,27 @@ def Configure(vm):
   """Configure redis server."""
   sed_cmd = (
       r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-      "{0}/redis.conf").format(REDIS_DIR)
+      "{0}/redis.conf").format(_GetRedisDir())
   vm.RemoteCommand(sed_cmd)
   if FLAGS.redis_enable_aof:
     vm.RemoteCommand(
         r'sed -i -e "s/appendonly no/appendonly yes/g" {0}/redis.conf'.format(
-            REDIS_DIR))
+            _GetRedisDir()))
     vm.RemoteCommand((
         r'sed -i -e "s/appendfsync everysec/# appendfsync everysec/g" '
         r'{0}/redis.conf'
-    ).format(REDIS_DIR))
+    ).format(_GetRedisDir()))
     vm.RemoteCommand((
         r'sed -i -e "s/# appendfsync always/appendfsync always/g" '
         r'{0}/redis.conf'
-    ).format(REDIS_DIR))
+    ).format(_GetRedisDir()))
   for i in range(FLAGS.redis_total_num_processes):
     port = REDIS_FIRST_PORT + i
     vm.RemoteCommand(
-        ('cp {0}/redis.conf {0}/redis-{1}.conf').format(REDIS_DIR, port))
+        ('cp {0}/redis.conf {0}/redis-{1}.conf').format(_GetRedisDir(), port))
     vm.RemoteCommand(
         r'sed -i -e "s/port %d/port %d/g" %s/redis-%d.conf' %
-        (REDIS_FIRST_PORT, port, REDIS_DIR, port))
+        (REDIS_FIRST_PORT, port, _GetRedisDir(), port))
 
 
 def Start(vm):
@@ -90,7 +97,7 @@ def Start(vm):
     vm.RemoteCommand(
         ('nohup sudo {0}/src/redis-server {0}/redis-{1}.conf '
          '&> /dev/null & echo $! > {0}/{2}-{1}').format(
-             REDIS_DIR, port, REDIS_PID_FILE))
+             _GetRedisDir(), port, REDIS_PID_FILE))
 
 
 def Cleanup(vm):
