@@ -388,3 +388,4 @@
   metadata from a VM that has not been provisioned yet.
 - TPU Pod doesn't support eval. Stop Evaluation in train phrase in MNIST benchmark.
 - Global steps was set incorrectly in Inception3 benchmark.
+- Add AWS T3 instances to list of non-placement group capable machine types.
