@@ -239,6 +239,7 @@
 - Add support for --nouse_pkb_logging to use standard ABSL logging instead.
 - Improved support for booting more than 200 VMs with the cluster_boot benchmark.
 - Adding version support to redis server.
+- Introduced app service metadata to indicate backend concurrency.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
