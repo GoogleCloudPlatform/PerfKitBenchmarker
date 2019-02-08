@@ -39,7 +39,7 @@ class ResNetBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testTrainResults(self):
     samples = mnist_benchmark.MakeSamplesFromTrainOutput(
-        self.metadata_input, self.contents, 0)
+        self.metadata_input, self.contents, 0, 5005)
     golden = [
         Sample('Loss', 3.6859958, '', self.metadata_output),
         Sample('Global Steps Per Second', 3.6699466666666667,

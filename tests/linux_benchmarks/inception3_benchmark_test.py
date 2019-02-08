@@ -39,7 +39,7 @@ class Inception3BenchmarkTestCase(unittest.TestCase,
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testTrainResults(self):
     samples = mnist_benchmark.MakeSamplesFromTrainOutput(
-        self.metadata_input, self.contents, 0)
+        self.metadata_input, self.contents, 0, 4000)
     golden = [
         Sample('Loss', 5.7193503, '', self.metadata_output),
         Sample('Global Steps Per Second', 1.4384171428571428,
