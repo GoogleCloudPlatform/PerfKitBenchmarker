@@ -300,7 +300,7 @@ def Run(benchmark_spec):
                                               should_log=True)
       elapsed_seconds += (time.time() - start)
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
-          metadata, stdout + stderr, elapsed_seconds))
+          metadata, stdout + stderr, elapsed_seconds, step))
     if benchmark_spec.mode in ('train_and_eval', 'eval'):
       resnet_benchmark_eval_cmd = (
           '{cmd} --tpu={tpu} --mode=eval --num_cores={num_cores}'.format(
