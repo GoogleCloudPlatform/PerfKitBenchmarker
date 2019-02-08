@@ -238,13 +238,14 @@ def ExtractThroughput(regex, output, metadata, metric, unit):
   return samples
 
 
-def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
+def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds, step):
   """Create a sample containing training metrics.
 
   Args:
     metadata: dict contains all the metadata that reports.
     output: string, command output
     elapsed_seconds: float, elapsed seconds from saved checkpoint.
+    step: int, the global steps in the training process.
 
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/mnist_benchmark_test.py
@@ -254,11 +255,6 @@ def MakeSamplesFromTrainOutput(metadata, output, elapsed_seconds):
   """
   samples = []
   metadata_copy = metadata.copy()
-  if 'Saving checkpoints' in output:
-    step = int(regex_util.ExtractAllMatches(
-        r'Saving checkpoints for (\d+) into', output).pop())
-  else:
-    step = int(regex_util.ExtractAllMatches(r'step = (\d+)', output).pop())
   metadata_copy['step'] = int(step)
   metadata_copy['epoch'] = step / metadata['num_examples_per_epoch']
   metadata_copy['elapsed_seconds'] = elapsed_seconds
@@ -356,8 +352,8 @@ def Run(benchmark_spec):
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd,
                                             should_log=True)
     elapsed_seconds = (time.time() - start)
-    samples.extend(MakeSamplesFromTrainOutput(metadata, stdout + stderr,
-                                              elapsed_seconds))
+    samples.extend(MakeSamplesFromTrainOutput(
+        metadata, stdout + stderr, elapsed_seconds, benchmark_spec.train_steps))
   if benchmark_spec.eval_steps:
     mnist_benchmark_eval_cmd = (
         '{cmd} --tpu="" --use_tpu=False --eval_steps={eval_steps}'.format(
