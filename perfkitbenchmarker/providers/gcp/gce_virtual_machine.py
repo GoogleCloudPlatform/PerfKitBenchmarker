@@ -880,6 +880,24 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
 
 
+class Windows2012GceVirtualMachine(WindowsGceVirtualMachine,
+                                   windows_virtual_machine.Windows2012Mixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2016GceVirtualMachine(WindowsGceVirtualMachine,
+                                   windows_virtual_machine.Windows2016Mixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2016'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2019GceVirtualMachine(WindowsGceVirtualMachine,
+                                   windows_virtual_machine.Windows2019Mixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""

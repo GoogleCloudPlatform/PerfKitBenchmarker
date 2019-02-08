@@ -492,11 +492,14 @@ class BenchmarkSpec(object):
       vm_util.RunThreaded(self.CreateAndBootVm, self.vms)
       vm_util.RunThreaded(self.PrepareVmAfterBoot, self.vms)
 
-      sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
+      sshable_vms = [
+          vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
+      ]
       sshable_vm_groups = {}
       for group_name, group_vms in self.vm_groups.iteritems():
         sshable_vm_groups[group_name] = [
-            vm for vm in group_vms if vm.OS_TYPE != os_types.WINDOWS
+            vm for vm in group_vms
+            if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
         ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
     if self.spark_service:
