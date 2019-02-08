@@ -179,7 +179,6 @@ def Run(benchmark_spec):
   inception3_benchmark_cmd = (
       '{env_cmd} && python {script} '
       '--learning_rate={learning_rate} '
-      '--train_steps={train_steps} '
       '--iterations={iterations} '
       '--use_tpu={use_tpu} '
       '--use_data={use_data} '
@@ -193,7 +192,6 @@ def Run(benchmark_spec):
           env_cmd=benchmark_spec.env_cmd,
           script=inception3_benchmark_script,
           learning_rate=benchmark_spec.learning_rate,
-          train_steps=benchmark_spec.train_steps,
           iterations=benchmark_spec.iterations,
           use_tpu=benchmark_spec.use_tpu,
           use_data=benchmark_spec.use_data,
@@ -215,10 +213,12 @@ def Run(benchmark_spec):
   for step in range(steps_per_eval, train_steps + steps_per_eval,
                     steps_per_eval):
     step = min(step, train_steps)
+    inception3_benchmark_cmd_step = '{cmd} --train_steps={step}'.format(
+        cmd=inception3_benchmark_cmd, step=step)
     if benchmark_spec.mode in ('train', 'train_and_eval'):
       inception3_benchmark_train_cmd = (
           '{cmd} --tpu={tpu} --mode=train --num_shards={num_shards}'.format(
-              cmd=inception3_benchmark_cmd,
+              cmd=inception3_benchmark_cmd_step,
               tpu=benchmark_spec.tpu_train,
               num_shards=benchmark_spec.num_shards_train))
       start = time.time()
@@ -226,11 +226,11 @@ def Run(benchmark_spec):
                                               should_log=True)
       elapsed_seconds += (time.time() - start)
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
-          metadata, stdout + stderr, elapsed_seconds))
+          metadata, stdout + stderr, elapsed_seconds, step))
     if benchmark_spec.mode in ('train_and_eval', 'eval'):
       inception3_benchmark_eval_cmd = (
           '{cmd} --tpu={tpu} --mode=eval --num_shards={num_shards}'.format(
-              cmd=inception3_benchmark_cmd,
+              cmd=inception3_benchmark_cmd_step,
               tpu=benchmark_spec.tpu_eval,
               num_shards=benchmark_spec.num_shards_eval))
       stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_eval_cmd,
