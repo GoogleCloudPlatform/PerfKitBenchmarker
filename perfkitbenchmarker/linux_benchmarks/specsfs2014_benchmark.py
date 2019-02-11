@@ -25,6 +25,7 @@ eventually become a "disk type" so that any benchmark that runs
 against a filesystem can run against Gluster.
 """
 
+import logging
 import posixpath
 import xml.etree.ElementTree
 
@@ -67,6 +68,11 @@ flags.DEFINE_integer(
     'The total number of SPEC runs. The load for the nth run is '
     '"load" + n * "specsfs_incr_load".',
     lower_bound=1)
+flags.DEFINE_boolean(
+    'specsfs2014_auto_mode', False,
+    'If True, automatically find the max passing score for each benchmark. '
+    'This ignores other flags such as specsfs2014_load, specsfs2014_incr_load, '
+    'and specsfs2014_num_runs.')
 
 BENCHMARK_NAME = 'specsfs2014'
 BENCHMARK_CONFIG = """
@@ -134,7 +140,8 @@ def _PrepareSpec(vm):
   vm.RemoteCommand('sudo umount {0} && sudo rm -rf {0}'.format(mount_dir))
 
 
-def _ConfigureSpec(prime_client, clients, benchmark):
+def _ConfigureSpec(prime_client, clients, benchmark,
+                   load=None, num_runs=None, incr_load=None):
   """Configures SPEC SFS 2014 on the prime client.
 
   This function modifies the default configuration file (sfs_rc) which
@@ -146,6 +153,9 @@ def _ConfigureSpec(prime_client, clients, benchmark):
     prime_client: The VM from which SPEC will be controlled.
     clients: A list of SPEC client VMs (including the prime_client).
     benchmark: The sub-benchmark to run.
+    load: List of ints. The LOAD parameter to SPECSFS.
+    num_runs: The NUM_RUNS parameter to SPECSFS.
+    incr_load: The INCR_LOAD parameter to SPECSFS.
   """
   config_path = posixpath.join(_SPEC_DIR, _SPEC_CONFIG)
   prime_client.RemoteCommand('sudo cp {0}.bak {0}'.format(config_path))
@@ -153,14 +163,17 @@ def _ConfigureSpec(prime_client, clients, benchmark):
   stdout, _ = prime_client.RemoteCommand('pwd')
   exec_path = posixpath.join(stdout.strip(), _SPEC_DIR, 'binaries',
                              'linux', 'x64', 'netmist')
+  load = load or FLAGS.specsfs2014_load
+  num_runs = num_runs or FLAGS.specsfs2014_load
+  incr_load = incr_load or FLAGS.specsfs2014_incr_load
   configuration_overrides = {
       'USER': prime_client.user_name,
       'EXEC_PATH': exec_path.replace('/', r'\/'),
       'CLIENT_MOUNTPOINTS': _MOUNTPOINTS_FILE,
       'BENCHMARK': benchmark,
-      'LOAD': ' '.join([str(x) for x in FLAGS.specsfs2014_load]),
-      'NUM_RUNS': FLAGS.specsfs2014_num_runs,
-      'INCR_LOAD': FLAGS.specsfs2014_incr_load,
+      'LOAD': ' '.join([str(x) for x in load]),
+      'NUM_RUNS': num_runs,
+      'INCR_LOAD': incr_load,
   }
   # Any special characters in the overrides dictionary should be escaped so
   # that they don't interfere with sed.
@@ -283,6 +296,47 @@ def _RunSpecSfs(benchmark_spec):
   return _ParseSpecSfsOutput(output, extra_metadata=gluster_metadata)
 
 
+def _FindBestPassingScore(benchmark_spec, benchmark):
+  """Find the highest load that will still produce valid runs.
+
+  Once this benchmark has been updated to wrap SPEC SFS SP2 rather than SP1,
+  this will use sfsmanager's "-a" option which does this automatically.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+    benchmark: The sub-benchmark to run.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
+  clients = benchmark_spec.vm_groups['clients']
+  prime_client = clients[0]
+  results = []
+  load = 1
+
+  lower_bound = 1
+  upper_bound = float('inf')
+  while (upper_bound - lower_bound) > 1:
+    logging.info('Running SPEC SFS with LOAD=%s', load)
+    _ConfigureSpec(prime_client, clients, benchmark, load=[load], num_runs=1)
+    last_run_results = _RunSpecSfs(benchmark_spec)
+    valid_run = all([result.metadata['valid_run']
+                     for result in last_run_results])
+    results += last_run_results
+    prime_client.RemoteCommand(
+        'rm %s' % posixpath.join(_SPEC_DIR, 'results', '*'))
+    if valid_run:
+      lower_bound = load
+    else:
+      upper_bound = load
+    if upper_bound == float('inf'):
+      load *= 2
+    else:
+      load = (upper_bound + lower_bound) // 2
+  return results
+
+
 def Run(benchmark_spec):
   """Run SPEC SFS 2014 for each configuration.
 
@@ -302,6 +356,9 @@ def Run(benchmark_spec):
         data.ResourcePath(FLAGS.specsfs2014_config),
         posixpath.join(_SPEC_DIR, _SPEC_CONFIG))
     results += _RunSpecSfs(benchmark_spec)
+  elif FLAGS.specsfs2014_auto_mode:
+    for benchmark in FLAGS.specsfs2014_benchmarks:
+      results += _FindBestPassingScore(benchmark_spec, benchmark)
   else:
     for benchmark in FLAGS.specsfs2014_benchmarks:
       _ConfigureSpec(prime_client, clients, benchmark)
