@@ -240,6 +240,7 @@
 - Improved support for booting more than 200 VMs with the cluster_boot benchmark.
 - Adding version support to redis server and setting permissions for newer redis versions.
 - Introduced app service metadata to indicate backend concurrency.
+- Added option to reuse SSH connections which speeds up benchmarks with lots of short commands.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
