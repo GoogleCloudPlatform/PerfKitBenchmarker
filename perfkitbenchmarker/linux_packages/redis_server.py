@@ -68,6 +68,11 @@ def Configure(vm):
   sed_cmd = (
       r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
       "{0}/redis.conf").format(_GetRedisDir())
+  vm.RemoteCommand(
+      'sudo sed -i "s/bind/#bind/g" {0}/redis.conf'.format(_GetRedisDir()))
+  vm.RemoteCommand(
+      'sudo sed -i "s/protected-mode yes/protected-mode no/g" {0}/redis.conf'.
+      format(_GetRedisDir()))
   vm.RemoteCommand(sed_cmd)
   if FLAGS.redis_enable_aof:
     vm.RemoteCommand(
