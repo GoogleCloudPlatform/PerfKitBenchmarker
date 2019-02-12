@@ -133,32 +133,15 @@ def _CreateMetadataDict(benchmark_spec):
   Returns:
     metadata dict
   """
-  metadata = {
-      'tpu_train': benchmark_spec.tpu_train,
-      'tpu_eval': benchmark_spec.tpu_eval,
+  metadata = mnist_benchmark.CreateMetadataDict(benchmark_spec)
+  metadata.update({
       'learning_rate': benchmark_spec.learning_rate,
-      'train_steps': benchmark_spec.train_steps,
-      'iterations': benchmark_spec.iterations,
-      'use_tpu': benchmark_spec.use_tpu,
       'use_data': benchmark_spec.use_data,
       'mode': benchmark_spec.mode,
-      'data_dir': benchmark_spec.data_dir,
-      'model_dir': benchmark_spec.model_dir,
       'save_checkpoints_secs': benchmark_spec.save_checkpoints_secs,
-      'train_batch_size': benchmark_spec.train_batch_size,
-      'eval_batch_size': benchmark_spec.eval_batch_size,
-      'commit': benchmark_spec.commit,
-      'num_shards': benchmark_spec.num_shards,
-      'num_shards_train': benchmark_spec.num_shards_train,
-      'num_shards_eval': benchmark_spec.num_shards_eval,
-      'num_train_images': benchmark_spec.num_train_images,
-      'num_eval_images': benchmark_spec.num_eval_images,
-      'train_epochs': benchmark_spec.train_epochs,
-      'num_examples_per_epoch': benchmark_spec.num_examples_per_epoch,
       'epochs_per_eval': benchmark_spec.epochs_per_eval,
       'steps_per_eval': benchmark_spec.steps_per_eval,
-      'precision': benchmark_spec.precision
-  }
+      'precision': benchmark_spec.precision})
   return metadata
 
 
