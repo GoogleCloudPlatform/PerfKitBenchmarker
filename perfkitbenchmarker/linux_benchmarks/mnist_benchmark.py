@@ -181,7 +181,7 @@ def Prepare(benchmark_spec):
                      login_shell=True)
 
 
-def _CreateMetadataDict(benchmark_spec):
+def CreateMetadataDict(benchmark_spec):
   """Create metadata dict to be used in run results.
 
   Args:
@@ -338,7 +338,7 @@ def Run(benchmark_spec):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)
   samples = []
-  metadata = _CreateMetadataDict(benchmark_spec)
+  metadata = CreateMetadataDict(benchmark_spec)
   if benchmark_spec.train_steps:
     mnist_benchmark_train_cmd = (
         '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
