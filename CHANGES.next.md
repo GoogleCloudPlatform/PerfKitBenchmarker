@@ -87,6 +87,7 @@
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
+- Added support for Windows2012, 2016, and 2019 for GCP.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -237,6 +238,9 @@
   configurations, all to be run in a single run phase.
 - Add support for --nouse_pkb_logging to use standard ABSL logging instead.
 - Improved support for booting more than 200 VMs with the cluster_boot benchmark.
+- Adding version support to redis server and setting permissions for newer redis versions.
+- Introduced app service metadata to indicate backend concurrency.
+- Added option to reuse SSH connections which speeds up benchmarks with lots of short commands.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -388,3 +392,4 @@
   metadata from a VM that has not been provisioned yet.
 - TPU Pod doesn't support eval. Stop Evaluation in train phrase in MNIST benchmark.
 - Global steps was set incorrectly in Inception3 benchmark.
+- Add AWS T3 instances to list of non-placement group capable machine types.

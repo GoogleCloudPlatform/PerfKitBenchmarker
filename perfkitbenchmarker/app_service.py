@@ -87,7 +87,8 @@ class BaseAppService(resource.BaseResource):
     self.builder = None
     # update metadata
     self.metadata.update({'backend': self.backend,
-                          'region': self.region})
+                          'region': self.region,
+                          'concurrency': 'default'})
     self.samples = []
 
   def _UpdateDependencies(self):
