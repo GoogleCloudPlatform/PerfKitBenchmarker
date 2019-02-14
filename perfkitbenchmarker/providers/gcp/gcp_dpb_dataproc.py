@@ -116,6 +116,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.boot_disk_size:
         self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role),
                        self.spec.worker_group.vm_spec.boot_disk_size)
+      # Set boot_disk_type
+      if self.spec.worker_group.vm_spec.boot_disk_type:
+        self._AddToCmd(cmd, '{0}-boot-disk-type'.format(role),
+                       self.spec.worker_group.vm_spec.boot_disk_type)
 
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
@@ -126,6 +130,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     if self.dpb_dataproc_image_version:
       cmd.flags['image-version'] = self.dpb_dataproc_image_version
+
+    if FLAGS.gcp_dataproc_image:
+      cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     # TODO(saksena): Retrieve the cluster create time and hold in a var

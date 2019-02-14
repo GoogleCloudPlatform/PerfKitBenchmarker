@@ -47,7 +47,7 @@ FLAGS = flags.FLAGS
 HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3'])
+NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3', 't3'])
 # Following dictionary based on
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
 NUM_LOCAL_VOLUMES = {

@@ -18,7 +18,6 @@ Redis homepage: http://redis.io/
 """
 import functools
 import math
-import posixpath
 
 from itertools import repeat
 from perfkitbenchmarker import configs
@@ -43,9 +42,6 @@ redis_ycsb:
     clients:
       vm_spec: *default_single_core
 """
-
-
-REDIS_PID_FILE = posixpath.join(redis_server.REDIS_DIR, 'redis.pid')
 
 
 def GetConfig(user_config):
@@ -98,7 +94,6 @@ def Prepare(benchmark_spec):
   vm_util.SetupSimulatedMaintenance(redis_vm)
 
 
-
 def Run(benchmark_spec):
   """Run YCSB against Redis.
 
@@ -130,7 +125,8 @@ def Run(benchmark_spec):
   num_client = FLAGS.ycsb_client_vms
   metadata = {'ycsb_client_vms': num_client,
               'ycsb_processes': num_ycsb,
-              'redis_total_num_processes': num_server}
+              'redis_total_num_processes': num_server,
+              'redis_server_version': FLAGS.redis_server_version}
 
   # Matching client vms and ycsb processes sequentially:
   # 1st to xth ycsb clients are assigned to client vm 1

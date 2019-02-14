@@ -50,6 +50,11 @@ def GetRunDirPath():
       FLAGS.temp_dir, _RUNS, str(flags.FLAGS.run_uri))
 
 
+def GetSshConnectionsDir():
+  """Returns the directory for SSH ControlPaths (for connection reuse)."""
+  return os.path.join(GetRunDirPath(), 'ssh')
+
+
 def GetVersionDirPath(version=version.VERSION):
   """Gets path to the directory containing files specific to a PKB version."""
   return os.path.join(FLAGS.temp_dir, _VERSIONS, version)
@@ -57,7 +62,7 @@ def GetVersionDirPath(version=version.VERSION):
 
 def CreateTemporaryDirectories():
   """Creates the temporary sub-directories needed by the current run."""
-  for path in (GetRunDirPath(), GetVersionDirPath()):
+  for path in (GetRunDirPath(), GetVersionDirPath(), GetSshConnectionsDir()):
     try:
       os.makedirs(path)
     except OSError:

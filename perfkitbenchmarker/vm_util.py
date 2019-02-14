@@ -84,6 +84,9 @@ flags.DEFINE_boolean('simulate_maintenance', False,
 flags.DEFINE_integer('simulate_maintenance_delay', 0,
                      'The number of seconds to wait to start simulating '
                      'maintenance.')
+flags.DEFINE_boolean('reuse_ssh_connections', True,
+                     'Whether to reuse SSH connections rather than '
+                     'restablishing a connection for each remote command.')
 
 
 class IpAddressSubset(object):
@@ -191,6 +194,13 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
   ]
   if FLAGS.use_ipv6:
     options.append('-6')
+  if FLAGS.reuse_ssh_connections:
+    control_path = os.path.join(temp_dir.GetSshConnectionsDir(), '%C')
+    options.extend([
+        '-o', 'ControlPath="%s"' % control_path,
+        '-o', 'ControlMaster=auto',
+        '-o', 'ControlPersist=10m'
+    ])
   options.extend(FLAGS.ssh_options)
 
   return options
