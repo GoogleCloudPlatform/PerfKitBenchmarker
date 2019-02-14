@@ -99,6 +99,16 @@ class BaseTpu(resource.BaseResource):
     """Gets the number of TPU shards."""
     raise NotImplementedError()
 
+  @abc.abstractmethod
+  def GetZone(self):
+    """Gets the TPU zone."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def GetAcceleratorType(self):
+    """Gets the TPU accelerator type."""
+    raise NotImplementedError()
+
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {

@@ -52,6 +52,12 @@ class FakeTpu(cloud_tpu.BaseTpu):
   def GetNumShards(self):
     pass
 
+  def GetZone(self):
+    pass
+
+  def GetAcceleratorType(self):
+    pass
+
 
 class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 

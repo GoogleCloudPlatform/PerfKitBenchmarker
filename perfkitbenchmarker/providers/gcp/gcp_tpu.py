@@ -120,6 +120,14 @@ class GcpTpu(cloud_tpu.BaseTpu):
     num_tpus = len(self._GetTpuDescription()[0]['networkEndpoints'])
     return num_tpus * FLAGS.tpu_cores_per_donut
 
+  def GetZone(self):
+    """Gets the TPU zone."""
+    return self.spec.tpu_zone
+
+  def GetAcceleratorType(self):
+    """Gets the TPU accelerator type."""
+    return self.spec.tpu_accelerator_type
+
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 
