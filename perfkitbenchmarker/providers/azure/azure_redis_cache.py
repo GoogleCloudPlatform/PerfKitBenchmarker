@@ -25,6 +25,8 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 
 FLAGS = flags.FLAGS
+# 15min timeout for issuing az redis delete command.
+DELETE_TIMEOUT = 900
 
 
 class AzureRedisCache(cloud_redis.BaseCloudRedis):
@@ -86,8 +88,9 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
         azure.AZURE_PATH, 'redis', 'delete',
         '--resource-group', self.resource_group.name,
         '--name', self.name,
+        '--yes',
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=DELETE_TIMEOUT)
 
   def DescribeCache(self):
     """Calls show on the cache to get information about it.
