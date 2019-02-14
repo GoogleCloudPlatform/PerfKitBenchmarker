@@ -21,8 +21,8 @@ from perfkitbenchmarker import flags
 
 CUDNN_6 = 'libcudnn6=6.0.21-1+cuda8.0'
 CUDNN_7 = 'libcudnn7=7.0.5.15-1+cuda9.0'
-CUDNN_7_4_9 = 'libcudnn7=7.4.1.5-1+cuda9.0'
-CUDNN_7_4_10 = 'libcudnn7=7.4.1.5-1+cuda10.0'
+CUDNN_7_4_9 = 'libcudnn7=7.4.2.24-1+cuda9.0'
+CUDNN_7_4_10 = 'libcudnn7=7.4.2.24-1+cuda10.0'
 
 flags.DEFINE_string('cudnn', None,
                     'The NVIDIA CUDA Deep Neural Network library. '
