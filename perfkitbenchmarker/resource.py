@@ -158,6 +158,15 @@ class BaseResource(object):
     """
     return False
 
+  def _PreDelete(self):
+    """Method that will be called once before _DeleteResource() is called.
+
+    Supplying this method is optional. If it is supplied, it will be called
+    once, before attempting to delete the resource. It is intended to allow
+    data about the resource to be collected right before it is deleted.
+    """
+    pass
+
   def _PostCreate(self):
     """Method that will be called once after _CreateResource() is called.
 
@@ -251,6 +260,7 @@ class BaseResource(object):
 
     if self.user_managed:
       return
+    self._PreDelete()
     self._DeleteResource()
     WaitUntilDeleted()
     self.deleted = True

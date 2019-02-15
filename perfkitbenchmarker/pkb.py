@@ -154,6 +154,8 @@ flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
 flags.DEFINE_boolean('use_pkb_logging', True, 'Whether to use PKB-specific '
                      'logging handlers. Disabling this will use the standard '
                      'ABSL logging directly.')
+flags.DEFINE_boolean('log_dmesg', False, 'Whether to log dmesg from '
+                     'each VM to the PKB log file before the VM is deleted.')
 
 
 def GetCurrentUser():

@@ -568,6 +568,10 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     return None
 
+  def _PreDelete(self):
+    """See base class."""
+    self.LogVmDebugInfo()
+
 
 class BaseOsMixin(object):
   """The base class for OS Mixin classes.
@@ -766,6 +770,10 @@ class BaseOsMixin(object):
 
   def SetupLocalDisks(self):
     """Perform OS specific setup on any local disks that exist."""
+    pass
+
+  def LogVmDebugInfo(self):
+    """Logs OS-specific debug info. Must be overridden on an OS mixin."""
     pass
 
   def PushFile(self, source_path, remote_path=''):

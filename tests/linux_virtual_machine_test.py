@@ -20,6 +20,7 @@ import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -33,6 +34,29 @@ class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
     pass
 
   def Uninstall(self):
+    pass
+
+
+class LinuxVMResource(virtual_machine.BaseVirtualMachine,
+                      linux_virtual_machine.BaseLinuxMixin):
+
+  CLOUD = 'fake_cloud'
+  OS_TYPE = 'fake_os_type'
+  BASE_OS_TYPE = 'debian'
+
+  def __init__(self, _):
+    pass
+
+  def Install(self):
+    pass
+
+  def Uninstall(self):
+    pass
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
     pass
 
 
@@ -142,6 +166,25 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
   def testNfsFormatDisk(self):
     self.vm.FormatDisk('dp', disk_type='nfs')
     self.assertRemoteHostCalled()  # no format disk command executed
+
+
+class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(LogDmesgTestCase, self).setUp()
+    self.vm = LinuxVMResource(None)
+
+  def testPreDeleteDoesNotCallDmesg(self):
+    FLAGS.log_dmesg = False
+    with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+      self.vm._PreDelete()
+    remote_command.assert_not_called()
+
+  def testPreDeleteCallsDmesg(self):
+    FLAGS.log_dmesg = True
+    with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+      self.vm._PreDelete()
+    remote_command.assert_called_once_with('hostname && dmesg', should_log=True)
 
 
 if __name__ == '__main__':
