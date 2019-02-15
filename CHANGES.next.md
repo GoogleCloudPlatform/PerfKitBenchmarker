@@ -241,6 +241,9 @@
 - Adding version support to redis server and setting permissions for newer redis versions.
 - Introduced app service metadata to indicate backend concurrency.
 - Added option to reuse SSH connections which speeds up benchmarks with lots of short commands.
+- Add abstract PreDelete method to the base resource class.
+- Add ability for linux vms to print the dmesg command before termination
+  using the flag 'log_dmesg'.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
