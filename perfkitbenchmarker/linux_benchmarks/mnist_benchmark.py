@@ -25,6 +25,8 @@ from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import tensorflow
 from perfkitbenchmarker.providers.gcp import gcs
+from perfkitbenchmarker.providers.gcp import util
+
 
 FLAGS = flags.FLAGS
 
@@ -155,8 +157,10 @@ def Prepare(benchmark_spec):
     model_dir = 'gs://{}'.format(FLAGS.run_uri)
     benchmark_spec.model_dir = model_dir
     vm.RemoteCommand(
-        '{gsutil} mb {model_dir}'.format(
+        '{gsutil} mb -c regional -l {location} {model_dir}'.format(
             gsutil=vm.gsutil_path,
+            location=util.GetRegionFromZone(
+                benchmark_spec.tpu_groups['train'].GetZone()),
             model_dir=benchmark_spec.model_dir), should_log=True)
     vm.RemoteCommand(
         '{gsutil} acl ch -u {service_account}:W {model_dir}'.format(

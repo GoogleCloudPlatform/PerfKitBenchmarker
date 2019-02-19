@@ -244,6 +244,7 @@
 - Add abstract PreDelete method to the base resource class.
 - Add ability for linux vms to print the dmesg command before termination
   using the flag 'log_dmesg'.
+- TPU and its GCS bucket should be in the same region.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
