@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,10 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for cloud Redis."""
+"""Module containing class for cloud managed memory stores."""
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
+
+
+# List of memory store types
+REDIS = 'REDIS'
 
 
 FLAGS = flags.FLAGS
@@ -40,11 +44,12 @@ REDIS_3_2 = 'REDIS_3_2'
 REDIS_VERSIONS = [REDIS_3_2]
 
 
-def GetCloudRedisClass(cloud):
-  """Gets the cloud Redis class corresponding to 'cloud'.
+def GetManagedMemoryStoreClass(cloud, memory_store):
+  """Gets the cloud managed memory store class corresponding to 'cloud'.
 
   Args:
-    cloud: String. name of cloud to get the class for.
+    cloud: String. Name of cloud to get the class for.
+    memory_store: String. Type of memory store to get the class for.
 
   Returns:
     Implementation class corresponding to the argument cloud
@@ -52,27 +57,24 @@ def GetCloudRedisClass(cloud):
   Raises:
     Exception: An invalid cloud was provided
   """
-  return resource.GetResourceClass(BaseCloudRedis, CLOUD=cloud)
+  return resource.GetResourceClass(BaseManagedMemoryStore,
+                                   CLOUD=cloud,
+                                   MEMORY_STORE=memory_store)
 
 
-class BaseCloudRedis(resource.BaseResource):
-  """Object representing a cloud redis."""
+class BaseManagedMemoryStore(resource.BaseResource):
+  """Object representing a cloud managed memory store."""
 
-  RESOURCE_TYPE = 'BaseCloudRedis'
+  REQUIRED_ATTRS = ['CLOUD', 'MEMORY_STORE']
+  RESOURCE_TYPE = 'BaseManagedMemoryStore'
 
-  def __init__(self, cloud_redis_spec):
-    """Initialize the cloud redis object.
+  def __init__(self, spec):
+    """Initialize the cloud managed memory store object.
 
     Args:
-      cloud_redis_spec: spec of the cloud redis.
+      spec: spec of the managed memory store.
     """
-    super(BaseCloudRedis, self).__init__()
-    self.spec = cloud_redis_spec
-    self.failover_style = FLAGS.redis_failover_style
+    super(BaseManagedMemoryStore, self).__init__()
+    self.spec = spec
+    self.name = 'pkb-%s' % FLAGS.run_uri
 
-  def GetResourceMetadata(self):
-    """Returns a dictionary of cluster metadata."""
-    metadata = {
-        'failover_style': self.failover_style
-    }
-    return metadata

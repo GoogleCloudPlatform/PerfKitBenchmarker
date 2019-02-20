@@ -524,7 +524,6 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
-  spec.ConstructCloudRedis()
   spec.ConstructNfsService()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
