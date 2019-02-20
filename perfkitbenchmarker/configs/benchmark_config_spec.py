@@ -21,13 +21,13 @@ import contextlib
 import os
 
 from perfkitbenchmarker import app_service
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
@@ -1079,7 +1079,7 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
 
 
 class _CloudRedisSpec(spec.BaseSpec):
-  """Specs needed to configure a cloud redis instance
+  """Specs needed to configure a cloud redis instance.
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -1105,8 +1105,8 @@ class _CloudRedisSpec(spec.BaseSpec):
             'default': None,
             'none_ok': False}),
         'redis_version': (option_decoders.EnumDecoder, {
-            'default': cloud_redis.REDIS_3_2,
-            'valid_values': cloud_redis.REDIS_VERSIONS}),
+            'default': managed_memory_store.REDIS_3_2,
+            'valid_values': managed_memory_store.REDIS_VERSIONS}),
     })
     return result
 

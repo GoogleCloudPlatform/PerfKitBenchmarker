@@ -15,9 +15,7 @@
 import unittest
 import mock
 
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
@@ -30,14 +28,8 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(GcpCloudRedisTestCase, self).setUp()
     FLAGS.project = 'project'
-    FLAGS.redis_failover_style = cloud_redis.Failover.FAILOVER_NONE
-    mock_spec = mock.Mock(
-        spec=benchmark_config_spec._CloudRedisSpec)
-    mock_spec.redis_name = 'foobar'
-    mock_spec.redis_tier = 'tier'
-    mock_spec.redis_size_gb = 5
-    mock_spec.redis_version = 'version'
-    mock_spec.client_vm = mock.Mock()
+    FLAGS.zones = ['us-central1-a']
+    mock_spec = mock.Mock()
     self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
 
   def testCreate(self):
