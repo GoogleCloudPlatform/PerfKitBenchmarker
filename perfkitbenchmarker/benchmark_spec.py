@@ -27,7 +27,6 @@ import uuid
 
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import capacity_reservation
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
@@ -136,7 +135,6 @@ class BenchmarkSpec(object):
     self.tpus = []
     self.tpu_groups = {}
     self.edw_service = None
-    self.cloud_redis = None
     self.nfs_service = None
     self.app_groups = {}
     self._zone_index = 0
@@ -247,15 +245,6 @@ class BenchmarkSpec(object):
                                 self.config.edw_service.type[1:])
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
-
-  def ConstructCloudRedis(self):
-    """Create the cloud_redis object."""
-    if self.config.cloud_redis is None:
-      return
-    cloud = self.config.cloud_redis.cloud
-    providers.LoadProvider(cloud)
-    cloud_redis_class = cloud_redis.GetCloudRedisClass(cloud)
-    self.cloud_redis = cloud_redis_class(self.config.cloud_redis)
 
   def ConstructNfsService(self):
     """Construct the NFS service object.
@@ -519,9 +508,6 @@ class BenchmarkSpec(object):
           if network.__class__.__name__ == 'AwsNetwork':
             self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
-    if self.cloud_redis:
-      self.config.cloud_redis.client_vm = self.vms[0]
-      self.cloud_redis.Create()
 
   def Delete(self):
     if self.deleted:
