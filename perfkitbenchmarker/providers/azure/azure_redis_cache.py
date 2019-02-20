@@ -16,9 +16,9 @@
 """
 
 import json
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -29,18 +29,19 @@ FLAGS = flags.FLAGS
 DELETE_TIMEOUT = 900
 
 
-class AzureRedisCache(cloud_redis.BaseCloudRedis):
+class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   """Object representing an Azure Redis Cache."""
 
   CLOUD = providers.AZURE
+  MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):
     super(AzureRedisCache, self).__init__(spec)
-    self.name = 'pkb-%s' % FLAGS.run_uri
     self.redis_region = FLAGS.redis_region
     self.resource_group = azure_network.GetResourceGroup(self.redis_region)
     self.azure_tier = FLAGS.azure_tier
     self.azure_redis_size = FLAGS.azure_redis_size
+    self.failover_style = FLAGS.redis_failover_style
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.
@@ -48,10 +49,12 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(AzureRedisCache, self).GetResourceMetadata()
-    result['region'] = self.redis_region
-    result['azure_tier'] = self.azure_tier
-    result['azure_redis_size'] = self.azure_redis_size
+    result = {
+        'cloud_redis_failover_style': self.failover_style,
+        'cloud_redis_region': self.redis_region,
+        'cloud_redis_azure_tier': self.azure_tier,
+        'cloud_redis_azure_redis_size': self.azure_redis_size,
+    }
     return result
 
   @staticmethod
@@ -64,8 +67,9 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
     Raises:
       errors.Config.InvalidValue: Input flag parameters are invalid.
     """
-    if FLAGS.redis_failover_style in [cloud_redis.Failover.FAILOVER_SAME_REGION,
-                                      cloud_redis.Failover.FAILOVER_SAME_ZONE]:
+    if FLAGS.redis_failover_style in [
+        managed_memory_store.Failover.FAILOVER_SAME_REGION,
+        managed_memory_store.Failover.FAILOVER_SAME_ZONE]:
       raise errors.Config.InvalidValue(
           'Azure redis with failover is not yet available.')
 

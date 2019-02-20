@@ -67,8 +67,9 @@ flags.DEFINE_boolean('azure_accelerated_networking', False,
                      'create-vm-accelerated-networking-cli'
                      'for more information.')
 
-flags.DEFINE_enum('azure_tier', None, VALID_TIERS,
-                  'Performance tier to use for the machine type.')
+flags.DEFINE_enum('azure_tier', 'Basic', VALID_TIERS,
+                  'Performance tier to use for the machine type. Defaults to '
+                  'Basic.')
 
 flags.DEFINE_integer(
     'azure_compute_units', None,
