@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Benchmarking support for Data Processing Backend Services
+"""Benchmarking support for Data Processing Backend Services.
 
 In order to benchmark Data Processing Backend services such as Google
 Cloud Platform's Dataproc and Dataflow or Amazon's EMR, we create a
@@ -21,23 +20,22 @@ the corresponding provider directory as a subclass of BaseDpbService.
 """
 
 import abc
+import datetime
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
-
-flags.DEFINE_string('static_dpb_service_instance', None,
-                    'If set, the name of the pre created dpb implementation,'
-                    'assumed to be ready.')
+flags.DEFINE_string(
+    'static_dpb_service_instance', None,
+    'If set, the name of the pre created dpb implementation,'
+    'assumed to be ready.')
 flags.DEFINE_string('dpb_log_level', 'INFO', 'Manipulate service log level')
 flags.DEFINE_string('dpb_job_jarfile', None,
                     'Executable Jarfile containing workload implementation')
 flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
-                                               'implementation in the jar file')
-
+                    'implementation in the jar file')
 
 FLAGS = flags.FLAGS
-
 
 # List of supported data processing backend services
 DATAPROC = 'dataproc'
@@ -47,16 +45,19 @@ EMR = 'emr'
 # Default number of workers to be used in the dpb service implementation
 DEFAULT_WORKER_COUNT = 2
 
-
 # List of supported applications that can be enabled on the dpb service
 FLINK = 'flink'
 HIVE = 'hive'
-
 
 # Metrics and Status related metadata
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
+
+# Terasort phases
+TERAGEN = 'teragen'
+TERASORT = 'terasort'
+TERAVALIDATE = 'teravalidate'
 
 
 def GetDpbServiceClass(dpb_service_type):
@@ -71,8 +72,8 @@ def GetDpbServiceClass(dpb_service_type):
   Raises:
     Exception: An invalid data processing backend service type was provided
   """
-  return resource.GetResourceClass(BaseDpbService,
-                                   SERVICE_TYPE=dpb_service_type)
+  return resource.GetResourceClass(
+      BaseDpbService, SERVICE_TYPE=dpb_service_type)
 
 
 class BaseDpbService(resource.BaseResource):
@@ -91,6 +92,16 @@ class BaseDpbService(resource.BaseResource):
   DATAFLOW_JOB_TYPE = 'dataflow'
   BEAM_JOB_TYPE = 'beam'
 
+  JOB_JARS = {
+      HADOOP_JOB_TYPE: {
+          'terasort':
+              'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
+      },
+      SPARK_JOB_TYPE: {
+          'pi': 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
+      }
+  }
+
   def __init__(self, dpb_service_spec):
     """Initialize the Dpb service object.
 
@@ -105,22 +116,24 @@ class BaseDpbService(resource.BaseResource):
     self.cluster_id = dpb_service_spec.static_dpb_service_instance
 
   @abc.abstractmethod
-  def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
-                job_stdout_file=None, job_arguments=None,
+  def SubmitJob(self,
+                job_jar,
+                class_name,
+                job_poll_interval=None,
+                job_stdout_file=None,
+                job_arguments=None,
                 job_type=None):
     """Submit a data processing job to the backend.
 
     Args:
       job_jar: Jar file to execute.
       class_name: Name of the main class.
-      job_poll_interval: integer saying how often to poll for job
-        completion.  Not used by providers for which submit job is a
-        synchronous operation.
-      job_stdout_file: String giving the location of the file in
-        which to put the standard out of the job.
-      job_arguments: Arguments to pass to class_name.  These are
-        not the arguments passed to the wrapper that submits the
-        job.
+      job_poll_interval: integer saying how often to poll for job completion.
+        Not used by providers for which submit job is a synchronous operation.
+      job_stdout_file: String giving the location of the file in which to put
+        the standard out of the job.
+      job_arguments: Arguments to pass to class_name.  These are not the
+        arguments passed to the wrapper that submits the job.
       job_type: Spark or Hadoop job
 
     Returns:
@@ -133,11 +146,12 @@ class BaseDpbService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
-    basic_data = {'dpb_service': self.SERVICE_TYPE,
-                  'dpb_cluster_id': self.cluster_id,
-                  'dpb_cluster_shape':
-                  self.spec.worker_group.vm_spec.machine_type,
-                  'dpb_cluster_size': self.spec.worker_count}
+    basic_data = {
+        'dpb_service': self.SERVICE_TYPE,
+        'dpb_cluster_id': self.cluster_id,
+        'dpb_cluster_shape': self.spec.worker_group.vm_spec.machine_type,
+        'dpb_cluster_size': self.spec.worker_count
+    }
     return basic_data
 
   def _Create(self):
@@ -152,3 +166,133 @@ class BaseDpbService(resource.BaseResource):
     deleted.
     """
     raise NotImplementedError()
+
+  def _ProcessWallTime(self, start_time, end_time):
+    """Compute the wall time from the given start and end processing time.
+
+    Args:
+      start_time: Datetime value when the processing was started.
+      end_time: Datetime value when the processing completed.
+
+    Returns:
+      Wall time in seconds.
+
+    Raises:
+        ValueError: Exception raised when invalid input is provided.
+    """
+    if start_time > end_time:
+      raise ValueError('start_time cannot be later than the end_time')
+    return (end_time - start_time).total_seconds()
+
+  def GetExecutionJar(self, job_category, job_type):
+    """Retrieve execution jar corresponding to the job_category and job_type.
+
+    Args:
+      job_category: String category of the job for eg. hadoop, spark, hive, etc.
+      job_type: String name of the type of workload to executed on the cluster,
+        for eg. word_count, terasort, etc.
+
+    Returns:
+      The path to the execusion jar on the cluster
+
+    Raises:
+        NotImplementedError: Exception: An unsupported combination of
+        job_category
+        and job_type was provided for execution on the cluster.
+    """
+    if job_category not in self.JOB_JARS or job_type not in self.JOB_JARS[
+        job_category]:
+      raise NotImplementedError()
+
+    return self.JOB_JARS[job_category][job_type]
+
+  def GenerateDataForTerasort(self, base_dir, generate_jar,
+                              generate_job_category):
+    """TeraGen generates data used as input data for subsequent TeraSort run.
+
+    Args:
+      base_dir: String for the base directory URI (inclusive of the file system)
+        for terasort benchmark data.
+      generate_jar: String path to the executable for generating the data. Can
+        point to a hadoop/yarn executable.
+      generate_job_category: String category of the generate job for eg. hadoop,
+        spark, hive, etc.
+
+    Returns:
+      Wall time for the Generate job.
+      The statistics from running the Generate job.
+    """
+
+    generate_args = [
+        TERAGEN,
+        str(FLAGS.dpb_terasort_num_records), base_dir + TERAGEN
+    ]
+    start_time = datetime.datetime.now()
+    stats = self.SubmitJob(
+        generate_jar,
+        None,
+        job_poll_interval=5,
+        job_arguments=generate_args,
+        job_stdout_file=None,
+        job_type=generate_job_category)
+    end_time = datetime.datetime.now()
+    return self._ProcessWallTime(start_time, end_time), stats
+
+  def SortDataForTerasort(self, base_dir, sort_jar, sort_job_category):
+    """TeraSort samples the input data and sorts the data into a total order.
+
+    TeraSort is implemented as a MapReduce sort job with a custom partitioner
+    that uses a sorted list of n-1 sampled keys that define the key range for
+    each reduce.
+
+    Args:
+      base_dir: String for the base directory URI (inclusive of the file system)
+        for terasort benchmark data.
+      sort_jar: String path to the executable for sorting the data. Can point to
+        a hadoop/yarn executable.
+      sort_job_category: String category of the generate job for eg. hadoop,
+        spark, hive, etc.
+
+    Returns:
+      Wall time for the Sort job.
+      The statistics from running the Sort job.
+    """
+    sort_args = [TERASORT, base_dir + TERAGEN, base_dir + TERASORT]
+    start_time = datetime.datetime.now()
+    stats = self.SubmitJob(
+        sort_jar,
+        None,
+        job_poll_interval=5,
+        job_arguments=sort_args,
+        job_stdout_file=None,
+        job_type=sort_job_category)
+    end_time = datetime.datetime.now()
+    return self._ProcessWallTime(start_time, end_time), stats
+
+  def ValidateDataForTerasort(self, base_dir, validate_jar,
+                              validate_job_category):
+    """TeraValidate ensures that the output data of TeraSort is globally sorted.
+
+    Args:
+      base_dir: String for the base directory URI (inclusive of the file system)
+        for terasort benchmark data.
+      validate_jar: String path to the executable for validating the sorted
+        data. Can point to a hadoop/yarn executable.
+      validate_job_category: String category of the validate job for eg. hadoop,
+        spark, hive, etc.
+
+    Returns:
+      Wall time for the Validate job.
+      The statistics from running the Validate job.
+    """
+    validate_args = [TERAVALIDATE, base_dir + TERASORT, base_dir + TERAVALIDATE]
+    start_time = datetime.datetime.now()
+    stats = self.SubmitJob(
+        validate_jar,
+        None,
+        job_poll_interval=5,
+        job_arguments=validate_args,
+        job_stdout_file=None,
+        job_type=validate_job_category)
+    end_time = datetime.datetime.now()
+    return self._ProcessWallTime(start_time, end_time), stats

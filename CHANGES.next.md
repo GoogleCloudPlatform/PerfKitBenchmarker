@@ -88,6 +88,7 @@
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
 - Added support for Windows2012, 2016, and 2019 for GCP.
+- Terasort implementation on dpb backend.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
