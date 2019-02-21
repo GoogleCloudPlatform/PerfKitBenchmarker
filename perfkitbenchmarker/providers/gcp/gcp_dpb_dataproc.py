@@ -55,6 +55,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   CLOUD = providers.GCP
   SERVICE_TYPE = 'dataproc'
+  PERSISTENT_FS_PREFIX = 'gs://'
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
