@@ -77,4 +77,3 @@ class BaseManagedMemoryStore(resource.BaseResource):
     super(BaseManagedMemoryStore, self).__init__()
     self.spec = spec
     self.name = 'pkb-%s' % FLAGS.run_uri
-
