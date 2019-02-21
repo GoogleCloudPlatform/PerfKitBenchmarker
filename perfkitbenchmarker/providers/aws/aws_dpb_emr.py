@@ -96,6 +96,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   CLOUD = providers.AWS
   SERVICE_TYPE = 'emr'
+  PERSISTENT_FS_PREFIX = 's3://'
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
