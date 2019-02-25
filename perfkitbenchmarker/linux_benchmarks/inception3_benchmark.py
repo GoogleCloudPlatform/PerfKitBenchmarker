@@ -176,7 +176,7 @@ def Run(benchmark_spec):
           script=inception3_benchmark_script,
           learning_rate=benchmark_spec.learning_rate,
           iterations=benchmark_spec.iterations,
-          use_tpu=benchmark_spec.use_tpu,
+          use_tpu=bool(benchmark_spec.tpus),
           use_data=benchmark_spec.use_data,
           steps_per_eval=benchmark_spec.steps_per_eval,
           data_dir=benchmark_spec.data_dir,
@@ -202,8 +202,10 @@ def Run(benchmark_spec):
       inception3_benchmark_train_cmd = (
           '{cmd} --tpu={tpu} --mode=train --num_shards={num_shards}'.format(
               cmd=inception3_benchmark_cmd_step,
-              tpu=benchmark_spec.tpu_train,
-              num_shards=benchmark_spec.num_shards_train))
+              tpu=(benchmark_spec.tpu_groups['train'].GetName() if
+                   benchmark_spec.tpus else ''),
+              num_shards=(benchmark_spec.tpu_groups['train'].GetNumShards() if
+                          benchmark_spec.tpus else 0)))
       start = time.time()
       stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_train_cmd,
                                               should_log=True)
@@ -214,8 +216,10 @@ def Run(benchmark_spec):
       inception3_benchmark_eval_cmd = (
           '{cmd} --tpu={tpu} --mode=eval --num_shards={num_shards}'.format(
               cmd=inception3_benchmark_cmd_step,
-              tpu=benchmark_spec.tpu_eval,
-              num_shards=benchmark_spec.num_shards_eval))
+              tpu=(benchmark_spec.tpu_groups['eval'].GetName() if
+                   benchmark_spec.tpus else ''),
+              num_shards=(benchmark_spec.tpu_groups['eval'].GetNumShards() if
+                          benchmark_spec.tpus else 0)))
       stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_eval_cmd,
                                               should_log=True)
       samples.extend(resnet_benchmark.MakeSamplesFromEvalOutput(

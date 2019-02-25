@@ -102,25 +102,8 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.data_dir = FLAGS.mnist_data_dir
-  benchmark_spec.use_tpu = True if benchmark_spec.tpus else False
-  benchmark_spec.tpu_train = ''
-  benchmark_spec.tpu_eval = ''
-  benchmark_spec.num_shards_train = FLAGS.tpu_cores_per_donut
-  benchmark_spec.num_shards_eval = FLAGS.tpu_cores_per_donut
-  if benchmark_spec.use_tpu:
-    tpu_groups = benchmark_spec.tpu_groups
-    if 'train' in tpu_groups:
-      tpu_train = tpu_groups['train']
-      benchmark_spec.tpu_train = tpu_train.GetName()
-      benchmark_spec.num_shards_train = tpu_train.GetNumShards()
-    if 'eval' in tpu_groups:
-      tpu_eval = tpu_groups['eval']
-      benchmark_spec.tpu_eval = tpu_eval.GetName()
-      benchmark_spec.num_shards_eval = tpu_eval.GetNumShards()
-  benchmark_spec.tpu = benchmark_spec.tpu_train
   benchmark_spec.iterations = FLAGS.tpu_iterations
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
-  benchmark_spec.num_shards = benchmark_spec.num_shards_train
   benchmark_spec.batch_size = FLAGS.mnist_batch_size
   benchmark_spec.num_train_images = FLAGS.mnist_num_train_images
   benchmark_spec.num_eval_images = FLAGS.mnist_num_eval_images
@@ -145,12 +128,12 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  if not benchmark_spec.use_tpu:
+  if not benchmark_spec.tpus:
     vm.Install('tensorflow')
   vm.Install('cloud_tpu_models')
   vm.RemoteCommand('git clone https://github.com/tensorflow/models.git',
                    should_log=True)
-  if benchmark_spec.use_tpu:
+  if benchmark_spec.tpus:
     storage_service = gcs.GoogleCloudStorageService()
     storage_service.PrepareVM(vm)
     benchmark_spec.storage_service = storage_service
@@ -197,18 +180,18 @@ def CreateMetadataDict(benchmark_spec):
   """
   return {
       'data_dir': benchmark_spec.data_dir,
-      'use_tpu': benchmark_spec.use_tpu,
+      'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
       'eval_steps': benchmark_spec.eval_steps,
-      'tpu': benchmark_spec.tpu,
-      'tpu_train': benchmark_spec.tpu_train,
-      'tpu_eval': benchmark_spec.tpu_eval,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
-      'num_shards': benchmark_spec.num_shards,
-      'num_shards_train': benchmark_spec.num_shards_train,
-      'num_shards_eval': benchmark_spec.num_shards_eval,
+      'train_tpu_num_shards': (
+          benchmark_spec.tpu_groups['train'].GetNumShards() if
+          benchmark_spec.tpus else ''),
+      'train_tpu_accelerator_type': (
+          benchmark_spec.tpu_groups['train'].GetAcceleratorType() if
+          benchmark_spec.tpus else ''),
       'num_train_images': benchmark_spec.num_train_images,
       'num_eval_images': benchmark_spec.num_eval_images,
       'train_epochs': benchmark_spec.train_epochs,
@@ -348,10 +331,12 @@ def Run(benchmark_spec):
         '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
         '--num_shards={num_shards} --noenable_predict'.format(
             cmd=mnist_benchmark_cmd,
-            tpu=benchmark_spec.tpu_train,
-            use_tpu=benchmark_spec.use_tpu,
+            tpu=(benchmark_spec.tpu_groups['train'].GetName() if
+                 benchmark_spec.tpus else ''),
+            use_tpu=True if benchmark_spec.tpus else False,
             train_steps=benchmark_spec.train_steps,
-            num_shards=benchmark_spec.num_shards_train))
+            num_shards=(benchmark_spec.tpu_groups['train'].GetNumShards() if
+                        benchmark_spec.tpus else 0)))
     start = time.time()
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd,
                                             should_log=True)
@@ -376,7 +361,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  if benchmark_spec.use_tpu:
+  if benchmark_spec.tpus:
     vm = benchmark_spec.vms[0]
     vm.RemoteCommand(
         '{gsutil} rm -r {model_dir}'.format(
