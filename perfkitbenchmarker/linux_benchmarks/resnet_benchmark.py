@@ -246,7 +246,7 @@ def Run(benchmark_spec):
       '--num_eval_images={num_eval_images}'.format(
           env_cmd=benchmark_spec.env_cmd,
           script=resnet_benchmark_script,
-          use_tpu=benchmark_spec.use_tpu,
+          use_tpu=bool(benchmark_spec.tpus),
           data_dir=benchmark_spec.data_dir,
           model_dir=benchmark_spec.model_dir,
           depth=benchmark_spec.depth,
@@ -276,8 +276,10 @@ def Run(benchmark_spec):
       resnet_benchmark_train_cmd = (
           '{cmd} --tpu={tpu} --mode=train --num_cores={num_cores}'.format(
               cmd=resnet_benchmark_cmd_step,
-              tpu=benchmark_spec.tpu_train,
-              num_cores=benchmark_spec.num_shards_train))
+              tpu=(benchmark_spec.tpu_groups['train'].GetName() if
+                   benchmark_spec.tpus else ''),
+              num_cores=(benchmark_spec.tpu_groups['train'].GetNumShards() if
+                         benchmark_spec.tpus else 0)))
       start = time.time()
       stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_train_cmd,
                                               should_log=True)
@@ -288,8 +290,10 @@ def Run(benchmark_spec):
       resnet_benchmark_eval_cmd = (
           '{cmd} --tpu={tpu} --mode=eval --num_cores={num_cores}'.format(
               cmd=resnet_benchmark_cmd_step,
-              tpu=benchmark_spec.tpu_eval,
-              num_cores=benchmark_spec.num_shards_eval))
+              tpu=(benchmark_spec.tpu_groups['eval'].GetName() if
+                   benchmark_spec.tpus else ''),
+              num_cores=(benchmark_spec.tpu_groups['eval'].GetNumShards() if
+                         benchmark_spec.tpus else 0)))
       stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_eval_cmd,
                                               should_log=True)
       samples.extend(MakeSamplesFromEvalOutput(
