@@ -84,9 +84,17 @@ flags.DEFINE_boolean('simulate_maintenance', False,
 flags.DEFINE_integer('simulate_maintenance_delay', 0,
                      'The number of seconds to wait to start simulating '
                      'maintenance.')
-flags.DEFINE_boolean('reuse_ssh_connections', True,
+flags.DEFINE_boolean('ssh_reuse_connections', True,
                      'Whether to reuse SSH connections rather than '
-                     'restablishing a connection for each remote command.')
+                     'reestablishing a connection for each remote command.')
+flags.DEFINE_integer('ssh_server_alive_interval', 30,
+                     'Value for ssh -o ServerAliveInterval. Use with '
+                     '--ssh_server_alive_count_max to configure how long to '
+                     'wait for unresponsive servers.')
+flags.DEFINE_integer('ssh_server_alive_count_max', 10,
+                     'Value for ssh -o ServerAliveCountMax. Use with '
+                     '--ssh_server_alive_interval to configure how long to '
+                     'wait for unresponsive servers.')
 
 
 class IpAddressSubset(object):
@@ -188,13 +196,13 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
       '-o', 'PasswordAuthentication=no',
       '-o', 'ConnectTimeout=%d' % connect_timeout,
       '-o', 'GSSAPIAuthentication=no',
-      '-o', 'ServerAliveInterval=30',
-      '-o', 'ServerAliveCountMax=10',
+      '-o', 'ServerAliveInterval=%d' % FLAGS.ssh_server_alive_interval,
+      '-o', 'ServerAliveCountMax=%d' % FLAGS.ssh_server_alive_count_max,
       '-i', ssh_key_filename
   ]
   if FLAGS.use_ipv6:
     options.append('-6')
-  if FLAGS.reuse_ssh_connections:
+  if FLAGS.ssh_reuse_connections:
     control_path = os.path.join(temp_dir.GetSshConnectionsDir(), '%C')
     options.extend([
         '-o', 'ControlPath="%s"' % control_path,
