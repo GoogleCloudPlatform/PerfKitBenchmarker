@@ -879,6 +879,10 @@ class YCSBExecutor(object):
     kwargs.setdefault('threads', self._default_preload_threads)
     if FLAGS.ycsb_record_count:
       kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
+    if FLAGS.ycsb_field_count:
+      kwargs.setdefault('fieldcount', FLAGS.ycsb_field_count)
+    if FLAGS.ycsb_field_length:
+      kwargs.setdefault('fieldlength', FLAGS.ycsb_field_length)
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
