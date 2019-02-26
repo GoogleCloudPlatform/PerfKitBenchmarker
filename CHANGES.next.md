@@ -238,16 +238,17 @@
   to vm in the Tensorflow benchmark.
 - Added flag `nttcp_config_list` to allow the user to supply a list of test
   configurations, all to be run in a single run phase.
-- Add support for --nouse_pkb_logging to use standard ABSL logging instead.
+- Add support for `--nouse_pkb_logging` to use standard ABSL logging instead.
 - Improved support for booting more than 200 VMs with the cluster_boot benchmark.
 - Adding version support to redis server and setting permissions for newer redis versions.
 - Introduced app service metadata to indicate backend concurrency.
-- Added option to reuse SSH connections which speeds up benchmarks with lots of short commands.
+- Added `--ssh_reuse_connections` to reuse SSH connections which speeds up benchmarks with lots of short commands.
 - Add abstract PreDelete method to the base resource class.
 - Add ability for linux vms to print the dmesg command before termination
-  using the flag 'log_dmesg'.
+  using the flag '--log_dmesg'.
 - TPU and its GCS bucket should be in the same region.
 - Adding field count and field length flag overrides to ycsb load.
+- Added `--ssh_server_alive_interval` and `ssh_server_alive_count_max` to adjust SSH server alive options.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
