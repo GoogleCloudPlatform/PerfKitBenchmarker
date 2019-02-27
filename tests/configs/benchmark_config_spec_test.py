@@ -386,10 +386,10 @@ class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode({
-        'redis_version': 'REDIS_3_2'
+        'redis_version': 'redis_3_2'
     }, _COMPONENT, FLAGS)
     self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
-    self.assertEqual(result.redis_version, 'REDIS_3_2')
+    self.assertEqual(result.redis_version, 'redis_3_2')
 
   def testInvalidInput(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
@@ -414,7 +414,7 @@ class CloudRedisSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testDefaults(self):
     result = self._spec_class(_COMPONENT, flag_values=FLAGS)
     self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
-    self.assertEqual(result.redis_version, 'REDIS_3_2')
+    self.assertEqual(result.redis_version, 'redis_3_2')
 
 
 class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):

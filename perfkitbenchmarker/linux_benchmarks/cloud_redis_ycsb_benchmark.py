@@ -30,7 +30,7 @@ from perfkitbenchmarker.linux_packages import ycsb
 FLAGS = flags.FLAGS
 flags.DEFINE_string('redis_region',
                     'us-central1',
-                    'The region to spin up cloud redis in')
+                    'The region to spin up cloud redis in.')
 
 BENCHMARK_NAME = 'cloud_redis_ycsb'
 
@@ -38,7 +38,7 @@ BENCHMARK_CONFIG = """
 cloud_redis_ycsb:
   description: Run YCSB against cloud redis
   cloud_redis:
-    redis_version: REDIS_3_2
+    redis_version: redis_3_2
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -52,6 +52,8 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['redis_version'].present:
+    config['cloud_redis']['redis_version'] = FLAGS.redis_version
   return config
 
 
