@@ -70,13 +70,13 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(stats['p74'], 2)
     self.assertEqual(stats['p80'], 5)
     self.assertEqual(stats['p100'], 5)
-    self.assertTrue(abs(stats['stddev'] - 1.538) <= 0.001)
+    self.assertLessEqual(abs(stats['stddev'] - 1.538), 0.001)
 
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
-    vm_spec.vms[0].RemoteCommand.side_effect = [
+    vm_spec.vms[0].RobustRemoteCommand.side_effect = [
         (i, '') for i in self.expected_stdout]
 
     result = netperf_benchmark.Run(vm_spec)

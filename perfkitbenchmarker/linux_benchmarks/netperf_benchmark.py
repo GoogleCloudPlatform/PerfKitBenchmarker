@@ -22,7 +22,7 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
-from collections import Counter
+import collections
 import csv
 import io
 import json
@@ -358,8 +358,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
   remote_cmd = ('./%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' %
                 (REMOTE_SCRIPT, netperf_cmd, num_streams, PORT_START))
-  remote_stdout, _ = vm.RemoteCommand(remote_cmd,
-                                      timeout=remote_cmd_timeout)
+  remote_stdout, _ = vm.RobustRemoteCommand(remote_cmd, should_log=True,
+                                            timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   json_out = json.loads(remote_stdout)
@@ -406,7 +406,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                         throughput_unit, metadata))
     if enable_latency_histograms:
       # Combine all of the latency histogram dictionaries
-      latency_histogram = Counter()
+      latency_histogram = collections.Counter()
       for histogram in latency_histograms:
         latency_histogram.update(histogram)
       # Create a sample for the aggregate latency histogram
@@ -448,7 +448,7 @@ def Run(benchmark_spec):
   }
 
   for num_streams in FLAGS.netperf_num_streams:
-    assert(num_streams >= 1)
+    assert num_streams >= 1
 
     for netperf_benchmark in FLAGS.netperf_benchmarks:
       if vm_util.ShouldRunOnExternalIpAddress():
