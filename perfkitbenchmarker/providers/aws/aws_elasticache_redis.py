@@ -26,7 +26,8 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
-REDIS_VERSION_MAPPING = {'REDIS_3_2': '3.2.10'}
+REDIS_VERSION_MAPPING = {'redis_3_2': '3.2.10',
+                         'redis_4_0': '4.0.10'}
 
 
 class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):

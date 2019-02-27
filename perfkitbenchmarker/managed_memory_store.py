@@ -40,8 +40,14 @@ flags.DEFINE_enum(
     'failover_none, failover_same_zone, and failover_same_region')
 
 # List of redis versions
-REDIS_3_2 = 'REDIS_3_2'
-REDIS_VERSIONS = [REDIS_3_2]
+REDIS_3_2 = 'redis_3_2'
+REDIS_4_0 = 'redis_4_0'
+REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0]
+
+flags.DEFINE_enum('redis_version',
+                  REDIS_3_2,
+                  REDIS_VERSIONS,
+                  'The version of redis to use.')
 
 
 def GetManagedMemoryStoreClass(cloud, memory_store):

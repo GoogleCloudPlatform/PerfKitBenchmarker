@@ -41,6 +41,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self.project = FLAGS.project
     self.size = FLAGS.gcp_redis_gb
     self.redis_region = FLAGS.redis_region
+    self.redis_version = spec.config.cloud_redis.redis_version
     self.failover_style = FLAGS.redis_failover_style
     if self.failover_style == managed_memory_store.Failover.FAILOVER_NONE:
       self.tier = BASIC_TIER
@@ -76,6 +77,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['network'] = FLAGS.gce_network_name
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
+    cmd.flags['redis-version'] = self.redis_version
     cmd.Issue()
 
   def _IsReady(self):
