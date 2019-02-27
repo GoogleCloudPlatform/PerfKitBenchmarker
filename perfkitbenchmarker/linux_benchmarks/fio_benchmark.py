@@ -244,6 +244,9 @@ group_reporting=1
 [{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
 stonewall
 rw={{scenario['rwkind']}}
+{%- if scenario['rwmixread'] is defined %}
+rwmixread={{scenario['rwmixread']}}
+{%- endif%}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
 {%- if scenario['size'] is defined %}
