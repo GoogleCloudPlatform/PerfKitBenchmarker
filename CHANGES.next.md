@@ -90,6 +90,7 @@
 - Added support for Windows2012, 2016, and 2019 for GCP.
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
+- Support multiple redis versions in cloud redis.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
