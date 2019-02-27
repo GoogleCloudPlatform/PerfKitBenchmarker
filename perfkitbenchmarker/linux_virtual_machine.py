@@ -496,6 +496,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # want to fail if this wasn't the case.
     if disk.NFS == disk_type:
       return
+    if disk.SMB == disk_type:
+      return
     fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
                'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
@@ -509,6 +511,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if disk.NFS == disk_type:
       mount_options = '-t nfs %s' % mount_options
       fs_type = 'nfs'
+    elif disk.SMB == disk_type:
+      mount_options = '-t cifs %s' % mount_options
+      fs_type = 'smb'
     else:
       fs_type = _DEFAULT_DISK_FS_TYPE
     fstab_options = fstab_options or ''
@@ -957,6 +962,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if nfs is None:
       raise errors.Resource.CreationError('No NFS Service created')
     return nfs
+
+  def _GetSmbService(self):
+    """Returns the SmbService created in the benchmark spec.
+
+    Before calling this method check that the disk.disk_type is equal to
+    disk.SMB or else an exception will be raised.
+
+    Returns:
+      The smb_service.BaseSmbService service for this cloud.
+
+    Raises:
+      CreationError: If no SMB service was created.
+    """
+    smb = getattr(context.GetThreadBenchmarkSpec(), 'smb_service')
+    if smb is None:
+      raise errors.Resource.CreationError('No SMB Service created')
+    return smb
 
 
 class RhelMixin(BaseLinuxMixin):
