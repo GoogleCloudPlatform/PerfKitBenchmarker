@@ -39,6 +39,7 @@ flags.DEFINE_string('nfs_directory', None,
                     'Directory to mount if using a StaticNfsService. This '
                     'corresponds to the "VOLUME_NAME" of other NfsService '
                     'classes.')
+flags.DEFINE_string('smb_version', '3.0', 'SMB version.')
 flags.DEFINE_list('mount_options', [],
                   'Additional arguments to supply when mounting.')
 flags.DEFINE_list('fstab_options', [],
@@ -62,8 +63,9 @@ LOCAL = 'local'
 
 RAM = 'ram'
 
-# refers to disks that come from a cloud NFS service
+# refers to disks that come from a cloud NFS or SMB service
 NFS = 'nfs'
+SMB = 'smb'
 
 # Map old disk type names to new disk type names
 DISK_TYPE_MAPS = dict()
@@ -232,6 +234,8 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['nfs_ip_address'] = flag_values.nfs_ip_address
     if flag_values['nfs_directory'].present:
       config_values['nfs_directory'] = flag_values.nfs_directory
+    if flag_values['smb_version'].present:
+      config_values['smb_version'] = flag_values.smb_version
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -267,6 +271,7 @@ class BaseDiskSpec(spec.BaseSpec):
         'nfs_timeout': (option_decoders.IntDecoder, {'default': 60}),
         'nfs_timeout_hard': (option_decoders.BooleanDecoder, {'default': True}),
         'nfs_retries': (option_decoders.IntDecoder, {'default': 2}),
+        'smb_version': (option_decoders.StringDecoder, {'default': '3.0'}),
     })
     return result
 
@@ -425,10 +430,46 @@ class RamDisk(BaseDisk):
     pass
 
 
+class NetworkDisk(BaseDisk):
+  """Object representing a Network Disk."""
+
+  def __init__(self, disk_spec):
+    super(NetworkDisk, self).__init__(disk_spec)
+    super(NetworkDisk, self).GetResourceMetadata()
+
+  @abc.abstractmethod
+  def _GetNetworkDiskMountOptionsDict(self):
+    """Default mount options as a dict."""
+    pass
+
+  @property
+  def mount_options(self):
+    opts = []
+    for key, value in sorted(
+        self._GetNetworkDiskMountOptionsDict().iteritems()):
+      opts.append('%s' % key if value is None else '%s=%s' % (key, value))
+    return ','.join(opts)
+
+  @property
+  def fstab_options(self):
+    return self.mount_options
+
+  def Detach(self):
+    self.vm.RemoteCommand('sudo umount %s' % self.mount_point)
+
+  def _Create(self):
+    # handled by the Network Disk service
+    pass
+
+  def _Delete(self):
+    # handled by the Network Disk service
+    pass
+
+
 # TODO(chriswilkes): adds to the disk.GetDiskSpecClass registry
 # that only has the cloud as the key.  Look into using (cloud, disk_type)
 # if causes problems
-class NfsDisk(BaseDisk):
+class NfsDisk(NetworkDisk):
   """Provides options for mounting NFS drives.
 
   NFS disk should be ready to mount at the time of creation of this disk.
@@ -449,13 +490,13 @@ class NfsDisk(BaseDisk):
     self.nfs_timeout = disk_spec.nfs_timeout
     self.nfs_retries = disk_spec.nfs_retries
     self.device_path = remote_mount_address
-    for key, value in self._GetNfsMountOptionsDict().iteritems():
+    for key, value in self._GetNetworkDiskMountOptionsDict().iteritems():
       self.metadata['nfs_{}'.format(key)] = value
     if nfs_tier:
       self.metadata['nfs_tier'] = nfs_tier
     super(NfsDisk, self).GetResourceMetadata()
 
-  def _GetNfsMountOptionsDict(self):
+  def _GetNetworkDiskMountOptionsDict(self):
     """Default NFS mount options as a dict."""
     options = {
         'hard' if self.nfs_timeout_hard else 'soft': None,
@@ -469,28 +510,43 @@ class NfsDisk(BaseDisk):
       options['nfsvers'] = self.nfs_version
     return options
 
-  @property
-  def mount_options(self):
-    opts = []
-    for key, value in sorted(self._GetNfsMountOptionsDict().iteritems()):
-      opts.append('%s' % key if value is None else '%s=%s' % (key, value))
-    return ','.join(opts)
-
-  @property
-  def fstab_options(self):
-    return self.mount_options
-
   def Attach(self, vm):
     self.vm = vm
     self.vm.Install('nfs_utils')
 
-  def Detach(self):
-    self.vm.RemoteCommand('sudo umount %s' % self.mount_point)
 
-  def _Create(self):
-    # handled by the NFS service
-    pass
+class SmbDisk(NetworkDisk):
+  """Provides options for mounting SMB drives.
 
-  def _Delete(self):
-    # handled by the NFS service
-    pass
+  SMB disk should be ready to mount at the time of creation of this disk.
+
+  Args:
+    disk_spec: The disk spec.
+    remote_mount_address: The host_address:/volume path to the SMB drive.
+    smb_tier: The SMB tier / performance level of the server.
+  """
+
+  def __init__(self, disk_spec, remote_mount_address, storage_account_and_key,
+               default_smb_version=None, smb_tier=None):
+    super(SmbDisk, self).__init__(disk_spec)
+    self.smb_version = disk_spec.smb_version
+    self.device_path = remote_mount_address
+    self.storage_account_and_key = storage_account_and_key
+    if smb_tier:
+      self.metadata['smb_tier'] = smb_tier
+
+  def _GetNetworkDiskMountOptionsDict(self):
+    """Default SMB mount options as a dict."""
+    options = {
+        'vers': self.smb_version,
+        'username': self.storage_account_and_key['user'],
+        'password': self.storage_account_and_key['pw'],
+        'dir_mode': '0777',
+        'file_mode': '0777',
+        'serverino': None,
+    }
+    return options
+
+  def Attach(self, vm):
+    self.vm = vm
+    self.vm.InstallPackages('cifs-utils')

@@ -249,6 +249,7 @@
 - TPU and its GCS bucket should be in the same region.
 - Adding field count and field length flag overrides to ycsb load.
 - Added `--ssh_server_alive_interval` and `ssh_server_alive_count_max` to adjust SSH server alive options.
+- Support for cloud SMB services (no implementation).
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
