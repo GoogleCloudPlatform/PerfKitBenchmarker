@@ -40,6 +40,7 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -136,6 +137,7 @@ class BenchmarkSpec(object):
     self.tpu_groups = {}
     self.edw_service = None
     self.nfs_service = None
+    self.smb_service = None
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
@@ -268,6 +270,28 @@ class BenchmarkSpec(object):
         nfs_class = nfs_service.GetNfsServiceClass(cloud)
         self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
       logging.debug('NFS service %s', self.nfs_service)
+      break
+
+  def ConstructSmbService(self):
+    """Construct the SMB service object.
+
+    Creates an SMB Service only if an SMB disk is found in the disk_specs.
+    """
+    if self.smb_service:
+      logging.info('SMB service already created: %s', self.smb_service)
+      return
+    for group_spec in self.config.vm_groups.values():
+      if not group_spec.disk_spec or not group_spec.vm_count:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type != disk.SMB:
+        continue
+
+      cloud = group_spec.cloud
+      providers.LoadProvider(cloud)
+      smb_class = smb_service.GetSmbServiceClass(cloud)
+      self.smb_service = smb_class(disk_spec, group_spec.vm_spec.zone)
+      logging.debug('SMB service %s', self.smb_service)
       break
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
@@ -472,6 +496,8 @@ class BenchmarkSpec(object):
     # do after network setup but before VM created
     if self.nfs_service:
       self.nfs_service.Create()
+    if self.smb_service:
+      self.smb_service.Create()
 
     if self.vms:
 
@@ -527,6 +553,8 @@ class BenchmarkSpec(object):
       self.edw_service.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
+    if self.smb_service:
+      self.smb_service.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).
