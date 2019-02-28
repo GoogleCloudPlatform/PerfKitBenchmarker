@@ -131,8 +131,7 @@ def Prepare(benchmark_spec):
   if not benchmark_spec.tpus:
     vm.Install('tensorflow')
   vm.Install('cloud_tpu_models')
-  vm.RemoteCommand('git clone https://github.com/tensorflow/models.git',
-                   should_log=True)
+  vm.Install('tensorflow_models')
   if benchmark_spec.tpus:
     storage_service = gcs.GoogleCloudStorageService()
     storage_service.PrepareVM(vm)
@@ -178,20 +177,13 @@ def CreateMetadataDict(benchmark_spec):
   Returns:
     metadata dict
   """
-  return {
+  metadata = {
       'data_dir': benchmark_spec.data_dir,
-      'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
       'eval_steps': benchmark_spec.eval_steps,
       'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
       'iterations': benchmark_spec.iterations,
-      'train_tpu_num_shards': (
-          benchmark_spec.tpu_groups['train'].GetNumShards() if
-          benchmark_spec.tpus else ''),
-      'train_tpu_accelerator_type': (
-          benchmark_spec.tpu_groups['train'].GetAcceleratorType() if
-          benchmark_spec.tpus else ''),
       'num_train_images': benchmark_spec.num_train_images,
       'num_eval_images': benchmark_spec.num_eval_images,
       'train_epochs': benchmark_spec.train_epochs,
@@ -200,6 +192,16 @@ def CreateMetadataDict(benchmark_spec):
       'train_batch_size': benchmark_spec.batch_size,
       'eval_batch_size': benchmark_spec.batch_size
   }
+  use_tpu = bool(benchmark_spec.tpus)
+  if use_tpu:
+    metadata.update({
+        'use_tpu': use_tpu,
+        'train_tpu_num_shards':
+            benchmark_spec.tpu_groups['train'].GetNumShards(),
+        'train_tpu_accelerator_type':
+            benchmark_spec.tpu_groups['train'].GetAcceleratorType()
+    })
+  return metadata
 
 
 def ExtractThroughput(regex, output, metadata, metric, unit):
@@ -327,16 +329,17 @@ def Run(benchmark_spec):
   samples = []
   metadata = CreateMetadataDict(benchmark_spec)
   if benchmark_spec.train_steps:
+    if benchmark_spec.tpus:
+      tpu = benchmark_spec.tpu_groups['train'].GetName()
+      num_shards = '--num_shards={}'.format(
+          benchmark_spec.tpu_groups['train'].GetNumShards())
+    else:
+      tpu = num_shards = ''
     mnist_benchmark_train_cmd = (
         '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
-        '--num_shards={num_shards} --noenable_predict'.format(
-            cmd=mnist_benchmark_cmd,
-            tpu=(benchmark_spec.tpu_groups['train'].GetName() if
-                 benchmark_spec.tpus else ''),
-            use_tpu=True if benchmark_spec.tpus else False,
-            train_steps=benchmark_spec.train_steps,
-            num_shards=(benchmark_spec.tpu_groups['train'].GetNumShards() if
-                        benchmark_spec.tpus else 0)))
+        '{num_shards} --noenable_predict'.format(
+            cmd=mnist_benchmark_cmd, tpu=tpu, use_tpu=bool(benchmark_spec.tpus),
+            train_steps=benchmark_spec.train_steps, num_shards=num_shards))
     start = time.time()
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd,
                                             should_log=True)
