@@ -253,6 +253,8 @@
 - Support for cloud SMB services (no implementation).
 - Added rwmixread option to fio scenarios. This option is ignored unless a split
   read/write workload is specified.
+- Added gce_local_ssd_count and gce_local_ssd_interface metadata to
+  GceVirtualMachine.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
