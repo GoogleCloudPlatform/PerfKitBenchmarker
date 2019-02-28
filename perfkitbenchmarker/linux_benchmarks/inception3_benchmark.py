@@ -199,13 +199,16 @@ def Run(benchmark_spec):
     inception3_benchmark_cmd_step = '{cmd} --train_steps={step}'.format(
         cmd=inception3_benchmark_cmd, step=step)
     if benchmark_spec.mode in ('train', 'train_and_eval'):
+      if benchmark_spec.tpus:
+        tpu = benchmark_spec.tpu_groups['train'].GetName()
+        num_shards = '--num_shards={}'.format(
+            benchmark_spec.tpu_groups['train'].GetNumShards())
+      else:
+        tpu = num_shards = ''
       inception3_benchmark_train_cmd = (
-          '{cmd} --tpu={tpu} --mode=train --num_shards={num_shards}'.format(
+          '{cmd} --tpu={tpu} --mode=train {num_shards}'.format(
               cmd=inception3_benchmark_cmd_step,
-              tpu=(benchmark_spec.tpu_groups['train'].GetName() if
-                   benchmark_spec.tpus else ''),
-              num_shards=(benchmark_spec.tpu_groups['train'].GetNumShards() if
-                          benchmark_spec.tpus else 0)))
+              tpu=tpu, num_shards=num_shards))
       start = time.time()
       stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_train_cmd,
                                               should_log=True)
@@ -213,13 +216,16 @@ def Run(benchmark_spec):
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
           metadata, stdout + stderr, elapsed_seconds, step))
     if benchmark_spec.mode in ('train_and_eval', 'eval'):
+      if benchmark_spec.tpus:
+        tpu = benchmark_spec.tpu_groups['eval'].GetName()
+        num_shards = '--num_shards={}'.format(
+            benchmark_spec.tpu_groups['eval'].GetNumShards())
+      else:
+        tpu = num_shards = ''
       inception3_benchmark_eval_cmd = (
-          '{cmd} --tpu={tpu} --mode=eval --num_shards={num_shards}'.format(
+          '{cmd} --tpu={tpu} --mode=eval {num_shards}'.format(
               cmd=inception3_benchmark_cmd_step,
-              tpu=(benchmark_spec.tpu_groups['eval'].GetName() if
-                   benchmark_spec.tpus else ''),
-              num_shards=(benchmark_spec.tpu_groups['eval'].GetNumShards() if
-                          benchmark_spec.tpus else 0)))
+              tpu=tpu, num_shards=num_shards))
       stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_eval_cmd,
                                               should_log=True)
       samples.extend(resnet_benchmark.MakeSamplesFromEvalOutput(

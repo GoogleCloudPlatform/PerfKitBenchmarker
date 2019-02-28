@@ -273,13 +273,16 @@ def Run(benchmark_spec):
     resnet_benchmark_cmd_step = '{cmd} --train_steps={step}'.format(
         cmd=resnet_benchmark_cmd, step=step)
     if benchmark_spec.mode in ('train', 'train_and_eval'):
+      if benchmark_spec.tpus:
+        tpu = benchmark_spec.tpu_groups['train'].GetName()
+        num_cores = '--num_cores={}'.format(
+            benchmark_spec.tpu_groups['train'].GetNumShards())
+      else:
+        tpu = num_cores = ''
       resnet_benchmark_train_cmd = (
-          '{cmd} --tpu={tpu} --mode=train --num_cores={num_cores}'.format(
+          '{cmd} --tpu={tpu} --mode=train {num_cores}'.format(
               cmd=resnet_benchmark_cmd_step,
-              tpu=(benchmark_spec.tpu_groups['train'].GetName() if
-                   benchmark_spec.tpus else ''),
-              num_cores=(benchmark_spec.tpu_groups['train'].GetNumShards() if
-                         benchmark_spec.tpus else 0)))
+              tpu=tpu, num_cores=num_cores))
       start = time.time()
       stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_train_cmd,
                                               should_log=True)
@@ -287,13 +290,16 @@ def Run(benchmark_spec):
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
           metadata, stdout + stderr, elapsed_seconds, step))
     if benchmark_spec.mode in ('train_and_eval', 'eval'):
+      if benchmark_spec.tpus:
+        tpu = benchmark_spec.tpu_groups['eval'].GetName()
+        num_cores = '--num_cores={}'.format(
+            benchmark_spec.tpu_groups['eval'].GetNumShards())
+      else:
+        tpu = num_cores = ''
       resnet_benchmark_eval_cmd = (
-          '{cmd} --tpu={tpu} --mode=eval --num_cores={num_cores}'.format(
+          '{cmd} --tpu={tpu} --mode=eval {num_cores}'.format(
               cmd=resnet_benchmark_cmd_step,
-              tpu=(benchmark_spec.tpu_groups['eval'].GetName() if
-                   benchmark_spec.tpus else ''),
-              num_cores=(benchmark_spec.tpu_groups['eval'].GetNumShards() if
-                         benchmark_spec.tpus else 0)))
+              tpu=tpu, num_cores=num_cores))
       stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_eval_cmd,
                                               should_log=True)
       samples.extend(MakeSamplesFromEvalOutput(
