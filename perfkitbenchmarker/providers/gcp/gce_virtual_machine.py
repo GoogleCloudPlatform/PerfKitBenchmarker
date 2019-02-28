@@ -453,9 +453,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           'as it is not supported by GCP.')
     if not FLAGS.gce_migrate_on_maintenance or self.gpu_count:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
-    ssd_interface_option = FLAGS.gce_ssd_interface
-    cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
-                              self.max_local_disks)
+    cmd.flags['local-ssd'] = (['interface={0}'.format(
+        FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     if self.preemptible:
@@ -676,6 +675,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['accelerator_type_override'] = self.gce_accelerator_type_override
     if self.gce_tags:
       result['gce_tags'] = ','.join(self.gce_tags)
+    if self.max_local_disks:
+      result['gce_local_ssd_count'] = self.max_local_disks
+      result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
     return result
 
   def SimulateMaintenanceEvent(self):
