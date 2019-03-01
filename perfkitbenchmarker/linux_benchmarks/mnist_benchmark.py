@@ -178,6 +178,7 @@ def CreateMetadataDict(benchmark_spec):
     metadata dict
   """
   metadata = {
+      'use_tpu': bool(benchmark_spec.tpus),
       'data_dir': benchmark_spec.data_dir,
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
@@ -192,10 +193,8 @@ def CreateMetadataDict(benchmark_spec):
       'train_batch_size': benchmark_spec.batch_size,
       'eval_batch_size': benchmark_spec.batch_size
   }
-  use_tpu = bool(benchmark_spec.tpus)
-  if use_tpu:
+  if benchmark_spec.tpus:
     metadata.update({
-        'use_tpu': use_tpu,
         'train_tpu_num_shards':
             benchmark_spec.tpu_groups['train'].GetNumShards(),
         'train_tpu_accelerator_type':
