@@ -151,7 +151,10 @@ def _CreateMetadataDict(benchmark_spec):
       'precision': benchmark_spec.precision,
       'skip_host_call': benchmark_spec.skip_host_call,
       'epochs_per_eval': benchmark_spec.epochs_per_eval,
-      'steps_per_eval': benchmark_spec.steps_per_eval})
+      'steps_per_eval': benchmark_spec.steps_per_eval,
+      'train_batch_size': benchmark_spec.train_batch_size,
+      'eval_batch_size': benchmark_spec.eval_batch_size
+  })
   return metadata
 
 
