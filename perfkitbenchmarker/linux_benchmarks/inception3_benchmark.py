@@ -141,7 +141,10 @@ def _CreateMetadataDict(benchmark_spec):
       'save_checkpoints_secs': benchmark_spec.save_checkpoints_secs,
       'epochs_per_eval': benchmark_spec.epochs_per_eval,
       'steps_per_eval': benchmark_spec.steps_per_eval,
-      'precision': benchmark_spec.precision})
+      'precision': benchmark_spec.precision,
+      'train_batch_size': benchmark_spec.train_batch_size,
+      'eval_batch_size': benchmark_spec.eval_batch_size
+  })
   return metadata
 
 
