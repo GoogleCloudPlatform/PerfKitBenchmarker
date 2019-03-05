@@ -91,6 +91,7 @@
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
+- Azure Files support via "disk_type: smb"
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
