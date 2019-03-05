@@ -335,10 +335,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+
+    Raises:
+      CreationError: If an SMB disk is listed but the SMB service not created.
     """
     disks = []
 
     for _ in xrange(disk_spec.num_striped_disks):
+      if disk_spec.disk_type == disk.SMB:
+        data_disk = self._GetSmbService().CreateSmbDisk()
+        disks.append(data_disk)
+        continue
       if disk_spec.disk_type == disk.LOCAL:
         # Local disk numbers start at 1 (0 is the system disk).
         disk_number = self.local_disk_counter + 1
