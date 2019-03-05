@@ -22,6 +22,7 @@ information about azure disks.
 """
 
 import json
+import re
 import threading
 
 from perfkitbenchmarker import disk
@@ -56,8 +57,11 @@ AZURE_REPLICATION_MAP = {
 
 LOCAL_SSD_PREFIXES = {
     'Standard_D',
-    'Standard_G'
+    'Standard_G',
+    'Standard_L'
 }
+
+AZURE_NVME_TYPES = [r'(Standard_L[0-9]+s_v2)',]
 
 
 def LocalDiskIsSSD(machine_type):
@@ -65,6 +69,12 @@ def LocalDiskIsSSD(machine_type):
 
   return any((machine_type.startswith(prefix)
               for prefix in LOCAL_SSD_PREFIXES))
+
+
+def LocalDriveIsNvme(machine_type):
+  """Check if the machine type uses NVMe driver."""
+  return any(re.search(machine_series, machine_type)
+             for machine_series in AZURE_NVME_TYPES)
 
 
 class AzureDisk(disk.BaseDisk):
@@ -84,7 +94,7 @@ class AzureDisk(disk.BaseDisk):
     self.lun = lun
     self.is_image = is_image
     self._deleted = False
-
+    self.machine_type = machine_type
     if self.disk_type == PREMIUM_STORAGE:
       self.metadata.update({
           disk.MEDIA: disk.SSD,
@@ -160,6 +170,8 @@ class AzureDisk(disk.BaseDisk):
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
+      if LocalDriveIsNvme(self.machine_type):
+        return '/dev/nvme%sn1' % str(self.lun)
       return '/dev/sdb'
     else:
       return '/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + self.lun)
