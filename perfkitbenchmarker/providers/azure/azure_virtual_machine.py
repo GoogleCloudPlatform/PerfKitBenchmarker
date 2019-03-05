@@ -47,6 +47,11 @@ from perfkitbenchmarker.providers.azure import azure_network
 import yaml
 
 FLAGS = flags.FLAGS
+NUM_LOCAL_VOLUMES = {
+    'Standard_L8s_v2': 1, 'Standard_L16s_v2': 2,
+    'Standard_L32s_v2': 4, 'Standard_L64s_v2': 8,
+    'Standard_L80s_v2': 10
+}
 
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
@@ -239,7 +244,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AzureVirtualMachine, self).__init__(vm_spec)
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
-    self.max_local_disks = 1
+    self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
     self._lun_counter = itertools.count()
     self._deleted = False
 
@@ -338,7 +343,6 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         # Local disk numbers start at 1 (0 is the system disk).
         disk_number = self.local_disk_counter + 1
         self.local_disk_counter += 1
-        lun = None
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
       else:
@@ -346,7 +350,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         # and local disks occupy [1, max_local_disks]).
         disk_number = self.remote_disk_counter + 1 + self.max_local_disks
         self.remote_disk_counter += 1
-        lun = next(self._lun_counter)
+      lun = next(self._lun_counter)
       data_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type,
                                        self.storage_account, lun)
       data_disk.disk_number = disk_number
