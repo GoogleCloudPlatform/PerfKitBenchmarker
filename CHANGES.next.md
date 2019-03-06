@@ -93,6 +93,7 @@
 - Support multiple redis versions in cloud redis.
 - Azure Files support via "disk_type: smb"
 - Added MLPerf benchmark.
+- Added stress-ng benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
