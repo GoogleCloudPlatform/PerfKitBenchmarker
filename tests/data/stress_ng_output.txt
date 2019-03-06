@@ -1,0 +1,39 @@
+stress-ng: info:  [9642] dispatching hogs: 16 af-alg, 16 bsearch, 16 cache, 16 context, 16 cpu, 16 cpu-online, 16 crypt, 16 fp-error, 16 getrandom, 16 heapsort, 16 hsearch, 16 icache, 16 lockbus, 16 longjmp, 16 lsearch, 16 malloc, 16 matrix, 16 membarrier, 16 memcpy, 16 memfd, 16 mergesort, 16 mincore, 16 null, 16 numa, 16 oom-pipe, 16 pipe, 16 qsort, 16 rdrand, 16 remap-file-pages, 16 stack, 16 str, 16 stream, 16 tsc, 16 tsearch, 16 vecmath, 16 vm, 16 vm-rw, 16 wcs, 16 zero, 16 zlib
+stress-ng: info:  [9642] successful run completed in 386.22s (6 mins, 26.22 secs)
+stress-ng: info:  [9642] stressor      bogo ops real time  usr time  sys time   bogo ops/s   bogo ops/s
+stress-ng: info:  [9642]                          (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: info:  [9642] af-alg        10759232     10.10      3.83     77.91   1065334.16    131627.50
+stress-ng: info:  [9642] bsearch          18295     10.00     80.23      0.00      1828.65       228.03
+stress-ng: info:  [9642] cache               56     10.00     33.02      0.08         5.60         1.69
+stress-ng: info:  [9642] context         138207     10.00     41.27     39.12     13817.93      1719.21
+stress-ng: info:  [9642] cpu              12634     10.06     81.13      0.00      1255.95       155.73
+stress-ng: info:  [9642] crypt             5056     10.02     80.53      0.00       504.78        62.78
+stress-ng: info:  [9642] getrandom       119170     10.00      0.02     79.77     11916.24      1493.55
+stress-ng: info:  [9642] heapsort           196     10.00     79.79      0.00        19.59         2.46
+stress-ng: info:  [9642] hsearch         159843     10.00     79.93      0.00     15985.01      1999.79
+stress-ng: info:  [9642] icache        24458089     10.00     81.21      0.00   2445723.62    301170.90
+stress-ng: info:  [9642] lockbus      117138145     10.01    147.13      0.29  11702022.02    794587.88
+stress-ng: info:  [9642] longjmp        5639628     10.00     94.76      0.00    563937.94     59514.86
+stress-ng: info:  [9642] lsearch            426     10.00     79.37      0.00        42.58         5.37
+stress-ng: info:  [9642] malloc        61524595     10.46     73.75     10.77   5882553.05    727929.42
+stress-ng: info:  [9642] matrix          143863     10.00     80.80      0.00     14385.37      1780.48
+stress-ng: info:  [9642] membarrier        1298     10.22      0.00      0.00       127.02         0.00
+stress-ng: info:  [9642] memcpy           73403     10.00     80.71      0.00      7338.27       909.47
+stress-ng: info:  [9642] memfd             7537     10.57      0.80     72.65       713.05       102.61
+stress-ng: info:  [9642] mergesort         8279     10.01     74.15      0.24       827.45       111.29
+stress-ng: info:  [9642] mincore        1341203     10.00     21.63     58.34    134112.48     16771.33
+stress-ng: info:  [9642] null         172857751     10.00     26.55     53.48  17278290.67   2159911.92
+stress-ng: info:  [9642] pipe          10188022     10.00     11.37     93.86   1018656.69     96816.71
+stress-ng: info:  [9642] qsort              452     10.00     80.23      0.01        45.19         5.63
+stress-ng: info:  [9642] rdrand        14550626     10.00     80.08      0.00   1454533.98    181701.12
+stress-ng: info:  [9642] remap-file-pages      8820     10.01      4.99     75.00       881.44       110.26
+stress-ng: info:  [9642] str            1654678     10.00     79.23      0.00    165460.41     20884.49
+stress-ng: info:  [9642] stream            1977     10.06     79.77      0.74       196.60        24.56
+stress-ng: info:  [9642] tsc           43663311     10.00     79.81      0.00   4365945.05    547090.73
+stress-ng: info:  [9642] tsearch            712     10.06     80.63      0.01        70.77         8.83
+stress-ng: info:  [9642] vecmath        1001366     10.00     80.72      0.00    100118.03     12405.43
+stress-ng: info:  [9642] vm             4600128     10.10    115.63     32.43    455508.40     31069.35
+stress-ng: info:  [9642] vm-rw             8812     10.01      0.09    159.79       880.19        55.12
+stress-ng: info:  [9642] wcs             958533     10.00    159.83      0.00     95852.41      5997.20
+stress-ng: info:  [9642] zero         166531101     10.00     26.30    133.18  16653247.43   1044213.07
+stress-ng: info:  [9642] zlib              1721     10.19    162.69      0.04       168.93        10.58
