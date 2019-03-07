@@ -91,6 +91,9 @@
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
+- Azure Files support via "disk_type: smb"
+- Added MLPerf benchmark.
+- Added stress-ng benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -408,3 +411,4 @@
 - Global steps was set incorrectly in Inception3 benchmark.
 - Add AWS T3 instances to list of non-placement group capable machine types.
 - Refactor managed redis resource base class into managed memory store resource base class
+- Remove flag tpu_zone because VM and TPU should be in the same zone.
