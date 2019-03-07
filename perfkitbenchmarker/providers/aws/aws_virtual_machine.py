@@ -75,7 +75,8 @@ NUM_LOCAL_VOLUMES = {
     'x1.16xlarge': 1, 'x1.32xlarge': 2,
     'x1e.xlarge': 1, 'x1e.2xlarge': 1, 'x1e.4xlarge': 1, 'x1e.8xlarge': 1,
     'x1e.16xlarge': 1, 'x1e.32xlarge': 2,
-    'f1.2xlarge': 1, 'f1.4xlarge': 1, 'f1.16xlarge': 4
+    'f1.2xlarge': 1, 'f1.4xlarge': 1, 'f1.16xlarge': 4,
+    'p3dn.24xlarge': 2
 }
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
