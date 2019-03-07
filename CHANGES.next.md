@@ -411,3 +411,4 @@
 - Global steps was set incorrectly in Inception3 benchmark.
 - Add AWS T3 instances to list of non-placement group capable machine types.
 - Refactor managed redis resource base class into managed memory store resource base class
+- Remove flag tpu_zone because VM and TPU should be in the same zone.
