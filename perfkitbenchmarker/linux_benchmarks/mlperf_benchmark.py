@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Run MLPerf benchmarks."""
 
 import posixpath
@@ -96,8 +95,8 @@ def Prepare(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
 
-  vm.RemoteCommand('git clone https://github.com/mlperf/results.git',
-                   should_log=True)
+  vm.RemoteCommand(
+      'git clone https://github.com/mlperf/results.git', should_log=True)
   vm.InstallPackages('python3-pip')
   vm.RemoteCommand('pip3 install mlperf_compliance==0.0.10')
 
@@ -106,8 +105,7 @@ def Prepare(benchmark_spec):
                      'pyyaml==3.13 '
                      'oauth2client==4.1.3 '
                      'google-api-python-client==1.7.4 '
-                     'google-cloud==0.34.0'
-                    )
+                     'google-cloud==0.34.0')
     vm.RemoteCommand('pip3 install cloud-tpu-profiler==1.12')
   else:
     vm.Install('nvidia_docker')
@@ -115,8 +113,8 @@ def Prepare(benchmark_spec):
     imagenet_data_dir = posixpath.join('/data', 'imagenet', 'combined')
     vm.RemoteCommand('sudo mkdir -p {}'.format(imagenet_data_dir))
     vm.RemoteCommand('sudo chmod a+w /data/imagenet/combined')
-    vm.InstallPreprovisionedBenchmarkData(
-        BENCHMARK_NAME, [_ILSVRC2012_TAR], imagenet_data_dir)
+    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [_ILSVRC2012_TAR],
+                                          imagenet_data_dir)
     vm.RemoteCommand('sudo tar -xvf {tar} -C {data_dir}'.format(
         tar=posixpath.join(imagenet_data_dir, _ILSVRC2012_TAR),
         data_dir=imagenet_data_dir))
@@ -137,7 +135,7 @@ def _CreateMetadataDict(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     metadata dict
@@ -151,7 +149,6 @@ def MakeSamplesFromOutput(metadata, output):
   Args:
     metadata: dict contains all the metadata that reports.
     output: string, command output
-
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/mlperf_benchmark_test.py
 
@@ -172,8 +169,9 @@ def MakeSamplesFromOutput(metadata, output):
     metadata_copy['times'] = wall_time - start
     metadata_copy['epoch'] = int(epoch)
     metadata_copy['version'] = version
-    samples.append(sample.Sample('Eval Accuracy', float(value) * 100,
-                                 '%', metadata_copy))
+    samples.append(
+        sample.Sample('Eval Accuracy',
+                      float(value) * 100, '%', metadata_copy))
   times = regex_util.ExtractExactlyOneMatch(r'RESULT,resnet,.*,(\d+),.*,.*',
                                             output)
   samples.append(sample.Sample('Times', int(times), 'seconds', metadata))
@@ -185,7 +183,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -207,11 +205,10 @@ def Run(benchmark_spec):
     cmd = 'bash run_helper.sh 2>&1 | tee output.txt'
   else:
     code_path = 'cloud_v100x8/code/resnet'
-    cmd = (
-        'sudo nvidia-docker build . -t foo && '
-        'sudo nvidia-docker run -v $MLP_HOST_DATA_DIR:/data -v '
-        '$MLP_HOST_OUTPUT_DIR:/output -v /proc:/host_proc -t '
-        'foo:latest run_helper_8xV100.sh 2>&1 | tee output.txt')
+    cmd = ('sudo nvidia-docker build . -t foo && '
+           'sudo nvidia-docker run -v $MLP_HOST_DATA_DIR:/data -v '
+           '$MLP_HOST_OUTPUT_DIR:/output -v /proc:/host_proc -t '
+           'foo:latest run_helper_8xV100.sh 2>&1 | tee output.txt')
   mlperf_benchmark_cmd = (
       'export MLP_GCS_MODEL_DIR={model_dir} && '
       'export MLP_PATH_GCS_IMAGENET={data_dir} && '
@@ -228,10 +225,10 @@ def Run(benchmark_spec):
       '{cmd}'.format(
           model_dir=benchmark_spec.model_dir,
           data_dir=benchmark_spec.data_dir,
-          tpu_train=(benchmark_spec.tpu_groups['train'].GetName() if
-                     benchmark_spec.tpus else ''),
-          tpu_eval=(benchmark_spec.tpu_groups['eval'].GetName() if
-                    benchmark_spec.tpus else ''),
+          tpu_train=(benchmark_spec.tpu_groups['train'].GetName()
+                     if benchmark_spec.tpus else ''),
+          tpu_eval=(benchmark_spec.tpu_groups['eval'].GetName()
+                    if benchmark_spec.tpus else ''),
           code_path=code_path,
           cmd=cmd))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
@@ -249,6 +246,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   mnist_benchmark.Cleanup(benchmark_spec)
