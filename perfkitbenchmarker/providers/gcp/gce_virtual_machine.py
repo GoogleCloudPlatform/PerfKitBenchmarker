@@ -63,11 +63,7 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
                     'potential stockout scenario.')
 _GCE_VM_CREATE_TIMEOUT = 600
-_GPU_TYPE_TO_INTERAL_NAME_MAP = {
-    'k80': 'nvidia-tesla-k80',
-    'p100': 'nvidia-tesla-p100',
-    'v100': 'nvidia-tesla-v100',
-}
+_GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -308,7 +304,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
     Must be prepended by the flag '--accelerator'.
   """
   gce_accelerator_type = (FLAGS.gce_accelerator_type_override or
-                          _GPU_TYPE_TO_INTERAL_NAME_MAP[accelerator_type])
+                          _GCE_NVIDIA_GPU_PREFIX + accelerator_type)
   return 'type={0},count={1}'.format(
       gce_accelerator_type,
       accelerator_count)

@@ -130,6 +130,7 @@ BENCHMARK_SETS = {
             'inception3',
             'iperf',
             'mesh_network',
+            'mlperf',
             'mnist',
             'mongodb_ycsb',
             'multichase',

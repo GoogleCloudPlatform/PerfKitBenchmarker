@@ -32,6 +32,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 SSH_PORT = 22
@@ -223,27 +224,11 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
-
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'show-connection-string',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
-
-    response = json.loads(stdout)
-    self.connection_string = response['connectionString']
-    # Connection strings are always represented the same way on the
-    # command line.
+    self.connection_string = util.GetAzureStorageConnectionString(
+        self.name, self.resource_group.args)
     self.connection_args = ['--connection-string', self.connection_string]
-
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'keys', 'list',
-         '--output', 'json',
-         '--account-name', self.name] + self.resource_group.args)
-
-    response = json.loads(stdout)
-    # A new storage account comes with two keys, but we only need one.
-    assert response[0]['permissions'] == 'Full'
-    self.key = response[0]['value']
+    self.key = util.GetAzureStorageAccountKey(
+        self.name, self.resource_group.args)
 
   def _Delete(self):
     """Deletes the storage account."""

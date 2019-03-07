@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Module containing classes related to Azure disks.
 
 Disks can be created, deleted, attached to VMs, and detached from VMs.
@@ -22,6 +21,7 @@ information about azure disks.
 """
 
 import json
+import re
 import threading
 
 from perfkitbenchmarker import disk
@@ -39,8 +39,7 @@ DRIVE_START_LETTER = 'c'
 PREMIUM_STORAGE = 'Premium_LRS'
 STANDARD_DISK = 'Standard_LRS'
 
-DISK_TYPE = {disk.STANDARD: STANDARD_DISK,
-             disk.REMOTE_SSD: PREMIUM_STORAGE}
+DISK_TYPE = {disk.STANDARD: STANDARD_DISK, disk.REMOTE_SSD: PREMIUM_STORAGE}
 
 HOST_CACHING = 'host_caching'
 
@@ -54,17 +53,24 @@ AZURE_REPLICATION_MAP = {
     # and (RA)GRS, because those are asynchronously replicated.
 }
 
-LOCAL_SSD_PREFIXES = {
-    'Standard_D',
-    'Standard_G'
-}
+LOCAL_SSD_PREFIXES = {'Standard_D', 'Standard_G', 'Standard_L'}
+
+AZURE_NVME_TYPES = [
+    r'(Standard_L[0-9]+s_v2)',
+]
 
 
 def LocalDiskIsSSD(machine_type):
   """Check whether the local disk is an SSD drive."""
 
-  return any((machine_type.startswith(prefix)
-              for prefix in LOCAL_SSD_PREFIXES))
+  return any((machine_type.startswith(prefix) for prefix in LOCAL_SSD_PREFIXES))
+
+
+def LocalDriveIsNvme(machine_type):
+  """Check if the machine type uses NVMe driver."""
+  return any(
+      re.search(machine_series, machine_type)
+      for machine_series in AZURE_NVME_TYPES)
 
 
 class AzureDisk(disk.BaseDisk):
@@ -72,8 +78,13 @@ class AzureDisk(disk.BaseDisk):
 
   _lock = threading.Lock()
 
-  def __init__(self, disk_spec, vm_name, machine_type,
-               storage_account, lun, is_image=False):
+  def __init__(self,
+               disk_spec,
+               vm_name,
+               machine_type,
+               storage_account,
+               lun,
+               is_image=False):
     super(AzureDisk, self).__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
     self.name = vm_name + str(lun)
@@ -84,7 +95,7 @@ class AzureDisk(disk.BaseDisk):
     self.lun = lun
     self.is_image = is_image
     self._deleted = False
-
+    self.machine_type = machine_type
     if self.disk_type == PREMIUM_STORAGE:
       self.metadata.update({
           disk.MEDIA: disk.SSD,
@@ -110,12 +121,13 @@ class AzureDisk(disk.BaseDisk):
     assert not self.is_image
 
     with self._lock:
-      _, _, retcode = vm_util.IssueCommand(
-          [azure.AZURE_PATH, 'vm', 'disk', 'attach', '--new',
-           '--caching', self.host_caching, '--disk', self.name,
-           '--lun', str(self.lun), '--sku', self.disk_type,
-           '--vm-name', self.vm_name, '--size-gb', str(self.disk_size)] +
-          self.resource_group.args)
+      _, _, retcode = vm_util.IssueCommand([
+          azure.AZURE_PATH, 'vm', 'disk', 'attach', '--new', '--caching',
+          self.host_caching, '--disk', self.name, '--lun',
+          str(self.lun), '--sku', self.disk_type, '--vm-name', self.vm_name,
+          '--size-gb',
+          str(self.disk_size)
+      ] + self.resource_group.args)
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
@@ -132,10 +144,10 @@ class AzureDisk(disk.BaseDisk):
     if self._deleted:
       return False
 
-    stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'disk', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+    stdout, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH, 'disk', 'show', '--output', 'json', '--name',
+        self.name
+    ] + self.resource_group.args)
     try:
       json.loads(stdout)
       return True
@@ -160,6 +172,8 @@ class AzureDisk(disk.BaseDisk):
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
+      if LocalDriveIsNvme(self.machine_type):
+        return '/dev/nvme%sn1' % str(self.lun)
       return '/dev/sdb'
     else:
       return '/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + self.lun)
