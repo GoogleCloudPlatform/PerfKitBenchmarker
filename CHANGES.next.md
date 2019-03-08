@@ -258,6 +258,7 @@
   read/write workload is specified.
 - Added gce_local_ssd_count and gce_local_ssd_interface metadata to
   GceVirtualMachine.
+- Added option to use real training data to the Horovod benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
