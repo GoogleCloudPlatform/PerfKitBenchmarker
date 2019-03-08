@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,9 +30,11 @@ class HorovodBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
     with open(path) as fp:
       self.test_output = fp.read()
 
-  def testExtractThroughput(self):
-    throughput = horovod_benchmark._ExtractThroughput(self.test_output)
-    self.assertEqual(16914.3, throughput)
+  def testExtractThroughputAndRuntime(self):
+    throughput, runtime = horovod_benchmark._ExtractThroughputAndRuntime(
+        self.test_output)
+    self.assertEqual(789.5, throughput)
+    self.assertEqual(1650.5, runtime)
 
 
 if __name__ == '__main__':
