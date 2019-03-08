@@ -396,3 +396,9 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def SetClusterProperty(self):
     pass
+
+  def ExecuteOnMaster(self, script_path):
+    raise NotImplementedError()
+
+  def CopyFromMaster(self, remote_path, local_path):
+    raise NotImplementedError()
