@@ -119,3 +119,6 @@ flags.DEFINE_multi_string('gcp_dataproc_property', [],
 flags.DEFINE_string('gcp_dataproc_image', None,
                     'Specifies the custom image URI or the custom image name '
                     'that will be used to create a cluster.')
+flags.DEFINE_boolean('gcp_internal_ip', False,
+                     'Use internal ips for ssh or scp commands. gcloud beta'
+                     'components must be installed to use this flag.')
