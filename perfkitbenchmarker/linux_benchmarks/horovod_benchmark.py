@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,21 +16,21 @@
 
 import logging
 import posixpath
-import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_benchmarks import mlperf_benchmark
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 FLAGS = flags.FLAGS
 
-
+DEEP_LEARNING_EXAMPLES_REPO = 'https://github.com/aws-samples/deep-learning-models.git'
 MACHINEFILE = 'HOSTFILE'
 
-BENCHMARK_VERSION = 0.31
+BENCHMARK_VERSION = 0.32
 BENCHMARK_NAME = 'horovod'
 BENCHMARK_CONFIG = """
 horovod:
@@ -56,20 +56,29 @@ horovod:
 """
 
 flags.DEFINE_enum(
-    'horovod_model', 'resnet152',
-    ['trivial', 'lenet', 'alexnet', 'googlenet', 'vgg11', 'vgg13', 'vgg16',
-     'vgg19', 'inception3', 'inception4', 'resnet18', 'resnet34', 'resnet50',
-     'resnet101', 'resnet152', 'resnext50', 'resnext101', 'resnext152',
-     'inception-resnet2'], 'name of the model to run.')
+    'horovod_model', 'resnet50',
+    ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152'],
+    'name of the model to run.')
 
 flags.DEFINE_integer(
-    'horovod_batch_size', 128, 'batch size per compute device.')
+    'horovod_batch_size', 256, 'Batch size per compute device.')
 
+# AWS DLAMI example script traines for 90 epochs when using real data.
+flags.DEFINE_integer(
+    'horovod_num_epochs', 1, 'Number of epochs to train for.')
+
+flags.DEFINE_boolean(
+    'horovod_synthetic', True, 'Whether to use synthetic data.')
+
+# The example training scripts are taken from the AWS deep learning
+# samples github repo. The script is authored by NVIDIA and AWS and
+# as of March 2018 is more up to date than the NVIDIA examples at
+# https://github.com/NVIDIA/DeepLearningExamples.
 flags.DEFINE_string(
     'horovod_deep_learning_examples_commit',
-    '147c37049e76daeeda8b6a313b040ac51aeabe4b',
-    'Commit hash of the NVIDIA deep learning examples github repo '
-    'to use for the benchmark')
+    '599adf2',
+    'Commit hash of the AWS deep learning samples github repo '
+    'to use for the benchmark.')
 
 
 class HorovodParseOutputError(errors.Benchmarks.RunError):
@@ -115,6 +124,8 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.total_gpus = total_gpus
   benchmark_spec.model = FLAGS.horovod_model
   benchmark_spec.batch_size = FLAGS.horovod_batch_size
+  benchmark_spec.num_epochs = FLAGS.horovod_num_epochs
+  benchmark_spec.synthetic = FLAGS.horovod_synthetic
   benchmark_spec.deep_learning_examples_commit = (
       FLAGS.horovod_deep_learning_examples_commit)
 
@@ -126,24 +137,19 @@ def _CopyAndUpdateRunScripts(vm):
     vm: vm to place and update run scripts on
   """
   vm.InstallPackages('git')
-  vm.RemoteCommand('rm -rf DeepLearningExamples')
+  vm.RemoteCommand('rm -rf deep-learning-models')
+  vm.RemoteCommand('git clone %s' % DEEP_LEARNING_EXAMPLES_REPO)
   vm.RemoteCommand(
-      'git clone https://github.com/NVIDIA/DeepLearningExamples.git')
-  vm.RemoteCommand(
-      'cd DeepLearningExamples && git checkout {}'.format(
+      'cd deep-learning-models && git checkout {}'.format(
           FLAGS.horovod_deep_learning_examples_commit)
   )
   # Copy the benchmark script from the github repo to the home directory.
   vm.RemoteCommand(
-      'cp %s .' % posixpath.join('DeepLearningExamples',
-                                 'TensorFlow',
-                                 'Classification',
-                                 'imagenet',
-                                 'nvcnn_hvd.py'))
-
-  # Run sed to remove the 'choices' from the models flag.
-  # This has the effect of enabling all models for testing.
-  vm.RemoteCommand('sed -i -e \"s/choices=\\[.*\\]//g\" %s' % 'nvcnn_hvd.py')
+      'cp %s .' % posixpath.join('deep-learning-models',
+                                 'models',
+                                 'resnet',
+                                 'tensorflow',
+                                 'train_imagenet_resnet_hvd.py'))
 
 
 def _PrepareHorovod(vm):
@@ -154,11 +160,18 @@ def _PrepareHorovod(vm):
   """
   # TODO(ferneyhough): Consider moving horovod installation to a package.
   logging.info('Installing Horovod on %s', vm)
+  vm.AuthenticateVm()
+  if not FLAGS.horovod_synthetic:
+    # Install ILSVRC2012 from the mlperf benchmark.
+    vm.InstallPreprovisionedBenchmarkData(
+        'mlperf', mlperf_benchmark.BENCHMARK_DATA, vm_util.VM_TMP_DIR)
+    vm.RemoteCommand('tar xvf %s' % posixpath.join(vm_util.VM_TMP_DIR,
+                                                   'ILSVRC2012.tar'))
+
   vm.Install('tensorflow')
   vm.Install('openmpi')
   vm.RemoteCommand('sudo HOROVOD_GPU_ALLREDUCE=NCCL pip install '
                    '--no-cache-dir horovod')
-  vm.AuthenticateVm()
 
 
 def Prepare(benchmark_spec):
@@ -194,26 +207,38 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['total_gpus'] = int(benchmark_spec.total_gpus)
   metadata['model'] = benchmark_spec.model
   metadata['batch_size'] = benchmark_spec.batch_size
+  metadata['num_epochs'] = benchmark_spec.num_epochs
+  metadata['synthetic'] = benchmark_spec.synthetic
   metadata['deep_learning_examples_commit'] = (
       benchmark_spec.deep_learning_examples_commit)
   return metadata
 
 
-def _ExtractThroughput(output):
-  """Extract throughput from Horovod output.
+def _ExtractThroughputAndRuntime(output):
+  """Extract throughput and runtime from Horovod output.
 
   Args:
     output: Horvod output
 
   Returns:
-    throuput in images per second (float)
+    Tuple of:
+      Average throuput in images per second (float),
+      Runtime in seconds (float).
   """
-  regex = r'Images\/sec\: (\d+\.\d+)'
-  match = re.search(regex, output)
-  try:
-    return float(match.group(1))
-  except:
-    raise HorovodParseOutputError('Unable to parse Horovod output')
+  # Start from last line and iterate backwards.
+  throughput_samples = []
+  runtime = 0
+  for line in output.splitlines()[::-1]:
+    split_line = line.split()
+    if split_line[0].startswith('Finished'):
+      runtime = float(split_line[2])
+      continue
+    split_line = line.split()
+    if split_line[0] == '1':  # Done parsing.
+      break
+    throughput_samples.append(float(split_line[2]))
+  avg_throughput = sum(throughput_samples) / len(throughput_samples)
+  return round(avg_throughput, 1), round(runtime, 1)
 
 
 def _MakeSamplesFromOutput(benchmark_spec, output):
@@ -227,9 +252,13 @@ def _MakeSamplesFromOutput(benchmark_spec, output):
     a Sample containing the Horovod throughput in images/sec
   """
   metadata = _CreateMetadataDict(benchmark_spec)
-  images_sec = _ExtractThroughput(output)
-  return [sample.Sample('Training synthetic data', images_sec,
-                        'images/sec', metadata)]
+  images_sec, runtime = _ExtractThroughputAndRuntime(output)
+  samples = []
+  samples.append(sample.Sample('Training thoughput', images_sec,
+                               'images/second', metadata))
+  samples.append(sample.Sample('Runtime', runtime,
+                               'seconds', metadata))
+  return samples
 
 
 def Run(benchmark_spec):
@@ -244,21 +273,36 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
-  master_vm.RemoteCommand('rm -rf results')
-  master_vm.RemoteCommand('mkdir results')
 
-  run_command = ('mpirun -np {num_gpus} '
-                 '--hostfile HOSTFILE --bind-to none --map-by slot -x '
-                 'NCCL_DEBUG=INFO -x NCCL_MIN_NRINGS=4 -x '
-                 'LD_LIBRARY_PATH -x PATH -mca pml ob1 -mca btl ^openib '
-                 'python nvcnn_hvd.py --batch_size={batch_size} --fp16 '
-                 '--model {model} --log_dir results --display_every 100'
-                 ).format(num_gpus=benchmark_spec.total_gpus,
-                          batch_size=benchmark_spec.batch_size,
-                          model=benchmark_spec.model)
+  # All this maddness was copied from the horovod example training script in
+  # the tensorflow_p36 environment on the AWS DLAMI.
+  # https://aws.amazon.com/releasenotes/deep-learning-ami-ubuntu-version-21-2
+  run_command = (
+      'mpirun -np {num_gpus} -hostfile HOSTFILE -mca plm_rsh_no_tree_spawn 1 '
+      '-bind-to socket -map-by slot -x HOROVOD_HIERARCHICAL_ALLREDUCE=1 '
+      '-x HOROVOD_FUSION_THRESHOLD=16777216 -x NCCL_MIN_NRINGS=4 '
+      '-x LD_LIBRARY_PATH -x PATH -mca pml ob1 -mca btl ^openib '
+      '-mca btl_tcp_if_exclude lo,docker0 -x TF_CPP_MIN_LOG_LEVEL=0 '
+      'python -W ignore {training_script} --num_epochs {num_epochs} '
+      '-b {batch_size} --model {model} --fp16 --clear_log'
+  ).format(
+      num_gpus=benchmark_spec.total_gpus,
+      training_script='train_imagenet_resnet_hvd.py',
+      num_epochs=benchmark_spec.num_epochs,
+      batch_size=benchmark_spec.batch_size,
+      model=benchmark_spec.model)
 
-  stdout, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
-  return _MakeSamplesFromOutput(benchmark_spec, stdout)
+  if benchmark_spec.synthetic:
+    run_command += ' --synthetic'
+    # The use of larc and loss scale is taken from the AWS DLAMI training
+    # script (see comment above).
+    if benchmark_spec.total_gpus >= 128:
+      run_command += ' --use_larc --loss_scale 256'
+  else:
+    run_command += ' --data_dir ~/ILSVRC2012/ILSVRC2012 --warmup_epochs 10'
+
+  _, stderr = master_vm.RobustRemoteCommand(run_command, should_log=True)
+  return _MakeSamplesFromOutput(benchmark_spec, stderr)
 
 
 def Cleanup(benchmark_spec):
