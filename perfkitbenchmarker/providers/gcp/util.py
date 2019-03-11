@@ -280,7 +280,7 @@ def FormatTags(tags_dict):
   Returns:
     A string contains formatted tags
   """
-  return ','.join('{0}={1}'.format(k, v) for k, v in tags_dict.iteritems())
+  return ','.join('{0}="{1}"'.format(k, v) for k, v in tags_dict.iteritems())
 
 
 def MakeFormattedDefaultTags(timeout_minutes=None):
