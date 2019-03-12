@@ -131,11 +131,12 @@ class BaseSparkService(resource.BaseResource):
     pass
 
   @abc.abstractmethod
-  def ExecuteOnMaster(self, script_path):
+  def ExecuteOnMaster(self, script_path, script_args):
     """Execute a script on the master node.
 
     Args:
       script_path: local path of the script to execute.
+      script_args: arguments to pass to the script.
     """
     pass
 
@@ -237,7 +238,7 @@ class PkbSparkService(BaseSparkService):
     else:
       raise NotImplemented()
 
-  def ExecuteOnMaster(self, script_path):
+  def ExecuteOnMaster(self, script_path, script_args):
     pass
 
   def CopyFromMaster(self, remote_path, local_path):
