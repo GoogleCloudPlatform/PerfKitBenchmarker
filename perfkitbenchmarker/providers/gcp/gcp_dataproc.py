@@ -195,7 +195,7 @@ class GcpDataproc(spark_service.BaseSparkService):
           raise Exception('Dataproc output in unexpected format.')
     return stats
 
-  def ExecuteOnMaster(self, script_path):
+  def ExecuteOnMaster(self, script_path, script_args):
     master_name = self.cluster_id + '-m'
     script_name = os.path.basename(script_path)
     if FLAGS.gcp_internal_ip:
@@ -210,7 +210,8 @@ class GcpDataproc(spark_service.BaseSparkService):
       ssh_cmd += ['--internal-ip']
     ssh_cmd += ['--zone=' + self.GetZone(), '--quiet',
                 'pkb@' + master_name, '--',
-                'chmod +x; sudo /tmp/' + script_name]
+                'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
+                + ' ' + ' '.join(script_args)]
     vm_util.IssueCommand(ssh_cmd, force_info_log=True)
 
   def CopyFromMaster(self, remote_path, local_path):
