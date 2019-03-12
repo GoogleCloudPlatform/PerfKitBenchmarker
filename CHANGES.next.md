@@ -21,7 +21,8 @@
 - Benchmarks are expected to not modify FLAGS in any way. If FLAGS are modified
   and multiple run configurations are run in a single PKB invocation, benchmark
   configurations may be incorrect.
-- Changed TF Serving benchmark to use ResNet instead of Inception
+- Changed TF Serving benchmark to use ResNet instead of Inception.
+- Renamed prepare_sleep_time flag to after_prepare_sleep_time.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -59,7 +60,7 @@
 - Added support for custom machine types on GKE.
 - Added `container_cluster_version` flag to container_service.py.
 - AWS EFS support via "disk_type: nfs"
-- Added disk_fill_size and prepare_sleep_time flags
+- Added --disk_fill_size and --after_prepare_sleep_time flags
 - Add timeout_minutes flag to assist with cleaning up stale resources
 - All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
 - Added windows udp test using iperf3.
@@ -94,6 +95,8 @@
 - Azure Files support via "disk_type: smb"
 - Added MLPerf benchmark.
 - Added stress-ng benchmark.
+- Added flag --after_run_sleep_time which instructs PKB to sleep for the number
+  of seconds specified after the run stage has completed.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

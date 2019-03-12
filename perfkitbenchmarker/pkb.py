@@ -312,9 +312,13 @@ flags.DEFINE_string(
     'skip_pending_runs_file', None,
     'If file exists, any pending runs will be not be executed.')
 flags.DEFINE_integer(
-    'prepare_sleep_time', 0,
+    'after_prepare_sleep_time', 0,
     'The time in seconds to sleep after the prepare phase. This can be useful '
     'for letting burst tokens accumulate.')
+flags.DEFINE_integer(
+    'after_run_sleep_time', 0,
+    'The time in seconds to sleep after the run phase. This can be useful '
+    'for letting the VM sit idle after the bechmarking phase is complete.')
 flags.DEFINE_integer(
     'timeout_minutes', 240,
     'An upper bound on the time in minutes that the benchmark is expected to '
@@ -655,10 +659,10 @@ def DoPreparePhase(spec, timer):
   with timer.Measure('Benchmark Prepare'):
     spec.BenchmarkPrepare(spec)
   spec.StartBackgroundWorkload()
-  if FLAGS.prepare_sleep_time:
-    logging.info('Sleeping %s seconds after the prepare phase.',
-                 FLAGS.prepare_sleep_time)
-    time.sleep(FLAGS.prepare_sleep_time)
+  if FLAGS.after_prepare_sleep_time:
+    logging.info('Sleeping for %s seconds after the prepare phase.',
+                 FLAGS.after_prepare_sleep_time)
+    time.sleep(FLAGS.after_prepare_sleep_time)
 
 
 def DoRunPhase(spec, collector, timer):
@@ -716,6 +720,10 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if _IsRunStageFinished():
+      if FLAGS.after_run_sleep_time:
+        logging.info('Sleeping for %s seconds after the run phase.',
+                     FLAGS.after_run_sleep_time)
+        time.sleep(FLAGS.after_run_sleep_time)
       break
 
 
