@@ -72,6 +72,19 @@ def FormatTags(tags_dict):
   return [FormatTag(k, v) for k, v in tags_dict.iteritems()]
 
 
+def GetResourceTags(timeout_minutes):
+  """Gets a dict of tags.
+
+  Args:
+    timeout_minutes: int, Timeout used for setting the timeout_utc tag.
+
+  Returns:
+    A dict contains formatted tags.
+  """
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  return benchmark_spec.GetResourceTags(timeout_minutes)
+
+
 def GetTags(timeout_minutes):
   """Gets a list of tags to be used with the --tags param of Azure CLI.
 
@@ -81,6 +94,16 @@ def GetTags(timeout_minutes):
   Returns:
     A string contains formatted tags.
   """
-  benchmark_spec = context.GetThreadBenchmarkSpec()
-  tags = FormatTags(benchmark_spec.GetResourceTags(timeout_minutes))
-  return tags
+  return FormatTags(GetResourceTags(timeout_minutes))
+
+
+def GetTagsJson(timeout_minutes):
+  """Gets a JSON string of tags to be used with the --set param of Azure CLI.
+
+  Args:
+    timeout_minutes: int, Timeout used for setting the timeout_utc tag.
+
+  Returns:
+    A string contains json formatted tags.
+  """
+  return 'tags={}'.format(json.dumps(GetResourceTags(timeout_minutes)))
