@@ -43,6 +43,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import util
 
 import yaml
 
@@ -320,6 +321,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = json.loads(stdout)
     self.os_disk.name = response['storageProfile']['osDisk']['name']
     self.os_disk.created = True
+    vm_util.IssueCommand([
+        azure.AZURE_PATH, 'disk', 'update', '--name', self.os_disk.name,
+        '--set', util.GetTagsJson(self.resource_group.timeout_minutes)] +
+                         self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
     self.ip_address = self.public_ip.GetIPAddress()
 

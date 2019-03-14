@@ -31,6 +31,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import flags as azure_flags
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 
@@ -132,6 +133,15 @@ class AzureDisk(disk.BaseDisk):
       if retcode:
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure disk.')
+
+      _, _, retcode = vm_util.IssueCommand([
+          azure.AZURE_PATH, 'disk', 'update', '--name', self.name, '--set',
+          util.GetTagsJson(self.resource_group.timeout_minutes)] +
+                                           self.resource_group.args)
+
+      if retcode:
+        raise errors.Resource.RetryableCreationError(
+            'Error tagging Azure disk.')
 
   def _Delete(self):
     """Deletes the disk."""

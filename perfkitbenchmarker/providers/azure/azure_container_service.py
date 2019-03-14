@@ -17,13 +17,13 @@
 import json
 
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import service_principal
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 
@@ -159,11 +159,9 @@ class AksCluster(container_service.KubernetesCluster):
     super(AksCluster, self)._PostCreate()
     cluster_resource_group_name = 'MC_%s_%s_%s' % (
         self.resource_group.name, self.name, self.zone)
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    tags = benchmark_spec.GetResourceTags(self.resource_group.timeout_minutes)
     set_tags_cmd = [
         azure.AZURE_PATH, 'group', 'update', '-g', cluster_resource_group_name,
-        '--set', 'tags=%s' % json.dumps(tags)
+        '--set', util.GetTagsJson(self.resource_group.timeout_minutes)
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
