@@ -16,6 +16,7 @@
 
 import json
 
+from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -52,3 +53,34 @@ def GetAzureStorageAccountKey(storage_account_name, resource_group_args):
   # A new storage account comes with two keys, but we only need one.
   assert response[0]['permissions'] == 'Full'
   return response[0]['value']
+
+
+def FormatTag(key, value):
+  """Format an individual tag for use with the --tags param of Azure CLI."""
+  return '{0}={1}'.format(key, value)
+
+
+def FormatTags(tags_dict):
+  """Format a dict of tags into arguments for 'tag' parameter.
+
+  Args:
+    tags_dict: Tags to be formatted.
+
+  Returns:
+    A list of tags formatted as arguments for 'tag' parameter.
+  """
+  return [FormatTag(k, v) for k, v in tags_dict.iteritems()]
+
+
+def GetTags(timeout_minutes):
+  """Gets a list of tags to be used with the --tags param of Azure CLI.
+
+  Args:
+    timeout_minutes: int, Timeout used for setting the timeout_utc tag.
+
+  Returns:
+    A string contains formatted tags.
+  """
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  tags = FormatTags(benchmark_spec.GetResourceTags(timeout_minutes))
+  return tags
