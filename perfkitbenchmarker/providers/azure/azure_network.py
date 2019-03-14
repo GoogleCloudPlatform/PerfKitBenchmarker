@@ -81,7 +81,7 @@ class AzureResourceGroup(resource.BaseResource):
           [azure.AZURE_PATH, 'group', 'create',
            '--name', self.name,
            '--location', self.location,
-           '--tags'] + self._GetTags())
+           '--tags'] + util.GetTags(self.timeout_minutes))
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
@@ -102,21 +102,6 @@ class AzureResourceGroup(resource.BaseResource):
         [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
         timeout=600)
 
-  def _FormatTag(self, key, value):
-    """Format an individual tag for use with the --tags param of Azure CLI."""
-    return '{0}={1}'.format(key, value)
-
-  def FormatTags(self, tags_dict):
-    """Format a dict of tags into arguments for 'tag' parameter.
-
-    Args:
-      tags_dict: Tags to be formatted.
-
-    Returns:
-      A list of tags formatted as arguments for 'tag' parameter.
-    """
-    return [self._FormatTag(k, v) for k, v in tags_dict.iteritems()]
-
   def AddTag(self, key, value):
     """Add a single tag to an existing Resource Group.
 
@@ -129,16 +114,9 @@ class AzureResourceGroup(resource.BaseResource):
     """
     _, _, retcode = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
-         '--set', 'tags.' + self._FormatTag(key, value)])
+         '--set', 'tags.' + util.FormatTag(key, value)])
     if retcode:
       raise errors.resource.CreationError('Error tagging Azure resource group.')
-
-  def _GetTags(self):
-    """Gets a list of tags to be used with the --tags param of Azure CLI."""
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    tags = self.FormatTags(benchmark_spec.GetResourceTags(self.timeout_minutes))
-
-    return tags
 
 
 class AzureAvailSet(resource.BaseResource):
@@ -186,7 +164,7 @@ class AzureStorageAccount(resource.BaseResource):
 
   def __init__(self, storage_type, location, name,
                kind=None, access_tier=None, resource_group=None,
-               use_existing=False):
+               use_existing=False, timeout_minutes=None):
     super(AzureStorageAccount, self).__init__()
     self.storage_type = storage_type
     self.name = name
@@ -194,6 +172,7 @@ class AzureStorageAccount(resource.BaseResource):
     self.location = location
     self.kind = kind or 'Storage'
     self.use_existing = use_existing
+    self.timeout_minutes = timeout_minutes
 
     AzureStorageAccount.total_storage_accounts += 1
 
@@ -207,13 +186,15 @@ class AzureStorageAccount(resource.BaseResource):
   def _Create(self):
     """Creates the storage account."""
     if not self.use_existing:
-      create_cmd = [azure.AZURE_PATH,
-                    'storage',
-                    'account',
-                    'create',
-                    '--kind', self.kind,
-                    '--sku', self.storage_type,
-                    '--name', self.name] + self.resource_group.args
+      create_cmd = ([azure.AZURE_PATH,
+                     'storage',
+                     'account',
+                     'create',
+                     '--kind', self.kind,
+                     '--sku', self.storage_type,
+                     '--name', self.name,
+                     '--tags'] + util.GetTags(self.timeout_minutes)
+                    + self.resource_group.args)
       if self.location:
         create_cmd.extend(
             ['--location', self.location])
