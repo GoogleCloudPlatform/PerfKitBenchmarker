@@ -323,8 +323,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_disk.created = True
     vm_util.IssueCommand([
         azure.AZURE_PATH, 'disk', 'update', '--name', self.os_disk.name,
-        '--set', util.GetTagsJson(self.resource_group.timeout_minutes)] +
-                         self.resource_group.args)
+        '--set', util.GetTagsJson(self.resource_group.timeout_minutes)
+    ] + self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
     self.ip_address = self.public_ip.GetIPAddress()
 
