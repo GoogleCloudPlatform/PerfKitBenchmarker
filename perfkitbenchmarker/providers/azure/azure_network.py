@@ -164,7 +164,7 @@ class AzureStorageAccount(resource.BaseResource):
 
   def __init__(self, storage_type, location, name,
                kind=None, access_tier=None, resource_group=None,
-               use_existing=False, timeout_minutes=None):
+               use_existing=False):
     super(AzureStorageAccount, self).__init__()
     self.storage_type = storage_type
     self.name = name
@@ -172,7 +172,6 @@ class AzureStorageAccount(resource.BaseResource):
     self.location = location
     self.kind = kind or 'Storage'
     self.use_existing = use_existing
-    self.timeout_minutes = timeout_minutes
 
     AzureStorageAccount.total_storage_accounts += 1
 
@@ -193,7 +192,8 @@ class AzureStorageAccount(resource.BaseResource):
                      '--kind', self.kind,
                      '--sku', self.storage_type,
                      '--name', self.name,
-                     '--tags'] + util.GetTags(self.timeout_minutes)
+                     '--tags'] + util.GetTags(
+                         self.resource_group.timeout_minutes)
                     + self.resource_group.args)
       if self.location:
         create_cmd.extend(
