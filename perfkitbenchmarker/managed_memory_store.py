@@ -13,12 +13,14 @@
 # limitations under the License.
 """Module containing class for cloud managed memory stores."""
 
+import abc
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
 
 # List of memory store types
 REDIS = 'REDIS'
+MEMCACHED = 'MEMCACHED'
 
 
 FLAGS = flags.FLAGS
@@ -44,10 +46,14 @@ REDIS_3_2 = 'redis_3_2'
 REDIS_4_0 = 'redis_4_0'
 REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0]
 
-flags.DEFINE_enum('redis_version',
-                  REDIS_3_2,
-                  REDIS_VERSIONS,
-                  'The version of redis to use.')
+flags.DEFINE_string('managed_memory_store_version',
+                    None,
+                    'The version of managed memory store to use. This flag '
+                    'overrides Redis or Memcached version defaults that is set '
+                    'in benchmark config. Defaults to None so that benchmark '
+                    'config defaults are used.')
+
+MEMCACHED_NODE_COUNT = 1
 
 
 def GetManagedMemoryStoreClass(cloud, memory_store):
@@ -83,3 +89,27 @@ class BaseManagedMemoryStore(resource.BaseResource):
     super(BaseManagedMemoryStore, self).__init__()
     self.spec = spec
     self.name = 'pkb-%s' % FLAGS.run_uri
+    self._ip = None
+    self._port = None
+    self._password = None
+
+  def GetMemoryStoreIp(self):
+    """Returns the Ip address of the managed memory store."""
+    if not self._ip:
+      self._PopulateEndpoint()
+    return self._ip
+
+  def GetMemoryStorePort(self):
+    """Returns the port number of the managed memory store."""
+    if not self._port:
+      self._PopulateEndpoint()
+    return self._port
+
+  @abc.abstractmethod
+  def _PopulateEndpoint(self):
+    """Populates the endpoint information for the managed memory store."""
+    raise NotImplementedError()
+
+  def GetMemoryStorePassword(self):
+    """Returns the access password of the managed memory store, if any."""
+    return self._password

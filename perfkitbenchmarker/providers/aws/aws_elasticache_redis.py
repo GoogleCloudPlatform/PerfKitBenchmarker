@@ -48,6 +48,10 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
+    if (FLAGS.managed_memory_store_version and
+        FLAGS.managed_memory_store_version not in
+        managed_memory_store.REDIS_VERSIONS):
+      raise errors.Config.InvalidValue('Invalid Redis version.')
     if FLAGS.redis_failover_style in [
         managed_memory_store.Failover.FAILOVER_NONE,
         managed_memory_store.Failover.FAILOVER_SAME_ZONE]:
@@ -90,7 +94,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
 
     if self.failover_style == (
         managed_memory_store.Failover.FAILOVER_SAME_REGION):
-      regional_network = self.spec.client_vm.network.regional_network
+      regional_network = self.spec.vms[0].network.regional_network
       vpc_id = regional_network.vpc.id
       cidr = regional_network.vpc.NextSubnetCidrBlock()
       self.failover_subnet = aws_network.AwsSubnet(
@@ -178,11 +182,9 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     return {}
 
   @vm_util.Retry(max_retries=5)
-  def GetInstanceDetails(self):
-    """Flattens address and port information from cluster_info.
+  def _PopulateEndpoint(self):
+    """Populates address and port information from cluster_info.
 
-    Returns:
-      dict mapping string cluster_info property key to value.
     Raises:
       errors.Resource.RetryableGetError:
       Failed to retrieve information on cluster
@@ -193,6 +195,5 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
           'Failed to retrieve information on %s', self.name)
 
     primary_endpoint = cluster_info['NodeGroups'][0]['PrimaryEndpoint']
-    cluster_info['host'] = primary_endpoint['Address']
-    cluster_info['port'] = primary_endpoint['Port']
-    return cluster_info
+    self._ip = primary_endpoint['Address']
+    self._port = primary_endpoint['Port']
