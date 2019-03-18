@@ -52,8 +52,8 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
-  if FLAGS['redis_version'].present:
-    config['cloud_redis']['redis_version'] = FLAGS.redis_version
+  if FLAGS['managed_memory_store_version'].present:
+    config['cloud_redis']['redis_version'] = FLAGS.managed_memory_store_version
   return config
 
 
@@ -95,14 +95,14 @@ def Prepare(benchmark_spec):
   benchmark_spec.cloud_redis_instance = (cloud_redis_class(benchmark_spec))
   benchmark_spec.cloud_redis_instance.Create()
 
-  instance_details = benchmark_spec.cloud_redis_instance.GetInstanceDetails()
   redis_args = {
       'shardkeyspace': True,
-      'redis.host': instance_details['host'],
-      'redis.port': instance_details['port']
+      'redis.host': benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
+      'redis.port': benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
   }
-  if 'password' in instance_details:
-    redis_args['redis.password'] = instance_details['password']
+  password = benchmark_spec.cloud_redis_instance.GetMemoryStorePassword()
+  if password:
+    redis_args['redis.password'] = password
   benchmark_spec.executor = ycsb.YCSBExecutor('redis', **redis_args)
 
 

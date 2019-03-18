@@ -53,6 +53,10 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     if FLAGS.redis_failover_style == managed_memory_store.Failover.FAILOVER_SAME_ZONE:
       raise errors.Config.InvalidValue(
           'GCP cloud redis does not support same zone failover')
+    if (FLAGS.managed_memory_store_version and
+        FLAGS.managed_memory_store_version not in
+        managed_memory_store.REDIS_VERSIONS):
+      raise errors.Config.InvalidValue('Invalid Redis version.')
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the instance.
@@ -82,8 +86,8 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
 
   def _IsReady(self):
     """Returns whether cluster is ready."""
-    instance_details = self.GetInstanceDetails()
-    return instance_details.get('state') == 'READY'
+    instance_details, _, _ = self.DescribeInstance()
+    return json.loads(instance_details).get('state') == 'READY'
 
   def _Delete(self):
     """Deletes the instance."""
@@ -112,11 +116,9 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     return stdout, stderr, retcode
 
   @vm_util.Retry(max_retries=5)
-  def GetInstanceDetails(self):
-    """Returns a dict containing details about the instance.
+  def _PopulateEndpoint(self):
+    """Populates endpoint information about the instance.
 
-    Returns:
-      dict mapping string property key to value.
     Raises:
       errors.Resource.RetryableGetError:
       Failed to retrieve information on instance
@@ -125,4 +127,5 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on {}'.format(self.name))
-    return json.loads(stdout)
+    self._ip = json.loads(stdout)['host']
+    self._port = json.loads(stdout)['port']

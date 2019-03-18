@@ -55,10 +55,5 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
                            return_value=('{}', '', 1)):
       self.assertFalse(self.redis._Exists())
 
-  def testGetInstanceDetails(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('{"foo": "bar"}', '', 0)):
-      self.assertEqual(self.redis.GetInstanceDetails(), {'foo': 'bar'})
-
 if __name__ == '__main__':
   unittest.main()
