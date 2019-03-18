@@ -27,6 +27,7 @@ from perfkitbenchmarker.providers.azure import azure_network
 FLAGS = flags.FLAGS
 # 15min timeout for issuing az redis delete command.
 DELETE_TIMEOUT = 900
+REDIS_VERSION = '3.2'
 
 
 class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
@@ -54,6 +55,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_region': self.redis_region,
         'cloud_redis_azure_tier': self.azure_tier,
         'cloud_redis_azure_redis_size': self.azure_redis_size,
+        'cloud_redis_azure_version': REDIS_VERSION,
     }
     return result
 
@@ -67,6 +69,10 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     Raises:
       errors.Config.InvalidValue: Input flag parameters are invalid.
     """
+    if FLAGS.managed_memory_store_version:
+      raise errors.Config.InvalidValue(
+          'Custom Redis version not supported on Azure Redis. '
+          'Redis version is {0}.'.format(REDIS_VERSION))
     if FLAGS.redis_failover_style in [
         managed_memory_store.Failover.FAILOVER_SAME_REGION,
         managed_memory_store.Failover.FAILOVER_SAME_ZONE]:
@@ -130,25 +136,27 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       return True
     return False
 
-  @vm_util.Retry(max_retries=5)
-  def GetInstanceDetails(self):
-    """Returns a dict containing details about the instance.
+  def GetMemoryStorePassword(self):
+    """See base class."""
+    if not self._password:
+      self._PopulateEndpoint()
+    return self._password
 
-    Returns:
-      dict mapping string property key to value.
+  @vm_util.Retry(max_retries=5)
+  def _PopulateEndpoint(self):
+    """Populates endpoint information for the instance.
+
     Raises:
       errors.Resource.RetryableGetError:
       Failed to retrieve information on cache.
     """
-    instance_details = {}
-
     stdout, _, retcode = self.DescribeCache()
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s.', self.name)
     response = json.loads(stdout)
-    instance_details['host'] = response['hostName']
-    instance_details['port'] = response['port']
+    self._ip = response['hostName']
+    self._port = response['port']
 
     stdout, _, retcode = vm_util.IssueCommand([
         azure.AZURE_PATH, 'redis', 'list-keys',
@@ -159,5 +167,4 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s.', self.name)
     response = json.loads(stdout)
-    instance_details['password'] = response['primaryKey']
-    return instance_details
+    self._password = response['primaryKey']
