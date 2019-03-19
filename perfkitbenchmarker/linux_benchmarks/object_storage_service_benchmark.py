@@ -165,6 +165,10 @@ flags.DEFINE_float('object_storage_latency_histogram_interval', None,
                    'size in the distribution, because it is easy to aggregate '
                    'the histograms during post-processing, but impossible to '
                    'go in the opposite direction.')
+flags.DEFINE_boolean(
+    'record_individual_latency_samples', False,
+    'If set, record the latency of each download and upload '
+    'in its own sample.')
 
 FLAGS = flags.FLAGS
 
@@ -478,6 +482,14 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
         latency_prefix,
         LATENCY_UNIT,
         this_size_metadata)
+
+    # Record samples for individual downloads and uploads if requested.
+    if FLAGS.record_individual_latency_samples:
+      for latency in all_active_latencies[all_active_sizes == size]:
+        results.append(
+            sample.Sample('%s individual' % latency_prefix, latency,
+                          LATENCY_UNIT, this_size_metadata))
+
     # Build the object latency histogram if user requested it
     if FLAGS.object_storage_latency_histogram_interval:
       histogram_interval = FLAGS.object_storage_latency_histogram_interval

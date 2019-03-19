@@ -262,6 +262,8 @@
 - Added gce_local_ssd_count and gce_local_ssd_interface metadata to
   GceVirtualMachine.
 - Added option to use real training data to the Horovod benchmark.
+- Added support to record individual latency samples in the object_storage_service
+  benchmark using the flag --record_individual_latency_samples.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
