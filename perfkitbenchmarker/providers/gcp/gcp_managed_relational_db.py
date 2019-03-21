@@ -95,7 +95,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
-        '--gce-zone=%s' % instance_zone,
+        '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size,
@@ -311,7 +311,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # The hostname '%' means unrestricted access from any host.
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.spec.database_username,
-        '%', '--instance={0}'.format(self.instance_id),
+        '--host=%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     _, _, _ = cmd.Issue()
 
