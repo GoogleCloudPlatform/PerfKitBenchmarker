@@ -139,7 +139,7 @@ def Run(benchmark_spec):
       'wcs', 'zero', 'zlib'
   ]
 
-  stressors = sorted(set(cpu_suites+cpu_cache_suites+memory_suites))
+  stressors = sorted(set(cpu_suites + cpu_cache_suites + memory_suites))
 
   samples = []
 
