@@ -345,7 +345,11 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       client_string = result_string
     if result_string.startswith('Command line:'):
       command_line = result_string
-    result_string = next(fp).strip()
+    try:
+      result_string = next(fp).strip()
+    except StopIteration:
+      raise IOError(
+          'Could not parse YCSB output: {}'.format(ycsb_result_string))
 
   if result_string.startswith('[OVERALL]'):  # YCSB > 0.7.0.
     lines.append(result_string)
