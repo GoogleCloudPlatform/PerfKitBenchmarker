@@ -1,0 +1,64 @@
+java -cp /opt/pkb/ycsb/redis-binding/conf:/opt/pkb/ycsb/conf:/opt/pkb/ycsb/lib/jackson-mapper-asl-1.9.4.jar:/opt/pkb/ycsb/lib/jackson-core-asl-1.9.4.jar:/opt/pkb/ycsb/lib/core-0.9.0.jar:/opt/pkb/ycsb/lib/htrace-core4-4.1.0-incubating.jar:/opt/pkb/ycsb/lib/HdrHistogram-2.1.4.jar:/opt/pkb/ycsb/redis-binding/lib/jedis-2.0.0.jar:/opt/pkb/ycsb/redis-binding/lib/redis-binding-0.9.0.jar:/opt/pkb/ycsb/redis-binding/lib/commons-pool-1.5.5.jar com.yahoo.ycsb.Client -db com.yahoo.ycsb.db.RedisClient -threads 16 -P /opt/pkb/workloadb -p measurement.interval=op -p redis.host=10.138.0.106 -p operationcount=300000000 -p redis.port=6380 -p maxexecutiontime=600 -p recordcount=1250000 -p insertstart=625000 -p measurementtype=histogram -t
+YCSB Client 0.9.0
+Command line: -db com.yahoo.ycsb.db.RedisClient -threads 16 -P /opt/pkb/workloadb -p measurement.interval=op -p redis.host=10.138.0.106 -p operationcount=300000000 -p redis.port=6380 -p maxexecutiontime=600 -p recordcount=1250000 -p insertstart=625000 -p measurementtype=histogram -t
+Loading workload...
+Starting test.
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+Maximum execution time specified as: 600 secs
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+DBWrapper: report latency for each error is false and specific error codes to track for latency are: []
+redis.clients.jedis.exceptions.JedisConnectionException: java.net.SocketTimeoutException: Read timed out
+        at redis.clients.jedis.Protocol.process(Protocol.java:74)
+        at redis.clients.jedis.Protocol.read(Protocol.java:122)
+        at redis.clients.jedis.Connection.getBinaryMultiBulkReply(Connection.java:189)
+        at redis.clients.jedis.Jedis.hgetAll(Jedis.java:861)
+        at com.yahoo.ycsb.db.RedisClient.read(RedisClient.java:99)
+        at com.yahoo.ycsb.DBWrapper.read(DBWrapper.java:151)
+        at com.yahoo.ycsb.workloads.CoreWorkload.doTransactionRead(CoreWorkload.java:708)
+        at com.yahoo.ycsb.workloads.CoreWorkload.doTransaction(CoreWorkload.java:630)
+        at com.yahoo.ycsb.ClientThread.run(Client.java:458)
+        at java.lang.Thread.run(Thread.java:748)
+Caused by: java.net.SocketTimeoutException: Read timed out
+        at java.net.SocketInputStream.socketRead0(Native Method)
+        at java.net.SocketInputStream.socketRead(SocketInputStream.java:116)
+        at java.net.SocketInputStream.read(SocketInputStream.java:171)
+        at java.net.SocketInputStream.read(SocketInputStream.java:141)
+        at java.net.SocketInputStream.read(SocketInputStream.java:127)
+        at redis.clients.util.RedisInputStream.fill(RedisInputStream.java:110)
+        at redis.clients.util.RedisInputStream.readByte(RedisInputStream.java:46)
+        at redis.clients.jedis.Protocol.process(Protocol.java:59)
+        ... 9 more
+redis.clients.jedis.exceptions.JedisConnectionException: java.net.SocketTimeoutException: Read timed out
+        at redis.clients.jedis.Protocol.process(Protocol.java:74)
+        at redis.clients.jedis.Protocol.read(Protocol.java:122)
+        at redis.clients.jedis.Connection.getBinaryMultiBulkReply(Connection.java:189)
+        at redis.clients.jedis.Jedis.hgetAll(Jedis.java:861)
+        at com.yahoo.ycsb.db.RedisClient.read(RedisClient.java:99)
+        at com.yahoo.ycsb.DBWrapper.read(DBWrapper.java:151)
+        at com.yahoo.ycsb.workloads.CoreWorkload.doTransactionRead(CoreWorkload.java:708)
+        at com.yahoo.ycsb.workloads.CoreWorkload.doTransaction(CoreWorkload.java:630)
+        at com.yahoo.ycsb.ClientThread.run(Client.java:458)
+        at java.lang.Thread.run(Thread.java:748)
+Caused by: java.net.SocketTimeoutException: Read timed out
+        at java.net.SocketInputStream.socketRead0(Native Method)
+        at java.net.SocketInputStream.socketRead(SocketInputStream.java:116)
+        at java.net.SocketInputStream.read(SocketInputStream.java:171)
+        at java.net.SocketInputStream.read(SocketInputStream.java:141)
+        at java.net.SocketInputStream.read(SocketInputStream.java:127)
+        at redis.clients.util.RedisInputStream.fill(RedisInputStream.java:110)
+        at redis.clients.util.RedisInputStream.readByte(RedisInputStream.java:46)
+        at redis.clients.jedis.Protocol.process(Protocol.java:59)
+        ... 9 more
