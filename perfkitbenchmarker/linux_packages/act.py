@@ -27,7 +27,8 @@ FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/act.git'
 ACT_DIR = '%s/act' % INSTALL_DIR
-flags.DEFINE_float('act_load', 1.0, 'Load multiplier for act test per device.')
+flags.DEFINE_list('act_load', ['1.0'],
+                  'Load multiplier for act test per device.')
 flags.DEFINE_boolean('act_parallel', False,
                      'Run act tools in parallel. One copy per device.')
 flags.DEFINE_integer('act_duration', 86400, 'Duration of act test in seconds.')
@@ -94,24 +95,24 @@ def RunActPrep(vm):
       _RunActPrep, vm.scratch_disks[FLAGS.act_reserved_partitions:])
 
 
-def PrepActConfig(vm, index=None):
+def PrepActConfig(vm, load, index=None):
   """Prepare act config file at remote VM."""
   if index is None:
     disk_lst = vm.scratch_disks
     # Treat first few partitions as reserved.
     disk_lst = disk_lst[FLAGS.act_reserved_partitions:]
-    config_file = 'actconfig.txt'
+    config_file = 'actconfig_{0}.txt'.format(load)
   else:
     disk_lst = [vm.scratch_disks[index]]
-    config_file = 'actconfig_{0}.txt'.format(index)
+    config_file = 'actconfig_{0}_{1}.txt'.format(index, load)
   devices = ','.join([d.GetDevicePath() for d in disk_lst])
   num_disk = len(disk_lst)
   # render template:
   content = ACT_CONFIG_TEMPLATE.format(
       devices=devices,
       duration=FLAGS.act_duration,
-      read_iops=_CalculateReadIops(num_disk, FLAGS.act_load),
-      write_iops=_CalculateWriteIops(num_disk, FLAGS.act_load))
+      read_iops=_CalculateReadIops(num_disk, load),
+      write_iops=_CalculateWriteIops(num_disk, load))
   if FLAGS.act_num_queues:
     content += 'num-queues: %d\n' % FLAGS.act_num_queues
   if FLAGS.act_threads_per_queue:
@@ -123,15 +124,15 @@ def PrepActConfig(vm, index=None):
     vm.PushDataFile(tf.name, config_file)
 
 
-def RunAct(vm, index=None):
+def RunAct(vm, load, index=None):
   """Runs act binary with provided config."""
   if index is None:
-    config = 'actconfig.txt'
-    output = 'output'
+    config = 'actconfig_{0}.txt'.format(load)
+    output = 'output_{0}'.format(load)
     act_config_metadata = {'device_index': 'all'}
   else:
-    config = 'actconfig_{0}.txt'.format(index)
-    output = 'output_{0}'.format(index)
+    config = 'actconfig_{0}_{1}.txt'.format(index, load)
+    output = 'output_{0}_{1}'.format(index, load)
     act_config_metadata = {'device_index': index}
   # Push config file to remote VM.
   vm.RobustRemoteCommand(
@@ -148,7 +149,8 @@ def RunAct(vm, index=None):
   if 'drive(s) can\'t keep up - test stopped' in last_output_block:
     act_config_metadata['ERROR'] = 'cannot keep up'
   act_config_metadata.update(
-      GetActMetadata(len(vm.scratch_disks) - FLAGS.act_reserved_partitions))
+      GetActMetadata(
+          len(vm.scratch_disks) - FLAGS.act_reserved_partitions, load))
   for s in samples:
     s.metadata.update(act_config_metadata)
   return samples
@@ -218,7 +220,7 @@ def ParseRunAct(out):
   return ret
 
 
-def GetActMetadata(num_disk):
+def GetActMetadata(num_disk, load):
   """Returns metadata for act test."""
   # TODO(user): Expose more stats and flags.
   metadata = {
@@ -230,8 +232,8 @@ def GetActMetadata(num_disk):
       'report-interval-sec': 1,
       'large-block-op-kbytes': 128,
       'record-bytes': 1536,
-      'read-reqs-per-sec': _CalculateReadIops(num_disk, FLAGS.act_load),
-      'write-reqs-per-sec': _CalculateWriteIops(num_disk, FLAGS.act_load),
+      'read-reqs-per-sec': _CalculateReadIops(num_disk, load),
+      'write-reqs-per-sec': _CalculateWriteIops(num_disk, load),
       'microsecond-histograms': 'no',
       'scheduler-mode': 'noop'}
   metadata['num-queues'] = FLAGS.act_num_queues or 'default'
@@ -245,3 +247,13 @@ def _CalculateReadIops(num_disk, load_multiplier):
 
 def _CalculateWriteIops(num_disk, load_multiplier):
   return int(_WRITE_1X_1D * num_disk * load_multiplier)
+
+
+def IsRunComplete(samples):
+  """Decides if the run is able to complete (regardless of latency)."""
+  for s in samples:
+    if s.metric == 'Failed:NotEnoughSample':
+      return False
+    if 'ERROR' in s.metadata:
+      return False
+  return True

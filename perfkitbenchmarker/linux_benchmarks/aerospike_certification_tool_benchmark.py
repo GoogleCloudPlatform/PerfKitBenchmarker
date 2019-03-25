@@ -36,6 +36,10 @@ aerospike_certification_tool:
 """
 
 FLAGS = flags.FLAGS
+flags.DEFINE_boolean(
+    'act_stop_on_complete', True,
+    'Stop the benchmark when completing current load. This can be useful '
+    'deciding maximum sustained load for stress tests.')
 
 
 def GetConfig(user_config):
@@ -53,11 +57,12 @@ def Prepare(benchmark_spec):
   """Prepares act benchmark."""
   vm = benchmark_spec.vms[0]
   vm.Install('act')
-  if FLAGS.act_parallel:
-    for i in range(len(vm.scratch_disks))[FLAGS.act_reserved_partitions:]:
-      act.PrepActConfig(vm, i)
-  else:
-    act.PrepActConfig(vm)
+  for load in FLAGS.act_load:
+    if FLAGS.act_parallel:
+      for i in range(len(vm.scratch_disks))[FLAGS.act_reserved_partitions:]:
+        act.PrepActConfig(vm, float(load), i)
+    else:
+      act.PrepActConfig(vm, float(load))
   for d in vm.scratch_disks:
     vm.RemoteCommand('sudo umount %s' % d.mount_point)
 
@@ -67,15 +72,22 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
   act.RunActPrep(vm)
   samples = []
+  run_samples = []
+  for load in FLAGS.act_load:
+    def _Run(act_load, index):
+      run_samples.extend(act.RunAct(vm, act_load, index))
 
-  def _Run(index):
-    samples.extend(act.RunAct(vm, index))
-
-  if FLAGS.act_parallel:
-    vm_util.RunThreaded(_Run, range(len(vm.scratch_disks))[
-        FLAGS.act_reserved_partitions:])
-  else:
-    samples = act.RunAct(vm)
+    if FLAGS.act_parallel:
+      args = [((float(load), idx), {})
+              for idx in range(
+                  len(vm.scratch_disks))[FLAGS.act_reserved_partitions:]]
+      vm_util.RunThreaded(_Run, args)
+    else:
+      run_samples.extend(act.RunAct(vm, float(load)))
+    samples.extend(run_samples)
+    if FLAGS.act_stop_on_complete and act.IsRunComplete(run_samples):
+      break
+    run_samples = []
   return samples
 
 
