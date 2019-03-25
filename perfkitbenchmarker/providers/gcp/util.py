@@ -296,18 +296,3 @@ def MakeFormattedDefaultTags(timeout_minutes=None):
   if not benchmark_spec:
     return {}
   return FormatTags(benchmark_spec.GetResourceTags(timeout_minutes))
-
-
-def MakeFormattedDefaultLabels(timeout_minutes=None):
-  """Get the default labels formatted.
-
-  Args:
-    timeout_minutes: Timeout used for setting the timeout_utc label.
-
-  Returns:
-    A string contains labels, contributed from the benchmark spec.
-  """
-  benchmark_spec = context.GetThreadBenchmarkSpec()
-  if not benchmark_spec:
-    return {}
-  return FormatTags(benchmark_spec.GetResourceLabels(timeout_minutes))
