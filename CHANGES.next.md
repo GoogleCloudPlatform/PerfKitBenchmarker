@@ -132,7 +132,7 @@
 - Added `copy_benchmark_single_file_mb` flag for single file support.
 - Record guest system information.
 - Support for static edw clusters.
-- Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
+- Add more granularity to FAILED benchmarks with FailedSubstatus (AWS, Azure, GCP).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
 - Update configurable parameters for ycsb benchmarks.
