@@ -40,6 +40,7 @@ from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
+QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
 
 _VM_SPEC_REGISTRY = {}
 _VM_REGISTRY = {}
@@ -316,9 +317,7 @@ class BaseVirtualMachine(resource.BaseResource):
     return self.scratch_disks[disk_num].mount_point
 
   def AllowIcmp(self):
-    """Opens the ICMP protocol on the firewall corresponding to the VM if
-    one exists.
-    """
+    """Opens ICMP protocol on the firewall corresponding to the VM if exists."""
     if self.firewall:
       self.firewall.AllowIcmp(self)
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-from collections import OrderedDict
+import collections
 import json
 import logging
 import re
@@ -22,6 +22,7 @@ import functools32
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -144,7 +145,7 @@ class GcloudCommand(object):
           to list available images).
     """
     self.args = list(args)
-    self.flags = OrderedDict()
+    self.flags = collections.OrderedDict()
     self.additional_flags = []
     self._AddCommonFlags(resource)
 
@@ -214,7 +215,6 @@ class GcloudCommand(object):
 
 
 _QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
-_QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
 
 _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
@@ -229,7 +229,7 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       retcode: The return code from a gcloud command.
   """
   if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
-    message = _QUOTA_EXCEEDED_MESSAGE + stderr
+    message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
     logging.error(message)
     raise errors.Benchmarks.QuotaFailure(message)
   if retcode and _NOT_ENOUGH_RESOURCES_STDERR in stderr:
