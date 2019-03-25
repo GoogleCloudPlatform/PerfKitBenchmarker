@@ -170,7 +170,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """See base class."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if classname:
       cmd.flags['jars'] = jarfile
