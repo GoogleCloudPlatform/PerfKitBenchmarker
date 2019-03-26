@@ -73,7 +73,7 @@ class GceDisk(disk.BaseDisk):
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'create', self.name)
     cmd.flags['size'] = self.disk_size
     cmd.flags['type'] = self.disk_type
-    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     if self.image:
       cmd.flags['image'] = self.image
     if self.image_project:
