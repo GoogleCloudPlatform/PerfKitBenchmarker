@@ -21,6 +21,7 @@ More information about DiskSpd may be found here:
 https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223
 """
 
+import collections
 import ntpath
 import xml.etree.ElementTree
 
@@ -105,6 +106,12 @@ flags.DEFINE_integer('diskspd_file_size', 819200,
                      'The file size DiskSpd will create when testing. '
                      'Defaults: 819200. Unit: KB.')
 
+flags.DEFINE_list(
+    'diskspd_config_list',
+    'FALSE:TRUE:64,FALSE:FALSE:64,TRUE:TRUE:64,TRUE:FALSE:64',
+    'comma separated list of configs to run with diskspd. The '
+    'format for a single config is RANDOM_ACCESS:IS_READ:BLOCK_SIZE, '
+    'for example FALSE:TRUE:64')
 
 DISKSPD_RETRIES = 10
 DISKSPD_DIR = 'DiskSpd-2.0.21a'
@@ -114,7 +121,62 @@ DISKSPD_URL = ('https://gallery.technet.microsoft.com/DiskSpd-A-Robust-Storage'
 DISKSPD_TMPFILE = 'testfile.dat'
 DISKSPD_XMLFILE = 'result.xml'
 DISKSPD_TIMEOUT_MULTIPLIER = 3
-DISKSPD_CONFIG_LIST = [('s', 0), ('s', 100), ('r', 0), ('r', 100)]
+
+TRUE_VALS = ['True', 'true', 't', 'TRUE']
+FALSE_VALS = ['False', 'false', 'f', 'FALSE']
+
+# When adding new configs to diskspd_config_list, increase this value
+_NUM_PARAMS_IN_CONFIG = 3
+
+# named tuple used in passing configs around
+DiskspdConf = collections.namedtuple('DiskspdConf',
+                                     ['access_pattern', 'write_ratio',
+                                      'block_size'])
+
+
+def DiskspdConfigListValidator(value):
+  """Returns whether or not the config list flag is valid."""
+  if not value:
+    return False
+  for config in value:
+    config_vals = config.split(':')
+    if len(config_vals) < _NUM_PARAMS_IN_CONFIG:
+      return False
+    try:
+      is_random_access = config_vals[0]
+      is_read = config_vals[1]
+      block_size = int(config_vals[2])
+    except ValueError:
+      return False
+
+    if is_random_access not in TRUE_VALS + FALSE_VALS:
+      return False
+
+    if is_read not in TRUE_VALS + FALSE_VALS:
+      return False
+
+    if block_size <= 0:
+      return False
+  return True
+
+
+flags.register_validator('diskspd_config_list', DiskspdConfigListValidator,
+                         'malformed config list')
+
+
+def ParseConfigList():
+  """Get the list of configs for the test from the flags."""
+  conf_list = []
+  for config in FLAGS.diskspd_config_list:
+    confs = config.split(':')
+
+    conf_list.append(
+        DiskspdConf(
+            access_pattern='r' if (confs[0] in TRUE_VALS) else 's',
+            write_ratio=0 if (confs[1] in TRUE_VALS) else 100,
+            block_size=int(confs[2])))
+
+  return conf_list
 
 
 def Install(vm):
@@ -157,9 +219,12 @@ def _RemoveTempFile(vm):
   vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
 
 
-def _RunDiskSpd(running_vm, access_pattern, diskspd_write_read_ratio, metadata):
+def _RunDiskSpd(running_vm, access_pattern,
+                diskspd_write_read_ratio, block_size, metadata):
+  """Run single iteration of Diskspd test."""
   sending_options = _GenerateOption(access_pattern,
-                                    diskspd_write_read_ratio)
+                                    diskspd_write_read_ratio,
+                                    block_size)
   process_args = [(_RunDiskSpdWithOptions, (running_vm, sending_options), {})]
   background_tasks.RunParallelProcesses(process_args, 200)
   result_xml = _CatXml(running_vm)
@@ -170,12 +235,13 @@ def _RunDiskSpd(running_vm, access_pattern, diskspd_write_read_ratio, metadata):
   return ParseDiskSpdResults(result_xml, metadata, main_metric)
 
 
-def _GenerateOption(access_pattern, diskspd_write_read_ratio):
+def _GenerateOption(access_pattern, diskspd_write_read_ratio, block_size):
   """Generate running options from the given flags.
 
   Args:
     access_pattern: the access pattern of diskspd, 's' or 'r'
     diskspd_write_read_ratio: the ratio of writing compared to reading.
+    block_size: the block size of read/ write.
 
   Returns:
     list of samples from the results of the diskspd tests.
@@ -186,8 +252,7 @@ def _GenerateOption(access_pattern, diskspd_write_read_ratio):
   disable_affinity_string = '-n' if FLAGS.diskspd_disable_affinity else ''
   software_cache_string = '-Su' if FLAGS.diskspd_software_cache else ''
   write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
-  block_size_string = str(FLAGS.diskspd_block_size) + \
-      str(FLAGS.diskspd_block_unit)
+  block_size_string = str(block_size) + str(FLAGS.diskspd_block_unit)
   access_pattern_string = str(access_pattern) + \
       str(FLAGS.diskspd_stride_or_alignment) + \
       str(FLAGS.diskspd_stride_or_alignment_unit)
@@ -233,7 +298,6 @@ def RunDiskSpd(running_vm):
 
   # add the flag information to the metadata
   # some of the flags information has been included in the xml file
-  metadata['diskspd_block_size'] = FLAGS.diskspd_block_size
   metadata['diskspd_block_size_unit'] = FLAGS.diskspd_block_unit
   metadata['diskspd_stride_or_alignment'] = FLAGS.diskspd_stride_or_alignment
   metadata['diskspd_stride_or_alignment_unit'] = FLAGS.diskspd_stride_or_alignment_unit
@@ -246,11 +310,13 @@ def RunDiskSpd(running_vm):
   metadata['diskspd_throughput'] = FLAGS.diskspd_throughput_per_ms
 
   sample_list = []
+  conf_list = ParseConfigList()
 
   # run diskspd in four different scenario, will generate a metadata list
-  for access_pattern, diskspd_write_read_ratio in DISKSPD_CONFIG_LIST:
-    sample_list.append(_RunDiskSpd(running_vm, access_pattern,
-                                   diskspd_write_read_ratio, metadata))
+  for conf in conf_list:
+    sample_list.append(_RunDiskSpd(running_vm, conf.access_pattern,
+                                   conf.write_ratio, conf.block_size,
+                                   metadata))
 
   return sample_list
 
@@ -264,6 +330,7 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
   Args:
     result_xml: diskspd output
     metadata: the running info of vm
+    main_metric: the main metric to test, for example 'ReadSpeed'
 
   Returns:
     list of samples from the results of the diskspd tests.
