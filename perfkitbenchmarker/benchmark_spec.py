@@ -67,8 +67,9 @@ NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
 # GCP labels only allow hyphens (-), underscores (_), lowercase characters, and
 # numbers and International characters.
+LABEL_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
 # metadata allow all characters and numbers.
-METADATA_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
+METADATA_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', providers.GCP, providers.VALID_CLOUDS,
@@ -634,6 +635,10 @@ class BenchmarkSpec(object):
   def GetResourceTags(self, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
     return self._GetResourceDict(METADATA_TIME_FORMAT, timeout_minutes)
+
+  def GetResourceLabels(self, timeout_minutes=None):
+    """Gets a list of labels to be used to tag resources."""
+    return self._GetResourceDict(LABEL_TIME_FORMAT, timeout_minutes)
 
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
