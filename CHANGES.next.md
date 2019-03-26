@@ -264,6 +264,8 @@
 - Added option to use real training data to the Horovod benchmark.
 - Added support to record individual latency samples in the object_storage_service
   benchmark using the flag --record_individual_latency_samples.
+- Added '--ssh_retries' to adjust the number of times we retry for errors with a
+  255 error code.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

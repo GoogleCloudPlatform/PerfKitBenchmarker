@@ -56,7 +56,6 @@ EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 
 LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
 UPDATE_RETRIES = 5
-SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '~/.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
@@ -120,6 +119,9 @@ flags.DEFINE_bool(
     'enable_transparent_hugepages', None, 'Whether to enable or '
     'disable transparent hugepages. If unspecified, the setting '
     'is unchanged from the default in the OS.')
+
+flags.DEFINE_integer(
+    'ssh_retries', 10, 'Default number of times to retry SSH.', lower_bound=0)
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -579,29 +581,46 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  def RemoteCommandWithReturnCode(self, command, should_log=False,
-                                  retries=SSH_RETRIES, ignore_failure=False,
-                                  login_shell=False, suppress_warning=False,
-                                  timeout=None):
-    return self.RemoteHostCommandWithReturnCode(
-        command, should_log, retries,
-        ignore_failure, login_shell,
-        suppress_warning, timeout)
+  def RemoteCommand(self, *args, **kwargs):
+    """Runs a command on the VM.
 
-  def RemoteCommand(self, command,
-                    should_log=False, retries=SSH_RETRIES,
-                    ignore_failure=False, login_shell=False,
-                    suppress_warning=False, timeout=None):
-    return self.RemoteCommandWithReturnCode(
-        command, should_log, retries,
-        ignore_failure, login_shell,
-        suppress_warning, timeout)[:2]
+    Args:
+      *args: Arguments passed directly to RemoteCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteCommandWithReturnCode.
 
-  def RemoteHostCommandWithReturnCode(self, command, should_log=False,
-                                      retries=SSH_RETRIES,
+    Returns:
+      A tuple of stdout, stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
+
+  def RemoteCommandWithReturnCode(self, *args, **kwargs):
+    """Runs a command on the VM.
+
+    Args:
+      *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
+
+    Returns:
+      A tuple of stdout, stderr, return_code from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
+
+  def RemoteHostCommandWithReturnCode(self,
+                                      command,
+                                      should_log=False,
+                                      retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False, timeout=None):
+                                      suppress_warning=False,
+                                      timeout=None):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -613,7 +632,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           logged at the info level. Even if it is false, the results will
           still be logged at the debug level.
       retries: The maximum number of times RemoteCommand should retry SSHing
-          when it receives a 255 return code.
+          when it receives a 255 return code. If None, it defaults to the value
+          of the flag ssh_retries.
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
@@ -626,6 +646,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
+    if retries is None:
+      retries = FLAGS.ssh_retries
     if vm_util.RunningOnWindows():
       # Multi-line commands passed to ssh won't work on Windows unless the
       # newlines are escaped.
@@ -662,26 +684,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     return (stdout, stderr, retcode)
 
-  def RemoteHostCommand(self, command, should_log=False, retries=SSH_RETRIES,
-                        ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+  def RemoteHostCommand(self, *args, **kwargs):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
     within i.e. a container in the host VM.
 
     Args:
-      command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
-      retries: The maximum number of times RemoteCommand should retry SSHing
-          when it receives a 255 return code.
-      ignore_failure: Ignore any failure if set to true.
-      login_shell: Run command in a login shell.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
-      timeout: The timeout for IssueCommand.
+      *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
 
     Returns:
       A tuple of stdout, stderr from running the command.
@@ -689,9 +701,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    return self.RemoteHostCommandWithReturnCode(
-        command, should_log, retries, ignore_failure, login_shell,
-        suppress_warning, timeout)[:2]
+    return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
 
   def _Reboot(self):
     """OS-specific implementation of reboot command."""
@@ -1340,23 +1350,12 @@ class ContainerizedDebianMixin(DebianMixin):
     self.docker_id = resp.rstrip()
     return self.docker_id
 
-  def RemoteCommand(self, command,
-                    should_log=False, retries=SSH_RETRIES,
-                    ignore_failure=False, login_shell=False,
-                    suppress_warning=False, timeout=None):
+  def RemoteCommand(self, command, **kwargs):
     """Runs a command inside the container.
 
     Args:
       command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
-      retries: The maximum number of times RemoteCommand should retry SSHing
-          when it receives a 255 return code.
-      ignore_failure: Ignore any failure if set to true.
-      login_shell: Run command in a login shell.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
+      **kwargs: Keyword arguments passed directly to RemoteHostCommand.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -1364,10 +1363,9 @@ class ContainerizedDebianMixin(DebianMixin):
     # Escapes bash sequences
     command = command.replace("'", r"'\''")
 
-    logging.info('Docker running: %s' % command)
+    logging.info('Docker running: %s', command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
-    return self.RemoteHostCommand(command, should_log, retries,
-                                  ignore_failure, login_shell, suppress_warning)
+    return self.RemoteHostCommand(command, **kwargs)
 
   def ContainerCopy(self, file_name, container_path='', copy_to=True):
     """Copies a file to or from container_path to the host's vm_util.VM_TMP_DIR.
