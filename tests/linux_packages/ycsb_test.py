@@ -21,14 +21,18 @@ import unittest
 from perfkitbenchmarker.linux_packages import ycsb
 
 
+def open_data_file(filename):
+  path = os.path.join(os.path.dirname(__file__), '..', 'data', filename)
+  with open(path) as fp:
+    return fp.read()
+
+
 class SimpleResultParserTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'ycsb-test-run.dat')
-    with open(path) as fp:
-      self.contents = fp.read()
+    super(SimpleResultParserTestCase, self).setUp()
+    self.contents = open_data_file('ycsb-test-run.dat')
     self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testCommandLineSet(self):
@@ -88,10 +92,8 @@ class SimpleResultParserTestCase(unittest.TestCase):
 class DetailedResultParserTestCase(unittest.TestCase):
 
   def setUp(self):
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'ycsb-test-run-2.dat')
-    with open(path) as fp:
-      self.contents = fp.read()
+    super(DetailedResultParserTestCase, self).setUp()
+    self.contents = open_data_file('ycsb-test-run-2.dat')
     self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testPercentilesFromHistogram_read(self):
@@ -105,6 +107,13 @@ class DetailedResultParserTestCase(unittest.TestCase):
     percentiles = ycsb._PercentilesFromHistogram(hist)
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
+
+
+class BadResultParserTestCase(unittest.TestCase):
+
+  def testBadTestRun(self):
+    contents = open_data_file('ycsb-test-run-3.dat')
+    self.assertRaises(IOError, ycsb.ParseResults, contents, 'histogram')
 
 
 class WeightedQuantileTestCase(unittest.TestCase):
@@ -149,12 +158,7 @@ class ParseWorkloadTestCase(unittest.TestCase):
 
 
   def testParsesSampleWorkload(self):
-    test_file_path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                                  'ycsb_workloada')
-
-    with open(test_file_path) as fp:
-      contents = fp.read()
-
+    contents = open_data_file('ycsb_workloada')
     actual = ycsb._ParseWorkload(contents)
 
     expected = {
