@@ -828,6 +828,9 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
+  if spec.failed_substatus:
+    metadata['failed_substatus'] = spec.failed_substatus
+
   def UpdateVmStatus(vm):
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)

@@ -132,7 +132,7 @@
 - Added `copy_benchmark_single_file_mb` flag for single file support.
 - Record guest system information.
 - Support for static edw clusters.
-- Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
+- Add more granularity to FAILED benchmarks with FailedSubstatus (AWS, Azure, GCP).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
 - Update configurable parameters for ycsb benchmarks.
@@ -264,6 +264,8 @@
 - Added option to use real training data to the Horovod benchmark.
 - Added support to record individual latency samples in the object_storage_service
   benchmark using the flag --record_individual_latency_samples.
+- Added '--ssh_retries' to adjust the number of times we retry for errors with a
+  255 error code.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -420,3 +422,4 @@
 - Remove flag tpu_zone because VM and TPU should be in the same zone.
 - Refactoring managed_memorystore to add GetIp, GetPort and GetPassword class methods for managed_memorystore base class.
 - Run individual stressors in stress-ng one by one.
+- Upgrade gcp cloud redis to use prod gcloud.
