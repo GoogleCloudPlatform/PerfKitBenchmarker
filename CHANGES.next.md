@@ -420,3 +420,4 @@
 - Remove flag tpu_zone because VM and TPU should be in the same zone.
 - Refactoring managed_memorystore to add GetIp, GetPort and GetPassword class methods for managed_memorystore base class.
 - Run individual stressors in stress-ng one by one.
+- Upgrade gcp cloud redis to use prod gcloud.
