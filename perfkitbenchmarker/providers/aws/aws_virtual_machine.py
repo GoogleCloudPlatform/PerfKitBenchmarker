@@ -64,6 +64,7 @@ NUM_LOCAL_VOLUMES = {
     'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
     'd2.8xlarge': 24, 'i3.large': 1, 'i3.xlarge': 1,
     'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8,
+    'i3.metal': 8,
     'c5d.large': 1, 'c5d.xlarge': 1, 'c5d.2xlarge': 1, 'c5d.4xlarge': 1,
     'c5d.9xlarge': 1, 'c5d.18xlarge': 2,
     'm5d.large': 1, 'm5d.xlarge': 1, 'm5d.2xlarge': 1, 'm5d.4xlarge': 2,

@@ -424,3 +424,4 @@
 - Run individual stressors in stress-ng one by one.
 - Upgrade gcp cloud redis to use prod gcloud.
 - Upgrade glibc_benchmark's version of glibc to 2.29.
+- Add number of disks for AWS i3.metal instance to configuration
