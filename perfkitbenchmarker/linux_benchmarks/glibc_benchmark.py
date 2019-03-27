@@ -20,8 +20,9 @@ basic performance properties of the function.
 
 Homepage: https://fossies.org/linux/glibc/benchtests/README
 
-Installs glibc-2.27. The benchmark needs python 2.7 or later in addition to the
-dependencies required to build the GNU C Library.
+Installs glibc (see linux_packages/glibc.py for the version). The benchmark
+needs python 2.7 or later in addition to the dependencies required to build the
+GNU C Library.
 """
 
 import json
@@ -31,6 +32,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import glibc
 
 FLAGS = flags.FLAGS
 
@@ -93,6 +95,7 @@ def UpdateMetadata(metadata):
   """Update metadata with glibc-related flag values."""
   metadata['gcc'] = '5.5.0-12'
   metadata['glibc_benchset'] = FLAGS.glibc_benchset
+  metadata['glibc_version'] = glibc.GLIBC_VERSION
 
 
 # The reason to write this helper function is that glibc_benchset_output.json

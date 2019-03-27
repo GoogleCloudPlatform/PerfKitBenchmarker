@@ -423,3 +423,4 @@
 - Refactoring managed_memorystore to add GetIp, GetPort and GetPassword class methods for managed_memorystore base class.
 - Run individual stressors in stress-ng one by one.
 - Upgrade gcp cloud redis to use prod gcloud.
+- Upgrade glibc_benchmark's version of glibc to 2.29.
