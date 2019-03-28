@@ -158,6 +158,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
     self.mock_flags.flag_matrix = None
     self.mock_flags.flag_zip = None
+    self.mock_flags.num_benchmark_copies = 1
 
   def testStandardSet(self):
     self.assertIn(benchmark_sets.STANDARD_SET, benchmark_sets.BENCHMARK_SETS)

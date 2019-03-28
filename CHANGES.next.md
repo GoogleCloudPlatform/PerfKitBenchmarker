@@ -266,6 +266,8 @@
   benchmark using the flag --record_individual_latency_samples.
 - Added '--ssh_retries' to adjust the number of times we retry for errors with a
   255 error code.
+- Added --num_benchmark_copies which controls the number of copies of each
+  configuration to run.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
