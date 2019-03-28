@@ -32,6 +32,8 @@ flags.DEFINE_string('flag_matrix', None,
                     'The name of the flag matrix to run.')
 flags.DEFINE_string('flag_zip', None,
                     'The name of the flag zip to run.')
+flags.DEFINE_integer('num_benchmark_copies', 1,
+                     'The number of copies of each benchmark config to run.')
 
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
@@ -460,6 +462,8 @@ def GetBenchmarksFromFlags():
       if (flag_matrix_filter and not eval(
           flag_matrix_filter, {}, config['flags'])):
         continue
-      benchmark_config_list.append((benchmark_module, config))
+
+      benchmark_config_list.extend([(benchmark_module, config)] *
+                                   FLAGS.num_benchmark_copies)
 
   return benchmark_config_list
