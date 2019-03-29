@@ -47,6 +47,11 @@ flags.DEFINE_list('managed_db_zone', None,
                   'Defaults to the client vm\'s zone.')
 flags.DEFINE_string('managed_db_machine_type', None,
                     'Machine type of the database.')
+flags.DEFINE_integer('managed_db_cpus', None,
+                     'Number of Cpus in the database.')
+flags.DEFINE_string('managed_db_memory', None,
+                    'Amount of Memory in the database.  Uses the same format '
+                    'string as custom machine memory type.')
 flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
 flags.DEFINE_string('managed_db_disk_type', None,
