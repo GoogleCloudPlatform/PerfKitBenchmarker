@@ -427,3 +427,4 @@
 - Upgrade gcp cloud redis to use prod gcloud.
 - Upgrade glibc_benchmark's version of glibc to 2.29.
 - Add number of disks for AWS i3.metal instance to configuration
+- Fix bug in Azure disk letter assignment when attaching more than 24 disks.
