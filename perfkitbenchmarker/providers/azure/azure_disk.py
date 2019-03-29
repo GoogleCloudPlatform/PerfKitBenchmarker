@@ -20,6 +20,7 @@ See http://msdn.microsoft.com/en-us/library/azure/dn790303.aspx for more
 information about azure disks.
 """
 
+import itertools
 import json
 import re
 import threading
@@ -36,6 +37,7 @@ from perfkitbenchmarker.providers.azure import util
 FLAGS = flags.FLAGS
 
 DRIVE_START_LETTER = 'c'
+MAX_DRIVE_SUFFIX_LENGTH = 2  # Last allowable device is /dev/sdzz.
 
 PREMIUM_STORAGE = 'Premium_LRS'
 STANDARD_DISK = 'Standard_LRS'
@@ -59,6 +61,34 @@ LOCAL_SSD_PREFIXES = {'Standard_D', 'Standard_G', 'Standard_L'}
 AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+s_v2)',
 ]
+
+
+def _ProductWithIncreasingLength(iterable, max_length):
+  """Yields increasing length cartesian products of iterable."""
+  for length in range(1, max_length + 1):
+    for p in itertools.product(iterable, repeat=length):
+      yield p
+
+
+def _GenerateDrivePathSuffixes():
+  """Yields drive path suffix strings.
+
+  Drive path suffixes in the form 'c', 'd', ..., 'cc', 'cd', etc.
+  """
+  character_range = xrange(ord(DRIVE_START_LETTER), ord('z') + 1)
+  products = _ProductWithIncreasingLength(
+      character_range, MAX_DRIVE_SUFFIX_LENGTH)
+
+  for p in products:
+    yield ''.join(chr(c) for c in p)
+
+
+REMOTE_DRIVE_PATH_SUFFIXES = list(_GenerateDrivePathSuffixes())
+
+
+class TooManyAzureDisksError(Exception):
+  """Exception raised when too many disks are attached."""
+  pass
 
 
 def LocalDiskIsSSD(machine_type):
@@ -186,4 +216,7 @@ class AzureDisk(disk.BaseDisk):
         return '/dev/nvme%sn1' % str(self.lun)
       return '/dev/sdb'
     else:
-      return '/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + self.lun)
+      try:
+        return '/dev/sd%s' % REMOTE_DRIVE_PATH_SUFFIXES[self.lun]
+      except IndexError:
+        raise TooManyAzureDisksError()
