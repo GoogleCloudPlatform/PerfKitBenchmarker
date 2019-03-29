@@ -102,17 +102,20 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     ]
     if self.spec.engine == managed_relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
-    # TODO(ferneyhough): add tier machine types support for Postgres
-    if self.spec.engine == managed_relational_db.MYSQL:
-      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
-      cmd_string.append(machine_type_flag)
-    else:
+
+    if (self.spec.vm_spec.cpus and
+        self.spec.vm_spec.memory):
       self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
+    elif hasattr(self.spec.vm_spec, 'machine_type'):
+      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+      cmd_string.append(machine_type_flag)
+    else:
+      raise Exception('Unspecified machine type')
 
     if self.spec.high_availability:
       cmd_string.append(self._GetHighAvailabilityFlag())
@@ -155,12 +158,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
         config.
     """
-    if not hasattr(self.spec.vm_spec, 'cpus'):
+    if not hasattr(self.spec.vm_spec, 'cpus') or not self.spec.vm_spec.cpus:
       raise data.ResourceNotFound(
           'Must specify cpu count in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
-    if not hasattr(self.spec.vm_spec, 'memory'):
+    if not hasattr(self.spec.vm_spec, 'memory') or not self.spec.vm_spec.memory:
       raise data.ResourceNotFound(
           'Must specify a memory amount in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '

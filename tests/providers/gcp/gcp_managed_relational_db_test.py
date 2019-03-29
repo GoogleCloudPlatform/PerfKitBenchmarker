@@ -69,6 +69,8 @@ class GcpMysqlManagedRelationalDbTestCase(
                                              'machine_type': 'db-n1-standard-1',
                                              'zone': 'us-west1-b',
                                          })
+    vm_spec.cpus = None
+    vm_spec.memory = None
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
