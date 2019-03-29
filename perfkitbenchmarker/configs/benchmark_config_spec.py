@@ -537,6 +537,24 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     # managed_db is to change the benchmark spec in the benchmark source code
     # itself.
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
+
+    has_managed_db_machine_type = flag_values['managed_db_machine_type'].present
+    has_managed_db_cpus = flag_values['managed_db_cpus'].present
+    has_managed_db_memory = flag_values['managed_db_memory'].present
+    has_custom_machine_type = has_managed_db_cpus and has_managed_db_memory
+
+    if has_custom_machine_type and has_managed_db_machine_type:
+      raise errors.config.UnrecognizedOption(
+          'managed_db_cpus/managed_db_memory can not be specified with '
+          'managed_db_machine_type.   Either specify a custom machine '
+          'with cpus and memory or specify a predefined machine type.')
+
+    if (not has_custom_machine_type and (
+        has_managed_db_cpus or has_managed_db_memory)):
+      raise errors.config.MissingOption(
+          'To specify a custom database machine instance, both managed_db_cpus '
+          'and managed_db_memory must be specified.')
+
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
     if flag_values['managed_db_engine'].present:
@@ -566,9 +584,14 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['vm_spec'][cloud]['zone'] = (
           flag_values.managed_db_zone[0])
       config_values['zones'] = flag_values.managed_db_zone
-    if flag_values['managed_db_machine_type'].present:
+    if has_managed_db_machine_type:
       config_values['vm_spec'][cloud]['machine_type'] = (
           flag_values.managed_db_machine_type)
+    if has_custom_machine_type:
+      config_values['vm_spec'][cloud]['machine_type'] = {
+          'cpus': flag_values.managed_db_cpus,
+          'memory': flag_values.managed_db_memory
+      }
     if flag_values['managed_db_disk_size'].present:
       config_values['disk_spec'][cloud]['disk_size'] = (
           flag_values.managed_db_disk_size)
