@@ -39,7 +39,7 @@ VALID_TIERS = ['Basic', 'Standard', 'Premium']
 # Azure redis cache tiers. See
 # https://docs.microsoft.com/en-us/azure/redis-cache/cache-faq for information.
 VALID_CACHE_SIZES = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6',
-                     'P1', 'P2', 'P3', 'P4']
+                     'P1', 'P2', 'P3', 'P4', 'P5']
 
 flags.DEFINE_enum(
     'azure_storage_type', LRS,
