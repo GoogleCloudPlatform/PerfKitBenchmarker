@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 
-DRIVE_START_LETTER = 'c'
 MAX_DRIVE_SUFFIX_LENGTH = 2  # Last allowable device is /dev/sdzz.
 
 PREMIUM_STORAGE = 'Premium_LRS'
@@ -73,12 +72,28 @@ def _ProductWithIncreasingLength(iterable, max_length):
 def _GenerateDrivePathSuffixes():
   """Yields drive path suffix strings.
 
-  Drive path suffixes in the form 'c', 'd', ..., 'cc', 'cd', etc.
+  Drive path suffixes in the form 'c', 'd', ..., 'z', 'aa', 'ab', etc.
+  Note that because we need the first suffix to be 'c', we need to
+  fast-forward the iterator by two before yielding. Why start at 'c'?
+  The os-disk will be /dev/sda, and the temporary disk will be /dev/sdb:
+  https://docs.microsoft.com/en-us/azure/virtual-machines/linux/faq#can-i-use-the-temporary-disk-devsdb1-to-store-data
+
+  Therefore, any additional remote disks will need to begin at 'c'.
+
+  The linux kernel code that determines this naming can be found here:
+  https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/scsi/sd.c?h=v2.6.37#n2262
+
+  Quoting the link from above:
+  SCSI disk names starts at sda. The 26th device is sdz and the 27th is sdaa.
+  The last one for two lettered suffix is sdzz which is followed by sdaaa.
   """
-  character_range = xrange(ord(DRIVE_START_LETTER), ord('z') + 1)
+  character_range = xrange(ord('a'), ord('z') + 1)
   products = _ProductWithIncreasingLength(
       character_range, MAX_DRIVE_SUFFIX_LENGTH)
 
+  # We want to start at 'c', so fast-forward the iterator by two.
+  products.next()
+  products.next()
   for p in products:
     yield ''.join(chr(c) for c in p)
 
