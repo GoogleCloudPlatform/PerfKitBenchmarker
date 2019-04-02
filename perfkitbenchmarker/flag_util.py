@@ -284,35 +284,6 @@ class OverrideFlags(object):
       self._flag_values[key].present = 0
 
 
-# TODO(b/118177033): Deprecate this as it is abusing internals of FlagValues.
-class FlagDictSubstitution(object):
-  """Context manager that redirects flag reads and writes."""
-
-  def __init__(self, flag_values, substitute):
-    """Initializes a FlagDictSubstitution.
-
-    Args:
-      flag_values: FlagValues that is temporarily modified such that all its
-          flag reads and writes are redirected.
-      substitute: Callable that temporarily replaces the FlagDict function of
-          flag_values. Accepts no arguments and returns a dict mapping flag
-          name string to Flag object.
-    """
-    self._flags = flag_values
-    self._substitute = substitute
-    self._flag_dict_func_name = (
-        '_flags' if hasattr(self._flags, '_flags') else 'FlagDict')
-
-  def __enter__(self):
-    """Begins the flag substitution."""
-    self._original_flagdict = getattr(self._flags, self._flag_dict_func_name)
-    self._flags.__dict__[self._flag_dict_func_name] = self._substitute
-
-  def __exit__(self, *unused_args, **unused_kwargs):
-    """Stops the flag substitution."""
-    self._flags.__dict__[self._flag_dict_func_name] = self._original_flagdict
-
-
 class UnitsParser(flags.ArgumentParser):
   """Parse a flag containing a unit expression.
 
