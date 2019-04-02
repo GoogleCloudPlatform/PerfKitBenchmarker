@@ -43,9 +43,12 @@ If not, run
 to install it. This will allow this benchmark to properly create an instance.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import re
-import StringIO
 import time
 
 from perfkitbenchmarker import configs
@@ -54,6 +57,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+import six
 
 
 FLAGS = flags.FLAGS
@@ -193,7 +197,7 @@ def _ParseSysbenchOutput(sysbench_output):
   latency_numbers = []
   qps_numbers = []
 
-  sysbench_output_io = StringIO.StringIO(sysbench_output)
+  sysbench_output_io = six.StringIO(sysbench_output)
   for line in sysbench_output_io:
     # parse a line like (it's one line - broken up in the comment to fit):
     # [ 6s ] thds: 16 tps: 650.51 qps: 12938.26 (r/w/o: 9046.18/2592.05/1300.03)
@@ -400,12 +404,12 @@ def _GetDatabaseSize(vm, benchmark_spec):
 
   stdout, _ = vm.RemoteCommand(get_db_size_cmd)
   logging.info('Query database size results: \n%s', stdout)
-  # example stdout is:
-  # Database	Size (MB)
-  # information_schema	0.16
-  # mysql	5.53
-  # performance_schema	0.00
-  # sbtest	0.33
+  # example stdout is tab delimited but shown here with spaces:
+  # Database  Size (MB)
+  # information_schema  0.16
+  # mysql 5.53
+  # performance_schema  0.00
+  # sbtest  0.33
   size_mb = 0
   for line in stdout.splitlines()[1:]:
     _, word_size_mb = line.split()
@@ -757,7 +761,7 @@ def Prepare(benchmark_spec):
     vm.Install('mysqlclient')
 
   prepare_results = _PrepareSysbench(vm, benchmark_spec)
-  print prepare_results
+  print(prepare_results)
 
 
 def Run(benchmark_spec):
@@ -781,7 +785,7 @@ def Run(benchmark_spec):
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.
     run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
-    print run_results
+    print(run_results)
     publisher.PublishRunStageSamples(benchmark_spec, run_results)
 
   if (benchmark_spec.managed_relational_db.spec.high_availability and
@@ -790,7 +794,7 @@ def Run(benchmark_spec):
         len(FLAGS.sysbench_thread_counts) - 1]
     failover_results = _PerformFailoverTest(
         vm, metadata, benchmark_spec, last_client_count)
-    print failover_results
+    print(failover_results)
     publisher.PublishRunStageSamples(benchmark_spec, failover_results)
 
   # all results have already been published

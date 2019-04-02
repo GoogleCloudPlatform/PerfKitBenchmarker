@@ -21,7 +21,6 @@ import collections
 import copy
 import csv
 import fcntl
-import httplib
 import io
 import itertools
 import json
@@ -35,11 +34,12 @@ import urllib
 import uuid
 
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+import six.moves.http_client as httplib
 
 FLAGS = flags.FLAGS
 
@@ -579,8 +579,8 @@ class CloudStoragePublisher(SamplePublisher):
     return '<{0} bucket="{1}">'.format(type(self).__name__, self.bucket)
 
   def _GenerateObjectName(self):
-      object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
-      return object_name[:GCS_OBJECT_NAME_LENGTH]
+    object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
+    return object_name[:GCS_OBJECT_NAME_LENGTH]
 
   def PublishSamples(self, samples):
     with vm_util.NamedTemporaryFile(prefix='perfkit-gcs-pub',

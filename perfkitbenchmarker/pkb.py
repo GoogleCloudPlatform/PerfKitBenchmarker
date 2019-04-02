@@ -55,6 +55,10 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
      the run_uri.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import getpass
 import itertools
@@ -98,6 +102,8 @@ from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.publisher import SampleCollector
+import six
+from six.moves import zip
 
 LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
@@ -179,10 +185,10 @@ flags.DEFINE_string(
     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
-    log_util.LOG_LEVELS.keys(),
+    list(log_util.LOG_LEVELS.keys()),
     'The log level to run at.')
 flags.DEFINE_enum(
-    'file_log_level', log_util.DEBUG, log_util.LOG_LEVELS.keys(),
+    'file_log_level', log_util.DEBUG, list(log_util.LOG_LEVELS.keys()),
     'Anything logged at this level or higher will be written to the log file.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
@@ -396,14 +402,14 @@ def _PrintHelp(matches=None):
       matched the regex. If None then all flags are printed.
   """
   if not matches:
-    print FLAGS
+    print(FLAGS)
   else:
     flags_by_module = FLAGS.flags_by_module_dict()
     modules = sorted(flags_by_module)
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-        print FLAGS.module_help(module_name)
+        print(FLAGS.module_help(module_name))
 
 
 def _PrintHelpMD(matches=None):
@@ -505,7 +511,7 @@ def _PrintHelpMD(matches=None):
 def CheckVersionFlag():
   """If the --version flag was specified, prints the version and exits."""
   if FLAGS.version:
-    print version.VERSION
+    print(version.VERSION)
     sys.exit(0)
 
 
@@ -557,7 +563,7 @@ def _CreateBenchmarkSpecs():
 
     # Assign a unique ID to each benchmark run. This differs even between two
     # runs of the same benchmark within a single PKB run.
-    uid = name + str(benchmark_counts[name].next())
+    uid = name + str(next(benchmark_counts[name]))
 
     # Optional step to check flag values and verify files exist.
     check_prereqs = getattr(benchmark_module, 'CheckPrerequisites', None)
@@ -1100,10 +1106,10 @@ def RunBenchmarks():
   if FLAGS.randomize_run_order:
     random.shuffle(benchmark_specs)
   if FLAGS.dry_run:
-    print 'PKB will run with the following configurations:'
+    print('PKB will run with the following configurations:')
     for spec in benchmark_specs:
-      print spec
-      print ''
+      print(spec)
+      print('')
     return 0
 
   collector = SampleCollector()
@@ -1115,7 +1121,7 @@ def RunBenchmarks():
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(
           tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
-    benchmark_specs, sample_lists = zip(*spec_sample_tuples)
+    benchmark_specs, sample_lists = list(zip(*spec_sample_tuples))
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
 
@@ -1165,7 +1171,7 @@ def _GenerateBenchmarkDocumentation():
     total_vm_count = 0
     vm_str = ''
     scratch_disk_str = ''
-    for group in vm_groups.itervalues():
+    for group in six.itervalues(vm_groups):
       group_vm_count = group.get('vm_count', 1)
       if group_vm_count is None:
         vm_str = 'variable'

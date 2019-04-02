@@ -51,13 +51,16 @@ code in this module is designed to allow interrupting parallel tasks while
 keeping the risk of deadlock low.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 from collections import deque
 import ctypes
 import functools
 import logging
 import os
-import Queue
 import signal
 import threading
 import time
@@ -68,6 +71,11 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
+import six
+from six.moves import queue
+from six.moves import range
+from six.moves import zip
+
 
 # For situations where an interruptable wait is necessary, a loop of waits with
 # long timeouts is used instead. This is because some of Python's built-in wait
@@ -105,7 +113,7 @@ def _GetCallString(target_arg_tuple):
     kwargs = inner_kwargs
     target = target.func
   arg_strings = [str(a) for a in args]
-  arg_strings.extend(['{0}={1}'.format(k, v) for k, v in kwargs.iteritems()])
+  arg_strings.extend(['{0}={1}'.format(k, v) for k, v in six.iteritems(kwargs)])
   return '{0}({1})'.format(getattr(target, '__name__', target),
                            ', '.join(arg_strings))
 
@@ -156,7 +164,7 @@ class _SingleReaderQueue(object):
 
   def Get(self, timeout=None):
     if not _WaitForCondition(lambda: self._deque, timeout):
-      raise Queue.Empty
+      raise queue.Empty
     return self._deque.popleft()
 
   def Put(self, item):
@@ -249,15 +257,13 @@ class _BackgroundTask(object):
       self.traceback = traceback.format_exc()
 
 
-class _BackgroundTaskManager(object):
+class _BackgroundTaskManager(six.with_metaclass(abc.ABCMeta, object)):
   """Base class for a context manager that manages state for background tasks.
 
   Attributes:
     tasks: list of _BackgroundTask instances. Contains one _BackgroundTask per
         started task, in the order that they were started.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   def __init__(self, max_concurrency):
     self._max_concurrency = max_concurrency
@@ -350,7 +356,7 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
     self._response_queue = _SingleReaderQueue()
     self._task_queues = []
     self._threads = []
-    self._available_worker_ids = range(self._max_concurrency)
+    self._available_worker_ids = list(range(self._max_concurrency))
     uninitialized_worker_ids = set(self._available_worker_ids)
     for worker_id in self._available_worker_ids:
       task_queue = _NonPollingSingleReaderQueue()

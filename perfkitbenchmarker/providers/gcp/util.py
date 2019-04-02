@@ -17,18 +17,22 @@ import collections
 import json
 import logging
 import re
-import functools32
-
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+import six
+
+if six.PY2:
+  import functools32 as functools
+else:
+  import functools
 
 FLAGS = flags.FLAGS
 
 
-@functools32.lru_cache()
+@functools.lru_cache()
 def GetDefaultProject():
   """Get the default project."""
   cmd = [FLAGS.gcloud_path, 'config', 'list', '--format=json']
@@ -37,7 +41,7 @@ def GetDefaultProject():
   return result['core']['project']
 
 
-@functools32.lru_cache()
+@functools.lru_cache()
 def GetDefaultUser():
   """Get the default project."""
   cmd = [FLAGS.gcloud_path, 'config', 'list', '--format=json']
@@ -157,7 +161,7 @@ class GcloudCommand(object):
     """
     cmd = [FLAGS.gcloud_path]
     cmd.extend(self.args)
-    for flag_name, values in self.flags.iteritems():
+    for flag_name, values in self.flags.items():
       flag_name_str = '--{0}'.format(flag_name)
       if values is True:
         cmd.append(flag_name_str)
