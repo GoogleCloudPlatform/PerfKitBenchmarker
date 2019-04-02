@@ -430,3 +430,5 @@
 - Add number of disks for AWS i3.metal instance to configuration
 - Fix bug in Azure disk letter assignment when attaching more than 24 disks.
 - Incremental fixes to support Python3.
+- Fix bug in Azure Windows VM names for long run URIs where the name could be
+  longer than 15 characters.
