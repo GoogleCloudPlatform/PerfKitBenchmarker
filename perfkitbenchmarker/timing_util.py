@@ -90,10 +90,10 @@ flags.DEFINE_list(
     MEASUREMENTS_FLAG_NAME, MEASUREMENTS_END_TO_END_RUNTIME,
     'Comma-separated list of values from <%s> that selects which timing '
     'measurements to enable. Measurements will be included as samples in the '
-    'benchmark results. %s' % (
-        '|'.join(MEASUREMENTS_ALL),
-        ' '.join(['%s: %s' % (option, description) for option, description in
-                  MEASUREMENTS_ALL.iteritems()])))
+    'benchmark results. %s' % ('|'.join(MEASUREMENTS_ALL), ' '.join([
+        '%s: %s' % (option, description)
+        for option, description in MEASUREMENTS_ALL.items()
+    ])))
 flags.register_validator(
     MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 

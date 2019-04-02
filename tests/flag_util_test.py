@@ -17,12 +17,13 @@
 import sys
 import unittest
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 
 
 class TestIntegerList(unittest.TestCase):
+
   def testSimpleLength(self):
     il = flag_util.IntegerList([1, 2, 3])
     self.assertEqual(len(il), 3)
@@ -85,6 +86,7 @@ class TestIntegerList(unittest.TestCase):
 
 
 class TestParseIntegerList(unittest.TestCase):
+
   def setUp(self):
     self.ilp = flag_util.IntegerListParser()
 
@@ -121,6 +123,10 @@ class TestParseIntegerList(unittest.TestCase):
                      [3, 4, 5, 8, 10, 12, 14])
     self.assertEqual(list(self.ilp.parse('3:5,8,10:15:2')),
                      [3, 4, 5, 8, 10, 12, 14])
+
+  def testIncreasingIntegerLists(self):
+    self.assertEqual(list(self.ilp.parse('1-5-2,6-8')),
+                     [1, 3, 5, 6, 7, 8])
 
   def testAnyNegativeValueRequiresNewFormat(self):
     for str_range in ('-1-5', '3--5', '3-1--1'):
@@ -194,8 +200,17 @@ class TestParseIntegerList(unittest.TestCase):
     with self.assertRaises(ValueError):
       ilp.parse('3:1:-2')
 
+  def testIntegerListsWhichAreNotIncreasing(self):
+    ilp = flag_util.IntegerListParser(
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+    with self.assertRaises(ValueError) as cm:
+      ilp.parse('1-5,3-7')
+    self.assertEqual('Integer list 1-5,3-7 is not increasing',
+                     str(cm.exception))
+
 
 class TestIntegerListSerializer(unittest.TestCase):
+
   def testSerialize(self):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5), 9])
@@ -333,13 +348,15 @@ class TestUnitsParser(unittest.TestCase):
 
 
 class TestStringToBytes(unittest.TestCase):
+
   def testValidString(self):
     self.assertEqual(flag_util.StringToBytes('100KB'),
                      100000)
 
   def testUnparseableString(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       flag_util.StringToBytes('asdf')
+    self.assertEqual("Couldn't parse size asdf", str(cm.exception))
 
   def testBadUnits(self):
     with self.assertRaises(ValueError):
@@ -355,9 +372,10 @@ class TestStringToBytes(unittest.TestCase):
 
 
 class TestStringToRawPct(unittest.TestCase):
+
   def testValidPct(self):
-    self.assertEquals(flag_util.StringToRawPercent('50.5%'),
-                      50.5)
+    self.assertEqual(flag_util.StringToRawPercent('50.5%'),
+                     50.5)
 
   def testNullString(self):
     with self.assertRaises(ValueError):
@@ -394,11 +412,13 @@ class TestYAMLParser(unittest.TestCase):
                      [1, 2, 3])
 
   def testBadYAML(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       self.parser.parse('{a')
+    self.assertIn("Couldn't parse YAML string '{a': ", str(cm.exception))
 
 
 class MockFlag():
+
   def __init__(self, name, value, present):
     self.name = name
     self.value = value
