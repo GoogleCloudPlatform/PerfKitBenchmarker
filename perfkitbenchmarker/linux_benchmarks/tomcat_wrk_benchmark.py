@@ -26,16 +26,21 @@ maximum error-free throughput.
 `tomcat` is a popular Java web server.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import functools
 import logging
 import operator
-import urlparse
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import tomcat
 from perfkitbenchmarker.linux_packages import wrk
+import six
+import six.moves.urllib.parse
 
 
 flags.DEFINE_integer('tomcat_wrk_test_length', 120,
@@ -137,9 +142,10 @@ def Run(benchmark_spec):
   duration = FLAGS.tomcat_wrk_test_length
   max_connections = FLAGS.tomcat_wrk_max_connections
 
-  target = urlparse.urljoin('http://{0}:{1}'.format(tomcat_vm.ip_address,
-                                                    tomcat.TOMCAT_HTTP_PORT),
-                            SAMPLE_PAGE_PATH)
+  target = six.moves.urllib.parse.urljoin(
+      'http://{0}:{1}'.format(tomcat_vm.ip_address,
+                              tomcat.TOMCAT_HTTP_PORT),
+      SAMPLE_PAGE_PATH)
 
   logging.info('Warming up for %ds', WARM_UP_DURATION)
   list(wrk.Run(wrk_vm, connections=1, target=target, duration=WARM_UP_DURATION))
@@ -178,21 +184,21 @@ def Run(benchmark_spec):
 
   # Annotate the sample with the best throughput
   max_throughput = max(all_by_metric, key=lambda x: x['throughput'].value)
-  for sample in max_throughput.itervalues():
+  for sample in six.itervalues(max_throughput):
     sample.metadata.update(best_throughput=True)
 
   # ...and best 50th percentile latency
   min_p50 = min(all_by_metric, key=lambda x: x['p50 latency'].value)
-  for sample in min_p50.itervalues():
+  for sample in six.itervalues(min_p50):
     sample.metadata.update(best_p50=True)
 
   sort_key = operator.attrgetter('metric')
   if FLAGS.tomcat_wrk_report_all_samples:
     samples = [sample for d in all_by_metric
-               for sample in sorted(d.itervalues(), key=sort_key)]
+               for sample in sorted(six.itervalues(d), key=sort_key)]
   else:
-    samples = (sorted(min_p50.itervalues(), key=sort_key) +
-               sorted(max_throughput.itervalues(), key=sort_key))
+    samples = (sorted(six.itervalues(min_p50), key=sort_key) +
+               sorted(six.itervalues(max_throughput), key=sort_key))
 
   for sample in samples:
     sample.metadata.update(ip_type='external', runtime_in_seconds=duration)

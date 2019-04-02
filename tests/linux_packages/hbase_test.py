@@ -14,11 +14,11 @@
 """Tests for perfkitbenchmarker.linux_packages.hbase."""
 
 import unittest
-import urllib2
 import mock
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import hbase
 from tests import pkb_common_test_case
+from six.moves import urllib
 
 FLAGS = flags.FLAGS
 
@@ -29,7 +29,7 @@ class HbaseTest(pkb_common_test_case.PkbCommonTestCase):
     super(HbaseTest, self).setUp()
     FLAGS['hbase_use_stable'].parse(False)
     FLAGS['hbase_version'].parse('1.3.2.1')
-    p = mock.patch.object(urllib2, 'urlopen')
+    p = mock.patch.object(urllib.request, 'urlopen')
     self.mock_url_open = p.start()
     self.addCleanup(p.stop)
 
