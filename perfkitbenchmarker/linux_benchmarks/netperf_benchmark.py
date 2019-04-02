@@ -83,6 +83,14 @@ netperf:
 
 MBPS = 'Mbits/sec'
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'
+# Specifies the keys and to include in the results for OMNI tests.
+# Any user of ParseNetperfOutput() (e.g. container_netperf_benchmark), must
+# specify these selectors to ensure the parsing doesn't break.
+OUTPUT_SELECTOR = (
+    'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
+    'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
+    'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
+    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
 PORT_START = 20000
@@ -332,15 +340,12 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
                  '-P ,{{data_port}} '
-                 '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
-                 'P99_LATENCY,STDDEV_LATENCY,'
-                 'MIN_LATENCY,MAX_LATENCY,'
-                 'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
-                 'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS').format(
+                 '-o {output_selector}').format(
                      netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
+                     output_selector=OUTPUT_SELECTOR,
                      confidence=confidence, verbosity=verbosity)
   if FLAGS.netperf_thinktime != 0:
     netperf_cmd += (' -X {thinktime},{thinktime_array_size},'
