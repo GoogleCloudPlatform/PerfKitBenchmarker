@@ -72,7 +72,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
   def RemoteBuild(self, image):
     """Build the image remotely."""
     full_tag = self.GetFullRegistryTag(image.name)
-    build_cmd = util.GcloudCommand(self, 'container', 'builds', 'submit',
+    build_cmd = util.GcloudCommand(self, 'builds', 'submit',
                                    '--tag', full_tag, image.directory)
     del build_cmd.flags['zone']
     build_cmd.Issue()
