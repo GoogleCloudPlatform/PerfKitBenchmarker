@@ -28,6 +28,7 @@ operate on the VM: boot, shutdown, etc.
 import itertools
 import json
 import posixpath
+import re
 
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -457,6 +458,10 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
 
   def __init__(self, vm_spec):
     super(WindowsAzureVirtualMachine, self).__init__(vm_spec)
+    # The names of Windows VMs on Azure are limited to 15 characters so let's
+    # drop the pkb prefix if necessary.
+    if len(self.name) > 15:
+      self.name = re.sub('^pkb-', '', self.name)
     self.user_name = self.name
     self.password = vm_util.GenerateRandomWindowsPassword()
 
