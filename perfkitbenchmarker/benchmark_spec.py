@@ -13,15 +13,17 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import contextlib
 import copy
-import copy_reg
 import datetime
 import importlib
 import logging
 import os
 import pickle
-import thread
 import threading
 import uuid
 
@@ -46,6 +48,10 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+import six
+from six.moves import range
+import six.moves._thread
+import six.moves.copyreg
 
 
 def PickleLock(lock):
@@ -59,8 +65,7 @@ def UnPickleLock(locked, *args):
       raise pickle.UnpicklingError('Cannot acquire lock')
   return lock
 
-
-copy_reg.pickle(thread.LockType, PickleLock)
+six.moves.copyreg.pickle(six.moves._thread.LockType, PickleLock)
 
 SUPPORTED = 'strict'
 NOT_EXCLUDED = 'permissive'
@@ -225,7 +230,7 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
     tpu_group_specs = self.config.tpu_groups
 
-    for group_name, group_spec in sorted(tpu_group_specs.iteritems()):
+    for group_name, group_spec in sorted(six.iteritems(tpu_group_specs)):
       tpu = self.ConstructTpuGroup(group_spec)
 
       self.tpu_groups[group_name] = tpu
@@ -332,7 +337,7 @@ class BenchmarkSpec(object):
     else:
       disk_spec = None
 
-    for _ in xrange(vm_count - len(vms)):
+    for _ in range(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
       if FLAGS.zones or FLAGS.extra_zones:
         zone_list = FLAGS.zones + FLAGS.extra_zones
@@ -343,7 +348,7 @@ class BenchmarkSpec(object):
       if disk_spec and not vm.is_static:
         if disk_spec.disk_type == disk.LOCAL and disk_count is None:
           disk_count = vm.max_local_disks
-        vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
+        vm.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
         # In the event that we need to create multiple disks from the same
         # DiskSpec, we need to ensure that they have different mount points.
         if (disk_count > 1 and disk_spec.mount_point):
@@ -357,7 +362,7 @@ class BenchmarkSpec(object):
     """Construct capacity reservations for each VM group."""
     if not FLAGS.use_capacity_reservations:
       return
-    for vm_group in self.vm_groups.itervalues():
+    for vm_group in six.itervalues(self.vm_groups):
       cloud = vm_group[0].CLOUD
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(
@@ -399,7 +404,7 @@ class BenchmarkSpec(object):
     vm_group_specs = self.config.vm_groups
 
     clouds = {}
-    for group_name, group_spec in sorted(vm_group_specs.iteritems()):
+    for group_name, group_spec in sorted(six.iteritems(vm_group_specs)):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
@@ -479,11 +484,12 @@ class BenchmarkSpec(object):
     # in this dict, and each per-zone object depends on a corresponding
     # per-region object, so the per-region objects are given keys that come
     # first when sorted.
-    networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
+    networks = [self.networks[key]
+                for key in sorted(six.iterkeys(self.networks))]
     vm_util.RunThreaded(lambda net: net.Create(), networks)
     if self.container_registry:
       self.container_registry.Create()
-      for container_spec in self.container_specs.itervalues():
+      for container_spec in six.itervalues(self.container_specs):
         if container_spec.static_image:
           continue
         container_spec.image = self.container_registry.GetOrBuild(
@@ -510,7 +516,7 @@ class BenchmarkSpec(object):
           vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
       ]
       sshable_vm_groups = {}
-      for group_name, group_vms in self.vm_groups.iteritems():
+      for group_name, group_vms in six.iteritems(self.vm_groups):
         sshable_vm_groups[group_name] = [
             vm for vm in group_vms
             if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
@@ -572,7 +578,7 @@ class BenchmarkSpec(object):
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
 
-    for firewall in self.firewalls.itervalues():
+    for firewall in six.itervalues(self.firewalls):
       try:
         firewall.DisallowAllPorts()
       except Exception:
@@ -584,7 +590,7 @@ class BenchmarkSpec(object):
       self.container_cluster.DeleteContainers()
       self.container_cluster.Delete()
 
-    for net in self.networks.itervalues():
+    for net in six.itervalues(self.networks):
       try:
         net.Delete()
       except Exception:

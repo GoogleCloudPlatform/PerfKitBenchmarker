@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing class for AWS's EMR service.
+
 Clusters can be created and deleted.
 """
 
@@ -24,8 +25,8 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
-import aws_network
-import util
+from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import util
 
 GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
                        'hadoop-mapreduce-client-jobclient.jar')
@@ -317,7 +318,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       # assumption: spark job will always have a jar and a class
       arg_list = ['--class', classname, jarfile]
       if job_arguments:
-          arg_list += job_arguments
+        arg_list += job_arguments
       arg_spec = '[' + ','.join(arg_list) + ']'
       step_type_spec = 'Type=Spark'
       step_list = [step_type_spec, 'Args=' + arg_spec]
@@ -360,7 +361,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-          raise EMRRetryableException('Step {0} not complete.'.format(step_id))
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['TestDFSIO']
@@ -494,7 +495,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-          raise EMRRetryableException('Step {0} not complete.'.format(step_id))
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['TestDFSIO']
