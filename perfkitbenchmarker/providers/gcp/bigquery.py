@@ -32,11 +32,6 @@ class Bigquery(edw_service.EdwService):
   CLOUD = providers.GCP
   SERVICE_TYPE = 'bigquery'
 
-  def __init__(self, edw_service_spec):
-    super(Bigquery, self).__init__(edw_service_spec)
-    bq = self.cluster_identifier.split('.')
-    self.job_id_prefix = '{}_{}'.format(FLAGS.run_uri, bq[1])
-
   def _Create(self):
     """Create a BigQuery cluster.
 
@@ -62,14 +57,12 @@ class Bigquery(edw_service.EdwService):
   def GetMetadata(self):
     """Return a dictionary of the metadata for the BigQuery cluster."""
     basic_data = super(Bigquery, self).GetMetadata()
-    basic_data['bq_job_id_prefix'] = self.job_id_prefix
     return basic_data
 
   def RunCommandHelper(self):
     """Bigquery specific run script command components."""
     bq = self.cluster_identifier.split('.')
-    return ('--bq_project_id={} --bq_dataset_id={}'
-            ' --bq_job_id_prefix={}').format(bq[0], bq[1], self.job_id_prefix)
+    return '--bq_project_id={} --bq_dataset_id={}'.format(bq[0], bq[1])
 
   def InstallAndAuthenticateRunner(self, vm):
     """Method to perform installation and authentication of bigquery runner.
