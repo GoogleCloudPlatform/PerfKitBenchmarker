@@ -14,6 +14,10 @@
 
 """Tests for perfkitbenchmarker.background_tasks."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import functools
 import multiprocessing
 import multiprocessing.managers
@@ -25,6 +29,7 @@ import unittest
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from tests import pkb_common_test_case
+from six.moves import range
 
 
 def _ReturnArgs(a, b=None):
