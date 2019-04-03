@@ -43,13 +43,15 @@ def execute_profile(profile):
     script = '{}.sql'.format(str(script_index))
     script_performance = script_driver.execute_script(script, logfile_suffix)
     execution_times.update(json.loads(script_performance))
-  execution_times['wall_time'] = round((time.time() - start_time), 2)
+  profile_execution_wall_time = round((time.time() - start_time), 2)
+  execution_times['wall_time'] = {'execution_time': profile_execution_wall_time,
+                                  'job_id': 'undefined_job'}
   return json.dumps(execution_times)
 
 
 def main(argv):
   del argv
-  print execute_profile(FLAGS.profile)
+  print (execute_profile(FLAGS.profile))  # pylint: disable=superfluous-parens
 
 
 if __name__ == '__main__':
