@@ -265,7 +265,7 @@ def _GenerateOption(access_pattern, diskspd_write_read_ratio, block_size):
                      '{large_page} {latency_stats} {disable_affinity} '
                      '{software_cache} {write_through} {throughput}'
                      '-b{block_size} -f{hint_string} -{access_pattern} '
-                     '-o{outstanding_io} '
+                     '-o{outstanding_io} -L '
                      'C:\\scratch\\{tempfile} > {xmlfile}').format(
                          filesize=FLAGS.diskspd_file_size,
                          duration=FLAGS.diskspd_duration,
@@ -349,11 +349,18 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
             if read_write_info.tag not in ['Path', 'FileSize']:
               if read_write_info.tag not in metadata:
                 metadata[read_write_info.tag] = 0
-              metadata[read_write_info.tag] += int(read_write_info.text)
+              try:
+                metadata[read_write_info.tag] += int(read_write_info.text)
+              except ValueError:
+                metadata[read_write_info.tag] += float(read_write_info.text)
         elif subitem.tag == 'CpuUtilization':
           target_item = subitem.find('Average')
           for cpu_info in list(target_item):
             metadata[cpu_info.tag] = cpu_info.text
+        elif subitem.tag == 'Latency':
+          # Latency data is added at the top level of the xml data, so no need
+          # to add it again here.
+          pass
         else:
           metadata[subitem.tag] = subitem.text
     if item.tag == 'Profile':
