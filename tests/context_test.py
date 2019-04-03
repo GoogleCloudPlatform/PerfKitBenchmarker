@@ -14,6 +14,10 @@
 
 """Tests for perfkitbenchmarker.context."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 import mock
@@ -21,6 +25,7 @@ import mock
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
+from six.moves import range
 
 
 class ThreadLocalBenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -46,7 +51,7 @@ class ThreadLocalBenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(new_benchmark_spec,
                        context.GetThreadBenchmarkSpec())
 
-    vm_util.RunThreaded(_DoWork, range(10))
+    vm_util.RunThreaded(_DoWork, list(range(10)))
 
 
 if __name__ == '__main__':
