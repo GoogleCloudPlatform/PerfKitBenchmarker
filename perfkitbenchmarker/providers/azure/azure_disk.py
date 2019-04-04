@@ -20,6 +20,10 @@ See http://msdn.microsoft.com/en-us/library/azure/dn790303.aspx for more
 information about azure disks.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import itertools
 import json
 import re
@@ -33,6 +37,7 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -87,13 +92,13 @@ def _GenerateDrivePathSuffixes():
   SCSI disk names starts at sda. The 26th device is sdz and the 27th is sdaa.
   The last one for two lettered suffix is sdzz which is followed by sdaaa.
   """
-  character_range = xrange(ord('a'), ord('z') + 1)
+  character_range = range(ord('a'), ord('z') + 1)
   products = _ProductWithIncreasingLength(
       character_range, MAX_DRIVE_SUFFIX_LENGTH)
 
   # We want to start at 'c', so fast-forward the iterator by two.
-  products.next()
-  products.next()
+  next(products)
+  next(products)
   for p in products:
     yield ''.join(chr(c) for c in p)
 
