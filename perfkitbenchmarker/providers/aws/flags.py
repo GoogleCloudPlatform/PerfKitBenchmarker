@@ -53,9 +53,9 @@ flags.DEFINE_string('aws_image_name_regex', None,
                     'IMAGE_NAME_REGEX.')
 flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
                     'AWS bucket where pre-provisioned data has been copied.')
-flags.DEFINE_string('redis_node_type',
+flags.DEFINE_string('cache_node_type',
                     'cache.m4.large',
-                    'The AWS node type to use for cloud redis')
+                    'The AWS cache node type to use for elasticache clusters.')
 flags.DEFINE_string('aws_elasticache_failover_zone',
                     None,
                     'AWS elasticache failover zone')
