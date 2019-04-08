@@ -98,6 +98,7 @@
 - Added flag --after_run_sleep_time which instructs PKB to sleep for the number
   of seconds specified after the run stage has completed.
 - Added P5 cache type for Azure managed redis.
+- Added AWS elasticache Memcached provider.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
