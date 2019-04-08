@@ -66,7 +66,7 @@ def _GeoMeanOverflow(iterable):
   Returns: The geometric mean of the list.
   """
   a = numpy.log(iterable)
-  return numpy.exp(a.sum()/len(a))
+  return numpy.exp(a.sum() / len(a))
 
 
 def StressngCustomStressorsValidator(stressors):
