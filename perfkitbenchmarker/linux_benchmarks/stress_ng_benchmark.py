@@ -26,6 +26,7 @@ http://manpages.ubuntu.com/manpages/xenial/man1/stress-ng.1.html
 """
 
 import logging
+import numpy
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -47,6 +48,52 @@ stress_ng:
 
 flags.DEFINE_integer('stress_ng_duration', 10,
                      'Number of seconds to run the test.')
+flags.DEFINE_boolean('stress_ng_calc_geomean', True,
+                     'Whether to calculate geomean or not.')
+flags.DEFINE_list('stress_ng_custom_stressors', [],
+                  'List of stressors to run against. Default combines cpu,'
+                  'cpu-cache, and memory suites')
+
+
+def _GeoMeanOverflow(iterable):
+  """Returns the geometric mean.
+
+  See https://en.wikipedia.org/wiki/Geometric_mean#Relationship_with_logarithms
+
+  Args:
+    iterable: a list of positive floats to take the geometric mean of.
+
+  Returns: The geometric mean of the list.
+  """
+  a = numpy.log(iterable)
+  return numpy.exp(a.sum()/len(a))
+
+
+def StressngCustomStressorsValidator(stressors):
+  """Returns whether or not the list of custom stressors is valid."""
+  valid_stressors = {
+      'affinity', 'af-alg', 'aio', 'aio-linux', 'apparmor', 'bigheap', 'brk',
+      'bsearch', 'cache', 'chdir', 'chmod', 'clock', 'clone', 'context', 'cpu',
+      'cpu-online', 'crypt', 'daemon', 'dentry', 'dir', 'dup', 'epoll',
+      'eventfd', 'exec', 'fallocate', 'fault', 'fcntl', 'fiemap', 'fifo',
+      'filename', 'flock', 'fork', 'fp-error', 'fstat', 'futex', 'get',
+      'getrandom', 'getdent', 'handle', 'hdd', 'heapsort', 'hsearch', 'icache',
+      'iosync', 'inotify', 'itimer', 'kcmp', 'key', 'kill', 'klog', 'lease',
+      'link', 'lockbus', 'lockf', 'longjmp', 'lsearch', 'malloc', 'matrix',
+      'membarrier', 'memcpy', 'memfd', 'mergesort', 'mincore', 'mknod', 'mlock',
+      'mmap', 'mmapfork', 'mmapmany', 'mremap', 'msg', 'mq', 'nice', 'null',
+      'numa', 'oom-pipe', 'open', 'personality', 'pipe', 'poll', 'procfs',
+      'pthread', 'ptrace', 'qsort', 'quota', 'rdrand', 'readahead',
+      'remap-file-pages', 'rename', 'rlimit', 'seccomp', 'seek', 'sem-posix',
+      'sem-sysv', 'shm-posix', 'shm-sysv', 'sendfile', 'sigfd', 'sigfpe',
+      'sigpending', 'sigq', 'sigsegv', 'sigsuspend', 'sleep', 'socket',
+      'socket-fd', 'socket-pair', 'spawn', 'splice', 'stack', 'str', 'stream',
+      'switch', 'symlink', 'sync-file', 'sysinfo', 'sysfs', 'tee', 'timer',
+      'timerfd', 'tsc', 'tsearch', 'udp', 'udp-flood', 'unshare', 'urandom',
+      'userfaultfd', 'utime', 'vecmath', 'vfork', 'vm', 'vm-rw', 'vm-splice',
+      'wait', 'wcs', 'xattr', 'yield', 'zero', 'zlib', 'zombie'
+  }
+  return valid_stressors.issuperset(set(stressors))
 
 
 def GetConfig(user_config):
@@ -141,7 +188,11 @@ def Run(benchmark_spec):
 
   stressors = sorted(set(cpu_suites + cpu_cache_suites + memory_suites))
 
+  if FLAGS.stress_ng_custom_stressors:
+    stressors = FLAGS.stress_ng_custom_stressors
+
   samples = []
+  values_to_geomean_list = []
 
   for stressor in stressors:
     cmd = ('stress-ng --{stressor} {numthreads} --metrics-brief '
@@ -151,6 +202,19 @@ def Run(benchmark_spec):
     stressng_sample = _ParseStressngResult(metadata, stdout)
     if stressng_sample:
       samples.append(stressng_sample)
+      values_to_geomean_list.append(stressng_sample.value)
+
+  # Only calculate geomean if each stressors provided a value
+  if FLAGS.stress_ng_calc_geomean and len(values_to_geomean_list) == len(
+      stressors):
+    geomean_metadata = metadata.copy()
+    geomean_metadata['stressors'] = stressors
+    geomean_sample = sample.Sample(
+        metric='STRESS_NG_GEOMEAN',
+        value=_GeoMeanOverflow(values_to_geomean_list),
+        unit='bogus_ops_sec',
+        metadata=geomean_metadata)
+    samples.append(geomean_sample)
 
   return samples
 

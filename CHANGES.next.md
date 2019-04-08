@@ -99,6 +99,7 @@
   of seconds specified after the run stage has completed.
 - Added P5 cache type for Azure managed redis.
 - Added AWS elasticache Memcached provider.
+- Added additional options to the stress-ng benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

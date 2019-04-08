@@ -57,5 +57,9 @@ class StressngTestCase(unittest.TestCase):
       self.assertEqual(16, sample.metadata['threads'])
     self.assertEqual(len(samples), 1)
 
+  def testGeoMean(self):
+    floats = [1.0, 3.0, 5.0]
+    self.assertAlmostEqual(stress_ng_benchmark._GeoMeanOverflow(floats),
+                           2.466212074)
 if __name__ == '__main__':
   unittest.main()
