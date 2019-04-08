@@ -42,8 +42,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     self.subnet_group_name = 'subnet-%s' % self.name
     self.zone = self.spec.vms[0].zone
     self.region = util.GetRegionFromZone(self.zone)
-    # TODO(ruwa): Rename redis_node_type flag to cache_node_type
-    self.node_type = FLAGS.redis_node_type
+    self.node_type = FLAGS.cache_node_type
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
