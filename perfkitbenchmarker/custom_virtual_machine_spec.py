@@ -14,12 +14,17 @@
 """Classes relating to decoding a custom machine type.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import re
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.azure import flags as azure_flags
+import six
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -102,7 +107,8 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a VM config."""
 
   def __init__(self, **kwargs):
-    super(MachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
+    super(MachineTypeDecoder, self).__init__((six.string_types + (dict,)),
+                                             **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a VM config.
@@ -124,7 +130,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     """
     super(MachineTypeDecoder, self).Decode(value, component_full_name,
                                            flag_values)
-    if isinstance(value, basestring):
+    if isinstance(value, six.string_types):
       return value
     return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
                                  flag_values=flag_values, **value)
@@ -134,7 +140,8 @@ class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a VM config."""
 
   def __init__(self, **kwargs):
-    super(AzureMachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
+    super(AzureMachineTypeDecoder, self).__init__(six.string_types + (dict,),
+                                                  **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a VM config.
@@ -156,7 +163,7 @@ class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
     """
     super(AzureMachineTypeDecoder, self).Decode(value, component_full_name,
                                                 flag_values)
-    if isinstance(value, basestring):
+    if isinstance(value, six.string_types):
       return value
     return AzurePerformanceTierDecoder(
         self._GetOptionFullName(component_full_name),

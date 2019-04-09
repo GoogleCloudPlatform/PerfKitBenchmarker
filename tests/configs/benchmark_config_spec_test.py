@@ -13,6 +13,10 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.configs.benchmark_config_spec."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import unittest
 
@@ -29,6 +33,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -147,10 +152,10 @@ class StaticVmListDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
       self._decoder.Decode(None, _COMPONENT, {})
 
   def testValidList(self):
-    input_list = [{'ssh_port': i} for i in xrange(3)]
+    input_list = [{'ssh_port': i} for i in range(3)]
     result = self._decoder.Decode(input_list, _COMPONENT, {})
     self.assertIsInstance(result, list)
-    self.assertEqual([vm_spec.ssh_port for vm_spec in result], range(3))
+    self.assertEqual([vm_spec.ssh_port for vm_spec in result], list(range(3)))
 
   def testInvalidList(self):
     input_list = [{'ssh_port': 0}, {'ssh_port': 1}, {'ssh_pory': 2}]

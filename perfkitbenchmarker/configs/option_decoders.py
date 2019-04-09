@@ -13,23 +13,25 @@
 # limitations under the License.
 """Classes for verifying and decoding config option values."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
-import types
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import spec
+import six
 
 
-class ConfigOptionDecoder(object):
+class ConfigOptionDecoder(six.with_metaclass(abc.ABCMeta, object)):
   """Verifies and decodes a config option value.
 
   Attributes:
     option: None or string. Name of the config option.
     required: boolean. True if the config option is required. False if not.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   def __init__(self, option=None, **kwargs):
     """Initializes a ConfigOptionDecoder.
@@ -96,7 +98,7 @@ class ConfigOptionDecoder(object):
 
 
 class EnumDecoder(ConfigOptionDecoder):
-  """ Verifies that the config options value is in the allowed set.
+  """Verifies that the config options value is in the allowed set.
 
   Passes through the value unmodified
   """
@@ -112,7 +114,7 @@ class EnumDecoder(ConfigOptionDecoder):
     self.valid_values = valid_values
 
   def Decode(self, value, component_full_name, flag_values):
-    """ Verifies that the provided value is in the allowed set.
+    """Verifies that the provided value is in the allowed set.
 
     Args:
       value: The value specified in the config.
@@ -128,7 +130,7 @@ class EnumDecoder(ConfigOptionDecoder):
       errors.Config.InvalidValue upon invalid input value.
     """
     if value in self.valid_values:
-     return value
+      return value
     else:
       raise errors.Config.InvalidValue(
           'Invalid {0} value: "{1}". Value must be one of the following: '
@@ -152,7 +154,7 @@ class TypeVerifier(ConfigOptionDecoder):
     """
     super(TypeVerifier, self).__init__(**kwargs)
     if none_ok:
-      self._valid_types = (types.NoneType,) + valid_types
+      self._valid_types = (type(None),) + valid_types
     else:
       self._valid_types = valid_types
 
@@ -279,7 +281,7 @@ class StringDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a string is expected."""
 
   def __init__(self, **kwargs):
-    super(StringDecoder, self).__init__((basestring,), **kwargs)
+    super(StringDecoder, self).__init__(six.string_types, **kwargs)
 
 
 class ListDecoder(TypeVerifier):

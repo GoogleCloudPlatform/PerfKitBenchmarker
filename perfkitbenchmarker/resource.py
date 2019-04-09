@@ -19,11 +19,16 @@ and checks for resource existence so that resources can be created and deleted
 reliably.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import time
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
+import six
 
 _RESOURCE_REGISTRY = {}
 
@@ -67,7 +72,7 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
     super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
 
 
-class BaseResource(object):
+class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
   """An object representing a cloud resource.
 
   Attributes:
@@ -81,8 +86,6 @@ class BaseResource(object):
   # A list of attributes that are used to register Resource subclasses
   # (e.g. CLOUD).
   REQUIRED_ATTRS = ['CLOUD']
-
-  __metaclass__ = AutoRegisterResourceMeta
 
   # Timeout in seconds for resource to be ready.
   READY_TIMEOUT = None

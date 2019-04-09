@@ -13,10 +13,15 @@
 # limitations under the License.
 """Base class for objects decoded from a YAML config."""
 
-from collections import OrderedDict
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import collections
 import threading
 
 from perfkitbenchmarker import errors
+import six
 
 _SPEC_REGISTRY = {}
 
@@ -44,7 +49,7 @@ class BaseSpecMetaClass(type):
   def __init__(cls, name, bases, dct):
     super(BaseSpecMetaClass, cls).__init__(name, bases, dct)
     cls._init_decoders_lock = threading.Lock()
-    cls._decoders = OrderedDict()
+    cls._decoders = collections.OrderedDict()
     cls._required_options = set()
     if (all(hasattr(cls, attr) for attr in cls.SPEC_ATTRS) and
         cls.SPEC_TYPE):
@@ -56,10 +61,8 @@ class BaseSpecMetaClass(type):
       _SPEC_REGISTRY[tuple(key)] = cls
 
 
-class BaseSpec(object):
+class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
   """Object decoded from a YAML config."""
-
-  __metaclass__ = BaseSpecMetaClass
   # The name of the spec class that will be extended with auto-registered
   # subclasses.
   SPEC_TYPE = None
@@ -120,7 +123,8 @@ class BaseSpec(object):
     with cls._init_decoders_lock:
       if not cls._decoders:
         constructions = cls._GetOptionDecoderConstructions()
-        for option, decoder_construction in sorted(constructions.iteritems()):
+        for option, decoder_construction in sorted(
+            six.iteritems(constructions)):
           decoder_class, init_args = decoder_construction
           decoder = decoder_class(option=option, **init_args)
           cls._decoders[option] = decoder
@@ -162,16 +166,16 @@ class BaseSpec(object):
       component_full_name: string. Fully qualified name of the configurable
           component containing the config options.
       config: dict mapping option name string to option value.
+      decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
       flag_values: flags.FlagValues. Runtime flags that may override provided
           config option values. These flags have already been applied to the
           current config, but they may be passed to the decoders for propagation
           to deeper spec constructors.
-      decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
     """
-    assert isinstance(decoders, OrderedDict), (
+    assert isinstance(decoders, collections.OrderedDict), (
         'decoders must be an OrderedDict. The order in which options are '
         'decoded must be guaranteed.')
-    for option, decoder in decoders.iteritems():
+    for option, decoder in six.iteritems(decoders):
       if option in config:
         value = decoder.Decode(config[option], component_full_name, flag_values)
       else:

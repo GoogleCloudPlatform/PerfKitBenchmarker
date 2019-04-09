@@ -155,7 +155,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm._Create()
-    self.assertEqual(e.exception.message, stderr)
+    self.assertEqual(str(e.exception), stderr)
 
   def testInstanceStockedOutAfterCreate(self):
     """This tests when run-instances succeeds and returns a pending instance.
@@ -167,7 +167,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm._Exists()
-    self.assertEqual(e.exception.message, 'Server.InsufficientInstanceCapacity:'
+    self.assertEqual(str(e.exception), 'Server.InsufficientInstanceCapacity:'
                      ' Insufficient capacity to satisfy instance request')
 
   def testInstanceDeleted(self):
@@ -204,7 +204,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
          '--instance-market-options={"MarketType": "spot", '
          '"SpotOptions": {"SpotInstanceType": "one-time", '
          '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
-         ]
+        ]
     )
     self.vm.use_spot_instance = False
 
@@ -218,7 +218,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm.use_spot_instance = True
       self.vm._Create()
-    self.assertEqual(e.exception.message, stderr)
+    self.assertEqual(str(e.exception), stderr)
     self.assertEqual(self.vm.spot_status_code,
                      'InsufficientSpotInstanceCapacity')
     self.assertTrue(self.vm.early_termination)
