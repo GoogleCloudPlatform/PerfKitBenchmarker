@@ -100,6 +100,7 @@
 - Added P5 cache type for Azure managed redis.
 - Added AWS elasticache Memcached provider.
 - Added additional options to the stress-ng benchmark.
+- Added support for launching GCE VMs into the standard network tier.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
