@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -123,6 +123,12 @@ flags.DEFINE_string('archive_bucket', None,
                     'Archive results to the given S3/GCS bucket.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
+flags.DEFINE_multi_string(
+    'zone', [],
+    'Similar to the --zones flag, but allows the flag to be specified '
+    'multiple times on the commandline. For example, --zone=a --zone=b is '
+    'equivalent to --zones=a,b. Furthermore, any values specified by --zone '
+    'will be appended to those specfied by --zones.')
 flags.DEFINE_list(
     'zones', [],
     'A list of zones within which to run PerfKitBenchmarker. '
