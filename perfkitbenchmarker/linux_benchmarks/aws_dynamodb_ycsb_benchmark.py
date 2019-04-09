@@ -13,11 +13,14 @@
 # limitations under the License.
 
 """Run YCSB benchmark against AWS DynamoDB.
+
 This benchmark does not provision VMs for the corresponding DynamboDB database.
 The only VM group is client group that sends requests to specifiedDB.
 TODO: add DAX option.
 TODO: add global table option.
 """
+
+import os
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -38,11 +41,6 @@ aws_dynamodb_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-AWS_REMOTE_CRED_DIR = '/tmp/AWSCredentials.properties'
-
-flags.DEFINE_string('aws_dynamodb_ycsb_awscredentials_properties',
-                    './AWSCredentials.properties',
-                    'The AWS credential location. Defaults to PKB top folder')
 flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
                      False,
                      "Consistent reads cost 2x eventual reads. "
@@ -58,23 +56,28 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
+
+  Args:
+    benchmark_config: Unused.
   Raises:
-  perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
+  del benchmark_config
   ycsb.CheckPrerequisites()
 
 
 def Prepare(benchmark_spec):
   """Install YCSB on the target vm.
+
   Args:
-  benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
 
   benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
       table_name='pkb-{0}'.format(FLAGS.run_uri))
-  benchmark_spec.dynamodb_instance._Create()
+  benchmark_spec.dynamodb_instance.Create()
 
   vms = benchmark_spec.vms
   # Install required packages.
@@ -84,16 +87,17 @@ def Prepare(benchmark_spec):
 
 def Run(benchmark_spec):
   """Run YCSB on the target vm.
+
   Args:
-  benchmark_spec: The benchmark specification. Contains all data that is
-  required to run the benchmark.
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
   Returns:
-  A list of sample.Sample objects.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
 
   run_kwargs = {
-      'dynamodb.awsCredentialsFile': AWS_REMOTE_CRED_DIR,
+      'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(vms[0]),
       'dynamodb.primaryKey': FLAGS.aws_dynamodb_primarykey,
       'dynamodb.endpoint': benchmark_spec.dynamodb_instance.GetEndPoint(),
       'table': 'pkb-{0}'.format(FLAGS.run_uri),
@@ -101,9 +105,9 @@ def Run(benchmark_spec):
   if FLAGS.aws_dynamodb_use_sort:
     run_kwargs.update({'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
                        'dynamodb.hashKeyName': FLAGS.aws_dynamodb_primarykey,
-                       'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey, })
+                       'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey})
   if FLAGS.aws_dynamodb_ycsb_consistentReads:
-    run_kwargs.update({'dynamodb.consistentReads': 'true', })
+    run_kwargs.update({'dynamodb.consistentReads': 'true'})
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
@@ -114,18 +118,32 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
   """Cleanup YCSB on the target vm.
+
   Args:
-  benchmark_spec: The benchmark specification. Contains all data that is
-  required to run the benchmark.
+    benchmark_spec: The benchmark specification. Contains all data that is
+    required to run the benchmark.
   """
+  benchmark_spec.dynamodb_instance.Delete()
 
 
-  benchmark_spec.dynamodb_instance._Delete()
+def GetRemoteVMCredentialsFullPath(vm):
+  """Returns the full path for AWS credentials file."""
+  home_dir, _ = vm.RemoteCommand('echo ~')
+  # aws credentials are always located in the 'credentials' directory of .aws
+  # configurations folder
+  # https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+  return os.path.join(home_dir.rstrip('\n'),
+                      FLAGS.aws_credentials_remote_path, 'credentials')
 
 
 def _Install(vm):
   """Install YCSB on client 'vm'."""
   vm.Install('ycsb')
   # copy AWS creds
-  vm.RemoteCopy(FLAGS.aws_dynamodb_ycsb_awscredentials_properties,
-                AWS_REMOTE_CRED_DIR)
+  vm.Install('aws_credentials')
+  # aws credentials file format to ycsb recognized format
+  vm.RemoteCommand('sed -i "s/aws_access_key_id/accessKey/g" {0}'.format(
+      GetRemoteVMCredentialsFullPath(vm)))
+  vm.RemoteCommand('sed -i "s/aws_secret_access_key/secretKey/g" {0}'.format(
+      GetRemoteVMCredentialsFullPath(vm)))
+
