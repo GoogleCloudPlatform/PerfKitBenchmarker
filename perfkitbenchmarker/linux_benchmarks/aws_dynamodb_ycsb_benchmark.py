@@ -146,4 +146,3 @@ def _Install(vm):
       GetRemoteVMCredentialsFullPath(vm)))
   vm.RemoteCommand('sed -i "s/aws_secret_access_key/secretKey/g" {0}'.format(
       GetRemoteVMCredentialsFullPath(vm)))
-
