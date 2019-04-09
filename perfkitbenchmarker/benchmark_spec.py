@@ -339,8 +339,8 @@ class BenchmarkSpec(object):
 
     for _ in range(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
-      if FLAGS.zones or FLAGS.extra_zones:
-        zone_list = FLAGS.zones + FLAGS.extra_zones
+      if FLAGS.zones or FLAGS.extra_zones or FLAGS.zone:
+        zone_list = FLAGS.zones + FLAGS.extra_zones + FLAGS.zone
         group_spec.vm_spec.zone = zone_list[self._zone_index]
         self._zone_index = (self._zone_index + 1
                             if self._zone_index < len(zone_list) - 1 else 0)

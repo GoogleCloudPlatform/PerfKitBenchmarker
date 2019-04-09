@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -184,6 +184,16 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     self.assertEqual(len(spec.vms), 2)
     self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
     self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
+
+  def testZonesFlagWithZoneFlag(self):
+    FLAGS.zones = ['us-east-1b']
+    FLAGS.extra_zones = []
+    FLAGS.zone = ['us-west-2b']
+    spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+    spec.ConstructVirtualMachines()
+    self.assertEqual(len(spec.vms), 2)
+    self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
+    self.assertEqual(spec.vm_groups['group2'][0].zone, 'us-west-2b')
 
 
 class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
