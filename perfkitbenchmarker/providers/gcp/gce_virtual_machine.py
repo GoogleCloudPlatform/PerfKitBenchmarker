@@ -366,6 +366,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
+    self.gce_network_tier = FLAGS.gce_network_tier
 
   @property
   def host_list(self):
@@ -455,6 +456,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     if self.preemptible:
       cmd.flags['preemptible'] = True
+    cmd.flags['network-tier'] = self.gce_network_tier.upper()
+
     return cmd
 
   def _Create(self):
@@ -674,6 +677,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.max_local_disks:
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
+    result['gce_network_tier'] = self.gce_network_tier
     return result
 
   def SimulateMaintenanceEvent(self):
