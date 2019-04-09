@@ -438,3 +438,4 @@
 - Incremental fixes to support Python3.
 - Fix bug in Azure Windows VM names for long run URIs where the name could be
   longer than 15 characters.
+- Update aws dynamodb_ycsb_benchmark to use aws credentials from the runner vm.
