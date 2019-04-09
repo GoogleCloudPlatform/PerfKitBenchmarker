@@ -17,6 +17,10 @@ See perfkitbenchmarker/configs/__init__.py for more information about
 configuration files.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import contextlib
 import os
 
@@ -37,6 +41,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.dpb_service import BaseDpbService
+import six
 
 _DEFAULT_DISK_COUNT = 1
 _DEFAULT_VM_COUNT = 1
@@ -54,8 +59,7 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
 
 
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
-  """Validates the dpb(data processing backend) service dictionary of a
-  benchmark config object."""
+  """Validates the dpb service dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
     super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
@@ -88,6 +92,7 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
 
 class _DpbServiceSpec(spec.BaseSpec):
   """Configurable options of an Distributed Processing Backend Service.
+
     We may add more options here, such as disk specs, as necessary.
     When there are flags for these attributes, the convention is that
     the flag is prefixed with dpb.
@@ -98,7 +103,7 @@ class _DpbServiceSpec(spec.BaseSpec):
       worker_count: the number of workers part of the dpb service
       applications: An enumerated list of applications that need
         to be enabled on the dpb service
-    """
+  """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_DpbServiceSpec, self).__init__(
@@ -800,7 +805,7 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     vm_group_configs = super(_VmGroupsDecoder, self).Decode(
         value, component_full_name, flag_values)
     result = {}
-    for vm_group_name, vm_group_config in vm_group_configs.iteritems():
+    for vm_group_name, vm_group_config in six.iteritems(vm_group_configs):
       result[vm_group_name] = _VmGroupSpec(
           '{0}.{1}'.format(
               self._GetOptionFullName(component_full_name), vm_group_name),
@@ -897,7 +902,7 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
     container_spec_configs = super(_ContainerSpecsDecoder, self).Decode(
         value, component_full_name, flag_values)
     result = {}
-    for spec_name, spec_config in container_spec_configs.iteritems():
+    for spec_name, spec_config in six.iteritems(container_spec_configs):
       result[spec_name] = container_service.ContainerSpec(
           '{0}.{1}'.format(
               self._GetOptionFullName(component_full_name), spec_name),
@@ -1087,7 +1092,7 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
     tpu_group_configs = super(_TpuGroupsDecoder, self).Decode(
         value, component_full_name, flag_values)
     result = {}
-    for tpu_group_name, tpu_group_config in tpu_group_configs.iteritems():
+    for tpu_group_name, tpu_group_config in six.iteritems(tpu_group_configs):
       result[tpu_group_name] = _TpuGroupSpec(
           self._GetOptionFullName(component_full_name),
           tpu_group_name,
@@ -1235,7 +1240,7 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
     app_group_configs = super(_AppGroupsDecoder, self).Decode(
         value, component_full_name, flag_values)
     result = {}
-    for app_group_name, app_group_config in app_group_configs.iteritems():
+    for app_group_name, app_group_config in six.iteritems(app_group_configs):
       result[app_group_name] = _AppGroupSpec(
           '{0}.{1}'.format(
               self._GetOptionFullName(component_full_name), app_group_name),
@@ -1377,7 +1382,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     super(BenchmarkConfigSpec, self).__init__(component_full_name, **kwargs)
     if expected_os_types is not None:
       mismatched_os_types = []
-      for group_name, group_spec in sorted(self.vm_groups.iteritems()):
+      for group_name, group_spec in sorted(six.iteritems(self.vm_groups)):
         if group_spec.os_type not in expected_os_types:
           mismatched_os_types.append('{0}.vm_groups[{1}].os_type: {2}'.format(
               component_full_name, repr(group_name), repr(group_spec.os_type)))

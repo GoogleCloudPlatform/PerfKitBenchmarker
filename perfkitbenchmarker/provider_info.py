@@ -19,6 +19,12 @@ used for IsBenchmarkSupported
 
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+import six
+
+
 _PROVIDER_INFO_REGISTRY = {}
 
 
@@ -36,9 +42,8 @@ class AutoRegisterProviderInfoMeta(type):
       _PROVIDER_INFO_REGISTRY[cls.CLOUD] = cls
 
 
-class BaseProviderInfo():
+class BaseProviderInfo(six.with_metaclass(AutoRegisterProviderInfoMeta)):
   """Class that holds provider-related data."""
-  __metaclass__ = AutoRegisterProviderInfoMeta
 
   CLOUD = None
 

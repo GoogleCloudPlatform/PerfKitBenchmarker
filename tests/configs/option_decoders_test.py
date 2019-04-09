@@ -17,7 +17,7 @@ import unittest
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
-
+import six
 
 _COMPONENT = 'test_component'
 _FLAGS = None
@@ -199,7 +199,8 @@ class StringDecoderTestCase(unittest.TestCase):
       decoder.Decode(5, _COMPONENT, _FLAGS)
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.test_option value: "5" (of type "int"). '
-        'Value must be one of the following types: basestring.'))
+        'Value must be one of the following types: %s.' %
+        six.string_types[0].__name__))
 
   def testValidString(self):
     decoder = option_decoders.StringDecoder(option=_OPTION)

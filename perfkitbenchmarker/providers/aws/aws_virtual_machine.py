@@ -18,9 +18,12 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import base64
 import collections
-from collections import OrderedDict
 import json
 import logging
 import posixpath
@@ -41,6 +44,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -201,8 +205,8 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
 
   if (machine_type in NUM_LOCAL_VOLUMES and
       not aws_disk.LocalDriveIsNvme(machine_type)):
-    for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
-      od = OrderedDict()
+    for i in range(NUM_LOCAL_VOLUMES[machine_type]):
+      od = collections.OrderedDict()
       od['VirtualName'] = 'ephemeral%s' % i
       od['DeviceName'] = '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
       mappings.append(od)
@@ -640,8 +644,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--capacity-reservation-specification=CapacityReservationTarget='
           '{CapacityReservationId=%s}' % self.capacity_reservation_id)
     if self.use_spot_instance:
-      instance_market_options = OrderedDict()
-      spot_options = OrderedDict()
+      instance_market_options = collections.OrderedDict()
+      spot_options = collections.OrderedDict()
       spot_options['SpotInstanceType'] = 'one-time'
       spot_options['InstanceInterruptionBehavior'] = 'terminate'
       if self.spot_price:

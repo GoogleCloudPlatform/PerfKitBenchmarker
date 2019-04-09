@@ -13,8 +13,8 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
-import mock
 import unittest
+import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -26,10 +26,10 @@ from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.providers.gcp import util
-from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 from tests import pkb_common_test_case
 
 
@@ -204,7 +204,7 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
     return True
 
   def testBenchmarkSupportFlag(self):
-    """ Test the benchmark_compatibility_checking flag
+    """Test the benchmark_compatibility_checking flag.
 
     We use Kubernetes as our test cloud platform because it has
     supported benchmarks (IsBenchmarkSupported returns true)
