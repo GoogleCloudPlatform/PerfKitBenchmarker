@@ -183,29 +183,28 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm.use_spot_instance = True
     self.vm._Create()
 
-    vm_util.IssueCommand.assert_called_with(
-        ['aws',
-         '--output',
-         'json',
-         'ec2',
-         'run-instances',
-         '--region=us-east-1',
-         '--subnet-id=subnet-id',
-         '--associate-public-ip-address',
-         '--client-token=00000000-1111-2222-3333-444444444444',
-         '--image-id=ami-12345',
-         '--instance-type=c3.large',
-         '--key-name=perfkit-key-aaaaaa',
-         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
-         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
-         '"DeviceName": "/dev/xvdc"}]',
-         '--placement=AvailabilityZone=us-east-1a,'
-         'GroupName=placement_group_name',
-         '--instance-market-options={"MarketType": "spot", '
-         '"SpotOptions": {"SpotInstanceType": "one-time", '
-         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
-        ]
-    )
+    vm_util.IssueCommand.assert_called_with([
+        'aws',
+        '--output',
+        'json',
+        'ec2',
+        'run-instances',
+        '--region=us-east-1',
+        '--subnet-id=subnet-id',
+        '--associate-public-ip-address',
+        '--client-token=00000000-1111-2222-3333-444444444444',
+        '--image-id=ami-12345',
+        '--instance-type=c3.large',
+        '--key-name=perfkit-key-aaaaaa',
+        '--block-device-mappings=[{"VirtualName": "ephemeral0", '
+        '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
+        '"DeviceName": "/dev/xvdc"}]',
+        '--placement=AvailabilityZone=us-east-1a,'
+        'GroupName=placement_group_name',
+        '--instance-market-options={"MarketType": "spot", '
+        '"SpotOptions": {"SpotInstanceType": "one-time", '
+        '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
+    ])
     self.vm.use_spot_instance = False
 
   def testCreateSpotFailure(self):
