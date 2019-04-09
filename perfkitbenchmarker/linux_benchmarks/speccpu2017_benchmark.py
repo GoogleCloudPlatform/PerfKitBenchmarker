@@ -145,6 +145,11 @@ def Prepare(benchmark_spec):
   install_config.runspec_config = benchmark_spec.config.speccpu.runspec_config
   speccpu.InstallSPECCPU(vm, install_config)
   vm.Install('speccpu2017_dependencies')
+  # spec17 tarball comes pre-packages with runner scripts for x86 architecture.
+  # But because we may have x86 or arm architecture machines, just rerun the
+  # install script to regenerate the runner scripts based on what spec detects
+  # to be the vm architecture.
+  vm.RemoteCommand('echo yes | /scratch/cpu2017/install.sh')
 
 
 def Run(benchmark_spec):
