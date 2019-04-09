@@ -271,6 +271,8 @@
   255 error code.
 - Added --num_benchmark_copies which controls the number of copies of each
   configuration to run.
+- Added --zone multistring flag as an additional way to specify zones. It can be
+  used in conjunction with the --zones flag.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
