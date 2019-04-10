@@ -631,8 +631,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.Issue()
 
     cmd = util.GcloudCommand(
-        self, 'compute', 'disks', 'add-labels',
-        '--labels={}'.format(util.MakeFormattedDefaultTags()), self.name)
+        self, 'compute', 'disks', 'add-labels', self.name)
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
