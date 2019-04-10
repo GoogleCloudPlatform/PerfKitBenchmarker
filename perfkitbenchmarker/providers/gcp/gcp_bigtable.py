@@ -47,7 +47,7 @@ class GcpBigtableInstance(resource.BaseResource):
     """Creates the instance."""
     cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'create',
                              self.name)
-    cmd.flags['description'] = 'PkbCreatedCluster'
+    cmd.flags['display-name'] = self.name
     cmd.flags['cluster'] = self.name
     cmd.flags['cluster-num-nodes'] = str(self.num_nodes)
     cmd.flags['cluster-zone'] = self.zone
