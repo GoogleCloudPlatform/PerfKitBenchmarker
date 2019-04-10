@@ -268,12 +268,13 @@
 - Added option to use real training data to the Horovod benchmark.
 - Added support to record individual latency samples in the object_storage_service
   benchmark using the flag --record_individual_latency_samples.
-- Added '--ssh_retries' to adjust the number of times we retry for errors with a
+- Added `--ssh_retries` to adjust the number of times we retry for errors with a
   255 error code.
-- Added --num_benchmark_copies which controls the number of copies of each
+- Added `--num_benchmark_copies` which controls the number of copies of each
   configuration to run.
-- Added --zone multistring flag as an additional way to specify zones. It can be
-  used in conjunction with the --zones flag.
+- Added `--zone multistring` flag as an additional way to specify zones. It can be
+  used in conjunction with the `--zones` flag.
+- Added `--before_cleanup_pause` to ease debugging.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
