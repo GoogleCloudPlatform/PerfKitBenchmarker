@@ -100,6 +100,7 @@
 - Added P5 cache type for Azure managed redis.
 - Added AWS elasticache Memcached provider.
 - Added additional options to the stress-ng benchmark.
+- Added support for launching GCE VMs into the standard network tier.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -271,6 +272,8 @@
   255 error code.
 - Added --num_benchmark_copies which controls the number of copies of each
   configuration to run.
+- Added --zone multistring flag as an additional way to specify zones. It can be
+  used in conjunction with the --zones flag.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -435,3 +438,4 @@
 - Incremental fixes to support Python3.
 - Fix bug in Azure Windows VM names for long run URIs where the name could be
   longer than 15 characters.
+- Update aws dynamodb_ycsb_benchmark to use aws credentials from the runner vm.

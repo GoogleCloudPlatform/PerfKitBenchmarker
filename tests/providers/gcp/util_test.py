@@ -114,6 +114,9 @@ class GcloudCommandTestCase(unittest.TestCase):
                                      '--format', 'json', '--quiet'])
     self.assertEqual(return_value, mock_issue_return_value)
 
+  def testGetRegionFromZone(self):
+    zone = 'us-central1-xyz'
+    self.assertEqual(util.GetRegionFromZone(zone), 'us-central1')
 
 if __name__ == '__main__':
   unittest.main()

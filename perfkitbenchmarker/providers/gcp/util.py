@@ -51,7 +51,19 @@ def GetDefaultUser():
 
 
 def GetRegionFromZone(zone):
-  return zone[:-2]
+  """Returns the region name from a fully-qualified zone name.
+
+  Each fully-qualified GCP zone name is formatted as <region>-<zone> where, for
+  example, each region looks like us-central1, europe-west1, or asia-east1.
+  Therefore, we pull the first two parts the fully qualified zone name delimited
+  by a dash and assume the rest is the name of the zone. See
+  https://cloud.google.com/compute/docs/regions-zones for more information.
+
+  Args:
+    zone: The fully-qualified name of a GCP zone.
+  """
+  parts = zone.split('-')
+  return '-'.join(parts[:2])
 
 
 def GetMultiRegionFromRegion(region):

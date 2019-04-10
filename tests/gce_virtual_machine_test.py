@@ -460,6 +460,18 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('--image-project bar', cmd)
 
+  def testNetworkTierFlagPremium(self):
+    """Tests that the premium network tier flag is supported."""
+    cmd, call_count = self._CreateVmCommand(gce_network_tier='premium')
+    self.assertEqual(call_count, 1)
+    self.assertIn('--network-tier PREMIUM', cmd)
+
+  def testNetworkTierFlagStandard(self):
+    """Tests that the standard network tier flag is supported."""
+    cmd, call_count = self._CreateVmCommand(gce_network_tier='standard')
+    self.assertEqual(call_count, 1)
+    self.assertIn('--network-tier STANDARD', cmd)
+
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(
         gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')
