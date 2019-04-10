@@ -14,6 +14,10 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import json
 import re
@@ -24,6 +28,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+import six
 
 AWS_PATH = 'aws'
 AWS_PREFIX = [AWS_PATH, '--output', 'json']
@@ -109,7 +114,7 @@ def FormatTags(tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag' parameter.
   """
-  return ['Key=%s,Value=%s' % (k, v) for k, v in tags_dict.iteritems()]
+  return ['Key=%s,Value=%s' % (k, v) for k, v in six.iteritems(tags_dict)]
 
 
 def AddTags(resource_id, region, **kwargs):
