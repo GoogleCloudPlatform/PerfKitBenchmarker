@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for HPCC benchmark."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import unittest
 
@@ -20,6 +24,7 @@ import mock
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
 from tests import pkb_common_test_case
+import six
 
 FLAGS = flags.FLAGS
 
@@ -35,7 +40,7 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def assertContainsSubDict(self, super_dict, sub_dict):
     """Asserts that every item in sub_dict is in super_dict."""
-    for key, value in sub_dict.iteritems():
+    for key, value in six.iteritems(sub_dict):
       self.assertEqual(super_dict[key], value)
 
   def testParseHpccValues(self):
@@ -103,7 +108,7 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     samples = hpcc_benchmark.ParseOutput(self.contents, benchmark_spec)
     self.assertEqual(46, len(samples))
     results = {metric: metadata for metric, _, _, metadata, _ in samples}
-    for metadata in results.itervalues():
+    for metadata in six.itervalues(results):
       self.assertEqual(metadata['hpcc_math_library'], 'openblas')
       self.assertEqual(metadata['hpcc_version'], '1.5.0')
 

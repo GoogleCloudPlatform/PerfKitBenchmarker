@@ -13,11 +13,10 @@
 # limitations under the License.
 
 import logging
-import yaml
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -26,7 +25,7 @@ def GetStaticPipelineOptions(options_list):
   """
   Takes the dictionary loaded from the yaml configuration file and returns it
   in a form consistent with the others in GenerateAllPipelineOptions: a list of
-  (pipeline_option_name, pipline_option_value) tuples.
+  (pipeline_option_name, pipeline_option_value) tuples.
 
   The options in the options_list are a dict:
     Key is the name of the pipeline option to pass to beam
@@ -34,10 +33,10 @@ def GetStaticPipelineOptions(options_list):
   """
   options = []
   for option in options_list:
-    if not len(option.keys()) == 1:
+    if len(list(option.keys())) != 1:
       raise Exception('Each item in static_pipeline_options should only have'
                       ' 1 key/value')
-    option_kv = option.items()[0]
+    option_kv = list(option.items())[0]
     options.append((option_kv[0], option_kv[1]))
   return options
 
@@ -93,7 +92,6 @@ def GenerateAllPipelineOptions(it_args, it_options, static_pipeline_options,
     user_option_list = it_options.rstrip(']').lstrip('[').split(',')
     user_option_list = [option.rstrip('" ').lstrip('" ')
                         for option in user_option_list]
-
 
   # Add static options from the benchmark_spec
   benchmark_spec_option_list = (

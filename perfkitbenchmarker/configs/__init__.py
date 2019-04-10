@@ -62,6 +62,9 @@ VM specs, disk specs, or any component of the benchmark configuration
 dictionary.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import copy
 import logging
 import re
@@ -248,7 +251,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
   def _Merge(d1, d2):
     """Merge two nested dicts."""
     merged_dict = copy.deepcopy(d1)
-    for k, v in d2.iteritems():
+    for k, v in six.iteritems(d2):
       if k not in d1:
         merged_dict[k] = copy.deepcopy(v)
         if warn_new_key:

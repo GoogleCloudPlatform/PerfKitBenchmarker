@@ -21,6 +21,9 @@ Runs TCP_STREAM and TCP_MAERTS benchmark from netperf between several machines
 to fully saturate the NIC on the primary vm.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import csv
 import io
 import json
@@ -32,6 +35,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
+from six.moves import range
 
 flags.DEFINE_list('bidirectional_network_tests',
                   ['TCP_STREAM', 'TCP_MAERTS', 'TCP_MAERTS'],
@@ -290,7 +294,7 @@ def Run(benchmark_spec):
   test_results = [None] * num_tests
 
   args = [((vms[0], vms[i + 1], FLAGS.bidirectional_network_tests[i],
-            num_streams, i, test_results), {}) for i in xrange(num_tests)]
+            num_streams, i, test_results), {}) for i in range(num_tests)]
 
   vm_util.RunThreaded(RunNetperf, args, num_tests)
 
