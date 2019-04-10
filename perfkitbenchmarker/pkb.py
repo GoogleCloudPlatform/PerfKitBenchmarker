@@ -326,6 +326,10 @@ flags.DEFINE_integer(
     'after_run_sleep_time', 0,
     'The time in seconds to sleep after the run phase. This can be useful '
     'for letting the VM sit idle after the bechmarking phase is complete.')
+flags.DEFINE_bool(
+    'before_cleanup_pause', False,
+    'If true, wait for command line input before executing the cleanup phase. '
+    'This is useful for debugging benchmarks during development.')
 flags.DEFINE_integer(
     'timeout_minutes', 240,
     'An upper bound on the time in minutes that the benchmark is expected to '
@@ -649,6 +653,8 @@ def DoCleanupPhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Cleanup function.
   """
+  if FLAGS.before_cleanup_pause:
+    raw_input('Hit enter to begin cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
@@ -959,7 +965,7 @@ def SetUpPKB():
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
       raise errors.Setup.MissingExecutableError(
-          'Could not find required executable "%s"', executable)
+          'Could not find required executable "%s"' % executable)
 
   # Check mutually exclusive flags
   if FLAGS.run_stage_iterations > 1 and FLAGS.run_stage_time > 0:
