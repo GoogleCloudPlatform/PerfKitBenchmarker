@@ -29,6 +29,10 @@ category:
   c: Single stream large object upload and download, measures throughput.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import datetime
 import glob
 import json
@@ -54,6 +58,9 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
+import six
+from six.moves import range
+from six.moves import zip
 
 flags.DEFINE_enum('storage', providers.GCP,
                   [providers.GCP, providers.AWS,
@@ -426,22 +433,22 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
   # following Python's [inclusive, exclusive) index convention.
   active_start_indexes = []
   for start_time in start_times:
-    for i in xrange(len(start_time)):
+    for i in range(len(start_time)):
       if start_time[i] >= last_start_time:
         active_start_indexes.append(i)
         break
   active_stop_indexes = []
   for stop_time in stop_times:
-    for i in xrange(len(stop_time) - 1, -1, -1):
+    for i in range(len(stop_time) - 1, -1, -1):
       if stop_time[i] <= first_stop_time:
         active_stop_indexes.append(i + 1)
         break
   active_latencies = [
       latencies[i][active_start_indexes[i]:active_stop_indexes[i]]
-      for i in xrange(num_streams)]
+      for i in range(num_streams)]
   active_sizes = [
       sizes[i][active_start_indexes[i]:active_stop_indexes[i]]
-      for i in xrange(num_streams)]
+      for i in range(num_streams)]
 
   all_active_latencies = np.concatenate(active_latencies)
   all_active_sizes = np.concatenate(active_sizes)
@@ -515,7 +522,7 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
   total_active_times = [np.sum(latency) for latency in active_latencies]
   active_durations = [stop_times[i][active_stop_indexes[i] - 1] -
                       start_times[i][active_start_indexes[i]]
-                      for i in xrange(num_streams)]
+                      for i in range(num_streams)]
   total_active_sizes = [np.sum(size) for size in active_sizes]
   # 'net throughput (with gap)' is computed by taking the throughput
   # for each stream (total # of bytes transmitted / (stop_time -
@@ -585,7 +592,7 @@ def _DistributionToBackendFormat(dist):
   if isinstance(dist, dict):
     val = {flag_util.StringToBytes(size):
            flag_util.StringToRawPercent(frequency)
-           for size, frequency in dist.iteritems()}
+           for size, frequency in six.iteritems(dist)}
   else:
     # We allow compact notation for point distributions. For instance,
     # '1KB' is an abbreviation for '{1KB: 100%}'.
@@ -595,7 +602,7 @@ def _DistributionToBackendFormat(dist):
   # with integer percentages. If we want to allow general decimal
   # percentages, all we have to do is replace this equality check with
   # approximate equality.
-  if sum(val.itervalues()) != 100.0:
+  if sum(six.itervalues(val)) != 100.0:
     raise ValueError("Frequencies in %s don't add to 100%%!" % dist)
 
   return val
@@ -877,7 +884,7 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
   # Each vm/process has a thread managing it.
   threads = [
       threading.Thread(target=RunOneProcess, args=(vm_idx,))
-      for vm_idx in xrange(len(vms))]
+      for vm_idx in range(len(vms))]
   for thread in threads:
     thread.start()
   logging.info('Started %s processes.', len(vms))
@@ -990,7 +997,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
     with open(FLAGS.object_storage_worker_output, 'w') as out_file:
       out_file.write(json.dumps(output))
   _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
-                             list(size_distribution.iterkeys()), results,
+                             list(six.iterkeys(size_distribution)), results,
                              metadata=metadata)
 
   # Write the objects written file if the flag is set and this is an upload
@@ -1120,8 +1127,8 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
       vm.PushFile(tmp_objects_written_path,
                   posixpath.join(vm_util.VM_TMP_DIR, OBJECTS_WRITTEN_FILE))
   except Exception as e:
-    raise Exception("Failed to upload the objects written files to the VMs: "
-                    "%s" % e)
+    raise Exception('Failed to upload the objects written files to the VMs: '
+                    '%s' % e)
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
                      bucket_name, 'download')

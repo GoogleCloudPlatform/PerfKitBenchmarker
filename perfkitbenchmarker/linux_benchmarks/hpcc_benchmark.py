@@ -38,6 +38,10 @@ http://www.advancedclustering.com/faq/how-do-i-tune-my-hpldat-file.html
 http://www.netlib.org/benchmark/hpl/faqs.html
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import math
 
@@ -51,6 +55,8 @@ from perfkitbenchmarker.linux_packages import hpcc
 from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import openblas
 from perfkitbenchmarker.linux_packages import openmpi
+import six
+from six.moves import range
 
 FLAGS = flags.FLAGS
 HPCCINF_FILE = 'hpccinf.txt'
@@ -133,7 +139,7 @@ def CreateHpccinf(vm, benchmark_spec):
   sqrt_cpus = int(math.sqrt(total_cpus)) + 1
   num_rows = 0
   num_columns = 0
-  for i in reversed(range(sqrt_cpus)):
+  for i in reversed(list(range(sqrt_cpus))):
     if total_cpus % i == 0:
       num_rows = i
       num_columns = total_cpus / i
@@ -231,7 +237,7 @@ def ParseOutput(hpcc_output, benchmark_spec):
   # benchmark from the metric_values map.
   benchmarks_run = FLAGS.hpcc_benchmarks or hpcc.HPCC_METRIC_MAP
   for benchmark in benchmarks_run:
-    for metric, units in hpcc.HPCC_METRIC_MAP[benchmark].iteritems():
+    for metric, units in six.iteritems(hpcc.HPCC_METRIC_MAP[benchmark]):
       value = metric_values[metric]
 
       # Copy metadata reported in the HPCC summary statistics to the metadata.

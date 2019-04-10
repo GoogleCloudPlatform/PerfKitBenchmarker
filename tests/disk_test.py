@@ -13,6 +13,10 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.disk."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 import mock
 
@@ -20,6 +24,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from tests import pkb_common_test_case
+import six
 
 FLAGS = flags.FLAGS
 
@@ -169,7 +174,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
                      self.MountOptionsAsDict(nfs_disk.mount_options))
     self.assertEqual(nfs_disk.mount_options, nfs_disk.fstab_options)
     disk_meta = {}
-    for key, value in self.MountOptions().iteritems():
+    for key, value in six.iteritems(self.MountOptions()):
       disk_meta['nfs_{}'.format(key)] = value
     disk_meta.update({'num_stripes': 1, 'size': None, 'type': None})
     self.assertEqual(disk_meta, nfs_disk.metadata)

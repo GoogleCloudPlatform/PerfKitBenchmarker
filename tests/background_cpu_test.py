@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for background cpu workload """
+"""Tests for background cpu workload."""
 
-import itertools
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 import contextlib2
@@ -27,9 +30,11 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+import six
+from six.moves import zip_longest
 
 FLAGS = flags.FLAGS
 
@@ -84,14 +89,15 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
                             for group in working_groups}
     expected_call_counts.update({group: non_working_expected_counts
                                  for group in non_working_groups})
-    for group_name, vm_expected_call_counts in expected_call_counts.iteritems():
+    for group_name, vm_expected_call_counts in six.iteritems(
+        expected_call_counts):
       group_vms = spec.vm_groups[group_name]
       self.assertEqual(len(group_vms), 1,
                        msg='VM group "{0}" had {1} VMs'.format(group_name,
                                                                len(group_vms)))
       vm = group_vms[0]
-      iter_mocked_functions = itertools.izip_longest(_MOCKED_VM_FUNCTIONS,
-                                                     vm_expected_call_counts)
+      iter_mocked_functions = zip_longest(_MOCKED_VM_FUNCTIONS,
+                                          vm_expected_call_counts)
       for function_name, expected_call_count in iter_mocked_functions:
         call_count = getattr(vm, function_name).call_count
         self.assertEqual(call_count, expected_call_count, msg=(
@@ -118,7 +124,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
       self._CheckVmCallCounts(spec, working, (1, 2), non_working, (0, 0))
 
   def testWindowsVMCausesError(self):
-    """ windows vm with background_cpu_threads raises exception """
+    """windows vm with background_cpu_threads raises exception."""
     FLAGS['background_cpu_threads'].parse(1)
     FLAGS['os_type'].parse(os_types.WINDOWS)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
@@ -131,14 +137,14 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
       spec.StopBackgroundWorkload()
 
   def testBackgroundWorkloadVM(self):
-    """ Check that the background_cpu_threads causes calls """
+    """Check that the background_cpu_threads causes calls."""
     FLAGS['background_cpu_threads'].parse(1)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfig(self):
-    """ Test that nothing happens with the vanilla config """
+    """Test that nothing happens with the vanilla config."""
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     for vm in spec.vms:
@@ -147,7 +153,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     self._CheckVMFromSpec(spec, non_working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadWindows(self):
-    """ Test that nothing happens with the vanilla config """
+    """Test that nothing happens with the vanilla config."""
     FLAGS['os_type'].parse(os_types.WINDOWS)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
@@ -157,7 +163,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     self._CheckVMFromSpec(spec, non_working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
-    """ Check that the background_cpu_threads flags overrides the config """
+    """Check that the background_cpu_threads flags overrides the config."""
     FLAGS['background_cpu_threads'].parse(2)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
@@ -166,7 +172,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadConfig(self):
-    """ Check that the config can be used to set background_cpu_threads """
+    """Check that the config can be used to set background_cpu_threads."""
     spec = self._CreateBenchmarkSpec(CONFIG_WITH_BACKGROUND_CPU)
     spec.ConstructVirtualMachines()
     for vm in spec.vm_groups[_GROUP_1]:
