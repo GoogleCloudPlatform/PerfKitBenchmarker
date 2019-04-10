@@ -31,8 +31,3 @@ def Install(vm):
       INSTALL_DIR, OPENMP_TAR_URL, OPENMP_TAR))
   vm.RemoteCommand('sudo apt-get install libjemalloc1 libjemalloc-dev')
   vm.RemoteCommand('sudo apt-get update && sudo apt-get install -y libomp-dev')
-  # spec tarball comes pre-packages with runner scripts for x86 architecture.
-  # But because we may have x86 or arm architecture machines, just rerun the
-  # install script to regenerate the runner scripts based on what spec detects
-  # to be the vm architecture.
-  vm.RemoteCommand('echo yes | /scratch/cpu2017/install.sh')

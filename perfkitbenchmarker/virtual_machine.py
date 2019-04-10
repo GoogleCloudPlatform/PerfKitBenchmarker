@@ -18,6 +18,10 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import os.path
 import threading
@@ -37,6 +41,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+import six
 
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
@@ -572,7 +577,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.LogVmDebugInfo()
 
 
-class BaseOsMixin(object):
+class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   """The base class for OS Mixin classes.
 
   This class holds VM methods and attributes relating to the VM's guest OS.
@@ -585,8 +590,6 @@ class BaseOsMixin(object):
     remote_access_ports: A list of ports which must be opened on the firewall
         in order to access the VM.
   """
-
-  __metaclass__ = abc.ABCMeta
   OS_TYPE = None
   BASE_OS_TYPE = None
 
@@ -637,7 +640,7 @@ class BaseOsMixin(object):
       ignore_failure: Ignore any failure if set to true.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
-      timeout is the time to wait in seconds for the command before exiting.
+      timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
 
     Returns:
