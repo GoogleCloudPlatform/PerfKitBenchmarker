@@ -1,0 +1,48 @@
+flags:
+  cloud: GCP
+  zones: europe-west4-b
+  machine_type: n1-standard-4
+
+boot_time:
+  name: cluster_boot
+  flag_zip_defs:
+    default: {}
+
+compute:
+  name: stress_ng
+  flags:
+    stress_ng_duration: 5
+    stress_ng_calc_geomean: True
+    stress_ng_custom_stressors: bsearch,malloc,matrix,mergesort,str,vecmath,zlib
+    run_stage_iterations: 2
+  flag_zip_defs:
+    default:
+      machine_type: [n1-standard-4, c2-standard-4]
+      gcp_min_cpu_platform: [skylake, none]
+
+memory:
+  name: multichase
+  flags:
+    multichase_stride_size_min: "512 bytes"
+    multichase_stride_size_max: "512 bytes"
+    multichase_thread_count: 1
+    multichase_memory_size_min: '4GiB'
+    multichase_memory_size_max: '4GiB'
+    multichase_additional_flags: '-T 4g'
+    enable_transparent_hugepages: True
+  flag_zip_defs:
+    default:
+      machine_type: [n1-standard-4, c2-standard-4]
+      gcp_min_cpu_platform: [skylake, none]
+
+networking:
+  name: netperf
+  flags:
+    ip_addresses: INTERNAL
+    netperf_benchmarks: TCP_RR
+    netperf_histogram_buckets: 1000
+  flag_zip_defs:
+    default:
+      machine_type: [n1-standard-4, c2-standard-4]
+      gcp_min_cpu_platform: [skylake, none]
+
