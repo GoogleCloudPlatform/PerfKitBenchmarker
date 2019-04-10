@@ -13,10 +13,15 @@
 # limitations under the License.
 """Utilities for working with OpenStack Cloud resources."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from collections import OrderedDict
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+import six
 
 FLAGS = flags.FLAGS
 
@@ -63,7 +68,7 @@ class OpenStackCLICommand(object):
     """
     cmd = [FLAGS.openstack_cli_path]
     cmd.extend(self.args)
-    for flag_name, values in self.flags.iteritems():
+    for flag_name, values in six.iteritems(self.flags):
       flag_name_str = '--%s' % flag_name
       if values is True:
         cmd.append(flag_name_str)
