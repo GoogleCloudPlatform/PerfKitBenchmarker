@@ -14,8 +14,12 @@
 
 """Module containing classes for background workloads."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
+import six
 
 BACKGROUND_WORKLOADS = []
 
@@ -31,9 +35,9 @@ class AutoRegisterBackgroundWorkloadMeta(type):
     BACKGROUND_WORKLOADS.append(cls)
 
 
-class BaseBackgroundWorkload(object):
+class BaseBackgroundWorkload(
+    six.with_metaclass(AutoRegisterBackgroundWorkloadMeta, object)):
   """Baseclass for background workloads."""
-  __metaclass__ = AutoRegisterBackgroundWorkloadMeta
 
   EXCLUDED_OS_TYPES = []
 

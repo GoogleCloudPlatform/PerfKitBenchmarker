@@ -17,6 +17,10 @@
 Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import logging
 
@@ -24,6 +28,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+import six
 
 flags.DEFINE_boolean('nfs_timeout_hard', True,
                      'Whether to use hard or soft for NFS mount.')
@@ -171,7 +176,7 @@ def WarnAndTranslateDiskFlags():
   """Translate old disk-related flags to new disk-related flags.
   """
 
-  for old, new in DISK_FLAGS_TO_TRANSLATE.iteritems():
+  for old, new in six.iteritems(DISK_FLAGS_TO_TRANSLATE):
     WarnAndCopyFlag(old, new)
 
 
@@ -446,7 +451,7 @@ class NetworkDisk(BaseDisk):
   def mount_options(self):
     opts = []
     for key, value in sorted(
-        self._GetNetworkDiskMountOptionsDict().iteritems()):
+        six.iteritems(self._GetNetworkDiskMountOptionsDict())):
       opts.append('%s' % key if value is None else '%s=%s' % (key, value))
     return ','.join(opts)
 
@@ -490,7 +495,7 @@ class NfsDisk(NetworkDisk):
     self.nfs_timeout = disk_spec.nfs_timeout
     self.nfs_retries = disk_spec.nfs_retries
     self.device_path = remote_mount_address
-    for key, value in self._GetNetworkDiskMountOptionsDict().iteritems():
+    for key, value in six.iteritems(self._GetNetworkDiskMountOptionsDict()):
       self.metadata['nfs_{}'.format(key)] = value
     if nfs_tier:
       self.metadata['nfs_tier'] = nfs_tier

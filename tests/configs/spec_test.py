@@ -13,12 +13,17 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.configs.spec."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 import mock
 
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from six.moves import range
 
 
 _COMPONENT = 'test_component'
