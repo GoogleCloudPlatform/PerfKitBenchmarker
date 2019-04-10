@@ -33,6 +33,7 @@ from perfkitbenchmarker.providers.aws import aws_nfs_service
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
+import six
 
 FLAGS = flags.FLAGS
 
@@ -136,7 +137,7 @@ class BaseTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['aws_delete_file_system'].parse(True)
     FLAGS['efs_throughput_mode'].parse(_THROUGHPUT_MODE)
     FLAGS['efs_provisioned_throughput'].parse(_PROVISIONED_THROUGHPUT)
-    for key, value in kwargs.iteritems():
+    for key, value in six.iteritems(kwargs):
       FLAGS[key].parse(value)
 
   def _CreatePatched(self, module, method_name):

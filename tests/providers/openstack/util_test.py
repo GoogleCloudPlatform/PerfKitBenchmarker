@@ -11,13 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.rackspace.util"""
+"""Tests for perfkitbenchmarker.providers.rackspace.util."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import unittest
 import mock
 
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.openstack import utils
+import six
 
 
 _OPENSTACK_CLI_PATH = 'path/openstack'
@@ -26,7 +31,7 @@ _OPENSTACK_CLI_PATH = 'path/openstack'
 class OpenStackResource(resource.BaseResource):
 
   def __init__(self, **kwargs):
-    for k, v in kwargs.iteritems():
+    for k, v in six.iteritems(kwargs):
       setattr(self, k, v)
 
   def _Create(self):
