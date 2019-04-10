@@ -143,7 +143,7 @@ def RunAct(vm, load, index=None):
       'cd {0} ; ./analysis/act_latency.py -n 7 -e 1 -x -l ~/{1}; exit 0'.format(
           ACT_DIR, output), ignore_failure=True)
   samples = ParseRunAct(out)
-  last_output_block, _ = vm.RemoteCommand('tail -n 20 ~/{0}'.format(output))
+  last_output_block, _ = vm.RemoteCommand('tail -n 100 ~/{0}'.format(output))
 
   # Early termination.
   if 'drive(s) can\'t keep up - test stopped' in last_output_block:
