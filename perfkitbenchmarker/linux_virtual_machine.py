@@ -348,20 +348,32 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           'dd if=/dev/zero of={out_file} bs=1G count={fill_size}'.format(
               out_file=out_file, fill_size=FLAGS.disk_fill_size))
 
-  def ApplySysctlPersistent(self, key, value):
-    """Apply "key=value" pair to /etc/sysctl.conf and reboot.
+  def _ApplySysctlPersistent(self, sysctl_params):
+    """Apply "key=value" pairs to /etc/sysctl.conf and mark the VM for reboot.
 
     The reboot ensures the values take effect and remain persistent across
     future reboots.
 
     Args:
-      key: a string - the key to write as part of the pair
-      value: a string - the value to write as part of the pair
+      sysctl_params: dict - the keys and values to write
     """
-    self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
-                       % (key, value))
+    for key, value in sysctl_params.items():
+      self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
+                         % (key, value))
 
     self._needs_reboot = True
+
+  def ApplySysctlPersistent(self, sysctl_params):
+    """Apply "key=value" pairs to /etc/sysctl.conf and reboot immediately.
+
+    The reboot ensures the values take effect and remain persistent across
+    future reboots.
+
+    Args:
+      sysctl_params: dict - the keys and values to write
+    """
+    self._ApplySysctlPersistent(sysctl_params)
+    self._RebootIfNecessary()
 
   def DoSysctls(self):
     """Apply --sysctl to the VM.
@@ -369,9 +381,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
        The Sysctl pairs are written persistently so that if a reboot
        occurs, the flags are not lost.
     """
+    sysctl_params = {}
     for pair in FLAGS.sysctl:
       key, value = pair.split('=')
-      self.ApplySysctlPersistent(key, value)
+      sysctl_params[key] = value
+    self._ApplySysctlPersistent(sysctl_params)
 
   def DoConfigureNetworkForBBR(self):
     """Apply --network_enable_BBR to the VM."""
@@ -387,8 +401,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if self.TcpCongestionControl() == 'bbr':
       return
 
-    self.ApplySysctlPersistent('net.core.default_qdisc', 'fq')
-    self.ApplySysctlPersistent('net.ipv4.tcp_congestion_control', 'bbr')
+    self._ApplySysctlPersistent({
+        'net.core.default_qdisc': 'fq',
+        'net.ipv4.tcp_congestion_control': 'bbr'
+    })
 
   def _RebootIfNecessary(self):
     """Will reboot the VM if self._needs_reboot has been set."""
