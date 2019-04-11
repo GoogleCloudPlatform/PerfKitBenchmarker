@@ -165,31 +165,44 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder,
-                         {'default': None}),
-        'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
-                                                        'min': 0}),
-        'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
-        'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
-        'project': (option_decoders.StringDecoder, {'default': None}),
-        'image_family': (option_decoders.StringDecoder, {'default': None}),
-        'image_project': (option_decoders.StringDecoder, {'default': None}),
-        'node_type': (
-            option_decoders.StringDecoder,
-            {
-                'default': 'n1-node-96-624'
-            }
-        ),
-        'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
-        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
-        'gce_tags': (
-            option_decoders.ListDecoder,
-            {
-                'item_decoder': option_decoders.StringDecoder(),
-                'default': None
-            }
-        ),
+        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {
+            'default': None
+        }),
+        'num_local_ssds': (option_decoders.IntDecoder, {
+            'default': 0,
+            'min': 0
+        }),
+        'preemptible': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'boot_disk_size': (option_decoders.IntDecoder, {
+            'default': None
+        }),
+        'boot_disk_type': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'project': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'image_family': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'image_project': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'node_type': (option_decoders.StringDecoder, {
+            'default': 'n1-node-96-624'
+        }),
+        'num_vms_per_host': (option_decoders.IntDecoder, {
+            'default': None
+        }),
+        'min_cpu_platform': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'gce_tags': (option_decoders.ListDecoder, {
+            'item_decoder': option_decoders.StringDecoder(),
+            'default': None
+        }),
     })
     return result
 
