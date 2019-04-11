@@ -23,7 +23,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_tpu
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
-import six
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -68,15 +68,11 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
   @contextlib.contextmanager
   def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
     """A context manager that patches a few critical objects with mocks."""
-    if six.PY2:
-      builtin_module = '__builtin__'
-    else:
-      builtin_module = 'builtins'
     retval = (stdout, stderr, return_code)
     with mock.patch(
         vm_util.__name__ + '.IssueCommand',
         return_value=retval) as issue_command, mock.patch(
-            builtin_module +
+            builtins.__name__ +
             '.open'), mock.patch(vm_util.__name__ +
                                  '.NamedTemporaryFile'), mock.patch(
                                      util.__name__ + '.GetDefaultProject',

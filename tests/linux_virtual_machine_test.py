@@ -22,6 +22,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
+import six
 
 FLAGS = flags.FLAGS
 
@@ -77,7 +78,8 @@ class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.SetFiles()
 
-    self.assertItemsEqual(  # use assertItemsEqual because order is undefined
+    six.assertCountEqual(  # use assertCountEqual because order is undefined
+        self,
         remote_command.call_args_list,
         calls)
 
