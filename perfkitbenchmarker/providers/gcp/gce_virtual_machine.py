@@ -24,6 +24,10 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import copy
 import itertools
@@ -50,6 +54,8 @@ from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
+import six
+from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -243,7 +249,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
   def __init__(self, node_type, zone, project):
     super(GceSoleTenantNodeGroup, self).__init__()
     with self._counter_lock:
-      self.instance_number = self._counter.next()
+      self.instance_number = next(self._counter)
     self.name = 'pkb-node-group-%s-%s' % (FLAGS.run_uri, self.instance_number)
     self.node_type = node_type
     self.node_template = None
@@ -419,27 +425,27 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
         FLAGS.gcp_instance_metadata_from_file)
-    for key, value in parsed_metadata_from_file.iteritems():
+    for key, value in six.iteritems(parsed_metadata_from_file):
       if key in metadata_from_file:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
                         'from command line.', key)
         continue
       metadata_from_file[key] = value
     cmd.flags['metadata-from-file'] = ','.join([
-        '%s=%s' % (k, v) for k, v in metadata_from_file.iteritems()
+        '%s=%s' % (k, v) for k, v in six.iteritems(metadata_from_file)
     ])
 
     metadata = {'owner': FLAGS.owner} if FLAGS.owner else {}
     metadata.update(self.boot_metadata)
     parsed_metadata = flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata)
-    for key, value in parsed_metadata.iteritems():
+    for key, value in six.iteritems(parsed_metadata):
       if key in metadata:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
                         'from command line.', key)
         continue
       metadata[key] = value
     cmd.flags['metadata'] = ','.join(
-        ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
+        ['%s=%s' % (k, v) for k, v in six.iteritems(metadata)])
 
     # TODO(gareth-ferneyhough): If GCE one day supports live migration on GPUs
     #                           this can be revised.
@@ -589,7 +595,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     disks = []
 
-    for i in xrange(disk_spec.num_striped_disks):
+    for i in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
         name = ''
         if FLAGS.gce_ssd_interface == SCSI:
