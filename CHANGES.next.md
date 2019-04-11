@@ -101,8 +101,8 @@
 - Added AWS elasticache Memcached provider.
 - Added additional options to the stress-ng benchmark.
 - Added support for launching GCE VMs into the standard network tier.
-- Added a demo under toos/.
-
+- Added a demo under tools/.
+- Added Nginx benchmark.
 ### Enhancements:
 - Support for ProfitBricks API v4:
   - Add `profitbricks_image_alias` flag and support for image aliases
