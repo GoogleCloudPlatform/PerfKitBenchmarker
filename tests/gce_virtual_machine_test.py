@@ -34,6 +34,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -73,11 +74,13 @@ def PatchCriticalObjects(retvals=None):
     del unused_kwargs
     return ('', '', 0) if retvals is None else retvals.pop(0)
 
-  with mock.patch(vm_util.__name__ + '.IssueCommand',
-                  side_effect=ReturnVal) as issue_command, \
-          mock.patch('__builtin__.open'), \
-          mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-          mock.patch(util.__name__ + '.GetDefaultProject'):
+  with mock.patch(
+      vm_util.__name__ + '.IssueCommand',
+      side_effect=ReturnVal) as issue_command, mock.patch(
+          builtins.__name__ + '.open'), mock.patch(
+              vm_util.__name__ +
+              '.NamedTemporaryFile'), mock.patch(util.__name__ +
+                                                 '.GetDefaultProject'):
     yield issue_command
 
 
@@ -158,7 +161,8 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -251,7 +255,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_num_cpus = p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -412,7 +417,8 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -513,7 +519,8 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
