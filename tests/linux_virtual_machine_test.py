@@ -110,7 +110,7 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.DoSysctls()
 
-    self.assertEqual(remote_command.call_args_list, calls)
+    self.assertEqual(sorted(remote_command.call_args_list), sorted(calls))
 
   def testSysctl(self):
     self.runTest(
