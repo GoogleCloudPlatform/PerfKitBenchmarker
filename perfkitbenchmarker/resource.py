@@ -218,11 +218,21 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
+
+    # Retryable method which allows waiting for deletion of the resource.
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0, timeout=3600,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableDeletionError,))
+    def WaitUntilDeleted():
+      if self._IsDeleting():
+        raise errors.Resource.RetryableDeletionError('Not yet deleted')
+
     if self.deleted:
       return
     if not self.delete_start_time:
       self.delete_start_time = time.time()
     self._Delete()
+    WaitUntilDeleted()
     try:
       if self._Exists():
         raise errors.Resource.RetryableDeletionError(
@@ -253,19 +263,10 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
   def Delete(self):
     """Deletes a resource and its dependencies."""
 
-    # Retryable method which allows waiting for deletion of the resource.
-    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0, timeout=3600,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableDeletionError,))
-    def WaitUntilDeleted():
-      if self._IsDeleting():
-        raise errors.Resource.RetryableDeletionError('Not yet deleted')
-
     if self.user_managed:
       return
     self._PreDelete()
     self._DeleteResource()
-    WaitUntilDeleted()
     self.deleted = True
     self.delete_end_time = time.time()
     self._DeleteDependencies()

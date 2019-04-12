@@ -379,6 +379,18 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       raise Exception('Unknown how to create AWS data base engine {0}'.format(
           self.spec.engine))
 
+  def _IsDeleting(self):
+    """See Base class BaseResource in perfkitbenchmarker.resource.py."""
+
+    for instance_id in self.all_instance_ids:
+      json_output = self._DescribeInstance(instance_id)
+      if json_output:
+        state = json_output['DBInstances'][0]['DBInstanceStatus']
+        if state == 'deleting':
+          return True
+
+    return False
+
   def _Delete(self):
     """Deletes the underlying resource.
 
@@ -414,14 +426,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     exceptions.
     """
     for current_instance_id in self.all_instance_ids:
-      cmd = util.AWS_PREFIX + [
-          'rds',
-          'describe-db-instances',
-          '--db-instance-identifier=%s' % current_instance_id,
-          '--region=%s' % self.region
-      ]
-      _, _, retcode = vm_util.IssueCommand(cmd)
-      if retcode != 0:
+      json_output = self._DescribeInstance(current_instance_id)
+      if not json_output:
         return False
 
     return True
@@ -579,18 +585,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
       json_output = self._DescribeInstance(instance_id)
-      try:
-        state = json_output['DBInstances'][0]['DBInstanceStatus']
-        pending_values = json_output['DBInstances'][0]['PendingModifiedValues']
-        logging.info('Instance state: %s', state)
-        if pending_values:
-          logging.info('Pending values: %s', (str(pending_values)))
+      if json_output:
+        try:
+          state = json_output['DBInstances'][0]['DBInstanceStatus']
+          pending_values = (
+              json_output['DBInstances'][0]['PendingModifiedValues'])
+          logging.info('Instance state: %s', state)
+          if pending_values:
+            logging.info('Pending values: %s', (str(pending_values)))
 
-        if state == 'available' and not pending_values:
-          break
-      except:
-        logging.exception('Error attempting to read stdout. Creation failure.')
-        return False
+          if state == 'available' and not pending_values:
+            break
+        except:
+          logging.exception(
+              'Error attempting to read stdout. Creation failure.')
+          return False
       time.sleep(5)
 
     return True
@@ -602,7 +611,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--db-instance-identifier=%s' % instance_id,
         '--region=%s' % self.region
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, suppress_warning=True)
+    if retcode != 0:
+      return None
     json_output = json.loads(stdout)
     return json_output
 
