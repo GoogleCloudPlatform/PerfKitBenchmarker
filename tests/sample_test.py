@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 from perfkitbenchmarker import sample
+from six.moves import range
 
 
 class SampleTestCase(unittest.TestCase):
@@ -31,8 +36,9 @@ class SampleTestCase(unittest.TestCase):
 
 
 class TestPercentileCalculator(unittest.TestCase):
+
   def testPercentileCalculator(self):
-    numbers = range(0, 1001)
+    numbers = list(range(0, 1001))
     percentiles = sample.PercentileCalculator(numbers,
                                               percentiles=[0, 1, 99.9, 100])
 
@@ -55,7 +61,7 @@ class TestPercentileCalculator(unittest.TestCase):
 
   def testWrongTypePercentile(self):
     with self.assertRaises(ValueError):
-      sample.PercentileCalculator([3], percentiles=["a"])
+      sample.PercentileCalculator([3], percentiles=['a'])
 
 
 if __name__ == '__main__':
