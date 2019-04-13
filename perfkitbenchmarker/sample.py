@@ -45,7 +45,7 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   total = sum(numbers_sorted)
   result = {}
   for percentile in percentiles:
-    _ = float(percentile)  # verify type
+    float(percentile)  # verify type
     if percentile < 0.0 or percentile > 100.0:
       raise ValueError('Invalid percentile %s' % percentile)
 
