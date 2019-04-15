@@ -442,3 +442,4 @@
   longer than 15 characters.
 - Update aws dynamodb_ycsb_benchmark to use aws credentials from the runner vm.
 - Reboot immediately during call to ApplySysCtlPersient.
+- Set lower tcp keepalive thresholds on netperf vms.
