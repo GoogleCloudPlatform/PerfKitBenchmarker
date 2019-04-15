@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -357,6 +357,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Args:
       sysctl_params: dict - the keys and values to write
     """
+    if not sysctl_params:
+      return
+
     for key, value in sysctl_params.items():
       self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
                          % (key, value))
