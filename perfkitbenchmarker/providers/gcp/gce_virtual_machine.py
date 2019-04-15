@@ -225,7 +225,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
 
   def _Create(self):
     """Creates the node template."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'create', self.name)
     cmd.flags['node-type'] = self.node_type
     cmd.flags['region'] = self.region
@@ -233,7 +233,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
 
   def _Exists(self):
     """Returns True if the node template exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'describe', self.name)
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
@@ -241,7 +241,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the node template."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'delete', self.name)
     cmd.flags['region'] = self.region
     cmd.Issue()
@@ -272,7 +272,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
 
   def _Create(self):
     """Creates the host."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'create', self.name)
     cmd.flags['node-template'] = self.node_template.name
     cmd.flags['target-size'] = 1
@@ -293,14 +293,14 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
 
   def _Exists(self):
     """Returns True if the host exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def _Delete(self):
     """Deletes the host."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'delete', self.name)
     cmd.Issue()
 
@@ -401,10 +401,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = []
-    if self.node_group:
-      args = ['alpha']
-    args.extend(['compute', 'instances', 'create', self.name])
+    args = ['compute', 'instances', 'create', self.name]
 
     cmd = util.GcloudCommand(self, *args)
     if self.network.subnet_resource is not None:
