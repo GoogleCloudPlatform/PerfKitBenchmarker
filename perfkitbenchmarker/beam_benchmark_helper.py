@@ -31,8 +31,6 @@ BEAM_PYTHON_SDK = 'python'
 
 flags.DEFINE_string('gradle_binary', None,
                     'Set to use a different gradle binary than gradle wrapper from the repository')
-flags.DEFINE_string('python_binary', 'python',
-                    'Set to use a different python binary that is on the PATH.')
 flags.DEFINE_string('beam_location', None,
                     'Location of already checked out Beam codebase.')
 flags.DEFINE_string('beam_it_module', None,
@@ -121,6 +119,11 @@ def AddExtraProperties(command, extra_properties):
   extra_properties = [p.rstrip('" ').lstrip('" ') for p in extra_properties]
   for p in extra_properties:
     command.append('-D{}'.format(p))
+
+
+def AddPythonAttributes(command, attributes):
+  if attributes:
+    command.append('-Dattr={}'.format(attributes))
 
 
 def InitializeBeamRepo(benchmark_spec):
@@ -233,25 +236,26 @@ def _BuildGradleCommand(classname, job_arguments):
   return cmd
 
 
-def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
+def _BuildPythonCommand(benchmark_spec, classname, job_arguments):
   """ Constructs Gradle command for Python benchmark.
 
   Python integration tests can be invoked from Gradle task
-  `beam-sdks-python:integrationTest`. How Python Gradle command constructs
-  is different from Java. In order to run tests, we can use following
-  project properties:
+  `integrationTest`. How Python Gradle command constructed
+  is different from Java. We can use following system properties
+  in commandline:
 
-    -Pattr: a nose flag that filters tests by attributes
-    -Ptests: a nose flag that filters tests by name
-    -PpipelineOptions: a set of pipeline options needed to run Beam job
+    -Dtests: fully qualified name of the test to run.
+      e.g. apache_beam.examples.wordcount_it_test:WordCountIT
+    -Dattr: a set of tests that are annotated by this attribute tag.
+    -DpipelineOptions: a set of pipeline options needed to run Beam job
 
   Args:
     benchmark_spec: The PKB spec for the benchmark to run.
-    modulename: The name of the python module to run.
+    classname: The full name of test to run.
     job_arguments: The additional job arguments provided for the run.
 
   Returns:
-    cmd: Array containg the built command.
+    cmd: Array contains full built command.
   """
 
   cmd = []
@@ -262,14 +266,14 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
     raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
-  cmd.append('beam-sdks-python:integrationTest')
-  cmd.append('-Ptests={}'.format(modulename))
-  cmd.append('-Pattr={}'.format(FLAGS.beam_python_attr))
+  cmd.append('integrationTest')
+  cmd.append('-Dtests={}'.format(classname))
+  AddModuleArgument(cmd, FLAGS.beam_it_module)
+  AddPythonAttributes(cmd, FLAGS.beam_python_attr)
 
   beam_args = job_arguments if job_arguments else []
-
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    beam_args.append('--runner={}'.format(FLAGS.beam_runner))
+    beam_args.append('"--runner={}"'.format(FLAGS.beam_runner))
 
     sdk_location = FLAGS.beam_python_sdk_location
     if not sdk_location:
@@ -278,9 +282,9 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
         raise RuntimeError('No python sdk tar file is available.')
       else:
         sdk_location = tar_list[0]
-    beam_args.append('--sdk_location={}'.format(sdk_location))
+    beam_args.append('"--sdk_location={}"'.format(sdk_location))
+  cmd.append('-DpipelineOptions={}'.format(' '.join(beam_args)))
 
-  cmd.append('-PpipelineOptions={}'.format(' '.join(beam_args)))
   cmd.append('--info')
   cmd.append('--scan')
 
