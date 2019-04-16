@@ -87,6 +87,20 @@ flags.DEFINE_integer('simulate_maintenance_delay', 0,
 flags.DEFINE_boolean('ssh_reuse_connections', True,
                      'Whether to reuse SSH connections rather than '
                      'reestablishing a connection for each remote command.')
+flags.DEFINE_string('ssh_control_path', None,
+                    'Overrides the default ControlPath setting for ssh '
+                    'connections if --ssh_reuse_connections is set. This can '
+                    'be helpful on systems whose default temporary directory '
+                    'path is too long (sockets have a max path length) or a '
+                    'version of ssh that doesn\'t support the %C token. See '
+                    'ssh documentation on the ControlPath setting for more '
+                    'detailed information.')
+flags.DEFINE_string('ssh_control_persist', '30m',
+                    'Setting applied to ssh connections if '
+                    '--ssh_reuse_connections is set. Sets how long the '
+                    'connections persist before they are removed. '
+                    'See ssh documentation about the ControlPersist setting '
+                    'for more detailed information.')
 flags.DEFINE_integer('ssh_server_alive_interval', 30,
                      'Value for ssh -o ServerAliveInterval. Use with '
                      '--ssh_server_alive_count_max to configure how long to '
@@ -203,11 +217,12 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
   if FLAGS.use_ipv6:
     options.append('-6')
   if FLAGS.ssh_reuse_connections:
-    control_path = os.path.join(temp_dir.GetSshConnectionsDir(), '%C')
+    control_path = (FLAGS.ssh_control_path or
+                    os.path.join(temp_dir.GetSshConnectionsDir(), '%C'))
     options.extend([
         '-o', 'ControlPath="%s"' % control_path,
         '-o', 'ControlMaster=auto',
-        '-o', 'ControlPersist=10m'
+        '-o', 'ControlPersist=%s' % FLAGS.ssh_control_persist
     ])
   options.extend(FLAGS.ssh_options)
 
