@@ -25,6 +25,7 @@ from __future__ import print_function
 import abc
 import os.path
 import threading
+import time
 
 import jinja2
 
@@ -662,8 +663,12 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       raise
 
   def Reboot(self):
-    """Reboot the VM."""
+    """Reboots the VM.
 
+    Returns:
+      The duration in seconds from the time the reboot command was issued to
+      the time we could SSH into the VM and verify that the timestamp changed.
+    """
     vm_bootable_time = None
 
     # Use self.bootable_time to determine if this is the first boot.
@@ -673,6 +678,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     if self.bootable_time is not None:
       vm_bootable_time = self.VMLastBootTime()
 
+    before_reboot_timestamp = time.time()
     self._Reboot()
 
     while True:
@@ -681,8 +687,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       # this is sufficient check for the first boot - but not for a reboot
       if vm_bootable_time != self.VMLastBootTime():
         break
-
+    reboot_duration_sec = time.time() - before_reboot_timestamp
     self._AfterReboot()
+    return reboot_duration_sec
 
   @abc.abstractmethod
   def _Reboot(self):

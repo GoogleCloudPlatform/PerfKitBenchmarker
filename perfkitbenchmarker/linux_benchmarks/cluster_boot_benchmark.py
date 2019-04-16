@@ -14,9 +14,12 @@
 """Records the time required to boot a cluster of VMs."""
 
 import logging
+import time
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -29,6 +32,12 @@ cluster_boot:
       vm_spec: *default_dual_core
       vm_count: null
 """
+
+flags.DEFINE_boolean(
+    'cluster_boot_time_reboot', False,
+    'Whether to reboot the VMs during the cluster boot benchmark to measure '
+    'reboot performance.')
+FLAGS = flags.FLAGS
 
 
 def GetConfig(user_config):
@@ -49,7 +58,7 @@ def GetTimeToBoot(vms):
     vms: List of BaseVirtualMachine subclasses.
 
   Returns:
-    List of Samples containing the boot time.
+    List of Samples containing the boot times and an overall cluster boot time.
   """
   if not vms:
     return []
@@ -95,6 +104,37 @@ def GetTimeToBoot(vms):
   return samples
 
 
+def _MeasureReboot(vms):
+  """Measures the time to reboot the cluster of VMs.
+
+  Args:
+    vms: List of BaseVirtualMachine subclasses.
+
+  Returns:
+    List of Samples containing the reboot times and an overall cluster reboot
+    time.
+  """
+  samples = []
+  before_reboot_timestamp = time.time()
+  reboot_times = vm_util.RunThreaded(lambda vm: vm.Reboot(), vms)
+  cluster_reboot_time = time.time() - before_reboot_timestamp
+  os_types = set()
+  for i, vm in enumerate(vms):
+    metadata = {
+        'machine_instance': i,
+        'num_vms': len(vms),
+        'os_type': vm.OS_TYPE
+    }
+    os_types.add(vm.OS_TYPE)
+    samples.append(
+        sample.Sample('Reboot Time', reboot_times[i], 'seconds', metadata))
+  metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
+  samples.append(
+      sample.Sample('Cluster Reboot Time', cluster_reboot_time, 'seconds',
+                    metadata))
+  return samples
+
+
 def Run(benchmark_spec):
   """Measure the boot time for all VMs.
 
@@ -104,8 +144,10 @@ def Run(benchmark_spec):
   Returns:
     An empty list (all boot samples will be added later).
   """
-  del benchmark_spec
-  return []
+  samples = []
+  if FLAGS.cluster_boot_time_reboot:
+    samples.extend(_MeasureReboot(benchmark_spec.vms))
+  return samples
 
 
 def Cleanup(unused_benchmark_spec):

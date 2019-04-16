@@ -103,6 +103,7 @@
 - Added support for launching GCE VMs into the standard network tier.
 - Added a demo under tools/.
 - Added Nginx benchmark.
+- Added support for measuring VM reboot time to the cluster boot benchmark.
 ### Enhancements:
 - Support for ProfitBricks API v4:
   - Add `profitbricks_image_alias` flag and support for image aliases
