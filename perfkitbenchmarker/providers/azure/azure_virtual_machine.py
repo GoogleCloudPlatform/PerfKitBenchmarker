@@ -296,6 +296,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     if retcode and 'Error Code: QuotaExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
+    if retcode and 'AllocationFailed' in stderr:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
 
   def _Exists(self):
     """Returns True if the VM exists."""
