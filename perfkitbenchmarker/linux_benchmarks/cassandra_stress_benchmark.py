@@ -72,7 +72,7 @@ flags.DEFINE_integer('cassandra_stress_preload_num_keys', None,
 flags.DEFINE_integer('num_keys', 0,
                      'Number of keys used in cassandra-stress tool across '
                      'all loader vms. If unset, this benchmark will use '
-                     '%s * num_cpus on data nodes as the value.'
+                     '%s * NumCpusForBenchmark() on data nodes as the value.'
                      % NUM_KEYS_PER_CORE)
 
 flags.DEFINE_integer('num_cassandra_stress_threads', 150,
@@ -238,7 +238,7 @@ def GenerateMetadataFromFlags(benchmark_spec):
   metadata = {}
   if not FLAGS.num_keys:
     metadata['num_keys'] = (
-        NUM_KEYS_PER_CORE * vm_dict[CASSANDRA_GROUP][0].num_cpus)
+        NUM_KEYS_PER_CORE * vm_dict[CASSANDRA_GROUP][0].NumCpusForBenchmark())
   else:
     metadata['num_keys'] = FLAGS.num_keys
 

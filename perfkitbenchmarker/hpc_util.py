@@ -21,7 +21,7 @@ flags.DEFINE_boolean('mpirun_allow_run_as_root', False,
                      'Whether to allow mpirun to be run by the root user.')
 
 
-def CreateMachineFile(vms, num_slots=lambda vm: vm.num_cpus,
+def CreateMachineFile(vms, num_slots=lambda vm: vm.NumCpusForBenchmark(),
                       remote_path='MACHINEFILE'):
   """Create a file with the IP of each machine in the cluster on its own line.
 
@@ -30,7 +30,7 @@ def CreateMachineFile(vms, num_slots=lambda vm: vm.num_cpus,
   Args:
     vms: The list of vms which will be in the cluster.
     num_slots: The function to use to calculate the number of slots
-      for each vm. Defaults to vm.num_cpus
+      for each vm. Defaults to vm.NumCpusForBenchmark()
     remote_path: remote path of the machine file. Defaults to MACHINEFILE
   """
   with vm_util.NamedTemporaryFile() as machine_file:

@@ -115,7 +115,7 @@ def Run(vm, target, rate, connections=1, duration=60, script_path=None,
     sample.Sample objects with results.
   """
   if threads is None:
-    threads = min(connections, vm.num_cpus)
+    threads = min(connections, vm.NumCpusForBenchmark())
   cmd = ('{wrk} '
          '--rate={rate} '
          '--connections={connections} '
