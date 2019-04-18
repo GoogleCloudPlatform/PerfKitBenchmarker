@@ -125,7 +125,7 @@ def CreateHpccinf(vm, benchmark_spec):
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
     total_memory = vm.total_free_memory_kb * 1024 * num_vms
-  total_cpus = vm.num_cpus * num_vms
+  total_cpus = vm.NumCpusForBenchmark() * num_vms
   block_size = BLOCK_SIZE
 
   # Finds a problem size that will fit in memory and is a multiple of the
@@ -266,7 +266,7 @@ def Run(benchmark_spec):
   master_vm.RemoteCommand(('if [ -f hpccoutf.txt ]; then '
                            'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
                            'fi'))
-  num_processes = len(vms) * master_vm.num_cpus
+  num_processes = len(vms) * master_vm.NumCpusForBenchmark()
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '

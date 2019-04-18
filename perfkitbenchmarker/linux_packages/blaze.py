@@ -49,7 +49,7 @@ def _Configure(vm):
           min(cache_in_B, MAX_BLAZE_CACHE_SIZE_IN_B - 1), os.path.join(
               BLAZE_DIR, 'blaze', 'config', 'CacheSize.h')))
   vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
-      BLAZE_DIR, CONFIG, vm.num_cpus))
+      BLAZE_DIR, CONFIG, vm.NumCpusForBenchmark()))
 
 
 def _Install(vm):

@@ -444,3 +444,4 @@
 - Update aws dynamodb_ycsb_benchmark to use aws credentials from the runner vm.
 - Reboot immediately during call to ApplySysCtlPersient.
 - Set lower tcp keepalive thresholds on netperf vms.
+- Introduced NumCpusForBenchmark() which should be used instead of num_cpus for benchmark configuration.

@@ -93,10 +93,10 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Coremark running on %s', vm)
-  num_cpus = vm.num_cpus
+  num_benchmark_cpus = vm.NumCpusForBenchmark()
   vm.RemoteCommand('cd %s;make PORT_DIR=linux64 ITERATIONS=%s XCFLAGS="-g -O2 '
                    '-DMULTITHREAD=%d -DUSE_PTHREAD -DPERFORMANCE_RUN=1"'
-                   % (COREMARK_DIR, ITERATIONS_PER_CPU, num_cpus))
+                   % (COREMARK_DIR, ITERATIONS_PER_CPU, num_benchmark_cpus))
   logging.info('Coremark Results:')
   stdout, _ = vm.RemoteCommand(
       'cat %s/run1.log' % COREMARK_DIR, should_log=True)
