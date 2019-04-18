@@ -15,12 +15,11 @@
 
 import collections
 import csv
-import io
 import json
 import re
 import tempfile
-import uuid
 import unittest
+import uuid
 
 import mock
 
@@ -30,6 +29,7 @@ from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
+import six
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -43,14 +43,14 @@ class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
       self.assertEqual(mock_stdout, instance.stream)
 
   def testSucceedsWithNoSamples(self):
-    stream = io.BytesIO()
+    stream = six.StringIO()
     instance = publisher.PrettyPrintStreamPublisher(stream)
     instance.PublishSamples([])
     self.assertRegexpMatches(
         stream.getvalue(), r'^\s*-+PerfKitBenchmarker\sResults\sSummary-+\s*$')
 
   def testWritesToStream(self):
-    stream = io.BytesIO()
+    stream = six.StringIO()
     instance = publisher.PrettyPrintStreamPublisher(stream)
     samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
                 'metadata': {}},
@@ -79,7 +79,8 @@ class LogPublisherTestCase(unittest.TestCase):
 class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.fp = tempfile.NamedTemporaryFile(prefix='perfkit-test-',
+    self.fp = tempfile.NamedTemporaryFile(mode='w+',
+                                          prefix='perfkit-test-',
                                           suffix='.json')
     self.addCleanup(self.fp.close)
     self.instance = publisher.NewlineDelimitedJSONPublisher(self.fp.name)
@@ -355,8 +356,10 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
 
 
 class CSVPublisherTestCase(unittest.TestCase):
+
   def setUp(self):
-    self.tf = tempfile.NamedTemporaryFile(prefix='perfkit-csv-publisher',
+    self.tf = tempfile.NamedTemporaryFile(mode='w+',
+                                          prefix='perfkit-csv-publisher',
                                           suffix='.csv')
     self.addCleanup(self.tf.close)
 
@@ -371,7 +374,7 @@ class CSVPublisherTestCase(unittest.TestCase):
     instance.PublishSamples(samples)
     self.tf.seek(0)
     rows = list(csv.DictReader(self.tf))
-    self.assertItemsEqual(['1', '2', '3'], [i['metric'] for i in rows])
+    six.assertCountEqual(self, ['1', '2', '3'], [i['metric'] for i in rows])
 
   def testUsesUnionOfMetaKeys(self):
     instance = publisher.CSVPublisher(self.tf.name)
@@ -390,6 +393,7 @@ class CSVPublisherTestCase(unittest.TestCase):
 
 
 class InfluxDBPublisherTestCase(unittest.TestCase):
+
   def setUp(self):
     self.db_name = 'test_db'
     self.db_uri = 'test'
@@ -438,21 +442,22 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
                          'test=testc', 'timestamp=123', 'metric=some\,metric',
                          'official=1.0', 'value=non', 'sample_uri=\\"\\"']
 
-    self.assertItemsEqual(sample_1_formatted_key_value, expected_sample_1)
-    self.assertItemsEqual(sample_2_formatted_key_value, expected_sample_2)
-    self.assertItemsEqual(sample_3_formatted_key_value, expected_sample_3)
-    self.assertItemsEqual(sample_4_formatted_key_value, expected_sample_4)
-    self.assertItemsEqual(sample_5_formatted_key_value, expected_sample_5)
+    six.assertCountEqual(self, sample_1_formatted_key_value, expected_sample_1)
+    six.assertCountEqual(self, sample_2_formatted_key_value, expected_sample_2)
+    six.assertCountEqual(self, sample_3_formatted_key_value, expected_sample_3)
+    six.assertCountEqual(self, sample_4_formatted_key_value, expected_sample_4)
+    six.assertCountEqual(self, sample_5_formatted_key_value, expected_sample_5)
 
   def testConstructSample(self):
     sample_with_metadata = {
         'test': 'testc', 'metric': '1', 'official': 1.0,
-        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace', 'product_name': 'PerfKitBenchmarker',
+        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+        'product_name': 'PerfKitBenchmarker',
         'run_uri': '323', 'sample_uri': '33',
         'timestamp': 123,
         'metadata': collections.OrderedDict([('info', '1'),
-                                            ('more_info', '2'),
-                                            ('bar', 'foo')])}
+                                             ('more_info', '2'),
+                                             ('bar', 'foo')])}
 
     constructed_sample = self.test_db._ConstructSample(sample_with_metadata)
 
@@ -472,16 +477,16 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
          'metadata': collections.OrderedDict([('info', '1'),
                                               ('more_info', '2'),
                                               ('bar', 'foo')])
-         },
+        },
         {'test': 'testb', 'metric': '2', 'official': 14.0,
          'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
          'run_uri': 'bba3', 'sample_uri': 'bb', 'timestamp': 55,
          'metadata': collections.OrderedDict()
-         },
+        },
         {'test': 'testa', 'metric': '3', 'official': 47.0,
          'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
          'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123
-         }
+        }
     ]
 
     expected = [
