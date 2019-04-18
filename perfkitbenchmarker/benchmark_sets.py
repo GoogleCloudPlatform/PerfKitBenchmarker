@@ -14,6 +14,10 @@
 
 """Benchmark set specific functions and definitions."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import copy
 import itertools
@@ -25,6 +29,8 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker import windows_packages
+import six
+from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -442,19 +448,19 @@ def GetBenchmarksFromFlags():
     crossed_axes = []
     if flag_zip:
       flag_axes = []
-      for flag, values in flag_zip.iteritems():
+      for flag, values in six.iteritems(flag_zip):
         flag_axes.append([{flag: v} for v in values])
 
       _AssertZipAxesHaveSameLength(flag_axes)
 
-      for flag_config in itertools.izip(*flag_axes):
+      for flag_config in zip(*flag_axes):
         config = _GetConfigForAxis(benchmark_config, flag_config)
         zipped_axes.append((benchmark_module, config))
 
       crossed_axes.append([benchmark_tuple[1]['flags'] for
                            benchmark_tuple in zipped_axes])
 
-    for flag, values in sorted(flag_matrix.iteritems()):
+    for flag, values in sorted(six.iteritems(flag_matrix)):
       crossed_axes.append([{flag: v} for v in values])
 
     for flag_config in itertools.product(*crossed_axes):
