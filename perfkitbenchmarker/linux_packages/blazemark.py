@@ -184,7 +184,7 @@ def RunTest(vm, test):
   """
   out, _ = vm.RemoteCommand(
       'cd %s; export BLAZE_NUM_THREADS=%s; ./%s -only-blaze' % (
-          os.path.join(BLAZEMARK_DIR, 'bin'), vm.num_cpus, test))
+          os.path.join(BLAZEMARK_DIR, 'bin'), vm.NumCpusForBenchmark(), test))
   ret = []
   try:
     ret = _ParseResult(out, test)

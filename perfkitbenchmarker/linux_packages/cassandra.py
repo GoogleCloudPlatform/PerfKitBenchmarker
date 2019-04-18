@@ -142,7 +142,7 @@ def Configure(vm, seed_vms):
   context = {'ip_address': vm.internal_ip,
              'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
              'seeds': ','.join(vm.internal_ip for vm in seed_vms),
-             'num_cpus': vm.num_cpus,
+             'num_cpus': vm.NumCpusForBenchmark(),
              'cluster_name': 'Test cluster',
              'concurrent_reads': FLAGS.cassandra_concurrent_reads}
 
