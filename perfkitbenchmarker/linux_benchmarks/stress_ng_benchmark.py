@@ -158,7 +158,7 @@ def Run(benchmark_spec):
 
   metadata = {
       'duration_sec': FLAGS.stress_ng_duration,
-      'threads': vm.num_cpus
+      'threads': vm.NumCpusForBenchmark()
   }
 
   # Rather than running stress-ng with --class cpu,cpu-cache,memory all in one
@@ -196,7 +196,8 @@ def Run(benchmark_spec):
 
   for stressor in stressors:
     cmd = ('stress-ng --{stressor} {numthreads} --metrics-brief '
-           '-t {duration}'.format(stressor=stressor, numthreads=vm.num_cpus,
+           '-t {duration}'.format(stressor=stressor,
+                                  numthreads=vm.NumCpusForBenchmark(),
                                   duration=FLAGS.stress_ng_duration))
     stdout, _ = vm.RemoteCommand(cmd)
     stressng_sample = _ParseStressngResult(metadata, stdout)

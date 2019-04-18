@@ -384,6 +384,8 @@ class BaseVirtualMachine(resource.BaseResource):
     # failing because the attribute didn't exist.
     if getattr(self, 'num_cpus', None):
       result['num_cpus'] = self.num_cpus
+      if self.NumCpusForBenchmark() != self.num_cpus:
+        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
 
     return result
 
@@ -875,11 +877,24 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       The number of CPUs on the VM.
     """
     if self._num_cpus is None:
-      if FLAGS.num_cpus_override:
-        self._num_cpus = FLAGS.num_cpus_override
-      else:
-        self._num_cpus = self._GetNumCpus()
+      self._num_cpus = self._GetNumCpus()
     return self._num_cpus
+
+  def NumCpusForBenchmark(self):
+    """Gets the number of CPUs for benchmark configuration purposes.
+
+    Many benchmarks scale their configurations based off of the number of CPUs
+    available on the system (e.g. determine the number of threads). Benchmarks
+    should use this property rather than num_cpus so that users can override
+    that behavior with the --num_cpus_override flag. Not all benchmarks may
+    use this, and they may use more than this number of CPUs. To actually
+    ensure that they are not being used during benchmarking, the CPUs should be
+    disabled.
+
+    Returns:
+      The number of CPUs for benchmark configuration purposes.
+    """
+    return FLAGS.num_cpus_override or self.num_cpus
 
   @abc.abstractmethod
   def _GetNumCpus(self):

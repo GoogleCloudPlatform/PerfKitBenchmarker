@@ -110,7 +110,7 @@ def Run(benchmark_spec):
 
   version_specific_parameters = []
   if FLAGS.runspec_metric == 'rate':
-    version_specific_parameters.append(' --rate=%s ' % vm.num_cpus)
+    version_specific_parameters.append(' --rate=%s ' % vm.NumCpusForBenchmark())
   else:
     version_specific_parameters.append(' --speed ')
   speccpu.Run(vm, 'runspec',

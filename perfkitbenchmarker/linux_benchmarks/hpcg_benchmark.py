@@ -123,7 +123,8 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   gpus_per_node = (FLAGS.hpcg_gpus_per_node or
                    cuda_toolkit.QueryNumberOfGpus(benchmark_spec.vms[0]))
-  cpus_per_rank = int(benchmark_spec.vms[0].num_cpus / gpus_per_node)
+  cpus_per_rank = int(benchmark_spec.vms[0].NumCpusForBenchmark() /
+                      gpus_per_node)
   num_vms = len(benchmark_spec.vms)
   total_gpus = gpus_per_node * num_vms
 

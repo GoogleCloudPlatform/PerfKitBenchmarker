@@ -104,7 +104,8 @@ pgbench:
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'
-MAX_JOBS = 16  # TODO(ferneyhough): determine MAX_JOBS from VM num_cpus
+# TODO(ferneyhough): determine MAX_JOBS from VM NumCpusForBenchmark()
+MAX_JOBS = 16
 
 
 def GetConfig(user_config):

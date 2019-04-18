@@ -35,7 +35,8 @@ def _Install(vm):
       'cd %s; mv make.inc.example make.inc; cmake .; make -j %s' % (
           LAPACK_DIR, vm.num_cpus))
   vm.RemoteCommand(
-      'cd %s; make -j %s' % (os.path.join(LAPACK_DIR, 'BLAS'), vm.num_cpus))
+      'cd %s; make -j %s' % (os.path.join(LAPACK_DIR, 'BLAS'),
+                             vm.NumCpusForBenchmark()))
 
 
 def YumInstall(vm):

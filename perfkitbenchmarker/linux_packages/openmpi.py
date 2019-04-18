@@ -36,7 +36,7 @@ def _Install(vm):
   vm.Install('wget')
   vm.RemoteCommand('wget %s -P %s' % (MPI_URL, INSTALL_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, MPI_TAR))
-  make_jobs = vm.num_cpus
+  make_jobs = vm.NumCpusForBenchmark()
   if FLAGS.openmpi_enable_shared:
     shared_lib_command = '--enable-shared'
   else:
