@@ -994,7 +994,7 @@ def RunBenchmarkTask(spec):
   # Many providers name resources using run_uris. When running multiple
   # benchmarks in parallel, this causes name collisions on resources.
   # By modifying the run_uri, we avoid the collisions.
-  if FLAGS.run_processes > 1:
+  if FLAGS.run_processes and FLAGS.run_processes > 1:
     spec.config.flags['run_uri'] = FLAGS.run_uri + str(spec.sequence_number)
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0

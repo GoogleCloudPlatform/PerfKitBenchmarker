@@ -481,7 +481,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     num_hosts = len(self.host_list)
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
-    with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(),
+    with vm_util.NamedTemporaryFile(mode='w', dir=vm_util.GetTempDir(),
                                     prefix='key-metadata') as tf:
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.close()
