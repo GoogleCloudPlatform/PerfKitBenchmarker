@@ -184,7 +184,8 @@ def SSHKeyGen():
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       stdin=subprocess.PIPE)
-    create_process.communicate(input='\n' * 7)
+    input_bytes = ('\n' * 7).encode('utf8')
+    create_process.communicate(input=input_bytes)
 
 
 def GetPrivateKeyPath():
@@ -491,7 +492,8 @@ def GetLastRunUri():
 
 
 @contextlib.contextmanager
-def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
+def NamedTemporaryFile(mode='w+b', prefix='tmp', suffix='', dir=None,
+                       delete=True):
   """Behaves like tempfile.NamedTemporaryFile.
 
   The existing tempfile.NamedTemporaryFile has the annoying property on
@@ -500,8 +502,18 @@ def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
   compatible way. This serves a similar role, but allows the file to be closed
   within a "with" statement without causing the file to be unlinked until the
   context exits.
+
+  Args:
+    mode: see mode in tempfile.NamedTemporaryFile.
+    prefix: see prefix in tempfile.NamedTemporaryFile.
+    suffix: see suffix in tempfile.NamedTemporaryFile.
+    dir: see dir in tempfile.NamedTemporaryFile.
+    delete: see delete in NamedTemporaryFile.
+
+  Yields:
+    A cross platform file-like object which is "with" compatible.
   """
-  f = tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix,
+  f = tempfile.NamedTemporaryFile(mode=mode, prefix=prefix, suffix=suffix,
                                   dir=dir, delete=False)
   try:
     yield f

@@ -72,8 +72,8 @@ flags.DEFINE_string(
     'Default: write to a run-specific temporary directory')
 flags.DEFINE_enum(
     'json_write_mode',
-    'wb',
-    ['wb', 'ab'],
+    'w',
+    ['w', 'a'],
     'Open mode for file specified by --json_path. Default: overwrite file')
 flags.DEFINE_boolean(
     'collapse_labels',
