@@ -11,24 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.aws.aws_managed_relational_db"""
+"""Tests for perfkitbenchmarker.providers.aws.aws_managed_relational_db."""
 
 import contextlib
-import unittest
-import os
 import json
+import os
+import unittest
 
 from mock import patch, Mock
 
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.managed_relational_db import AURORA_POSTGRES
-from perfkitbenchmarker.providers.aws import aws_managed_relational_db
+from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_managed_relational_db
 from perfkitbenchmarker.providers.aws.aws_managed_relational_db import (
     AwsManagedRelationalDb)
+from six.moves import builtins
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -46,12 +47,12 @@ def readTestDataFile(filename):
 
 
 class AwsManagedRelationalDbSpecTestCase(unittest.TestCase):
-  """Class that tests the creation of an AwsManagedRelationalDbSpec"""
+  """Class that tests the creation of an AwsManagedRelationalDbSpec."""
   pass
 
 
 class AwsManagedRelationalDbFlagsTestCase(unittest.TestCase):
-  """Class that tests the flags defined in AwsManagedRelationalDb"""
+  """Class that tests the flags defined in AwsManagedRelationalDb."""
   pass
 
 
@@ -68,10 +69,11 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
   def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
     """A context manager that patches a few critical objects with mocks."""
     retval = (stdout, stderr, return_code)
-    with patch(vm_util.__name__ + '.IssueCommand',
-               return_value=retval) as issue_command, \
-            patch('__builtin__.open'), \
-            patch(vm_util.__name__ + '.NamedTemporaryFile'):
+    with patch(
+        vm_util.__name__ + '.IssueCommand',
+        return_value=retval) as issue_command, patch(
+            builtins.__name__ + '.open'), patch(vm_util.__name__ +
+                                                '.NamedTemporaryFile'):
       yield issue_command
 
   def createMockSpec(self, additional_spec_items={}):
