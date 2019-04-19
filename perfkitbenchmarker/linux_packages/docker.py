@@ -55,6 +55,7 @@ class _DockerImagePackage(object):
   def __init__(self, name):
     """Creates a vm-installable package from a docker image."""
     self.name = name
+    self.__name__ = name
 
   def Install(self, vm):
     """Installs the docker image for self.name on the VM."""

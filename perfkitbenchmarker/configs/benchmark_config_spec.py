@@ -1280,80 +1280,6 @@ class _AppServiceDecoder(option_decoders.TypeVerifier):
         flag_values=flag_values, **config)
 
 
-class _SpeccpuSpec(spec.BaseSpec):
-  """Specs needed to configure speccpu.
-  """
-
-  def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_SpeccpuSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-      The pair specifies a decoder class and its __init__() keyword arguments to
-      construct in order to decode the named option.
-    """
-    result = super(_SpeccpuSpec, cls)._GetOptionDecoderConstructions()
-    result.update({
-        'runspec_config': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True}),
-    })
-
-    return result
-
-  @classmethod
-  def _ApplyFlags(cls, config_values, flag_values):
-    """Modifies config options based on runtime flag values.
-
-    Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
-      flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
-    """
-    super(_SpeccpuSpec, cls)._ApplyFlags(config_values, flag_values)
-    if (flag_values['runspec_config'].present or
-        'runspec_config' not in config_values):
-      config_values['runspec_config'] = flag_values.runspec_config
-
-
-class _SpeccpuDecoder(option_decoders.TypeVerifier):
-  """Validate the speccpu dictionary of a benchmark config object.
-  """
-
-  def __init__(self, **kwargs):
-    super(_SpeccpuDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Verify speccpu dict of a benchmark config object.
-
-    Args:
-      value: dict. Config dictionary
-      component_full_name: string.  Fully qualified name of the configurable
-        component containing the config option.
-      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
-        BaseSpec constructors.
-
-    Returns:
-      _Speccpu built from the config passed in in value.
-
-    Raises:
-      errors.Config.InvalidateValue upon invalid input value.
-    """
-    speccpu_config = super(
-        _SpeccpuDecoder, self).Decode(value, component_full_name,
-                                      flag_values)
-    result = _SpeccpuSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **speccpu_config)
-    return result
-
-
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -1452,9 +1378,6 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'app_groups': (_AppGroupsDecoder, {
             'default': {}
         }),
-        'speccpu': (_SpeccpuDecoder, {
-            'default': None
-        })
     })
     return result
 
