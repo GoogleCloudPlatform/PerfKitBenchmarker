@@ -21,6 +21,9 @@ See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
 for more information.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import datetime
 import json
 import logging
@@ -30,6 +33,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -182,7 +186,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Raises:
       ValueError on invalid configuration.
     """
-    if cpus not in [1] + range(2, 32, 2):
+    if cpus not in [1] + list(range(2, 32, 2)):
       raise ValueError(
           'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
           'inclusive.' % cpus)
@@ -194,14 +198,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     ratio = memory / 1024.0 / cpus
     if (ratio < CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND or
         ratio > CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND):
-      raise ValueError('The memory (%.2fGiB) per vCPU (%d) of a custom machine '
-                       'type must be between %.2f GiB and %.2f GiB per vCPU, '
-                       'inclusive.' %
-                       (memory / 1024.0,
-                        cpus,
-                        CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
-                        CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND)
-                       )
+      raise ValueError(
+          'The memory (%.2fGiB) per vCPU (%d) of a custom machine '
+          'type must be between %.2f GiB and %.2f GiB per vCPU, '
+          'inclusive.' %
+          (memory / 1024.0, cpus, CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
+           CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND))
     if memory < MIN_CUSTOM_MACHINE_MEM_MB:
       raise ValueError('The total memory (%dMiB) for a custom machine type'
                        'must be at least %dMiB.' %
