@@ -69,6 +69,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_size': self.size,
         'cloud_redis_tier': self.tier,
         'cloud_redis_region': self.redis_region,
+        'cloud_redis_version': self.redis_version,
     }
     return result
 
