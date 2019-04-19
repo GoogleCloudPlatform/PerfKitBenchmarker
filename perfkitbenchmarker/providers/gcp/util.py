@@ -13,6 +13,9 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import collections
 import json
 import logging
@@ -296,7 +299,7 @@ def FormatTags(tags_dict):
   Returns:
     A string contains formatted tags
   """
-  return ','.join('{0}={1}'.format(k, v) for k, v in tags_dict.iteritems())
+  return ','.join('{0}={1}'.format(k, v) for k, v in six.iteritems(tags_dict))
 
 
 def MakeFormattedDefaultTags(timeout_minutes=None):
