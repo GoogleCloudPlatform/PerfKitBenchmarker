@@ -55,21 +55,7 @@ speccpu2006:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_50_gb
-  speccpu:
-    runspec_config: linux64-x64-gcc47.cfg
 """
-
-_MOUNT_DIR = 'cpu2006_mnt'
-_SPECCPU2006_DIR = 'cpu2006'
-_SPECCPU2006_ISO = 'cpu2006-1.2.iso'
-_SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
-_TAR_REQUIRED_MEMBERS = 'cpu2006', 'cpu2006/bin/runspec'
-_LOG_FORMAT = r'Est. (SPEC.*_base2006)\s*(\S*)'
-# This benchmark can be run with an .iso file in the data directory, a tar file
-# in the data directory, or a tar file preprovisioned in cloud storage. To run
-# this benchmark with tar file preprovisioned in cloud storage, update the
-# following dict with md5sum of the file in cloud storage.
-BENCHMARK_DATA = {_SPECCPU2006_TAR: None}
 
 
 def GetConfig(user_config):
@@ -84,16 +70,7 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  install_config = speccpu.SpecInstallConfigurations()
-  install_config.benchmark_name = BENCHMARK_NAME
-  install_config.base_mount_dir = _MOUNT_DIR
-  install_config.base_spec_dir = _SPECCPU2006_DIR
-  install_config.base_iso_file_path = _SPECCPU2006_ISO
-  install_config.base_tar_file_path = _SPECCPU2006_TAR
-  install_config.required_members = _TAR_REQUIRED_MEMBERS
-  install_config.log_format = _LOG_FORMAT
-  install_config.runspec_config = benchmark_spec.config.speccpu.runspec_config
-  speccpu.InstallSPECCPU(vm, install_config)
+  vm.Install('speccpu2006')
 
 
 def Run(benchmark_spec):

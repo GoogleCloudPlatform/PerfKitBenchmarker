@@ -66,15 +66,8 @@ speccpu2017:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       os_type: ubuntu1604
-  speccpu:
-    runspec_config: pkb-crosstool-llvm-linux-x86-fdo.cfg
 """
 
-_SPECCPU2017_DIR = 'cpu2017'
-_SPECCPU2017_TAR = 'speccpu2017.tgz'
-_TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
-_LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
-BENCHMARK_DATA = {_SPECCPU2017_TAR: None}
 KB_TO_GB_MULTIPLIER = 1000000
 
 LOG_FILENAME = {
@@ -136,20 +129,7 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   CheckVmPrerequisites(vm)
-  install_config = speccpu.SpecInstallConfigurations()
-  install_config.benchmark_name = BENCHMARK_NAME
-  install_config.base_spec_dir = _SPECCPU2017_DIR
-  install_config.base_tar_file_path = _SPECCPU2017_TAR
-  install_config.required_members = _TAR_REQUIRED_MEMBERS
-  install_config.log_format = _LOG_FORMAT
-  install_config.runspec_config = benchmark_spec.config.speccpu.runspec_config
-  speccpu.InstallSPECCPU(vm, install_config)
-  vm.Install('speccpu2017_dependencies')
-  # spec17 tarball comes pre-packages with runner scripts for x86 architecture.
-  # But because we may have x86 or arm architecture machines, just rerun the
-  # install script to regenerate the runner scripts based on what spec detects
-  # to be the vm architecture.
-  vm.RemoteCommand('echo yes | /scratch/cpu2017/install.sh')
+  vm.Install('speccpu2017')
 
 
 def Run(benchmark_spec):

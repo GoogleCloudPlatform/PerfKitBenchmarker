@@ -192,7 +192,7 @@ class SpecInstallConfigurations(object):
   the remote machine as part of running the benchmark.
 
   Attributes:
-    benchmark_name: String. Either speccpu2006 or speccpu2017.
+    package_name: String. Either speccpu2006 or speccpu2017.
     cfg_file_path: Optional string. Path of the cfg file on the remote machine.
     base_mount_dir: Optional string. Base directory where iso file is mounted.
     mount_dir: Optional string. Path where the iso file is mounted on the
@@ -210,7 +210,7 @@ class SpecInstallConfigurations(object):
   """
 
   def __init__(self):
-    self.benchmark_name = None
+    self.package_name = None
     self.cfg_file_path = None
     self.base_mount_dir = None
     self.mount_dir = None
@@ -246,7 +246,7 @@ def InstallSPECCPU(vm, speccpu_vm_state):
                   speccpu_vm_state)
   except errors.Setup.BadPreprovisionedDataError:
     _CheckIsoAndCfgFile(speccpu_vm_state.runspec_config,
-                        speccpu_vm_state.iso_dir)
+                        speccpu_vm_state.iso_file_path)
     _PrepareWithIsoFile(vm, speccpu_vm_state)
   vm.Install('speccpu')
 
@@ -276,9 +276,9 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
   scratch_dir = vm.GetScratchDir()
-  vm.InstallPreprovisionedBenchmarkData(speccpu_vm_state.benchmark_name,
-                                        [speccpu_vm_state.base_tar_file_path],
-                                        scratch_dir)
+  vm.InstallPreprovisionedPackageData(speccpu_vm_state.package_name,
+                                      [speccpu_vm_state.base_tar_file_path],
+                                      scratch_dir)
   vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(
       dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path))
   speccpu_vm_state.cfg_file_path = posixpath.join(
