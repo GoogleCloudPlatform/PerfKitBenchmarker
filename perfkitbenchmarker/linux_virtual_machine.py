@@ -468,10 +468,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
-    """Return the UTC time the VM was last rebooted as reported by the VM."""
-    resp, _ = self.RemoteHostCommand('uptime -s', retries=1,
-                                     suppress_warning=True)
-    return resp
+    """Returns the time the VM was last rebooted as reported by the VM.
+
+    See
+    https://unix.stackexchange.com/questions/165002/how-to-reliably-get-timestamp-at-which-the-system-booted.
+    """
+    stdout, _ = self.RemoteHostCommand(
+        'stat -c %z /proc/', retries=1, suppress_warning=True)
+    return stdout
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""

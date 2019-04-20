@@ -445,3 +445,5 @@
 - Reboot immediately during call to ApplySysCtlPersient.
 - Set lower tcp keepalive thresholds on netperf vms.
 - Introduced NumCpusForBenchmark() which should be used instead of num_cpus for benchmark configuration.
+- Use stat -c %z /proc/ instead of uptime -s to find a boot timestamp since it
+  is more universal.
