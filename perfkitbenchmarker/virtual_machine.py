@@ -730,7 +730,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
   @abc.abstractmethod
   def VMLastBootTime(self):
-    """Returns the UTC time the VM was last rebooted as reported by the VM.
+    """Returns the time the VM was last rebooted as reported by the VM.
     """
     raise NotImplementedError()
 
