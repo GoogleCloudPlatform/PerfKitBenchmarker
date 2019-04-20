@@ -292,7 +292,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('shutdown -t 0 -r -f', ignore_failure=True)
 
   def VMLastBootTime(self):
-    """Returns the UTC time the VM was last rebooted as reported by the VM."""
+    """Returns the time the VM was last rebooted as reported by the VM."""
     resp, _ = self.RemoteHostCommand('systeminfo | find /i "Boot Time"',
                                      suppress_warning=True)
     return resp
