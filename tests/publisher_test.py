@@ -471,21 +471,24 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
   @mock.patch.object(publisher.InfluxDBPublisher, '_Publish')
   def testPublishSamples(self, mock_publish_method):
     samples = [
-        {'test': 'testc', 'metric': '1', 'official': 1.0,
-         'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
-         'run_uri': '323', 'sample_uri': '33', 'timestamp': 123,
-         'metadata': collections.OrderedDict([('info', '1'),
-                                              ('more_info', '2'),
-                                              ('bar', 'foo')])
+        {
+            'test': 'testc', 'metric': '1', 'official': 1.0,
+            'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+            'run_uri': '323', 'sample_uri': '33', 'timestamp': 123,
+            'metadata': collections.OrderedDict([('info', '1'),
+                                                 ('more_info', '2'),
+                                                 ('bar', 'foo')])
         },
-        {'test': 'testb', 'metric': '2', 'official': 14.0,
-         'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
-         'run_uri': 'bba3', 'sample_uri': 'bb', 'timestamp': 55,
-         'metadata': collections.OrderedDict()
+        {
+            'test': 'testb', 'metric': '2', 'official': 14.0,
+            'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+            'run_uri': 'bba3', 'sample_uri': 'bb', 'timestamp': 55,
+            'metadata': collections.OrderedDict()
         },
-        {'test': 'testa', 'metric': '3', 'official': 47.0,
-         'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
-         'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123
+        {
+            'test': 'testa', 'metric': '3', 'official': 47.0,
+            'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
+            'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123
         }
     ]
 
