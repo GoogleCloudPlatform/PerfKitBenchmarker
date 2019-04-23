@@ -727,9 +727,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # the argument is deprecated in favor of --filter.
       vm_without_zone = copy.copy(self)
       vm_without_zone.zone = None
-      gcloud_command = util.GcloudCommand(
-          vm_without_zone, 'compute', 'operations', 'list',
-          '--filter=zone:%s targetLink.scope():%s' % (self.zone, self.name))
+      gcloud_command = util.GcloudCommand(vm_without_zone, 'compute',
+                                          'operations', 'list')
+      gcloud_command.flags['filter'] = 'zone:%s targetLink.scope():%s' % (
+          self.zone, self.name)
       stdout, _, _ = gcloud_command.Issue()
       self.early_termination = any(
           operation['operationType'] == 'compute.instances.preempted'
