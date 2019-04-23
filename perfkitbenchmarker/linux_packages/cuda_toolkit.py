@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,11 +69,13 @@ flags.DEFINE_string('cuda_toolkit_installation_dir', '/usr/local/cuda',
                     'here. If it is already installed, the installation at '
                     'this path will be used.')
 
-flags.DEFINE_enum('cuda_toolkit_version', '9.0', ['8.0', '9.0', '10.0'],
+flags.DEFINE_enum('cuda_toolkit_version', '9.0', ['8.0', '9.0', '10.0', '10.1'],
                   'Version of CUDA Toolkit to install', module_name=__name__)
 
 FLAGS = flags.FLAGS
 
+
+CUDA_10_1_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.1/Prod/local_installers/cuda-repo-ubuntu1604-10-1-local-10.1.105-418.39_1.0-1_amd64.deb'
 
 CUDA_10_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda-repo-ubuntu1604-10-0-local-10.0.130-410.48_1.0-1_amd64'
 
@@ -411,7 +413,7 @@ def _InstallCudaPatch(vm, patch_url):
 def _InstallCuda8(vm):
   """Installs CUDA Toolkit from NVIDIA.
 
-  args:
+  Args:
     vm: VM to install CUDA on
   """
   # Need to append .deb to package name because the file downloaded from
@@ -425,10 +427,10 @@ def _InstallCuda8(vm):
   _InstallCudaPatch(vm, CUDA_8_PATCH)
 
 
-def _InstallCuda90(vm):
+def _InstallCuda9Point0(vm):
   """Installs CUDA Toolkit 9.0 from NVIDIA.
 
-  args:
+  Args:
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(CUDA_9_0_TOOLKIT) + '.deb'
@@ -441,17 +443,33 @@ def _InstallCuda90(vm):
   _InstallCudaPatch(vm, CUDA_9_0_PATCH)
 
 
-def _InstallCuda10(vm):
+def _InstallCuda10Point0(vm):
   """Installs CUDA Toolkit 10.0 from NVIDIA.
 
-  args:
+  Args:
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(CUDA_10_0_TOOLKIT) + '.deb'
   vm.RemoteCommand('wget -q %s -O %s' % (CUDA_10_0_TOOLKIT,
                                          basename))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-key add /var/cuda-repo-10-0-local-10.0.130-410.48/7fa2af80.pub')
+  vm.RemoteCommand('sudo apt-key add '
+                   '/var/cuda-repo-10-0-local-10.0.130-410.48/7fa2af80.pub')
+  vm.RemoteCommand('sudo apt-get update')
+  vm.RemoteCommand('sudo apt-get install -y cuda')
+
+
+def _InstallCuda10Point1(vm):
+  """Installs CUDA Toolkit 10.1 from NVIDIA.
+
+  Args:
+    vm: VM to install CUDA on
+  """
+  basename = posixpath.basename(CUDA_10_1_TOOLKIT)
+  vm.RemoteCommand('wget -q %s' % CUDA_10_1_TOOLKIT)
+  vm.RemoteCommand('sudo dpkg -i %s' % basename)
+  vm.RemoteCommand('sudo apt-key add '
+                   '/var/cuda-repo-10-1-local-10.1.105-418.39/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get install -y cuda')
 
@@ -467,9 +485,11 @@ def AptInstall(vm):
   if FLAGS.cuda_toolkit_version == '8.0':
     _InstallCuda8(vm)
   elif FLAGS.cuda_toolkit_version == '9.0':
-    _InstallCuda90(vm)
+    _InstallCuda9Point0(vm)
   elif FLAGS.cuda_toolkit_version == '10.0':
-    _InstallCuda10(vm)
+    _InstallCuda10Point0(vm)
+  elif FLAGS.cuda_toolkit_version == '10.1':
+    _InstallCuda10Point1(vm)
   else:
     raise UnsupportedCudaVersionException()
   DoPostInstallActions(vm)

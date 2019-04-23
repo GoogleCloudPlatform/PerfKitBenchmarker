@@ -104,6 +104,7 @@
 - Added a demo under tools/.
 - Added Nginx benchmark.
 - Added support for measuring VM reboot time to the cluster boot benchmark.
+
 ### Enhancements:
 - Support for ProfitBricks API v4:
   - Add `profitbricks_image_alias` flag and support for image aliases
@@ -277,6 +278,7 @@
 - Added `--zone multistring` flag as an additional way to specify zones. It can be
   used in conjunction with the `--zones` flag.
 - Added `--before_cleanup_pause` to ease debugging.
+- Added support for CUDA 10.1.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
