@@ -35,11 +35,14 @@ By default, this runs YCSB workloads A and B against the database, 32 threads
 per client VM, with an initial database size of 1GB (1k records).
 Each workload runs for at most 30 minutes.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import bisect
 import collections
 import copy
 import csv
-import io
 import itertools
 import json
 import logging
@@ -57,6 +60,10 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+import six
+from six.moves import filter
+from six.moves import range
+from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -334,7 +341,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'
-  fp = io.BytesIO(ycsb_result_string)
+  fp = six.StringIO(ycsb_result_string)
   result_string = next(fp).strip()
 
   def IsHeadOfResults(line):
@@ -362,7 +369,8 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   # filter to just those lines.
   def LineFilter(line):
     return re.search(r'^\[[A-Z]+\]', line) is not None
-  lines = itertools.chain(lines, itertools.ifilter(LineFilter, fp))
+
+  lines = itertools.chain(lines, filter(LineFilter, fp))
 
   r = csv.reader(lines)
 
@@ -467,7 +475,7 @@ def ParseHdrLogs(hdrlogs):
     Dict of group to histogram tuples of reportable percentile values.
   """
   parsed_hdr_histograms = {}
-  for group, logfile in hdrlogs.iteritems():
+  for group, logfile in six.iteritems(hdrlogs):
     values = ParseHdrLogFile(logfile)
     parsed_hdr_histograms[group] = values
   return parsed_hdr_histograms
@@ -535,7 +543,7 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
     if math.modf(percentile)[0] < 1e-7:
       percentile = int(percentile)
     label = 'p{0}'.format(percentile)
-    latencies, freqs = zip(*histogram)
+    latencies, freqs = list(zip(*histogram))
     time_ms = _WeightedQuantile(latencies, freqs, percentile * 0.01)
     result[label] = time_ms
   return result
@@ -559,8 +567,8 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   """
   def DropUnaggregated(result):
     """Remove statistics which 'operators' specify should not be combined."""
-    drop_keys = {k for k, v in AGGREGATE_OPERATORS.iteritems() if v is None}
-    for group in result['groups'].itervalues():
+    drop_keys = {k for k, v in six.iteritems(AGGREGATE_OPERATORS) if v is None}
+    for group in six.itervalues(result['groups']):
       for k in drop_keys:
         group['statistics'].pop(k, None)
 
@@ -625,7 +633,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   series_weight = 0.0
   for indiv in result_list[1:]:
     series_weight += 1.0
-    for group_name, group in indiv['groups'].iteritems():
+    for group_name, group in six.iteritems(indiv['groups']):
       if group_name not in result['groups']:
         logging.warn('Found result group "%s" in individual YCSB result, '
                      'but not in accumulator.', group_name)
@@ -637,7 +645,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       # Otherwise, the aggregated value is either:
       # * The value in 'indiv', if the statistic is not present in 'result' or
       # * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
-      for k, v in group['statistics'].iteritems():
+      for k, v in six.iteritems(group['statistics']):
         if k not in AGGREGATE_OPERATORS:
           logging.warn('No operator for "%s". Skipping aggregation.', k)
           continue
@@ -693,7 +701,7 @@ def _ParseWorkload(contents):
     dict mapping from property key to property value for each property found in
     'contents'.
   """
-  fp = io.BytesIO(contents)
+  fp = six.StringIO(contents)
   result = {}
   for line in fp:
     if (line.strip() and not line.lstrip().startswith('#') and
@@ -721,10 +729,10 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
                    'ycsb_version': FLAGS.ycsb_version}
   base_metadata.update(kwargs)
 
-  for group_name, group in ycsb_result['groups'].iteritems():
+  for group_name, group in six.iteritems(ycsb_result['groups']):
     meta = base_metadata.copy()
     meta['operation'] = group_name
-    for statistic, value in group['statistics'].iteritems():
+    for statistic, value in six.iteritems(group['statistics']):
       if value is None:
         continue
 
@@ -737,7 +745,7 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
 
     if group.get(HISTOGRAM, []):
       percentiles = _PercentilesFromHistogram(group[HISTOGRAM])
-      for label, value in percentiles.iteritems():
+      for label, value in six.iteritems(percentiles):
         yield sample.Sample(' '.join([group_name, label, 'latency']),
                             value, 'ms', meta)
       if include_histogram:
@@ -750,7 +758,7 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
       # Strip percentile from the three-element tuples.
       histogram = [value_count[-2:] for value_count in group[HDRHISTOGRAM]]
       percentiles = _PercentilesFromHistogram(histogram)
-      for label, value in percentiles.iteritems():
+      for label, value in six.iteritems(percentiles):
         yield sample.Sample(' '.join([group_name, label, 'latency']),
                             value, 'ms', meta)
       if include_histogram:
@@ -839,7 +847,7 @@ class YCSBExecutor(object):
     for param_file in list(self.parameter_files) + list(parameter_files or []):
       command.extend(('-P', param_file))
 
-    for parameter, value in parameters.iteritems():
+    for parameter, value in six.iteritems(parameters):
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
     return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
@@ -897,10 +905,11 @@ class YCSBExecutor(object):
                            workload_name=os.path.basename(workload_file))
       self.workload_meta = workload_meta
     record_count = int(workload_meta.get('recordcount', '1000'))
-    n_per_client = long(record_count) // len(vms)
-    loader_counts = [n_per_client +
-                     (1 if i < (record_count % len(vms)) else 0)
-                     for i in xrange(len(vms))]
+    n_per_client = int(record_count) // len(vms)
+    loader_counts = [
+        n_per_client + (1 if i < (record_count % len(vms)) else 0)
+        for i in range(len(vms))
+    ]
 
     def PushWorkload(vm):
       vm.PushFile(workload_file, remote_path)
@@ -919,7 +928,7 @@ class YCSBExecutor(object):
       logging.info('VM %d (%s) finished', loader_index, vms[loader_index])
 
     start = time.time()
-    vm_util.RunThreaded(_Load, range(len(vms)))
+    vm_util.RunThreaded(_Load, list(range(len(vms))))
     events.record_event.send(
         type(self).__name__, event='load', start_timestamp=start,
         end_timestamp=time.time(), metadata=copy.deepcopy(kwargs))
@@ -965,9 +974,10 @@ class YCSBExecutor(object):
     target = kwargs.pop('target', None)
     if target is not None:
       target_per_client = target // len(vms)
-      targets = [target_per_client +
-                 (1 if i < (target % len(vms)) else 0)
-                 for i in xrange(len(vms))]
+      targets = [
+          target_per_client + (1 if i < (target % len(vms)) else 0)
+          for i in range(len(vms))
+      ]
     else:
       targets = [target for _ in vms]
 
@@ -975,10 +985,11 @@ class YCSBExecutor(object):
 
     if self.shardkeyspace:
       record_count = int(self.workload_meta.get('recordcount', '1000'))
-      n_per_client = long(record_count) // len(vms)
-      loader_counts = [n_per_client +
-                       (1 if i < (record_count % len(vms)) else 0)
-                       for i in xrange(len(vms))]
+      n_per_client = int(record_count) // len(vms)
+      loader_counts = [
+          n_per_client + (1 if i < (record_count % len(vms)) else 0)
+          for i in range(len(vms))
+      ]
 
     def _Run(loader_index):
       """Run YCSB on an individual VM."""
@@ -994,7 +1005,8 @@ class YCSBExecutor(object):
                       recordcount=end)
       results.append(self._Run(vm, **params))
       logging.info('VM %d (%s) finished', loader_index, vm)
-    vm_util.RunThreaded(_Run, range(len(vms)))
+
+    vm_util.RunThreaded(_Run, list(range(len(vms))))
 
     if len(results) != len(vms):
       raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
