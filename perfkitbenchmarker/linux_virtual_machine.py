@@ -26,6 +26,10 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import os
 import pipes
@@ -45,6 +49,8 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
+import six
+from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -212,7 +218,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     stderr_file = file_base + '.stderr'
     status_file = file_base + '.status'
 
-    if not isinstance(command, basestring):
+    if not isinstance(command, six.string_types):
       command = ' '.join(command)
 
     start_command = ['nohup', 'python', execute_path,
@@ -335,7 +341,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # of cpus for symmetry. So disable the last cpus in the range.
     # e.g.  If num_cpus = 4 and num_disable_cpus = 2,
     # then want cpus 0,1 active and 2,3 inactive.
-    for x in xrange(self.num_cpus - self.num_disable_cpus, self.num_cpus):
+    for x in range(self.num_cpus - self.num_disable_cpus, self.num_cpus):
       self.RemoteCommand('sudo bash -c '
                          '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
                          x)
@@ -1717,7 +1723,7 @@ class JujuMixin(DebianMixin):
 
     # Find the already-deployed machines belonging to this vm_group
     machines = []
-    for machine_id, unit in self.machines.iteritems():
+    for machine_id, unit in six.iteritems(self.machines):
       if unit.vm_group == vm_group:
         machines.append(machine_id)
 
