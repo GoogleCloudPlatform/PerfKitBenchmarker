@@ -19,7 +19,6 @@ from __future__ import print_function
 
 import collections
 import csv
-import io
 import json
 import logging
 import time
@@ -30,6 +29,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from six import StringIO
 from six.moves import range
 import six.moves.configparser
 
@@ -102,7 +102,7 @@ def ParseJobFile(job_file):
         dictionaries of sample metadata as value.
   """
   config = six.moves.configparser.RawConfigParser(allow_no_value=True)
-  config.readfp(io.BytesIO(job_file))
+  config.readfp(StringIO(job_file))
   global_metadata = {}
   if GLOBAL in config.sections():
     global_metadata = dict(config.items(GLOBAL))

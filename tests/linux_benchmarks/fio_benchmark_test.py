@@ -19,10 +19,12 @@ import unittest
 import mock
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -148,14 +150,19 @@ blocksize = 8k
                        expect_fill_device=None,
                        expect_against_device=None,
                        expect_format_disk=None):
-    with mock.patch(fio_benchmark.__name__ + '.FillDevice') as FillDevice, \
-            mock.patch(fio_benchmark.__name__ +
-                       '.GetOrGenerateJobFileString') as GetJobString, \
-            mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.GetTempDir'), \
-            mock.patch(fio_benchmark.__name__ + '.fio.ParseResults'), \
-            mock.patch(fio_benchmark.__name__ + '.FLAGS') as fio_FLAGS:
-      fio_FLAGS.fio_target_mode = mode
+    fio_name = fio_benchmark.__name__
+    vm_name = vm_util.__name__
+    dir_name = temp_dir.__name__
+
+    with mock.patch(fio_name + '.FillDevice') as mock_fill_device, \
+        mock.patch(fio_name + '.GetOrGenerateJobFileString') as mock_get_job_string, \
+        mock.patch(builtins.__name__ + '.open'), \
+        mock.patch(vm_name + '.GetTempDir', return_value='/tmp/dir'), \
+        mock.patch(vm_name + '.PrependTempDir', return_value='/tmp/prepend_dir'), \
+        mock.patch(dir_name + '.GetRunDirPath', return_value='/tmp/run_dir'), \
+        mock.patch(fio_name + '.fio.ParseResults'), \
+        mock.patch(fio_name + '.FLAGS') as mock_fio_flags:
+      mock_fio_flags.fio_target_mode = mode
       benchmark_spec = mock.MagicMock()
       benchmark_spec.vms = [mock.MagicMock()]
       benchmark_spec.vms[0].RobustRemoteCommand = (
@@ -164,21 +171,21 @@ blocksize = 8k
       fio_benchmark.Run(benchmark_spec)
 
       if expect_fill_device is True:
-        self.assertEquals(FillDevice.call_count, 1)
+        self.assertEqual(mock_fill_device.call_count, 1)
       elif expect_fill_device is False:
-        self.assertEquals(FillDevice.call_count, 0)
+        self.assertEqual(mock_fill_device.call_count, 0)
       # get_job_string.call_args[0][2] is a boolean saying whether or
       # not we are testing against a device.
-      against_device_arg = GetJobString.call_args[0][2]
+      against_device_arg = mock_get_job_string.call_args[0][2]
       if expect_against_device is True:
-        self.assertEquals(against_device_arg, True)
+        self.assertEqual(against_device_arg, True)
       elif expect_against_device is False:
-        self.assertEquals(against_device_arg, False)
+        self.assertEqual(against_device_arg, False)
 
       if expect_format_disk is True:
-        self.assertEquals(benchmark_spec.vms[0].FormatDisk.call_count, 1)
+        self.assertEqual(benchmark_spec.vms[0].FormatDisk.call_count, 1)
       elif expect_format_disk is False:
-        self.assertEquals(benchmark_spec.vms[0].FormatDisk.call_count, 0)
+        self.assertEqual(benchmark_spec.vms[0].FormatDisk.call_count, 0)
 
   def testAgainstFileWithFill(self):
     self.doTargetModeTest('against_file_with_fill',

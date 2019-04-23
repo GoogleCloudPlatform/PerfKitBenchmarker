@@ -18,6 +18,10 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import posixpath
@@ -34,6 +38,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
+import six
+from six.moves import range
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
@@ -283,7 +289,7 @@ def GenerateJobFileString(filename, scenario_strings,
   """
 
   if 'all' in scenario_strings:
-    scenarios = SCENARIOS.itervalues()
+    scenarios = six.itervalues(SCENARIOS)
   else:
     for name in scenario_strings:
       if name not in SCENARIOS:
@@ -296,7 +302,7 @@ def GenerateJobFileString(filename, scenario_strings,
     # SCENARIOS variable.
     scenarios = [scenario.copy() for scenario in scenarios]
     for scenario in scenarios:
-      scenario['blocksize'] = str(long(block_size.m_as(units.byte))) + 'B'
+      scenario['blocksize'] = str(int(block_size.m_as(units.byte))) + 'B'
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
