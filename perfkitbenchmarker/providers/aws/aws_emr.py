@@ -30,7 +30,7 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 DEFAULT_MACHINE_TYPE = 'm3.xlarge'
-RELEASE_LABEL = 'emr-4.5.0'
+RELEASE_LABEL = 'emr-5.23.0'
 READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
@@ -43,7 +43,7 @@ MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
 
 # Certain machine types require a subnet.
-NEEDS_SUBNET = ['m4', 'c4']
+NEEDS_SUBNET = ['m4', 'c4', 'm5', 'c5']
 
 
 class AwsSecurityGroup(resource.BaseResource):
