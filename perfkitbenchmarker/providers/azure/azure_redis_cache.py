@@ -26,7 +26,7 @@ from perfkitbenchmarker.providers.azure import azure_network
 
 FLAGS = flags.FLAGS
 # 15min timeout for issuing az redis delete command.
-DELETE_TIMEOUT = 900
+TIMEOUT = 900
 REDIS_VERSION = '3.2'
 
 
@@ -40,9 +40,12 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     super(AzureRedisCache, self).__init__(spec)
     self.redis_region = FLAGS.redis_region
     self.resource_group = azure_network.GetResourceGroup(self.redis_region)
-    self.azure_tier = FLAGS.azure_tier
     self.azure_redis_size = FLAGS.azure_redis_size
     self.failover_style = FLAGS.redis_failover_style
+    if self.failover_style == managed_memory_store.Failover.FAILOVER_SAME_REGION:
+      self.azure_tier = 'Premium'
+    else:
+      self.azure_tier = 'Basic'
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.
@@ -74,10 +77,9 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
           'Custom Redis version not supported on Azure Redis. '
           'Redis version is {0}.'.format(REDIS_VERSION))
     if FLAGS.redis_failover_style in [
-        managed_memory_store.Failover.FAILOVER_SAME_REGION,
         managed_memory_store.Failover.FAILOVER_SAME_ZONE]:
       raise errors.Config.InvalidValue(
-          'Azure redis with failover is not yet available.')
+          'Azure redis with failover in the same zone is not supported.')
 
   def _Create(self):
     """Creates the cache."""
@@ -90,7 +92,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         '--vm-size', self.azure_redis_size,
         '--enable-non-ssl-port',
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=TIMEOUT)
 
   def _Delete(self):
     """Deletes the cache."""
@@ -100,7 +102,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         '--name', self.name,
         '--yes',
     ]
-    vm_util.IssueCommand(cmd, timeout=DELETE_TIMEOUT)
+    vm_util.IssueCommand(cmd, timeout=TIMEOUT)
 
   def DescribeCache(self):
     """Calls show on the cache to get information about it.
