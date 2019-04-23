@@ -126,6 +126,7 @@ def Run(benchmark_spec):
   stages = [('generate', gen_args),
             ('sort', sort_args),
             ('validate', validate_args)]
+  cumulative_runtime = 0
   for (label, args) in stages:
     stats = spark_cluster.SubmitJob(terasort_jar,
                                     None,
@@ -144,11 +145,14 @@ def Run(benchmark_spec):
       results.append(sample.Sample(label + '_runtime',
                                    stats[spark_service.RUNTIME],
                                    'seconds', metadata))
+    cumulative_runtime += stats[spark_service.RUNTIME]
     if spark_service.WAITING in stats:
       results.append(sample.Sample(label + '_pending_time',
                                    stats[spark_service.WAITING],
                                    'seconds', metadata))
-
+  results.append(sample.Sample('cumulative_runtime',
+                               cumulative_runtime,
+                               'seconds', metadata))
   if not spark_cluster.user_managed:
     create_time = (spark_cluster.resource_ready_time -
                    spark_cluster.create_start_time)
