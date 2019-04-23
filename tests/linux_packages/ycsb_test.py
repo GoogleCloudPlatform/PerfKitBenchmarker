@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.packages.ycsb"""
+"""Tests for perfkitbenchmarker.packages.ycsb."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import copy
 import os
@@ -19,6 +23,8 @@ import unittest
 
 
 from perfkitbenchmarker.linux_packages import ycsb
+import six
+from six.moves import range
 
 
 def open_data_file(filename):
@@ -119,7 +125,7 @@ class BadResultParserTestCase(unittest.TestCase):
 class WeightedQuantileTestCase(unittest.TestCase):
 
   def testEvenlyWeightedSamples(self):
-    x = range(1, 101)  # 1-100
+    x = list(range(1, 101))  # 1-100
     weights = [1 for _ in x]
     self.assertEqual(50, ycsb._WeightedQuantile(x, weights, 0.50))
     self.assertEqual(75, ycsb._WeightedQuantile(x, weights, 0.75))
@@ -131,14 +137,14 @@ class WeightedQuantileTestCase(unittest.TestCase):
   def testLowWeight(self):
     x = [1, 4]
     weights = [99, 1]
-    for i in xrange(100):
+    for i in range(100):
       self.assertEqual(1, ycsb._WeightedQuantile(x, weights, i / 100.0))
     self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
 
   def testMidWeight(self):
     x = [0, 1.2, 4]
     weights = [1, 98, 1]
-    for i in xrange(2, 99):
+    for i in range(2, 99):
       self.assertAlmostEqual(1.2, ycsb._WeightedQuantile(x, weights, i / 100.0))
     self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
 
@@ -155,7 +161,6 @@ class ParseWorkloadTestCase(unittest.TestCase):
                                              '# columnfamily=cf'))
     self.assertDictEqual({'recordcount': '10'},
                          ycsb._ParseWorkload('#Sample!\nrecordcount = 10'))
-
 
   def testParsesSampleWorkload(self):
     contents = open_data_file('ycsb_workloada')
@@ -210,9 +215,9 @@ class CombineResultsTestCase(unittest.TestCase):
         }
     }
     combined = ycsb._CombineResults([r1, r2], 'histogram', {})
-    self.assertItemsEqual(['read', 'update'], combined['groups'])
-    self.assertItemsEqual(['Operations', 'Return=0', 'Return=-1'],
-                          combined['groups']['read']['statistics'])
+    six.assertCountEqual(self, ['read', 'update'], combined['groups'])
+    six.assertCountEqual(self, ['Operations', 'Return=0', 'Return=-1'],
+                         combined['groups']['read']['statistics'])
     read_stats = combined['groups']['read']['statistics']
     self.assertEqual({'Operations': 196, 'Return=0': 194, 'Return=-1': 2},
                      read_stats)
