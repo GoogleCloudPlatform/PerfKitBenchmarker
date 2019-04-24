@@ -90,9 +90,9 @@ class BaseNfsService(resource.BaseResource):
       raise errors.Config.InvalidValue(
           ('nfs_tier "%s" not in acceptable list "%s" '
            'for cloud %s') % (self.nfs_tier, self.NFS_TIERS, self.CLOUD))
-    logging.info('%s NFS service with nfs_tier %s zone %s default version %s',
-                 self.CLOUD, self.nfs_tier, self.zone,
-                 self.DEFAULT_NFS_VERSION)
+    logging.debug('%s NFS service with nfs_tier %s zone %s default version %s',
+                  self.CLOUD, self.nfs_tier, self.zone,
+                  self.DEFAULT_NFS_VERSION)
 
   def CreateNfsDisk(self):
     mount_point = '%s:/%s' % (self.GetRemoteAddress(), self.VOLUME_NAME)
@@ -108,3 +108,31 @@ class BaseNfsService(resource.BaseResource):
   def GetRemoteAddress(self):
     """The NFS server's address."""
     pass
+
+
+class StaticNfsService(BaseNfsService):
+  """Object allowing VMs to connect to a preprovisioned NFS endpoint."""
+  CLOUD = 'Static'
+
+  def __init__(self, disk_spec):
+    super(StaticNfsService, self).__init__(disk_spec, None)
+    self.ip_address = disk_spec.nfs_ip_address
+    self.server_directory = disk_spec.nfs_directory or ''
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
+    pass
+
+  def CreateNfsDisk(self):
+    mount_point = '%s:/%s' % (self.GetRemoteAddress(), self.server_directory)
+    return disk.NfsDisk(self.disk_spec, mount_point, None, None)
+
+  def _IsReady(self):
+    """Boolean function to determine if disk is NFS mountable."""
+    return True
+
+  def GetRemoteAddress(self):
+    """The NFS server's address."""
+    return self.ip_address

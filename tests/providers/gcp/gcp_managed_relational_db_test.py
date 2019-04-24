@@ -12,25 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.providers.gcp.gcp_managed_relational_db"""
+"""Tests for perfkitbenchmarker.providers.gcp.gcp_managed_relational_db."""
 
 import contextlib
-import unittest
 import json
-import mock
 import os
+import unittest
+import mock
 
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.managed_relational_db import POSTGRES
-from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
-from perfkitbenchmarker import disk
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -51,12 +52,14 @@ def CreateManagedDbFromSpec(spec_dict):
 def PatchCriticalObjects(stdout='', stderr='', return_code=0):
   """A context manager that patches a few critical objects with mocks."""
   retval = (stdout, stderr, return_code)
-  with mock.patch(vm_util.__name__ + '.IssueCommand',
-                  return_value=retval) as issue_command, \
-          mock.patch('__builtin__.open'), \
-          mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-          mock.patch(util.__name__ + '.GetDefaultProject',
-                     return_value='fakeproject'):
+  with mock.patch(
+      vm_util.__name__ + '.IssueCommand',
+      return_value=retval) as issue_command, mock.patch(
+          builtins.__name__ +
+          '.open'), mock.patch(vm_util.__name__ +
+                               '.NamedTemporaryFile'), mock.patch(
+                                   util.__name__ + '.GetDefaultProject',
+                                   return_value='fakeproject'):
     yield issue_command
 
 
@@ -69,6 +72,8 @@ class GcpMysqlManagedRelationalDbTestCase(
                                              'machine_type': 'db-n1-standard-1',
                                              'zone': 'us-west1-b',
                                          })
+    vm_spec.cpus = None
+    vm_spec.memory = None
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
@@ -120,7 +125,7 @@ class GcpMysqlManagedRelationalDbTestCase(
       self.assertIn('--storage-size=50', command_string)
       self.assertIn('--backup', command_string)
       self.assertIn('--backup-start-time=07:00', command_string)
-      self.assertIn('--gce-zone=us-west1-b', command_string)
+      self.assertIn('--zone=us-west1-b', command_string)
 
   def testCreateWithBackupDisabled(self):
     with PatchCriticalObjects() as issue_command:

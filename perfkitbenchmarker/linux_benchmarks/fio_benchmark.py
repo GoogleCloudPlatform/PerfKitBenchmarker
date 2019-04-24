@@ -18,6 +18,10 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import posixpath
@@ -34,6 +38,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
+import six
+from six.moves import range
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
@@ -244,6 +250,9 @@ group_reporting=1
 [{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
 stonewall
 rw={{scenario['rwkind']}}
+{%- if scenario['rwmixread'] is defined %}
+rwmixread={{scenario['rwmixread']}}
+{%- endif%}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
 {%- if scenario['size'] is defined %}
@@ -280,7 +289,7 @@ def GenerateJobFileString(filename, scenario_strings,
   """
 
   if 'all' in scenario_strings:
-    scenarios = SCENARIOS.itervalues()
+    scenarios = six.itervalues(SCENARIOS)
   else:
     for name in scenario_strings:
       if name not in SCENARIOS:
@@ -293,7 +302,7 @@ def GenerateJobFileString(filename, scenario_strings,
     # SCENARIOS variable.
     scenarios = [scenario.copy() for scenario in scenarios]
     for scenario in scenarios:
-      scenario['blocksize'] = str(long(block_size.m_as(units.byte))) + 'B'
+      scenario['blocksize'] = str(int(block_size.m_as(units.byte))) + 'B'
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
@@ -414,6 +423,7 @@ def GetConfig(user_config):
 
 
 def GetLogFlags(log_file_base):
+  """Gets fio log files."""
   collect_logs = FLAGS.fio_lat_log or FLAGS.fio_bw_log or FLAGS.fio_iops_log
   fio_log_flags = [(FLAGS.fio_lat_log, '--write_lat_log=%(filename)s',),
                    (FLAGS.fio_bw_log, '--write_bw_log=%(filename)s',),

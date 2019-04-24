@@ -13,6 +13,10 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.disk."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 import mock
 
@@ -20,6 +24,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from tests import pkb_common_test_case
+import six
 
 FLAGS = flags.FLAGS
 
@@ -169,7 +174,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
                      self.MountOptionsAsDict(nfs_disk.mount_options))
     self.assertEqual(nfs_disk.mount_options, nfs_disk.fstab_options)
     disk_meta = {}
-    for key, value in self.MountOptions().iteritems():
+    for key, value in six.iteritems(self.MountOptions()):
       disk_meta['nfs_{}'.format(key)] = value
     disk_meta.update({'num_stripes': 1, 'size': None, 'type': None})
     self.assertEqual(disk_meta, nfs_disk.metadata)
@@ -210,6 +215,86 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     nfs_disk = _NfsDisk(FLAGS)
     nfs_disk.Attach(vm)  # to set the vm on the disk
     nfs_disk.Detach()
+    vm.RemoteCommand.assert_called_with('sudo umount /mnt')
+
+
+class _SmbDisk(disk.SmbDisk):
+
+  def __init__(self, default_smb_version=None):
+    if FLAGS:
+      disk_spec = disk.BaseDiskSpec(_COMPONENT, FLAGS)
+    else:
+      disk_spec = disk.BaseDiskSpec(_COMPONENT)
+    super(_SmbDisk, self).__init__(
+        disk_spec, 'host1', {'user': 'username', 'pw': 'password'},
+        default_smb_version)
+
+
+class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def MountOptions(self, **overrides):
+    mount_options = {
+        'vers': '3.0',
+        'username': 'username',
+        'password': 'password',
+        'dir_mode': '0777',
+        'file_mode': '0777',
+        'serverino': None,
+    }
+    mount_options.update(overrides)
+    return mount_options
+
+  def MountOptionsAsDict(self, mount_options_str):
+    options = dict()
+    string_values = set(['vers', 'username', 'password',
+                         'dir_mode', 'file_mode'])
+    for entry in mount_options_str.split(','):
+      parts = entry.split('=', 1)
+      key = parts[0]
+      value = None if len(parts) == 1 else parts[1]
+      options[key] = value if key in string_values else value
+    return options
+
+  def testDefaults(self):
+    smb_disk = _SmbDisk()
+    self.assertEqual('host1', smb_disk.GetDevicePath())
+    self.assertEqual(self.MountOptions(),
+                     self.MountOptionsAsDict(smb_disk.mount_options))
+    self.assertEqual(smb_disk.mount_options, smb_disk.fstab_options)
+    disk_meta = {}
+    disk_meta.update({'num_stripes': 1, 'size': None, 'type': None})
+    self.assertEqual(disk_meta, smb_disk.metadata)
+    self.assertTrue(smb_disk._IsReady())
+
+  def testSmbFlags(self):
+    FLAGS['smb_version'].parse('3.0')
+    smb_disk = _SmbDisk(FLAGS)
+    mount_options = self.MountOptions(vers='3.0', dir_mode='0777',
+                                      file_mode='0777')
+    self.assertEqual(mount_options,
+                     self.MountOptionsAsDict(smb_disk.mount_options))
+
+  def testDefaultSmbVersion(self):
+    smb_disk = _SmbDisk(default_smb_version='3.0')
+    self.assertEqual('3.0', smb_disk.smb_version)
+
+  def testFlagsOverrideDefaultSmbVersion(self):
+    FLAGS['smb_version'].parse('2.1')
+    smb_disk = _SmbDisk(default_smb_version='3.0')
+    self.assertEqual('2.1', smb_disk.smb_version)
+
+  def testAttach(self):
+    vm = mock.Mock()
+    smb_disk = _SmbDisk()
+    smb_disk.Attach(vm)
+    vm.InstallPackages.assert_called_with('cifs-utils')
+
+  def testDetach(self):
+    vm = mock.Mock()
+    FLAGS['scratch_dir'].parse('/mnt')
+    smb_disk = _SmbDisk(FLAGS)
+    smb_disk.Attach(vm)  # to set the vm on the disk
+    smb_disk.Detach()
     vm.RemoteCommand.assert_called_with('sudo umount /mnt')
 
 

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains classes/functions related to S3."""
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
@@ -47,7 +49,8 @@ class S3Service(object_storage_service.ObjectStorageService):
     # Tag the bucket with the persistent timeout flag so that buckets can
     # optionally stick around after PKB runs.
     default_tags = util.MakeFormattedDefaultTags(
-        timeout_minutes=FLAGS.persistent_timeout_minutes)
+        timeout_minutes=max(FLAGS.timeout_minutes,
+                            FLAGS.persistent_timeout_minutes))
     tag_set = ','.join('{%s}' % tag for tag in default_tags)
     vm_util.IssueCommand(
         ['aws', 's3api', 'put-bucket-tagging',

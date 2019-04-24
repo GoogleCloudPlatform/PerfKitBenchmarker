@@ -36,12 +36,13 @@ ALL_MODE = 'all'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
-    'runspec_config', 'linux64-x64-gcc47.cfg',
+    'runspec_config', None,
     'Used by the PKB speccpu benchmarks. Name of the cfg file to use as the '
     'SPEC CPU config file provided to the runspec binary via its --config '
     'flag. If the benchmark is run using an .iso file, then the '
     'cfg file must be placed in the local PKB data directory and will be '
-    'copied to the remote machine prior to executing runspec/runcpu. '
+    'copied to the remote machine prior to executing runspec/runcpu. Defaults '
+    'to None. '
     'See README.md for instructions if running with a repackaged .tgz file.')
 flags.DEFINE_string(
     'runspec_build_tool_version', None,
@@ -191,7 +192,7 @@ class SpecInstallConfigurations(object):
   the remote machine as part of running the benchmark.
 
   Attributes:
-    benchmark_name: String. Either speccpu2006 or speccpu2017.
+    package_name: String. Either speccpu2006 or speccpu2017.
     cfg_file_path: Optional string. Path of the cfg file on the remote machine.
     base_mount_dir: Optional string. Base directory where iso file is mounted.
     mount_dir: Optional string. Path where the iso file is mounted on the
@@ -205,10 +206,11 @@ class SpecInstallConfigurations(object):
     tar_file_path: Optional string. Path of the tar file on the remote machine.
     required_members: List. File components that must exist for spec to run.
     log_format: String. Logging format of this spec run.
+    runspec_config: String. Name of the config file to run with.
   """
 
   def __init__(self):
-    self.benchmark_name = None
+    self.package_name = None
     self.cfg_file_path = None
     self.base_mount_dir = None
     self.mount_dir = None
@@ -220,6 +222,7 @@ class SpecInstallConfigurations(object):
     self.tar_file_path = None
     self.required_members = None
     self.log_format = None
+    self.runspec_config = None
 
 
 def InstallSPECCPU(vm, speccpu_vm_state):
@@ -238,11 +241,12 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     # Since this will override 'build_tools' installation, install this
     # before we install 'build_tools' package
     _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
-    _CheckTarFile(vm, FLAGS.runspec_config,
+    _CheckTarFile(vm, speccpu_vm_state.runspec_config,
                   stages.PROVISION in FLAGS.run_stage,
                   speccpu_vm_state)
   except errors.Setup.BadPreprovisionedDataError:
-    _CheckIsoAndCfgFile(FLAGS.runspec_config, speccpu_vm_state.iso_dir)
+    _CheckIsoAndCfgFile(speccpu_vm_state.runspec_config,
+                        speccpu_vm_state.iso_file_path)
     _PrepareWithIsoFile(vm, speccpu_vm_state)
   vm.Install('speccpu')
 
@@ -253,10 +257,10 @@ def Install(vm):
   vm.Install('fortran')
   vm.Install('build_tools')
 
-  # If using default config files and runspec_build_tool_version is not set,
+  # If runspec_build_tool_version is not set,
   # install 4.7 gcc/g++/gfortan. If either one of the flag is set, we assume
   # user is smart
-  if not FLAGS['runspec_config'].present or FLAGS.runspec_build_tool_version:
+  if FLAGS.runspec_build_tool_version:
     build_tool_version = FLAGS.runspec_build_tool_version or '4.7'
     build_tools.Reinstall(vm, version=build_tool_version)
   if FLAGS.runspec_enable_32bit:
@@ -272,13 +276,13 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
   scratch_dir = vm.GetScratchDir()
-  vm.InstallPreprovisionedBenchmarkData(speccpu_vm_state.benchmark_name,
-                                        [speccpu_vm_state.base_tar_file_path],
-                                        scratch_dir)
+  vm.InstallPreprovisionedPackageData(speccpu_vm_state.package_name,
+                                      [speccpu_vm_state.base_tar_file_path],
+                                      scratch_dir)
   vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(
       dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path))
   speccpu_vm_state.cfg_file_path = posixpath.join(
-      speccpu_vm_state.spec_dir, 'config', FLAGS.runspec_config)
+      speccpu_vm_state.spec_dir, 'config', speccpu_vm_state.runspec_config)
 
 
 def _PrepareWithIsoFile(vm, speccpu_vm_state):
@@ -314,7 +318,7 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
   vm.RemoteCommand('chmod -R 777 {0}'.format(speccpu_vm_state.spec_dir))
 
   # Copy the cfg to the VM.
-  local_cfg_file_path = data.ResourcePath(FLAGS.runspec_config)
+  local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
   cfg_file_name = os.path.basename(local_cfg_file_path)
   speccpu_vm_state.cfg_file_path = posixpath.join(
       speccpu_vm_state.spec_dir, 'config', cfg_file_name)
@@ -422,7 +426,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       result_section.pop()
 
   metadata = {
-      'runspec_config': FLAGS.runspec_config,
+      'runspec_config': speccpu_vm_state.runspec_config,
       'runspec_iterations': str(FLAGS.runspec_iterations),
       'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
       'runspec_define': FLAGS.runspec_define,

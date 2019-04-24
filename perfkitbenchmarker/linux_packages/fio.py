@@ -13,11 +13,12 @@
 # limitations under the License.
 
 """Module containing fio installation, cleanup, parsing functions."""
-import collections
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
-import ConfigParser
+import collections
 import csv
-import io
 import json
 import logging
 import time
@@ -28,6 +29,9 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from six import StringIO
+from six.moves import range
+import six.moves.configparser
 
 FIO_DIR = '%s/fio' % INSTALL_DIR
 GIT_REPO = 'http://git.kernel.dk/fio.git'
@@ -97,8 +101,8 @@ def ParseJobFile(job_file):
     A dictionary of dictionaries of sample metadata, using test name as keys,
         dictionaries of sample metadata as value.
   """
-  config = ConfigParser.RawConfigParser(allow_no_value=True)
-  config.readfp(io.BytesIO(job_file))
+  config = six.moves.configparser.RawConfigParser(allow_no_value=True)
+  config.readfp(StringIO(job_file))
   global_metadata = {}
   if GLOBAL in config.sections():
     global_metadata = dict(config.items(GLOBAL))
@@ -166,7 +170,7 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
   # come from the same fio run.
   timestamp = time.time()
   parameter_metadata = ParseJobFile(job_file)
-  io_modes = DATA_DIRECTION.values()
+  io_modes = list(DATA_DIRECTION.values())
 
   # clat_hist files are indexed sequentially by inner job.  If you have a job
   # file with 2 jobs, each with numjobs=4 you will have 8 clat_hist files.
@@ -252,7 +256,7 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
     if log_file_base and bin_vals:
       # Parse histograms
       aggregates = collections.defaultdict(collections.Counter)
-      for _ in xrange(int(parameters.get('numjobs', 1))):
+      for _ in range(int(parameters.get('numjobs', 1))):
         clat_hist_idx += 1
         hist_file_path = vm_util.PrependTempDir(
             '%s_clat_hist.%s.log' % (log_file_base, str(clat_hist_idx)))

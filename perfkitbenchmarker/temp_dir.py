@@ -11,20 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Functions related to PerfKit Benchmarker's temporary directory.
+r"""Functions related to PerfKit Benchmarker's temporary directory.
 
 PerfKit Benchmarker creates files under a temporary directory (typically in
 /tmp/perfkitbenchmarker or C:\TEMP\perfkitbenchmarker - see tempfile.tempdir for
 more information).
 """
 
-import functools32
 import os
 import tempfile
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
+import six
 
+if six.PY2:
+  import functools32 as functools
+else:
+  import functools
 
 _PERFKITBENCHMARKER = 'perfkitbenchmarker'
 _RUNS = 'runs'
@@ -43,11 +47,16 @@ def GetAllRunsDirPath():
 
 # Caching this will have the effect that even if the
 # run_uri changes, the temp dir will stay the same.
-@functools32.lru_cache()
+@functools.lru_cache()
 def GetRunDirPath():
   """Gets path to the directory containing files specific to a PKB run."""
   return os.path.join(
       FLAGS.temp_dir, _RUNS, str(flags.FLAGS.run_uri))
+
+
+def GetSshConnectionsDir():
+  """Returns the directory for SSH ControlPaths (for connection reuse)."""
+  return os.path.join(GetRunDirPath(), 'ssh')
 
 
 def GetVersionDirPath(version=version.VERSION):
@@ -57,7 +66,7 @@ def GetVersionDirPath(version=version.VERSION):
 
 def CreateTemporaryDirectories():
   """Creates the temporary sub-directories needed by the current run."""
-  for path in (GetRunDirPath(), GetVersionDirPath()):
+  for path in (GetRunDirPath(), GetVersionDirPath(), GetSshConnectionsDir()):
     try:
       os.makedirs(path)
     except OSError:

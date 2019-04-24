@@ -33,16 +33,10 @@ export SCRIPT=$3
 # Output and Error Log files
 export SCRIPT_OUTPUT=$4
 export SCRIPT_ERROR=$5
-export COLLECT_OUTPUT=$6
-export OUTPUT_TABLE=$7
 
 pid=""
 
-if [ "$COLLECT_OUTPUT" = true ] ; then
-    cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID --quiet query --nouse_cache --nouse_legacy_sql --destination_table=$OUTPUT_TABLE 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
-else
-    cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID --quiet query --nouse_cache --nouse_legacy_sql 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
-fi
+cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID --quiet query --nouse_cache --nouse_legacy_sql --rpc --apilog=apilog.out 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
 
 pid=$!
 

@@ -18,10 +18,9 @@ unit registry.
 """
 
 import copy
-import copy_reg
 import numbers
-
 import pint
+import six.moves.copyreg
 
 
 class _UnitRegistry(pint.UnitRegistry):
@@ -61,7 +60,7 @@ def _UnPickleQuantity(inp):
   return _UNIT_REGISTRY.Quantity.from_tuple(inp)
 
 
-copy_reg.pickle(_UNIT_REGISTRY.Quantity, _PickleQuantity)
+six.moves.copyreg.pickle(_UNIT_REGISTRY.Quantity, _PickleQuantity)
 
 
 # The following monkey-patch has been submitted to upstream Pint as

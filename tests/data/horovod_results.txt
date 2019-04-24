@@ -1,873 +1,137 @@
-TensorFlow:  1.12.0
-This script: nvcnn_hvd.py v1.1
-Cmd line args:
-  --batch_size=128
-  --fp16
-  --model
-  resnet152
-  --log_dir
-  results
-  --display_every
-  100
-Num ranks:   64
-Num images:  Synthetic
-Model:       resnet152
-Batch size:  128 per device
-             8192 total
-Data format: NCHW
-Data type:   fp16
-Building training graph
-Creating session
-Initializing variables
-Checkpoint written to results/checkpoint-0
-Pre-filling input pipeline
-Training
-  Step Epoch Img/sec   Loss   LR
-Writing summaries to  results
-ip-10-0-0-218:66502:67556 [0] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66502:67556 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66502:67556 [0] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66502:67556 [0] NCCL INFO NET/Socket : 1 interfaces found
-NCCL version 2.3.5+cuda9.0
-ip-10-0-0-218:66502:67556 [0] NCCL INFO rank 0 nranks 64
-ip-10-0-0-218:66503:67546 [1] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66503:67546 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66503:67546 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66503:67546 [1] NCCL INFO rank 1 nranks 64
-ip-10-0-0-218:66504:67544 [2] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66504:67544 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66504:67544 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66504:67544 [2] NCCL INFO rank 2 nranks 64
-ip-10-0-0-218:66505:67545 [3] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66505:67545 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66505:67545 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66505:67545 [3] NCCL INFO rank 3 nranks 64
-ip-10-0-0-218:66506:67542 [4] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66506:67542 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66506:67542 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66506:67542 [4] NCCL INFO rank 4 nranks 64
-ip-10-0-0-218:66507:67553 [5] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66507:67553 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66507:67553 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66507:67553 [5] NCCL INFO rank 5 nranks 64
-ip-10-0-0-218:66508:67552 [6] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66508:67552 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66508:67552 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66508:67552 [6] NCCL INFO rank 6 nranks 64
-ip-10-0-0-218:66509:67550 [7] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66509:67550 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-218:66509:67550 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-218:66509:67550 [7] NCCL INFO rank 7 nranks 64
-ip-10-0-0-193:65783:66823 [2] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65783:66823 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65783:66823 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65783:66823 [2] NCCL INFO rank 34 nranks 64
-ip-10-0-0-193:65784:66831 [3] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65784:66831 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65784:66831 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65784:66831 [3] NCCL INFO rank 35 nranks 64
-ip-10-0-0-200:65723:66763 [0] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65723:66763 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65723:66763 [0] NCCL INFO rank 8 nranks 64
-ip-10-0-0-193:65785:66827 [4] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65785:66827 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65785:66827 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65785:66827 [4] NCCL INFO rank 36 nranks 64
-ip-10-0-0-200:65724:66766 [1] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65724:66766 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65724:66766 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65724:66766 [1] NCCL INFO rank 9 nranks 64
-ip-10-0-0-132:65769:66802 [7] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65769:66802 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65769:66802 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65769:66802 [7] NCCL INFO rank 23 nranks 64
-ip-10-0-0-193:65787:66821 [6] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65787:66821 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65787:66821 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65787:66821 [6] NCCL INFO rank 38 nranks 64
-ip-10-0-0-200:65725:66774 [2] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65725:66774 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65725:66774 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65725:66774 [2] NCCL INFO rank 10 nranks 64
-ip-10-0-0-132:65762:66803 [0] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65762:66803 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65762:66803 [0] NCCL INFO rank 16 nranks 64
-ip-10-0-0-193:65788:66825 [7] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65788:66825 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65788:66825 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65788:66825 [7] NCCL INFO rank 39 nranks 64
-ip-10-0-0-200:65726:66772 [3] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65726:66772 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65726:66772 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65726:66772 [3] NCCL INFO rank 11 nranks 64
-ip-10-0-0-132:65763:66806 [1] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65763:66806 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65763:66806 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65763:66806 [1] NCCL INFO rank 17 nranks 64
-ip-10-0-0-193:65781:66833 [0] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65781:66833 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65781:66833 [0] NCCL INFO rank 32 nranks 64
-ip-10-0-0-200:65727:66777 [4] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65727:66777 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65727:66777 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65727:66777 [4] NCCL INFO rank 12 nranks 64
-ip-10-0-0-132:65764:66807 [2] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65764:66807 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65764:66807 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65764:66807 [2] NCCL INFO rank 18 nranks 64
-ip-10-0-0-193:65782:66835 [1] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65782:66835 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65782:66835 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65782:66835 [1] NCCL INFO rank 33 nranks 64
-ip-10-0-0-200:65728:66771 [5] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65728:66771 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65728:66771 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65728:66771 [5] NCCL INFO rank 13 nranks 64
-ip-10-0-0-132:65765:66812 [3] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65765:66812 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65765:66812 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65765:66812 [3] NCCL INFO rank 19 nranks 64
-ip-10-0-0-132:65766:66810 [4] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65766:66810 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65766:66810 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65766:66810 [4] NCCL INFO rank 20 nranks 64
-ip-10-0-0-193:65786:66828 [5] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65786:66828 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-193:65786:66828 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-193:65786:66828 [5] NCCL INFO rank 37 nranks 64
-ip-10-0-0-200:65729:66765 [6] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65729:66765 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65729:66765 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65729:66765 [6] NCCL INFO rank 14 nranks 64
-ip-10-0-0-132:65767:66814 [5] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65767:66814 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65767:66814 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65767:66814 [5] NCCL INFO rank 21 nranks 64
-ip-10-0-0-200:65730:66768 [7] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65730:66768 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-200:65730:66768 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-200:65730:66768 [7] NCCL INFO rank 15 nranks 64
-ip-10-0-0-31:65745:66790 [1] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65745:66790 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65745:66790 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65745:66790 [1] NCCL INFO rank 41 nranks 64
-ip-10-0-0-239:65700:66740 [3] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65700:66740 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65700:66740 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65700:66740 [3] NCCL INFO rank 27 nranks 64
-ip-10-0-0-31:65746:66784 [2] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65746:66784 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65746:66784 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65746:66784 [2] NCCL INFO rank 42 nranks 64
-ip-10-0-0-239:65702:66745 [5] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65702:66745 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65702:66745 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65702:66745 [5] NCCL INFO rank 29 nranks 64
-ip-10-0-0-132:65768:66816 [6] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65768:66816 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-132:65768:66816 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-132:65768:66816 [6] NCCL INFO rank 22 nranks 64
-ip-10-0-0-31:65747:66796 [3] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65747:66796 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65747:66796 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65747:66796 [3] NCCL INFO rank 43 nranks 64
-ip-10-0-0-52:65721:66771 [4] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65721:66771 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65721:66771 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65721:66771 [4] NCCL INFO rank 52 nranks 64
-ip-10-0-0-239:65703:66743 [6] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65703:66743 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65703:66743 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65703:66743 [6] NCCL INFO rank 30 nranks 64
-ip-10-0-0-52:65722:66768 [5] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65722:66768 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65722:66768 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65722:66768 [5] NCCL INFO rank 53 nranks 64
-ip-10-0-0-31:65749:66788 [5] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65749:66788 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65749:66788 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65749:66788 [5] NCCL INFO rank 45 nranks 64
-ip-10-0-0-52:65723:66767 [6] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65723:66767 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65723:66767 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65723:66767 [6] NCCL INFO rank 54 nranks 64
-ip-10-0-0-239:65704:66750 [7] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65704:66750 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65704:66750 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65704:66750 [7] NCCL INFO rank 31 nranks 64
-ip-10-0-0-52:65724:66759 [7] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65724:66759 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65724:66759 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65724:66759 [7] NCCL INFO rank 55 nranks 64
-ip-10-0-0-31:65750:66792 [6] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65750:66792 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65750:66792 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65750:66792 [6] NCCL INFO rank 46 nranks 64
-ip-10-0-0-52:65717:66763 [0] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65717:66763 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65717:66763 [0] NCCL INFO rank 48 nranks 64
-ip-10-0-0-239:65697:66739 [0] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65697:66739 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65697:66739 [0] NCCL INFO rank 24 nranks 64
-ip-10-0-0-52:65718:66764 [1] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65718:66764 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65718:66764 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65718:66764 [1] NCCL INFO rank 49 nranks 64
-ip-10-0-0-31:65751:66794 [7] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65751:66794 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65751:66794 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65751:66794 [7] NCCL INFO rank 47 nranks 64
-ip-10-0-0-52:65719:66761 [2] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65719:66761 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65719:66761 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65719:66761 [2] NCCL INFO rank 50 nranks 64
-ip-10-0-0-239:65698:66748 [1] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65698:66748 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65698:66748 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65698:66748 [1] NCCL INFO rank 25 nranks 64
-ip-10-0-0-52:65720:66757 [3] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65720:66757 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-52:65720:66757 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-52:65720:66757 [3] NCCL INFO rank 51 nranks 64
-ip-10-0-0-239:65699:66746 [2] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65699:66746 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65699:66746 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65699:66746 [2] NCCL INFO rank 26 nranks 64
-ip-10-0-0-31:65744:66798 [0] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65744:66798 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65744:66798 [0] NCCL INFO rank 40 nranks 64
-ip-10-0-0-31:65748:66785 [4] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65748:66785 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-31:65748:66785 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-31:65748:66785 [4] NCCL INFO rank 44 nranks 64
-ip-10-0-0-239:65701:66737 [4] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65701:66737 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-239:65701:66737 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-239:65701:66737 [4] NCCL INFO rank 28 nranks 64
-ip-10-0-0-189:65803:66845 [4] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65803:66845 [4] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65803:66845 [4] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65803:66845 [4] NCCL INFO rank 60 nranks 64
-ip-10-0-0-189:65804:66841 [5] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65804:66841 [5] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65804:66841 [5] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65804:66841 [5] NCCL INFO rank 61 nranks 64
-ip-10-0-0-189:65805:66853 [6] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65805:66853 [6] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65805:66853 [6] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65805:66853 [6] NCCL INFO rank 62 nranks 64
-ip-10-0-0-189:65806:66840 [7] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65806:66840 [7] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65806:66840 [7] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65806:66840 [7] NCCL INFO rank 63 nranks 64
-ip-10-0-0-189:65799:66849 [0] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65799:66849 [0] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65799:66849 [0] NCCL INFO rank 56 nranks 64
-ip-10-0-0-189:65800:66839 [1] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65800:66839 [1] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65800:66839 [1] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65800:66839 [1] NCCL INFO rank 57 nranks 64
-ip-10-0-0-189:65801:66847 [2] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65801:66847 [2] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65801:66847 [2] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65801:66847 [2] NCCL INFO rank 58 nranks 64
-ip-10-0-0-189:65802:66851 [3] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65802:66851 [3] NCCL INFO NET/IB : Using interface ens3 for sideband communication
-ip-10-0-0-189:65802:66851 [3] NCCL INFO Using internal Network Socket
-ip-10-0-0-189:65802:66851 [3] NCCL INFO rank 59 nranks 64
-ip-10-0-0-218:66506:67542 [4] NCCL INFO comm 0x7f39344c0470 rank 4 nranks 64
-ip-10-0-0-218:66506:67542 [4] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66506:67542 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66506:67542 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65767:66814 [5] NCCL INFO comm 0x7f208c51b230 rank 21 nranks 64
-ip-10-0-0-132:65767:66814 [5] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65767:66814 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66509:67550 [7] NCCL INFO comm 0x7f3aac475430 rank 7 nranks 64
-ip-10-0-0-218:66509:67550 [7] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66509:67550 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66509:67550 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65767:66814 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65805:66853 [6] NCCL INFO comm 0x7f10d84cd020 rank 62 nranks 64
-ip-10-0-0-189:65805:66853 [6] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65805:66853 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65805:66853 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65723:66763 [0] NCCL INFO comm 0x7f3108b558e0 rank 8 nranks 64
-ip-10-0-0-200:65723:66763 [0] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65723:66763 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65723:66763 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65726:66772 [3] NCCL INFO comm 0x7feaf84d5ec0 rank 11 nranks 64
-ip-10-0-0-200:65726:66772 [3] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65726:66772 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65726:66772 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65700:66740 [3] NCCL INFO comm 0x7f87444c3e30 rank 27 nranks 64
-ip-10-0-0-239:65700:66740 [3] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65700:66740 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65700:66740 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65787:66821 [6] NCCL INFO comm 0x7feacc4d5ae0 rank 38 nranks 64
-ip-10-0-0-193:65787:66821 [6] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65787:66821 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65787:66821 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65704:66750 [7] NCCL INFO comm 0x7fae2c4f7fd0 rank 31 nranks 64
-ip-10-0-0-239:65704:66750 [7] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65704:66750 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65704:66750 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65727:66777 [4] NCCL INFO comm 0x7fdd5c4d6870 rank 12 nranks 64
-ip-10-0-0-200:65727:66777 [4] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65727:66777 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65727:66777 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65766:66810 [4] NCCL INFO comm 0x7fb3704d3ae0 rank 20 nranks 64
-ip-10-0-0-132:65766:66810 [4] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65766:66810 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65766:66810 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65719:66761 [2] NCCL INFO comm 0x7f35f44bae90 rank 50 nranks 64
-ip-10-0-0-52:65719:66761 [2] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65719:66761 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65719:66761 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65803:66845 [4] NCCL INFO comm 0x7f437c4cda10 rank 60 nranks 64
-ip-10-0-0-189:65803:66845 [4] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65803:66845 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65730:66768 [7] NCCL INFO comm 0x7fb158545400 rank 15 nranks 64
-ip-10-0-0-200:65730:66768 [7] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65730:66768 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65803:66845 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65728:66771 [5] NCCL INFO comm 0x7f86684c3510 rank 13 nranks 64
-ip-10-0-0-200:65728:66771 [5] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65728:66771 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65730:66768 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65728:66771 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65724:66766 [1] NCCL INFO comm 0x7f5c544cb580 rank 9 nranks 64
-ip-10-0-0-200:65724:66766 [1] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65724:66766 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65729:66765 [6] NCCL INFO comm 0x7efb044d5f10 rank 14 nranks 64
-ip-10-0-0-200:65729:66765 [6] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65729:66765 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65725:66774 [2] NCCL INFO comm 0x7f90784dc500 rank 10 nranks 64
-ip-10-0-0-200:65725:66774 [2] NCCL INFO NET : Using interface ens3:10.0.0.200<0>
-ip-10-0-0-200:65725:66774 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-200:65724:66766 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65729:66765 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-200:65725:66774 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65750:66792 [6] NCCL INFO comm 0x7fb1dc4c32a0 rank 46 nranks 64
-ip-10-0-0-31:65750:66792 [6] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65750:66792 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65750:66792 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66508:67552 [6] NCCL INFO comm 0x7f09a847d490 rank 6 nranks 64
-ip-10-0-0-218:66508:67552 [6] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66508:67552 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66508:67552 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66507:67553 [5] NCCL INFO comm 0x7f804c48e3c0 rank 5 nranks 64
-ip-10-0-0-218:66507:67553 [5] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66507:67553 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66507:67553 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65799:66849 [0] NCCL INFO comm 0x7fe3246a9480 rank 56 nranks 64
-ip-10-0-0-189:65799:66849 [0] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65799:66849 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65806:66840 [7] NCCL INFO comm 0x7f7d6049e330 rank 63 nranks 64
-ip-10-0-0-189:65806:66840 [7] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65806:66840 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65799:66849 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65806:66840 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65784:66831 [3] NCCL INFO comm 0x7ff83c4c3510 rank 35 nranks 64
-ip-10-0-0-193:65784:66831 [3] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65784:66831 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65784:66831 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65781:66833 [0] NCCL INFO comm 0x7f57f8817200 rank 32 nranks 64
-ip-10-0-0-193:65781:66833 [0] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65781:66833 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65804:66841 [5] NCCL INFO comm 0x7fe5b04ccd20 rank 61 nranks 64
-ip-10-0-0-189:65804:66841 [5] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65804:66841 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65781:66833 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65804:66841 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65800:66839 [1] NCCL INFO comm 0x7f5d6c4cdbf0 rank 57 nranks 64
-ip-10-0-0-189:65800:66839 [1] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65800:66839 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65802:66851 [3] NCCL INFO comm 0x7ff2b84cdb90 rank 59 nranks 64
-ip-10-0-0-189:65802:66851 [3] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65802:66851 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65801:66847 [2] NCCL INFO comm 0x7f7e044ce0d0 rank 58 nranks 64
-ip-10-0-0-189:65801:66847 [2] NCCL INFO NET : Using interface ens3:10.0.0.189<0>
-ip-10-0-0-189:65801:66847 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-189:65800:66839 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65802:66851 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-189:65801:66847 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66502:67556 [0] NCCL INFO comm 0x7f0c78878910 rank 0 nranks 64
-ip-10-0-0-218:66503:67546 [1] NCCL INFO comm 0x7f42e84b02d0 rank 1 nranks 64
-ip-10-0-0-218:66503:67546 [1] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66503:67546 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66505:67545 [3] NCCL INFO comm 0x7f1f1c456ae0 rank 3 nranks 64
-ip-10-0-0-218:66505:67545 [3] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66505:67545 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66504:67544 [2] NCCL INFO comm 0x7f60c449e4f0 rank 2 nranks 64
-ip-10-0-0-218:66504:67544 [2] NCCL INFO NET : Using interface ens3:10.0.0.218<0>
-ip-10-0-0-218:66504:67544 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-218:66502:67556 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66503:67546 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66505:67545 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66504:67544 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65768:66816 [6] NCCL INFO comm 0x7ff7b051c900 rank 22 nranks 64
-ip-10-0-0-132:65768:66816 [6] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65768:66816 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65768:66816 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65765:66812 [3] NCCL INFO comm 0x7f0598525140 rank 19 nranks 64
-ip-10-0-0-132:65765:66812 [3] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65765:66812 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65765:66812 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65762:66803 [0] NCCL INFO comm 0x7f76f0bfea30 rank 16 nranks 64
-ip-10-0-0-132:65762:66803 [0] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65762:66803 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65764:66807 [2] NCCL INFO comm 0x7fdd545094f0 rank 18 nranks 64
-ip-10-0-0-132:65764:66807 [2] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65764:66807 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65762:66803 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65764:66807 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65769:66802 [7] NCCL INFO comm 0x7f0e184e6e20 rank 23 nranks 64
-ip-10-0-0-132:65769:66802 [7] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65769:66802 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65788:66825 [7] NCCL INFO comm 0x7efc9052eb60 rank 39 nranks 64
-ip-10-0-0-193:65788:66825 [7] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65788:66825 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65763:66806 [1] NCCL INFO comm 0x7fc0e04f98e0 rank 17 nranks 64
-ip-10-0-0-132:65763:66806 [1] NCCL INFO NET : Using interface ens3:10.0.0.132<0>
-ip-10-0-0-132:65763:66806 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-132:65769:66802 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65788:66825 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-132:65763:66806 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65783:66823 [2] NCCL INFO comm 0x7fd9c44c32c0 rank 34 nranks 64
-ip-10-0-0-193:65783:66823 [2] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65783:66823 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65785:66827 [4] NCCL INFO comm 0x7fb9144d62c0 rank 36 nranks 64
-ip-10-0-0-193:65785:66827 [4] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65785:66827 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65786:66828 [5] NCCL INFO comm 0x7fe0e04d5490 rank 37 nranks 64
-ip-10-0-0-193:65786:66828 [5] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65786:66828 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65783:66823 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65785:66827 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-193:65786:66828 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65723:66767 [6] NCCL INFO comm 0x7fe5c04d52a0 rank 54 nranks 64
-ip-10-0-0-52:65723:66767 [6] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65723:66767 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65782:66835 [1] NCCL INFO comm 0x7f50704d5640 rank 33 nranks 64
-ip-10-0-0-193:65782:66835 [1] NCCL INFO NET : Using interface ens3:10.0.0.193<0>
-ip-10-0-0-193:65782:66835 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-193:65782:66835 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65723:66767 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65718:66764 [1] NCCL INFO comm 0x7f4d304bae60 rank 49 nranks 64
-ip-10-0-0-52:65718:66764 [1] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65718:66764 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65718:66764 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65717:66763 [0] NCCL INFO comm 0x7f21dc539ce0 rank 48 nranks 64
-ip-10-0-0-52:65717:66763 [0] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65717:66763 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65717:66763 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65724:66759 [7] NCCL INFO comm 0x7f6a60518490 rank 55 nranks 64
-ip-10-0-0-52:65724:66759 [7] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65724:66759 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65722:66768 [5] NCCL INFO comm 0x7f80b84bad80 rank 53 nranks 64
-ip-10-0-0-52:65722:66768 [5] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65722:66768 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65724:66759 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65720:66757 [3] NCCL INFO comm 0x7f8db44d4b50 rank 51 nranks 64
-ip-10-0-0-52:65720:66757 [3] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65720:66757 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65721:66771 [4] NCCL INFO comm 0x7f12d04badd0 rank 52 nranks 64
-ip-10-0-0-52:65721:66771 [4] NCCL INFO NET : Using interface ens3:10.0.0.52<0>
-ip-10-0-0-52:65721:66771 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-52:65722:66768 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65720:66757 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-52:65721:66771 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65745:66790 [1] NCCL INFO comm 0x7fef0c4d09c0 rank 41 nranks 64
-ip-10-0-0-31:65745:66790 [1] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65745:66790 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65745:66790 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65699:66746 [2] NCCL INFO comm 0x7f521c4c3e10 rank 26 nranks 64
-ip-10-0-0-239:65699:66746 [2] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65699:66746 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65702:66745 [5] NCCL INFO comm 0x7f40ac4d3460 rank 29 nranks 64
-ip-10-0-0-239:65702:66745 [5] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65702:66745 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65703:66743 [6] NCCL INFO comm 0x7f70944d54f0 rank 30 nranks 64
-ip-10-0-0-239:65703:66743 [6] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65703:66743 [6] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65699:66746 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65702:66745 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65698:66748 [1] NCCL INFO comm 0x7faa544c3280 rank 25 nranks 64
-ip-10-0-0-239:65698:66748 [1] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65698:66748 [1] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65703:66743 [6] NCCL INFO CUDA Dev 6, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65698:66748 [1] NCCL INFO CUDA Dev 1, IP Interfaces : ens3(PHB) 
-ip-10-0-0-239:65697:66739 [0] NCCL INFO comm 0x7f91946ede90 rank 24 nranks 64
-ip-10-0-0-239:65697:66739 [0] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65697:66739 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65701:66737 [4] NCCL INFO comm 0x7fb8244d3e80 rank 28 nranks 64
-ip-10-0-0-239:65701:66737 [4] NCCL INFO NET : Using interface ens3:10.0.0.239<0>
-ip-10-0-0-239:65701:66737 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65746:66784 [2] NCCL INFO comm 0x7f409c4c3410 rank 42 nranks 64
-ip-10-0-0-239:65697:66739 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65746:66784 [2] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65746:66784 [2] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-239:65701:66737 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65746:66784 [2] NCCL INFO CUDA Dev 2, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65747:66796 [3] NCCL INFO comm 0x7fdcc44f7ba0 rank 43 nranks 64
-ip-10-0-0-31:65747:66796 [3] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65747:66796 [3] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65747:66796 [3] NCCL INFO CUDA Dev 3, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65751:66794 [7] NCCL INFO comm 0x7f5854509ec0 rank 47 nranks 64
-ip-10-0-0-31:65751:66794 [7] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65751:66794 [7] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65748:66785 [4] NCCL INFO comm 0x7f1fcc4d5760 rank 44 nranks 64
-ip-10-0-0-31:65748:66785 [4] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65748:66785 [4] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65749:66788 [5] NCCL INFO comm 0x7fb66c4c35a0 rank 45 nranks 64
-ip-10-0-0-31:65749:66788 [5] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65749:66788 [5] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65744:66798 [0] NCCL INFO comm 0x7fcee45cf150 rank 40 nranks 64
-ip-10-0-0-31:65744:66798 [0] NCCL INFO NET : Using interface ens3:10.0.0.31<0>
-ip-10-0-0-31:65744:66798 [0] NCCL INFO NET/Socket : 1 interfaces found
-ip-10-0-0-31:65751:66794 [7] NCCL INFO CUDA Dev 7, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65748:66785 [4] NCCL INFO CUDA Dev 4, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65749:66788 [5] NCCL INFO CUDA Dev 5, IP Interfaces : ens3(PHB) 
-ip-10-0-0-31:65744:66798 [0] NCCL INFO CUDA Dev 0, IP Interfaces : ens3(PHB) 
-ip-10-0-0-218:66504:67544 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66507:67553 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66503:67546 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66506:67542 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66505:67545 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66502:67556 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Duplicating rings to 4 per user request.
-ip-10-0-0-218:66509:67550 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66508:67552 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65725:66774 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65726:66772 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65723:66763 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65727:66777 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65728:66771 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65724:66766 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65730:66768 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-200:65729:66765 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65763:66806 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65764:66807 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65781:66833 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65697:66739 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65765:66812 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65784:66831 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65699:66746 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65762:66803 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65782:66835 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65700:66740 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65768:66816 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65698:66748 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65766:66810 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65788:66825 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65786:66828 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65702:66745 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65769:66802 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65785:66827 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65704:66750 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65701:66737 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-132:65767:66814 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65783:66823 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-239:65703:66743 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65717:66763 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-193:65787:66821 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65744:66798 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65718:66764 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65747:66796 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65723:66767 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65719:66761 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Using 256 threads
-ip-10-0-0-52:65722:66768 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65748:66785 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65721:66771 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65746:66784 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65720:66757 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65745:66790 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-52:65724:66759 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65749:66788 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65751:66794 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-31:65750:66792 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65801:66847 [2] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65799:66849 [0] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65804:66841 [5] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65800:66839 [1] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65805:66853 [6] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65806:66840 [7] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Min Comp Cap 7
-ip-10-0-0-189:65803:66845 [4] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-189:65802:66851 [3] NCCL INFO NCCL_MIN_NRINGS set by environment to 4.
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 00 :    0   1   3   2   6   4   5   7   8   9  11  10  14  12  13  15  16  17  19  18
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 01 :    0   1   3   2   6   4   5   7   8   9  11  10  14  12  13  15  16  17  19  18
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 02 :    0   1   3   2   6   4   5   7   8   9  11  10  14  12  13  15  16  17  19  18
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 03 :    0   1   3   2   6   4   5   7   8   9  11  10  14  12  13  15  16  17  19  18
-ip-10-0-0-239:65703:66743 [6] NCCL INFO Ring 00 : 30[6] -> 28[4] via P2P/IPC
-ip-10-0-0-239:65701:66737 [4] NCCL INFO Ring 00 : 28[4] -> 29[5] via P2P/IPC
-ip-10-0-0-200:65725:66774 [2] NCCL INFO Ring 00 : 10[2] -> 14[6] via P2P/IPC
-ip-10-0-0-193:65783:66823 [2] NCCL INFO Ring 00 : 34[2] -> 38[6] via P2P/IPC
-ip-10-0-0-218:66506:67542 [4] NCCL INFO Ring 00 : 4[4] -> 5[5] via P2P/IPC
-ip-10-0-0-239:65702:66745 [5] NCCL INFO Ring 00 : 29[5] -> 31[7] via P2P/IPC
-ip-10-0-0-132:65768:66816 [6] NCCL INFO Ring 00 : 22[6] -> 20[4] via P2P/IPC
-ip-10-0-0-200:65727:66777 [4] NCCL INFO Ring 00 : 12[4] -> 13[5] via P2P/IPC
-ip-10-0-0-239:65699:66746 [2] NCCL INFO Ring 00 : 26[2] -> 30[6] via P2P/IPC
-ip-10-0-0-218:66504:67544 [2] NCCL INFO Ring 00 : 2[2] -> 6[6] via P2P/IPC
-ip-10-0-0-31:65746:66784 [2] NCCL INFO Ring 00 : 42[2] -> 46[6] via P2P/IPC
-ip-10-0-0-132:65765:66812 [3] NCCL INFO Ring 00 : 19[3] -> 18[2] via P2P/IPC
-ip-10-0-0-189:65802:66851 [3] NCCL INFO Ring 00 : 59[3] -> 58[2] via P2P/IPC
-ip-10-0-0-218:66508:67552 [6] NCCL INFO Ring 00 : 6[6] -> 4[4] via P2P/IPC
-ip-10-0-0-200:65724:66766 [1] NCCL INFO Ring 00 : 9[1] -> 11[3] via P2P/IPC
-ip-10-0-0-189:65801:66847 [2] NCCL INFO Ring 00 : 58[2] -> 62[6] via P2P/IPC
-ip-10-0-0-200:65726:66772 [3] NCCL INFO Ring 00 : 11[3] -> 10[2] via P2P/IPC
-ip-10-0-0-218:66507:67553 [5] NCCL INFO Ring 00 : 5[5] -> 7[7] via P2P/IPC
-ip-10-0-0-200:65728:66771 [5] NCCL INFO Ring 00 : 13[5] -> 15[7] via P2P/IPC
-ip-10-0-0-189:65805:66853 [6] NCCL INFO Ring 00 : 62[6] -> 60[4] via P2P/IPC
-ip-10-0-0-200:65729:66765 [6] NCCL INFO Ring 00 : 14[6] -> 12[4] via P2P/IPC
-ip-10-0-0-31:65748:66785 [4] NCCL INFO Ring 00 : 44[4] -> 45[5] via P2P/IPC
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 00 : 23 -> 24 via NET/Socket/0
-ip-10-0-0-218:66505:67545 [3] NCCL INFO Ring 00 : 3[3] -> 2[2] via P2P/IPC
-ip-10-0-0-193:65787:66821 [6] NCCL INFO Ring 00 : 38[6] -> 36[4] via P2P/IPC
-ip-10-0-0-31:65750:66792 [6] NCCL INFO Ring 00 : 46[6] -> 44[4] via P2P/IPC
-ip-10-0-0-132:65767:66814 [5] NCCL INFO Ring 00 : 21[5] -> 23[7] via P2P/IPC
-ip-10-0-0-189:65800:66839 [1] NCCL INFO Ring 00 : 57[1] -> 59[3] via P2P/IPC
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 00 : 24[0] -> 25[1] via P2P/IPC
-ip-10-0-0-189:65804:66841 [5] NCCL INFO Ring 00 : 61[5] -> 63[7] via P2P/IPC
-ip-10-0-0-239:65700:66740 [3] NCCL INFO Ring 00 : 27[3] -> 26[2] via P2P/IPC
-ip-10-0-0-218:66503:67546 [1] NCCL INFO Ring 00 : 1[1] -> 3[3] via P2P/IPC
-ip-10-0-0-193:65782:66835 [1] NCCL INFO Ring 00 : 33[1] -> 35[3] via P2P/IPC
-ip-10-0-0-189:65803:66845 [4] NCCL INFO Ring 00 : 60[4] -> 61[5] via P2P/IPC
-ip-10-0-0-193:65785:66827 [4] NCCL INFO Ring 00 : 36[4] -> 37[5] via P2P/IPC
-ip-10-0-0-132:65764:66807 [2] NCCL INFO Ring 00 : 18[2] -> 22[6] via P2P/IPC
-ip-10-0-0-31:65749:66788 [5] NCCL INFO Ring 00 : 45[5] -> 47[7] via P2P/IPC
-ip-10-0-0-132:65766:66810 [4] NCCL INFO Ring 00 : 20[4] -> 21[5] via P2P/IPC
-ip-10-0-0-31:65745:66790 [1] NCCL INFO Ring 00 : 41[1] -> 43[3] via P2P/IPC
-ip-10-0-0-132:65763:66806 [1] NCCL INFO Ring 00 : 17[1] -> 19[3] via P2P/IPC
-ip-10-0-0-193:65786:66828 [5] NCCL INFO Ring 00 : 37[5] -> 39[7] via P2P/IPC
-ip-10-0-0-31:65747:66796 [3] NCCL INFO Ring 00 : 43[3] -> 42[2] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 00 : 31 -> 32 via NET/Socket/0
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 00 : 32[0] -> 33[1] via P2P/IPC
-ip-10-0-0-193:65784:66831 [3] NCCL INFO Ring 00 : 35[3] -> 34[2] via P2P/IPC
-ip-10-0-0-52:65718:66764 [1] NCCL INFO Ring 00 : 49[1] -> 51[3] via P2P/IPC
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 00 : 7 -> 8 via NET/Socket/0
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 00 : 8[0] -> 9[1] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 00 : 15 -> 16 via NET/Socket/0
-ip-10-0-0-52:65719:66761 [2] NCCL INFO Ring 00 : 50[2] -> 54[6] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 00 : 16[0] -> 17[1] via P2P/IPC
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 00 : 63 -> 0 via NET/Socket/0
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 00 : 0[0] -> 1[1] via P2P/IPC
-ip-10-0-0-52:65721:66771 [4] NCCL INFO Ring 00 : 52[4] -> 53[5] via P2P/IPC
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 00 : 55 -> 56 via NET/Socket/0
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 00 : 56[0] -> 57[1] via P2P/IPC
-ip-10-0-0-239:65698:66748 [1] NCCL INFO Ring 00 : 25[1] -> 27[3] via P2P/IPC
-ip-10-0-0-52:65723:66767 [6] NCCL INFO Ring 00 : 54[6] -> 52[4] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 00 : 39 -> 40 via NET/Socket/0
-ip-10-0-0-52:65720:66757 [3] NCCL INFO Ring 00 : 51[3] -> 50[2] via P2P/IPC
-ip-10-0-0-52:65722:66768 [5] NCCL INFO Ring 00 : 53[5] -> 55[7] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 00 : 40[0] -> 41[1] via P2P/IPC
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 00 : 47 -> 48 via NET/Socket/0
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 00 : 48[0] -> 49[1] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 01 : 15 -> 16 via NET/Socket/0
-ip-10-0-0-132:65763:66806 [1] NCCL INFO Ring 01 : 17[1] -> 19[3] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 01 : 16[0] -> 17[1] via P2P/IPC
-ip-10-0-0-132:65764:66807 [2] NCCL INFO Ring 01 : 18[2] -> 22[6] via P2P/IPC
-ip-10-0-0-132:65765:66812 [3] NCCL INFO Ring 01 : 19[3] -> 18[2] via P2P/IPC
-ip-10-0-0-132:65766:66810 [4] NCCL INFO Ring 01 : 20[4] -> 21[5] via P2P/IPC
-ip-10-0-0-132:65767:66814 [5] NCCL INFO Ring 01 : 21[5] -> 23[7] via P2P/IPC
-ip-10-0-0-132:65768:66816 [6] NCCL INFO Ring 01 : 22[6] -> 20[4] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 01 : 31 -> 32 via NET/Socket/0
-ip-10-0-0-239:65698:66748 [1] NCCL INFO Ring 01 : 25[1] -> 27[3] via P2P/IPC
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 01 : 23 -> 24 via NET/Socket/0
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 01 : 24[0] -> 25[1] via P2P/IPC
-ip-10-0-0-239:65699:66746 [2] NCCL INFO Ring 01 : 26[2] -> 30[6] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 01 : 32[0] -> 33[1] via P2P/IPC
-ip-10-0-0-239:65700:66740 [3] NCCL INFO Ring 01 : 27[3] -> 26[2] via P2P/IPC
-ip-10-0-0-239:65701:66737 [4] NCCL INFO Ring 01 : 28[4] -> 29[5] via P2P/IPC
-ip-10-0-0-239:65702:66745 [5] NCCL INFO Ring 01 : 29[5] -> 31[7] via P2P/IPC
-ip-10-0-0-239:65703:66743 [6] NCCL INFO Ring 01 : 30[6] -> 28[4] via P2P/IPC
-ip-10-0-0-193:65782:66835 [1] NCCL INFO Ring 01 : 33[1] -> 35[3] via P2P/IPC
-ip-10-0-0-193:65783:66823 [2] NCCL INFO Ring 01 : 34[2] -> 38[6] via P2P/IPC
-ip-10-0-0-193:65784:66831 [3] NCCL INFO Ring 01 : 35[3] -> 34[2] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 01 : 39 -> 40 via NET/Socket/0
-ip-10-0-0-193:65786:66828 [5] NCCL INFO Ring 01 : 37[5] -> 39[7] via P2P/IPC
-ip-10-0-0-193:65785:66827 [4] NCCL INFO Ring 01 : 36[4] -> 37[5] via P2P/IPC
-ip-10-0-0-193:65787:66821 [6] NCCL INFO Ring 01 : 38[6] -> 36[4] via P2P/IPC
-ip-10-0-0-31:65745:66790 [1] NCCL INFO Ring 01 : 41[1] -> 43[3] via P2P/IPC
-ip-10-0-0-218:66505:67545 [3] NCCL INFO Ring 01 : 3[3] -> 2[2] via P2P/IPC
-ip-10-0-0-31:65746:66784 [2] NCCL INFO Ring 01 : 42[2] -> 46[6] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 01 : 40[0] -> 41[1] via P2P/IPC
-ip-10-0-0-31:65747:66796 [3] NCCL INFO Ring 01 : 43[3] -> 42[2] via P2P/IPC
-ip-10-0-0-31:65748:66785 [4] NCCL INFO Ring 01 : 44[4] -> 45[5] via P2P/IPC
-ip-10-0-0-31:65749:66788 [5] NCCL INFO Ring 01 : 45[5] -> 47[7] via P2P/IPC
-ip-10-0-0-31:65750:66792 [6] NCCL INFO Ring 01 : 46[6] -> 44[4] via P2P/IPC
-ip-10-0-0-189:65801:66847 [2] NCCL INFO Ring 01 : 58[2] -> 62[6] via P2P/IPC
-ip-10-0-0-189:65800:66839 [1] NCCL INFO Ring 01 : 57[1] -> 59[3] via P2P/IPC
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 01 : 55 -> 56 via NET/Socket/0
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 01 : 56[0] -> 57[1] via P2P/IPC
-ip-10-0-0-189:65802:66851 [3] NCCL INFO Ring 01 : 59[3] -> 58[2] via P2P/IPC
-ip-10-0-0-189:65803:66845 [4] NCCL INFO Ring 01 : 60[4] -> 61[5] via P2P/IPC
-ip-10-0-0-189:65804:66841 [5] NCCL INFO Ring 01 : 61[5] -> 63[7] via P2P/IPC
-ip-10-0-0-189:65805:66853 [6] NCCL INFO Ring 01 : 62[6] -> 60[4] via P2P/IPC
-ip-10-0-0-200:65725:66774 [2] NCCL INFO Ring 01 : 10[2] -> 14[6] via P2P/IPC
-ip-10-0-0-218:66503:67546 [1] NCCL INFO Ring 01 : 1[1] -> 3[3] via P2P/IPC
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 01 : 7 -> 8 via NET/Socket/0
-ip-10-0-0-200:65724:66766 [1] NCCL INFO Ring 01 : 9[1] -> 11[3] via P2P/IPC
-ip-10-0-0-200:65726:66772 [3] NCCL INFO Ring 01 : 11[3] -> 10[2] via P2P/IPC
-ip-10-0-0-200:65727:66777 [4] NCCL INFO Ring 01 : 12[4] -> 13[5] via P2P/IPC
-ip-10-0-0-200:65729:66765 [6] NCCL INFO Ring 01 : 14[6] -> 12[4] via P2P/IPC
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 01 : 8[0] -> 9[1] via P2P/IPC
-ip-10-0-0-218:66504:67544 [2] NCCL INFO Ring 01 : 2[2] -> 6[6] via P2P/IPC
-ip-10-0-0-218:66506:67542 [4] NCCL INFO Ring 01 : 4[4] -> 5[5] via P2P/IPC
-ip-10-0-0-218:66507:67553 [5] NCCL INFO Ring 01 : 5[5] -> 7[7] via P2P/IPC
-ip-10-0-0-218:66508:67552 [6] NCCL INFO Ring 01 : 6[6] -> 4[4] via P2P/IPC
-ip-10-0-0-200:65728:66771 [5] NCCL INFO Ring 01 : 13[5] -> 15[7] via P2P/IPC
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 01 : 63 -> 0 via NET/Socket/0
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 01 : 0[0] -> 1[1] via P2P/IPC
-ip-10-0-0-52:65718:66764 [1] NCCL INFO Ring 01 : 49[1] -> 51[3] via P2P/IPC
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 01 : 47 -> 48 via NET/Socket/0
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 01 : 48[0] -> 49[1] via P2P/IPC
-ip-10-0-0-52:65719:66761 [2] NCCL INFO Ring 01 : 50[2] -> 54[6] via P2P/IPC
-ip-10-0-0-52:65720:66757 [3] NCCL INFO Ring 01 : 51[3] -> 50[2] via P2P/IPC
-ip-10-0-0-52:65721:66771 [4] NCCL INFO Ring 01 : 52[4] -> 53[5] via P2P/IPC
-ip-10-0-0-52:65722:66768 [5] NCCL INFO Ring 01 : 53[5] -> 55[7] via P2P/IPC
-ip-10-0-0-52:65723:66767 [6] NCCL INFO Ring 01 : 54[6] -> 52[4] via P2P/IPC
-ip-10-0-0-218:66504:67544 [2] NCCL INFO Ring 02 : 2[2] -> 6[6] via P2P/IPC
-ip-10-0-0-218:66503:67546 [1] NCCL INFO Ring 02 : 1[1] -> 3[3] via P2P/IPC
-ip-10-0-0-218:66505:67545 [3] NCCL INFO Ring 02 : 3[3] -> 2[2] via P2P/IPC
-ip-10-0-0-218:66506:67542 [4] NCCL INFO Ring 02 : 4[4] -> 5[5] via P2P/IPC
-ip-10-0-0-218:66507:67553 [5] NCCL INFO Ring 02 : 5[5] -> 7[7] via P2P/IPC
-ip-10-0-0-218:66508:67552 [6] NCCL INFO Ring 02 : 6[6] -> 4[4] via P2P/IPC
-ip-10-0-0-200:65724:66766 [1] NCCL INFO Ring 02 : 9[1] -> 11[3] via P2P/IPC
-ip-10-0-0-200:65725:66774 [2] NCCL INFO Ring 02 : 10[2] -> 14[6] via P2P/IPC
-ip-10-0-0-200:65726:66772 [3] NCCL INFO Ring 02 : 11[3] -> 10[2] via P2P/IPC
-ip-10-0-0-200:65727:66777 [4] NCCL INFO Ring 02 : 12[4] -> 13[5] via P2P/IPC
-ip-10-0-0-200:65728:66771 [5] NCCL INFO Ring 02 : 13[5] -> 15[7] via P2P/IPC
-ip-10-0-0-200:65729:66765 [6] NCCL INFO Ring 02 : 14[6] -> 12[4] via P2P/IPC
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 02 : 7 -> 8 via NET/Socket/0
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 02 : 8[0] -> 9[1] via P2P/IPC
-ip-10-0-0-239:65698:66748 [1] NCCL INFO Ring 02 : 25[1] -> 27[3] via P2P/IPC
-ip-10-0-0-239:65699:66746 [2] NCCL INFO Ring 02 : 26[2] -> 30[6] via P2P/IPC
-ip-10-0-0-193:65782:66835 [1] NCCL INFO Ring 02 : 33[1] -> 35[3] via P2P/IPC
-ip-10-0-0-239:65701:66737 [4] NCCL INFO Ring 02 : 28[4] -> 29[5] via P2P/IPC
-ip-10-0-0-239:65702:66745 [5] NCCL INFO Ring 02 : 29[5] -> 31[7] via P2P/IPC
-ip-10-0-0-193:65783:66823 [2] NCCL INFO Ring 02 : 34[2] -> 38[6] via P2P/IPC
-ip-10-0-0-239:65700:66740 [3] NCCL INFO Ring 02 : 27[3] -> 26[2] via P2P/IPC
-ip-10-0-0-239:65703:66743 [6] NCCL INFO Ring 02 : 30[6] -> 28[4] via P2P/IPC
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 02 : 23 -> 24 via NET/Socket/0
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 02 : 24[0] -> 25[1] via P2P/IPC
-ip-10-0-0-193:65784:66831 [3] NCCL INFO Ring 02 : 35[3] -> 34[2] via P2P/IPC
-ip-10-0-0-193:65785:66827 [4] NCCL INFO Ring 02 : 36[4] -> 37[5] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 02 : 31 -> 32 via NET/Socket/0
-ip-10-0-0-52:65718:66764 [1] NCCL INFO Ring 02 : 49[1] -> 51[3] via P2P/IPC
-ip-10-0-0-193:65786:66828 [5] NCCL INFO Ring 02 : 37[5] -> 39[7] via P2P/IPC
-ip-10-0-0-193:65787:66821 [6] NCCL INFO Ring 02 : 38[6] -> 36[4] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 02 : 32[0] -> 33[1] via P2P/IPC
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 02 : 63 -> 0 via NET/Socket/0
-ip-10-0-0-52:65719:66761 [2] NCCL INFO Ring 02 : 50[2] -> 54[6] via P2P/IPC
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 02 : 0[0] -> 1[1] via P2P/IPC
-ip-10-0-0-31:65745:66790 [1] NCCL INFO Ring 02 : 41[1] -> 43[3] via P2P/IPC
-ip-10-0-0-31:65746:66784 [2] NCCL INFO Ring 02 : 42[2] -> 46[6] via P2P/IPC
-ip-10-0-0-31:65747:66796 [3] NCCL INFO Ring 02 : 43[3] -> 42[2] via P2P/IPC
-ip-10-0-0-31:65748:66785 [4] NCCL INFO Ring 02 : 44[4] -> 45[5] via P2P/IPC
-ip-10-0-0-52:65720:66757 [3] NCCL INFO Ring 02 : 51[3] -> 50[2] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 02 : 39 -> 40 via NET/Socket/0
-ip-10-0-0-52:65723:66767 [6] NCCL INFO Ring 02 : 54[6] -> 52[4] via P2P/IPC
-ip-10-0-0-52:65721:66771 [4] NCCL INFO Ring 02 : 52[4] -> 53[5] via P2P/IPC
-ip-10-0-0-52:65722:66768 [5] NCCL INFO Ring 02 : 53[5] -> 55[7] via P2P/IPC
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 02 : 47 -> 48 via NET/Socket/0
-ip-10-0-0-31:65750:66792 [6] NCCL INFO Ring 02 : 46[6] -> 44[4] via P2P/IPC
-ip-10-0-0-31:65749:66788 [5] NCCL INFO Ring 02 : 45[5] -> 47[7] via P2P/IPC
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 02 : 48[0] -> 49[1] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 02 : 40[0] -> 41[1] via P2P/IPC
-ip-10-0-0-189:65800:66839 [1] NCCL INFO Ring 02 : 57[1] -> 59[3] via P2P/IPC
-ip-10-0-0-189:65801:66847 [2] NCCL INFO Ring 02 : 58[2] -> 62[6] via P2P/IPC
-ip-10-0-0-189:65802:66851 [3] NCCL INFO Ring 02 : 59[3] -> 58[2] via P2P/IPC
-ip-10-0-0-189:65803:66845 [4] NCCL INFO Ring 02 : 60[4] -> 61[5] via P2P/IPC
-ip-10-0-0-189:65804:66841 [5] NCCL INFO Ring 02 : 61[5] -> 63[7] via P2P/IPC
-ip-10-0-0-189:65805:66853 [6] NCCL INFO Ring 02 : 62[6] -> 60[4] via P2P/IPC
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 02 : 55 -> 56 via NET/Socket/0
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 02 : 56[0] -> 57[1] via P2P/IPC
-ip-10-0-0-132:65763:66806 [1] NCCL INFO Ring 02 : 17[1] -> 19[3] via P2P/IPC
-ip-10-0-0-132:65764:66807 [2] NCCL INFO Ring 02 : 18[2] -> 22[6] via P2P/IPC
-ip-10-0-0-132:65765:66812 [3] NCCL INFO Ring 02 : 19[3] -> 18[2] via P2P/IPC
-ip-10-0-0-132:65766:66810 [4] NCCL INFO Ring 02 : 20[4] -> 21[5] via P2P/IPC
-ip-10-0-0-132:65767:66814 [5] NCCL INFO Ring 02 : 21[5] -> 23[7] via P2P/IPC
-ip-10-0-0-132:65768:66816 [6] NCCL INFO Ring 02 : 22[6] -> 20[4] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 02 : 15 -> 16 via NET/Socket/0
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 02 : 16[0] -> 17[1] via P2P/IPC
-ip-10-0-0-218:66504:67544 [2] NCCL INFO Ring 03 : 2[2] -> 6[6] via P2P/IPC
-ip-10-0-0-218:66503:67546 [1] NCCL INFO Ring 03 : 1[1] -> 3[3] via P2P/IPC
-ip-10-0-0-218:66505:67545 [3] NCCL INFO Ring 03 : 3[3] -> 2[2] via P2P/IPC
-ip-10-0-0-218:66507:67553 [5] NCCL INFO Ring 03 : 5[5] -> 7[7] via P2P/IPC
-ip-10-0-0-218:66506:67542 [4] NCCL INFO Ring 03 : 4[4] -> 5[5] via P2P/IPC
-ip-10-0-0-218:66508:67552 [6] NCCL INFO Ring 03 : 6[6] -> 4[4] via P2P/IPC
-ip-10-0-0-200:65725:66774 [2] NCCL INFO Ring 03 : 10[2] -> 14[6] via P2P/IPC
-ip-10-0-0-200:65724:66766 [1] NCCL INFO Ring 03 : 9[1] -> 11[3] via P2P/IPC
-ip-10-0-0-132:65763:66806 [1] NCCL INFO Ring 03 : 17[1] -> 19[3] via P2P/IPC
-ip-10-0-0-200:65726:66772 [3] NCCL INFO Ring 03 : 11[3] -> 10[2] via P2P/IPC
-ip-10-0-0-200:65729:66765 [6] NCCL INFO Ring 03 : 14[6] -> 12[4] via P2P/IPC
-ip-10-0-0-200:65727:66777 [4] NCCL INFO Ring 03 : 12[4] -> 13[5] via P2P/IPC
-ip-10-0-0-200:65728:66771 [5] NCCL INFO Ring 03 : 13[5] -> 15[7] via P2P/IPC
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 03 : 7 -> 8 via NET/Socket/0
-ip-10-0-0-200:65723:66763 [0] NCCL INFO Ring 03 : 8[0] -> 9[1] via P2P/IPC
-ip-10-0-0-132:65764:66807 [2] NCCL INFO Ring 03 : 18[2] -> 22[6] via P2P/IPC
-ip-10-0-0-132:65765:66812 [3] NCCL INFO Ring 03 : 19[3] -> 18[2] via P2P/IPC
-ip-10-0-0-132:65766:66810 [4] NCCL INFO Ring 03 : 20[4] -> 21[5] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 03 : 15 -> 16 via NET/Socket/0
-ip-10-0-0-132:65768:66816 [6] NCCL INFO Ring 03 : 22[6] -> 20[4] via P2P/IPC
-ip-10-0-0-132:65767:66814 [5] NCCL INFO Ring 03 : 21[5] -> 23[7] via P2P/IPC
-ip-10-0-0-132:65762:66803 [0] NCCL INFO Ring 03 : 16[0] -> 17[1] via P2P/IPC
-ip-10-0-0-239:65698:66748 [1] NCCL INFO Ring 03 : 25[1] -> 27[3] via P2P/IPC
-ip-10-0-0-239:65699:66746 [2] NCCL INFO Ring 03 : 26[2] -> 30[6] via P2P/IPC
-ip-10-0-0-239:65701:66737 [4] NCCL INFO Ring 03 : 28[4] -> 29[5] via P2P/IPC
-ip-10-0-0-239:65700:66740 [3] NCCL INFO Ring 03 : 27[3] -> 26[2] via P2P/IPC
-ip-10-0-0-239:65702:66745 [5] NCCL INFO Ring 03 : 29[5] -> 31[7] via P2P/IPC
-ip-10-0-0-239:65703:66743 [6] NCCL INFO Ring 03 : 30[6] -> 28[4] via P2P/IPC
-ip-10-0-0-193:65782:66835 [1] NCCL INFO Ring 03 : 33[1] -> 35[3] via P2P/IPC
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 03 : 23 -> 24 via NET/Socket/0
-ip-10-0-0-239:65697:66739 [0] NCCL INFO Ring 03 : 24[0] -> 25[1] via P2P/IPC
-ip-10-0-0-193:65783:66823 [2] NCCL INFO Ring 03 : 34[2] -> 38[6] via P2P/IPC
-ip-10-0-0-193:65784:66831 [3] NCCL INFO Ring 03 : 35[3] -> 34[2] via P2P/IPC
-ip-10-0-0-193:65785:66827 [4] NCCL INFO Ring 03 : 36[4] -> 37[5] via P2P/IPC
-ip-10-0-0-31:65745:66790 [1] NCCL INFO Ring 03 : 41[1] -> 43[3] via P2P/IPC
-ip-10-0-0-193:65786:66828 [5] NCCL INFO Ring 03 : 37[5] -> 39[7] via P2P/IPC
-ip-10-0-0-193:65787:66821 [6] NCCL INFO Ring 03 : 38[6] -> 36[4] via P2P/IPC
-ip-10-0-0-31:65746:66784 [2] NCCL INFO Ring 03 : 42[2] -> 46[6] via P2P/IPC
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 03 : 63 -> 0 via NET/Socket/0
-ip-10-0-0-31:65747:66796 [3] NCCL INFO Ring 03 : 43[3] -> 42[2] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 03 : 31 -> 32 via NET/Socket/0
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Ring 03 : 0[0] -> 1[1] via P2P/IPC
-ip-10-0-0-193:65781:66833 [0] NCCL INFO Ring 03 : 32[0] -> 33[1] via P2P/IPC
-ip-10-0-0-31:65748:66785 [4] NCCL INFO Ring 03 : 44[4] -> 45[5] via P2P/IPC
-ip-10-0-0-31:65749:66788 [5] NCCL INFO Ring 03 : 45[5] -> 47[7] via P2P/IPC
-ip-10-0-0-31:65750:66792 [6] NCCL INFO Ring 03 : 46[6] -> 44[4] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 03 : 39 -> 40 via NET/Socket/0
-ip-10-0-0-189:65800:66839 [1] NCCL INFO Ring 03 : 57[1] -> 59[3] via P2P/IPC
-ip-10-0-0-189:65801:66847 [2] NCCL INFO Ring 03 : 58[2] -> 62[6] via P2P/IPC
-ip-10-0-0-31:65744:66798 [0] NCCL INFO Ring 03 : 40[0] -> 41[1] via P2P/IPC
-ip-10-0-0-189:65802:66851 [3] NCCL INFO Ring 03 : 59[3] -> 58[2] via P2P/IPC
-ip-10-0-0-189:65803:66845 [4] NCCL INFO Ring 03 : 60[4] -> 61[5] via P2P/IPC
-ip-10-0-0-189:65804:66841 [5] NCCL INFO Ring 03 : 61[5] -> 63[7] via P2P/IPC
-ip-10-0-0-189:65805:66853 [6] NCCL INFO Ring 03 : 62[6] -> 60[4] via P2P/IPC
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 03 : 55 -> 56 via NET/Socket/0
-ip-10-0-0-189:65799:66849 [0] NCCL INFO Ring 03 : 56[0] -> 57[1] via P2P/IPC
-ip-10-0-0-52:65718:66764 [1] NCCL INFO Ring 03 : 49[1] -> 51[3] via P2P/IPC
-ip-10-0-0-52:65719:66761 [2] NCCL INFO Ring 03 : 50[2] -> 54[6] via P2P/IPC
-ip-10-0-0-52:65720:66757 [3] NCCL INFO Ring 03 : 51[3] -> 50[2] via P2P/IPC
-ip-10-0-0-52:65721:66771 [4] NCCL INFO Ring 03 : 52[4] -> 53[5] via P2P/IPC
-ip-10-0-0-52:65723:66767 [6] NCCL INFO Ring 03 : 54[6] -> 52[4] via P2P/IPC
-ip-10-0-0-52:65722:66768 [5] NCCL INFO Ring 03 : 53[5] -> 55[7] via P2P/IPC
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 03 : 47 -> 48 via NET/Socket/0
-ip-10-0-0-52:65717:66763 [0] NCCL INFO Ring 03 : 48[0] -> 49[1] via P2P/IPC
-ip-10-0-0-218:66502:67556 [0] NCCL INFO Launch mode Parallel
-     1     1   695.2  13.862 8.00000
-Writing summaries to  results
-Checkpoint written to results/checkpoint-50
-----------------------------------------------------------------
-Images/sec: 16914.3 +/- 38.3 (jitter = 168.2)
-----------------------------------------------------------------
+[pkb-fc055cef-0:31416] Warning: could not find environment variable "LD_LIBRARY_PATH"
+2019-01-08 23:02:36.365343: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2019-01-08 23:02:36.506766: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:964] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2019-01-08 23:02:36.507207: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1432] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+totalMemory: 15.75GiB freeMemory: 15.34GiB
+2019-01-08 23:02:36.507236: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1511] Adding visible gpu devices: 0
+2019-01-08 23:02:37.054795: I tensorflow/core/common_runtime/gpu/gpu_device.cc:982] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-01-08 23:02:37.054862: I tensorflow/core/common_runtime/gpu/gpu_device.cc:988]      0
+2019-01-08 23:02:37.054871: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1001] 0:   N
+2019-01-08 23:02:37.055209: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14837 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:00:04.0, compute capability: 7.0)
+2019-01-08 23:02:37.421267: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1511] Adding visible gpu devices: 0
+2019-01-08 23:02:37.421329: I tensorflow/core/common_runtime/gpu/gpu_device.cc:982] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-01-08 23:02:37.421337: I tensorflow/core/common_runtime/gpu/gpu_device.cc:988]      0
+2019-01-08 23:02:37.421342: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1001] 0:   N
+2019-01-08 23:02:37.421453: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14837 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:00:04.0, compute capability: 7.0)
+PY2.7.13 (default, Sep 26 2018, 18:42:22)
+[GCC 6.3.0 20170516]TF1.12.0
+Horovod size: 1
+Using a learning rate of 0.1
+Checkpointing every 1000 steps
+Saving summary every 5004 steps
+Using preprocessing threads per GPU: 5
+2019-01-08 23:02:44.528600: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1511] Adding visible gpu devices: 0
+2019-01-08 23:02:44.528695: I tensorflow/core/common_runtime/gpu/gpu_device.cc:982] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-01-08 23:02:44.528702: I tensorflow/core/common_runtime/gpu/gpu_device.cc:988]      0
+2019-01-08 23:02:44.528707: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1001] 0:   N
+2019-01-08 23:02:44.528843: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14837 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:00:04.0, compute capability: 7.0)
+  Step Epoch Speed   Loss  FinLoss   LR
+2019-01-08 23:02:59.623387: W tensorflow/core/common_runtime/bfc_allocator.cc:211] Allocator (GPU_0_bfc) ran out of memory trying to allocate 3.38GiB. The caller indicates that this is not a failure, but may mean that there could be performance gains if more memory were available.
+2019-01-08 23:02:59.623464: W tensorflow/core/common_runtime/bfc_allocator.cc:211] Allocator (GPU_0_bfc) ran out of memory trying to allocate 3.38GiB. The caller indicates that this is not a failure, but may mean that there could be performance gains if more memory were available.
+2019-01-08 23:03:00.567470: W tensorflow/core/common_runtime/bfc_allocator.cc:211] Allocator (GPU_0_bfc) ran out of memory trying to allocate 3.72GiB. The caller indicates that this is not a failure, but may mean that there could be performance gains if more memory were available.
+2019-01-08 23:03:00.567549: W tensorflow/core/common_runtime/bfc_allocator.cc:211] Allocator (GPU_0_bfc) ran out of memory trying to allocate 3.72GiB. The caller indicates that this is not a failure, but may mean that there could be performance gains if more memory were available.
+     0   0.0    32.9  6.683  8.022 0.10000
+     1   0.0   132.6  0.000  1.339 0.09996
+    50   0.0   792.5  0.000  1.343 0.09801
+   100   0.0   791.9  0.000  1.330 0.09604
+   150   0.0   792.1  0.000  1.318 0.09410
+   200   0.0   792.0  0.000  1.306 0.09217
+   250   0.0   792.1  0.000  1.294 0.09026
+   300   0.0   791.4  0.000  1.282 0.08837
+   350   0.0   791.9  0.000  1.271 0.08650
+   400   0.0   792.1  0.000  1.260 0.08465
+   450   0.0   792.2  0.000  1.250 0.08282
+   500   0.0   792.1  0.000  1.239 0.08102
+   550   0.0   792.3  0.000  1.230 0.07923
+   600   0.0   792.1  0.000  1.220 0.07746
+   650   0.0   791.2  0.000  1.211 0.07571
+   700   0.0   791.6  0.000  1.202 0.07398
+   750   0.0   791.6  0.000  1.193 0.07227
+   800   0.0   791.4  0.000  1.184 0.07058
+   850   0.0   791.8  0.000  1.176 0.06892
+   900   0.0   791.9  0.000  1.168 0.06727
+   950   0.0   791.9  0.000  1.160 0.06564
+  1000   0.0   755.7  0.000  1.153 0.06403
+  1050   0.0   791.5  0.000  1.146 0.06244
+  1100   0.0   791.4  0.000  1.139 0.06087
+  1150   0.0   791.7  0.000  1.132 0.05932
+  1200   0.0   791.7  0.000  1.125 0.05779
+  1250   0.0   792.6  0.000  1.119 0.05628
+  1300   0.0   792.0  0.000  1.113 0.05480
+  1350   0.0   791.9  0.000  1.107 0.05333
+  1400   0.0   790.9  0.000  1.101 0.05188
+  1450   0.0   790.9  0.000  1.095 0.05045
+  1500   0.0   791.1  0.000  1.090 0.04904
+  1550   0.0   791.4  0.000  1.084 0.04765
+  1600   0.0   791.5  0.000  1.079 0.04628
+  1650   0.0   791.2  0.000  1.074 0.04493
+  1700   0.0   792.0  0.000  1.070 0.04360
+  1750   0.0   792.1  0.000  1.065 0.04229
+  1800   0.0   791.9  0.000  1.061 0.04100
+  1850   0.0   791.1  0.000  1.056 0.03973
+  1900   0.0   790.9  0.000  1.052 0.03848
+  1950   0.0   792.0  0.000  1.048 0.03725
+  2000   0.0   745.6  0.000  1.044 0.03604
+  2050   0.0   792.0  0.000  1.041 0.03486
+  2100   0.0   792.4  0.000  1.037 0.03369
+  2150   0.0   792.4  0.000  1.034 0.03254
+  2200   0.0   791.7  0.000  1.030 0.03141
+  2250   0.0   791.2  0.000  1.027 0.03030
+  2300   0.0   792.4  0.000  1.024 0.02921
+  2350   0.0   791.3  0.000  1.021 0.02814
+  2400   0.0   791.7  0.000  1.018 0.02709
+  2450   0.0   792.0  0.000  1.016 0.02606
+  2500   0.0   792.1  0.000  1.013 0.02505
+  2550   0.0   791.5  0.000  1.011 0.02406
+  2600   0.0   791.3  0.000  1.008 0.02309
+  2650   0.0   792.0  0.000  1.006 0.02214
+  2700   0.0   791.7  0.000  1.004 0.02121
+  2750   0.0   792.2  0.000  1.002 0.02030
+  2800   0.0   792.5  0.000  1.000 0.01941
+  2850   0.0   791.7  0.000  0.998 0.01854
+  2900   0.0   791.7  0.000  0.996 0.01769
+  2950   0.0   791.3  0.000  0.994 0.01686
+  3000   0.0   753.7  0.000  0.993 0.01605
+  3050   0.0   792.0  0.000  0.991 0.01526
+  3100   0.0   791.7  0.000  0.990 0.01449
+  3150   0.0   791.8  0.000  0.988 0.01374
+  3200   0.0   792.0  0.000  0.987 0.01301
+  3250   0.0   791.8  0.000  0.986 0.01230
+  3300   0.0   791.5  0.000  0.985 0.01160
+  3350   0.0   791.8  0.000  0.983 0.01093
+  3400   0.0   791.8  0.000  0.982 0.01028
+  3450   0.0   791.9  0.000  0.981 0.00965
+  3500   0.0   791.7  0.000  0.980 0.00904
+  3550   0.0   791.0  0.000  0.980 0.00845
+  3600   0.0   790.7  0.000  0.979 0.00788
+  3650   0.0   790.8  0.000  0.978 0.00733
+  3700   0.0   791.1  0.000  0.977 0.00680
+  3750   0.0   791.0  0.000  0.977 0.00629
+  3800   0.0   791.0  0.000  0.976 0.00580
+  3850   0.0   792.0  0.000  0.976 0.00533
+  3900   0.0   791.3  0.000  0.975 0.00488
+  3950   0.0   791.7  0.000  0.975 0.00445
+  4000   0.0   750.2  0.000  0.974 0.00404
+  4050   0.0   791.4  0.000  0.974 0.00364
+  4100   0.0   790.9  0.000  0.974 0.00327
+  4150   0.0   791.5  0.000  0.973 0.00292
+  4200   0.0   791.4  0.000  0.973 0.00259
+  4250   0.0   791.2  0.000  0.973 0.00228
+  4300   0.0   791.7  0.000  0.973 0.00199
+  4350   0.0   791.4  0.000  0.972 0.00172
+  4400   0.0   790.9  0.000  0.972 0.00147
+  4450   0.0   791.1  0.000  0.972 0.00124
+  4500   0.0   791.4  0.000  0.972 0.00102
+  4550   0.0   791.9  0.000  0.972 0.00083
+  4600   0.0   791.3  0.000  0.972 0.00066
+  4650   0.0   791.5  0.000  0.972 0.00051
+  4700   0.0   791.3  0.000  0.972 0.00038
+  4750   0.0   790.9  0.000  0.972 0.00027
+  4800   0.0   790.9  0.000  0.972 0.00018
+  4850   0.0   790.3  0.000  0.972 0.00010
+  4900   0.0   791.1  0.000  0.972 0.00005
+  4950   0.0   791.3  0.000  0.972 0.00002
+  5000   0.0   739.3  0.000  0.972 0.00001
+Finished in 1650.46359277

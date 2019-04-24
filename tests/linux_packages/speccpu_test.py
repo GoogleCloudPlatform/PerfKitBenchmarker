@@ -417,6 +417,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     speccpu.FLAGS.spec_runmode = 'base'
     vm.speccpu_vm_state = spec_test_config
 
@@ -458,6 +459,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
     samples = speccpu._ExtractScore(SPEED_OUTPUT_SPECINT, vm,
                                     False, 'speed')
@@ -470,6 +472,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
     samples = speccpu._ExtractScore(TEST_OUTPUT_ALL, vm,
                                     False, None)
@@ -482,6 +485,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
     samples = speccpu._ExtractScore(TEST_OUTPUT_PEAK, vm,
                                     False, None)
@@ -494,6 +498,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
     samples = speccpu._ExtractScore(TEST_OUTPUT_PARTIAL_PEAK, vm,
                                     True, None)

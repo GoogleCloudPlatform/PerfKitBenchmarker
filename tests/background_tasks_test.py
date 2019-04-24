@@ -14,6 +14,10 @@
 
 """Tests for perfkitbenchmarker.background_tasks."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import functools
 import multiprocessing
 import multiprocessing.managers
@@ -24,6 +28,8 @@ import unittest
 
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
+from tests import pkb_common_test_case
+from six.moves import range
 
 
 def _ReturnArgs(a, b=None):
@@ -49,7 +55,7 @@ def _WaitAndAppendInt(int_list, int_to_append, event=None, timeout=None):
   int_list.append(int_to_append)
 
 
-class GetCallStringTestCase(unittest.TestCase):
+class GetCallStringTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNoArgs(self):
     result = background_tasks._GetCallString((_ReturnArgs, (), {}))
@@ -86,7 +92,7 @@ class GetCallStringTestCase(unittest.TestCase):
     self.assertEqual(result, '_ReturnArgs(1, 3, blue, 5, x=8)')
 
 
-class RunParallelThreadsTestCase(unittest.TestCase):
+class RunParallelThreadsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testFewerThreadsThanConcurrencyLimit(self):
     calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]
@@ -126,7 +132,7 @@ class RunParallelThreadsTestCase(unittest.TestCase):
     self.assertEqual(int_list, [1])
 
 
-class RunThreadedTestCase(unittest.TestCase):
+class RunThreadedTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNonListParams(self):
     with self.assertRaises(ValueError):
@@ -150,7 +156,7 @@ class RunThreadedTestCase(unittest.TestCase):
     self.assertEqual(result, [(None, 'red'), ('blue', 'green')])
 
 
-class RunParallelProcessesTestCase(unittest.TestCase):
+class RunParallelProcessesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testFewerThreadsThanConcurrencyLimit(self):
     calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]

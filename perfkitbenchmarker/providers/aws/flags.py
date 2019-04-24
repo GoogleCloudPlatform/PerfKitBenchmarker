@@ -26,7 +26,7 @@ flags.DEFINE_integer('aws_provisioned_iops', None,
 flags.DEFINE_string('aws_emr_loguri', None,
                     'The log-uri parameter to pass to AWS when creating a '
                     'cluster.  If not set, a bucket will be created.')
-flags.DEFINE_integer('aws_emr_job_wait_time', None,
+flags.DEFINE_integer('aws_emr_job_wait_time', 18000,
                      'The time to wait for an EMR job to finish, in seconds')
 
 flags.DEFINE_string('s3_custom_endpoint', None,
@@ -53,9 +53,9 @@ flags.DEFINE_string('aws_image_name_regex', None,
                     'IMAGE_NAME_REGEX.')
 flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
                     'AWS bucket where pre-provisioned data has been copied.')
-flags.DEFINE_string('redis_node_type',
+flags.DEFINE_string('cache_node_type',
                     'cache.m4.large',
-                    'The AWS node type to use for cloud redis')
+                    'The AWS cache node type to use for elasticache clusters.')
 flags.DEFINE_string('aws_elasticache_failover_zone',
                     None,
                     'AWS elasticache failover zone')

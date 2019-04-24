@@ -21,6 +21,9 @@ See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
 for more information.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import datetime
 import json
 import logging
@@ -30,6 +33,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -95,24 +99,27 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
-        '--gce-zone=%s' % instance_zone,
+        '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size,
     ]
     if self.spec.engine == managed_relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
-    # TODO(ferneyhough): add tier machine types support for Postgres
-    if self.spec.engine == managed_relational_db.MYSQL:
-      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
-      cmd_string.append(machine_type_flag)
-    else:
+
+    if (self.spec.vm_spec.cpus and
+        self.spec.vm_spec.memory):
       self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
+    elif hasattr(self.spec.vm_spec, 'machine_type'):
+      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+      cmd_string.append(machine_type_flag)
+    else:
+      raise Exception('Unspecified machine type')
 
     if self.spec.high_availability:
       cmd_string.append(self._GetHighAvailabilityFlag())
@@ -155,12 +162,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
         config.
     """
-    if not hasattr(self.spec.vm_spec, 'cpus'):
+    if not hasattr(self.spec.vm_spec, 'cpus') or not self.spec.vm_spec.cpus:
       raise data.ResourceNotFound(
           'Must specify cpu count in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
-    if not hasattr(self.spec.vm_spec, 'memory'):
+    if not hasattr(self.spec.vm_spec, 'memory') or not self.spec.vm_spec.memory:
       raise data.ResourceNotFound(
           'Must specify a memory amount in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
@@ -179,7 +186,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Raises:
       ValueError on invalid configuration.
     """
-    if cpus not in [1] + range(2, 32, 2):
+    if cpus not in [1] + list(range(2, 32, 2)):
       raise ValueError(
           'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
           'inclusive.' % cpus)
@@ -191,14 +198,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     ratio = memory / 1024.0 / cpus
     if (ratio < CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND or
         ratio > CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND):
-      raise ValueError('The memory (%.2fGiB) per vCPU (%d) of a custom machine '
-                       'type must be between %.2f GiB and %.2f GiB per vCPU, '
-                       'inclusive.' %
-                       (memory / 1024.0,
-                        cpus,
-                        CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
-                        CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND)
-                       )
+      raise ValueError(
+          'The memory (%.2fGiB) per vCPU (%d) of a custom machine '
+          'type must be between %.2f GiB and %.2f GiB per vCPU, '
+          'inclusive.' %
+          (memory / 1024.0, cpus, CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
+           CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND))
     if memory < MIN_CUSTOM_MACHINE_MEM_MB:
       raise ValueError('The total memory (%dMiB) for a custom machine type'
                        'must be at least %dMiB.' %
@@ -321,7 +326,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.engine == managed_relational_db.POSTGRES:
       cmd = util.GcloudCommand(
           self, 'sql', 'users', 'set-password', 'postgres',
-          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--host=dummy_host', '--instance={0}'.format(self.instance_id),
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
 

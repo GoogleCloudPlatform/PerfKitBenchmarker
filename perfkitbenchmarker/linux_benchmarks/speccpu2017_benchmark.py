@@ -65,13 +65,9 @@ speccpu2017:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
+      os_type: ubuntu1604
 """
 
-_SPECCPU2017_DIR = 'cpu2017'
-_SPECCPU2017_TAR = 'speccpu2017.tgz'
-_TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
-_LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
-BENCHMARK_DATA = {_SPECCPU2017_TAR: None}
 KB_TO_GB_MULTIPLIER = 1000000
 
 LOG_FILENAME = {
@@ -133,14 +129,7 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   CheckVmPrerequisites(vm)
-  install_config = speccpu.SpecInstallConfigurations()
-  install_config.benchmark_name = BENCHMARK_NAME
-  install_config.base_spec_dir = _SPECCPU2017_DIR
-  install_config.base_tar_file_path = _SPECCPU2017_TAR
-  install_config.required_members = _TAR_REQUIRED_MEMBERS
-  install_config.log_format = _LOG_FORMAT
-  speccpu.InstallSPECCPU(vm, install_config)
-  vm.Install('speccpu2017_dependencies')
+  vm.Install('speccpu2017')
 
 
 def Run(benchmark_spec):
@@ -169,12 +158,13 @@ def Run(benchmark_spec):
   # rate runs require 2 GB minimum system main memory per copy,
   # not including os overhead
   # Refer to: https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
-  copies = min(vm.num_cpus,
+  copies = min(vm.NumCpusForBenchmark(),
                vm.total_free_memory_kb / (2 * KB_TO_GB_MULTIPLIER))
   version_specific_parameters.append(' --copies=%s ' %
                                      (FLAGS.spec17_copies or copies))
   version_specific_parameters.append(' --threads=%s ' %
-                                     (FLAGS.spec17_threads or vm.num_cpus))
+                                     (FLAGS.spec17_threads or
+                                      vm.NumCpusForBenchmark()))
 
   if FLAGS.spec17_fdo:
     version_specific_parameters.append('--feedback ')
@@ -182,6 +172,12 @@ def Run(benchmark_spec):
 
   speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
               version_specific_parameters)
+
+  partial_results = True
+  # Do not allow partial results if any benchmark subset is a full suite.
+  for benchmark_subset in FLAGS.benchmark_subset:
+    if benchmark_subset in ['intspeed', 'fpspeed', 'intrate', 'fprate']:
+      partial_results = False
 
   log_files = set()
   for test in FLAGS.spec17_subset:
@@ -197,7 +193,7 @@ def Run(benchmark_spec):
       elif test in FPRATE_SUITE:
         log_files.add(LOG_FILENAME['fprate'])
 
-  return speccpu.ParseOutput(vm, log_files, False, None)
+  return speccpu.ParseOutput(vm, log_files, partial_results, None)
 
 
 def Cleanup(benchmark_spec):

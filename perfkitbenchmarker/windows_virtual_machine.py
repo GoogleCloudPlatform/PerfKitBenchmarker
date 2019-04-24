@@ -292,7 +292,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('shutdown -t 0 -r -f', ignore_failure=True)
 
   def VMLastBootTime(self):
-    """Returns the UTC time the VM was last rebooted as reported by the VM."""
+    """Returns the time the VM was last rebooted as reported by the VM."""
     resp, _ = self.RemoteHostCommand('systeminfo | find /i "Boot Time"',
                                      suppress_warning=True)
     return resp
@@ -504,3 +504,18 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       devices: list of strings. A list of block devices.
     """
     raise NotImplementedError()
+
+
+class Windows2012Mixin(WindowsMixin):
+  """Class holding Windows2012 specific VM methods and attributes."""
+  OS_TYPE = os_types.WINDOWS2012
+
+
+class Windows2016Mixin(WindowsMixin):
+  """Class holding Windows2016 specific VM methods and attributes."""
+  OS_TYPE = os_types.WINDOWS2016
+
+
+class Windows2019Mixin(WindowsMixin):
+  """Class holding Windows2019 specific VM methods and attributes."""
+  OS_TYPE = os_types.WINDOWS2019

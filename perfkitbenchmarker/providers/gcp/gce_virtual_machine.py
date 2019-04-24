@@ -24,6 +24,10 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import copy
 import itertools
@@ -50,6 +54,8 @@ from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
+import six
+from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -63,11 +69,7 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
                     'potential stockout scenario.')
 _GCE_VM_CREATE_TIMEOUT = 600
-_GPU_TYPE_TO_INTERAL_NAME_MAP = {
-    'k80': 'nvidia-tesla-k80',
-    'p100': 'nvidia-tesla-p100',
-    'v100': 'nvidia-tesla-v100',
-}
+_GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -163,31 +165,44 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder,
-                         {'default': None}),
-        'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
-                                                        'min': 0}),
-        'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
-        'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
-        'project': (option_decoders.StringDecoder, {'default': None}),
-        'image_family': (option_decoders.StringDecoder, {'default': None}),
-        'image_project': (option_decoders.StringDecoder, {'default': None}),
-        'node_type': (
-            option_decoders.StringDecoder,
-            {
-                'default': 'n1-node-96-624'
-            }
-        ),
-        'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
-        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
-        'gce_tags': (
-            option_decoders.ListDecoder,
-            {
-                'item_decoder': option_decoders.StringDecoder(),
-                'default': None
-            }
-        ),
+        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {
+            'default': None
+        }),
+        'num_local_ssds': (option_decoders.IntDecoder, {
+            'default': 0,
+            'min': 0
+        }),
+        'preemptible': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'boot_disk_size': (option_decoders.IntDecoder, {
+            'default': None
+        }),
+        'boot_disk_type': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'project': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'image_family': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'image_project': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'node_type': (option_decoders.StringDecoder, {
+            'default': 'n1-node-96-624'
+        }),
+        'num_vms_per_host': (option_decoders.IntDecoder, {
+            'default': None
+        }),
+        'min_cpu_platform': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'gce_tags': (option_decoders.ListDecoder, {
+            'item_decoder': option_decoders.StringDecoder(),
+            'default': None
+        }),
     })
     return result
 
@@ -210,7 +225,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
 
   def _Create(self):
     """Creates the node template."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'create', self.name)
     cmd.flags['node-type'] = self.node_type
     cmd.flags['region'] = self.region
@@ -218,7 +233,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
 
   def _Exists(self):
     """Returns True if the node template exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'describe', self.name)
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
@@ -226,7 +241,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the node template."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'delete', self.name)
     cmd.flags['region'] = self.region
     cmd.Issue()
@@ -247,7 +262,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
   def __init__(self, node_type, zone, project):
     super(GceSoleTenantNodeGroup, self).__init__()
     with self._counter_lock:
-      self.instance_number = self._counter.next()
+      self.instance_number = next(self._counter)
     self.name = 'pkb-node-group-%s-%s' % (FLAGS.run_uri, self.instance_number)
     self.node_type = node_type
     self.node_template = None
@@ -257,7 +272,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
 
   def _Create(self):
     """Creates the host."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'create', self.name)
     cmd.flags['node-template'] = self.node_template.name
     cmd.flags['target-size'] = 1
@@ -278,14 +293,14 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
 
   def _Exists(self):
     """Returns True if the host exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def _Delete(self):
     """Deletes the host."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+    cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'delete', self.name)
     cmd.Issue()
 
@@ -308,7 +323,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
     Must be prepended by the flag '--accelerator'.
   """
   gce_accelerator_type = (FLAGS.gce_accelerator_type_override or
-                          _GPU_TYPE_TO_INTERAL_NAME_MAP[accelerator_type])
+                          _GCE_NVIDIA_GPU_PREFIX + accelerator_type)
   return 'type={0},count={1}'.format(
       gce_accelerator_type,
       accelerator_count)
@@ -370,6 +385,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
+    self.gce_network_tier = FLAGS.gce_network_tier
 
   @property
   def host_list(self):
@@ -385,10 +401,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = []
-    if self.node_group:
-      args = ['alpha']
-    args.extend(['compute', 'instances', 'create', self.name])
+    args = ['compute', 'instances', 'create', self.name]
 
     cmd = util.GcloudCommand(self, *args)
     if self.network.subnet_resource is not None:
@@ -422,27 +435,27 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
         FLAGS.gcp_instance_metadata_from_file)
-    for key, value in parsed_metadata_from_file.iteritems():
+    for key, value in six.iteritems(parsed_metadata_from_file):
       if key in metadata_from_file:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
                         'from command line.', key)
         continue
       metadata_from_file[key] = value
     cmd.flags['metadata-from-file'] = ','.join([
-        '%s=%s' % (k, v) for k, v in metadata_from_file.iteritems()
+        '%s=%s' % (k, v) for k, v in six.iteritems(metadata_from_file)
     ])
 
     metadata = {'owner': FLAGS.owner} if FLAGS.owner else {}
     metadata.update(self.boot_metadata)
     parsed_metadata = flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata)
-    for key, value in parsed_metadata.iteritems():
+    for key, value in six.iteritems(parsed_metadata):
       if key in metadata:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
                         'from command line.', key)
         continue
       metadata[key] = value
     cmd.flags['metadata'] = ','.join(
-        ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
+        ['%s=%s' % (k, v) for k, v in six.iteritems(metadata)])
 
     # TODO(gareth-ferneyhough): If GCE one day supports live migration on GPUs
     #                           this can be revised.
@@ -453,13 +466,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           'as it is not supported by GCP.')
     if not FLAGS.gce_migrate_on_maintenance or self.gpu_count:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
-    ssd_interface_option = FLAGS.gce_ssd_interface
-    cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
-                              self.max_local_disks)
+    cmd.flags['local-ssd'] = (['interface={0}'.format(
+        FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     if self.preemptible:
       cmd.flags['preemptible'] = True
+    cmd.flags['network-tier'] = self.gce_network_tier.upper()
+
     return cmd
 
   def _Create(self):
@@ -467,7 +481,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     num_hosts = len(self.host_list)
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
-    with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(),
+    with vm_util.NamedTemporaryFile(mode='w', dir=vm_util.GetTempDir(),
                                     prefix='key-metadata') as tf:
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.close()
@@ -521,17 +535,33 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           self.node_group.Delete()
           self.deleted_hosts.add(self.node_group)
 
+  def _ParseDescribeResponse(self, describe_response):
+    """Sets the ID and IP addresses from a response to the describe command.
+
+    Args:
+      describe_response: JSON-loaded response to the describe gcloud command.
+
+    Raises:
+      KeyError, IndexError: If the ID and IP addresses cannot be parsed.
+    """
+    self.id = describe_response['id']
+    network_interface = describe_response['networkInterfaces'][0]
+    self.internal_ip = network_interface['networkIP']
+    self.ip_address = network_interface['accessConfigs'][0]['natIP']
+
+  def _NeedsToParseDescribeResponse(self):
+    """Returns whether the ID and IP addresses still need to be set."""
+    return not self.id or not self.internal_ip or not self.ip_address
+
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
-    getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
-                                         'describe', self.name)
-    stdout, _, _ = getinstance_cmd.Issue()
-    response = json.loads(stdout)
-    self.id = response['id']
-    network_interface = response['networkInterfaces'][0]
-    self.internal_ip = network_interface['networkIP']
-    self.ip_address = network_interface['accessConfigs'][0]['natIP']
+    if self._NeedsToParseDescribeResponse():
+      getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
+                                           'describe', self.name)
+      stdout, _, _ = getinstance_cmd.Issue()
+      response = json.loads(stdout)
+      self._ParseDescribeResponse(response)
     if not self.image:
       getdisk_cmd = util.GcloudCommand(
           self, 'compute', 'disks', 'describe', self.name)
@@ -552,9 +582,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                          'describe', self.name)
     stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True)
     try:
-      json.loads(stdout)
+      response = json.loads(stdout)
     except ValueError:
       return False
+    try:
+      # The VM may exist before we can fully parse the describe response for the
+      # IP address or ID of the VM. For example, if the VM has a status of
+      # provisioning, we can't yet parse the IP address. If this is the case, we
+      # will continue to invoke the describe command in _PostCreate above.
+      # However, if we do have this information now, it's better to stash it and
+      # avoid invoking the describe command again.
+      self._ParseDescribeResponse(response)
+    except (KeyError, IndexError):
+      pass
     return True
 
   def CreateScratchDisk(self, disk_spec):
@@ -565,7 +605,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     disks = []
 
-    for i in xrange(disk_spec.num_striped_disks):
+    for i in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
         name = ''
         if FLAGS.gce_ssd_interface == SCSI:
@@ -594,7 +634,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def AddMetadata(self, **kwargs):
-    """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
+    """Adds metadata to the VM and disk."""
     if not kwargs:
       return
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
@@ -604,6 +644,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['metadata'] = '{metadata},{kwargs}'.format(
           metadata=cmd.flags['metadata'],
           kwargs=util.FormatTags(kwargs))
+    cmd.Issue()
+
+    cmd = util.GcloudCommand(
+        self, 'compute', 'disks', 'add-labels', self.name)
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
@@ -645,6 +690,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['accelerator_type_override'] = self.gce_accelerator_type_override
     if self.gce_tags:
       result['gce_tags'] = ','.join(self.gce_tags)
+    if self.max_local_disks:
+      result['gce_local_ssd_count'] = self.max_local_disks
+      result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
+    result['gce_network_tier'] = self.gce_network_tier
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -678,9 +727,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # the argument is deprecated in favor of --filter.
       vm_without_zone = copy.copy(self)
       vm_without_zone.zone = None
-      gcloud_command = util.GcloudCommand(
-          vm_without_zone, 'compute', 'operations', 'list',
-          '--filter=zone:%s targetLink.scope():%s' % (self.zone, self.name))
+      gcloud_command = util.GcloudCommand(vm_without_zone, 'compute',
+                                          'operations', 'list')
+      gcloud_command.flags['filter'] = 'zone:%s targetLink.scope():%s' % (
+          self.zone, self.name)
       stdout, _, _ = gcloud_command.Issue()
       self.early_termination = any(
           operation['operationType'] == 'compute.instances.preempted'
@@ -847,6 +897,24 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = self.RemoteCommand('netsh int tcp show global')
     if 'Receive-Side Scaling State          : enabled' in stdout:
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
+
+
+class Windows2012GceVirtualMachine(WindowsGceVirtualMachine,
+                                   windows_virtual_machine.Windows2012Mixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2016GceVirtualMachine(WindowsGceVirtualMachine,
+                                   windows_virtual_machine.Windows2016Mixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2016'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2019GceVirtualMachine(WindowsGceVirtualMachine,
+                                   windows_virtual_machine.Windows2019Mixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

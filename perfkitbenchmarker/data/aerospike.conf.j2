@@ -2,90 +2,92 @@
 
 # This stanza must come first.
 service {
-	run-as-daemon false
-	paxos-single-replica-limit 1 # Number of nodes where the replica count is automatically reduced to 1.
-	transaction-threads-per-queue {{ transaction_threads_per_queue }}
-	# Note:  The number of concurrent connections to the database is limited by "proto-fd-max",
-	#         which is in turn limited by the system's maximum number of open file descriptors.
-	#         Read "man limits.conf" for how to set the system's "nofile" limit.
-	proto-fd-max 1024
-	work-directory run/work
-	pidfile run/asd.pid
+  run-as-daemon false
+  paxos-single-replica-limit 1 # Number of nodes where the replica count is automatically reduced to 1.
+  transaction-threads-per-queue {{ transaction_threads_per_queue }}
+  # Note:  The number of concurrent connections to the database is limited by "proto-fd-max",
+  #         which is in turn limited by the system's maximum number of open file descriptors.
+  #         Read "man limits.conf" for how to set the system's "nofile" limit.
+  proto-fd-max 1024
+  work-directory run/work
+  pidfile run/asd.pid
 }
 
 mod-lua {
-	user-path   run/work/usr/udf/lua
-	system-path run/work/sys/udf/lua
+  user-path   run/work/usr/udf/lua
+  system-path run/work/sys/udf/lua
 }
 
 logging {
-	# Log file must be an absolute path.
-	file run/log/aerospike.log {
-		context any info
-	}
+  # Log file must be an absolute path.
+  file run/log/aerospike.log {
+    context any info
+  }
 
-	console {
-		context any info
-	}
+  console {
+    context any info
+  }
 }
 
 network {
-	service {
-		address any
-		port 3000
-	}
+  service {
+    address any
+    port 3000
+  }
 
-	heartbeat {
-		mode mesh                   # Send heartbeats using Mesh (Unicast) protocol
+  heartbeat {
+    mode mesh                   # Send heartbeats using Mesh (Unicast) protocol
 
-		port 3002                   # port on which this node is listening to
+    port 3002                   # port on which this node is listening to
 
 {%- for address in seed_addresses|default([], true) %}
-		mesh-seed-address-port {{ address }}  3002 # IP address for seed node in the cluster
+    mesh-seed-address-port {{ address }}  3002 # IP address for seed node in the cluster
 {% endfor %}
-		interval 150
-		timeout 10
-	}
+    interval 150
+    timeout 10
+  }
 
-	fabric {
-		port 3001
-	}
+  fabric {
+    port 3001
+  }
 
-	info {
-		port 3003
-	}
+  info {
+    port 3003
+  }
 }
 
 namespace test {
-	replication-factor {{ replication_factor }}
-	memory-size {{ memory_size }}K
-	default-ttl 30d # 30 days, use 0 to never expire/evict.
-	{# if storage devices are passed to the template, use them for storage; otherwise use memory. -#}
-	{% if devices %}
-	storage-engine device { # Configure the storage-engine to use persistence
-	{% for device_path in devices %}
-	device {{ device_path }}
-	{% endfor %}
-	write-block-size 128K   # adjust block size to make it efficient for SSDs
-	disable-odirect true
-	}
-	{% else %}
-	storage-engine memory
-	{% endif %}
+  replication-factor {{ replication_factor }}
+  memory-size {{ memory_size }}K
+  default-ttl 30d # 30 days, use 0 to never expire/evict.
+  {# if storage devices are passed to the template, use them for storage; otherwise use memory. -#}
+  {% if devices %}
+  storage-engine device { # Configure the storage-engine to use persistence
+  {% for device_path in devices %}
+  device {{ device_path }}
+  {% endfor %}
+  write-block-size 128K   # adjust block size to make it efficient for SSDs
+  }
+  # As noted in https://discuss.aerospike.com/t/buffering-and-caching-in-aerospike/5623,
+  # running with disable-odirect true could lead to more extensive data loss
+  # since it disabled odirect for all IO.
+  {% else %}
+  storage-engine memory
+  {% endif %}
 }
 
 namespace bar {
-	replication-factor 2
-	memory-size 4G
-	default-ttl 30d # 30 days, use 0 to never expire/evict.
+  replication-factor 2
+  memory-size 4G
+  default-ttl 30d # 30 days, use 0 to never expire/evict.
 
-	storage-engine memory
+  storage-engine memory
 
-	# To use file storage backing, comment out the line above and use the
-	# following lines instead.
-#	storage-engine device {
-#		file /opt/aerospike/data/bar.dat
-#		filesize 16G
-#		data-in-memory true # Store data in memory in addition to file.
-#	}
+  # To use file storage backing, comment out the line above and use the
+  # following lines instead.
+#  storage-engine device {
+#    file /opt/aerospike/data/bar.dat
+#    filesize 16G
+#    data-in-memory true # Store data in memory in addition to file.
+#  }
 }

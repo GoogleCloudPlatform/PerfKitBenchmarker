@@ -21,15 +21,14 @@ import functools
 import logging
 import os
 import posixpath
-
 import re
-import urllib2
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from six.moves import urllib
 
 
 FLAGS = flags.FLAGS
@@ -68,7 +67,7 @@ def _GetHBaseURL():
   url = '{}/{}/'.format(
       HBASE_URL_BASE,
       'stable' if FLAGS.hbase_use_stable else FLAGS.hbase_version)
-  response = urllib2.urlopen(url)
+  response = urllib.request.urlopen(url)
   html = response.read()
   m = re.search(HBASE_PATTERN, html)
   if not m:

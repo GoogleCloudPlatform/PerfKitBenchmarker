@@ -20,9 +20,14 @@ basic performance properties of the function.
 
 Homepage: https://fossies.org/linux/glibc/benchtests/README
 
-Installs glibc-2.27. The benchmark needs python 2.7 or later in addition to the
-dependencies required to build the GNU C Library.
+Installs glibc (see linux_packages/glibc.py for the version). The benchmark
+needs python 2.7 or later in addition to the dependencies required to build the
+GNU C Library.
 """
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import json
 import logging
@@ -31,6 +36,8 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import glibc
+import six
 
 FLAGS = flags.FLAGS
 
@@ -93,6 +100,7 @@ def UpdateMetadata(metadata):
   """Update metadata with glibc-related flag values."""
   metadata['gcc'] = '5.5.0-12'
   metadata['glibc_benchset'] = FLAGS.glibc_benchset
+  metadata['glibc_version'] = glibc.GLIBC_VERSION
 
 
 # The reason to write this helper function is that glibc_benchset_output.json
@@ -144,14 +152,14 @@ def ParseOutput(glibc_output, benchmark_spec, upper_key, results):
   UpdateMetadata(metadata)
 
   jsondata = json.loads(glibc_output, object_pairs_hook=HelperParseOutput)
-  for function, items in jsondata[upper_key].iteritems():
+  for function, items in six.iteritems(jsondata[upper_key]):
     # handle the jsondata with duplicate keys
     if isinstance(items, list):
       for item in items:
         current_metadata = metadata.copy()
-        for key, val in item.iteritems():
+        for key, val in six.iteritems(item):
           metric = '{0}:{1}'.format(function, key)
-          for subitem, value in val.iteritems():
+          for subitem, value in six.iteritems(val):
             current_metadata[subitem] = value
           results.append(sample.Sample(metric, -1, '', current_metadata))
     # handle the jsondata with unique keys
@@ -159,7 +167,7 @@ def ParseOutput(glibc_output, benchmark_spec, upper_key, results):
       for item in items:
         current_metadata = metadata.copy()
         metric = '{0}:{1}'.format(function, item)
-        for subitem, value in items[item].iteritems():
+        for subitem, value in six.iteritems(items[item]):
           current_metadata[subitem] = value
         results.append(sample.Sample(metric, -1, '', current_metadata))
 

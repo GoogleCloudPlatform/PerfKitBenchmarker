@@ -284,7 +284,7 @@ def Run(benchmark_spec):
   base_cmd.extend(('-c', chase_type))
 
   for thread_count in FLAGS.multichase_thread_count:
-    if thread_count > vm.num_cpus:
+    if thread_count > vm.NumCpusForBenchmark():
       continue
     memory_size_iterator = _IterMemorySizes(
         lambda: vm.total_memory_kb * 1024, FLAGS.multichase_memory_size_min,

@@ -92,7 +92,7 @@ def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
       'master_ip': master_ip,
       'worker_ips': worker_ips,
       'scratch_dir': scratch_dir,
-      'vcpus': vm.num_cpus,
+      'vcpus': vm.NumCpusForBenchmark(),
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
       'user': vm.user_name,
       'yarn_memory_mb': yarn_memory_mb

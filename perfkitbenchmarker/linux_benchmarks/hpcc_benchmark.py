@@ -38,6 +38,10 @@ http://www.advancedclustering.com/faq/how-do-i-tune-my-hpldat-file.html
 http://www.netlib.org/benchmark/hpl/faqs.html
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import math
 
@@ -51,6 +55,8 @@ from perfkitbenchmarker.linux_packages import hpcc
 from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import openblas
 from perfkitbenchmarker.linux_packages import openmpi
+import six
+from six.moves import range
 
 FLAGS = flags.FLAGS
 HPCCINF_FILE = 'hpccinf.txt'
@@ -119,7 +125,7 @@ def CreateHpccinf(vm, benchmark_spec):
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
     total_memory = vm.total_free_memory_kb * 1024 * num_vms
-  total_cpus = vm.num_cpus * num_vms
+  total_cpus = vm.NumCpusForBenchmark() * num_vms
   block_size = BLOCK_SIZE
 
   # Finds a problem size that will fit in memory and is a multiple of the
@@ -133,7 +139,7 @@ def CreateHpccinf(vm, benchmark_spec):
   sqrt_cpus = int(math.sqrt(total_cpus)) + 1
   num_rows = 0
   num_columns = 0
-  for i in reversed(range(sqrt_cpus)):
+  for i in reversed(list(range(sqrt_cpus))):
     if total_cpus % i == 0:
       num_rows = i
       num_columns = total_cpus / i
@@ -231,7 +237,7 @@ def ParseOutput(hpcc_output, benchmark_spec):
   # benchmark from the metric_values map.
   benchmarks_run = FLAGS.hpcc_benchmarks or hpcc.HPCC_METRIC_MAP
   for benchmark in benchmarks_run:
-    for metric, units in hpcc.HPCC_METRIC_MAP[benchmark].iteritems():
+    for metric, units in six.iteritems(hpcc.HPCC_METRIC_MAP[benchmark]):
       value = metric_values[metric]
 
       # Copy metadata reported in the HPCC summary statistics to the metadata.
@@ -260,7 +266,7 @@ def Run(benchmark_spec):
   master_vm.RemoteCommand(('if [ -f hpccoutf.txt ]; then '
                            'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
                            'fi'))
-  num_processes = len(vms) * master_vm.num_cpus
+  num_processes = len(vms) * master_vm.NumCpusForBenchmark()
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '

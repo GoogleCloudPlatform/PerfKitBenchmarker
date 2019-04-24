@@ -14,7 +14,10 @@
 
 """Tests for PerfKitBenchmarker' StaticVirtualMachine."""
 
-from io import BytesIO
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 import mock
@@ -25,6 +28,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
 from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
 from tests import pkb_common_test_case
+from six import StringIO
+from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -63,7 +68,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     super(StaticVirtualMachineTest, self).setUp()
     self._initial_pool = StaticVirtualMachine.vm_pool
     StaticVirtualMachine.vm_pool.clear()
-    p = mock.patch(vm_util.__name__ + '.GetTempDir')
+    p = mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')
     p.start()
     self.addCleanup(p.stop)
     FLAGS.image = 'test_image'
@@ -81,19 +86,19 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(vm1.ssh_private_key, vm2.ssh_private_key)
 
   def testReadFromFile_WrongFormat(self):
-    fp = BytesIO('{}')
+    fp = StringIO('{}')
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
 
   def testReadFromFile_MissingKey(self):
-    fp = BytesIO('[{"ip_address": "10.10.10.3"}]')
+    fp = StringIO('[{"ip_address": "10.10.10.3"}]')
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
 
   def testReadFromFile_Empty(self):
-    fp = BytesIO('[]')
+    fp = StringIO('[]')
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual([], list(StaticVirtualMachine.vm_pool))
 
@@ -110,7 +115,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '   "internal_ip": "10.10.10.2", '
          '   "zone": "rackspace_dallas" '
          '}] ')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
 
     vm_pool = StaticVirtualMachine.vm_pool
@@ -134,7 +139,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '  "keyfile_path": "perfkitbenchmarker.pem", '
          '  "scratch_disk_mountpoints": "/tmp/google-pkb" '
          '}]')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
@@ -146,7 +151,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '  "user_name": "perfkitbenchmarker", '
          '  "keyfile_path": "perfkitbenchmarker.pem"'
          '}]')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
 
     vm_pool = StaticVirtualMachine.vm_pool
@@ -172,7 +177,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '   "internal_ip": "10.10.10.2", '
          '   "zone": "rackspace_dallas" '
          '}] ')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(2, len(StaticVirtualMachine.vm_pool))
     vm0 = StaticVirtualMachine.GetStaticVirtualMachine()
@@ -197,7 +202,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     expected_paths_and_mount_points = (
         (None, '/test_scratch_disk_0'), (None, '/test_scratch_disk_1'),
         ('/test_local_disk_0', None), ('/test_local_disk_1', None))
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(1, len(StaticVirtualMachine.vm_pool))
     vm = StaticVirtualMachine.GetStaticVirtualMachine()

@@ -16,7 +16,8 @@
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 GLIBC_DIR = '%s/glibc' % INSTALL_DIR
-GLIBC_TAR = 'glibc-2.27.tar.xz'
+GLIBC_VERSION = '2.29'
+GLIBC_TAR = 'glibc-{}.tar.xz'.format(GLIBC_VERSION)
 
 BINUTILS_DIR = '%s/binutils' % INSTALL_DIR
 BINUTILS_TAR = 'binutils-2.30.tar.gz'
@@ -44,14 +45,14 @@ def _Install(vm):
   vm.RemoteCommand('cd {0} && mkdir glibc'.format(INSTALL_DIR))
   vm.RemoteCommand(
       'cd {0} && '
-      'wget https://fossies.org/linux/misc/glibc-2.27.tar.xz'.format(GLIBC_DIR))
+      'wget https://fossies.org/linux/misc/{1}'.format(GLIBC_DIR, GLIBC_TAR))
   vm.RemoteCommand('cd {0} && tar xvf {1}'.format(GLIBC_DIR, GLIBC_TAR))
   vm.RemoteCommand(
       'cd {0} && mkdir glibc-build && cd glibc-build && '
-      '../glibc-2.27/configure --prefix=/usr/local/glibc --disable-profile '
+      '../glibc-{1}/configure --prefix=/usr/local/glibc --disable-profile '
       '--enable-add-ons --with-headers=/usr/include '
       '--with-binutils=/opt/binutils/bin && make && sudo make install'.format(
-          GLIBC_DIR))
+          GLIBC_DIR, GLIBC_VERSION))
 
 
 def YumInstall(vm):

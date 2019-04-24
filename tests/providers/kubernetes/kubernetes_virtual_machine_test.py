@@ -27,6 +27,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flgs.FLAGS
 FLAGS.kubernetes_anti_affinity = False
@@ -158,7 +159,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     flags.kubectl = _KUBECTL
     flags.kubeconfig = _KUBECONFIG
 
-    stack.enter_context(mock.patch('__builtin__.open'))
+    stack.enter_context(mock.patch(builtins.__name__ + '.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
 
     # Save and return the temp_file mock here so that we can access the write()

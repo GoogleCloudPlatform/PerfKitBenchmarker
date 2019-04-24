@@ -14,6 +14,10 @@
 
 """Contains code related to lifecycle management of Kubernetes Pods."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import posixpath
@@ -31,6 +35,7 @@ from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
+import six
 
 FLAGS = flags.FLAGS
 
@@ -39,9 +44,7 @@ SELECTOR_PREFIX = 'pkb'
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
-  """
-  Object representing a Kubernetes POD.
-  """
+  """Object representing a Kubernetes POD."""
   CLOUD = providers.KUBERNETES
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
@@ -96,9 +99,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._DeletePod()
 
   def _CheckPrerequisites(self):
-    """
-    Exits if any of the prerequisites is not met.
-    """
+    """Exits if any of the prerequisites is not met."""
     if not FLAGS.kubectl:
       raise Exception('Please provide path to kubectl tool using --kubectl '
                       'flag. Exiting.')
@@ -141,9 +142,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
                     self.name)
 
   def _DeletePod(self):
-    """
-    Deletes a POD.
-    """
+    """Deletes a POD."""
     delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'delete', 'pod', self.name]
     output = vm_util.IssueCommand(delete_pod)
@@ -151,9 +150,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self):
-    """
-    POD should have been already created but this is a double check.
-    """
+    """POD should have been already created but this is a double check."""
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
@@ -171,9 +168,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _DeleteVolumes(self):
-    """
-    Deletes volumes.
-    """
+    """Deletes volumes."""
     for scratch_disk in self.scratch_disks[:]:
       scratch_disk.Delete()
       self.scratch_disks.remove(scratch_disk)
@@ -182,9 +177,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
   def _GetInternalIp(self):
-    """
-    Gets the POD's internal ip address.
-    """
+    """Gets the POD's internal ip address."""
     pod_ip = kubernetes_helper.Get(
         'pods', self.name, '', '.status.podIP')
 
@@ -213,9 +206,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _SetupDevicesPaths(self):
-    """
-    Sets the path to each scratch disk device.
-    """
+    """Sets the path to each scratch disk device."""
     for scratch_disk in self.scratch_disks:
       scratch_disk.SetDevicePath(self)
 
@@ -263,9 +254,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     return json.dumps(template)
 
   def _BuildVolumesBody(self):
-    """
-    Constructs volumes-related part of POST request to create POD.
-    """
+    """Constructs volumes-related part of POST request to create POD."""
     volumes = []
 
     for scratch_disk in self.scratch_disks:
@@ -274,9 +263,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     return volumes
 
   def _BuildContainerBody(self):
-    """
-    Constructs containers-related part of POST request to create POD.
-    """
+    """Constructs containers-related part of POST request to create POD."""
     registry = getattr(context.GetThreadBenchmarkSpec(), 'registry', None)
     if (not FLAGS.static_container_image and
         registry is not None):
@@ -340,8 +327,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       resources['limits'].update(gpu_dict)
       resources['requests'].update(gpu_dict)
 
-    result_with_empty_values_removed = (
-        {k: v for k, v in resources.iteritems() if v})
+    result_with_empty_values_removed = ({
+        k: v for k, v in six.iteritems(resources) if v
+    })
     return result_with_empty_values_removed
 
 

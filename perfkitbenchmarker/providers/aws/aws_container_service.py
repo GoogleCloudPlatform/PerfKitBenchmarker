@@ -113,6 +113,7 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   def Login(self):
     """Logs in to the registry."""
     get_login_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
         'ecr', 'get-login', '--no-include-email'
     ]
     stdout, _, _ = vm_util.IssueCommand(get_login_cmd)

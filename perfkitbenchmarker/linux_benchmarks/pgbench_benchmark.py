@@ -30,12 +30,15 @@
   (as of 10/2017) version installed on Ubuntu 16.04.
 """
 
+import re
 import time
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
+
 
 flags.DEFINE_integer(
     'pgbench_scale_factor', 1, 'scale factor used to fill the database',
@@ -101,7 +104,8 @@ pgbench:
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'
-MAX_JOBS = 16  # TODO(ferneyhough): determine MAX_JOBS from VM num_cpus
+# TODO(ferneyhough): determine MAX_JOBS from VM NumCpusForBenchmark()
+MAX_JOBS = 16
 
 
 def GetConfig(user_config):
@@ -112,10 +116,13 @@ def GetConfig(user_config):
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
+  Args:
+    benchmark_config:  Benchmark config to verify
+
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  pass
+  del benchmark_config
 
 
 def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
@@ -139,6 +146,10 @@ def Prepare(benchmark_spec):
   If DEFAULT_DB_NAME exists, it will be dropped and recreated,
   else it will be created. pgbench will populate the database
   with sample data using FLAGS.pgbench_scale_factor.
+
+  Args:
+    benchmark_spec: benchmark_spec object which contains the database server
+                    and client_vm
   """
   vm = benchmark_spec.vms[0]
   vm.Install('pgbench')
@@ -151,8 +162,45 @@ def Prepare(benchmark_spec):
   CreateDatabase(benchmark_spec, DEFAULT_DB_NAME, TEST_DB_NAME)
 
   connection_string = db.MakePsqlConnectionString(TEST_DB_NAME)
-  stdout, _ = vm.RobustRemoteCommand('pgbench {0} -i -s {1}'.format(
+  vm.RobustRemoteCommand('pgbench {0} -i -s {1}'.format(
       connection_string, benchmark_spec.scale_factor))
+
+  stdout = _IssueDatabaseCommand(
+      benchmark_spec,
+      TEST_DB_NAME,
+      'SELECT pg_size_pretty(pg_database_size(\'{0}\'))'.format(TEST_DB_NAME))
+
+  db.postgres_db_size_MB = ParseSizeFromTable(stdout)
+
+
+def ParseSizeFromTable(stdout):
+  """Parse stdout of a table representing size of the database.
+
+  Example stdoutput is:
+
+  pg_size_pretty
+  ----------------
+  22 MB
+  (1 row)
+
+  Args:
+     stdout:  stdout from psql query obtaining the table size.
+  Returns:
+     size in MB that was parsed from the table
+  Raises:
+     Exception: if unknown how to parse the output.
+  """
+  size_line = stdout.splitlines()[2]
+  match = re.match(r' *(\d+) *(\w*)$', size_line)
+  size = float(match.group(1))
+  units = match.group(2)
+
+  if units == 'MB':
+    return size
+  elif units == 'GB':
+    return size * 1000
+  else:
+    raise Exception('Unknown how to parse units {0} {1}.'.format(size, units))
 
 
 def DoesDatabaseExist(client_vm, connection_string, database_name):
@@ -173,6 +221,17 @@ def DoesDatabaseExist(client_vm, connection_string, database_name):
   return return_value == 0
 
 
+def _IssueDatabaseCommand(benchmark_spec, database_name, command):
+  client_vm = benchmark_spec.vms[0]
+  db = benchmark_spec.managed_relational_db
+  connection_string = db.MakePsqlConnectionString(database_name)
+  command = 'psql {0} -c "{1};"'.format(
+      connection_string,
+      command)
+  stdout, _ = client_vm.RemoteCommand(command, should_log=True)
+  return stdout
+
+
 def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
   """Creates a new database on the database server.
 
@@ -191,13 +250,15 @@ def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
   connection_string = db.MakePsqlConnectionString(default_database_name)
 
   if DoesDatabaseExist(client_vm, connection_string, new_database_name):
-    command = 'psql {0} -c "DROP DATABASE {1};"'.format(
-        connection_string, new_database_name)
-    stdout, _ = client_vm.RemoteCommand(command, should_log=True)
+    _IssueDatabaseCommand(
+        benchmark_spec,
+        default_database_name,
+        'DROP DATABASE {0}'.format(new_database_name))
 
-  command = 'psql {0} -c "CREATE DATABASE {1};"'.format(
-      connection_string, new_database_name)
-  stdout, _ = client_vm.RemoteCommand(command, should_log=True)
+  _IssueDatabaseCommand(
+      benchmark_spec,
+      default_database_name,
+      'CREATE DATABASE {0}'.format(new_database_name))
 
 
 def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
@@ -252,11 +313,10 @@ def Run(benchmark_spec):
 
   common_metadata = {
       'scale_factor': benchmark_spec.scale_factor,
+      'postgres_db_size_MB': db.postgres_db_size_MB,
       'seconds_per_test': benchmark_spec.seconds_per_test,
       'seconds_to_pause_before_steps': benchmark_spec.seconds_to_pause,
   }
-
-  samples = []
   for client in benchmark_spec.client_counts:
     time.sleep(benchmark_spec.seconds_to_pause)
     jobs = min(client, 16)
@@ -266,11 +326,12 @@ def Run(benchmark_spec):
                    client,
                    jobs,
                    benchmark_spec.seconds_per_test))
-    stdout, stderr = benchmark_spec.vms[0].RobustRemoteCommand(
+    _, stderr = benchmark_spec.vms[0].RobustRemoteCommand(
         command, should_log=True)
-    samples.extend(MakeSamplesFromOutput(
-        stderr, client, jobs, common_metadata))
-  return samples
+    samples = MakeSamplesFromOutput(
+        stderr, client, jobs, common_metadata)
+    publisher.PublishRunStageSamples(benchmark_spec, samples)
+  return []
 
 
 def Cleanup(benchmark_spec):

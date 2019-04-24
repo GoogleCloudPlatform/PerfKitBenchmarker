@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,20 +13,22 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import contextlib
 import copy
-import copy_reg
 import datetime
 import importlib
 import logging
 import os
 import pickle
-import thread
 import threading
 import uuid
 
 from perfkitbenchmarker import benchmark_status
-from perfkitbenchmarker import cloud_redis
+from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
@@ -40,11 +42,16 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+import six
+from six.moves import range
+import six.moves._thread
+import six.moves.copyreg
 
 
 def PickleLock(lock):
@@ -58,17 +65,15 @@ def UnPickleLock(locked, *args):
       raise pickle.UnpicklingError('Cannot acquire lock')
   return lock
 
-
-copy_reg.pickle(thread.LockType, PickleLock)
+six.moves.copyreg.pickle(six.moves._thread.LockType, PickleLock)
 
 SUPPORTED = 'strict'
 NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
 # GCP labels only allow hyphens (-), underscores (_), lowercase characters, and
 # numbers and International characters.
-LABEL_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
 # metadata allow all characters and numbers.
-METADATA_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+METADATA_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', providers.GCP, providers.VALID_CLOUDS,
@@ -135,10 +140,11 @@ class BenchmarkSpec(object):
     self.tpus = []
     self.tpu_groups = {}
     self.edw_service = None
-    self.cloud_redis = None
     self.nfs_service = None
+    self.smb_service = None
     self.app_groups = {}
     self._zone_index = 0
+    self.capacity_reservations = []
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -224,7 +230,7 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
     tpu_group_specs = self.config.tpu_groups
 
-    for group_name, group_spec in sorted(tpu_group_specs.iteritems()):
+    for group_name, group_spec in sorted(six.iteritems(tpu_group_specs)):
       tpu = self.ConstructTpuGroup(group_spec)
 
       self.tpu_groups[group_name] = tpu
@@ -246,15 +252,6 @@ class BenchmarkSpec(object):
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
 
-  def ConstructCloudRedis(self):
-    """Create the cloud_redis object."""
-    if self.config.cloud_redis is None:
-      return
-    cloud = self.config.cloud_redis.cloud
-    providers.LoadProvider(cloud)
-    cloud_redis_class = cloud_redis.GetCloudRedisClass(cloud)
-    self.cloud_redis = cloud_redis_class(self.config.cloud_redis)
-
   def ConstructNfsService(self):
     """Construct the NFS service object.
 
@@ -269,11 +266,36 @@ class BenchmarkSpec(object):
       disk_spec = group_spec.disk_spec
       if disk_spec.disk_type != disk.NFS:
         continue
+      if disk_spec.nfs_ip_address:
+        self.nfs_service = nfs_service.StaticNfsService(disk_spec)
+      else:
+        cloud = group_spec.cloud
+        providers.LoadProvider(cloud)
+        nfs_class = nfs_service.GetNfsServiceClass(cloud)
+        self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
+      logging.debug('NFS service %s', self.nfs_service)
+      break
+
+  def ConstructSmbService(self):
+    """Construct the SMB service object.
+
+    Creates an SMB Service only if an SMB disk is found in the disk_specs.
+    """
+    if self.smb_service:
+      logging.info('SMB service already created: %s', self.smb_service)
+      return
+    for group_spec in self.config.vm_groups.values():
+      if not group_spec.disk_spec or not group_spec.vm_count:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type != disk.SMB:
+        continue
+
       cloud = group_spec.cloud
       providers.LoadProvider(cloud)
-      nfs_class = nfs_service.GetNfsServiceClass(cloud)
-      self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
-      logging.info('NFS service %s', self.nfs_service)
+      smb_class = smb_service.GetSmbServiceClass(cloud)
+      self.smb_service = smb_class(disk_spec, group_spec.vm_spec.zone)
+      logging.debug('SMB service %s', self.smb_service)
       break
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
@@ -315,10 +337,10 @@ class BenchmarkSpec(object):
     else:
       disk_spec = None
 
-    for _ in xrange(vm_count - len(vms)):
+    for _ in range(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
-      if FLAGS.zones or FLAGS.extra_zones:
-        zone_list = FLAGS.zones + FLAGS.extra_zones
+      if FLAGS.zones or FLAGS.extra_zones or FLAGS.zone:
+        zone_list = FLAGS.zones + FLAGS.extra_zones + FLAGS.zone
         group_spec.vm_spec.zone = zone_list[self._zone_index]
         self._zone_index = (self._zone_index + 1
                             if self._zone_index < len(zone_list) - 1 else 0)
@@ -326,7 +348,7 @@ class BenchmarkSpec(object):
       if disk_spec and not vm.is_static:
         if disk_spec.disk_type == disk.LOCAL and disk_count is None:
           disk_count = vm.max_local_disks
-        vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
+        vm.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
         # In the event that we need to create multiple disks from the same
         # DiskSpec, we need to ensure that they have different mount points.
         if (disk_count > 1 and disk_spec.mount_point):
@@ -335,6 +357,18 @@ class BenchmarkSpec(object):
       vms.append(vm)
 
     return vms
+
+  def ConstructCapacityReservations(self):
+    """Construct capacity reservations for each VM group."""
+    if not FLAGS.use_capacity_reservations:
+      return
+    for vm_group in six.itervalues(self.vm_groups):
+      cloud = vm_group[0].CLOUD
+      providers.LoadProvider(cloud)
+      capacity_reservation_class = capacity_reservation.GetResourceClass(
+          cloud)
+      self.capacity_reservations.append(
+          capacity_reservation_class(vm_group))
 
   def _CheckBenchmarkSupport(self, cloud):
     """Throw an exception if the benchmark isn't supported."""
@@ -370,7 +404,7 @@ class BenchmarkSpec(object):
     vm_group_specs = self.config.vm_groups
 
     clouds = {}
-    for group_name, group_spec in sorted(vm_group_specs.iteritems()):
+    for group_name, group_spec in sorted(six.iteritems(vm_group_specs)):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
@@ -430,6 +464,17 @@ class BenchmarkSpec(object):
 
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
+    # Create capacity reservations if the cloud supports it. Note that the
+    # capacity reservation class may update the VMs themselves. This is true
+    # on AWS, because the VM needs to be aware of the capacity resrevation id
+    # before its Create() method is called. Furthermore, if the user does not
+    # specify an AWS zone, but a region instead, the AwsCapacityReservation
+    # class will make a reservation in a zone that has sufficient capacity.
+    # In this case the VM's zone attribute, and the VMs network instance
+    # need to be updated as well.
+    if self.capacity_reservations:
+      vm_util.RunThreaded(lambda res: res.Create(), self.capacity_reservations)
+
     # Sort networks into a guaranteed order of creation based on dict key.
     # There is a finite limit on the number of threads that are created to
     # provision networks. Until support is added to provision resources in an
@@ -439,11 +484,12 @@ class BenchmarkSpec(object):
     # in this dict, and each per-zone object depends on a corresponding
     # per-region object, so the per-region objects are given keys that come
     # first when sorted.
-    networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
+    networks = [self.networks[key]
+                for key in sorted(six.iterkeys(self.networks))]
     vm_util.RunThreaded(lambda net: net.Create(), networks)
     if self.container_registry:
       self.container_registry.Create()
-      for container_spec in self.container_specs.itervalues():
+      for container_spec in six.itervalues(self.container_specs):
         if container_spec.static_image:
           continue
         container_spec.image = self.container_registry.GetOrBuild(
@@ -455,14 +501,25 @@ class BenchmarkSpec(object):
     # do after network setup but before VM created
     if self.nfs_service:
       self.nfs_service.Create()
+    if self.smb_service:
+      self.smb_service.Create()
 
     if self.vms:
-      vm_util.RunThreaded(self.PrepareVm, self.vms)
-      sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
+
+      # We separate out creating, booting, and preparing the VMs into two phases
+      # so that we don't slow down the creation of all the VMs by running
+      # commands on the VMs that booted.
+      vm_util.RunThreaded(self.CreateAndBootVm, self.vms)
+      vm_util.RunThreaded(self.PrepareVmAfterBoot, self.vms)
+
+      sshable_vms = [
+          vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
+      ]
       sshable_vm_groups = {}
-      for group_name, group_vms in self.vm_groups.iteritems():
+      for group_name, group_vms in six.iteritems(self.vm_groups):
         sshable_vm_groups[group_name] = [
-            vm for vm in group_vms if vm.OS_TYPE != os_types.WINDOWS
+            vm for vm in group_vms
+            if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
         ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
     if self.spark_service:
@@ -482,9 +539,6 @@ class BenchmarkSpec(object):
           if network.__class__.__name__ == 'AwsNetwork':
             self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
-    if self.cloud_redis:
-      self.config.cloud_redis.client_vm = self.vms[0]
-      self.cloud_redis.Create()
 
   def Delete(self):
     if self.deleted:
@@ -504,6 +558,18 @@ class BenchmarkSpec(object):
       self.edw_service.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
+    if self.smb_service:
+      self.smb_service.Delete()
+
+    # Note: It is ok to delete capacity reservations before deleting the VMs,
+    # and will actually save money (mere seconds of usage).
+    if self.capacity_reservations:
+      try:
+        vm_util.RunThreaded(lambda reservation: reservation.Delete(),
+                            self.capacity_reservations)
+      except Exception:  # pylint: disable=broad-except
+        logging.exception('Got an exception deleting CapacityReservations. '
+                          'Attempting to continue tearing down.')
 
     if self.vms:
       try:
@@ -512,7 +578,7 @@ class BenchmarkSpec(object):
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
 
-    for firewall in self.firewalls.itervalues():
+    for firewall in six.itervalues(self.firewalls):
       try:
         firewall.DisallowAllPorts()
       except Exception:
@@ -524,7 +590,7 @@ class BenchmarkSpec(object):
       self.container_cluster.DeleteContainers()
       self.container_cluster.Delete()
 
-    for net in self.networks.itervalues():
+    for net in six.itervalues(self.networks):
       try:
         net.Delete()
       except Exception:
@@ -575,10 +641,6 @@ class BenchmarkSpec(object):
     """Gets a list of tags to be used to tag resources."""
     return self._GetResourceDict(METADATA_TIME_FORMAT, timeout_minutes)
 
-  def GetResourceLabels(self, timeout_minutes=None):
-    """Gets a list of labels to be used to tag resources."""
-    return self._GetResourceDict(LABEL_TIME_FORMAT, timeout_minutes)
-
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
 
@@ -603,32 +665,46 @@ class BenchmarkSpec(object):
 
     return vm_class(vm_spec)
 
-  def PrepareVm(self, vm):
-    """Creates a single VM and prepares a scratch disk if required.
+  def CreateAndBootVm(self, vm):
+    """Creates a single VM and waits for boot to complete.
 
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
+    vm.Create()
+    logging.info('VM: %s', vm.ip_address)
+    logging.info('Waiting for boot completion.')
+    vm.AllowRemoteAccessPorts()
+    vm.WaitForBootCompletion()
+
+  def PrepareVmAfterBoot(self, vm):
+    """Prepares a VM after it has booted.
+
+    This function will prepare a scratch disk if required.
+
+    Args:
+        vm: The BaseVirtualMachine object representing the VM.
+
+    Raises:
+        Exception: If --vm_metadata is malformed.
+    """
     vm_metadata = {
-        'benchmark': self.name,
-        'perfkit_uuid': self.uuid,
-        'benchmark_uid': self.uid,
+        'benchmark':
+            self.name,
+        'perfkit_uuid':
+            self.uuid,
+        'benchmark_uid':
+            self.uid,
         'create_time_utc':
-        datetime.datetime.utcnow().strftime(METADATA_TIME_FORMAT),
-        'owner': FLAGS.owner
+            datetime.datetime.utcfromtimestamp(vm.create_start_time),
+        'owner':
+            FLAGS.owner
     }
     for item in FLAGS.vm_metadata:
       if ':' not in item:
         raise Exception('"%s" not in expected key:value format' % item)
       key, value = item.split(':', 1)
       vm_metadata[key] = value
-
-    vm.Create()
-
-    logging.info('VM: %s', vm.ip_address)
-    logging.info('Waiting for boot completion.')
-    vm.AllowRemoteAccessPorts()
-    vm.WaitForBootCompletion()
     vm.AddMetadata(**vm_metadata)
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
@@ -638,7 +714,10 @@ class BenchmarkSpec(object):
         vm.CreateRamDisk(disk_spec)
       else:
         vm.CreateScratchDisk(disk_spec)
-
+      # TODO(user): Simplify disk logic.
+      if disk_spec.num_striped_disks > 1:
+        # scratch disks has already been created and striped together.
+        break
     # This must come after Scratch Disk creation to support the
     # Containerized VM case
     vm.PrepareVMEnvironment()

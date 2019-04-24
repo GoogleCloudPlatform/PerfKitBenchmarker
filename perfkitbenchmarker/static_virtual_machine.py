@@ -54,7 +54,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
   def __init__(self, component_full_name, ip_address=None, user_name=None,
                ssh_private_key=None, internal_ip=None, ssh_port=22,
                password=None, disk_specs=None, os_type=None, tag=None,
-               **kwargs):
+               zone=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
@@ -73,6 +73,8 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
           information.
       tag: A string that allows the VM to be included or excluded from a run
           by using the 'static_vm_tags' flag.
+      zone: The VM's zone.
+      **kwargs: Other args for the superclass.
     """
     super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
@@ -83,6 +85,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.password = password
     self.os_type = os_type
     self.tag = tag
+    self.zone = zone
     self.disk_specs = [
         disk.BaseDiskSpec(
             '{0}.disk_specs[{1}]'.format(component_full_name, i),
@@ -307,6 +310,16 @@ class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
                                     linux_virtual_machine.RhelMixin):
   pass
+
+
+class Centos7BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.Centos7Mixin):
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedStaticVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,

@@ -35,8 +35,6 @@ flags.DEFINE_string('tpu_network', None,
                     'Specifies the network that this TPU will be a part of.')
 flags.DEFINE_string('tpu_tf_version', None,
                     'TensorFlow version for the TPU.')
-flags.DEFINE_string('tpu_zone', None,
-                    'The zone of the tpu to create. Zone in which TPU lives.')
 flags.DEFINE_string('tpu_name', None,
                     'The name of the TPU to create.')
 flags.DEFINE_boolean('tpu_preemptible', False,
@@ -99,6 +97,16 @@ class BaseTpu(resource.BaseResource):
     """Gets the number of TPU shards."""
     raise NotImplementedError()
 
+  @abc.abstractmethod
+  def GetZone(self):
+    """Gets the TPU zone."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def GetAcceleratorType(self):
+    """Gets the TPU accelerator type."""
+    raise NotImplementedError()
+
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {
@@ -107,7 +115,6 @@ class BaseTpu(resource.BaseResource):
         'description': self.spec.tpu_description,
         'network': self.spec.tpu_network,
         'tf_version': self.spec.tpu_tf_version,
-        'zone': self.spec.tpu_zone,
         'name': self.spec.tpu_name,
         'preemptible': self.spec.tpu_preemptible
     }

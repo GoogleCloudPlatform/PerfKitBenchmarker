@@ -20,7 +20,9 @@ import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
+import six
 
 FLAGS = flags.FLAGS
 
@@ -33,6 +35,29 @@ class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
     pass
 
   def Uninstall(self):
+    pass
+
+
+class LinuxVMResource(virtual_machine.BaseVirtualMachine,
+                      linux_virtual_machine.BaseLinuxMixin):
+
+  CLOUD = 'fake_cloud'
+  OS_TYPE = 'fake_os_type'
+  BASE_OS_TYPE = 'debian'
+
+  def __init__(self, _):
+    pass
+
+  def Install(self):
+    pass
+
+  def Uninstall(self):
+    pass
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
     pass
 
 
@@ -53,7 +78,8 @@ class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.SetFiles()
 
-    self.assertItemsEqual(  # use assertItemsEqual because order is undefined
+    six.assertCountEqual(  # use assertCountEqual because order is undefined
+        self,
         remote_command.call_args_list,
         calls)
 
@@ -84,7 +110,7 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.DoSysctls()
 
-    self.assertEqual(remote_command.call_args_list, calls)
+    self.assertEqual(sorted(remote_command.call_args_list), sorted(calls))
 
   def testSysctl(self):
     self.runTest(
@@ -142,6 +168,25 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
   def testNfsFormatDisk(self):
     self.vm.FormatDisk('dp', disk_type='nfs')
     self.assertRemoteHostCalled()  # no format disk command executed
+
+
+class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(LogDmesgTestCase, self).setUp()
+    self.vm = LinuxVMResource(None)
+
+  def testPreDeleteDoesNotCallDmesg(self):
+    FLAGS.log_dmesg = False
+    with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+      self.vm._PreDelete()
+    remote_command.assert_not_called()
+
+  def testPreDeleteCallsDmesg(self):
+    FLAGS.log_dmesg = True
+    with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+      self.vm._PreDelete()
+    remote_command.assert_called_once_with('hostname && dmesg', should_log=True)
 
 
 if __name__ == '__main__':

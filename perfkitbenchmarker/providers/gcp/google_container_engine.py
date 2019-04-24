@@ -72,7 +72,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
   def RemoteBuild(self, image):
     """Build the image remotely."""
     full_tag = self.GetFullRegistryTag(image.name)
-    build_cmd = util.GcloudCommand(self, 'container', 'builds', 'submit',
+    build_cmd = util.GcloudCommand(self, 'builds', 'submit',
                                    '--tag', full_tag, image.directory)
     del build_cmd.flags['zone']
     build_cmd.Issue()
@@ -151,6 +151,9 @@ class GkeCluster(container_service.KubernetesCluster):
           self.cpus, self.memory)
     else:
       cmd.flags['machine-type'] = self.machine_type
+
+    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.

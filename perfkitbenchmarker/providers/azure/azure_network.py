@@ -32,6 +32,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 SSH_PORT = 22
@@ -80,7 +81,7 @@ class AzureResourceGroup(resource.BaseResource):
           [azure.AZURE_PATH, 'group', 'create',
            '--name', self.name,
            '--location', self.location,
-           '--tags'] + self._GetTags())
+           '--tags'] + util.GetTags(self.timeout_minutes))
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
@@ -101,21 +102,6 @@ class AzureResourceGroup(resource.BaseResource):
         [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
         timeout=600)
 
-  def _FormatTag(self, key, value):
-    """Format an individual tag for use with the --tags param of Azure CLI."""
-    return '{0}={1}'.format(key, value)
-
-  def FormatTags(self, tags_dict):
-    """Format a dict of tags into arguments for 'tag' parameter.
-
-    Args:
-      tags_dict: Tags to be formatted.
-
-    Returns:
-      A list of tags formatted as arguments for 'tag' parameter.
-    """
-    return [self._FormatTag(k, v) for k, v in tags_dict.iteritems()]
-
   def AddTag(self, key, value):
     """Add a single tag to an existing Resource Group.
 
@@ -128,16 +114,9 @@ class AzureResourceGroup(resource.BaseResource):
     """
     _, _, retcode = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
-         '--set', 'tags.' + self._FormatTag(key, value)])
+         '--set', 'tags.' + util.FormatTag(key, value)])
     if retcode:
       raise errors.resource.CreationError('Error tagging Azure resource group.')
-
-  def _GetTags(self):
-    """Gets a list of tags to be used with the --tags param of Azure CLI."""
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    tags = self.FormatTags(benchmark_spec.GetResourceTags(self.timeout_minutes))
-
-    return tags
 
 
 class AzureAvailSet(resource.BaseResource):
@@ -206,13 +185,16 @@ class AzureStorageAccount(resource.BaseResource):
   def _Create(self):
     """Creates the storage account."""
     if not self.use_existing:
-      create_cmd = [azure.AZURE_PATH,
-                    'storage',
-                    'account',
-                    'create',
-                    '--kind', self.kind,
-                    '--sku', self.storage_type,
-                    '--name', self.name] + self.resource_group.args
+      create_cmd = ([azure.AZURE_PATH,
+                     'storage',
+                     'account',
+                     'create',
+                     '--kind', self.kind,
+                     '--sku', self.storage_type,
+                     '--name', self.name,
+                     '--tags'] + util.GetTags(
+                         self.resource_group.timeout_minutes)
+                    + self.resource_group.args)
       if self.location:
         create_cmd.extend(
             ['--location', self.location])
@@ -223,27 +205,11 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
-
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'show-connection-string',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
-
-    response = json.loads(stdout)
-    self.connection_string = response['connectionString']
-    # Connection strings are always represented the same way on the
-    # command line.
+    self.connection_string = util.GetAzureStorageConnectionString(
+        self.name, self.resource_group.args)
     self.connection_args = ['--connection-string', self.connection_string]
-
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'keys', 'list',
-         '--output', 'json',
-         '--account-name', self.name] + self.resource_group.args)
-
-    response = json.loads(stdout)
-    # A new storage account comes with two keys, but we only need one.
-    assert response[0]['permissions'] == 'Full'
-    self.key = response[0]['value']
+    self.key = util.GetAzureStorageAccountKey(
+        self.name, self.resource_group.args)
 
   def _Delete(self):
     """Deletes the storage account."""

@@ -23,6 +23,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_tpu
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -41,7 +42,6 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
         'tpu_description': 'MyTFNode',
         'tpu_network': 'default',
         'tpu_tf_version': 'nightly',
-        'tpu_zone': 'us-central1-a',
         'tpu_preemptible': True
     }
 
@@ -58,6 +58,7 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.project = ''
     FLAGS.tpu_cores_per_donut = 8
     FLAGS.gcloud_path = 'gcloud'
+    FLAGS.zones = ['us-central1-a']
 
     mock_tpu_spec_attrs = self.CreateTpuSpecDict()
     self.mock_tpu_spec = mock.Mock(
@@ -71,10 +72,11 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch(
         vm_util.__name__ + '.IssueCommand',
         return_value=retval) as issue_command, mock.patch(
-            '__builtin__.open'), mock.patch(
-                vm_util.__name__ + '.NamedTemporaryFile'), mock.patch(
-                    util.__name__ + '.GetDefaultProject',
-                    return_value='fakeproject'):
+            builtins.__name__ +
+            '.open'), mock.patch(vm_util.__name__ +
+                                 '.NamedTemporaryFile'), mock.patch(
+                                     util.__name__ + '.GetDefaultProject',
+                                     return_value='fakeproject'):
       yield issue_command
 
   def testCreate(self):

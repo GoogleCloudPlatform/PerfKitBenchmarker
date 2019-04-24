@@ -80,7 +80,7 @@ def Prepare(benchmark_spec):
              "   save \"\"/save \"\"/g' %s/redis.conf")
   redis_vm.RemoteCommand(sed_cmd % redis_server.REDIS_DIR)
 
-  for i in range(redis_vm.num_cpus * FLAGS.redis_numprocesses):
+  for i in range(redis_vm.NumCpusForBenchmark() * FLAGS.redis_numprocesses):
     port = FIRST_PORT + i
     redis_vm.RemoteCommand(
         'cp %s/redis.conf %s/redis-%d.conf' %
@@ -157,7 +157,7 @@ def Run(benchmark_spec):
   latency_threshold = 1000000.0
   threads = 0
   results = []
-  num_servers = redis_vm.num_cpus * FLAGS.redis_numprocesses
+  num_servers = redis_vm.NumCpusForBenchmark() * FLAGS.redis_numprocesses
   max_throughput_for_completion_latency_under_1ms = 0.0
 
   while latency < latency_threshold:

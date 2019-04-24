@@ -180,6 +180,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
 
   def test_build_python_command(self):
     FLAGS.beam_python_attr = 'IT'
+    FLAGS.beam_it_module = 'sdks/python'
     FLAGS.beam_runner = 'TestRunner'
     FLAGS.beam_python_sdk_location = 'py/location.tar'
     FLAGS.beam_sdk = beam_benchmark_helper.BEAM_PYTHON_SDK
@@ -197,10 +198,13 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
                                                              ['--args'])
       expected_cmd = [
           'gradlew',
-          'beam-sdks-python:integrationTest',
-          '-Ptests=apache_beam.py',
-          '-Pattr=IT',
-          '-PpipelineOptions=--args --runner=TestRunner --sdk_location=py/location.tar',
+          'integrationTest',
+          '-Dtests=apache_beam.py',
+          '-p',
+          'sdks/python',
+          '-Dattr=IT',
+          '-DpipelineOptions=--args "--runner=TestRunner" '
+          '"--sdk_location=py/location.tar"',
           '--info',
           '--scan',
       ]
