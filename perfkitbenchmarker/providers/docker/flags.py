@@ -33,6 +33,12 @@ flags.DEFINE_boolean('privileged_docker', False,
                      'in a privileged mode. Note that some benchmarks execute '
                      'commands which are only allowed in privileged mode.')
 
+
+flags.DEFINE_string('docker_cli', 'docker',
+                    'Path to docker cli. You can set it here if it is'
+                    'not in your system PATH or not at a default location')
+
+
 # Defined in providers/mesos/flags.py
 # flags.DEFINE_integer('docker_memory_mb', 2048,
 #                      'Memory limit for docker containers.')

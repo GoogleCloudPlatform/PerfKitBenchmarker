@@ -44,10 +44,6 @@ from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 from perfkitbenchmarker.providers.gcp import google_container_engine
 
-flags.DEFINE_string('docker_cli', 'docker',
-                    'Path to docker cli. You can set it here if it is'
-                    'not in your system PATH or not at a default location')
-
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu:xenial'
