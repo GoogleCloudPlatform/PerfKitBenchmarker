@@ -469,7 +469,7 @@ def _PrintHelpMD(matches=None):
 
   # normal helpmatch search from above
   if not matches:
-    print FLAGS
+    print(FLAGS)
   else:
     flags_by_module = FLAGS.flags_by_module_dict()
     modules = sorted(flags_by_module)
@@ -512,9 +512,9 @@ def _PrintHelpMD(matches=None):
               docstring = dsm.group(1)
            # print docstring
         # format output
-        print '### [' + module, '](' + BASE_RELATIVE + module_link + ')\n'
-        print '#### Description:\n\n' + docstring + '\n\n#### Flags:\n'
-        print '\n'.join(flags) + '\n'
+        print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
+        print('#### Description:\n\n' + docstring + '\n\n#### Flags:\n')
+        print('\n'.join(flags) + '\n')
 
 
 
