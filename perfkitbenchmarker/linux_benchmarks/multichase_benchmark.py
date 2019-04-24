@@ -20,9 +20,11 @@ multichase codebase: https://github.com/google/multichase
 """
 
 import itertools
+import logging
 import posixpath
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -46,6 +48,7 @@ _CHASES = {c: c in _CHASES_WITH_ARGS
            for c in _CHASES_WITHOUT_ARGS + _CHASES_WITH_ARGS}
 
 _BENCHMARK_SPECIFIC_VM_STATE_ATTR = 'multichase_vm_state'
+_NOT_ENOUGH_CPUS = 'error: more threads than cpus available'
 
 BENCHMARK_NAME = 'multichase'
 BENCHMARK_CONFIG = """
@@ -150,10 +153,9 @@ _DefineMemorySizeFlag(
     'Can be specified as a percentage of the maximum memory (-m flag) of each '
     'multichase execution.')
 flags.DEFINE_string(
-    'multichase_taskset_options', None,
-    "If provided, taskset is used to limit the cores available to multichase. "
-    "The value of this flag contains the options to provide to taskset. "
-    "Examples: '0x00001FE5' or '-c 0,2,5-12'.")
+    'multichase_numactl_options', None,
+    'If provided, numactl is used to control memory placement and process '
+    'CPU affinity. Examples: "--membind=0" or "--cpunodebind=0".')
 flags.DEFINE_string(
     'multichase_additional_flags', '',
     "Additional flags to use when executing multichase. Example: '-O 16 -y'.")
@@ -230,6 +232,7 @@ class _MultichaseSpecificState(object):
     multichase_dir: Optional string. Path of a directory on the remote machine
         where multichase files are stored. A subdirectory within dir.
   """
+
   def __init__(self):
     self.dir = None
     self.multichase_dir = None
@@ -245,12 +248,13 @@ def Prepare(benchmark_spec):
   vm_state = _MultichaseSpecificState()
   setattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, vm_state)
   vm.Install('multichase')
+  vm.Install('numactl')
   remote_benchmark_dir = '_'.join(('pkb', FLAGS.run_uri, benchmark_spec.uid))
   vm.RemoteCommand('mkdir ' + remote_benchmark_dir)
   vm_state.dir = remote_benchmark_dir
   vm_state.multichase_dir = posixpath.join(vm_state.dir, 'multichase')
   vm.RemoteCommand('cp -ar {0} {1}'.format(
-                   multichase.INSTALL_PATH, vm_state.multichase_dir))
+      multichase.INSTALL_PATH, vm_state.multichase_dir))
 
 
 def Run(benchmark_spec):
@@ -268,11 +272,12 @@ def Run(benchmark_spec):
                    'multichase_version': multichase.GIT_VERSION}
   vm = benchmark_spec.vms[0]
   vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
+  max_thread_count = float('inf')
 
   base_cmd = []
-  if FLAGS.multichase_taskset_options:
-    base_cmd.extend(('taskset', FLAGS.multichase_taskset_options))
-    base_metadata['taskset_options'] = FLAGS.multichase_taskset_options
+  if FLAGS.multichase_numactl_options:
+    base_cmd.extend(('numactl', FLAGS.multichase_numactl_options))
+    base_metadata['numactl_options'] = FLAGS.multichase_numactl_options
 
   multichase_path = posixpath.join(vm_state.multichase_dir, 'multichase')
   base_cmd.extend((multichase_path, '-a', '-v'))
@@ -294,10 +299,25 @@ def Run(benchmark_spec):
           lambda: memory_size, FLAGS.multichase_stride_size_min,
           FLAGS.multichase_stride_size_max)
       for stride_size in stride_size_iterator:
+        if thread_count >= max_thread_count:
+          continue
         cmd = ' '.join(str(s) for s in itertools.chain(base_cmd, (
             '-m', memory_size, '-s', stride_size, '-t', thread_count,
             FLAGS.multichase_additional_flags)))
-        stdout, _ = vm.RemoteCommand(cmd)
+
+        stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
+            cmd, ignore_failure=True)
+        if retcode:
+          if _NOT_ENOUGH_CPUS in stderr:
+            logging.warning(
+                'Not enough CPUs to run %s threads. If you have more than that '
+                'number of CPUs on the system, it could be due to process '
+                'CPU affinity.', thread_count)
+            max_thread_count = min(max_thread_count, thread_count)
+            continue
+          else:
+            raise errors.VirtualMachine.RemoteCommandError(
+                'Multichase failed.\nSTDOUT: %s\nSTDERR: %s' % (stdout, stderr))
 
         # Latency is printed in ns in the last line.
         latency_ns = float(stdout.split()[-1])
