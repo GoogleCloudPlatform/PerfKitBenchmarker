@@ -23,6 +23,7 @@
   configurations may be incorrect.
 - Changed TF Serving benchmark to use ResNet instead of Inception.
 - Renamed prepare_sleep_time flag to after_prepare_sleep_time.
+- multichase_taskset_options flag changed to multichase_numactl_options.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
