@@ -48,7 +48,7 @@ write-reqs-per-sec: {write_iops}
 """
 _READ_1X_1D = 2000
 _WRITE_1X_1D = 1000
-ACT_COMMIT = '2cca4113a273cbcf40c30e94fe2f755e50b8ae77'  # ACT 5.0
+ACT_COMMIT = 'db9961ff7e0ad2691ddb41fb080561f6a1cdcdc9'  # ACT 5.1
 
 
 def _Install(vm):
