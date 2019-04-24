@@ -28,10 +28,11 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 SSH_PORT = 22
@@ -57,15 +58,16 @@ def GetResourceGroup(zone=None):
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name, zone=None, use_existing=False):
+  def __init__(self, name, zone=None, use_existing=False, timeout_minutes=None):
     super(AzureResourceGroup, self).__init__()
     self.name = name
     self.use_existing = use_existing
+    self.timeout_minutes = timeout_minutes
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
-    self.location = (FLAGS.zones[0] if FLAGS.zones else
-                     zone or DEFAULT_LOCATION)
+    self.location = (
+        FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_LOCATION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
@@ -77,7 +79,9 @@ class AzureResourceGroup(resource.BaseResource):
       # FLAGS.zones[0].
       _, _, retcode = vm_util.IssueCommand(
           [azure.AZURE_PATH, 'group', 'create',
-           '--name', self.name, '--location', self.location])
+           '--name', self.name,
+           '--location', self.location,
+           '--tags'] + util.GetTags(self.timeout_minutes))
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
@@ -90,13 +94,29 @@ class AzureResourceGroup(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def _Delete(self):
     vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'group', 'delete',
-         '--yes', '--name', self.name])
+        [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
+        timeout=600)
+
+  def AddTag(self, key, value):
+    """Add a single tag to an existing Resource Group.
+
+    Args:
+      key: tag key
+      value: tag value
+
+    Raises:
+      errors.resource.CreationError on failure.
+    """
+    _, _, retcode = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
+         '--set', 'tags.' + util.FormatTag(key, value)])
+    if retcode:
+      raise errors.resource.CreationError('Error tagging Azure resource group.')
 
 
 class AzureAvailSet(resource.BaseResource):
@@ -165,13 +185,16 @@ class AzureStorageAccount(resource.BaseResource):
   def _Create(self):
     """Creates the storage account."""
     if not self.use_existing:
-      create_cmd = [azure.AZURE_PATH,
-                    'storage',
-                    'account',
-                    'create',
-                    '--kind', self.kind,
-                    '--sku', self.storage_type,
-                    '--name', self.name] + self.resource_group.args
+      create_cmd = ([azure.AZURE_PATH,
+                     'storage',
+                     'account',
+                     'create',
+                     '--kind', self.kind,
+                     '--sku', self.storage_type,
+                     '--name', self.name,
+                     '--tags'] + util.GetTags(
+                         self.resource_group.timeout_minutes)
+                    + self.resource_group.args)
       if self.location:
         create_cmd.extend(
             ['--location', self.location])
@@ -182,27 +205,11 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
-
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'show-connection-string',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
-
-    response = json.loads(stdout)
-    self.connection_string = response['connectionString']
-    # Connection strings are always represented the same way on the
-    # command line.
+    self.connection_string = util.GetAzureStorageConnectionString(
+        self.name, self.resource_group.args)
     self.connection_args = ['--connection-string', self.connection_string]
-
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'keys', 'list',
-         '--output', 'json',
-         '--account-name', self.name] + self.resource_group.args)
-
-    response = json.loads(stdout)
-    # A new storage account comes with two keys, but we only need one.
-    assert response[0]['permissions'] == 'Full'
-    self.key = response[0]['value']
+    self.key = util.GetAzureStorageAccountKey(
+        self.name, self.resource_group.args)
 
   def _Delete(self):
     """Deletes the storage account."""
@@ -225,7 +232,7 @@ class AzureStorageAccount(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
 
@@ -277,6 +284,8 @@ class AzureVirtualNetwork(resource.BaseResource):
 
 
 class AzureSubnet(resource.BaseResource):
+  """Object representing an Azure Subnet."""
+
   def __init__(self, vnet, name):
     super(AzureSubnet, self).__init__()
     self.resource_group = GetResourceGroup()
@@ -306,6 +315,8 @@ class AzureSubnet(resource.BaseResource):
 
 
 class AzureNetworkSecurityGroup(resource.BaseResource):
+  """Object representing an Azure Network Security Group."""
+
   def __init__(self, location, subnet, name):
     super(AzureNetworkSecurityGroup, self).__init__()
 
@@ -358,6 +369,9 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       start_port: either a single port or the start of a range.
       end_port: if given, the end of the port range.
       source_range: unsupported at present.
+
+    Raises:
+      ValueError: when there are too many firewall rules.
     """
 
     with self.rules_lock:
@@ -400,6 +414,7 @@ class AzureFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the port for.
       start_port: The local port to open.
       end_port: if given, open the range [start_port, end_port].
+      source_range: unsupported at present.
     """
 
     vm.network.nsg.AllowPort(vm, start_port, end_port=end_port,
@@ -422,7 +437,8 @@ class AzureNetwork(network.BaseNetwork):
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
-    self.avail_set = AzureAvailSet(self.resource_group.name, self.zone)
+    avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
+    self.avail_set = AzureAvailSet(avail_set_name, self.zone)
 
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri

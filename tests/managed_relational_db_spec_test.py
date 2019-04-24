@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,15 +16,17 @@
 import unittest
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
-_FLAGS = None
 
 
 def _mergeDicts(dict1, dict2):
@@ -50,12 +52,15 @@ class FakeManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def GetDefaultEngineVersion(self, _):
     pass
 
+  def _FailoverHA(self):
+    pass
 
-class ManagedRelationalDbSpecTestCase(unittest.TestCase):
+
+class ManagedRelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.MockFlags()
-    self.flags['run_uri'].parse('123')
+    super(ManagedRelationalDbSpecTestCase, self).setUp()
+    FLAGS['run_uri'].parse('123')
 
     self.minimal_spec = {
         'cloud': 'GCP',
@@ -77,83 +82,85 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
     }
 
   def tearDown(self):
+    super(ManagedRelationalDbSpecTestCase, self).tearDown()
     managed_relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {}
 
   def testMinimalConfig(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.engine, 'mysql')
     self.assertEqual(result.cloud, 'GCP')
     self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
 
   def testDefaultDatabaseName(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.database_name, 'pkb-db-123')
 
   def testCustomDatabaseName(self):
     spec = _mergeDicts(self.minimal_spec, {'database_name': 'fakename'})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **spec)
+        _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.database_name, 'fakename')
 
   def testCustomDatabaseVersion(self):
     spec = _mergeDicts(self.minimal_spec, {'engine_version': '6.6'})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **spec)
+        _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.engine_version, '6.6')
 
   def testDefaultDatabasePassword(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertIsInstance(result.database_password, str)
     self.assertTrue(len(result.database_password) == 10)
 
   def testRandomDatabasePassword(self):
     spec = _mergeDicts(self.minimal_spec, {'database_password': 'fakepassword'})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **spec)
+        _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
   def testDefaultHighAvailability(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.high_availability, False)
 
   def testCustomHighAvailability(self):
     spec = _mergeDicts(self.minimal_spec, {'high_availability': True})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **spec)
+        _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.high_availability, True)
 
   def testDefaultBackupEnabled(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.backup_enabled, True)
 
   def testCustomBackupEnabled(self):
     spec = _mergeDicts(self.minimal_spec, {'backup_enabled': False})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **spec)
+        _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.backup_enabled, False)
 
   def testDefaultBackupTime(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.backup_start_time, '07:00')
 
   def testCustomBackupTime(self):
     spec = _mergeDicts(self.minimal_spec, {'backup_start_time': '08:00'})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **spec)
+        _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.backup_start_time, '08:00')
 
 
-class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
+class ManagedRelationalDbMinimalSpecTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.MockFlags()
-    self.flags['run_uri'].parse('123')
+    super(ManagedRelationalDbMinimalSpecTestCase, self).setUp()
+    FLAGS['run_uri'].parse('123')
 
     self.spec = {
         'cloud': 'GCP',
@@ -174,20 +181,20 @@ class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
     del self.spec['disk_spec']
     with self.assertRaisesRegexp(errors.Config.MissingOption, 'disk_spec'):
       benchmark_config_spec._ManagedRelationalDbSpec(
-          _COMPONENT, flag_values=self.flags, **self.spec)
+          _COMPONENT, flag_values=FLAGS, **self.spec)
 
   def testVmSpecRequired(self):
     del self.spec['vm_spec']
     with self.assertRaisesRegexp(errors.Config.MissingOption, 'vm_spec'):
       benchmark_config_spec._ManagedRelationalDbSpec(
-          _COMPONENT, flag_values=self.flags, **self.spec)
+          _COMPONENT, flag_values=FLAGS, **self.spec)
 
 
-class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
+class ManagedRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    self.flags = mock_flags.MockFlags()
-    self.flags['run_uri'].parse('123')
+    super(ManagedRelationalDbFlagsTestCase, self).setUp()
+    FLAGS['run_uri'].parse('123')
 
     self.full_spec = {
         'cloud': 'GCP',
@@ -214,6 +221,7 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
     }
 
   def tearDown(self):
+    super(ManagedRelationalDbFlagsTestCase, self).tearDown()
     managed_relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {}
 
   # Not testing this yet, because it requires the implementation
@@ -223,51 +231,51 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
     pass
 
   def testDatabaseFlag(self):
-    self.flags['managed_db_engine'].parse('postgres')
+    FLAGS['managed_db_engine'].parse('postgres')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.engine, 'postgres')
 
   def testDatabaseNameFlag(self):
-    self.flags['managed_db_database_name'].parse('fakedbname')
+    FLAGS['managed_db_database_name'].parse('fakedbname')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.database_name, 'fakedbname')
 
   def testDatabasePasswordFlag(self):
-    self.flags['managed_db_database_password'].parse('fakepassword')
+    FLAGS['managed_db_database_password'].parse('fakepassword')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
   def testHighAvailabilityFlag(self):
-    self.flags['managed_db_high_availability'].parse(True)
+    FLAGS['managed_db_high_availability'].parse(True)
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.high_availability, True)
 
   def testDatabaseVersionFlag(self):
-    self.flags['managed_db_engine_version'].parse('5.6')
+    FLAGS['managed_db_engine_version'].parse('5.6')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.engine_version, '5.6')
 
   def testBackupEnabledFlag(self):
-    self.flags['managed_db_backup_enabled'].parse(False)
+    FLAGS['managed_db_backup_enabled'].parse(False)
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.backup_enabled, False)
 
   def testBackupStartTimeFlag(self):
-    self.flags['managed_db_backup_start_time'].parse('12:23')
+    FLAGS['managed_db_backup_start_time'].parse('12:23')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.backup_start_time, '12:23')
 
   def testZoneFlag(self):
-    self.flags['managed_db_zone'].parse('us-east1-b')
+    FLAGS['managed_db_zone'].parse('us-east1-b')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.full_spec)
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.vm_spec.zone, 'us-east1-b')
 
 if __name__ == '__main__':

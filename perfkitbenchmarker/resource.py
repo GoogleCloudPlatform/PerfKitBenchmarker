@@ -19,11 +19,16 @@ and checks for resource existence so that resources can be created and deleted
 reliably.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import time
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
+import six
 
 _RESOURCE_REGISTRY = {}
 
@@ -42,8 +47,9 @@ def GetResourceClass(base_class, **kwargs):
   key = [base_class.__name__]
   key += sorted(kwargs.items())
   if tuple(key) not in _RESOURCE_REGISTRY:
-    raise Exception('No %s subclass defined with the attributes: %s' %
-                    (base_class.__name__, kwargs))
+    raise errors.Resource.SubclassNotFoundError(
+        'No %s subclass defined with the attributes: %s' %
+        (base_class.__name__, kwargs))
   return _RESOURCE_REGISTRY.get(tuple(key))
 
 
@@ -57,16 +63,16 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
           attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None]
       if unset_attrs:
         raise Exception(
-            'Subclasses of %s must have the following attrs set: %s. The '
-            'following attrs were not set: %s.' %
-            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, unset_attrs))
+            'Subclasses of %s must have the following attrs set: %s. For %s '
+            'the following attrs were not set: %s.' %
+            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs))
       key = [cls.RESOURCE_TYPE]
       key += sorted([(attr, getattr(cls, attr)) for attr in cls.REQUIRED_ATTRS])
       _RESOURCE_REGISTRY[tuple(key)] = cls
     super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
 
 
-class BaseResource(object):
+class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
   """An object representing a cloud resource.
 
   Attributes:
@@ -81,7 +87,10 @@ class BaseResource(object):
   # (e.g. CLOUD).
   REQUIRED_ATTRS = ['CLOUD']
 
-  __metaclass__ = AutoRegisterResourceMeta
+  # Timeout in seconds for resource to be ready.
+  READY_TIMEOUT = None
+  # Time between retries.
+  POLL_INTERVAL = 5
 
   def __init__(self, user_managed=False):
     super(BaseResource, self).__init__()
@@ -152,8 +161,17 @@ class BaseResource(object):
     """
     return False
 
+  def _PreDelete(self):
+    """Method that will be called once before _DeleteResource() is called.
+
+    Supplying this method is optional. If it is supplied, it will be called
+    once, before attempting to delete the resource. It is intended to allow
+    data about the resource to be collected right before it is deleted.
+    """
+    pass
+
   def _PostCreate(self):
-    """Method that will be called once after _CreateReource is called.
+    """Method that will be called once after _CreateResource() is called.
 
     Supplying this method is optional. If it is supplied, it will be called
     once, after the resource is confirmed to exist. It is intended to allow
@@ -200,11 +218,21 @@ class BaseResource(object):
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
+
+    # Retryable method which allows waiting for deletion of the resource.
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0, timeout=3600,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableDeletionError,))
+    def WaitUntilDeleted():
+      if self._IsDeleting():
+        raise errors.Resource.RetryableDeletionError('Not yet deleted')
+
     if self.deleted:
       return
     if not self.delete_start_time:
       self.delete_start_time = time.time()
     self._Delete()
+    WaitUntilDeleted()
     try:
       if self._Exists():
         raise errors.Resource.RetryableDeletionError(
@@ -215,9 +243,8 @@ class BaseResource(object):
   def Create(self):
     """Creates a resource and its dependencies."""
 
-    # A more general solution would allow the retry interval to be set as a
-    # property of the class.  We don't currently need that.
-    @vm_util.Retry(poll_interval=5, fuzz=0,
+    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
+                   timeout=self.READY_TIMEOUT,
                    retryable_exceptions=(
                        errors.Resource.RetryableCreationError,))
     def WaitUntilReady():
@@ -236,18 +263,10 @@ class BaseResource(object):
   def Delete(self):
     """Deletes a resource and its dependencies."""
 
-    # Retryable method which allows waiting for deletion of the resource.
-    @vm_util.Retry(poll_interval=5, fuzz=0, timeout=3600,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableDeletionError,))
-    def WaitUntilDeleted():
-      if self._IsDeleting():
-        raise errors.Resource.RetryableDeletionError('Not yet deleted')
-
     if self.user_managed:
       return
+    self._PreDelete()
     self._DeleteResource()
-    WaitUntilDeleted()
     self.deleted = True
     self.delete_end_time = time.time()
     self._DeleteDependencies()

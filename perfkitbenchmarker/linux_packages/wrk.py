@@ -94,7 +94,7 @@ def Run(vm, target, connections=1, duration=60):
   Yields:
     sample.Sample objects with results.
   """
-  threads = min(connections, vm.num_cpus)
+  threads = min(connections, vm.NumCpusForBenchmark())
   cmd = ('{wrk} --connections={connections} --threads={threads} '
          '--duration={duration} '
          '--timeout={timeout} '

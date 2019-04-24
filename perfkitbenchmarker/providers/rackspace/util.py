@@ -13,10 +13,15 @@
 # limitations under the License.
 """Utilities for working with Rackspace Cloud Platform resources."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from collections import OrderedDict
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+import six
 
 FLAGS = flags.FLAGS
 
@@ -99,7 +104,7 @@ class RackCLICommand(object):
     cmd = [FLAGS.rack_path]
     cmd.extend(self.args)
     self._AddCommonFlags(self.resource)
-    for flag_name, value in self.flags.iteritems():
+    for flag_name, value in six.iteritems(self.flags):
       flag_name_str = '--{0}'.format(flag_name)
       if value is True:
         cmd.append(flag_name_str)

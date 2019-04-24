@@ -82,18 +82,12 @@ def Run(benchmark_spec):
   cluster = benchmark_spec.container_cluster
   container_0 = cluster.containers['netperf'][0]
   spec = benchmark_spec.container_specs['netperf']
-
-  output_selector = (
-      'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,P99_LATENCY,'
-      'STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,CONFIDENCE_ITERATION,'
-      'THROUGHPUT_CONFID'
-  )
   spec.command = ['netperf',
                   '-t', 'TCP_STREAM',
                   '-H', container_0.ip_address,
                   '-l', '100',
                   '--',
-                  '-o', output_selector]
+                  '-o', netperf_benchmark.OUTPUT_SELECTOR]
   cluster.DeployContainer('netperf', benchmark_spec.container_specs['netperf'])
   container_1 = cluster.containers['netperf'][1]
   container_1.WaitForExit()

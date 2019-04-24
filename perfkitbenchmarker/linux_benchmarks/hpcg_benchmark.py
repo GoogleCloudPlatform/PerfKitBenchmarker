@@ -22,10 +22,10 @@ import os
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import sample
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
@@ -42,22 +42,19 @@ hpcg:
   description: Runs HPCG. Specify the number of VMs with --num_vms
   vm_groups:
     default:
+      os_type: ubuntu1604
       vm_spec:
         GCP:
-          image: ubuntu-1604-xenial-v20180122
-          image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
           gpu_type: k80
           gpu_count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-41e0b93b
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
         Azure:
-          image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
       vm_count: null
@@ -73,12 +70,7 @@ flag_util.DEFINE_integerlist(
     'hpcg_problem_size',
     flag_util.IntegerList([256, 256, 256]),
     'three dimensional problem size for each node. Must contain '
-    'three integers')
-
-flags.DEFINE_boolean(
-    'hpcg_run_as_root', False, 'If true, pass --allow-run-as-root '
-    'to mpirun.')
-
+    'three integers', module_name=__name__)
 
 
 class HpcgParseOutputException(Exception):
@@ -131,7 +123,8 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   gpus_per_node = (FLAGS.hpcg_gpus_per_node or
                    cuda_toolkit.QueryNumberOfGpus(benchmark_spec.vms[0]))
-  cpus_per_rank = int(benchmark_spec.vms[0].num_cpus / gpus_per_node)
+  cpus_per_rank = int(benchmark_spec.vms[0].NumCpusForBenchmark() /
+                      gpus_per_node)
   num_vms = len(benchmark_spec.vms)
   total_gpus = gpus_per_node * num_vms
 
@@ -141,7 +134,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.total_gpus = total_gpus
   benchmark_spec.hpcg_problem_size = FLAGS.hpcg_problem_size
   benchmark_spec.hpcg_runtime = FLAGS.hpcg_runtime
-  benchmark_spec.run_as_root = FLAGS.hpcg_run_as_root
+  benchmark_spec.run_as_root = FLAGS.mpirun_allow_run_as_root
 
 
 def _CopyAndUpdateRunScripts(vm, benchmark_spec):

@@ -18,6 +18,10 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import posixpath
@@ -34,6 +38,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
+import six
+from six.moves import range
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
@@ -126,10 +132,12 @@ flag_util.DEFINE_integerlist('fio_io_depths', flag_util.IntegerList([1]),
                              'number, like --fio_io_depths=1, a range, like '
                              '--fio_io_depths=1-4, or a list, like '
                              '--fio_io_depths=1-4,6-8',
-                             on_nonincreasing=flag_util.IntegerListParser.WARN)
+                             on_nonincreasing=flag_util.IntegerListParser.WARN,
+                             module_name=__name__)
 flag_util.DEFINE_integerlist('fio_num_jobs', flag_util.IntegerList([1]),
                              'Number of concurrent fio jobs to run.',
-                             on_nonincreasing=flag_util.IntegerListParser.WARN)
+                             on_nonincreasing=flag_util.IntegerListParser.WARN,
+                             module_name=__name__)
 flags.DEFINE_integer('fio_working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device. If using '
@@ -236,12 +244,15 @@ group_reporting=1
 {{parameter}}
 {%- endfor %}
 {%- for scenario in scenarios %}
-{%- for iodepth in iodepths %}
 {%- for numjob in numjobs %}
+{%- for iodepth in iodepths %}
 
 [{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
 stonewall
 rw={{scenario['rwkind']}}
+{%- if scenario['rwmixread'] is defined %}
+rwmixread={{scenario['rwmixread']}}
+{%- endif%}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
 {%- if scenario['size'] is defined %}
@@ -278,7 +289,7 @@ def GenerateJobFileString(filename, scenario_strings,
   """
 
   if 'all' in scenario_strings:
-    scenarios = SCENARIOS.itervalues()
+    scenarios = six.itervalues(SCENARIOS)
   else:
     for name in scenario_strings:
       if name not in SCENARIOS:
@@ -291,7 +302,7 @@ def GenerateJobFileString(filename, scenario_strings,
     # SCENARIOS variable.
     scenarios = [scenario.copy() for scenario in scenarios]
     for scenario in scenarios:
-      scenario['blocksize'] = str(long(block_size.m_as(units.byte))) + 'B'
+      scenario['blocksize'] = str(int(block_size.m_as(units.byte))) + 'B'
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
@@ -412,6 +423,7 @@ def GetConfig(user_config):
 
 
 def GetLogFlags(log_file_base):
+  """Gets fio log files."""
   collect_logs = FLAGS.fio_lat_log or FLAGS.fio_bw_log or FLAGS.fio_iops_log
   fio_log_flags = [(FLAGS.fio_lat_log, '--write_lat_log=%(filename)s',),
                    (FLAGS.fio_bw_log, '--write_bw_log=%(filename)s',),
@@ -442,7 +454,7 @@ def Prepare(benchmark_spec):
 def GetFileAsString(file_path):
   if not file_path:
     return None
-  with open(file_path, 'r') as jobfile:
+  with open(data.ResourcePath(file_path), 'r') as jobfile:
     return jobfile.read()
 
 
@@ -476,8 +488,10 @@ def PrepareWithExec(benchmark_spec, exec_path):
   # without fill, it was never unmounted (see GetConfig()).
   if FLAGS.fio_target_mode == AGAINST_FILE_WITH_FILL_MODE:
     disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
-    vm.FormatDisk(disk.GetDevicePath())
-    vm.MountDisk(disk.GetDevicePath(), disk.mount_point)
+    disk_spec = vm.disk_specs[0]
+    vm.FormatDisk(disk.GetDevicePath(), disk_spec.disk_type)
+    vm.MountDisk(disk.GetDevicePath(), disk.mount_point,
+                 disk_spec.disk_type, disk.mount_options, disk.fstab_options)
 
 
 def Run(benchmark_spec):

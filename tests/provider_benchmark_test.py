@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.providers"""
+"""Tests for perfkitbenchmarker.providers."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import unittest
 
 import mock
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
+import six
 
 
 class ProviderBenchmarkChecks(unittest.TestCase):
@@ -40,11 +45,15 @@ class ProviderBenchmarkChecks(unittest.TestCase):
 
   def testIperfSupport(self):
     expected = {providers.GCP: True, providers.DIGITALOCEAN: True}
-    for cloud, support_expected in expected.iteritems():
+    for cloud, support_expected in six.iteritems(expected):
       self._VerifyProviderBenchmarkSupport(cloud, 'iperf', support_expected)
 
   def testMYSQLSupport(self):
     expected = {providers.GCP: True, providers.DIGITALOCEAN: False}
-    for cloud, support_expected in expected.iteritems():
+    for cloud, support_expected in six.iteritems(expected):
       self._VerifyProviderBenchmarkSupport(cloud, 'mysql_service',
                                            support_expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

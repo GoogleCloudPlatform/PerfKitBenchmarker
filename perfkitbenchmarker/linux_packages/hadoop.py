@@ -24,17 +24,18 @@ import re
 import time
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-HADOOP_VERSION = '2.8.1'
-HADOOP_URL = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
-              'hadoop-{0}.tar.gz').format(HADOOP_VERSION)
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('hadoop_version', '2.8.4', 'Version of hadoop.')
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml',
-              'hadoop/hadoop-env.sh.j2', 'hadoop/slaves.j2']
+              'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
 HADOOP_DIR = posixpath.join(INSTALL_DIR, 'hadoop')
@@ -57,9 +58,11 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('openjdk')
   vm.Install('curl')
+  hadoop_url = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
+                'hadoop-{0}.tar.gz').format(FLAGS.hadoop_version)
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        HADOOP_DIR, HADOOP_URL))
+                        HADOOP_DIR, hadoop_url))
 
 
 def YumInstall(vm):
@@ -89,13 +92,17 @@ def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
       'master_ip': master_ip,
       'worker_ips': worker_ips,
       'scratch_dir': scratch_dir,
-      'vcpus': vm.num_cpus,
+      'vcpus': vm.NumCpusForBenchmark(),
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
+      'user': vm.user_name,
       'yarn_memory_mb': yarn_memory_mb
   }
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
+    if (file_name == 'hadoop/workers.j2' and
+        FLAGS.hadoop_version.split('.')[0] == '2'):
+      file_name = 'hadoop/slaves.j2'
     remote_path = posixpath.join(HADOOP_CONF_DIR,
                                  os.path.basename(file_name))
     if file_name.endswith('.j2'):

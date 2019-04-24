@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for perfkitbenchmarker.configs.benchmark_config_spec."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import os
 import unittest
@@ -28,8 +32,10 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
-from tests import mock_flags
+from tests import pkb_common_test_case
+from six.moves import range
 
+FLAGS = flags.FLAGS
 
 _COMPONENT = 'test_component'
 _OPTION = 'test_option'
@@ -43,67 +49,7 @@ def _GetFlagDict(flag_values):
   return {name: flag_values[name] for name in flag_values}
 
 
-class FlagsDecoderTestCase(unittest.TestCase):
-
-  def setUp(self):
-    super(FlagsDecoderTestCase, self).setUp()
-    self._decoder = benchmark_config_spec.FlagsDecoder(option=_OPTION)
-    self._flag_values = flags.FlagValues()
-    flags.DEFINE_integer('test_flag', 0, 'Test flag.',
-                         flag_values=self._flag_values)
-
-  def assertResultIsCorrect(self, result, expected_flag_value,
-                            expected_flag_present):
-    self.assertIsInstance(result, dict)
-    self.assertEqual(len(result), 1)
-    self.assertEqual(result['test_flag'].value, expected_flag_value)
-    self.assertEqual(result['test_flag'].present, expected_flag_present)
-    self.assertIsNot(result, _GetFlagDict(self._flag_values))
-
-  def testNone(self):
-    result = self._decoder.Decode(None, _COMPONENT, self._flag_values)
-    self.assertResultIsCorrect(result, 0, False)
-
-  def testEmptyDict(self):
-    result = self._decoder.Decode({}, _COMPONENT, self._flag_values)
-    self.assertResultIsCorrect(result, 0, False)
-
-  def testValidFlagOverride(self):
-    result = self._decoder.Decode({'test_flag': 1}, _COMPONENT,
-                                  self._flag_values)
-    self.assertResultIsCorrect(result, 1, True)
-
-  def testPresentFlagNotOverridden(self):
-    self._flag_values['test_flag'].present = True
-    result = self._decoder.Decode({'test_flag': 1}, _COMPONENT,
-                                  self._flag_values)
-    self.assertResultIsCorrect(result, 0, True)
-
-  def testInvalidValueType(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._decoder.Decode(0, _COMPONENT, self._flag_values)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "0" (of type "int"). Value '
-        'must be one of the following types: NoneType, dict.'))
-
-  def testInvalidFlagName(self):
-    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      self._decoder.Decode({'flag': 1}, _COMPONENT, self._flag_values)
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized option test_component.test_option.flag. Each option '
-        'within test_component.test_option must correspond to a valid '
-        'command-line flag.'))
-
-  def testInvalidFlagValue(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._decoder.Decode({'test_flag': 'two'}, _COMPONENT, self._flag_values)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option.test_flag value: "two" (of type '
-        '"str").{0}flag --test_flag=two: invalid literal for int() with base '
-        "10: 'two'".format(os.linesep)))
-
-
-class PerCloudConfigSpecTestCase(unittest.TestCase):
+class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(PerCloudConfigSpecTestCase, self).setUp()
@@ -134,7 +80,7 @@ class PerCloudConfigSpecTestCase(unittest.TestCase):
         'Unrecognized options were found in test_component: fake_provider.'))
 
 
-class PerCloudConfigDecoderTestCase(unittest.TestCase):
+class PerCloudConfigDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(PerCloudConfigDecoderTestCase, self).setUp()
@@ -163,7 +109,7 @@ class PerCloudConfigDecoderTestCase(unittest.TestCase):
     self.assertEqual(result.__dict__, expected_attributes)
 
 
-class StaticVmDecoderTestCase(unittest.TestCase):
+class StaticVmDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(StaticVmDecoderTestCase, self).setUp()
@@ -179,23 +125,23 @@ class StaticVmDecoderTestCase(unittest.TestCase):
     self.assertEqual(result.ssh_port, 111)
 
   def testVmSpecFlag(self):
-    flags = mock_flags.MockFlags()
-    flags['install_packages'].value = False
-    flags['install_packages'].present = True
-    result = self._decoder.Decode({}, _COMPONENT, flags)
+    FLAGS.install_packages = False
+    FLAGS['install_packages'].present = True
+    result = self._decoder.Decode({}, _COMPONENT, FLAGS)
     self.assertFalse(result.install_packages)
 
   def testDiskSpecFlag(self):
-    flags = mock_flags.MockFlags()
-    flags['scratch_dir'].value = '/path/from/flag'
-    flags['scratch_dir'].present = True
-    result = self._decoder.Decode(
-        {'disk_specs': [{'mount_point': '/path/from/spec'}]},
-        _COMPONENT, flags)
+    FLAGS.scratch_dir = '/path/from/flag'
+    FLAGS['scratch_dir'].present = True
+    result = self._decoder.Decode({
+        'disk_specs': [{
+            'mount_point': '/path/from/spec'
+        }]
+    }, _COMPONENT, FLAGS)
     self.assertEqual(result.disk_specs[0].mount_point, '/path/from/flag')
 
 
-class StaticVmListDecoderTestCase(unittest.TestCase):
+class StaticVmListDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(StaticVmListDecoderTestCase, self).setUp()
@@ -206,10 +152,10 @@ class StaticVmListDecoderTestCase(unittest.TestCase):
       self._decoder.Decode(None, _COMPONENT, {})
 
   def testValidList(self):
-    input_list = [{'ssh_port': i} for i in xrange(3)]
+    input_list = [{'ssh_port': i} for i in range(3)]
     result = self._decoder.Decode(input_list, _COMPONENT, {})
     self.assertIsInstance(result, list)
-    self.assertEqual([vm_spec.ssh_port for vm_spec in result], range(3))
+    self.assertEqual([vm_spec.ssh_port for vm_spec in result], list(range(3)))
 
   def testInvalidList(self):
     input_list = [{'ssh_port': 0}, {'ssh_port': 1}, {'ssh_pory': 2}]
@@ -219,7 +165,7 @@ class StaticVmListDecoderTestCase(unittest.TestCase):
         'Unrecognized options were found in test_component[2]: ssh_pory.'))
 
 
-class VmGroupSpecTestCase(unittest.TestCase):
+class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(VmGroupSpecTestCase, self).setUp()
@@ -341,34 +287,34 @@ class VmGroupSpecTestCase(unittest.TestCase):
         'contain a configuration for "GCP".'))
 
   def createNonPresentFlags(self):
-    result = mock_flags.MockFlags()
-    result['cloud'].value = providers.AWS
-    result['num_vms'].value = 3
-    result['os_type'].value = os_types.WINDOWS
-    return result
+    FLAGS.cloud = providers.AWS
+    FLAGS.num_vms = 3
+    FLAGS.os_type = os_types.WINDOWS
 
   def createPresentFlags(self):
-    result = self.createNonPresentFlags()
-    result['cloud'].present = True
-    result['num_vms'].present = True
-    result['os_type'].present = True
-    return result
+    self.createNonPresentFlags()
+    FLAGS['cloud'].present = True
+    FLAGS['num_vms'].present = True
+    FLAGS['os_type'].present = True
 
   def testPresentFlagsAndPresentConfigValues(self):
-    result = self._spec_class(_COMPONENT, flag_values=self.createPresentFlags(),
-                              vm_count=2, **self._kwargs)
+    self.createPresentFlags()
+    result = self._spec_class(
+        _COMPONENT, flag_values=FLAGS, vm_count=2, **self._kwargs)
     self.assertEqual(result.cloud, 'AWS')
     self.assertEqual(result.os_type, 'windows')
     self.assertEqual(result.vm_count, 2)
 
   def testPresentFlagsAndNonPresentConfigValues(self):
-    result = self._spec_class(_COMPONENT, flag_values=self.createPresentFlags(),
-                              vm_spec=_GCP_AWS_VM_CONFIG)
+    self.createPresentFlags()
+    result = self._spec_class(
+        _COMPONENT, flag_values=FLAGS, vm_spec=_GCP_AWS_VM_CONFIG)
     self.assertEqual(result.cloud, 'AWS')
     self.assertEqual(result.os_type, 'windows')
     self.assertEqual(result.vm_count, 1)
 
   def testNonPresentFlagsAndPresentConfigValues(self):
+    self.createNonPresentFlags()
     result = self._spec_class(
         _COMPONENT, flag_values=self.createNonPresentFlags(), vm_count=2,
         **self._kwargs)
@@ -377,27 +323,27 @@ class VmGroupSpecTestCase(unittest.TestCase):
     self.assertEqual(result.vm_count, 2)
 
   def testVmCountNone(self):
+    self.createNonPresentFlags()
     result = self._spec_class(
-        _COMPONENT, flag_values=self.createNonPresentFlags(), vm_count=None,
-        **self._kwargs)
+        _COMPONENT, vm_count=None, flag_values=FLAGS, **self._kwargs)
     self.assertEqual(result.vm_count, 3)
 
   def testCallsLoadProviderAndChecksRequirements(self):
-    flag_values = self.createNonPresentFlags()
-    flag_values.ignore_package_requirements = False
+    self.createNonPresentFlags()
+    FLAGS.ignore_package_requirements = False
     with mock.patch(providers.__name__ + '.LoadProvider'):
-      self._spec_class(_COMPONENT, flag_values, **self._kwargs)
+      self._spec_class(_COMPONENT, flag_values=FLAGS, **self._kwargs)
       providers.LoadProvider.assert_called_once_with('GCP', False)
 
   def testCallsLoadProviderAndIgnoresRequirements(self):
-    flag_values = self.createNonPresentFlags()
-    flag_values.ignore_package_requirements = True
+    self.createNonPresentFlags()
+    FLAGS.ignore_package_requirements = True
     with mock.patch(providers.__name__ + '.LoadProvider'):
-      self._spec_class(_COMPONENT, flag_values, **self._kwargs)
+      self._spec_class(_COMPONENT, flag_values=FLAGS, **self._kwargs)
       providers.LoadProvider.assert_called_once_with('GCP', True)
 
 
-class VmGroupsDecoderTestCase(unittest.TestCase):
+class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(VmGroupsDecoderTestCase, self).setUp()
@@ -431,15 +377,13 @@ class VmGroupsDecoderTestCase(unittest.TestCase):
         'test_component.default.static_vms[1]: fake_option.'))
 
 
-class CloudRedisDecoderTestCase(unittest.TestCase):
+class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(CloudRedisDecoderTestCase, self).setUp()
     self._decoder = benchmark_config_spec._CloudRedisDecoder()
-    self.flags = mock_flags.MockFlags()
-    self.flags['cloud'].value = providers.GCP
-    self.flags['cloud'].present = True
-    self.flags['run_uri'].value = 'test'
+    FLAGS.cloud = providers.GCP
+    FLAGS.run_uri = 'test'
 
   def testNone(self):
     with self.assertRaises(errors.Config.InvalidValue):
@@ -447,28 +391,24 @@ class CloudRedisDecoderTestCase(unittest.TestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode({
-        'redis_version': 'REDIS_3_2'}, _COMPONENT, self.flags)
+        'redis_version': 'redis_3_2'
+    }, _COMPONENT, FLAGS)
     self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
-    self.assertEqual(result.redis_version, 'REDIS_3_2')
+    self.assertEqual(result.redis_version, 'redis_3_2')
 
   def testInvalidInput(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      self._decoder.Decode(
-          {'foo': 'bar'}, _COMPONENT, self.flags)
+      self._decoder.Decode({'foo': 'bar'}, _COMPONENT, FLAGS)
     self.assertEqual(str(cm.exception), (
         'Unrecognized options were found in '
         'test_component: foo.'))
 
 
-class CloudRedisSpecTestCase(unittest.TestCase):
+class CloudRedisSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(CloudRedisSpecTestCase, self).setUp()
     self._spec_class = benchmark_config_spec._CloudRedisSpec
-    self.flags = mock_flags.MockFlags()
-    self.flags['cloud'].value = providers.GCP
-    self.flags['cloud'].present = True
-    self.flags['run_uri'].value = 'test'
 
   def testMissingValues(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
@@ -477,15 +417,16 @@ class CloudRedisSpecTestCase(unittest.TestCase):
         'Required options were missing from test_component: cloud.'))
 
   def testDefaults(self):
-    result = self._spec_class(_COMPONENT, flag_values=self.flags)
+    result = self._spec_class(_COMPONENT, flag_values=FLAGS)
     self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
-    self.assertEqual(result.redis_version, 'REDIS_3_2')
+    self.assertEqual(result.redis_version, 'redis_3_2')
 
 
-class BenchmarkConfigSpecTestCase(unittest.TestCase):
+class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(BenchmarkConfigSpecTestCase, self).setUp()
+
     self._spec_class = benchmark_config_spec.BenchmarkConfigSpec
     self._description = 'Test description.'
     self._vm_groups = {'default': {'cloud': providers.GCP,
@@ -495,8 +436,7 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
                     'vm_groups': self._vm_groups}
 
   def testValidInput(self):
-    result = self._spec_class(_COMPONENT, flag_values=flags.FLAGS,
-                              **self._kwargs)
+    result = self._spec_class(_COMPONENT, flag_values=FLAGS, **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
     self.assertIsNot(result.flags, _GetFlagDict(flags.FLAGS))
@@ -513,7 +453,7 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
     self._kwargs['vm_groups']['default']['static_vms'] = [{'disk_specs': [{
         'disk_size': 0.5}]}]
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._spec_class(_COMPONENT, flag_values=flags.FLAGS, **self._kwargs)
+      self._spec_class(_COMPONENT, flag_values=FLAGS, **self._kwargs)
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.vm_groups.default.static_vms[0].disk_specs[0]'
         '.disk_size value: "0.5" (of type "float"). Value must be one of the '
@@ -525,8 +465,11 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
         for os_type in (os_types.DEBIAN, os_types.RHEL, os_types.WINDOWS)}
     expected_os_types = os_types.JUJU, os_types.WINDOWS
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._spec_class(_COMPONENT, expected_os_types=expected_os_types,
-                       flag_values=flags.FLAGS, **self._kwargs)
+      self._spec_class(
+          _COMPONENT,
+          expected_os_types=expected_os_types,
+          flag_values=FLAGS,
+          **self._kwargs)
     self.assertEqual(str(cm.exception), (
         "VM groups in test_component may only have the following OS types: "
         "'juju', 'windows'. The following VM group options are invalid:{sep}"
@@ -537,14 +480,13 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
   def testFlagOverridesPropagate(self):
     self._kwargs['flags'] = {'cloud': providers.AWS,
                              'ignore_package_requirements': True}
-    result = self._spec_class(_COMPONENT, flag_values=flags.FLAGS,
-                              **self._kwargs)
+    result = self._spec_class(_COMPONENT, flag_values=FLAGS, **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
     self.assertIsInstance(result.flags, dict)
     self.assertIsNot(result.flags, _GetFlagDict(flags.FLAGS))
     self.assertEqual(result.flags['cloud'], 'AWS')
-    self.assertEqual(flags.FLAGS['cloud'].value, 'GCP')
+    self.assertEqual(FLAGS['cloud'].value, 'GCP')
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
     self.assertIsInstance(result.vm_groups['default'],

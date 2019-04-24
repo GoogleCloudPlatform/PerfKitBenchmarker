@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for cloud TPU."""
+"""Module containing class for TPU."""
 
 import abc
 
@@ -35,16 +35,19 @@ flags.DEFINE_string('tpu_network', None,
                     'Specifies the network that this TPU will be a part of.')
 flags.DEFINE_string('tpu_tf_version', None,
                     'TensorFlow version for the TPU.')
-flags.DEFINE_string('tpu_zone', None,
-                    'The zone of the tpu to create. Zone in which TPU lives.')
 flags.DEFINE_string('tpu_name', None,
-                    'The name of the cloud TPU to create.')
+                    'The name of the TPU to create.')
+flags.DEFINE_boolean('tpu_preemptible', False,
+                     'Use preemptible TPU or not.')
+flags.DEFINE_integer('tpu_cores_per_donut', 8,
+                     'The number of cores per TPU donut. This is 8 because each'
+                     ' TPU has 4 chips each with 2 cores.')
 
 FLAGS = flags.FLAGS
 
 
-def GetCloudTpuClass(cloud):
-  """Gets the cloud TPU class corresponding to 'cloud'.
+def GetTpuClass(cloud):
+  """Gets the TPU class corresponding to 'cloud'.
 
   Args:
     cloud: String. name of cloud to get the class for.
@@ -53,40 +56,55 @@ def GetCloudTpuClass(cloud):
     Implementation class corresponding to the argument cloud
 
   Raises:
-    Exception: An invalid cloud TPU was provided
+    Exception: An invalid TPU was provided
   """
-  return resource.GetResourceClass(BaseCloudTpu, CLOUD=cloud)
+  return resource.GetResourceClass(BaseTpu, CLOUD=cloud)
 
 
-class BaseCloudTpu(resource.BaseResource):
-  """Object representing a cloud TPU."""
+class BaseTpu(resource.BaseResource):
+  """Object representing a TPU."""
 
-  RESOURCE_TYPE = 'BaseCloudTpu'
+  RESOURCE_TYPE = 'BaseTpu'
 
-  def __init__(self, cloud_tpu_spec):
-    """Initialize the cloud TPU object.
+  def __init__(self, tpu_spec):
+    """Initialize the TPU object.
 
     Args:
-      cloud_tpu_spec: spec of the cloud TPU.
+      tpu_spec: spec of the TPU.
     """
-    super(BaseCloudTpu, self).__init__()
-    self.spec = cloud_tpu_spec
+    super(BaseTpu, self).__init__()
+    self.spec = tpu_spec
 
   def _Create(self):
-    """Creates the cloud TPU."""
+    """Creates the TPU."""
     raise NotImplementedError()
 
   def _Delete(self):
-    """Deletes the cloud TPU.
-    """
+    """Deletes the TPU."""
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def GetCloudTpuIp(self):
+  def GetName(self):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def GetCloudTpuPort(self):
+  def GetMasterGrpcAddress(self):
+    """Gets the master grpc address of the TPU."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def GetNumShards(self):
+    """Gets the number of TPU shards."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def GetZone(self):
+    """Gets the TPU zone."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def GetAcceleratorType(self):
+    """Gets the TPU accelerator type."""
     raise NotImplementedError()
 
   def GetResourceMetadata(self):
@@ -97,7 +115,7 @@ class BaseCloudTpu(resource.BaseResource):
         'description': self.spec.tpu_description,
         'network': self.spec.tpu_network,
         'tf_version': self.spec.tpu_tf_version,
-        'zone': self.spec.tpu_zone,
-        'name': self.spec.tpu_name
+        'name': self.spec.tpu_name,
+        'preemptible': self.spec.tpu_preemptible
     }
     return metadata

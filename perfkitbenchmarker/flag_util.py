@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,21 @@
 
 """Utility functions for working with user-supplied flags."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
+import os
 import re
 
-import yaml
-
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 
+import six
+from six.moves import range
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -47,7 +54,7 @@ class IntegerList(object):
   by the step size. (Ex: [5, (8,12)] represents the integer list
   5,8,9,10,11,12, and [(8-14-2)] represents the list 8,10,12,14.)
 
-  For negative number ranges use a colon seperator (ex: "-2:1" is the integer
+  For negative number ranges use a colon separator (ex: "-2:1" is the integer
   list -2, -1, 0, 1).
   """
 
@@ -56,7 +63,7 @@ class IntegerList(object):
 
     length = 0
     for elt in groups:
-      if isinstance(elt, int) or isinstance(elt, long):
+      if isinstance(elt, six.integer_types):
         length += 1
       if isinstance(elt, tuple):
         length += len(self._CreateXrangeFromTuple(elt))
@@ -94,14 +101,18 @@ class IntegerList(object):
       return self.groups[group_idx]
 
   def __eq__(self, other):
+    if other is None:
+      return False
     return tuple(self) == tuple(other)
 
   def __ne__(self, other):
+    if other is None:
+      return True
     return tuple(self) != tuple(other)
 
   def __iter__(self):
     for group in self.groups:
-      if isinstance(group, int) or isinstance(group, long):
+      if isinstance(group, six.integer_types):
         yield group
       else:
         for val in self._CreateXrangeFromTuple(group):
@@ -117,7 +128,28 @@ class IntegerList(object):
     start = input_tuple[0]
     step = 1 if len(input_tuple) == 2 else input_tuple[2]
     stop_inclusive = input_tuple[1] + (1 if step > 0 else -1)
-    return xrange(start, stop_inclusive, step)
+    return range(start, stop_inclusive, step)
+
+
+def _IsNonIncreasing(result, val):
+  """Determines if result would be non-increasing if val is appended.
+
+  Args:
+    result: list integers and/or range tuples.
+    val: integer or range tuple to append.
+  Returns:
+    bool indicating if the appended list is non-increasing.
+  """
+  if result:
+    if isinstance(result[-1], tuple):
+      # extract high from previous tuple
+      prev = result[-1][1]
+    else:
+      # previous is int
+      prev = result[-1]
+    if val <= prev:
+      return True
+  return False
 
 
 class IntegerListParser(flags.ArgumentParser):
@@ -137,7 +169,7 @@ class IntegerListParser(flags.ArgumentParser):
   or an IntegerList. In these cases, the return value iterates over
   the same integers as were in the argument.
 
-  For negative number ranges use a colon seperator, for example "-3:4:2" parses
+  For negative number ranges use a colon separator, for example "-3:4:2" parses
   to [-3, -1, 1, 3].
   """
 
@@ -176,7 +208,7 @@ class IntegerListParser(flags.ArgumentParser):
       if self.on_nonincreasing == IntegerListParser.WARN:
         logging.warning('Integer list %s is not increasing', inp)
       elif self.on_nonincreasing == IntegerListParser.EXCEPTION:
-        raise ValueError('Integer list %s is not increasing', inp)
+        raise ValueError('Integer list %s is not increasing' % inp)
 
     groups = inp.split(',')
     result = []
@@ -185,11 +217,11 @@ class IntegerListParser(flags.ArgumentParser):
       match = INTEGER_GROUP_REGEXP.match(
           group) or INTEGER_GROUP_REGEXP_COLONS.match(group)
       if match is None:
-        raise ValueError('Invalid integer list %s', inp)
+        raise ValueError('Invalid integer list %s' % inp)
       elif match.group(2) is None:
         val = int(match.group(1))
 
-        if len(result) > 0 and val <= result[-1]:
+        if _IsNonIncreasing(result, val):
           HandleNonIncreasing()
 
         result.append(val)
@@ -199,7 +231,7 @@ class IntegerListParser(flags.ArgumentParser):
         step = int(match.group(5)) if match.group(5) is not None else 1
         step = -step if step > 0 and low > high else step
 
-        if high <= low or (len(result) > 0 and low <= result[-1]):
+        if high <= low or (_IsNonIncreasing(result, low)):
           HandleNonIncreasing()
 
         result.append((low, high, step))
@@ -217,7 +249,7 @@ class IntegerListSerializer(flags.ArgumentSerializer):
     return separator.join(str(item) for item in val)
 
   def serialize(self, il):
-    return ','.join([str(val) if isinstance(val, int) or isinstance(val, long)
+    return ','.join([str(val) if isinstance(val, six.integer_types)
                      else self._SerializeRange(val)
                      for val in il.groups])
 
@@ -232,32 +264,51 @@ def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
 
 
-class FlagDictSubstitution(object):
-  """Context manager that redirects flag reads and writes."""
+class OverrideFlags(object):
+  """Context manager that applies any config_dict overrides to flag_values."""
 
-  def __init__(self, flag_values, substitute):
-    """Initializes a FlagDictSubstitution.
+  def __init__(self, flag_values, config_dict):
+    """Initializes an OverrideFlags context manager.
 
     Args:
-      flag_values: FlagValues that is temporarily modified such that all its
-          flag reads and writes are redirected.
-      substitute: Callable that temporarily replaces the FlagDict function of
-          flag_values. Accepts no arguments and returns a dict mapping flag
-          name string to Flag object.
+      flag_values: FlagValues that is temporarily modified so that any options
+        in override_dict that are not 'present' in flag_values are applied to
+        flag_values.
+        Upon exit, flag_values will be restored to its original state.
+      config_dict: Merged config flags from the benchmark config and benchmark
+        configuration yaml file.
     """
-    self._flags = flag_values
-    self._substitute = substitute
-    self._flag_dict_func_name = (
-        '_flags' if hasattr(self._flags, '_flags') else 'FlagDict')
+    self._flag_values = flag_values
+    self._config_dict = config_dict
+    self._flags_to_reapply = {}
 
   def __enter__(self):
-    """Begins the flag substitution."""
-    self._original_flagdict = getattr(self._flags, self._flag_dict_func_name)
-    self._flags.__dict__[self._flag_dict_func_name] = self._substitute
+    """Overrides flag_values with options in override_dict."""
+    if not self._config_dict:
+      return
+
+    for key, value in six.iteritems(self._config_dict):
+      if key not in self._flag_values:
+        raise errors.Config.UnrecognizedOption(
+            'Unrecognized option {0}.{1}. Each option within {0} must '
+            'correspond to a valid command-line flag.'.format('flags', key))
+      if not self._flag_values[key].present:
+        self._flags_to_reapply[key] = self._flag_values[key].value
+        try:
+          self._flag_values[key].parse(value)  # Set 'present' to True.
+        except flags.IllegalFlagValueError as e:
+          raise errors.Config.InvalidValue(
+              'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
+                  'flags', key, value,
+                  value.__class__.__name__, os.linesep, e))
 
   def __exit__(self, *unused_args, **unused_kwargs):
-    """Stops the flag substitution."""
-    self._flags.__dict__[self._flag_dict_func_name] = self._original_flagdict
+    """Restores flag_values to its original state."""
+    if not self._flags_to_reapply:
+      return
+    for key, value in six.iteritems(self._flags_to_reapply):
+      self._flag_values[key].value = value
+      self._flag_values[key].present = 0
 
 
 class UnitsParser(flags.ArgumentParser):
@@ -283,7 +334,7 @@ class UnitsParser(flags.ArgumentParser):
           at least one of the specified Units, or the parse() method will raise
           a ValueError.
     """
-    if isinstance(convertible_to, (basestring, units.Unit)):
+    if isinstance(convertible_to, (six.string_types, units.Unit)):
       self.convertible_to = [units.Unit(convertible_to)]
     else:
       self.convertible_to = [units.Unit(u) for u in convertible_to]
@@ -309,7 +360,7 @@ class UnitsParser(flags.ArgumentParser):
         quantity = units.ParseExpression(inp)
       except Exception as e:
         raise ValueError("Couldn't parse unit expression %r: %s" %
-                         (inp, e.message))
+                         (inp, str(e)))
       if not isinstance(quantity, units.Quantity):
         raise ValueError('Expression %r evaluates to a unitless value.' % inp)
 
@@ -430,11 +481,11 @@ class YAMLParser(flags.ArgumentParser):
     """Parse the input.
 
     Args:
-      inp. A string or the result of yaml.load. If a string, should be
-      a valid YAML document.
+      inp: A string or the result of yaml.load. If a string, should be
+           a valid YAML document.
     """
 
-    if isinstance(inp, basestring):
+    if isinstance(inp, six.string_types):
       # This will work unless the user writes a config with a quoted
       # string that, if unquoted, would be parsed as a non-string
       # Python type (example: '123'). In that case, the first
@@ -447,7 +498,7 @@ class YAMLParser(flags.ArgumentParser):
         return yaml.load(inp)
       except yaml.YAMLError as e:
         raise ValueError("Couldn't parse YAML string '%s': %s" %
-                         (inp, e.message))
+                         (inp, str(e)))
     else:
       return inp
 

@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +19,14 @@ import unittest
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
-from perfkitbenchmarker import os_types
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import pkb  # pylint: disable=unused-import
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
 
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'uid'
@@ -32,16 +35,19 @@ _BENCHMARK_UID = 'uid'
 class _DiskTypeRenamingTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.os_type = os_types.DEBIAN
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)
+
+    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock.start()
+    self.addCleanup(get_tmp_dir_mock.stop)
+
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpec(self, config_dict):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=self.mocked_flags, **config_dict)
+        _BENCHMARK_NAME, flag_values=FLAGS, **config_dict)
     spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
                                         _BENCHMARK_UID)
     spec.ConstructVirtualMachines()
@@ -166,3 +172,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
     }
     spec = self._CreateBenchmarkSpec(config)
     self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'io1')
+
+
+if __name__ == '__main__':
+  unittest.main()

@@ -217,8 +217,8 @@ def _ExtractThroughput(output):
   """Extract throughput from MXNet output.
 
   Sample output:
-  INFO:root:Epoch[0] Batch [460]	Speed: 50.42 samples/sec	accuracy=1.000000
-  INFO:root:Epoch[0] Batch [480]	Speed: 50.47 samples/sec	accuracy=1.000000
+  INFO:root:Epoch[0] Batch [460-480] Speed: 50.42 samples/sec accuracy=1.000000
+  INFO:root:Epoch[0] Batch [480-500] Speed: 50.47 samples/sec accuracy=1.000000
   INFO:root:Epoch[0] Train-accuracy=1.000000
   INFO:root:Epoch[0] Time cost=634.243
 
@@ -228,7 +228,7 @@ def _ExtractThroughput(output):
   Returns:
     throughput (float)
   """
-  regex = r'Batch\s+\[\d+\]\tSpeed:\s+(\d+.\d+)\s+'
+  regex = r'Speed:\s+(\d+.\d+)'
   match = re.findall(regex, output)
   try:
     return sum(float(step) for step in match) / len(match)
@@ -294,6 +294,13 @@ def Run(benchmark_spec):
           env=mxnet.GetEnvironmentVars(vm),
           cmd=mx_benchmark_cmd,
           gpus=','.join(str(n) for n in range(num_gpus)))
+    elif benchmark_spec.device == CPU:
+      # Specifies the number of threads to use in CPU test.
+      # https://mxnet.incubator.apache.org/faq/perf.html
+      mx_benchmark_cmd = 'OMP_NUM_THREADS={omp_num_threads} {cmd}'.format(
+          omp_num_threads=vm.NumCpusForBenchmark() / 2,
+          cmd=mx_benchmark_cmd)
+
     if num_layers:
       mx_benchmark_cmd = '%s --num-layers %s' % (mx_benchmark_cmd, num_layers)
     run_command = 'cd %s && %s' % (mx_benchmark_dir,

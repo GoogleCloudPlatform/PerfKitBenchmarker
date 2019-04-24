@@ -28,6 +28,7 @@ operate on the VM: boot, shutdown, etc.
 import itertools
 import json
 import posixpath
+import re
 
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -43,10 +44,16 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import util
 
 import yaml
 
 FLAGS = flags.FLAGS
+NUM_LOCAL_VOLUMES = {
+    'Standard_L8s_v2': 1, 'Standard_L16s_v2': 2,
+    'Standard_L32s_v2': 4, 'Standard_L64s_v2': 8,
+    'Standard_L80s_v2': 10
+}
 
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
@@ -137,7 +144,7 @@ class AzurePublicIPAddress(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def GetIPAddress(self):
@@ -190,7 +197,7 @@ class AzureNIC(resource.BaseResource):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def GetInternalIP(self):
@@ -239,7 +246,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AzureVirtualMachine, self).__init__(vm_spec)
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
-    self.max_local_disks = 1
+    self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
     self._lun_counter = itertools.count()
     self._deleted = False
 
@@ -284,7 +291,13 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # Uses a custom default because create for larger sizes sometimes times out.
     azure_vm_create_timeout = 600
-    vm_util.IssueCommand(create_cmd, timeout=azure_vm_create_timeout)
+    _, stderr, retcode = vm_util.IssueCommand(create_cmd,
+                                              timeout=azure_vm_create_timeout)
+    if retcode and 'Error Code: QuotaExceeded' in stderr:
+      raise errors.Benchmarks.QuotaFailure(
+          virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
+    if retcode and 'AllocationFailed' in stderr:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
 
   def _Exists(self):
     """Returns True if the VM exists."""
@@ -298,7 +311,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     try:
       json.loads(stdout)
       return True
-    except:
+    except ValueError:
       return False
 
   def _Delete(self):
@@ -315,6 +328,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = json.loads(stdout)
     self.os_disk.name = response['storageProfile']['osDisk']['name']
     self.os_disk.created = True
+    vm_util.IssueCommand([
+        azure.AZURE_PATH, 'disk', 'update', '--name', self.os_disk.name,
+        '--set', util.GetTagsJson(self.resource_group.timeout_minutes)
+    ] + self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
     self.ip_address = self.public_ip.GetIPAddress()
 
@@ -330,15 +347,21 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+
+    Raises:
+      CreationError: If an SMB disk is listed but the SMB service not created.
     """
     disks = []
 
     for _ in xrange(disk_spec.num_striped_disks):
+      if disk_spec.disk_type == disk.SMB:
+        data_disk = self._GetSmbService().CreateSmbDisk()
+        disks.append(data_disk)
+        continue
       if disk_spec.disk_type == disk.LOCAL:
         # Local disk numbers start at 1 (0 is the system disk).
         disk_number = self.local_disk_counter + 1
         self.local_disk_counter += 1
-        lun = None
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
       else:
@@ -346,7 +369,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         # and local disks occupy [1, max_local_disks]).
         disk_number = self.remote_disk_counter + 1 + self.max_local_disks
         self.remote_disk_counter += 1
-        lun = next(self._lun_counter)
+      lun = next(self._lun_counter)
       data_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type,
                                        self.storage_account, lun)
       data_disk.disk_number = disk_number
@@ -354,39 +377,27 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
     Use --azure_preprovisioned_data_bucket to specify the name of the account.
 
     Note: Azure blob storage does not allow underscores in the container name,
-    so this method replaces any underscores in benchmark_name with dashes.
+    so this method replaces any underscores in module_name with dashes.
     Make sure that the same convention is used when uploading the data
     to Azure blob storage. For example: when uploading data for
-    'benchmark_name' to Azure, create a container named 'benchmark-name'.
+    'module_name' to Azure, create a container named 'benchmark-name'.
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
-    benchmark_name_with_underscores_removed = benchmark_name.replace(
-        '_', '-')
     self.Install('azure_cli')
     self.Install('azure_credentials')
-    destpath = posixpath.join(install_path, filename)
-    self.RemoteCommand('mkdir -p %s' % posixpath.dirname(destpath))
-    self.RemoteCommand('az storage blob download '
-                       '--no-progress '
-                       '--account-name %s '
-                       '--container-name %s '
-                       '--name %s '
-                       '--file %s' % (
-                           FLAGS.azure_preprovisioned_data_bucket,
-                           benchmark_name_with_underscores_removed,
-                           filename,
-                           destpath))
+    self.RemoteCommand(
+        GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                                  filename))
 
   def GetResourceMetadata(self):
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
@@ -414,9 +425,14 @@ class Ubuntu1710BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'Canonical:UbuntuServer:17.10:latest'
 
 
+class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1804Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
+
+
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
                                    linux_virtual_machine.RhelMixin):
-  IMAGE_URN = 'RedHat:RHEL:7.2:latest'
+  IMAGE_URN = 'RedHat:RHEL:7.4:latest'
 
   def __init__(self, vm_spec):
     super(RhelBasedAzureVirtualMachine, self).__init__(vm_spec)
@@ -438,10 +454,16 @@ class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
 
 class WindowsAzureVirtualMachine(AzureVirtualMachine,
                                  windows_virtual_machine.WindowsMixin):
+  """Class supporting Windows Azure virtual machines."""
+
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
   def __init__(self, vm_spec):
     super(WindowsAzureVirtualMachine, self).__init__(vm_spec)
+    # The names of Windows VMs on Azure are limited to 15 characters so let's
+    # drop the pkb prefix if necessary.
+    if len(self.name) > 15:
+      self.name = re.sub('^pkb-', '', self.name)
     self.user_name = self.name
     self.password = vm_util.GenerateRandomWindowsPassword()
 
@@ -456,3 +478,25 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
          '--publisher', 'Microsoft.Compute',
          '--version', '1.4',
          '--protected-settings=%s' % config] + self.resource_group.args)
+
+
+def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
+                                              filename):
+  """Returns a string used to download preprovisioned data."""
+  module_name_with_underscores_removed = module_name.replace(
+      '_', '-')
+  destpath = posixpath.join(install_path, filename)
+  # TODO(ferneyhough): Refactor this so that this mkdir command
+  # is run on all clouds, and is os-agnostic (this is linux specific).
+  mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
+  download_command = ('az storage blob download '
+                      '--no-progress '
+                      '--account-name %s '
+                      '--container-name %s '
+                      '--name %s '
+                      '--file %s' % (
+                          FLAGS.azure_preprovisioned_data_bucket,
+                          module_name_with_underscores_removed,
+                          filename,
+                          destpath))
+  return '{0} && {1}'.format(mkdir_command, download_command)

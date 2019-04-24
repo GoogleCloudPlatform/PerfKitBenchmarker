@@ -1,0 +1,161 @@
+W0822 20:19:14.293354 140195756140288 __init__.py:44] file_cache is unavailable when using oauth2client >= 4.0.0 or google-auth
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/googleapiclient/discovery_cache/__init__.py", line 41, in autodetect
+    from . import file_cache
+  File "/usr/local/lib/python2.7/dist-packages/googleapiclient/discovery_cache/file_cache.py", line 41, in <module>
+    'file_cache is unavailable when using oauth2client >= 4.0.0 or google-auth')
+ImportError: file_cache is unavailable when using oauth2client >= 4.0.0 or google-auth
+W0822 20:19:14.468494 140195756140288 tf_logging.py:125] Estimator's model_fn (<function resnet_model_fn at 0x7f819fa1f938>) includes params argument, but params are not passed to Estimator.
+I0822 20:19:14.469619 140195756140288 tf_logging.py:115] Using config: {'_save_checkpoints_secs': None, '_session_config': allow_soft_placement: true
+cluster_def {
+  job {
+    name: "worker"
+    tasks {
+      value: "10.240.0.2:8470"
+    }
+  }
+}
+, '_keep_checkpoint_max': 5, '_task_type': 'worker', '_train_distribute': None, '_is_chief': True, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7f819f10ac90>, '_model_dir': 'gs://d7ed2b03', '_save_checkpoints_steps': 1251, '_keep_checkpoint_every_n_hours': 10000, '_service': None, '_num_ps_replicas': 0, '_tpu_config': TPUConfig(iterations_per_loop=1251, num_shards=8, num_cores_per_replica=None, per_host_input_for_training=3, tpu_job_name=None, initial_infeed_sleep_secs=None), '_tf_random_seed': None, '_save_summary_steps': 100, '_device_fn': None, '_cluster': <tensorflow.contrib.cluster_resolver.python.training.tpu_cluster_resolver.TPUClusterResolver object at 0x7f819fa23290>, '_num_worker_replicas': 1, '_task_id': 0, '_log_step_count_steps': None, '_evaluation_master': u'grpc://10.240.0.2:8470', '_global_id_in_cluster': 0, '_master': u'grpc://10.240.0.2:8470'}
+I0822 20:19:14.470020 140195756140288 tf_logging.py:115] _TPUContext: eval_on_tpu True
+I0822 20:19:14.470289 140195756140288 tf_logging.py:115] Precision: bfloat16
+I0822 20:19:14.711364 140195756140288 tf_logging.py:115] Training for 5005 steps (4.00 epochs in total). Current step 0.
+I0822 20:19:14.912529 140195756140288 tf_logging.py:115] Querying Tensorflow master (grpc://10.240.0.2:8470) for TPU system metadata.
+2018-08-22 20:19:14.914386: W tensorflow/core/distributed_runtime/rpc/grpc_session.cc:349] GrpcSession::ListDevices will initialize the session with an empty graph and other defaults because the session has not yet been created.
+I0822 20:19:14.923137 140195756140288 tf_logging.py:115] Found TPU system:
+I0822 20:19:14.923368 140195756140288 tf_logging.py:115] *** Num TPU Cores: 8
+I0822 20:19:14.923686 140195756140288 tf_logging.py:115] *** Num TPU Workers: 1
+I0822 20:19:14.923790 140195756140288 tf_logging.py:115] *** Num TPU Cores Per Worker: 8
+I0822 20:19:14.923856 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:CPU:0, CPU, -1)
+I0822 20:19:14.924068 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:XLA_CPU:0, XLA_CPU, 17179869184)
+I0822 20:19:14.924119 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:XLA_GPU:0, XLA_GPU, 17179869184)
+I0822 20:19:14.924173 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:0, TPU, 17179869184)
+I0822 20:19:14.924228 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:1, TPU, 17179869184)
+I0822 20:19:14.924276 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:2, TPU, 17179869184)
+I0822 20:19:14.924319 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:3, TPU, 17179869184)
+I0822 20:19:14.924364 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:4, TPU, 17179869184)
+I0822 20:19:14.924417 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:5, TPU, 17179869184)
+I0822 20:19:14.924463 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:6, TPU, 17179869184)
+I0822 20:19:14.924508 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:7, TPU, 17179869184)
+I0822 20:19:14.924551 140195756140288 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU_SYSTEM:0, TPU_SYSTEM, 17179869184)
+I0822 20:19:14.939095 140195756140288 tf_logging.py:115] Calling model_fn.
+I0822 20:19:24.418486 140195756140288 tf_logging.py:115] Create CheckpointSaverHook.
+I0822 20:19:24.658811 140195756140288 tf_logging.py:115] Done calling model_fn.
+I0822 20:19:27.041791 140195756140288 tf_logging.py:115] TPU job name worker
+I0822 20:19:27.904561 140195756140288 tf_logging.py:115] Graph was finalized.
+I0822 20:19:30.928796 140195756140288 tf_logging.py:115] Running local_init_op.
+I0822 20:19:31.143781 140195756140288 tf_logging.py:115] Done running local_init_op.
+I0822 20:19:38.432033 140195756140288 tf_logging.py:115] Saving checkpoints for 0 into gs://d7ed2b03/model.ckpt.
+I0822 20:19:48.556399 140195756140288 tf_logging.py:115] Installing graceful shutdown hook.
+2018-08-22 20:19:48.556749: W tensorflow/core/distributed_runtime/rpc/grpc_session.cc:349] GrpcSession::ListDevices will initialize the session with an empty graph and other defaults because the session has not yet been created.
+I0822 20:19:48.559253 140195756140288 tf_logging.py:115] Creating heartbeat manager for ['/job:tpu_worker/replica:0/task:0/device:CPU:0', '/job:tpu_worker/replica:0/task:0/device:XLA_CPU:0']
+W0822 20:19:48.563854 140195756140288 tf_logging.py:120] Worker heartbeats not supported by all workers.  No failure handling will be enabled.
+I0822 20:19:48.564044 140195756140288 tf_logging.py:115] Init TPU system
+I0822 20:19:56.928848 140194039723776 tf_logging.py:115] Starting infeed thread controller.
+I0822 20:19:56.929490 140194031331072 tf_logging.py:115] Starting outfeed thread controller.
+I0822 20:19:57.121305 140195756140288 tf_logging.py:115] Enqueue next (1251) batch(es) of data to infeed.
+I0822 20:19:57.121843 140195756140288 tf_logging.py:115] Dequeue next (1251) batch(es) of data from outfeed.
+I0822 20:25:45.504735 140195756140288 tf_logging.py:115] Saving checkpoints for 1251 into gs://d7ed2b03/model.ckpt.
+I0822 20:25:54.433166 140195756140288 tf_logging.py:115] loss = 6.7694535, step = 1251
+I0822 20:25:54.435013 140195756140288 tf_logging.py:115] Enqueue next (1251) batch(es) of data to infeed.
+I0822 20:25:54.435246 140195756140288 tf_logging.py:115] Dequeue next (1251) batch(es) of data from outfeed.
+I0822 20:31:27.972564 140195756140288 tf_logging.py:115] Saving checkpoints for 2502 into gs://d7ed2b03/model.ckpt.
+I0822 20:31:37.439291 140195756140288 tf_logging.py:115] loss = 4.9571056, step = 2502 (343.006 sec)
+I0822 20:31:37.440692 140195756140288 tf_logging.py:115] global_step/sec: 3.64716
+I0822 20:31:37.441203 140195756140288 tf_logging.py:115] examples/sec: 3734.69
+I0822 20:31:37.442502 140195756140288 tf_logging.py:115] Enqueue next (1251) batch(es) of data to infeed.
+I0822 20:31:37.442686 140195756140288 tf_logging.py:115] Dequeue next (1251) batch(es) of data from outfeed.
+I0822 20:37:07.402102 140195756140288 tf_logging.py:115] Saving checkpoints for 3753 into gs://d7ed2b03/model.ckpt.
+I0822 20:37:16.496866 140195756140288 tf_logging.py:115] loss = 4.545597, step = 3753 (339.058 sec)
+I0822 20:37:16.498336 140195756140288 tf_logging.py:115] global_step/sec: 3.68964
+I0822 20:37:16.498805 140195756140288 tf_logging.py:115] examples/sec: 3778.19
+I0822 20:37:16.500063 140195756140288 tf_logging.py:115] Enqueue next (1251) batch(es) of data to infeed.
+I0822 20:37:16.500246 140195756140288 tf_logging.py:115] Dequeue next (1251) batch(es) of data from outfeed.
+I0822 20:42:46.605559 140195756140288 tf_logging.py:115] Saving checkpoints for 5004 into gs://d7ed2b03/model.ckpt.
+I0822 20:42:57.086759 140195756140288 tf_logging.py:115] loss = 3.7546859, step = 5004 (340.590 sec)
+I0822 20:42:57.088213 140195756140288 tf_logging.py:115] global_step/sec: 3.67304
+I0822 20:42:57.088536 140195756140288 tf_logging.py:115] examples/sec: 3761.19
+I0822 20:42:57.089926 140195756140288 tf_logging.py:115] Enqueue next (1) batch(es) of data to infeed.
+I0822 20:42:57.090090 140195756140288 tf_logging.py:115] Dequeue next (1) batch(es) of data from outfeed.
+I0822 20:42:57.753058 140195756140288 tf_logging.py:115] loss = 3.6859958, step = 5005 (0.666 sec)
+I0822 20:42:57.755151 140195756140288 tf_logging.py:115] Saving checkpoints for 5005 into gs://d7ed2b03/model.ckpt.
+I0822 20:43:09.398699 140195756140288 tf_logging.py:115] Stop infeed thread controller
+I0822 20:43:09.399046 140195756140288 tf_logging.py:115] Shutting down InfeedController thread.
+I0822 20:43:09.399411 140194039723776 tf_logging.py:115] InfeedController received shutdown signal, stopping.
+I0822 20:43:09.399755 140194039723776 tf_logging.py:115] Infeed thread finished, shutting down.
+I0822 20:43:09.400068 140195756140288 tf_logging.py:115] Stop output thread controller
+I0822 20:43:09.400264 140195756140288 tf_logging.py:115] Shutting down OutfeedController thread.
+I0822 20:43:15.943166 140194031331072 tf_logging.py:115] OutfeedController received shutdown signal, stopping.
+I0822 20:43:15.943419 140194031331072 tf_logging.py:115] Outfeed thread finished, shutting down.
+I0822 20:43:15.943675 140195756140288 tf_logging.py:115] Shutdown TPU system.
+I0822 20:43:17.539324 140195756140288 tf_logging.py:115] Loss for final step: 3.6859958.
+I0822 20:43:17.539825 140195756140288 tf_logging.py:115] Finished training up to step 5005. Elapsed seconds 1442.
+
+W0822 20:43:22.127865 139711379916544 __init__.py:44] file_cache is unavailable when using oauth2client >= 4.0.0 or google-auth
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/googleapiclient/discovery_cache/__init__.py", line 41, in autodetect
+    from . import file_cache
+  File "/usr/local/lib/python2.7/dist-packages/googleapiclient/discovery_cache/file_cache.py", line 41, in <module>
+    'file_cache is unavailable when using oauth2client >= 4.0.0 or google-auth')
+ImportError: file_cache is unavailable when using oauth2client >= 4.0.0 or google-auth
+W0822 20:43:22.301018 139711379916544 tf_logging.py:125] Estimator's model_fn (<function resnet_model_fn at 0x7f10d8926938>) includes params argument, but params are not passed to Estimator.
+I0822 20:43:22.302166 139711379916544 tf_logging.py:115] Using config: {'_save_checkpoints_secs': None, '_session_config': allow_soft_placement: true
+cluster_def {
+  job {
+    name: "worker"
+    tasks {
+      value: "10.240.1.2:8470"
+    }
+  }
+}
+, '_keep_checkpoint_max': 5, '_task_type': 'worker', '_train_distribute': None, '_is_chief': True, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7f10d8012cd0>, '_model_dir': 'gs://d7ed2b03', '_save_checkpoints_steps': 1251, '_keep_checkpoint_every_n_hours': 10000, '_service': None, '_num_ps_replicas': 0, '_tpu_config': TPUConfig(iterations_per_loop=1251, num_shards=8, num_cores_per_replica=None, per_host_input_for_training=3, tpu_job_name=None, initial_infeed_sleep_secs=None), '_tf_random_seed': None, '_save_summary_steps': 100, '_device_fn': None, '_cluster': <tensorflow.contrib.cluster_resolver.python.training.tpu_cluster_resolver.TPUClusterResolver object at 0x7f10d892a2d0>, '_num_worker_replicas': 1, '_task_id': 0, '_log_step_count_steps': None, '_evaluation_master': u'grpc://10.240.1.2:8470', '_global_id_in_cluster': 0, '_master': u'grpc://10.240.1.2:8470'}
+I0822 20:43:22.302459 139711379916544 tf_logging.py:115] _TPUContext: eval_on_tpu True
+I0822 20:43:22.302702 139711379916544 tf_logging.py:115] Precision: bfloat16
+I0822 20:43:22.302824 139711379916544 tf_logging.py:115] Waiting for new checkpoint at gs://d7ed2b03
+I0822 20:43:22.619968 139711379916544 tf_logging.py:115] Found new checkpoint at gs://d7ed2b03/model.ckpt-5005
+I0822 20:43:22.620441 139711379916544 tf_logging.py:115] Starting to evaluate.
+I0822 20:43:22.620826 139711379916544 tf_logging.py:115] Querying Tensorflow master (grpc://10.240.1.2:8470) for TPU system metadata.
+2018-08-22 20:43:22.623125: W tensorflow/core/distributed_runtime/rpc/grpc_session.cc:349] GrpcSession::ListDevices will initialize the session with an empty graph and other defaults because the session has not yet been created.
+I0822 20:43:22.630397 139711379916544 tf_logging.py:115] Found TPU system:
+I0822 20:43:22.630707 139711379916544 tf_logging.py:115] *** Num TPU Cores: 8
+I0822 20:43:22.631156 139711379916544 tf_logging.py:115] *** Num TPU Workers: 1
+I0822 20:43:22.631221 139711379916544 tf_logging.py:115] *** Num TPU Cores Per Worker: 8
+I0822 20:43:22.631277 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:CPU:0, CPU, -1)
+I0822 20:43:22.631474 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:XLA_CPU:0, XLA_CPU, 17179869184)
+I0822 20:43:22.631540 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:XLA_GPU:0, XLA_GPU, 17179869184)
+I0822 20:43:22.631598 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:0, TPU, 17179869184)
+I0822 20:43:22.631648 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:1, TPU, 17179869184)
+I0822 20:43:22.631695 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:2, TPU, 17179869184)
+I0822 20:43:22.631743 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:3, TPU, 17179869184)
+I0822 20:43:22.631829 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:4, TPU, 17179869184)
+I0822 20:43:22.631879 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:5, TPU, 17179869184)
+I0822 20:43:22.631988 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:6, TPU, 17179869184)
+I0822 20:43:22.632085 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU:7, TPU, 17179869184)
+I0822 20:43:22.632131 139711379916544 tf_logging.py:115] *** Available Device: _DeviceAttributes(/job:worker/replica:0/task:0/device:TPU_SYSTEM:0, TPU_SYSTEM, 17179869184)
+I0822 20:43:22.639520 139711379916544 tf_logging.py:115] Calling model_fn.
+I0822 20:43:25.605379 139711379916544 tf_logging.py:115] Done calling model_fn.
+I0822 20:43:25.620893 139711379916544 tf_logging.py:115] Starting evaluation at 2018-08-22-20:43:25
+I0822 20:43:25.621115 139711379916544 tf_logging.py:115] TPU job name worker
+I0822 20:43:26.305270 139711379916544 tf_logging.py:115] Graph was finalized.
+I0822 20:43:26.380211 139711379916544 tf_logging.py:115] Restoring parameters from gs://d7ed2b03/model.ckpt-5005
+I0822 20:43:28.587060 139711379916544 tf_logging.py:115] Running local_init_op.
+I0822 20:43:28.656275 139711379916544 tf_logging.py:115] Done running local_init_op.
+I0822 20:43:28.869340 139711379916544 tf_logging.py:115] Init TPU system
+I0822 20:43:36.879229 139710039058176 tf_logging.py:115] Starting infeed thread controller.
+I0822 20:43:36.879728 139710030665472 tf_logging.py:115] Starting outfeed thread controller.
+I0822 20:43:37.236860 139711379916544 tf_logging.py:115] Enqueue next (48) batch(es) of data to infeed.
+I0822 20:43:37.237412 139711379916544 tf_logging.py:115] Dequeue next (48) batch(es) of data from outfeed.
+I0822 20:43:54.282207 139711379916544 tf_logging.py:115] Evaluation [48/48]
+I0822 20:43:54.282522 139711379916544 tf_logging.py:115] Stop infeed thread controller
+I0822 20:43:54.282591 139711379916544 tf_logging.py:115] Shutting down InfeedController thread.
+I0822 20:43:54.282778 139710039058176 tf_logging.py:115] InfeedController received shutdown signal, stopping.
+I0822 20:43:54.282948 139710039058176 tf_logging.py:115] Infeed thread finished, shutting down.
+I0822 20:43:54.283076 139711379916544 tf_logging.py:115] Stop output thread controller
+I0822 20:43:54.283178 139711379916544 tf_logging.py:115] Shutting down OutfeedController thread.
+I0822 20:43:54.283348 139710030665472 tf_logging.py:115] OutfeedController received shutdown signal, stopping.
+I0822 20:43:54.283476 139710030665472 tf_logging.py:115] Outfeed thread finished, shutting down.
+I0822 20:43:54.283596 139711379916544 tf_logging.py:115] Shutdown TPU system.
+I0822 20:43:54.658210 139711379916544 tf_logging.py:115] Finished evaluation at 2018-08-22-20:43:54
+I0822 20:43:54.658510 139711379916544 tf_logging.py:115] Saving dict for global step 5005: global_step = 5005, loss = 3.86324, top_1_accuracy = 0.32751465, top_5_accuracy = 0.58825684
+I0822 20:43:57.432018 139711379916544 tf_logging.py:115] Saving 'checkpoint_path' summary for global step 5005: gs://d7ed2b03/model.ckpt-5005
+I0822 20:43:57.794670 139711379916544 tf_logging.py:115] Eval results: {'loss': 3.86324, 'top_1_accuracy': 0.32751465, 'global_step': 5005, 'top_5_accuracy': 0.58825684}. Elapsed seconds: 35
+I0822 20:43:57.794962 139711379916544 tf_logging.py:115] Evaluation finished after training step 5005

@@ -42,9 +42,21 @@ flags.DEFINE_string('managed_db_backup_start_time', '07:00',
                     'Time in UTC that automated backups (if enabled) '
                     'will be scheduled. In the form HH:MM UTC. '
                     'Defaults to 07:00 UTC')
-flags.DEFINE_string('managed_db_zone', None,
-                    'zone or region to launch the database in. '
-                    'Defaults to the client vm\'s zone.')
+flags.DEFINE_list('managed_db_zone', None,
+                  'zone or region to launch the database in. '
+                  'Defaults to the client vm\'s zone.')
+flags.DEFINE_string('managed_db_machine_type', None,
+                    'Machine type of the database.')
+flags.DEFINE_integer('managed_db_cpus', None,
+                     'Number of Cpus in the database.')
+flags.DEFINE_string('managed_db_memory', None,
+                    'Amount of Memory in the database.  Uses the same format '
+                    'string as custom machine memory type.')
+flags.DEFINE_integer('managed_db_disk_size', None,
+                     'Size of the database disk in GB.')
+flags.DEFINE_string('managed_db_disk_type', None,
+                    'Machine type of the database.')
+
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
 flags.register_validator(
@@ -55,6 +67,8 @@ flags.register_validator(
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
+AURORA_MYSQL = 'aurora-mysql'
+AURORA_MYSQL56 = 'aurora'
 
 FLAGS = flags.FLAGS
 
@@ -172,7 +186,8 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
     }
-    if hasattr(self.spec.vm_spec, 'machine_type'):
+    if (hasattr(self.spec.vm_spec, 'machine_type') and
+        self.spec.vm_spec.machine_type):
       metadata.update({
           'machine_type': self.spec.vm_spec.machine_type,
       })
@@ -208,3 +223,15 @@ class BaseManagedRelationalDb(resource.BaseResource):
 
     Returns: default version as a string for the given engine.
     """
+
+  def Failover(self):
+    """Fail over the database.  Throws exception if not high available."""
+    if not self.spec.high_availability:
+      raise Exception('Attempt to fail over a database that isn\'t marked '
+                      'as high available')
+    self._FailoverHA()
+
+  @abstractmethod
+  def _FailoverHA(self):
+    """Fail over from master to replica."""
+    pass

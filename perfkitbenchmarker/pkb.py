@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,6 +55,10 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
      the run_uri.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import getpass
 import itertools
@@ -62,6 +66,7 @@ import json
 import logging
 import multiprocessing
 from os.path import isfile, os
+import random
 import re
 import sys
 import time
@@ -83,6 +88,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
@@ -96,15 +102,18 @@ from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.publisher import SampleCollector
+import six
+from six.moves import zip
 
 LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
-MAX_RUN_URI_LENGTH = 8
+MAX_RUN_URI_LENGTH = 12
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
+flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
                   'Benchmarks and/or benchmark sets that should be run. The '
                   'default is the standard set. For more information about '
@@ -114,6 +123,12 @@ flags.DEFINE_string('archive_bucket', None,
                     'Archive results to the given S3/GCS bucket.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
+flags.DEFINE_multi_string(
+    'zone', [],
+    'Similar to the --zones flag, but allows the flag to be specified '
+    'multiple times on the commandline. For example, --zone=a --zone=b is '
+    'equivalent to --zones=a,b. Furthermore, any values specified by --zone '
+    'will be appended to those specfied by --zones.')
 flags.DEFINE_list(
     'zones', [],
     'A list of zones within which to run PerfKitBenchmarker. '
@@ -138,7 +153,7 @@ flags.DEFINE_integer(
     'specified.')
 flags.DEFINE_enum(
     'gpu_type', None,
-    ['k80', 'p100', 'v100'],
+    ['k80', 'p100', 'v100', 'p4', 'p4-vws'],
     'Type of gpus to attach to the VM. Requires gpu_count to be '
     'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
@@ -148,14 +163,38 @@ flags.DEFINE_string('image', None, 'Default image that will be '
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to %d '
                     'characters in length.' % MAX_RUN_URI_LENGTH)
-flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
-                    'Used to tag created resources and performance records.')
+flags.DEFINE_boolean('use_pkb_logging', True, 'Whether to use PKB-specific '
+                     'logging handlers. Disabling this will use the standard '
+                     'ABSL logging directly.')
+flags.DEFINE_boolean('log_dmesg', False, 'Whether to log dmesg from '
+                     'each VM to the PKB log file before the VM is deleted.')
+
+
+def GetCurrentUser():
+  """Get the current user name.
+
+  On some systems the current user information may be unavailable. In these
+  cases we just need a string to tag the created resources with. It should
+  not be a fatal error.
+
+  Returns:
+    User name OR default string if user name not available.
+  """
+  try:
+    return getpass.getuser()
+  except KeyError:
+    return 'user_unknown'
+
+
+flags.DEFINE_string(
+    'owner', GetCurrentUser(), 'Owner name. '
+    'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
-    log_util.LOG_LEVELS.keys(),
+    list(log_util.LOG_LEVELS.keys()),
     'The log level to run at.')
 flags.DEFINE_enum(
-    'file_log_level', log_util.DEBUG, log_util.LOG_LEVELS.keys(),
+    'file_log_level', log_util.DEBUG, list(log_util.LOG_LEVELS.keys()),
     'Anything logged at this level or higher will be written to the log file.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
@@ -238,7 +277,7 @@ flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
 flags.DEFINE_integer(
-    'run_processes', 1,
+    'run_processes', None,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
 flags.DEFINE_float(
@@ -268,6 +307,10 @@ flags.DEFINE_boolean(
     'This sample will include metadata specifying the run stage that '
     'failed, the exception that occurred, as well as all the flags that '
     'were provided to PKB on the command line.')
+flags.DEFINE_boolean(
+    'create_started_run_sample', False,
+    'Whether PKB will create a sample at the start of the provision phase of '
+    'the benchmark run.')
 flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
     'If create_failed_run_samples is true, PKB will truncate any error '
@@ -280,6 +323,34 @@ flags.DEFINE_boolean(
 flags.DEFINE_string(
     'skip_pending_runs_file', None,
     'If file exists, any pending runs will be not be executed.')
+flags.DEFINE_integer(
+    'after_prepare_sleep_time', 0,
+    'The time in seconds to sleep after the prepare phase. This can be useful '
+    'for letting burst tokens accumulate.')
+flags.DEFINE_integer(
+    'after_run_sleep_time', 0,
+    'The time in seconds to sleep after the run phase. This can be useful '
+    'for letting the VM sit idle after the bechmarking phase is complete.')
+flags.DEFINE_bool(
+    'before_cleanup_pause', False,
+    'If true, wait for command line input before executing the cleanup phase. '
+    'This is useful for debugging benchmarks during development.')
+flags.DEFINE_integer(
+    'timeout_minutes', 240,
+    'An upper bound on the time in minutes that the benchmark is expected to '
+    'run. This time is annotated or tagged on the resources of cloud '
+    'providers.')
+flags.DEFINE_integer(
+    'persistent_timeout_minutes', 240,
+    'An upper bound on the time in minutes that resources left behind by the '
+    'benchmark. Some benchmarks purposefully create resources for other '
+    'benchmarks to use. Persistent timeout specifies how long these shared '
+    'resources should live.')
+flags.DEFINE_bool('disable_interrupt_moderation', False,
+                  'Turn off the interrupt moderation networking feature')
+flags.DEFINE_bool('disable_rss', False,
+                  'Whether or not to disable the Receive Side Scaling feature.')
+
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -291,6 +362,9 @@ flags.DEFINE_string('https_proxy', '',
 flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
+flags.DEFINE_bool('randomize_run_order', False,
+                  'When running with more than one benchmarks, '
+                  'randomize order of the benchmarks.')
 
 _TEARDOWN_EVENT = multiprocessing.Event()
 
@@ -338,14 +412,14 @@ def _PrintHelp(matches=None):
       matched the regex. If None then all flags are printed.
   """
   if not matches:
-    print FLAGS
+    print(FLAGS)
   else:
     flags_by_module = FLAGS.flags_by_module_dict()
     modules = sorted(flags_by_module)
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-        print FLAGS.module_help(module_name)
+        print(FLAGS.module_help(module_name))
 
 
 def _PrintHelpMD(matches=None):
@@ -447,7 +521,7 @@ def _PrintHelpMD(matches=None):
 def CheckVersionFlag():
   """If the --version flag was specified, prints the version and exits."""
   if FLAGS.version:
-    print version.VERSION
+    print(version.VERSION)
     sys.exit(0)
 
 
@@ -489,9 +563,7 @@ def _CreateBenchmarkSpecs():
     expected_os_types = (
         os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
         else os_types.LINUX_OS_TYPES)
-    merged_flags = benchmark_config_spec.FlagsDecoder().Decode(
-        user_config.get('flags'), 'flags', FLAGS)
-    with flag_util.FlagDictSubstitution(FLAGS, lambda: merged_flags):
+    with flag_util.OverrideFlags(FLAGS, user_config.get('flags')):
       config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
         benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
@@ -501,7 +573,7 @@ def _CreateBenchmarkSpecs():
 
     # Assign a unique ID to each benchmark run. This differs even between two
     # runs of the same benchmark within a single PKB run.
-    uid = name + str(benchmark_counts[name].next())
+    uid = name + str(next(benchmark_counts[name]))
 
     # Optional step to check flag values and verify files exist.
     check_prereqs = getattr(benchmark_module, 'CheckPrerequisites', None)
@@ -557,6 +629,8 @@ def DoProvisionPhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of resource
       provisioning.
   """
+  if FLAGS.create_started_run_sample:
+    PublishRunStartedSample(spec)
   logging.info('Provisioning resources for benchmark %s', spec.name)
   spec.ConstructContainerCluster()
   spec.ConstructContainerRegistry()
@@ -565,9 +639,14 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
-  spec.ConstructCloudTpu()
+  # CapacityReservations need to be constructed after VirtualMachines because
+  # it needs information about the VMs (machine type, count, zone, etc). The
+  # CapacityReservations will be provisioned before VMs.
+  spec.ConstructCapacityReservations()
+  spec.ConstructTpu()
   spec.ConstructEdwService()
-  spec.ConstructCloudRedis()
+  spec.ConstructNfsService()
+  spec.ConstructSmbService()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
@@ -596,6 +675,10 @@ def DoPreparePhase(spec, timer):
   with timer.Measure('Benchmark Prepare'):
     spec.BenchmarkPrepare(spec)
   spec.StartBackgroundWorkload()
+  if FLAGS.after_prepare_sleep_time:
+    logging.info('Sleeping for %s seconds after the prepare phase.',
+                 FLAGS.after_prepare_sleep_time)
+    time.sleep(FLAGS.after_prepare_sleep_time)
 
 
 def DoRunPhase(spec, collector, timer):
@@ -653,17 +736,26 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if _IsRunStageFinished():
+      if FLAGS.after_run_sleep_time:
+        logging.info('Sleeping for %s seconds after the run phase.',
+                     FLAGS.after_run_sleep_time)
+        time.sleep(FLAGS.after_run_sleep_time)
       break
 
 
 def DoCleanupPhase(spec, timer):
   """Performs the Cleanup phase of benchmark execution.
 
+  Cleanup phase work should be delegated to spec.BenchmarkCleanup to allow
+  non-PKB based cleanup if needed.
+
   Args:
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Cleanup function.
   """
+  if FLAGS.before_cleanup_pause:
+    raw_input('Hit enter to begin cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
@@ -674,6 +766,9 @@ def DoCleanupPhase(spec, timer):
 
 def DoTeardownPhase(spec, timer):
   """Performs the Teardown phase of benchmark execution.
+
+  Teardown phase work should be delegated to spec.Delete to allow non-PKB based
+  teardown if needed.
 
   Args:
     spec: The BenchmarkSpec created for the benchmark.
@@ -704,6 +799,25 @@ def RegisterSkipPendingRunsCheck(func):
     func: A function which returns True if pending runs should be skipped.
   """
   _SKIP_PENDING_RUNS_CHECKS.append(func)
+
+
+def PublishRunStartedSample(spec):
+  """Publishes a sample indicating that a run has started.
+
+  This sample is published immediately so that there exists some metric for any
+  run (even if the process dies).
+
+  Args:
+    spec: The BenchmarkSpec object with run information.
+  """
+  collector = SampleCollector()
+  metadata = {
+      'flags': str(flag_util.GetProvidedCommandLineFlags())
+  }
+  collector.AddSamples(
+      [sample.Sample('Run Started', 1, 'Run Started', metadata)],
+      spec.name, spec)
+  collector.PublishSamples()
 
 
 def RunBenchmark(spec, collector):
@@ -783,10 +897,9 @@ def RunBenchmark(spec, collector):
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
         if FLAGS.create_failed_run_samples:
-          collector.AddSamples(MakeFailedRunSample(spec, str(e),
-                                                   current_run_stage),
-                               spec.name,
-                               spec)
+          collector.AddSamples(MakeFailedRunSample(
+              spec, str(e), current_run_stage), spec.name, spec)
+
         # If the particular benchmark requests us to always call cleanup, do it
         # here.
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
@@ -834,6 +947,9 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
+  if spec.failed_substatus:
+    metadata['failed_substatus'] = spec.failed_substatus
+
   def UpdateVmStatus(vm):
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)
@@ -842,17 +958,22 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
   interrupted_vm_count = 0
   vm_status_codes = []
   for vm in spec.vms:
-    # discounted vm metadata
     if vm.IsInterruptible():
       interruptible_vm_count += 1
       if vm.WasInterrupted():
         interrupted_vm_count += 1
-        vm_status_codes.append(vm.GetVmStatusCode())
+        status_code = vm.GetVmStatusCode()
+        if status_code:
+          vm_status_codes.append(status_code)
 
   if interruptible_vm_count:
     metadata.update({'interruptible_vms': interruptible_vm_count,
                      'interrupted_vms': interrupted_vm_count,
                      'vm_status_codes': vm_status_codes})
+  if interrupted_vm_count:
+    logging.error(
+        '%d interruptible VMs were interrupted in this failed PKB run.',
+        interrupted_vm_count)
   return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
@@ -873,8 +994,10 @@ def RunBenchmarkTask(spec):
   # Many providers name resources using run_uris. When running multiple
   # benchmarks in parallel, this causes name collisions on resources.
   # By modifying the run_uri, we avoid the collisions.
-  if FLAGS.run_processes > 1:
+  if FLAGS.run_processes and FLAGS.run_processes > 1:
     spec.config.flags['run_uri'] = FLAGS.run_uri + str(spec.sequence_number)
+    # Unset run_uri so the config value takes precedence.
+    FLAGS['run_uri'].present = 0
 
   collector = SampleCollector()
   try:
@@ -921,11 +1044,12 @@ def SetUpPKB():
 
   # Initialize logging.
   vm_util.GenTempDir()
-  log_util.ConfigureLogging(
-      stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri,
-      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
+  if FLAGS.use_pkb_logging:
+    log_util.ConfigureLogging(
+        stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
+        log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
+        run_uri=FLAGS.run_uri,
+        file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   # Translate deprecated flags and log all provided flag values.
@@ -942,7 +1066,7 @@ def SetUpPKB():
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
       raise errors.Setup.MissingExecutableError(
-          'Could not find required executable "%s"', executable)
+          'Could not find required executable "%s"' % executable)
 
   # Check mutually exclusive flags
   if FLAGS.run_stage_iterations > 1 and FLAGS.run_stage_time > 0:
@@ -959,6 +1083,17 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
   benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
+  package_lookup.SetPackageModuleFunction(benchmark_sets.PackageModule)
+
+  # Update max_concurrent_threads to use at least as many threads as VMs. This
+  # is important for the cluster_boot benchmark where we want to launch the VMs
+  # in parallel.
+  if not FLAGS.max_concurrent_threads:
+    FLAGS.max_concurrent_threads = max(
+        background_tasks.MAX_CONCURRENT_THREADS,
+        FLAGS.num_vms)
+    logging.info('Setting --max_concurrent_threads=%d.',
+                 FLAGS.max_concurrent_threads)
 
 
 def RunBenchmarkTasksInSeries(tasks):
@@ -980,23 +1115,25 @@ def RunBenchmarks():
     Exit status for the process.
   """
   benchmark_specs = _CreateBenchmarkSpecs()
+  if FLAGS.randomize_run_order:
+    random.shuffle(benchmark_specs)
   if FLAGS.dry_run:
-    print 'PKB will run with the following configurations:'
+    print('PKB will run with the following configurations:')
     for spec in benchmark_specs:
-      print spec
-      print ''
+      print(spec)
+      print('')
     return 0
 
   collector = SampleCollector()
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    if FLAGS.run_with_pdb and FLAGS.run_processes == 1:
+    if FLAGS.run_processes is None:
       spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(
           tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
-    benchmark_specs, sample_lists = zip(*spec_sample_tuples)
+    benchmark_specs, sample_lists = list(zip(*spec_sample_tuples))
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
 
@@ -1046,7 +1183,7 @@ def _GenerateBenchmarkDocumentation():
     total_vm_count = 0
     vm_str = ''
     scratch_disk_str = ''
-    for group in vm_groups.itervalues():
+    for group in six.itervalues(vm_groups):
       group_vm_count = group.get('vm_count', 1)
       if group_vm_count is None:
         vm_str = 'variable'

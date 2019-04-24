@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,24 +14,31 @@
 
 """Tests for PerfKitBenchmarker' StaticVirtualMachine."""
 
-from io import BytesIO
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 import mock
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
 from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
+from tests import pkb_common_test_case
+from six import StringIO
+from six.moves import zip
 
-from tests import mock_flags
+FLAGS = flags.FLAGS
 
 _COMPONENT = 'test_static_vm_spec'
 _DISK_SPEC_DICTS = [{'device_path': '/test_device_path'},
                     {'mount_point': '/test_mount_point'}]
 
 
-class StaticVmSpecTest(unittest.TestCase):
+class StaticVmSpecTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     spec = StaticVmSpec(_COMPONENT)
@@ -55,20 +62,20 @@ class StaticVmSpecTest(unittest.TestCase):
     self.assertEqual(spec.disk_specs[1].mount_point, '/test_mount_point')
 
 
-class StaticVirtualMachineTest(unittest.TestCase):
+class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(StaticVirtualMachineTest, self).setUp()
     self._initial_pool = StaticVirtualMachine.vm_pool
     StaticVirtualMachine.vm_pool.clear()
-    p = mock.patch(vm_util.__name__ + '.GetTempDir')
+    p = mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')
     p.start()
     self.addCleanup(p.stop)
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.image = 'test_image'
-    mocked_flags.os_type = 'debian'
-
+    FLAGS.image = 'test_image'
+    FLAGS.os_type = 'debian'
 
   def tearDown(self):
+    super(StaticVirtualMachineTest, self).tearDown()
     StaticVirtualMachine.vm_pool = self._initial_pool
 
   def _AssertStaticVMsEqual(self, vm1, vm2):
@@ -79,19 +86,19 @@ class StaticVirtualMachineTest(unittest.TestCase):
     self.assertEqual(vm1.ssh_private_key, vm2.ssh_private_key)
 
   def testReadFromFile_WrongFormat(self):
-    fp = BytesIO('{}')
+    fp = StringIO('{}')
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
 
   def testReadFromFile_MissingKey(self):
-    fp = BytesIO('[{"ip_address": "10.10.10.3"}]')
+    fp = StringIO('[{"ip_address": "10.10.10.3"}]')
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
 
   def testReadFromFile_Empty(self):
-    fp = BytesIO('[]')
+    fp = StringIO('[]')
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual([], list(StaticVirtualMachine.vm_pool))
 
@@ -108,7 +115,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
          '   "internal_ip": "10.10.10.2", '
          '   "zone": "rackspace_dallas" '
          '}] ')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
 
     vm_pool = StaticVirtualMachine.vm_pool
@@ -132,10 +139,30 @@ class StaticVirtualMachineTest(unittest.TestCase):
          '  "keyfile_path": "perfkitbenchmarker.pem", '
          '  "scratch_disk_mountpoints": "/tmp/google-pkb" '
          '}]')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
+
+  def testReadFromFile_UnknownOsTypeDefaultsToLinuxRequiredKeys(self):
+    FLAGS.os_type = 'unknown_os_type'
+    s = ('[{'
+         '  "ip_address": "174.12.14.1", '
+         '  "user_name": "perfkitbenchmarker", '
+         '  "keyfile_path": "perfkitbenchmarker.pem"'
+         '}]')
+    fp = StringIO(s)
+    StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
+
+    vm_pool = StaticVirtualMachine.vm_pool
+    self.assertEqual(1, len(vm_pool))
+    self._AssertStaticVMsEqual(
+        StaticVirtualMachine(
+            StaticVmSpec(_COMPONENT,
+                         ip_address='174.12.14.1',
+                         user_name='perfkitbenchmarker',
+                         ssh_private_key='perfkitbenchmarker.pem')),
+        vm_pool[0])
 
   def testCreateReturn(self):
     s = ('[{'
@@ -150,7 +177,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
          '   "internal_ip": "10.10.10.2", '
          '   "zone": "rackspace_dallas" '
          '}] ')
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(2, len(StaticVirtualMachine.vm_pool))
     vm0 = StaticVirtualMachine.GetStaticVirtualMachine()
@@ -175,7 +202,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
     expected_paths_and_mount_points = (
         (None, '/test_scratch_disk_0'), (None, '/test_scratch_disk_1'),
         ('/test_local_disk_0', None), ('/test_local_disk_1', None))
-    fp = BytesIO(s)
+    fp = StringIO(s)
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(1, len(StaticVirtualMachine.vm_pool))
     vm = StaticVirtualMachine.GetStaticVirtualMachine()

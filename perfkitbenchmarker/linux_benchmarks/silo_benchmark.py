@@ -141,7 +141,7 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vm = vms[0]
-  nthreads = vm.num_cpus
+  nthreads = vm.NumCpusForBenchmark()
   logging.info('Silo running on %s', vm)
   command = 'cd {0} && '\
             'out-perf.masstree/benchmarks/dbtest '\

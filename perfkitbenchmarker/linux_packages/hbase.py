@@ -18,19 +18,30 @@ https://hbase.apache.org/
 """
 
 import functools
+import logging
 import os
 import posixpath
 import re
-import urllib2
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from six.moves import urllib
 
 
-HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase/stable/'
-HBASE_PATTERN = r'>(hbase-\d+.\d+.\d+-bin.tar.gz)<'
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('hbase_version', '1.3.2.1', 'HBase version.')
+flags.DEFINE_boolean('hbase_use_stable', False,
+                     'Whether to use the current stable release of HBase.')
+flags.DEFINE_string('hbase_bin_url', None,
+                    'Specify to override url from HBASE_URL_BASE.')
+
+HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase'
+HBASE_PATTERN = r'>(hbase-([\d\.]+)-bin.tar.gz)<'
+HBASE_VERSION_PATTERN = re.compile('HBase (.*)$', re.IGNORECASE | re.MULTILINE)
 
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
               'hbase/hbase-env.sh.j2']
@@ -41,11 +52,43 @@ HBASE_CONF_DIR = posixpath.join(HBASE_DIR, 'conf')
 
 
 def _GetHBaseURL():
-  response = urllib2.urlopen(HBASE_URL_BASE)
+  """Gets the HBase download url based on flags.
+
+  The default is to look for the version `--hbase_version` to download.
+  If `--hbase_use_stable` is set will look for the latest stable version.
+
+  Returns:
+    The HBase download url.
+
+  Raises:
+    ValueError: If the download link cannot be found on the download page or
+      if the download version does not match the hbase_version flag.
+  """
+  url = '{}/{}/'.format(
+      HBASE_URL_BASE,
+      'stable' if FLAGS.hbase_use_stable else FLAGS.hbase_version)
+  response = urllib.request.urlopen(url)
   html = response.read()
   m = re.search(HBASE_PATTERN, html)
-  the_version = m.group(1)
-  return HBASE_URL_BASE + the_version
+  if not m:
+    raise ValueError('Response {} from url {}, no {} in {}'.format(
+        response.getcode(), url, HBASE_PATTERN, html))
+  link, the_version = m.groups()
+  if not FLAGS.hbase_use_stable and the_version != FLAGS.hbase_version:
+    raise ValueError('Found version {} in {} expected {}'.format(
+        the_version, url, FLAGS.hbase_version))
+  return url + link
+
+
+def GetHBaseVersion(vm):
+  txt, _ = vm.RemoteCommand(posixpath.join(HBASE_BIN, 'hbase') + ' version')
+  m = HBASE_VERSION_PATTERN.search(txt)
+  if m:
+    return m.group(1)
+  else:
+    # log as an warning, don't throw exception so as to continue on
+    logging.warn('Could not find HBase version from %s', txt)
+    return None
 
 
 def CheckPrerequisites():
@@ -61,7 +104,7 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('hadoop')
   vm.Install('curl')
-  hbase_url = _GetHBaseURL()
+  hbase_url = FLAGS.hbase_bin_url or _GetHBaseURL()
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         HBASE_DIR, hbase_url))

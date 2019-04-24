@@ -26,6 +26,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
 
+import timeout_decorator
 import winrm
 
 FLAGS = flags.FLAGS
@@ -61,9 +62,14 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
     encoded_command=base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le')))
 
 
+class WaitTimeoutException(Exception):
+  """Exception thrown if a wait operation takes too long."""
+
+
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
   OS_TYPE = os_types.WINDOWS
+  BASE_OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
     super(WindowsMixin, self).__init__()
@@ -93,21 +99,30 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
-      timeout: A timeout in seconds for the command. This argument is currently
-          unused.
+      timeout: Float. A timeout in seconds for the command. If None is passed,
+          no timeout is applied. Timeout kills the winrm session which then
+          kills the process being executed.
 
     Returns:
       A tuple of stdout and stderr from running the command.
 
     Raises:
-      RemoteCommandError: If there was a problem issuing the command.
+      RemoteCommandError: If there was a problem issuing the command or the
+          command timed out.
     """
     logging.info('Running command on %s: %s', self, command)
     s = winrm.Session('https://%s:%s' % (self.ip_address, self.winrm_port),
                       auth=(self.user_name, self.password),
                       server_cert_validation='ignore')
     encoded_command = base64.b64encode(command.encode('utf_16_le'))
-    r = s.run_cmd('powershell -encodedcommand %s' % encoded_command)
+
+    @timeout_decorator.timeout(timeout, use_signals=False,
+                               timeout_exception=errors.VirtualMachine.
+                               RemoteCommandError)
+    def run_command():
+      return s.run_cmd('powershell -encodedcommand %s' % encoded_command)
+
+    r = run_command()
     retcode, stdout, stderr = r.status_code, r.std_out, r.std_err
 
     debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
@@ -256,7 +271,13 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     if FLAGS.log_windows_password:
       logging.info('Password for %s: %s', self, self.password)
 
+  @vm_util.Retry(poll_interval=1, max_retries=15)
   def OnStartup(self):
+    # Log driver information so that the user has a record of which drivers
+    # were used.
+    # TODO: put the driver information in the metadata.
+    stdout, _ = self.RemoteCommand('dism /online /get-drivers')
+    logging.info(stdout)
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
     self.temp_dir = ntpath.join(stdout.strip(), 'pkb')
     stdout, _ = self.RemoteCommand('echo $env:USERPROFILE')
@@ -271,7 +292,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('shutdown -t 0 -r -f', ignore_failure=True)
 
   def VMLastBootTime(self):
-    """Returns the UTC time the VM was last rebooted as reported by the VM."""
+    """Returns the time the VM was last rebooted as reported by the VM."""
     resp, _ = self.RemoteHostCommand('systeminfo | find /i "Boot Time"',
                                      suppress_warning=True)
     return resp
@@ -308,6 +329,38 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       self.Uninstall(package_name)
     self.RemoteCommand('rm -recurse -force %s' % self.temp_dir)
     self.EnableGuestFirewall()
+
+  def WaitForProcessRunning(self, process, timeout):
+    """Blocks until either the timeout passes or the process is running.
+
+    Args:
+      process: string name of the process.
+      timeout: number of seconds to block while the process is not running.
+
+    Raises:
+      WaitTimeoutException: raised if the process does not run within "timeout"
+                            seconds.
+    """
+    command = ('$count={timeout};'
+               'while( (ps | select-string {process} | measure-object).Count '
+               '-eq 0 -and $count -gt 0) {{sleep 1; $count=$count-1}}; '
+               'if ($count -eq 0) {{echo "FAIL"}}').format(
+                   timeout=timeout, process=process)
+    stdout, _ = self.RemoteCommand(command)
+    if 'FAIL' in stdout:
+      raise WaitTimeoutException()
+
+  def IsProcessRunning(self, process):
+    """Checks if a given process is running on the system.
+
+    Args:
+      process: string name of the process.
+
+    Returns:
+      Whether the process name is in the PS output.
+    """
+    stdout, _ = self.RemoteCommand('ps')
+    return process in stdout
 
   def _GetNumCpus(self):
     """Returns the number of logical CPUs on the VM.
@@ -352,7 +405,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     # Allow more security protocols to make it easier to download from
     # sites where we don't know the security protocol beforehand
     command = ('[Net.ServicePointManager]::SecurityProtocol = '
-               '[System.Security.Authentication.SslProtocols] '
+               '[System.Net.SecurityProtocolType] '
                '"tls, tls11, tls12";'
                'Invoke-WebRequest {url} -OutFile {dest}').format(
                    url=url, dest=dest)
@@ -451,3 +504,18 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       devices: list of strings. A list of block devices.
     """
     raise NotImplementedError()
+
+
+class Windows2012Mixin(WindowsMixin):
+  """Class holding Windows2012 specific VM methods and attributes."""
+  OS_TYPE = os_types.WINDOWS2012
+
+
+class Windows2016Mixin(WindowsMixin):
+  """Class holding Windows2016 specific VM methods and attributes."""
+  OS_TYPE = os_types.WINDOWS2016
+
+
+class Windows2019Mixin(WindowsMixin):
+  """Class holding Windows2019 specific VM methods and attributes."""
+  OS_TYPE = os_types.WINDOWS2019

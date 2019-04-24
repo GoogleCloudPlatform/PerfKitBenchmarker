@@ -16,9 +16,9 @@ import os
 import unittest
 import mock
 
-from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
+from perfkitbenchmarker.sample import Sample
 
 
 class MnistBenchmarkTestCase(unittest.TestCase,
@@ -29,24 +29,35 @@ class MnistBenchmarkTestCase(unittest.TestCase,
                         'mnist_output.txt')
     with open(path) as fp:
       self.contents = fp.read()
-    self.metadata = {}
 
-  def testExtractThroughput(self):
-    metric = 'metric'
-    unit = 'unit'
-    with mock.patch('time.time') as foo:
-      regex = r'global_step/sec: (\S+)'
-      foo.return_value = 0
-      samples = mnist_benchmark._ExtractThroughput(regex, self.contents,
-                                                   self.metadata, metric, unit)
-      golden = [sample.Sample(metric, 74.8278, unit, {'index': 0}),
-                sample.Sample(metric, 28.9749, unit, {'index': 1}),
-                sample.Sample(metric, 20.8336, unit, {'index': 2}),
-                sample.Sample(metric, 31.2365, unit, {'index': 3}),
-                sample.Sample(metric, 31.6943, unit, {'index': 4}),
-                sample.Sample(metric, 39.1528, unit, {'index': 5})]
+    self.metadata_input = {'num_examples_per_epoch': 1251.1,
+                           'train_batch_size': 1024}
+    self.metadata_output = {'num_examples_per_epoch': 1251.1,
+                            'train_batch_size': 1024, 'step': 2000,
+                            'elapsed_seconds': 0, 'epoch': 1.5985932379506036}
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testTrainResults(self):
+    samples = mnist_benchmark.MakeSamplesFromTrainOutput(
+        self.metadata_input, self.contents, 0, 2000)
+    golden = [
+        Sample('Loss', 0.09562386, '', self.metadata_output),
+        Sample('Global Steps Per Second', 217.69966666666664,
+               'global_steps/sec', self.metadata_output),
+        Sample('Examples Per Second', 222924.33333333334,
+               'examples/sec', self.metadata_output)
+    ]
     self.assertEqual(samples, golden)
 
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testEvalResults(self):
+    samples = mnist_benchmark.MakeSamplesFromEvalOutput(
+        self.metadata_input, self.contents, 0)
+    golden = [
+        Sample('Eval Loss', 0.03615343, '', self.metadata_output),
+        Sample('Accuracy', 98.77387, '%', self.metadata_output)
+    ]
+    self.assertEqual(samples, golden)
 
 if __name__ == '__main__':
   unittest.main()

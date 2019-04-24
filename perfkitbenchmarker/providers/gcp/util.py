@@ -13,20 +13,29 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-from collections import OrderedDict
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+import collections
 import json
 import logging
 import re
-import functools32
-
+from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+import six
+
+if six.PY2:
+  import functools32 as functools
+else:
+  import functools
 
 FLAGS = flags.FLAGS
 
 
-@functools32.lru_cache()
+@functools.lru_cache()
 def GetDefaultProject():
   """Get the default project."""
   cmd = [FLAGS.gcloud_path, 'config', 'list', '--format=json']
@@ -35,8 +44,29 @@ def GetDefaultProject():
   return result['core']['project']
 
 
+@functools.lru_cache()
+def GetDefaultUser():
+  """Get the default project."""
+  cmd = [FLAGS.gcloud_path, 'config', 'list', '--format=json']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  result = json.loads(stdout)
+  return result['core']['account']
+
+
 def GetRegionFromZone(zone):
-  return zone[:-2]
+  """Returns the region name from a fully-qualified zone name.
+
+  Each fully-qualified GCP zone name is formatted as <region>-<zone> where, for
+  example, each region looks like us-central1, europe-west1, or asia-east1.
+  Therefore, we pull the first two parts the fully qualified zone name delimited
+  by a dash and assume the rest is the name of the zone. See
+  https://cloud.google.com/compute/docs/regions-zones for more information.
+
+  Args:
+    zone: The fully-qualified name of a GCP zone.
+  """
+  parts = zone.split('-')
+  return '-'.join(parts[:2])
 
 
 def GetMultiRegionFromRegion(region):
@@ -51,6 +81,61 @@ def GetMultiRegionFromRegion(region):
     return 'asia'
   else:
     raise Exception('Unknown region "%s".' % region)
+
+
+def IssueCommandFunction(cmd, **kwargs):
+  """Use vm_util to issue the given command.
+
+  Args:
+    cmd: the gcloud command to run
+    **kwargs: additional arguments for the gcloud command
+
+  Returns:
+    stdout, stderr, retcode tuple from running the command
+  """
+  return vm_util.IssueCommand(cmd.GetCommand(), **kwargs)
+
+
+def IssueRetryableCommandFunction(cmd, **kwargs):
+  """Use vm_util to issue the given retryable command.
+
+  Args:
+    cmd: the gcloud command to run
+    **kwargs: additional arguments for the gcloud command
+
+  Returns:
+    stdout, stderr, tuple from running the command
+  """
+  return vm_util.IssueRetryableCommand(cmd.GetCommand(), **kwargs)
+
+
+# The function that is used to issue a command, when given a GcloudCommand
+# object and additional arguments. Can be overridden.
+_issue_command_function = IssueCommandFunction
+
+# The function that is used to issue a retryable command, when given a
+# GcloudCommand object and additional arguments. Can be overridden.
+_issue_retryable_command_function = IssueRetryableCommandFunction
+
+
+def SetIssueCommandFunction(func):
+  """Set the issue command function to be the given function.
+
+  Args:
+    func: the function to run when issuing a GcloudCommand.
+  """
+  global _issue_command_function
+  _issue_command_function = func
+
+
+def SetIssueRetryableCommandFunction(func):
+  """Set the issue retryable command function to be the given function.
+
+  Args:
+    func: the function to run when issuing a GcloudCommand.
+  """
+  global _issue_retryable_command_function
+  _issue_retryable_command_function = func
 
 
 class GcloudCommand(object):
@@ -79,11 +164,11 @@ class GcloudCommand(object):
           to list available images).
     """
     self.args = list(args)
-    self.flags = OrderedDict()
+    self.flags = collections.OrderedDict()
     self.additional_flags = []
     self._AddCommonFlags(resource)
 
-  def _GetCommand(self):
+  def GetCommand(self):
     """Generates the gcloud command.
 
     Returns:
@@ -91,7 +176,7 @@ class GcloudCommand(object):
     """
     cmd = [FLAGS.gcloud_path]
     cmd.extend(self.args)
-    for flag_name, values in self.flags.iteritems():
+    for flag_name, values in self.flags.items():
       flag_name_str = '--{0}'.format(flag_name)
       if values is True:
         cmd.append(flag_name_str)
@@ -104,19 +189,19 @@ class GcloudCommand(object):
     return cmd
 
   def __repr__(self):
-    return '{0}({1})'.format(type(self).__name__, ' '.join(self._GetCommand()))
+    return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
   def Issue(self, **kwargs):
-    """Tries running the gcloud command once.
+    """Tries to run the gcloud command once.
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
-          issuing the gcloud command.
+        issuing the gcloud command.
 
     Returns:
       A tuple of stdout, stderr, and retcode from running the gcloud command.
     """
-    return vm_util.IssueCommand(self._GetCommand(), **kwargs)
+    return _issue_command_function(self, **kwargs)
 
   def IssueRetryable(self, **kwargs):
     """Tries running the gcloud command until it succeeds or times out.
@@ -128,7 +213,7 @@ class GcloudCommand(object):
     Returns:
       (stdout, stderr) pair of strings from running the gcloud command.
     """
-    return vm_util.IssueRetryableCommand(self._GetCommand(), **kwargs)
+    return _issue_retryable_command_function(self, **kwargs)
 
   def _AddCommonFlags(self, resource):
     """Adds common flags to the command.
@@ -140,15 +225,15 @@ class GcloudCommand(object):
     """
     self.flags['format'] = 'json'
     self.flags['quiet'] = True
-    if resource.project is not None:
-      self.flags['project'] = resource.project
-    if hasattr(resource, 'zone') and resource.zone:
-      self.flags['zone'] = resource.zone
+    if resource:
+      if resource.project is not None:
+        self.flags['project'] = resource.project
+      if hasattr(resource, 'zone') and resource.zone:
+        self.flags['zone'] = resource.zone
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())
 
 
 _QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
-_QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
 
 _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
@@ -163,10 +248,70 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       retcode: The return code from a gcloud command.
   """
   if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
-    message = _QUOTA_EXCEEDED_MESSAGE + stderr
+    message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
     logging.error(message)
     raise errors.Benchmarks.QuotaFailure(message)
   if retcode and _NOT_ENOUGH_RESOURCES_STDERR in stderr:
     message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
     logging.error(message)
     raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+
+
+def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud'):
+  """Authorize gcloud to access Cloud Platform with a Google service account.
+
+  If you want gcloud (and other tools in the Cloud SDK) to use service account
+  credentials to make requests, use this method to authenticate.
+  Account name is provided by FLAGS.gcp_service_account
+  Credentials are fetched from a file whose local path is provided by
+  FLAGS.gcp_service_account_key_filethat. It contains private authorization key.
+
+  Args:
+    vm: vm on which the gcloud library needs to be authenticated.
+    vm_gcloud_path: Optional path to the gcloud binary on the vm.
+  """
+  vm.PushFile(FLAGS.gcp_service_account_key_file)
+  activate_cmd = ('{} auth activate-service-account {} --key-file={}'
+                  .format(vm_gcloud_path, FLAGS.gcp_service_account,
+                          FLAGS.gcp_service_account_key_file.split('/')[-1]))
+  vm.RemoteCommand(activate_cmd)
+
+
+def InstallGcloudComponents(vm, vm_gcloud_path='gcloud', component='alpha'):
+  """Install gcloud components on the target vm.
+
+  Args:
+    vm: vm on which the gcloud's alpha components need to be installed.
+    vm_gcloud_path: Optional path to the gcloud binary on the vm.
+    component: Gcloud component to install.
+  """
+  install_cmd = '{} components install {} --quiet'.format(vm_gcloud_path,
+                                                          component)
+  vm.RemoteCommand(install_cmd)
+
+
+def FormatTags(tags_dict):
+  """Format a dict of tags into arguments.
+
+  Args:
+    tags_dict: Tags to be formatted.
+
+  Returns:
+    A string contains formatted tags
+  """
+  return ','.join('{0}={1}'.format(k, v) for k, v in six.iteritems(tags_dict))
+
+
+def MakeFormattedDefaultTags(timeout_minutes=None):
+  """Get the default tags formatted.
+
+  Args:
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
+
+  Returns:
+    A string contains tags, contributed from the benchmark spec.
+  """
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if not benchmark_spec:
+    return {}
+  return FormatTags(benchmark_spec.GetResourceTags(timeout_minutes))

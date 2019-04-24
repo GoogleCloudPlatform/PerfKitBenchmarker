@@ -16,13 +16,15 @@
 
 """Classes to collect and publish performance samples to various sinks."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import collections
 import copy
 import csv
 import fcntl
-import httplib
-import io
 import itertools
 import json
 import logging
@@ -31,14 +33,17 @@ import operator
 import pprint
 import sys
 import time
-import urllib
 import uuid
 
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+import six
+from six.moves import urllib
+import six.moves.http_client as httplib
 
 FLAGS = flags.FLAGS
 
@@ -67,8 +72,8 @@ flags.DEFINE_string(
     'Default: write to a run-specific temporary directory')
 flags.DEFINE_enum(
     'json_write_mode',
-    'wb',
-    ['wb', 'ab'],
+    'w',
+    ['w', 'a'],
     'Open mode for file specified by --json_path. Default: overwrite file')
 flags.DEFINE_boolean(
     'collapse_labels',
@@ -137,6 +142,28 @@ GCS_OBJECT_NAME_LENGTH = 20
 EXTERNAL_PUBLISHERS = []
 
 
+def PublishRunStageSamples(benchmark_spec, samples):
+  """Publishes benchmark run-stage samples immediately.
+
+  Typically, a benchmark publishes samples by returning them from the Run
+  function so that they can be pubished at set points (publish periods or at the
+  end of a run). This function can be called to publish the samples immediately.
+
+  Note that metadata for the run number will not be added to such samples.
+  TODO(deitz): Can we still add the run number? This will require passing a run
+  number or callback to the benchmark Run functions (or some other mechanism).
+
+  Args:
+    benchmark_spec: The BenchmarkSpec created for the benchmark.
+    samples: A list of samples to publish.
+  """
+  events.samples_created.send(
+      events.RUN_PHASE, benchmark_spec=benchmark_spec, samples=samples)
+  collector = SampleCollector()
+  collector.AddSamples(samples, benchmark_spec.name, benchmark_spec)
+  collector.PublishSamples()
+
+
 def GetLabelsFromDict(metadata):
   """Converts a metadata dictionary to a string of labels sorted by key.
 
@@ -147,15 +174,13 @@ def GetLabelsFromDict(metadata):
     A string of labels, sorted by key, in the format that Perfkit uses.
   """
   labels = []
-  for k, v in sorted(metadata.iteritems()):
+  for k, v in sorted(six.iteritems(metadata)):
     labels.append('|%s:%s|' % (k, v))
   return ','.join(labels)
 
 
-class MetadataProvider(object):
+class MetadataProvider(six.with_metaclass(abc.ABCMeta, object)):
   """A provider of sample metadata."""
-
-  __metaclass__ = abc.ABCMeta
 
   @abc.abstractmethod
   def AddMetadata(self, metadata, benchmark_spec):
@@ -186,42 +211,36 @@ class DefaultMetadataProvider(MetadataProvider):
                                         for vm in benchmark_spec.vms])
     if benchmark_spec.container_cluster:
       cluster = benchmark_spec.container_cluster
-      for k, v in cluster.GetResourceMetadata().iteritems():
+      for k, v in six.iteritems(cluster.GetResourceMetadata()):
         metadata['container_cluster_' + k] = v
 
     if benchmark_spec.managed_relational_db:
       managed_db = benchmark_spec.managed_relational_db
-      for k, v in managed_db.GetResourceMetadata().iteritems():
+      for k, v in six.iteritems(managed_db.GetResourceMetadata()):
         metadata['managed_relational_db_' + k] = v
 
-    if benchmark_spec.cloud_tpu:
-      cloud_tpu = benchmark_spec.cloud_tpu
-      for k, v in cloud_tpu.GetResourceMetadata().iteritems():
-        metadata['cloud_tpu_' + k] = v
+    for name, tpu in six.iteritems(benchmark_spec.tpu_groups):
+      for k, v in six.iteritems(tpu.GetResourceMetadata()):
+        metadata['tpu_' + k] = v
 
-    if benchmark_spec.cloud_redis:
-      cloud_redis = benchmark_spec.cloud_redis
-      for k, v in cloud_redis.GetResourceMetadata().iteritems():
-        metadata['cloud_redis_' + k] = v
-
-    for name, vms in benchmark_spec.vm_groups.iteritems():
+    for name, vms in six.iteritems(benchmark_spec.vm_groups):
       if len(vms) == 0:
         continue
       # Get a representative VM so that we can publish the cloud, zone,
       # machine type, and image.
       vm = vms[-1]
       name_prefix = '' if name == 'default' else name + '_'
-      for k, v in vm.GetResourceMetadata().iteritems():
+      for k, v in six.iteritems(vm.GetResourceMetadata()):
         metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
-      for k, v in vm.GetOSResourceMetadata().iteritems():
+      for k, v in six.iteritems(vm.GetOSResourceMetadata()):
         metadata[name_prefix + k] = v
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
         metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
-        for key, value in data_disk.GetResourceMetadata().iteritems():
-          metadata[name_prefix + 'data_disk_0_%s' % (key, )] = value
+        for key, value in six.iteritems(data_disk.GetResourceMetadata()):
+          metadata[name_prefix + 'data_disk_0_%s' % (key,)] = value
 
     if FLAGS.set_files:
       metadata['set_files'] = ','.join(FLAGS.set_files)
@@ -239,10 +258,8 @@ class DefaultMetadataProvider(MetadataProvider):
 DEFAULT_METADATA_PROVIDERS = [DefaultMetadataProvider()]
 
 
-class SamplePublisher(object):
+class SamplePublisher(six.with_metaclass(abc.ABCMeta, object)):
   """An object that can publish performance samples."""
-
-  __metaclass__ = abc.ABCMeta
 
   @abc.abstractmethod
   def PublishSamples(self, samples):
@@ -256,7 +273,6 @@ class SamplePublisher(object):
       samples: list of dicts to publish.
     """
     raise NotImplementedError()
-
 
 
 class CSVPublisher(SamplePublisher):
@@ -339,7 +355,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
     unique_values = {}
 
     for sample in samples:
-      for k, v in sample['metadata'].iteritems():
+      for k, v in six.iteritems(sample['metadata']):
         if len(unique_values.setdefault(k, set())) < 2 and v.__hash__:
           unique_values[k].add(v)
 
@@ -348,17 +364,17 @@ class PrettyPrintStreamPublisher(SamplePublisher):
       for k in frozenset(unique_values) - frozenset(sample['metadata']):
         unique_values[k].add(None)
 
-    return frozenset(k for k, v in unique_values.iteritems() if len(v) == 1)
+    return frozenset(k for k, v in six.iteritems(unique_values) if len(v) == 1)
 
   def _FormatMetadata(self, metadata):
     """Format 'metadata' as space-delimited key="value" pairs."""
     return ' '.join('{0}="{1}"'.format(k, v)
-                    for k, v in sorted(metadata.iteritems()))
+                    for k, v in sorted(six.iteritems(metadata)))
 
   def PublishSamples(self, samples):
     # result will store the formatted text, then be emitted to self.stream and
     # logged.
-    result = io.BytesIO()
+    result = six.StringIO()
     dashes = '-' * 25
     result.write('\n' + dashes +
                  'PerfKitBenchmarker Results Summary' +
@@ -384,7 +400,8 @@ class PrettyPrintStreamPublisher(SamplePublisher):
           globally_constant_keys)
       all_constant_meta = globally_constant_keys.union(locally_constant_keys)
 
-      benchmark_meta = {k: v for k, v in test_samples[0]['metadata'].iteritems()
+      benchmark_meta = {k: v
+                        for k, v in six.iteritems(test_samples[0]['metadata'])
                         if k in locally_constant_keys}
       result.write('{0}:\n'.format(benchmark.upper()))
 
@@ -393,7 +410,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
             self._FormatMetadata(benchmark_meta)))
 
       for sample in test_samples:
-        meta = {k: v for k, v in sample['metadata'].iteritems()
+        meta = {k: v for k, v in six.iteritems(sample['metadata'])
                 if k not in all_constant_meta}
         result.write('  {0:<30s} {1:>15f} {2:<30s}'.format(
             sample['metric'], sample['value'], sample['unit']))
@@ -401,7 +418,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
           result.write(' ({0})'.format(self._FormatMetadata(meta)))
         result.write('\n')
 
-    global_meta = {k: v for k, v in samples[0]['metadata'].iteritems()
+    global_meta = {k: v for k, v in six.iteritems(samples[0]['metadata'])
                    if k in globally_constant_keys}
     result.write('\n' + dashes + '\n')
     result.write('For all tests: {0}\n'.format(
@@ -454,7 +471,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
     collapse_labels: boolean. If true, collapse sample metadata.
   """
 
-  def __init__(self, file_path, mode='wb', collapse_labels=True):
+  def __init__(self, file_path, mode='wt', collapse_labels=True):
     self.file_path = file_path
     self.mode = mode
     self.collapse_labels = collapse_labels
@@ -562,8 +579,8 @@ class CloudStoragePublisher(SamplePublisher):
     return '<{0} bucket="{1}">'.format(type(self).__name__, self.bucket)
 
   def _GenerateObjectName(self):
-      object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
-      return object_name[:GCS_OBJECT_NAME_LENGTH]
+    object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
+    return object_name[:GCS_OBJECT_NAME_LENGTH]
 
   def PublishSamples(self, samples):
     with vm_util.NamedTemporaryFile(prefix='perfkit-gcs-pub',
@@ -588,6 +605,7 @@ class ElasticsearchPublisher(SamplePublisher):
     es_index: String. Default "perfkit"
     es_type: String. Default "result"
   """
+
   def __init__(self, es_uri=None, es_index=None, es_type=None):
     self.es_uri = es_uri
     self.es_index = es_index.lower()
@@ -655,7 +673,7 @@ class ElasticsearchPublisher(SamplePublisher):
     }
 
   def PublishSamples(self, samples):
-    """Publish samples to Elasticsearch service"""
+    """Publish samples to Elasticsearch service."""
     try:
       from elasticsearch import Elasticsearch
     except ImportError:
@@ -741,6 +759,7 @@ class InfluxDBPublisher(SamplePublisher):
       logging.error('Error connecting to the database:  %s', http_exception)
 
   def _ConstructSample(self, sample):
+    sample['product_name'] = FLAGS.product_name
     timestamp = str(int((10 ** 9) * sample['timestamp']))
     measurement = 'perfkitbenchmarker'
 
@@ -749,7 +768,7 @@ class InfluxDBPublisher(SamplePublisher):
       if sample['metadata']:
         tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
     tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
-                'metric', 'unit')
+                'metric', 'unit', 'product_name')
     ordered_tags = collections.OrderedDict([(k, sample[k]) for k in tag_keys])
     tag_set = ','.join(self._FormatToKeyValue(ordered_tags))
     if tag_set_metadata:
@@ -763,7 +782,7 @@ class InfluxDBPublisher(SamplePublisher):
 
   def _FormatToKeyValue(self, sample):
     key_value_pairs = []
-    for k, v in sample.iteritems():
+    for k, v in six.iteritems(sample):
       if v == '':
         v = '\\"\\"'
       v = str(v)
@@ -779,7 +798,8 @@ class InfluxDBPublisher(SamplePublisher):
     successful_http_request_codes = [200, 202, 204]
     header = {'Content-type': 'application/x-www-form-urlencoded',
               'Accept': 'text/plain'}
-    params = urllib.urlencode({'q': 'CREATE DATABASE ' + self.influx_db_name})
+    params = urllib.parse.urlencode(
+        {'q': 'CREATE DATABASE ' + self.influx_db_name})
     conn = httplib.HTTPConnection(self.influx_uri)
     conn.request('POST', '/query?' + params, headers=header)
     response = conn.getresponse()
@@ -826,6 +846,7 @@ class SampleCollector(object):
       the run directory to the publishers list.
     run_uri: A unique tag for the run.
   """
+
   def __init__(self, metadata_providers=None, publishers=None,
                publishers_from_flags=True, add_default_publishers=True):
     self.samples = []
@@ -836,12 +857,12 @@ class SampleCollector(object):
       self.metadata_providers = DEFAULT_METADATA_PROVIDERS
 
     self.publishers = publishers[:] if publishers else []
+    for publisher_class in EXTERNAL_PUBLISHERS:
+      self.publishers.append(publisher_class())
     if publishers_from_flags:
       self.publishers.extend(SampleCollector._PublishersFromFlags())
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
-    for publisher_class in EXTERNAL_PUBLISHERS:
-      self.publishers.append(publisher_class())
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 

@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -31,17 +32,19 @@ from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
-from tests import mock_flags
+from tests import pkb_common_test_case
 
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
-class AwsVolumeExistsTestCase(unittest.TestCase):
+class AwsVolumeExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(AwsVolumeExistsTestCase, self).setUp()
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
@@ -67,9 +70,10 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
     self.assertFalse(self.disk._Exists())
 
 
-class AwsVpcExistsTestCase(unittest.TestCase):
+class AwsVpcExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(AwsVpcExistsTestCase, self).setUp()
     p = mock.patch('perfkitbenchmarker.providers.aws.'
                    'util.IssueRetryableCommand')
     p.start()
@@ -91,7 +95,7 @@ class AwsVpcExistsTestCase(unittest.TestCase):
     self.assertTrue(self.vpc._Exists())
 
 
-class AwsVirtualMachineTestCase(unittest.TestCase):
+class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def open_json_data(self, filename):
     path = os.path.join(os.path.dirname(__file__),
@@ -100,11 +104,11 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
       return f.read()
 
   def setUp(self):
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.cloud = providers.AWS
-    mocked_flags.os_type = os_types.DEBIAN
-    mocked_flags.run_uri = 'aaaaaa'
-    mocked_flags.temp_dir = 'tmp'
+    super(AwsVirtualMachineTestCase, self).setUp()
+    FLAGS.cloud = providers.AWS
+    FLAGS.os_type = os_types.DEBIAN
+    FLAGS.run_uri = 'aaaaaa'
+    FLAGS.temp_dir = 'tmp'
     p = mock.patch('perfkitbenchmarker.providers.aws.'
                    'util.IssueRetryableCommand')
     p.start()
@@ -116,7 +120,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
 
     # VM Creation depends on there being a BenchmarkSpec.
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=mocked_flags, vm_groups={})
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
     self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
                                              _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
@@ -151,7 +155,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     with self.assertRaises(
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm._Create()
-    self.assertEqual(e.exception.message, stderr)
+    self.assertEqual(str(e.exception), stderr)
 
   def testInstanceStockedOutAfterCreate(self):
     """This tests when run-instances succeeds and returns a pending instance.
@@ -163,7 +167,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     with self.assertRaises(
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm._Exists()
-    self.assertEqual(e.exception.message, 'Server.InsufficientInstanceCapacity:'
+    self.assertEqual(str(e.exception), 'Server.InsufficientInstanceCapacity:'
                      ' Insufficient capacity to satisfy instance request')
 
   def testInstanceDeleted(self):
@@ -179,29 +183,28 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     self.vm.use_spot_instance = True
     self.vm._Create()
 
-    vm_util.IssueCommand.assert_called_with(
-        ['aws',
-         '--output',
-         'json',
-         'ec2',
-         'run-instances',
-         '--region=us-east-1',
-         '--subnet-id=subnet-id',
-         '--associate-public-ip-address',
-         '--client-token=00000000-1111-2222-3333-444444444444',
-         '--image-id=ami-12345',
-         '--instance-type=c3.large',
-         '--key-name=perfkit-key-aaaaaa',
-         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
-         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
-         '"DeviceName": "/dev/xvdc"}]',
-         '--placement=AvailabilityZone=us-east-1a,'
-         'GroupName=placement_group_name',
-         '--instance-market-options={"MarketType": "spot", '
-         '"SpotOptions": {"SpotInstanceType": "one-time", '
-         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
-         ]
-    )
+    vm_util.IssueCommand.assert_called_with([
+        'aws',
+        '--output',
+        'json',
+        'ec2',
+        'run-instances',
+        '--region=us-east-1',
+        '--subnet-id=subnet-id',
+        '--associate-public-ip-address',
+        '--client-token=00000000-1111-2222-3333-444444444444',
+        '--image-id=ami-12345',
+        '--instance-type=c3.large',
+        '--key-name=perfkit-key-aaaaaa',
+        '--block-device-mappings=[{"VirtualName": "ephemeral0", '
+        '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
+        '"DeviceName": "/dev/xvdc"}]',
+        '--placement=AvailabilityZone=us-east-1a,'
+        'GroupName=placement_group_name',
+        '--instance-market-options={"MarketType": "spot", '
+        '"SpotOptions": {"SpotInstanceType": "one-time", '
+        '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
+    ])
     self.vm.use_spot_instance = False
 
   def testCreateSpotFailure(self):
@@ -214,7 +217,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm.use_spot_instance = True
       self.vm._Create()
-    self.assertEqual(e.exception.message, stderr)
+    self.assertEqual(str(e.exception), stderr)
     self.assertEqual(self.vm.spot_status_code,
                      'InsufficientSpotInstanceCapacity')
     self.assertTrue(self.vm.early_termination)
@@ -236,7 +239,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     self.vm.use_spot_instance = False
 
 
-class AwsIsRegionTestCase(unittest.TestCase):
+class AwsIsRegionTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testBadFormat(self):
     with self.assertRaises(ValueError):
@@ -249,7 +252,7 @@ class AwsIsRegionTestCase(unittest.TestCase):
     self.assertTrue(util.IsRegion('eu-central-1'))
 
 
-class AwsGetRegionFromZoneTestCase(unittest.TestCase):
+class AwsGetRegionFromZoneTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testBadFormat(self):
     with self.assertRaises(ValueError):
@@ -262,9 +265,10 @@ class AwsGetRegionFromZoneTestCase(unittest.TestCase):
     self.assertEqual(util.GetRegionFromZone('eu-central-1'), 'eu-central-1')
 
 
-class AwsGetBlockDeviceMapTestCase(unittest.TestCase):
+class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(AwsGetBlockDeviceMapTestCase, self).setUp()
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
@@ -302,9 +306,11 @@ class AwsGetBlockDeviceMapTestCase(unittest.TestCase):
     self.assertEqual(actual, expected)
 
 
-class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
+class AwsGetRootBlockDeviceSpecForImageTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(AwsGetRootBlockDeviceSpecForImageTestCase, self).setUp()
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
@@ -332,3 +338,7 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
     actual = aws_virtual_machine.GetRootBlockDeviceSpecForImage(image_id,
                                                                 region)
     self.assertEqual(actual, expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

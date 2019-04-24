@@ -18,13 +18,12 @@ and deleted.
 """
 
 import json
-import util
-
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
@@ -35,22 +34,17 @@ DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
 
 
-def AddTags(resource_arn, region, **kwargs):
+def AddTags(resource_arn, region):
   """Adds tags to a Redshift cluster created by PerfKitBenchmarker.
 
   Args:
     resource_arn: The arn of AWS resource to operate on.
     region: The AWS region resource was created in.
-    **kwargs: dict. Key-value pairs to set on the instance.
   """
-
-  if not kwargs:
-    return
   cmd_prefix = util.AWS_PREFIX
   tag_cmd = cmd_prefix + ['redshift', 'create-tags', '--region=%s' % region,
                           '--resource-name', resource_arn, '--tags']
-  for key, value in kwargs.iteritems():
-    tag_cmd.append('Key={0},Value={1}'.format(key, value))
+  tag_cmd += util.MakeFormattedDefaultTags()
   vm_util.IssueCommand(tag_cmd)
 
 
@@ -88,7 +82,7 @@ class RedshiftClusterSubnetGroup(object):
                              self.subnet_id]
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
+  def Delete(self):
     """Delete a redshift cluster subnet group."""
     cmd = self.cmd_prefix + ['redshift',
                              'delete-cluster-subnet-group',
@@ -135,7 +129,7 @@ class RedshiftClusterParameterGroup(object):
                                              wlm_concurrency_parameter_postfix)]
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
+  def Delete(self):
     """Delete a redshift cluster parameter group."""
     cmd = self.cmd_prefix + ['redshift',
                              'delete-cluster-parameter-group',
@@ -155,11 +149,13 @@ class Redshift(edw_service.EdwService):
   CLOUD = providers.AWS
   SERVICE_TYPE = 'redshift'
 
+  READY_TIMEOUT = 7200
+
   def __init__(self, edw_service_spec):
     super(Redshift, self).__init__(edw_service_spec)
     # pkb setup attribute
     self.project = None
-    self.cmd_prefix = util.AWS_PREFIX
+    self.cmd_prefix = list(util.AWS_PREFIX)
     if FLAGS.zones:
       self.zone = FLAGS.zones[0]
       self.region = util.GetRegionFromZone(self.zone)
@@ -243,7 +239,7 @@ class Redshift(edw_service.EdwService):
                                '--cluster-subnet-group-name',
                                self.cluster_subnet_group.name,
                                '--cluster-parameter-group-name',
-                               self.cluster_subnet_group.name,
+                               self.cluster_parameter_group.name,
                                '--publicly-accessible',
                                '--automated-snapshot-retention-period=0']
       stdout, stderr, _ = vm_util.IssueCommand(cmd)
@@ -294,8 +290,7 @@ class Redshift(edw_service.EdwService):
     self.arn = 'arn:aws:redshift:{}:{}:cluster:{}'.format(self.region, account,
                                                           self.
                                                           cluster_identifier)
-    tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
-    AddTags(self.arn, self.region, **tags)
+    AddTags(self.arn, self.region)
 
   def _Delete(self):
     """Delete a redshift cluster and disallow creation of a snapshot."""
@@ -315,8 +310,8 @@ class Redshift(edw_service.EdwService):
 
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""
-    self.cluster_subnet_group._Delete()
-    self.cluster_parameter_group._Delete()
+    self.cluster_subnet_group.Delete()
+    self.cluster_parameter_group.Delete()
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
@@ -326,3 +321,19 @@ class Redshift(edw_service.EdwService):
     if self.snapshot is not None:
       basic_data['snapshot'] = self.snapshot
     return basic_data
+
+  def RunCommandHelper(self):
+    """Redshift specific run script command components."""
+    return '--host={} --database={} --user={} --password={}'.format(
+        self.endpoint, self.db, self.user, self.password)
+
+  def InstallAndAuthenticateRunner(self, vm):
+    """Method to perform installation and authentication of redshift runner.
+
+    psql, a terminal-based front end from PostgreSQL, used as client
+    https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-from-psql.html
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    vm.Install('pgbench')

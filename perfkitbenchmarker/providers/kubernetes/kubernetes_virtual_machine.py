@@ -14,6 +14,10 @@
 
 """Contains code related to lifecycle management of Kubernetes Pods."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import posixpath
@@ -26,8 +30,12 @@ from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
+import six
 
 FLAGS = flags.FLAGS
 
@@ -36,12 +44,11 @@ SELECTOR_PREFIX = 'pkb'
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
-  """
-  Object representing a Kubernetes POD.
-  """
+  """Object representing a Kubernetes POD."""
   CLOUD = providers.KUBERNETES
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
+  HOME_DIR = '/root'
 
   def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
@@ -92,9 +99,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._DeletePod()
 
   def _CheckPrerequisites(self):
-    """
-    Exits if any of the prerequisites is not met.
-    """
+    """Exits if any of the prerequisites is not met."""
     if not FLAGS.kubectl:
       raise Exception('Please provide path to kubectl tool using --kubectl '
                       'flag. Exiting.')
@@ -122,7 +127,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
-    logging.info("Waiting for POD %s" % self.name)
+    logging.info('Waiting for POD %s' % self.name)
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
     if pod_info:
       pod_info = json.loads(pod_info)
@@ -130,16 +135,14 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       if len(containers) == 1:
         pod_status = pod_info['status']['phase']
         if (containers[0]['name'].startswith(self.name)
-            and pod_status == "Running"):
-          logging.info("POD is up and running.")
+            and pod_status == 'Running'):
+          logging.info('POD is up and running.')
           return
-    raise Exception("POD %s is not running. Retrying to check status." %
+    raise Exception('POD %s is not running. Retrying to check status.' %
                     self.name)
 
   def _DeletePod(self):
-    """
-    Deletes a POD.
-    """
+    """Deletes a POD."""
     delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'delete', 'pod', self.name]
     output = vm_util.IssueCommand(delete_pod)
@@ -147,9 +150,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self):
-    """
-    POD should have been already created but this is a double check.
-    """
+    """POD should have been already created but this is a double check."""
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
@@ -167,9 +168,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _DeleteVolumes(self):
-    """
-    Deletes volumes.
-    """
+    """Deletes volumes."""
     for scratch_disk in self.scratch_disks[:]:
       scratch_disk.Delete()
       self.scratch_disks.remove(scratch_disk)
@@ -178,14 +177,12 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
   def _GetInternalIp(self):
-    """
-    Gets the POD's internal ip address.
-    """
+    """Gets the POD's internal ip address."""
     pod_ip = kubernetes_helper.Get(
         'pods', self.name, '', '.status.podIP')
 
     if not pod_ip:
-      raise Exception("Internal POD IP address not found. Retrying.")
+      raise Exception('Internal POD IP address not found. Retrying.')
 
     self.internal_ip = pod_ip
 
@@ -199,19 +196,17 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
 
     if FLAGS.http_proxy:
-      http_proxy = "sed -i '1i export http_proxy=%s' /etc/bash.bashrc"
+      http_proxy = 'sed -i \'1i export http_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(http_proxy % FLAGS.http_proxy)
     if FLAGS.https_proxy:
-      https_proxy = "sed -i '1i export https_proxy=%s' /etc/bash.bashrc"
+      https_proxy = 'sed -i \'1i export https_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(https_proxy % FLAGS.http_proxy)
     if FLAGS.ftp_proxy:
-      ftp_proxy = "sed -i '1i export ftp_proxy=%s' /etc/bash.bashrc"
+      ftp_proxy = 'sed -i \'1i export ftp_proxy=%s\' /etc/bash.bashrc'
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _SetupDevicesPaths(self):
-    """
-    Sets the path to each scratch disk device.
-    """
+    """Sets the path to each scratch disk device."""
     for scratch_disk in self.scratch_disks:
       scratch_disk.SetDevicePath(self)
 
@@ -225,43 +220,41 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     volumes = self._BuildVolumesBody()
 
     template = {
-        "kind": "Pod",
-        "apiVersion": "v1",
-        "metadata": {
-            "name": self.name,
-            "labels": {
+        'kind': 'Pod',
+        'apiVersion': 'v1',
+        'metadata': {
+            'name': self.name,
+            'labels': {
                 SELECTOR_PREFIX: self.name
             }
         },
-        "spec": {
-            "volumes": volumes,
-            "containers": [container],
-            "dnsPolicy": "ClusterFirst",
+        'spec': {
+            'volumes': volumes,
+            'containers': [container],
+            'dnsPolicy': 'ClusterFirst',
         }
     }
     if FLAGS.kubernetes_anti_affinity:
-      template["spec"]["affinity"] = {
-          "podAntiAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": [{
-                  "labelSelector": {
-                      "matchExpressions": [{
-                          "key": "pkb_anti_affinity",
-                          "operator": "In",
-                          "values": [""],
+      template['spec']['affinity'] = {
+          'podAntiAffinity': {
+              'requiredDuringSchedulingIgnoredDuringExecution': [{
+                  'labelSelector': {
+                      'matchExpressions': [{
+                          'key': 'pkb_anti_affinity',
+                          'operator': 'In',
+                          'values': [''],
                       }],
                   },
-                  "topologyKey": "kubernetes.io/hostname",
+                  'topologyKey': 'kubernetes.io/hostname',
               }],
           },
       }
-      template["metadata"]["labels"]["pkb_anti_affinity"] = ""
+      template['metadata']['labels']['pkb_anti_affinity'] = ''
 
     return json.dumps(template)
 
   def _BuildVolumesBody(self):
-    """
-    Constructs volumes-related part of POST request to create POD.
-    """
+    """Constructs volumes-related part of POST request to create POD."""
     volumes = []
 
     for scratch_disk in self.scratch_disks:
@@ -270,9 +263,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     return volumes
 
   def _BuildContainerBody(self):
-    """
-    Constructs containers-related part of POST request to create POD.
-    """
+    """Constructs containers-related part of POST request to create POD."""
     registry = getattr(context.GetThreadBenchmarkSpec(), 'registry', None)
     if (not FLAGS.static_container_image and
         registry is not None):
@@ -280,12 +271,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       image = self.image
     container = {
-        "image": image,
-        "name": self.name,
-        "securityContext": {
-            "privileged": FLAGS.docker_in_privileged_mode
+        'image': image,
+        'name': self.name,
+        'workingDir': self.HOME_DIR,
+        'securityContext': {
+            'privileged': FLAGS.docker_in_privileged_mode
         },
-        "volumeMounts": [
+        'volumeMounts': [
         ]
     }
 
@@ -335,8 +327,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       resources['limits'].update(gpu_dict)
       resources['requests'].update(gpu_dict)
 
-    result_with_empty_values_removed = (
-        {k: v for k, v in resources.iteritems() if v})
+    result_with_empty_values_removed = ({
+        k: v for k, v in six.iteritems(resources) if v
+    })
     return result_with_empty_values_removed
 
 
@@ -416,10 +409,82 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # benchmarks require it.
     self.InstallPackages('ssh')
     self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
-    self.RemoteCommand('mkdir ~/.ssh')
+    self.RemoteCommand('mkdir -p ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
+
+    # Don't assume the relevant CLI is installed in the Kubernetes environment.
+    if FLAGS.container_cluster_cloud == 'GCP':
+      self.InstallGcloudCli()
+    elif FLAGS.container_cluster_cloud == 'AWS':
+      self.InstallAwsCli()
+    elif FLAGS.container_cluster_cloud == 'Azure':
+      self.InstallAzureCli()
+
+  def InstallAwsCli(self):
+    """Installs the AWS CLI; used for downloading preprovisioned data."""
+    self.Install('aws_credentials')
+    self.Install('awscli')
+
+  def InstallAzureCli(self):
+    """Installs the Azure CLI; used for downloading preprovisioned data."""
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+
+  # TODO(ferneyhough): Consider making this a package.
+  def InstallGcloudCli(self):
+    """Installs the Gcloud CLI; used for downloading preprovisioned data."""
+    self.InstallPackages('curl')
+    self.RemoteCommand('echo "deb http://packages.cloud.google.com/apt '
+                       'cloud-sdk-$(lsb_release -c -s) main" | sudo tee -a '
+                       '/etc/apt/sources.list.d/google-cloud-sdk.list')
+    self.RemoteCommand('curl https://packages.cloud.google.com/apt/doc/'
+                       'apt-key.gpg | sudo apt-key add -')
+    self.RemoteCommand('sudo apt-get update && sudo apt-get install '
+                       '-y google-cloud-sdk')
+
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+    """Downloads a preprovisioned data file.
+
+    This function works by looking up the VirtualMachine class which matches
+    the cloud we are running on (defined by FLAGS.container_cluster_cloud).
+
+    Then we look for a module-level function defined in the same module as
+    the VirtualMachine class which generates a string used to download
+    preprovisioned data for the given cloud.
+
+    Note that this implementation is specific to debian os types.
+    Windows support will need to be handled in
+    WindowsBasedKubernetesVirtualMachine.
+
+    Args:
+      install_path: The install path on this VM.
+      module_name: Name of the module associated with this data file.
+      filename: The name of the file that was downloaded.
+
+    Raises:
+      NotImplementedError: if this method does not support the specified cloud.
+      AttributeError: if the VirtualMachine class does not implement
+        GenerateDownloadPreprovisionedDataCommand.
+    """
+    cloud = FLAGS.container_cluster_cloud
+    if cloud == 'GCP':
+      download_function = (gce_virtual_machine.
+                           GenerateDownloadPreprovisionedDataCommand)
+    elif cloud == 'AWS':
+      download_function = (aws_virtual_machine.
+                           GenerateDownloadPreprovisionedDataCommand)
+    elif cloud == 'Azure':
+      download_function = (azure_virtual_machine.
+                           GenerateDownloadPreprovisionedDataCommand)
+    else:
+      raise NotImplementedError(
+          'Cloud {0} does not support downloading preprovisioned '
+          'data on Kubernetes VMs.'.format(cloud))
+
+    self.RemoteCommand(
+        download_function(install_path, module_name, filename))
 
 
 def _install_sudo_command():

@@ -21,17 +21,15 @@ This benchmark is composed of the following:
     and their labels
 
 The benchmark uses two VMs: a server, and a client.
-Tensorflow Serving is built from source, which takes
+Tensorflow Serving is built from source (in a docker image), which takes
 a significant amount of time (45 minutes on an n1-standard-8).
-Note that both client and server VMs build the code.
+Note that both client and server VMs build the code. This is necessary to build
+an optimized binary for the CPU it will be running on.
 
-Once the code is built, the server prepares an inception model
-for serving. It prepares a pre-trained inception model using a publicly
-available checkpoint file. This model has been trained to ~75% accuracy
-on the imagenet 2012 dataset, so is relatively useless; however, measuring
-the accuracy of the model is beyond the scope of this benchmark.
-The server then starts the standard tensorflow_model_server binary using
-the prepared model.
+Once the code is built, the server prepares an ResNet model
+for serving. It prepares a pre-trained ResNet model using a publicly
+available SavedModel. The server then starts a platform-optimized
+tensorflow_model_server binary using the prepared model.
 
 The client VM downloads the imagenet 2012 validation images from cloud storage
 and begins running a client-side load generator script which does the
@@ -59,17 +57,17 @@ from perfkitbenchmarker.linux_packages import tensorflow_serving
 
 FLAGS = flags.FLAGS
 CLIENT_SCRIPT = 'tensorflow_serving_client_workload.py'
-INCEPTION_MODEL_CHECKPOINT = 'inception-v3-2016-03-01.tar.gz'
+RESNET_NHWC_SAVEDMODEL_TGZ = 'resnet_v2_fp32_savedmodel_NHWC_jpg.tar.gz'
 ILSVRC_VALIDATION_IMAGES_TAR = 'ILSVRC2012_img_val.tar'
-SERVER_PORT = 9000
-TF_SERVING_BIN_DIRECTORY = tensorflow_serving.TF_SERVING_BIN_DIRECTORY
+SERVER_PORT = 8500
 TF_SERVING_BASE_DIRECTORY = tensorflow_serving.TF_SERVING_BASE_DIRECTORY
 
 BENCHMARK_DATA = {
-    # This is a pre-trained (to ~75% accuracy on imagenet)
-    # inception model checkpoint available here:
-    # http://download.tensorflow.org/models/image/imagenet/inception-v3-2016-03-01.tar.gz
-    INCEPTION_MODEL_CHECKPOINT: '57e9eb71006424f5e7ad5345565b503e',
+    # This ResNet SavedModel (ResNet-50 v2, fp32, Accuracy 76.47%) is from the
+    # official TF models repo. It takes in JPG as input and is channels-last
+    # (NHWC), which is generally better for CPU. It is available here:
+    # http://download.tensorflow.org/models/official/20181001_resnet/savedmodels/resnet_v2_fp32_savedmodel_NHWC_jpg.tar.gz
+    RESNET_NHWC_SAVEDMODEL_TGZ: 'a354fb68325f75b1510e2f6868680d8d',
 
     # Collection of 50,000 imagenet 2012 validation images.
     # Available here:
@@ -115,8 +113,10 @@ tensorflow_serving:
 
 flags.DEFINE_integer(
     'tf_serving_runtime', 60, 'benchmark runtime in seconds', lower_bound=1)
-flag_util.DEFINE_integerlist('tf_serving_client_thread_counts', [16, 32],
-                             'number of client worker threads')
+flag_util.DEFINE_integerlist(
+    'tf_serving_client_thread_counts', [16, 32],
+    'number of client worker threads',
+    module_name=__name__)
 
 
 class ClientWorkloadScriptExecutionError(Exception):
@@ -153,29 +153,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   del benchmark_spec
 
 
-def _ExportCheckpointedInceptionModel(vm):
-  """Exports a trained inception3 model.
-
-  This model has been pre-trained on the imagenet 2012
-  dataset to about 75% accuracy.
-
-  Args:
-    vm: vm to operate on
-  """
-  vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, [INCEPTION_MODEL_CHECKPOINT], TF_SERVING_BASE_DIRECTORY)
-
-  logging.info('Exporting pre-trained inception3 model')
-  vm.RemoteCommand('cd {0} && tar xvf {1}'.format(TF_SERVING_BASE_DIRECTORY,
-                                                  INCEPTION_MODEL_CHECKPOINT))
-
-  binary_path = posixpath.join(TF_SERVING_BIN_DIRECTORY,
-                               'example/inception_saved_model')
-  vm.RemoteCommand('cd {0} && {1} --checkpoint_dir=inception-v3 '
-                   '--output_dir=inception-export'.format(
-                       TF_SERVING_BASE_DIRECTORY, binary_path))
-
-
 def _PrepareClient(vm):
   """Installs Tensorflow Serving on a single client vm.
 
@@ -207,7 +184,16 @@ def _PrepareServer(vm):
   """
   logging.info('Installing Tensorflow Serving on server %s', vm)
   vm.Install('tensorflow_serving')
-  _ExportCheckpointedInceptionModel(vm)
+  vm.InstallPreprovisionedBenchmarkData(
+      BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY)
+
+  extract_dir = posixpath.join(
+      TF_SERVING_BASE_DIRECTORY, "resnet")
+  vm.RemoteCommand('mkdir {0}'.format(extract_dir))
+
+  vm.RemoteCommand('cd {0} && tar --strip-components=2 --directory {1} -xvzf '
+                   '{2}'.format(TF_SERVING_BASE_DIRECTORY, extract_dir,
+                                RESNET_NHWC_SAVEDMODEL_TGZ))
 
 
 def Prepare(benchmark_spec):
@@ -254,14 +240,15 @@ def _StartServer(vm):
   Args:
     vm: The server VM.
   """
-  model_server_binary = posixpath.join(TF_SERVING_BIN_DIRECTORY,
-                                       'model_servers/tensorflow_model_server')
-  model_export_directory = posixpath.join(TF_SERVING_BASE_DIRECTORY,
-                                          'inception-export')
+  model_download_directory = posixpath.join(TF_SERVING_BASE_DIRECTORY, 'resnet')
+
+  # Use the docker development image to build the inception model
   vm.RemoteCommand(
-      'nohup {0} --port=9000 --model_name=inception '
-      '--model_base_path={1} > server.log 2>&1 &'.format(
-          model_server_binary, model_export_directory),
+      'sudo docker run -d --rm --name tfserving-server --network host '
+      '--mount type=bind,source={0},target=/models/resnet '
+      '-e MODEL_NAME=resnet '
+      '-t benchmarks/tensorflow-serving --port={1}'.format(
+          model_download_directory, SERVER_PORT),
       should_log=True)
 
 
@@ -308,8 +295,8 @@ def _CreateSingleSample(sample_name, sample_units, metadata, client_stdout):
     key2: int_or_float_value_2
 
   Args:
-    sample_name: Name of the sample. Used to create a regex to extract
-      the value from client_stdout. Also used as the returned sample's name.
+    sample_name: Name of the sample. Used to create a regex to extract the value
+      from client_stdout. Also used as the returned sample's name.
     sample_units: Units to be specified in the returned sample
     metadata: Metadata to be added to the returned sample
     client_stdout: Stdout from tensorflow_serving_client_workload.py
@@ -407,9 +394,27 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
   """Cleans up Tensorflow Serving.
 
-  This function is currently unimplemented.
-
   Args:
     benchmark_spec: The benchmark specification.
   """
+  servers = benchmark_spec.vm_groups['servers']
+  clients = benchmark_spec.vm_groups['clients']
+
+  def _CleanupServer(vm):
+    vm.RemoteCommand('sudo docker stop tfserving-server || true')
+    vm.Uninstall('tensorflow_serving')
+
+  def _CleanupClient(vm):
+    vm.Uninstall('tensorflow_serving')
+
+  vms = []
+  # Create tuples of (function_to_run, vm) in order to dispatch
+  # to the appropriate prepare function in parallel.
+  for s in servers:
+    vms.append(((_CleanupServer, s), {}))
+  for c in clients:
+    vms.append(((_CleanupClient, c), {}))
+
+  vm_util.RunThreaded(lambda cleanup_function, vm: cleanup_function(vm), vms)
+
   del benchmark_spec

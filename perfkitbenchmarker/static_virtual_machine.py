@@ -34,6 +34,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
 
@@ -53,7 +54,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
   def __init__(self, component_full_name, ip_address=None, user_name=None,
                ssh_private_key=None, internal_ip=None, ssh_port=22,
                password=None, disk_specs=None, os_type=None, tag=None,
-               **kwargs):
+               zone=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
@@ -72,6 +73,8 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
           information.
       tag: A string that allows the VM to be included or excluded from a run
           by using the 'static_vm_tags' flag.
+      zone: The VM's zone.
+      **kwargs: Other args for the superclass.
     """
     super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
@@ -82,6 +85,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.password = password
     self.os_type = os_type
     self.tag = tag
+    self.zone = zone
     self.disk_specs = [
         disk.BaseDiskSpec(
             '{0}.disk_specs[{1}]'.format(component_full_name, i),
@@ -200,7 +204,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         os_types.RHEL: linux_required_keys,
         os_types.UBUNTU_CONTAINER: linux_required_keys,
     }
-    required_keys = required_keys_by_os[FLAGS.os_type]
+
+    # assume linux_required_keys for unknown os_type
+    required_keys = required_keys_by_os.get(FLAGS.os_type, linux_required_keys)
 
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
                                'scratch_disk_mountpoints', 'os_type',
@@ -263,7 +269,6 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm = vm_class(vm_spec)
       cls.vm_pool.append(vm)
 
-
   @classmethod
   def GetStaticVirtualMachine(cls):
     """Pull a Static VM from the pool of static VMs.
@@ -284,34 +289,39 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 def GetStaticVmClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
-  class_dict = {
-      os_types.DEBIAN: DebianBasedStaticVirtualMachine,
-      os_types.RHEL: RhelBasedStaticVirtualMachine,
-      os_types.WINDOWS: WindowsBasedStaticVirtualMachine,
-      os_types.UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
-  }
-  if os_type in class_dict:
-    return class_dict[os_type]
-  else:
+  if not os_type:
     logging.warning('Could not find os type for VM. Defaulting to debian.')
-    return DebianBasedStaticVirtualMachine
+    os_type = os_types.DEBIAN
+  return resource.GetResourceClass(virtual_machine.BaseVirtualMachine,
+                                   CLOUD=StaticVirtualMachine.CLOUD,
+                                   OS_TYPE=os_type)
 
 
 class ContainerizedStaticVirtualMachine(
-        StaticVirtualMachine, linux_virtual_machine.ContainerizedDebianMixin):
-    pass
+    StaticVirtualMachine, linux_virtual_machine.ContainerizedDebianMixin):
+  pass
 
 
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
                                       linux_virtual_machine.DebianMixin):
-    pass
+  pass
 
 
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
                                     linux_virtual_machine.RhelMixin):
-    pass
+  pass
+
+
+class Centos7BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.Centos7Mixin):
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedStaticVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,
                                        windows_virtual_machine.WindowsMixin):
-    pass
+  pass

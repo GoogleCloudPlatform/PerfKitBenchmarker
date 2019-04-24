@@ -21,6 +21,9 @@ See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
 for more information.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import datetime
 import json
 import logging
@@ -30,6 +33,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -95,24 +99,27 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
-        '--enable-bin-log',
-        '--gce-zone=%s' % instance_zone,
-        '--region=%s' % util.GetRegionFromZone(instance_zone),
+        '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size,
     ]
-    # TODO(ferneyhough): add tier machine types support for Postgres
     if self.spec.engine == managed_relational_db.MYSQL:
-      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
-      cmd_string.append(machine_type_flag)
-    else:
+      cmd_string.append('--enable-bin-log')
+
+    if (self.spec.vm_spec.cpus and
+        self.spec.vm_spec.memory):
       self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
+    elif hasattr(self.spec.vm_spec, 'machine_type'):
+      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+      cmd_string.append(machine_type_flag)
+    else:
+      raise Exception('Unspecified machine type')
 
     if self.spec.high_availability:
       cmd_string.append(self._GetHighAvailabilityFlag())
@@ -155,12 +162,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
         config.
     """
-    if not hasattr(self.spec.vm_spec, 'cpus'):
+    if not hasattr(self.spec.vm_spec, 'cpus') or not self.spec.vm_spec.cpus:
       raise data.ResourceNotFound(
           'Must specify cpu count in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
-    if not hasattr(self.spec.vm_spec, 'memory'):
+    if not hasattr(self.spec.vm_spec, 'memory') or not self.spec.vm_spec.memory:
       raise data.ResourceNotFound(
           'Must specify a memory amount in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
@@ -179,7 +186,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Raises:
       ValueError on invalid configuration.
     """
-    if cpus not in [1] + range(2, 32, 2):
+    if cpus not in [1] + list(range(2, 32, 2)):
       raise ValueError(
           'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
           'inclusive.' % cpus)
@@ -191,14 +198,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     ratio = memory / 1024.0 / cpus
     if (ratio < CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND or
         ratio > CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND):
-      raise ValueError('The memory (%.2fGiB) per vCPU (%d) of a custom machine '
-                       'type must be between %.2f GiB and %.2f GiB per vCPU, '
-                       'inclusive.' %
-                       (memory / 1024.0,
-                        cpus,
-                        CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
-                        CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND)
-                       )
+      raise ValueError(
+          'The memory (%.2fGiB) per vCPU (%d) of a custom machine '
+          'type must be between %.2f GiB and %.2f GiB per vCPU, '
+          'inclusive.' %
+          (memory / 1024.0, cpus, CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
+           CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND))
     if memory < MIN_CUSTOM_MACHINE_MEM_MB:
       raise ValueError('The total memory (%dMiB) for a custom machine type'
                        'must be at least %dMiB.' %
@@ -237,6 +242,30 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     except:
       return False
 
+  def _IsDBInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
+    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
+                             instance_id)
+    start_time = datetime.datetime.now()
+
+    while True:
+      if (datetime.datetime.now() - start_time).seconds > timeout:
+        logging.exception('Timeout waiting for sql instance to be ready')
+        return False
+      stdout, _, _ = cmd.Issue(suppress_warning=True)
+
+      try:
+        json_output = json.loads(stdout)
+        state = json_output['state']
+        logging.info('Instance %s state: %s', instance_id, state)
+        if state == 'RUNNABLE':
+          break
+      except:
+        logging.exception('Error attempting to read stdout. Creation failure.')
+        return False
+      time.sleep(5)
+
+    return True
+
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
@@ -244,29 +273,21 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     without being ready.  If the subclass does not implement
     it then it just returns true.
 
+    timeout: how long to wait when checking if the DB is ready.
+
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
-                             self.instance_id)
-    start_time = datetime.datetime.now()
-
-    while True:
-      if (datetime.datetime.now() - start_time).seconds > timeout:
-        logging.exception('Timeout waiting for sql instance to be ready')
+    if not self._IsDBInstanceReady(self.instance_id, timeout):
+      return False
+    if self.spec.high_availability and hasattr(self, 'replica_instance_id'):
+      if not self._IsDBInstanceReady(self.replica_instance_id, timeout):
         return False
-      stdout, _, retcode = cmd.Issue(suppress_warning=True)
 
-      try:
-        json_output = json.loads(stdout)
-        state = json_output['state']
-        logging.info('Instance state: {0}'.format(state))
-        if state == 'RUNNABLE':
-          break
-      except:
-        logging.exception('Error attempting to read stdout. Creation failure.')
-        return False
-      time.sleep(5)
+    cmd = util.GcloudCommand(
+        self, 'sql', 'instances', 'describe', self.instance_id)
+    stdout, _, _ = cmd.Issue()
+    json_output = json.loads(stdout)
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = DEFAULT_MYSQL_PORT
     return True
@@ -295,7 +316,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # The hostname '%' means unrestricted access from any host.
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.spec.database_username,
-        '%', '--instance={0}'.format(self.instance_id),
+        '--host=%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     _, _, _ = cmd.Issue()
 
@@ -305,7 +326,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.engine == managed_relational_db.POSTGRES:
       cmd = util.GcloudCommand(
           self, 'sql', 'users', 'set-password', 'postgres',
-          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--host=dummy_host', '--instance={0}'.format(self.instance_id),
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
 
@@ -341,8 +362,25 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if engine == managed_relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
+      elif version == '5.6':
+        return 'MYSQL_5_6'
     elif engine == managed_relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
                               'POSTGRES 9.6')
+
+  def _FailoverHA(self):
+    """Fail over from master to replica."""
+    cmd_string = [
+        self,
+        'sql',
+        'instances',
+        'failover',
+        self.instance_id,
+    ]
+    cmd = util.GcloudCommand(*cmd_string)
+    cmd.flags['project'] = self.project
+    # this command doesnt support the specifier: 'format'
+    del cmd.flags['format']
+    cmd.IssueRetryable()

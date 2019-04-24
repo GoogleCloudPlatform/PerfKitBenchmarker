@@ -22,9 +22,12 @@ except that this can target TPU.
 # TODO(tohaowu): We only measure image processing speed for now, and we will
 # measure the other metrics in the future.
 
+import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
+from perfkitbenchmarker.linux_benchmarks import resnet_benchmark
+from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
@@ -51,24 +54,17 @@ inception3:
 """
 
 flags.DEFINE_float('inception3_learning_rate', 0.165, 'Learning rate.')
-flags.DEFINE_integer('inception3_train_steps', 250000,
-                     'Number of steps use for training.')
-flags.DEFINE_integer('inception3_iterations', 100,
-                     'Number of iterations per TPU training loop.')
+flags.DEFINE_integer('inception3_train_epochs', 200,
+                     'Number of epochs use for training.', lower_bound=1)
 flags.DEFINE_enum('inception3_use_data', 'real', ['real', 'fake'],
                   'Whether to use real or fake data. If real, the data is '
-                  'downloaded from inception3_data_dir. Otherwise, synthetic '
+                  'downloaded from imagenet_data_dir. Otherwise, synthetic '
                   'data is generated.')
-flags.DEFINE_enum('inception3_mode', 'train',
+flags.DEFINE_enum('inception3_mode', 'train_and_eval',
                   ['train', 'eval', 'train_and_eval'],
                   'Mode to run: train, eval, train_and_eval')
-flags.DEFINE_integer('inception3_train_steps_per_eval', 2000,
-                     'Number of training steps to run between evaluations.')
-flags.DEFINE_string('inception3_data_dir',
-                    'gs://cloud-tpu-test-datasets/fake_imagenet',
-                    'Directory where input data is stored')
-flags.DEFINE_string('inception3_model_dir', None,
-                    'Directory where model output is stored')
+flags.DEFINE_integer('inception3_epochs_per_eval', 2,
+                     'Number of training epochs to run between evaluations.')
 flags.DEFINE_integer('inception3_save_checkpoints_secs', 0, 'Interval (in '
                      'seconds) at which the model data should be checkpointed. '
                      'Set to 0 to disable.')
@@ -97,21 +93,24 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.learning_rate = FLAGS.inception3_learning_rate
-  benchmark_spec.train_steps = FLAGS.inception3_train_steps
-  benchmark_spec.iterations = FLAGS.inception3_iterations
-  benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
   benchmark_spec.use_data = FLAGS.inception3_use_data
   benchmark_spec.mode = FLAGS.inception3_mode
-  benchmark_spec.train_steps_per_eval = FLAGS.inception3_train_steps_per_eval
-  benchmark_spec.data_dir = FLAGS.inception3_data_dir
-  benchmark_spec.model_dir = FLAGS.inception3_model_dir
   benchmark_spec.save_checkpoints_secs = FLAGS.inception3_save_checkpoints_secs
   benchmark_spec.train_batch_size = FLAGS.inception3_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.inception3_eval_batch_size
-  benchmark_spec.master = 'grpc://{ip}:{port}'.format(
-      ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
-      port=benchmark_spec.cloud_tpu.GetCloudTpuPort()
-  ) if benchmark_spec.use_tpu else ''
+  benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
+  benchmark_spec.data_dir = FLAGS.imagenet_data_dir
+  benchmark_spec.num_train_images = FLAGS.imagenet_num_train_images
+  benchmark_spec.num_eval_images = FLAGS.imagenet_num_eval_images
+  benchmark_spec.num_examples_per_epoch = (
+      float(benchmark_spec.num_train_images) / benchmark_spec.train_batch_size)
+  benchmark_spec.train_epochs = FLAGS.inception3_train_epochs
+  benchmark_spec.train_steps = int(
+      benchmark_spec.train_epochs * benchmark_spec.num_examples_per_epoch)
+  benchmark_spec.epochs_per_eval = FLAGS.inception3_epochs_per_eval
+  benchmark_spec.steps_per_eval = int(
+      benchmark_spec.epochs_per_eval *
+      benchmark_spec.num_examples_per_epoch)
 
 
 def Prepare(benchmark_spec):
@@ -120,15 +119,8 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification
   """
-  benchmark_spec.always_call_cleanup = True
+  mnist_benchmark.Prepare(benchmark_spec)
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  vm = benchmark_spec.vms[0]
-  # Use ml-images if you want to use TPU. ml-image has pre-installed TensorFlow
-  # and TPU models, which includes MNIST, Inception, ResNet etc. Those models
-  # can be run on CPU, GPU and TPU.
-  if not benchmark_spec.use_tpu:
-    vm.Install('tensorflow')
-    vm.Install('cloud_tpu_models')
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -141,21 +133,18 @@ def _CreateMetadataDict(benchmark_spec):
   Returns:
     metadata dict
   """
-  metadata = {
-      'master': benchmark_spec.master,
+  metadata = mnist_benchmark.CreateMetadataDict(benchmark_spec)
+  metadata.update({
       'learning_rate': benchmark_spec.learning_rate,
-      'train_steps': benchmark_spec.train_steps,
-      'iterations': benchmark_spec.iterations,
-      'use_tpu': benchmark_spec.use_tpu,
       'use_data': benchmark_spec.use_data,
       'mode': benchmark_spec.mode,
-      'train_steps_per_eval': benchmark_spec.train_steps_per_eval,
-      'data_dir': benchmark_spec.data_dir,
-      'model_dir': benchmark_spec.model_dir,
       'save_checkpoints_secs': benchmark_spec.save_checkpoints_secs,
+      'epochs_per_eval': benchmark_spec.epochs_per_eval,
+      'steps_per_eval': benchmark_spec.steps_per_eval,
+      'precision': benchmark_spec.precision,
       'train_batch_size': benchmark_spec.train_batch_size,
       'eval_batch_size': benchmark_spec.eval_batch_size
-  }
+  })
   return metadata
 
 
@@ -172,47 +161,86 @@ def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
   inception3_benchmark_script = (
-      '/usr/share/tpu/models/experimental/inception/inception_v3.py' if
-      benchmark_spec.use_tpu else
       'tpu/models/experimental/inception/inception_v3.py')
   inception3_benchmark_cmd = (
-      'python {script} '
-      '--master={master} '
+      '{env_cmd} && python {script} '
       '--learning_rate={learning_rate} '
-      '--train_steps={train_steps} '
       '--iterations={iterations} '
       '--use_tpu={use_tpu} '
       '--use_data={use_data} '
-      '--mode={mode} '
-      '--train_steps_per_eval={train_steps_per_eval} '
+      '--train_steps_per_eval={steps_per_eval} '
       '--data_dir={data_dir} '
       '--model_dir={model_dir} '
       '--save_checkpoints_secs={save_checkpoints_secs} '
       '--train_batch_size={train_batch_size} '
-      '--eval_batch_size={eval_batch_size}'.format(
+      '--eval_batch_size={eval_batch_size} '
+      '--precision={precision}'.format(
+          env_cmd=benchmark_spec.env_cmd,
           script=inception3_benchmark_script,
-          master=benchmark_spec.master,
           learning_rate=benchmark_spec.learning_rate,
-          train_steps=benchmark_spec.train_steps,
           iterations=benchmark_spec.iterations,
-          use_tpu=benchmark_spec.use_tpu,
+          use_tpu=bool(benchmark_spec.tpus),
           use_data=benchmark_spec.use_data,
-          mode=benchmark_spec.mode,
-          train_steps_per_eval=benchmark_spec.train_steps_per_eval,
+          steps_per_eval=benchmark_spec.steps_per_eval,
           data_dir=benchmark_spec.data_dir,
           model_dir=benchmark_spec.model_dir,
           save_checkpoints_secs=benchmark_spec.save_checkpoints_secs,
           train_batch_size=benchmark_spec.train_batch_size,
-          eval_batch_size=benchmark_spec.eval_batch_size))
+          eval_batch_size=benchmark_spec.eval_batch_size,
+          precision=benchmark_spec.precision))
   if FLAGS.tf_device == 'gpu':
     inception3_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=inception3_benchmark_cmd)
-  stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_cmd,
-                                          should_log=True)
-  return mnist_benchmark.MakeSamplesFromOutput(
-      _CreateMetadataDict(benchmark_spec), stdout + stderr)
+  samples = []
+  metadata = _CreateMetadataDict(benchmark_spec)
+  elapsed_seconds = 0
+  steps_per_eval = benchmark_spec.steps_per_eval
+  train_steps = benchmark_spec.train_steps
+  for step in range(steps_per_eval, train_steps + steps_per_eval,
+                    steps_per_eval):
+    step = min(step, train_steps)
+    inception3_benchmark_cmd_step = '{cmd} --train_steps={step}'.format(
+        cmd=inception3_benchmark_cmd, step=step)
+    if benchmark_spec.mode in ('train', 'train_and_eval'):
+      if benchmark_spec.tpus:
+        tpu = benchmark_spec.tpu_groups['train'].GetName()
+        num_shards = '--num_shards={}'.format(
+            benchmark_spec.tpu_groups['train'].GetNumShards())
+      else:
+        tpu = num_shards = ''
+      inception3_benchmark_train_cmd = (
+          '{cmd} --tpu={tpu} --mode=train {num_shards}'.format(
+              cmd=inception3_benchmark_cmd_step,
+              tpu=tpu, num_shards=num_shards))
+      start = time.time()
+      stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_train_cmd,
+                                              should_log=True)
+      elapsed_seconds += (time.time() - start)
+      samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
+          metadata, stdout + stderr, elapsed_seconds, step))
+    if benchmark_spec.mode in ('train_and_eval', 'eval'):
+      if benchmark_spec.tpus:
+        tpu = benchmark_spec.tpu_groups['eval'].GetName()
+        num_shards = '--num_shards={}'.format(
+            benchmark_spec.tpu_groups['eval'].GetNumShards())
+      else:
+        tpu = num_shards = ''
+      inception3_benchmark_eval_cmd = (
+          '{cmd} --tpu={tpu} --mode=eval {num_shards}'.format(
+              cmd=inception3_benchmark_cmd_step,
+              tpu=tpu, num_shards=num_shards))
+      stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_eval_cmd,
+                                              should_log=True)
+      samples.extend(resnet_benchmark.MakeSamplesFromEvalOutput(
+          metadata, stdout + stderr, elapsed_seconds))
+  return samples
 
 
-def Cleanup(unused_benchmark_spec):
-  """Cleanup Inception V3 on the cluster."""
-  pass
+def Cleanup(benchmark_spec):
+  """Cleanup Inception V3 on the cluster.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
+  mnist_benchmark.Cleanup(benchmark_spec)

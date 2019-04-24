@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,13 +16,19 @@
 
 import unittest
 from mock import patch
-import yaml
 
+from perfkitbenchmarker import benchmark_sets
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_benchmarks
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
-from perfkitbenchmarker import configs
-from perfkitbenchmarker import linux_benchmarks
-from perfkitbenchmarker import benchmark_sets
+
+import six
+import yaml
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 USER_CONFIG = """
 internal_iprf:
@@ -137,7 +143,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # create set of valid benchmark names from the benchmark directory
     self.valid_benchmark_names = set()
     for benchmark_module in linux_benchmarks.BENCHMARKS:
-        self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
+      self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
 
     self.valid_benchmark_set_names = set()
     # include the benchmark_set names since these can also appear
@@ -153,6 +159,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
     self.mock_flags.flag_matrix = None
     self.mock_flags.flag_zip = None
+    self.mock_flags.num_benchmark_copies = 1
 
   def testStandardSet(self):
     self.assertIn(benchmark_sets.STANDARD_SET, benchmark_sets.BENCHMARK_SETS)
@@ -165,7 +172,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # check all the benchmark sets to make sure they contain valid names
     valid_benchmark_and_set_names = (self.valid_benchmark_names |
                                      self.valid_benchmark_set_names)
-    benchmark_set_items = benchmark_sets.BENCHMARK_SETS.items()
+    benchmark_set_items = list(benchmark_sets.BENCHMARK_SETS.items())
     for key_name, key_value in benchmark_set_items:
       benchmark_def_list = key_value[benchmark_sets.BENCHMARK_LIST]
       for benchmark_name in benchmark_def_list:
@@ -192,10 +199,10 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.mock_flags.benchmarks = [benchmark_sets.STANDARD_SET]
     standard_module_list = benchmark_sets.GetBenchmarksFromFlags()
     with patch.dict(benchmark_sets.BENCHMARK_SETS, {
-            'test_derived_set': {
+        'test_derived_set': {
             benchmark_sets.MESSAGE: 'test derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]},
-            'test_nested_derived_set': {
+        'test_nested_derived_set': {
             benchmark_sets.MESSAGE: 'test nested derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
       # TODO(voellm): better check would be to make sure both lists are the same
@@ -277,7 +284,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 4)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_MATRIX_FLAGS)
+    six.assertCountEqual(self, flag_list, EXPECTED_MATRIX_FLAGS)
 
   def testZipWithDifferentAxesLengths(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -293,7 +300,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 2)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_ZIP_FLAGS)
+    six.assertCountEqual(self, flag_list, EXPECTED_ZIP_FLAGS)
 
   def testZipSingleAxis(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -303,7 +310,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 2)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_SINGLE_ZIP_FLAGS)
+    six.assertCountEqual(self, flag_list, EXPECTED_SINGLE_ZIP_FLAGS)
 
   def testZipAndMatrix(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -313,7 +320,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 4)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_ZIP_AND_MATRIX_FLAGS)
+    six.assertCountEqual(self, flag_list, EXPECTED_ZIP_AND_MATRIX_FLAGS)
 
   def testFilters(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -351,3 +358,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
                return_value=yaml.load(USER_CONFIG)):
       with self.assertRaises(benchmark_sets.FlagZipNotFoundException):
         benchmark_sets.GetBenchmarksFromFlags()
+
+
+if __name__ == '__main__':
+  unittest.main()

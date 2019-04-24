@@ -18,9 +18,14 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import os.path
 import threading
+import time
 
 import jinja2
 
@@ -31,13 +36,17 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+import six
 
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
+QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
 
 _VM_SPEC_REGISTRY = {}
 _VM_REGISTRY = {}
@@ -47,10 +56,19 @@ flags.DEFINE_boolean(
     'dedicated_hosts', False,
     'If True, use hosts that only have VMs from the same '
     'benchmark running on them.')
+flags.DEFINE_integer(
+    'num_cpus_override', None,
+    'Rather than detecting the number of CPUs present on the machine, use this '
+    'value if set. Some benchmarks will use this number to automatically '
+    'scale their configurations; this can be used as a method to control '
+    'benchmark scaling. It will also change the num_cpus metadata '
+    'published along with the benchmark data.')
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
-VALID_GPU_TYPES = ['k80', 'p100', 'v100']
+# Note: If adding a gpu type here, be sure to add it to
+# the flag definition in pkb.py too.
+VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws']
 
 
 def GetVmSpecClass(cloud):
@@ -124,6 +142,11 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_type'] = flag_values.gpu_type
     if flag_values['gpu_count'].present:
       config_values['gpu_count'] = flag_values.gpu_count
+    if flag_values['disable_interrupt_moderation'].present:
+      config_values['disable_interrupt_moderation'] = (
+          flag_values.disable_interrupt_moderation)
+    if flag_values['disable_rss'].present:
+      config_values['disable_rss'] = flag_values.disable_rss
 
     if 'gpu_count' in config_values and 'gpu_type' not in config_values:
       raise errors.Config.MissingOption(
@@ -146,6 +169,9 @@ class BaseVmSpec(spec.BaseSpec):
     """
     result = super(BaseVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
+        'disable_interrupt_moderation': (option_decoders.BooleanDecoder, {
+            'default': False}),
+        'disable_rss': (option_decoders.BooleanDecoder, {'default': False}),
         'image': (option_decoders.StringDecoder, {'none_ok': True,
                                                   'default': None}),
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
@@ -211,6 +237,10 @@ class BaseVirtualMachine(resource.BaseResource):
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
+  # Supports overriding the PIP package version based on the provider image.
+  # By default, the latest PIP version is used.
+  PYTHON_PIP_PACKAGE_VERSION = None
+
   def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 
@@ -222,6 +252,8 @@ class BaseVirtualMachine(resource.BaseResource):
       self.instance_number = self._instance_counter
       self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
+    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
+    self.disable_rss = vm_spec.disable_rss
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.gpu_count = vm_spec.gpu_count
@@ -250,6 +282,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.tcp_congestion_control = None
     self.numa_node_count = None
     self.num_disable_cpus = None
+    self.capacity_reservation_id = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -290,9 +323,7 @@ class BaseVirtualMachine(resource.BaseResource):
     return self.scratch_disks[disk_num].mount_point
 
   def AllowIcmp(self):
-    """Opens the ICMP protocol on the firewall corresponding to the VM if
-    one exists.
-    """
+    """Opens ICMP protocol on the firewall corresponding to the VM if exists."""
     if self.firewall:
       self.firewall.AllowIcmp(self)
 
@@ -327,6 +358,8 @@ class BaseVirtualMachine(resource.BaseResource):
     Returns:
       dict mapping string property key to value.
     """
+    if not self.created:
+      return {}
     result = self.metadata.copy()
     result.update({
         'image': self.image,
@@ -351,12 +384,47 @@ class BaseVirtualMachine(resource.BaseResource):
     # failing because the attribute didn't exist.
     if getattr(self, 'num_cpus', None):
       result['num_cpus'] = self.num_cpus
+      if self.NumCpusForBenchmark() != self.num_cpus:
+        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
 
     return result
 
   def SimulateMaintenanceEvent(self):
     """Simulates a maintenance event on the VM."""
     raise NotImplementedError()
+
+  def _InstallData(self, preprovisioned_data, module_name, filenames,
+                   install_path):
+    """Installs preprovisioned_data on this VM.
+
+    Args:
+      preprovisioned_data: The dict mapping filenames to md5sum hashes.
+      module_name: The name of the module defining the preprovisioned data.
+      filenames: An iterable of preprovisioned data filenames for a particular
+      module.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreProvisionedDataError: If the module or filename are
+          not defined with preprovisioned data, or if the md5sum hash in the
+          code does not match the md5sum of the file.
+    """
+    for filename in filenames:
+      if data.ResourceExists(filename):
+        local_tar_file_path = data.ResourcePath(filename)
+        self.PushFile(local_tar_file_path, install_path)
+        continue
+      md5sum = preprovisioned_data.get(filename)
+      if md5sum:
+        self.DownloadPreprovisionedData(install_path, module_name, filename)
+        self.CheckPreprovisionedData(
+            install_path, module_name, filename, md5sum)
+        continue
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot find md5sum hash for file %s in module %s. See README.md '
+          'for information about preprovisioned data. '
+          'Cannot find file in /data directory either, fail to upload from '
+          'local directory.' % (filename, module_name))
 
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
@@ -365,7 +433,7 @@ class BaseVirtualMachine(resource.BaseResource):
     Some benchmarks require importing many bytes of data into the virtual
     machine. This data can be staged in a particular cloud and the virtual
     machine implementation can override how the preprovisioned data is
-    installed in the VM by overriding DownloadPreprovisionedBenchmarkData.
+    installed in the VM by overriding DownloadPreprovisionedData.
 
     For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
     bucket that the VMs may access. For a benchmark that requires
@@ -396,31 +464,63 @@ class BaseVirtualMachine(resource.BaseResource):
           'Cannot install preprovisioned data for undefined benchmark %s.' %
           benchmark_name)
     try:
-      benchmark_data = benchmark_module.BENCHMARK_DATA
+      # TODO(yanfeiren): Change BENCHMARK_DATA to PREPROVISIONED_DATA.
+      preprovisioned_data = benchmark_module.BENCHMARK_DATA
     except AttributeError:
       raise errors.Setup.BadPreprovisionedDataError(
           'Benchmark %s does not define a BENCHMARK_DATA dict with '
           'preprovisioned data.' % benchmark_name)
-    for filename in filenames:
-      if data.ResourceExists(filename):
-        local_tar_file_path = data.ResourcePath(filename)
-        self.PushFile(local_tar_file_path, install_path)
-        continue
-      md5sum = benchmark_data.get(filename)
-      if md5sum:
-        self.DownloadPreprovisionedBenchmarkData(install_path, benchmark_name,
-                                                 filename)
-        self.CheckPreprovisionedBenchmarkData(install_path, benchmark_name,
-                                              filename, md5sum)
-        continue
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Cannot find md5sum hash for file %s in benchmark %s. See README.md '
-          'for information about preprovisioned data. '
-          'Cannot find file in /data directory either, fail to upload from '
-          'local directory.' % (filename, benchmark_name))
+    self._InstallData(preprovisioned_data, benchmark_name, filenames,
+                      install_path)
 
-  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                          filename):
+  def InstallPreprovisionedPackageData(self, package_name, filenames,
+                                       install_path):
+    """Installs preprovisioned Package data on this VM.
+
+    Some benchmarks require importing many bytes of data into the virtual
+    machine. This data can be staged in a particular cloud and the virtual
+    machine implementation can override how the preprovisioned data is
+    installed in the VM by overriding DownloadPreprovisionedData.
+
+    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
+    bucket that the VMs may access. For a benchmark that requires
+    preprovisioned data, follow the instructions for that benchmark to download
+    and store the data so that it may be accessed by a VM via this method.
+
+    Before installing from preprovisioned data in the cloud, this function looks
+    for files in the local data directory. If found, they are pushed to the VM.
+    Otherwise, this function attempts to download them from their preprovisioned
+    location onto the VM.
+
+    Args:
+      package_name: The name of the package file defining the preprovisoned
+      data. The default vaule is None. If the package_name is provided, the
+      package file must define the dict PREPROVISIONED_DATA mapping filenames to
+      md5sum hashes.
+      filenames: An iterable of preprovisioned data filenames for a particular
+      package.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreProvisionedDataError: If the package or filename are
+          not defined with preprovisioned data, or if the md5sum hash in the
+          code does not match the md5sum of the file.
+    """
+    package_module = package_lookup.PackageModule(package_name)
+    if not package_module:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot install preprovisioned data for undefined package %s.' %
+          package_name)
+    try:
+      preprovisioned_data = package_module.PREPROVISIONED_DATA
+    except AttributeError:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Package %s does not define a PREPROVISIONED_DATA dict with '
+          'preprovisioned data.' % package_name)
+    self._InstallData(preprovisioned_data, package_name, filenames,
+                      install_path)
+
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads preprovisioned benchmark data.
 
     This function should be overridden by each cloud provider VM. The file
@@ -432,7 +532,7 @@ class BaseVirtualMachine(resource.BaseResource):
 
     Args:
       install_path: The install path on this VM.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
     raise NotImplementedError()
@@ -475,8 +575,12 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     return None
 
+  def _PreDelete(self):
+    """See base class."""
+    self.LogVmDebugInfo()
 
-class BaseOsMixin(object):
+
+class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   """The base class for OS Mixin classes.
 
   This class holds VM methods and attributes relating to the VM's guest OS.
@@ -489,9 +593,8 @@ class BaseOsMixin(object):
     remote_access_ports: A list of ports which must be opened on the firewall
         in order to access the VM.
   """
-
-  __metaclass__ = abc.ABCMeta
   OS_TYPE = None
+  BASE_OS_TYPE = None
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()
@@ -509,6 +612,8 @@ class BaseOsMixin(object):
     self._total_memory_kb = None
     self._num_cpus = None
     self.os_metadata = {}
+    if self.OS_TYPE:
+      assert self.BASE_OS_TYPE in os_types.BASE_OS_TYPES
 
   def GetOSResourceMetadata(self):
     """Returns a dict containing VM OS metadata.
@@ -538,7 +643,7 @@ class BaseOsMixin(object):
       ignore_failure: Ignore any failure if set to true.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
-      timeout is the time to wait in seconds for the command before exiting.
+      timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
 
     Returns:
@@ -560,8 +665,12 @@ class BaseOsMixin(object):
       raise
 
   def Reboot(self):
-    """Reboot the VM."""
+    """Reboots the VM.
 
+    Returns:
+      The duration in seconds from the time the reboot command was issued to
+      the time we could SSH into the VM and verify that the timestamp changed.
+    """
     vm_bootable_time = None
 
     # Use self.bootable_time to determine if this is the first boot.
@@ -571,6 +680,7 @@ class BaseOsMixin(object):
     if self.bootable_time is not None:
       vm_bootable_time = self.VMLastBootTime()
 
+    before_reboot_timestamp = time.time()
     self._Reboot()
 
     while True:
@@ -579,8 +689,9 @@ class BaseOsMixin(object):
       # this is sufficient check for the first boot - but not for a reboot
       if vm_bootable_time != self.VMLastBootTime():
         break
-
+    reboot_duration_sec = time.time() - before_reboot_timestamp
     self._AfterReboot()
+    return reboot_duration_sec
 
   @abc.abstractmethod
   def _Reboot(self):
@@ -619,7 +730,7 @@ class BaseOsMixin(object):
 
   @abc.abstractmethod
   def VMLastBootTime(self):
-    """Returns the UTC time the VM was last rebooted as reported by the VM.
+    """Returns the time the VM was last rebooted as reported by the VM.
     """
     raise NotImplementedError()
 
@@ -635,7 +746,19 @@ class BaseOsMixin(object):
 
     This will be called once after setting up scratch disks.
     """
-    pass
+    if self.disable_interrupt_moderation:
+      self.DisableInterruptModeration()
+
+    if self.disable_rss:
+      self.DisableRSS()
+
+  def DisableInterruptModeration(self):
+    """Disables interrupt moderation on the VM."""
+    raise NotImplementedError()
+
+  def DisableRSS(self):
+    """Disables RSS on the VM."""
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def Install(self, package_name):
@@ -658,6 +781,10 @@ class BaseOsMixin(object):
 
   def SetupLocalDisks(self):
     """Perform OS specific setup on any local disks that exist."""
+    pass
+
+  def LogVmDebugInfo(self):
+    """Logs OS-specific debug info. Must be overridden on an OS mixin."""
     pass
 
   def PushFile(self, source_path, remote_path=''):
@@ -752,6 +879,22 @@ class BaseOsMixin(object):
     if self._num_cpus is None:
       self._num_cpus = self._GetNumCpus()
     return self._num_cpus
+
+  def NumCpusForBenchmark(self):
+    """Gets the number of CPUs for benchmark configuration purposes.
+
+    Many benchmarks scale their configurations based off of the number of CPUs
+    available on the system (e.g. determine the number of threads). Benchmarks
+    should use this property rather than num_cpus so that users can override
+    that behavior with the --num_cpus_override flag. Not all benchmarks may
+    use this, and they may use more than this number of CPUs. To actually
+    ensure that they are not being used during benchmarking, the CPUs should be
+    disabled.
+
+    Returns:
+      The number of CPUs for benchmark configuration purposes.
+    """
+    return FLAGS.num_cpus_override or self.num_cpus
 
   @abc.abstractmethod
   def _GetNumCpus(self):
@@ -862,9 +1005,9 @@ class BaseOsMixin(object):
     """
     raise NotImplementedError()
 
-  def CheckPreprovisionedBenchmarkData(self, install_path, benchmark_name,
-                                       filename, expected_md5sum):
-    """Checks preprovisioned benchmark data for a checksum.
+  def CheckPreprovisionedData(self, install_path, module_name, filename,
+                              expected_md5sum):
+    """Checks preprovisioned data for a checksum.
 
     Checks the expected md5sum against the actual md5sum. Called after the file
     is downloaded.
@@ -874,7 +1017,7 @@ class BaseOsMixin(object):
     Args:
       install_path: The install path on this VM. The benchmark is installed at
           this path in a subdirectory of the benchmark name.
-      benchmark_name: Name of the benchmark associated with this data file.
+      module_name: Name of the benchmark associated with this data file.
       filename: The name of the file that was downloaded.
       expected_md5sum: The expected md5sum checksum value.
     """
@@ -882,4 +1025,4 @@ class BaseOsMixin(object):
     if actual_md5sum != expected_md5sum:
       raise errors.Setup.BadPreprovisionedDataError(
           'Invalid md5sum for %s/%s: %s (actual) != %s (expected)' % (
-              benchmark_name, filename, actual_md5sum, expected_md5sum))
+              module_name, filename, actual_md5sum, expected_md5sum))

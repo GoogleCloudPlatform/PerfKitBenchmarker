@@ -74,3 +74,7 @@ class CreateSummaryTestCase(unittest.TestCase):
   def testCreateSummary(self):
     result = benchmark_status.CreateSummary(_BENCHMARK_SPECS)
     self.assertEqual(result, _STATUS_SUMMARY)
+
+
+if __name__ == '__main__':
+  unittest.main()

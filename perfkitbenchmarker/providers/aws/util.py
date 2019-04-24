@@ -14,13 +14,21 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import collections
 import json
 import re
 import string
 
+
+from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+import six
 
 AWS_PATH = 'aws'
 AWS_PREFIX = [AWS_PATH, '--output', 'json']
@@ -63,6 +71,40 @@ def GetRegionFromZones(zones):
   return region
 
 
+def GetZonesInRegion(region):
+  """Returns all available zones in a given region."""
+  get_zones_cmd = AWS_PREFIX + [
+      'ec2',
+      'describe-availability-zones',
+      '--region={0}'.format(region)
+  ]
+  stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
+  response = json.loads(stdout)
+  zones = [item['ZoneName'] for item in response['AvailabilityZones']
+           if item['State'] == 'available']
+  return zones
+
+
+def GroupZonesIntoRegions(zones):
+  """Returns a map of regions to zones."""
+  regions_to_zones_map = collections.defaultdict(set)
+  for zone in zones:
+    region = GetRegionFromZone(zone)
+    regions_to_zones_map[region].add(zone)
+  return regions_to_zones_map
+
+
+def EksZonesValidator(value):
+  if len(value) < 2:
+    return False
+  if any(IsRegion(zone) for zone in value):
+    return False
+  region = GetRegionFromZone(value[0])
+  if any(GetRegionFromZone(zone) != region for zone in value):
+    return False
+  return True
+
+
 def FormatTags(tags_dict):
   """Format a dict of tags into arguments for 'tag' parameter.
 
@@ -72,7 +114,7 @@ def FormatTags(tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag' parameter.
   """
-  return ['Key=%s,Value=%s' % (k, v) for k, v in tags_dict.iteritems()]
+  return ['Key=%s,Value=%s' % (k, v) for k, v in six.iteritems(tags_dict)]
 
 
 def AddTags(resource_id, region, **kwargs):
@@ -95,13 +137,24 @@ def AddTags(resource_id, region, **kwargs):
   IssueRetryableCommand(tag_cmd)
 
 
-def MakeDefaultTags():
+def MakeDefaultTags(timeout_minutes=None):
   """Default tags for an AWS resource created by PerfKitBenchmarker.
 
+  Args:
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
+
   Returns:
-    Dict of default tags with owner and run_uri.
+    Dict of default tags, contributed from the benchmark spec.
   """
-  return {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if not benchmark_spec:
+    return {}
+  return benchmark_spec.GetResourceTags(timeout_minutes=timeout_minutes)
+
+
+def MakeFormattedDefaultTags(timeout_minutes=None):
+  """Get the default tags formatted correctly for --tags parameter."""
+  return FormatTags(MakeDefaultTags(timeout_minutes=timeout_minutes))
 
 
 def AddDefaultTags(resource_id, region):

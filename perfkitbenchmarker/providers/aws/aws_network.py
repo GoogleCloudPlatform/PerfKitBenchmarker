@@ -443,6 +443,11 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     route_table: an AwsRouteTable instance. The default route table.
   """
 
+  CLOUD = providers.AWS
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
+
   def __init__(self, region):
     self.region = region
     self.vpc = AwsVpc(self.region)
@@ -528,12 +533,15 @@ class AwsNetwork(network.BaseNetwork):
 
   Attributes:
     region: The AWS region the Network is in.
-    regional_network: The AwsRegionalNetwor for 'region'.
+    regional_network: The AwsRegionalNetwork for 'region'.
     subnet: the AwsSubnet for this zone.
     placement_group: An AwsPlacementGroup instance.
   """
 
   CLOUD = providers.AWS
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
 
   def __init__(self, spec):
     """Initializes AwsNetwork instances.

@@ -118,7 +118,7 @@ flags.DEFINE_integer(
 flag_util.DEFINE_integerlist(
     'multichase_thread_count', flag_util.IntegerList([1]),
     'Number of threads (one per core), to use when executing multichase. '
-    'Passed to multichase via its -t flag.')
+    'Passed to multichase via its -t flag.', module_name=__name__)
 _DefineMemorySizeFlag(
     'multichase_memory_size_min', _DEFAULT_MEMORY_SIZE,
     'Memory size to use when executing multichase. Passed to multichase via '
@@ -284,7 +284,7 @@ def Run(benchmark_spec):
   base_cmd.extend(('-c', chase_type))
 
   for thread_count in FLAGS.multichase_thread_count:
-    if thread_count > vm.num_cpus:
+    if thread_count > vm.NumCpusForBenchmark():
       continue
     memory_size_iterator = _IterMemorySizes(
         lambda: vm.total_memory_kb * 1024, FLAGS.multichase_memory_size_min,

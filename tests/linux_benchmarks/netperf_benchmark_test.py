@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,16 @@ import unittest
 import mock
 
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
+
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class NetperfBenchmarkTestCase(unittest.TestCase):
@@ -46,7 +54,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnInternalIpAddress')
     self.should_run_internal = p.start()
     self.addCleanup(p.stop)
-    netperf_benchmark.FLAGS.netperf_enable_histograms = False
+    FLAGS.netperf_enable_histograms = False
 
   def _ConfigureIpTypes(self, run_external=True, run_internal=True):
     self.should_run_external.return_value = run_external
@@ -62,13 +70,13 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(stats['p74'], 2)
     self.assertEqual(stats['p80'], 5)
     self.assertEqual(stats['p100'], 5)
-    self.assertTrue(abs(stats['stddev'] - 1.538) <= 0.001)
+    self.assertLessEqual(abs(stats['stddev'] - 1.538), 0.001)
 
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
-    vm_spec.vms[0].RemoteCommand.side_effect = [
+    vm_spec.vms[0].RobustRemoteCommand.side_effect = [
         (i, '') for i in self.expected_stdout]
 
     result = netperf_benchmark.Run(vm_spec)
@@ -132,3 +140,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
       self.assertDictContainsSubset(meta, result[i][3])
+
+
+if __name__ == '__main__':
+  unittest.main()

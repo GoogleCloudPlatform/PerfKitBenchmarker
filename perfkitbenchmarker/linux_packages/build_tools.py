@@ -40,7 +40,8 @@ def Reinstall(vm, version='4.7'):
     vm: VirtualMachine object.
     version: string. GCC version.
   """
-  if vm.OS_TYPE != os_types.DEBIAN:
+  # TODO(user): Make this work on yum based systems.
+  if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return
   for pkg in ('gcc', 'gfortran', 'g++'):
     version_string = _GetVersion(vm, pkg)
@@ -48,8 +49,7 @@ def Reinstall(vm, version='4.7'):
       continue
     else:
       new_pkg = pkg + '-' + version
-      vm.RemoteCommand('sudo apt-get remove {pkg} -y'.format(pkg=pkg),
-                       ignore_failure=True)
       vm.InstallPackages(new_pkg)
+      vm.RemoteCommand('sudo rm /usr/bin/{pkg}'.format(pkg=pkg))
       vm.RemoteCommand('sudo ln -s /usr/bin/{new_pkg} /usr/bin/{pkg}'.format(
           new_pkg=new_pkg, pkg=pkg))

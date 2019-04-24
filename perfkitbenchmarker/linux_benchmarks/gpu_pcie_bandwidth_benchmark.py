@@ -47,7 +47,8 @@ flag_util.DEFINE_integerlist(
     flag_util.IntegerList(
         [DEFAULT_RANGE_START, DEFAULT_RANGE_END,
          DEFAULT_RANGE_STEP]), 'range of transfer sizes to use in bytes. '
-    'Only used if gpu_pcie_bandwidth_mode is set to range')
+    'Only used if gpu_pcie_bandwidth_mode is set to range',
+    module_name=__name__)
 
 FLAGS = flags.FLAGS
 
@@ -284,7 +285,7 @@ def Run(benchmark_spec):
     metadata['range_step'] = transfer_size_range[2]
 
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all' %
-                 cuda_toolkit.CUDA_TOOLKIT_INSTALL_DIR)
+                 metadata['cuda_toolkit_installation_dir'])
   if mode == 'range':
     run_command += (' --mode=range --start={0} --end={1} --increment={2}'
                     .format(transfer_size_range[0], transfer_size_range[1],

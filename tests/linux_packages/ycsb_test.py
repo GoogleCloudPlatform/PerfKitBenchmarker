@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.packages.ycsb"""
+"""Tests for perfkitbenchmarker.packages.ycsb."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import copy
 import os
@@ -19,16 +23,22 @@ import unittest
 
 
 from perfkitbenchmarker.linux_packages import ycsb
+import six
+from six.moves import range
+
+
+def open_data_file(filename):
+  path = os.path.join(os.path.dirname(__file__), '..', 'data', filename)
+  with open(path) as fp:
+    return fp.read()
 
 
 class SimpleResultParserTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'ycsb-test-run.dat')
-    with open(path) as fp:
-      self.contents = fp.read()
+    super(SimpleResultParserTestCase, self).setUp()
+    self.contents = open_data_file('ycsb-test-run.dat')
     self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testCommandLineSet(self):
@@ -85,14 +95,11 @@ class SimpleResultParserTestCase(unittest.TestCase):
         self.results['groups']['overall'])
 
 
-
 class DetailedResultParserTestCase(unittest.TestCase):
 
   def setUp(self):
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'ycsb-test-run-2.dat')
-    with open(path) as fp:
-      self.contents = fp.read()
+    super(DetailedResultParserTestCase, self).setUp()
+    self.contents = open_data_file('ycsb-test-run-2.dat')
     self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testPercentilesFromHistogram_read(self):
@@ -108,10 +115,17 @@ class DetailedResultParserTestCase(unittest.TestCase):
     self.assertEqual(7, percentiles['p99'])
 
 
+class BadResultParserTestCase(unittest.TestCase):
+
+  def testBadTestRun(self):
+    contents = open_data_file('ycsb-test-run-3.dat')
+    self.assertRaises(IOError, ycsb.ParseResults, contents, 'histogram')
+
+
 class WeightedQuantileTestCase(unittest.TestCase):
 
   def testEvenlyWeightedSamples(self):
-    x = range(1, 101)  # 1-100
+    x = list(range(1, 101))  # 1-100
     weights = [1 for _ in x]
     self.assertEqual(50, ycsb._WeightedQuantile(x, weights, 0.50))
     self.assertEqual(75, ycsb._WeightedQuantile(x, weights, 0.75))
@@ -123,14 +137,14 @@ class WeightedQuantileTestCase(unittest.TestCase):
   def testLowWeight(self):
     x = [1, 4]
     weights = [99, 1]
-    for i in xrange(100):
+    for i in range(100):
       self.assertEqual(1, ycsb._WeightedQuantile(x, weights, i / 100.0))
     self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
 
   def testMidWeight(self):
     x = [0, 1.2, 4]
     weights = [1, 98, 1]
-    for i in xrange(2, 99):
+    for i in range(2, 99):
       self.assertAlmostEqual(1.2, ycsb._WeightedQuantile(x, weights, i / 100.0))
     self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
 
@@ -148,14 +162,8 @@ class ParseWorkloadTestCase(unittest.TestCase):
     self.assertDictEqual({'recordcount': '10'},
                          ycsb._ParseWorkload('#Sample!\nrecordcount = 10'))
 
-
   def testParsesSampleWorkload(self):
-    test_file_path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                                  'ycsb_workloada')
-
-    with open(test_file_path) as fp:
-      contents = fp.read()
-
+    contents = open_data_file('ycsb_workloada')
     actual = ycsb._ParseWorkload(contents)
 
     expected = {
@@ -207,9 +215,9 @@ class CombineResultsTestCase(unittest.TestCase):
         }
     }
     combined = ycsb._CombineResults([r1, r2], 'histogram', {})
-    self.assertItemsEqual(['read', 'update'], combined['groups'])
-    self.assertItemsEqual(['Operations', 'Return=0', 'Return=-1'],
-                          combined['groups']['read']['statistics'])
+    six.assertCountEqual(self, ['read', 'update'], combined['groups'])
+    six.assertCountEqual(self, ['Operations', 'Return=0', 'Return=-1'],
+                         combined['groups']['read']['statistics'])
     read_stats = combined['groups']['read']['statistics']
     self.assertEqual({'Operations': 196, 'Return=0': 194, 'Return=-1': 2},
                      read_stats)
@@ -245,11 +253,17 @@ class HdrLogsParserTestCase(unittest.TestCase):
          314.000 0.000000000000          2           1.00
          853.000 0.100000000000      49955           1.11
          949.000 0.200000000000     100351           1.25
+         949.000 0.210000000000     100351           1.27
          1033.000 0.300000000000     150110           1.43
       #[Mean    =     1651.145, StdDeviation   =      851.707]
       #[Max     =   203903.000, Total count    =       499019]
       #[Buckets =            8, SubBuckets     =         2048]
     """
     actual = ycsb.ParseHdrLogFile(rawlog)
-    expected = [(0.0, 0.314), (10.0, 0.853), (20.0, 0.949), (30.0, 1.033)]
+    expected = [(0.0, 0.314, 2), (10.0, 0.853, 49953),
+                (20.0, 0.949, 50396), (30.0, 1.033, 49759)]
     self.assertEqual(actual, expected)
+
+
+if __name__ == '__main__':
+  unittest.main()

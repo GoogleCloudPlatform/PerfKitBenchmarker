@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing class for AWS's EMR service.
+
 Clusters can be created and deleted.
 """
 
@@ -24,14 +25,14 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
-import aws_network
-import util
+from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import util
 
 GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
                        'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('dpb_emr_release_label', 'emr-5.2.0',
+flags.DEFINE_string('dpb_emr_release_label', 'emr-5.8.0',
                     'The emr version to use for the cluster.')
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
@@ -96,11 +97,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   CLOUD = providers.AWS
   SERVICE_TYPE = 'emr'
+  PERSISTENT_FS_PREFIX = 's3://'
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
     self.project = None
-    self.cmd_prefix = util.AWS_PREFIX
+    self.cmd_prefix = list(util.AWS_PREFIX)
 
     if FLAGS.zones:
       self.zone = FLAGS.zones[0]
@@ -174,51 +176,64 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              '--application', 'Name=Spark',
                              'Name=Hadoop',
                              '--log-uri', logs_bucket]
+
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
 
-    stdout, stderr, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
     logging.info('Cluster created with id %s', self.cluster_id)
+    for tag_key, tag_value in util.MakeDefaultTags().items():
+      self._AddTag(tag_key, tag_value)
+
+  def _AddTag(self, key, value):
+    cmd = self.cmd_prefix + ['emr', 'add-tags',
+                             '--resource-id', self.cluster_id,
+                             '--tag',
+                             '{}={}'.format(key, value)]
+    vm_util.IssueCommand(cmd)
 
   def _DeleteSecurityGroups(self):
     """Delete the security groups associated with this cluster."""
-    cmd = self.cmd_prefix + ['emr', 'describe-cluster',
-                             '--cluster-id', self.cluster_id]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    cluster_desc = json.loads(stdout)
-    sec_object = cluster_desc['Cluster']['Ec2InstanceAttributes']
-    manager_sg = sec_object[MANAGER_SG]
-    worker_sg = sec_object[WORKER_SG]
+    if self.cluster_id:
+      cmd = self.cmd_prefix + ['emr', 'describe-cluster',
+                               '--cluster-id', self.cluster_id]
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      cluster_desc = json.loads(stdout)
+      sec_object = cluster_desc['Cluster']['Ec2InstanceAttributes']
+      manager_sg = sec_object[MANAGER_SG]
+      worker_sg = sec_object[WORKER_SG]
 
-    # the manager group and the worker group reference each other, so neither
-    # can be deleted.  First we delete the references to the manager group in
-    # the worker group.  Then we delete the manager group, and then, finally the
-    # worker group.
+      # the manager group and the worker group reference each other, so neither
+      # can be deleted.  First we delete the references to the manager group in
+      # the worker group.  Then we delete the manager group, and then, finally
+      # the worker group.
 
-    # remove all references to the manager group from the worker group.
-    for proto, port in [('tcp', '0-65535'), ('udp', '0-65535'), ('icmp', '-1')]:
-      for group1, group2 in [(worker_sg, manager_sg), (manager_sg, worker_sg)]:
-        cmd = self.cmd_prefix + ['ec2', 'revoke-security-group-ingress',
-                                 '--group-id=' + group1,
-                                 '--source-group=' + group2,
-                                 '--protocol=' + proto,
-                                 '--port=' + port]
-        vm_util.IssueCommand(cmd)
+      # remove all references to the manager group from the worker group.
+      for proto, port in [('tcp', '0-65535'), ('udp', '0-65535'),
+                          ('icmp', '-1')]:
+        for group1, group2 in [(worker_sg, manager_sg),
+                               (manager_sg, worker_sg)]:
+          cmd = self.cmd_prefix + ['ec2', 'revoke-security-group-ingress',
+                                   '--group-id=' + group1,
+                                   '--source-group=' + group2,
+                                   '--protocol=' + proto,
+                                   '--port=' + port]
+          vm_util.IssueCommand(cmd)
 
-    # Now we need to delete the manager, then the worker.
-    for group in manager_sg, worker_sg:
-      sec_group = AwsSecurityGroup(self.cmd_prefix, group)
-      sec_group.Delete()
-
+      # Now we need to delete the manager, then the worker.
+      for group in manager_sg, worker_sg:
+        sec_group = AwsSecurityGroup(self.cmd_prefix, group)
+        sec_group.Delete()
 
   def _Delete(self):
-    delete_cmd = self.cmd_prefix + ['emr',
-                                    'terminate-clusters',
-                                    '--cluster-ids',
-                                    self.cluster_id]
-    vm_util.IssueCommand(delete_cmd)
+    if self.cluster_id:
+      delete_cmd = self.cmd_prefix + ['emr',
+                                      'terminate-clusters',
+                                      '--cluster-ids',
+                                      self.cluster_id]
+      vm_util.IssueCommand(delete_cmd)
 
   def _DeleteDependencies(self):
     if self.network:
@@ -230,6 +245,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
+    if not self.cluster_id:
+      return False
     cmd = self.cmd_prefix + ['emr',
                              'describe-cluster',
                              '--cluster-id',
@@ -301,7 +318,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       # assumption: spark job will always have a jar and a class
       arg_list = ['--class', classname, jarfile]
       if job_arguments:
-          arg_list += job_arguments
+        arg_list += job_arguments
       arg_spec = '[' + ','.join(arg_list) + ']'
       step_type_spec = 'Type=Spark'
       step_list = [step_type_spec, 'Args=' + arg_spec]
@@ -344,7 +361,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-          raise EMRRetryableException('Step {0} not complete.'.format(step_id))
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['TestDFSIO']
@@ -478,7 +495,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-          raise EMRRetryableException('Step {0} not complete.'.format(step_id))
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['TestDFSIO']

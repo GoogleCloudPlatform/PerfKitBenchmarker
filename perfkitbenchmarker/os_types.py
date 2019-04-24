@@ -15,7 +15,6 @@
 
 from perfkitbenchmarker import flags
 
-
 CENTOS7 = 'centos7'
 DEBIAN = 'debian'
 DEBIAN9 = 'debian9'
@@ -26,7 +25,11 @@ UBUNTU1404 = 'ubuntu1404'
 UBUNTU1604 = 'ubuntu1604'
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
 UBUNTU1710 = 'ubuntu1710'
+UBUNTU1804 = 'ubuntu1804'
 WINDOWS = 'windows'
+WINDOWS2012 = 'windows2012'
+WINDOWS2016 = 'windows2016'
+WINDOWS2019 = 'windows2019'
 
 LINUX_OS_TYPES = [
     CENTOS7,
@@ -38,12 +41,20 @@ LINUX_OS_TYPES = [
     UBUNTU1404,
     UBUNTU1604,
     UBUNTU1604_CUDA9,
-    UBUNTU1710]
-WINDOWS_OS_TYPES = [WINDOWS]
+    UBUNTU1710,
+    UBUNTU1804,
+]
+WINDOWS_OS_TYPES = [
+    WINDOWS,
+    WINDOWS2012,
+    WINDOWS2016,
+    WINDOWS2019,
+]
 ALL = LINUX_OS_TYPES + WINDOWS_OS_TYPES
+BASE_OS_TYPES = [DEBIAN, RHEL, WINDOWS]
 
 flags.DEFINE_enum(
-    'os_type', DEBIAN, ALL,
+    'os_type', UBUNTU1604, ALL,
     'The VM\'s OS type. Ubuntu\'s os_type can also be specified as "debian" '
     'because it is largely built on Debian and uses the same package manager. '
     'Likewise, CentOS\'s os_type can be "rhel". In general if two OS\'s use '

@@ -52,6 +52,10 @@ class Setup(object):
     """Error raised when the set of command line flags is invalid."""
     pass
 
+  class InvalidConfigurationError(Error):
+    """Error raised when configuration is invalid."""
+    pass
+
 
 class VirtualMachine(object):
   """Errors raised by virtual_machine.py."""
@@ -178,6 +182,9 @@ class Resource(object):
     pass
 
   class RetryableGetError(Error):
+    pass
+
+  class SubclassNotFoundError(Error):
     pass
 
 

@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,18 +21,21 @@ import unittest
 import mock
 import numpy
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import bidirectional_network_benchmark
-from tests import mock_flags
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 MBPS = 'Mbits/sec'
 TOLERANCE = 0.000001
 
 
-class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
-
-  maxDiff = None
+class BidirectionalNetworkBenchmarkTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(BidirectionalNetworkBenchmarkTestCase, self).setUp()
     # Load netperf stdout data
     path = os.path.join(os.path.dirname(__file__),
                         '..', 'data',
@@ -79,11 +82,11 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(1, len(match))
 
   def testRun(self):
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.bidirectional_network_tests = ['TCP_STREAM', 'TCP_MAERTS',
-                                                'TCP_MAERTS', 'TCP_MAERTS']
-    mocked_flags.bidirectional_network_test_length = 60
-    mocked_flags.bidirectional_stream_num_streams = 8
+    FLAGS.bidirectional_network_tests = [
+        'TCP_STREAM', 'TCP_MAERTS', 'TCP_MAERTS', 'TCP_MAERTS'
+    ]
+    FLAGS.bidirectional_network_test_length = 60
+    FLAGS.bidirectional_stream_num_streams = 8
 
     # Helper for GetNetperfStdOut whichs holds the last returned index for the
     # given test. Used to ensure the mocked stdout is returned matching the
@@ -104,7 +107,7 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
         i = last_returned[netperf_test]
         while True:
           i += 1
-          if mocked_flags.bidirectional_network_tests[i] == netperf_test:
+          if FLAGS.bidirectional_network_tests[i] == netperf_test:
             last_returned[netperf_test] = i
             return (self.expected_stdout[i], '')
 
@@ -191,3 +194,7 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
     total_metrics = num_tests * metrics_per_test + summary_metrics
 
     self.assertEqual(total_metrics, len(results))
+
+
+if __name__ == '__main__':
+  unittest.main()

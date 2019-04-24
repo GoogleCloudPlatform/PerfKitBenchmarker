@@ -13,36 +13,23 @@
 # limitations under the License.
 """Module containing TensorFlow Serving installation functions.
 
-  At the moment some of TensorFlow Serving is broken on the master branch
-  (https://github.com/tensorflow/serving/issues/684), so this module builds
-  the r1.4 from source.
 """
 import posixpath
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-FLAGS = flags.FLAGS
 VM_TMP_DIR = vm_util.VM_TMP_DIR
-
-BAZEL_INSTALLER_URL = 'https://github.com/bazelbuild/bazel/releases/download/0.6.0/bazel-0.6.0-installer-linux-x86_64.sh'
-TF_SERVING_BIN_DIRECTORY = posixpath.join(
-    INSTALL_DIR, 'serving/bazel-bin/tensorflow_serving')
 TF_SERVING_BASE_DIRECTORY = posixpath.join(INSTALL_DIR, 'serving')
 
+FLAGS = flags.FLAGS
 
-def InstallBazel(vm):
-  """Installs Bazel 0.6.0."""
-  # TODO(ferneyhough): Consider moving this to its own package.
-  basename = posixpath.basename(BAZEL_INSTALLER_URL)
-  vm.RemoteCommand('cd {0} && wget {1}'.format(VM_TMP_DIR, BAZEL_INSTALLER_URL))
-  vm.RemoteCommand('cd {0} && chmod +x {1}'.format(VM_TMP_DIR, basename))
-  vm.RemoteCommand('cd {0} && sudo ./{1}'.format(
-      VM_TMP_DIR, basename))  # This installs to /usr/local/bin
+# Versions supported including TF Serving 1.11.0 and above
+flags.DEFINE_string('tf_serving_branch', 'master', 'GitHub branch to pull from')
 
 
-def BuildAndInstallPipPackage(vm):
-  """Builds a TensorFlowServing pip package and install it on the vm.
+def InstallTensorFlowServingAPI(vm):
+  """Installs TF Serving API on the vm.
 
   Currently this is only useful so that the clients can run python
   scripts that import tensorflow_serving. The server vms make no use
@@ -51,54 +38,70 @@ def BuildAndInstallPipPackage(vm):
   Args:
     vm: VM to operate on.
   """
-  build_pip_package_tool = posixpath.join(
-      TF_SERVING_BIN_DIRECTORY, 'tools/pip_package/build_pip_package')
+
   pip_package_output_dir = posixpath.join(VM_TMP_DIR, 'tf_serving_pip_package')
   pip_package = posixpath.join(pip_package_output_dir,
-                               'tensorflow_serving_api-1.4.0-py2-none-any.whl')
+                               'tensorflow_serving_api*.whl')
 
-  # The following command must be run from root of the tf serving build tree.
-  vm.RemoteCommand('cd {0} && {1} {2}'.format(TF_SERVING_BASE_DIRECTORY,
-                                              build_pip_package_tool,
-                                              pip_package_output_dir))
+  vm.Install('pip')
+
+  # Build the pip package from the same source as the serving binary
+  vm.RemoteCommand('sudo docker run --rm -v {0}:{0} '
+                   'benchmarks/tensorflow-serving-devel '
+                   'bash -c "bazel build --config=nativeopt '
+                   'tensorflow_serving/tools/pip_package:build_pip_package && '
+                   'bazel-bin/tensorflow_serving/tools/pip_package/'
+                   'build_pip_package {0}"'.format(pip_package_output_dir))
+
   vm.RemoteCommand('sudo pip install {0}'.format(pip_package))
 
 
-def BuildTfServing(vm):
-  """Builds the Tensorflow Serving r1.4 from source."""
-  vm.RemoteCommand('cd {0} && git clone -b r1.4 --recurse-submodules '
-                   'https://github.com/tensorflow/serving'.format(INSTALL_DIR))
-  # Run the configure script using default for all prompts.
-  vm.RemoteCommand('cd {0} && yes "" | ./configure'.format(
-      posixpath.join(TF_SERVING_BASE_DIRECTORY, 'tensorflow')))
+def BuildDockerImages(vm):
+  """Builds the Docker images from source Dockerfiles for a pre-built env."""
 
-  # Note: This took 45 minutes to build on an n1-standard-8 but is much
-  # faster on an n1-standard-64.
-  vm.RemoteCommand(
-      'cd {0} && /usr/local/bin/bazel '
-      'build -c opt tensorflow_serving/...'.format(TF_SERVING_BASE_DIRECTORY))
+  vm.InstallPackages('git')
+  vm.RemoteHostCommand('cd {0} && git clone -b {1} '
+                       'https://github.com/tensorflow/serving'.format(
+                           INSTALL_DIR, FLAGS.tf_serving_branch))
 
-  BuildAndInstallPipPackage(vm)
+  # Build an optimized binary for TF Serving, and keep all the build artifacts
+  vm.RemoteHostCommand(
+      'sudo docker build --target binary_build '
+      '-t benchmarks/tensorflow-serving-devel '
+      '-f {0}/tensorflow_serving/tools/docker/Dockerfile.devel '
+      '{0}/tensorflow_serving/tools/docker/'.format(TF_SERVING_BASE_DIRECTORY))
+
+  # Create a serving image with the optimized model_server binary
+  vm.RemoteHostCommand(
+      'sudo docker build '
+      '-t benchmarks/tensorflow-serving '
+      '--build-arg '
+      'TF_SERVING_BUILD_IMAGE=benchmarks/tensorflow-serving-devel '
+      '-f {0}/tensorflow_serving/tools/docker/Dockerfile '
+      '{0}/tensorflow_serving/tools/docker/'.format(TF_SERVING_BASE_DIRECTORY))
 
 
-def InstallFromSource(vm):
-  """Downloads and builds Tensorflow Serving."""
-  vm.InstallPackages('build-essential curl libcurl3-dev libfreetype6-dev '
-                     'libpng12-dev libzmq3-dev pkg-config python-dev '
-                     'python-numpy software-properties-common swig '
-                     'zip zlib1g-dev')
-  vm.RemoteCommand('sudo pip install grpcio')
-  InstallBazel(vm)
-  BuildTfServing(vm)
+def InstallFromDocker(vm):
+  """Installs Docker and TF Serving."""
+
+  vm.Install('docker')
+  BuildDockerImages(vm)
 
 
 def AptInstall(vm):
-  """Installs TensorFlowServing on the VM."""
-  vm.Install('pip')
-  vm.InstallPackages('python-numpy')
-  InstallFromSource(vm)
+  """Installs TensorFlow Serving on the VM."""
+
+  InstallFromDocker(vm)
+  InstallTensorFlowServingAPI(vm)
 
 
 def Uninstall(vm):
   """Uninstalls TensorFlow Serving on the VM."""
+
+  vm.RemoteCommand(
+      'sudo pip uninstall -y tensorflow_serving_api', should_log=True)
+  vm.RemoteHostCommand(
+      'sudo docker rmi benchmarks/tensorflow-serving', should_log=True)
+  vm.RemoteHostCommand(
+      'sudo docker rmi benchmarks/tensorflow-serving-devel', should_log=True)
   del vm

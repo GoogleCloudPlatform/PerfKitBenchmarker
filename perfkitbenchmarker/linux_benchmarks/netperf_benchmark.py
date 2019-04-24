@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
-from collections import Counter
+import collections
 import csv
 import io
 import json
@@ -51,7 +51,8 @@ flags.DEFINE_bool('netperf_enable_histograms', True,
                   'collected/reported. Only for *RR benchmarks')
 flag_util.DEFINE_integerlist('netperf_num_streams', flag_util.IntegerList([1]),
                              'Number of netperf processes to run. Netperf '
-                             'will run once for each value in the list.')
+                             'will run once for each value in the list.',
+                             module_name=__name__)
 flags.DEFINE_integer('netperf_thinktime', 0,
                      'Time in nanoseconds to do work for each request.')
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
@@ -82,6 +83,14 @@ netperf:
 
 MBPS = 'Mbits/sec'
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'
+# Specifies the keys and to include in the results for OMNI tests.
+# Any user of ParseNetperfOutput() (e.g. container_netperf_benchmark), must
+# specify these selectors to ensure the parsing doesn't break.
+OUTPUT_SELECTOR = (
+    'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
+    'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
+    'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
+    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
 PORT_START = 20000
@@ -105,6 +114,22 @@ def GetConfig(user_config):
 def PrepareNetperf(vm):
   """Installs netperf on a single vm."""
   vm.Install('netperf')
+
+  # Set keepalive to a low value to ensure that the control connection
+  # is not closed by the cloud networking infrastructure.
+  # This causes keepalive packets to be sent every minute on all ipv4
+  # tcp connections.
+  #
+  # TODO(user): Keepalive is not enabled on the netperf control socket.
+  # While (for unknown reasons) this hack fixes the issue with the socket
+  # being closed anyway, a more correct approach would be to patch netperf
+  # and enable keepalive on the control socket in addition to changing the
+  # system defaults below.
+  #
+  vm.ApplySysctlPersistent({
+      'net.ipv4.tcp_keepalive_time': 60,
+      'net.ipv4.tcp_keepalive_intvl': 60,
+  })
 
 
 def Prepare(benchmark_spec):
@@ -249,6 +274,12 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
+  if 'TCP' in benchmark_name:
+    meta_keys.extend([
+        ('Local Transport Retransmissions', 'netperf_retransmissions'),
+        ('Remote Transport Retransmissions', 'netserver_retransmissions'),
+    ])
+
   metadata.update({meta_key: results[netperf_key]
                    for netperf_key, meta_key in meta_keys})
 
@@ -325,14 +356,12 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
                  '-P ,{{data_port}} '
-                 '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
-                 'P99_LATENCY,STDDEV_LATENCY,'
-                 'MIN_LATENCY,MAX_LATENCY,'
-                 'CONFIDENCE_ITERATION,THROUGHPUT_CONFID').format(
+                 '-o {output_selector}').format(
                      netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
+                     output_selector=OUTPUT_SELECTOR,
                      confidence=confidence, verbosity=verbosity)
   if FLAGS.netperf_thinktime != 0:
     netperf_cmd += (' -X {thinktime},{thinktime_array_size},'
@@ -350,8 +379,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
   remote_cmd = ('./%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' %
                 (REMOTE_SCRIPT, netperf_cmd, num_streams, PORT_START))
-  remote_stdout, _ = vm.RemoteCommand(remote_cmd,
-                                      timeout=remote_cmd_timeout)
+  remote_stdout, _ = vm.RobustRemoteCommand(remote_cmd, should_log=True,
+                                            timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   json_out = json.loads(remote_stdout)
@@ -398,7 +427,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                         throughput_unit, metadata))
     if enable_latency_histograms:
       # Combine all of the latency histogram dictionaries
-      latency_histogram = Counter()
+      latency_histogram = collections.Counter()
       for histogram in latency_histograms:
         latency_histogram.update(histogram)
       # Create a sample for the aggregate latency histogram
@@ -440,7 +469,7 @@ def Run(benchmark_spec):
   }
 
   for num_streams in FLAGS.netperf_num_streams:
-    assert(num_streams >= 1)
+    assert num_streams >= 1
 
     for netperf_benchmark in FLAGS.netperf_benchmarks:
       if vm_util.ShouldRunOnExternalIpAddress():

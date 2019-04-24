@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,10 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import os
 import pipes
@@ -35,6 +39,7 @@ import threading
 import time
 import uuid
 
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -44,6 +49,8 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
+import six
+from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -55,7 +62,6 @@ EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 
 LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
 UPDATE_RETRIES = 5
-SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '~/.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
@@ -112,6 +118,16 @@ flags.DEFINE_integer('num_disable_cpus', None,
                      'Number of CPUs to disable on the virtual machine.'
                      'If the VM has n CPUs, you can disable at most n-1.',
                      lower_bound=1)
+flags.DEFINE_integer('disk_fill_size', 0,
+                     'Size of file to create in GBs.')
+
+flags.DEFINE_bool(
+    'enable_transparent_hugepages', None, 'Whether to enable or '
+    'disable transparent hugepages. If unspecified, the setting '
+    'is unchanged from the default in the OS.')
+
+flags.DEFINE_integer(
+    'ssh_retries', 10, 'Default number of times to retry SSH.', lower_bound=0)
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -135,6 +151,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
+  def _SetTransparentHugepages(self):
+    """Sets transparent hugepages based on --enable_transparent_hugepages.
+
+    If the flag is unset (None), this is a nop.
+    """
+    if FLAGS.enable_transparent_hugepages is None:
+      return
+    setting = 'always' if FLAGS.enable_transparent_hugepages else 'never'
+    self.RemoteCommand(
+        'echo %s | sudo tee /sys/kernel/mm/transparent_hugepage/enabled' %
+        setting)
+    self.os_metadata['transparent_hugepage'] = setting
+
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
 
@@ -147,7 +176,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                             os.path.basename(f)))
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None):
+  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
+                          ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     Executes a command via a pair of scripts on the VM:
@@ -165,6 +195,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       should_log: Whether to log the command's output at the info level. The
           output is always logged at the debug level.
       timeout: The timeout for the command.
+      ignore_failure: Ignore any failure if set to true.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -187,7 +218,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     stderr_file = file_base + '.stderr'
     status_file = file_base + '.status'
 
-    if not isinstance(command, basestring):
+    if not isinstance(command, six.string_types):
       command = ' '.join(command)
 
     start_command = ['nohup', 'python', execute_path,
@@ -207,12 +238,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), should_log=should_log)
+            ' '.join(wait_command), should_log=should_log, timeout=1800)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete'])
-      return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
+      return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
+                                ignore_failure=ignore_failure)
 
     try:
       return _WaitForCommand()
@@ -254,8 +286,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     pass
 
   def PrepareVMEnvironment(self):
+    super(BaseLinuxMixin, self).PrepareVMEnvironment()
     self.SetupProxy()
     self._CreateVmTmpDir()
+    self._SetTransparentHugepages()
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
@@ -272,6 +306,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._DisableCpus()
     self.RecordAdditionalMetadata()
     self.BurnCpu()
+    self.FillDisk()
 
   def SetFiles(self):
     """Apply --set_files to the VM."""
@@ -306,25 +341,48 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # of cpus for symmetry. So disable the last cpus in the range.
     # e.g.  If num_cpus = 4 and num_disable_cpus = 2,
     # then want cpus 0,1 active and 2,3 inactive.
-    for x in xrange(self.num_cpus - self.num_disable_cpus, self.num_cpus):
+    for x in range(self.num_cpus - self.num_disable_cpus, self.num_cpus):
       self.RemoteCommand('sudo bash -c '
                          '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
                          x)
 
-  def ApplySysctlPersistent(self, key, value):
-    """Apply "key=value" pair to /etc/sysctl.conf and reboot.
+  def FillDisk(self):
+    """Fills the primary scratch disk with a zeros file."""
+    if FLAGS.disk_fill_size:
+      out_file = posixpath.join(self.scratch_disks[0].mount_point, 'fill_file')
+      self.RobustRemoteCommand(
+          'dd if=/dev/zero of={out_file} bs=1G count={fill_size}'.format(
+              out_file=out_file, fill_size=FLAGS.disk_fill_size))
+
+  def _ApplySysctlPersistent(self, sysctl_params):
+    """Apply "key=value" pairs to /etc/sysctl.conf and mark the VM for reboot.
 
     The reboot ensures the values take effect and remain persistent across
     future reboots.
 
     Args:
-      key: a string - the key to write as part of the pair
-      value: a string - the value to write as part of the pair
+      sysctl_params: dict - the keys and values to write
     """
-    self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
-                       % (key, value))
+    if not sysctl_params:
+      return
+
+    for key, value in sysctl_params.items():
+      self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
+                         % (key, value))
 
     self._needs_reboot = True
+
+  def ApplySysctlPersistent(self, sysctl_params):
+    """Apply "key=value" pairs to /etc/sysctl.conf and reboot immediately.
+
+    The reboot ensures the values take effect and remain persistent across
+    future reboots.
+
+    Args:
+      sysctl_params: dict - the keys and values to write
+    """
+    self._ApplySysctlPersistent(sysctl_params)
+    self._RebootIfNecessary()
 
   def DoSysctls(self):
     """Apply --sysctl to the VM.
@@ -332,9 +390,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
        The Sysctl pairs are written persistently so that if a reboot
        occurs, the flags are not lost.
     """
+    sysctl_params = {}
     for pair in FLAGS.sysctl:
       key, value = pair.split('=')
-      self.ApplySysctlPersistent(key, value)
+      sysctl_params[key] = value
+    self._ApplySysctlPersistent(sysctl_params)
 
   def DoConfigureNetworkForBBR(self):
     """Apply --network_enable_BBR to the VM."""
@@ -350,8 +410,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if self.TcpCongestionControl() == 'bbr':
       return
 
-    self.ApplySysctlPersistent('net.core.default_qdisc', 'fq')
-    self.ApplySysctlPersistent('net.ipv4.tcp_congestion_control', 'bbr')
+    self._ApplySysctlPersistent({
+        'net.core.default_qdisc': 'fq',
+        'net.ipv4.tcp_congestion_control': 'bbr'
+    })
 
   def _RebootIfNecessary(self):
     """Will reboot the VM if self._needs_reboot has been set."""
@@ -412,10 +474,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
-    """Return the UTC time the VM was last rebooted as reported by the VM."""
-    resp, _ = self.RemoteHostCommand('uptime -s', retries=1,
-                                     suppress_warning=True)
-    return resp
+    """Returns the time the VM was last rebooted as reported by the VM.
+
+    See
+    https://unix.stackexchange.com/questions/165002/how-to-reliably-get-timestamp-at-which-the-system-booted.
+    """
+    stdout, _ = self.RemoteHostCommand(
+        'stat -c %z /proc/', retries=1, suppress_warning=True)
+    return stdout
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
@@ -455,35 +521,53 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     pass
 
   @vm_util.Retry()
-  def FormatDisk(self, device_path):
+  def FormatDisk(self, device_path, disk_type=None):
     """Formats a disk attached to the VM."""
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
+    if disk.NFS == disk_type:
+      return
+    if disk.SMB == disk_type:
+      return
     fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
                'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
-  def MountDisk(self, device_path, mount_path):
+  def MountDisk(self, device_path, mount_path, disk_type=None,
+                mount_options=disk.DEFAULT_MOUNT_OPTIONS,
+                fstab_options=disk.DEFAULT_FSTAB_OPTIONS):
     """Mounts a formatted disk in the VM."""
-    mount_opts = _DEFAULT_DISK_MOUNT_OPTIONS
-    fs_type = _DEFAULT_DISK_FS_TYPE
-    fstab_opts = _DEFAULT_DISK_FSTAB_OPTIONS
+    mount_options = '-o %s' % mount_options if mount_options else ''
+    if disk.NFS == disk_type:
+      mount_options = '-t nfs %s' % mount_options
+      fs_type = 'nfs'
+    elif disk.SMB == disk_type:
+      mount_options = '-t cifs %s' % mount_options
+      fs_type = 'smb'
+    else:
+      fs_type = _DEFAULT_DISK_FS_TYPE
+    fstab_options = fstab_options or ''
     mnt_cmd = ('sudo mkdir -p {mount_path};'
-               'sudo mount {mount_cmd_opts} {device_path} {mount_path};'
-               'sudo chown -R $USER:$USER {mount_path};').format(
+               'sudo mount {mount_options} {device_path} {mount_path} && '
+               'sudo chown $USER:$USER {mount_path};').format(
                    mount_path=mount_path,
                    device_path=device_path,
-                   mount_cmd_opts='-o %s' % mount_opts)
+                   mount_options=mount_options)
     self.RemoteHostCommand(mnt_cmd)
     # add to /etc/fstab to mount on reboot
-    mnt_cmd = ('echo "{device_path} {mount_path} {fs_type} {fstab_opts}" '
+    mnt_cmd = ('echo "{device_path} {mount_path} {fs_type} {fstab_options}" '
                '| sudo tee -a /etc/fstab').format(
                    device_path=device_path,
                    mount_path=mount_path,
                    fs_type=fs_type,
-                   fstab_opts=fstab_opts)
+                   fstab_options=fstab_options)
     self.RemoteHostCommand(mnt_cmd)
+
+  def LogVmDebugInfo(self):
+    """Logs the output of calling dmesg on the VM."""
+    if FLAGS.log_dmesg:
+      self.RemoteCommand('hostname && dmesg', should_log=True)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     self.RemoteHostCopy(file_path, remote_path, copy_to)
@@ -505,9 +589,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         file_path = file_path.split(':', 1)[1]
       # Replace the last instance of '\' with '/' to make scp happy.
       file_path = '/'.join(file_path.rsplit('\\', 1))
-
+    remote_ip = '[%s]' % self.ip_address if FLAGS.use_ipv6 else self.ip_address
     remote_location = '%s@%s:%s' % (
-        self.user_name, self.ip_address, remote_path)
+        self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     # An scp is not retried, so increase the connection timeout.
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key,
@@ -526,29 +610,46 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  def RemoteCommandWithReturnCode(self, command, should_log=False,
-                                  retries=SSH_RETRIES, ignore_failure=False,
-                                  login_shell=False, suppress_warning=False,
-                                  timeout=None):
-    return self.RemoteHostCommandWithReturnCode(
-        command, should_log, retries,
-        ignore_failure, login_shell,
-        suppress_warning, timeout)
+  def RemoteCommand(self, *args, **kwargs):
+    """Runs a command on the VM.
 
-  def RemoteCommand(self, command,
-                    should_log=False, retries=SSH_RETRIES,
-                    ignore_failure=False, login_shell=False,
-                    suppress_warning=False, timeout=None):
-    return self.RemoteCommandWithReturnCode(
-        command, should_log, retries,
-        ignore_failure, login_shell,
-        suppress_warning, timeout)[:2]
+    Args:
+      *args: Arguments passed directly to RemoteCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteCommandWithReturnCode.
 
-  def RemoteHostCommandWithReturnCode(self, command, should_log=False,
-                                      retries=SSH_RETRIES,
+    Returns:
+      A tuple of stdout, stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
+
+  def RemoteCommandWithReturnCode(self, *args, **kwargs):
+    """Runs a command on the VM.
+
+    Args:
+      *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
+
+    Returns:
+      A tuple of stdout, stderr, return_code from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
+
+  def RemoteHostCommandWithReturnCode(self,
+                                      command,
+                                      should_log=False,
+                                      retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False, timeout=None):
+                                      suppress_warning=False,
+                                      timeout=None):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -560,7 +661,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           logged at the info level. Even if it is false, the results will
           still be logged at the debug level.
       retries: The maximum number of times RemoteCommand should retry SSHing
-          when it receives a 255 return code.
+          when it receives a 255 return code. If None, it defaults to the value
+          of the flag ssh_retries.
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
@@ -573,6 +675,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
+    if retries is None:
+      retries = FLAGS.ssh_retries
     if vm_util.RunningOnWindows():
       # Multi-line commands passed to ssh won't work on Windows unless the
       # newlines are escaped.
@@ -609,26 +713,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     return (stdout, stderr, retcode)
 
-  def RemoteHostCommand(self, command, should_log=False, retries=SSH_RETRIES,
-                        ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+  def RemoteHostCommand(self, *args, **kwargs):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
     within i.e. a container in the host VM.
 
     Args:
-      command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
-      retries: The maximum number of times RemoteCommand should retry SSHing
-          when it receives a 255 return code.
-      ignore_failure: Ignore any failure if set to true.
-      login_shell: Run command in a login shell.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
-      timeout: The timeout for IssueCommand.
+      *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
 
     Returns:
       A tuple of stdout, stderr from running the command.
@@ -636,9 +730,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    return self.RemoteHostCommandWithReturnCode(
-        command, should_log, retries, ignore_failure, login_shell,
-        suppress_warning, timeout)[:2]
+    return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
 
   def _Reboot(self):
     """OS-specific implementation of reboot command."""
@@ -650,6 +742,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     This will be called after every call to Reboot().
     """
     self._CreateVmTmpDir()
+    self._SetTransparentHugepages()
 
   def MoveFile(self, target, source_path, remote_path=''):
     self.MoveHostFile(target, source_path, remote_path)
@@ -831,8 +924,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.StripeDisks(device_paths, data_disk.GetDevicePath())
 
     if disk_spec.mount_point:
-      self.FormatDisk(data_disk.GetDevicePath())
-      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
+      self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
+      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
+                     disk_spec.disk_type, data_disk.mount_options,
+                     data_disk.fstab_options)
 
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
@@ -890,11 +985,46 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     md5sum, _ = stdout.split()
     return md5sum
 
+  def _GetNfsService(self):
+    """Returns the NfsService created in the benchmark spec.
+
+    Before calling this method check that the disk.disk_type is equal to
+    disk.NFS or else an exception will be raised.
+
+    Returns:
+      The nfs_service.BaseNfsService service for this cloud.
+
+    Raises:
+      CreationError: If no NFS service was created.
+    """
+    nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
+    if nfs is None:
+      raise errors.Resource.CreationError('No NFS Service created')
+    return nfs
+
+  def _GetSmbService(self):
+    """Returns the SmbService created in the benchmark spec.
+
+    Before calling this method check that the disk.disk_type is equal to
+    disk.SMB or else an exception will be raised.
+
+    Returns:
+      The smb_service.BaseSmbService service for this cloud.
+
+    Raises:
+      CreationError: If no SMB service was created.
+    """
+    smb = getattr(context.GetThreadBenchmarkSpec(), 'smb_service')
+    if smb is None:
+      raise errors.Resource.CreationError('No SMB Service created')
+    return smb
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL
+  BASE_OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -1017,6 +1147,7 @@ class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN
+  BASE_OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
     super(DebianMixin, self).__init__(*args, **kwargs)
@@ -1178,6 +1309,11 @@ class Ubuntu1710Mixin(DebianMixin):
   OS_TYPE = os_types.UBUNTU1710
 
 
+class Ubuntu1804Mixin(DebianMixin):
+  """Class holding Ubuntu1804 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1804
+
+
 class Ubuntu1604Cuda9Mixin(DebianMixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
@@ -1243,23 +1379,12 @@ class ContainerizedDebianMixin(DebianMixin):
     self.docker_id = resp.rstrip()
     return self.docker_id
 
-  def RemoteCommand(self, command,
-                    should_log=False, retries=SSH_RETRIES,
-                    ignore_failure=False, login_shell=False,
-                    suppress_warning=False, timeout=None):
+  def RemoteCommand(self, command, **kwargs):
     """Runs a command inside the container.
 
     Args:
       command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
-      retries: The maximum number of times RemoteCommand should retry SSHing
-          when it receives a 255 return code.
-      ignore_failure: Ignore any failure if set to true.
-      login_shell: Run command in a login shell.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
+      **kwargs: Keyword arguments passed directly to RemoteHostCommand.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -1267,10 +1392,9 @@ class ContainerizedDebianMixin(DebianMixin):
     # Escapes bash sequences
     command = command.replace("'", r"'\''")
 
-    logging.info('Docker running: %s' % command)
+    logging.info('Docker running: %s', command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
-    return self.RemoteHostCommand(command, should_log, retries,
-                                  ignore_failure, login_shell, suppress_warning)
+    return self.RemoteHostCommand(command, **kwargs)
 
   def ContainerCopy(self, file_name, container_path='', copy_to=True):
     """Copies a file to or from container_path to the host's vm_util.VM_TMP_DIR.
@@ -1440,6 +1564,20 @@ class LsCpuResults(object):
       raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
                        lscpu)
 
+    match = re.search(r'Core\(s\)\ per\ socket:\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.cores_per_socket = int(match.group(1))
+    else:
+      raise ValueError('Core(s) per socket could not be found in lscpu '
+                       'value:\n%s' % lscpu)
+
+    match = re.search(r'Socket\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.socket_count = int(match.group(1))
+    else:
+      raise ValueError('Socket(s) count could not be found in lscpu '
+                       'value:\n%s' % lscpu)
+
 
 class JujuMixin(DebianMixin):
   """Class to allow running Juju-deployed workloads.
@@ -1553,8 +1691,8 @@ class JujuMixin(DebianMixin):
 
       # Accept blocked because the service may be waiting on relation
       if ss not in ['active', 'unknown']:
-          raise errors.Juju.TimeoutException(
-              'Service %s is not ready; status is %s' % (service, ss))
+        raise errors.Juju.TimeoutException(
+            'Service %s is not ready; status is %s' % (service, ss))
 
       if ss in ['error']:
         # The service has failed to deploy.
@@ -1585,7 +1723,7 @@ class JujuMixin(DebianMixin):
 
     # Find the already-deployed machines belonging to this vm_group
     machines = []
-    for machine_id, unit in self.machines.iteritems():
+    for machine_id, unit in six.iteritems(self.machines):
       if unit.vm_group == vm_group:
         machines.append(machine_id)
 

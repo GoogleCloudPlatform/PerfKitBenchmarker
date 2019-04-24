@@ -1,0 +1,5 @@
+stress-ng: info:  [2566] dispatching hogs: 2 context
+stress-ng: info:  [2566] successful run completed in 5.00s
+stress-ng: info:  [2566] stressor      bogo ops real time  usr time  sys time   bogo ops/s   bogo ops/s
+stress-ng: info:  [2566]                          (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: info:  [2566] context          22429      5.00      5.49      4.48      4485.82      2249.65

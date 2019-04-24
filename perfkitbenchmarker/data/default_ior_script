@@ -1,0 +1,30 @@
+IOR START
+api=POSIX
+filePerProc=1
+useO_DIRECT=1
+fsync=1
+keepFile=1
+
+# Sequential write test.
+writeFile=1
+blockSize=4G
+transferSize=1M
+
+RUN
+# Sequential read test.
+writeFile=0
+readFile=1
+deadlineForStonewalling=600
+
+RUN
+# Random read test.
+transferSize=4k
+randomOffset=1
+
+RUN
+# Random write test.
+writeFile=1
+readFile=0
+useExistingTestFile=1
+keepFile=0
+IOR STOP

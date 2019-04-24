@@ -21,7 +21,7 @@ import unittest
 
 import mock
 
-import object_storage_api_tests
+from perfkitbenchmarker.scripts.object_storage_api_test_scripts import object_storage_api_tests
 
 
 class TestSizeDistributionIterator(unittest.TestCase):

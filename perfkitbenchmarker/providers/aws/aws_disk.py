@@ -81,25 +81,33 @@ LOCAL_HDD_METADATA = {
     disk.REPLICATION: disk.NONE,
 }
 
-LOCAL_HDD_PREFIXES = ['d2', 'hs']
-EBS_NVME_TYPES = ['c5', 'm5']
-LOCAL_NVME_TYPES = ['i3', 'f1']
+LOCAL_HDD_PREFIXES = ['d2', 'hs1', 'h1', 'c1', 'cc2', 'm1', 'm2']
+# Following lists based on
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html
+NON_EBS_NVME_TYPES = [
+    'c4', 'd2', 'f1', 'g3', 'h1', 'i3', 'm4', 'p2', 'p3', 'r4', 't2', 'x1',
+    'x1e', 'm1', 'm3', 'c1', 'cc2', 'c3', 'm2', 'cr1', 'r3', 'hs1', 'i2', 'g2',
+    't1'
+]
+NON_LOCAL_NVME_TYPES = LOCAL_HDD_PREFIXES + [
+    'c3', 'cr1', 'g2', 'i2', 'm3', 'r3', 'x1', 'x1e']
 
 
 def LocalDiskIsHDD(machine_type):
   """Check whether the local disks use spinning magnetic storage."""
-
-  return machine_type[:2].lower() in LOCAL_HDD_PREFIXES
+  return machine_type.split('.')[0].lower() in LOCAL_HDD_PREFIXES
 
 
 def LocalDriveIsNvme(machine_type):
   """Check if the machine type uses NVMe driver."""
-  return machine_type[:2].lower() in LOCAL_NVME_TYPES
+  return machine_type.split('.')[0].lower() not in NON_LOCAL_NVME_TYPES
 
 
 def EbsDriveIsNvme(machine_type):
   """Check if the machine type uses NVMe driver."""
-  return machine_type[:2].lower() in EBS_NVME_TYPES
+  instance_family = machine_type.split('.')[0].lower()
+  return (instance_family not in NON_EBS_NVME_TYPES or
+          'metal' in machine_type)
 
 
 AWS = 'AWS'
@@ -162,7 +170,7 @@ class AwsDisk(disk.BaseDisk):
     self.attached_vm_id = None
     self.machine_type = machine_type
     if self.disk_type != disk.LOCAL:
-      self.metadata.update(DISK_METADATA[self.disk_type])
+      self.metadata.update(DISK_METADATA.get(self.disk_type, {}))
     else:
       self.metadata.update((LOCAL_HDD_METADATA
                             if LocalDiskIsHDD(machine_type)
@@ -261,10 +269,18 @@ class AwsDisk(disk.BaseDisk):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
       if LocalDriveIsNvme(self.machine_type):
-        return '/dev/nvme%sn1' % str(ord(self.device_letter) - ord('b'))
+        first_device_letter = 'b'
+        if EbsDriveIsNvme(self.machine_type):
+          # If the root drive is also NVME, assume the second drive is the
+          # local drive.
+          first_device_letter = 'a'
+        return '/dev/nvme%sn1' % str(
+            ord(self.device_letter) - ord(first_device_letter))
       return '/dev/xvd%s' % self.device_letter
     else:
       if EbsDriveIsNvme(self.machine_type):
-        return '/dev/nvme%sn1' % (1 + ord(self.device_letter) - ord('a'))
+        first_device_letter = 'a'
+        return '/dev/nvme%sn1' % (
+            1 + ord(self.device_letter) - ord(first_device_letter))
       else:
         return '/dev/xvdb%s' % self.device_letter

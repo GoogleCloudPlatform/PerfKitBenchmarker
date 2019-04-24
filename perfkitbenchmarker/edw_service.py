@@ -42,13 +42,25 @@ flags.DEFINE_string('edw_service_cluster_password', None,
 flags.DEFINE_enum('edw_query_execution_mode', 'sequential', ['sequential',
                                                              'concurrent'],
                   'The mode for executing the queries on the edw cluster.')
+flags.DEFINE_string('edw_service_resource_group', None,
+                    'Needed to manage Azure clusters.')
 
 FLAGS = flags.FLAGS
 
 
-TYPE_2_PROVIDER = dict([('redshift', 'aws')])
+TYPE_2_PROVIDER = dict([('redshift', 'aws'),
+                        ('spectrum', 'aws'),
+                        ('bigquery', 'gcp'),
+                        ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([('redshift',
-                       'perfkitbenchmarker.providers.aws.redshift')])
+                       'perfkitbenchmarker.providers.aws.redshift'),
+                      ('spectrum',
+                       'perfkitbenchmarker.providers.aws.spectrum'),
+                      ('bigquery',
+                       'perfkitbenchmarker.providers.gcp.bigquery'),
+                      ('azuresqldatawarehouse',
+                       'perfkitbenchmarker.providers.azure.'
+                       'azure_sql_data_warehouse')])
 DEFAULT_NUMBER_OF_NODES = 2
 
 
@@ -95,12 +107,27 @@ class EdwService(resource.BaseResource):
     # resource workflow management
     self.supports_wait_on_delete = True
 
-
   def GetMetadata(self):
     """Return a dictionary of the metadata for this edw service."""
     basic_data = {'edw_service_type': self.spec.type,
                   'edw_cluster_identifier': self.cluster_identifier,
                   'edw_cluster_node_type': self.node_type,
-                  'edw_cluster_node_count': self.node_count
-                  }
+                  'edw_cluster_node_count': self.node_count}
     return basic_data
+
+  def RunCommandHelper(self):
+    """Returns EDW instance specific launch command components.
+
+    Returns:
+      A string with additional command components needed when invoking script
+      runner.
+    """
+    raise NotImplementedError
+
+  def InstallAndAuthenticateRunner(self, vm):
+    """Method to perform installation and authentication of runner utilities.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    raise NotImplementedError

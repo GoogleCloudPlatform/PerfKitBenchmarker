@@ -13,14 +13,25 @@
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
+- Updated GCP sole tenancy support.  Removed `gcp_host_type` added
+  `gcp_node_type`.
+- Fixed missing installation directory in gpu_pcie_bandwidth benchmark.
+- Removed duplicated metrics from the HPCC benchmark. Metrics now use the name
+  from the summary section of the benchmark-produced output.
+- Benchmarks are expected to not modify FLAGS in any way. If FLAGS are modified
+  and multiple run configurations are run in a single PKB invocation, benchmark
+  configurations may be incorrect.
+- Changed TF Serving benchmark to use ResNet instead of Inception.
+- Renamed prepare_sleep_time flag to after_prepare_sleep_time.
 
 ### New features:
-- Windows benchmarks can now be run from linux controllers
-- MXNet benchmarks can now be run from linux controllers
+- Windows benchmarks can now be run from linux controllers.
+- MXNet benchmarks can now be run from linux controllers.
 - Added initial support for preprovisioning benchmark binaries in the cloud,
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
   Redis Cache in Azure.
+- YCSB benchmark for DynamoDB in AWS.
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
   called a specified number of times
 - Added cuda_toolkit_version flag
@@ -46,6 +57,53 @@
 - Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
   Tensorflow benchmark, through the `benchmark_args` flag.
 - Added hdrhistogram support to ycsb package.
+- Added support for custom machine types on GKE.
+- Added `container_cluster_version` flag to container_service.py.
+- AWS EFS support via "disk_type: nfs"
+- Added --disk_fill_size and --after_prepare_sleep_time flags
+- Add timeout_minutes flag to assist with cleaning up stale resources
+- All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
+- Added windows udp test using iperf3.
+- Added timeout-decorator python package.
+- Added timeout support for windows vm remote command call.
+- Added IOR benchmark.
+- Added mdtest to IOR benchmark.
+- Added Elastic Container Service (EKS) as a container cluster type.
+- Added ResNet benchmark.
+- Added support for ACI (Azure Container Instances).
+- Added spec cpu 2017 and feedback optimization for peak runs.
+- Added glibc benchmark.
+- Added lmbench benchmark.
+- Added support to `--disable_interrupt_moderation` for Windows VMs on AWS.
+- Added support to `--disable_rss` for Windows VMs on GCP.
+- Added act benchmark.
+- Added `--gce_tags` flag to add --tags when launching VMs on GCP.
+- Added PKB support to publish samples immediately.
+- Adding benchmarking of Memcached on cloud VMs using memtier benchmark.
+- Adding support for different client/server machine types on memcached-memtier.
+- Adding functionality in memtier benchmark to run a variable number of threads
+  counts in each run.
+- Adding support for AWS ARM machine types.
+- Adding support for AWS ARM machines on SPECCPU.
+- Added Horovod distributed Tensorflow traning benchmark.
+- Added support for capacity reservations for VMs and added AWS implementation.
+- Added support for adding additional flags to mount and /etc/fstab.
+- Added support for Windows2012, 2016, and 2019 for GCP.
+- Terasort implementation on dpb backend.
+- Added cluster boot benchmark implementation on dpb backend.
+- Support multiple redis versions in cloud redis.
+- Azure Files support via "disk_type: smb"
+- Added MLPerf benchmark.
+- Added stress-ng benchmark.
+- Added flag --after_run_sleep_time which instructs PKB to sleep for the number
+  of seconds specified after the run stage has completed.
+- Added P5 cache type for Azure managed redis.
+- Added AWS elasticache Memcached provider.
+- Added additional options to the stress-ng benchmark.
+- Added support for launching GCE VMs into the standard network tier.
+- Added a demo under tools/.
+- Added Nginx benchmark.
+- Added support for measuring VM reboot time to the cluster boot benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -64,12 +122,12 @@
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
 - Add `os_type` support to KubernetesVirtualMachine.
-- Avoid setting up thread pool etc when run_processes is set
-  to 1 and using --run_with_pdb flag to simplify debugging.
+- Avoid setting up thread pool etc when run_processes is not set (to simplify
+  debugging).
 - Added a sample benchmark for descriptive purposes.
 - Added GPU peer to peer topology information to metadata.
-- Added a flag, `hpcg_run_as_root` which allows OpenMPI to run HPCG in the case
-  that the user is root.
+- Added a flag, `mpirun_allow_run_as_root` which allows OpenMPI to run in the
+  case that the user is root.
 - Modified KubernetesVirtualMachine to ensure that ssh is installed on the
   container.
 - Added `container_cluster_num_vms` flag.
@@ -81,7 +139,7 @@
 - Added `copy_benchmark_single_file_mb` flag for single file support.
 - Record guest system information.
 - Support for static edw clusters.
-- Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
+- Add more granularity to FAILED benchmarks with FailedSubstatus (AWS, Azure, GCP).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
 - Update configurable parameters for ycsb benchmarks.
@@ -94,8 +152,9 @@
 - Added `time_commands` flag to enable diagnostic timing of commands
 - Added image processing speed in mnist.
 - Updated cloud TPU model link.
-- Updated AWS spot instance creation and added
-  spot instance failure metadata support.
+- Updated AWS spot instance creation.
+- Added support for extending the failure sample with metadata if AWS spot VMs
+  or GCP preemptible VMs are interrupted.
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
@@ -104,6 +163,122 @@
 - Added `num_cpus` to virtual_machine published metadata.
 - Added a timeout to RobustRemoteCommand.
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
+- Preliminary support for NFS file systems
+- Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+- Added support for authorizing gcloud to access Cloud Platform with a Google service account.
+- Added support for specification of resource specific ready timeouts.
+- Adding runner utilities to execute multiple sql scripts on edw clusters.
+- TPU checkpoints and summaries are now stored in GCS.
+- Updated cloud TPU models version.
+- Support for cloud NFS services (no implementation).
+- Added support for default batch sizes given a certain GPU type and model in
+  the Tensorflow benchmark.
+- Added method to get the NfsService from the linux_virtual_machine.
+- Added support for fio job files in the data directory.
+- Added InvalidConfigurationError.
+- Added owner tag in metadata.
+- Added support for NVIDIA P4 GPUs.
+- Added YCSB timeseries parsing.
+- Added Intel MKL to HPCC benchmark.
+- Added flag support for enabling or disabling transparent hugepages on Linux
+  VMs.
+- Add AWS MySql Aurora support
+- Abandon beta in TPU commands.
+- Update ycsb hdr histograms to output {bucket:count} data set for latencies, removing percentile:latency_value data set.
+- Added GPU test for ResNet benchmark.
+- Update ResNet testcases.
+- Remove unused lib in ResNet benchmark.
+- Added way to run several specsfs benchmarks in a single PKB run.
+- Add `--preemptible` in TPU creation command.
+- Add `--skip_host_call` in ResNet benchmark.
+- Update ResNet benchmark test for TensorFlow 1.9.
+- Removed the flag resnet_num_cores from the resnet benchmark and added the flag tpu_num_shards to MNIST, resnet, and inception3.
+- Update MNIST benchmark source path.
+- Replace old flags `--tpu_name` and `--master` with a new flag, `--tpu`.
+- Added support for EFS provisioned throughput.
+- Added support for `--os_type` ubuntu1804. Removed ubuntu1710 for GCP.
+- Added flag `--iperf3_set_tcp_window_size` to let the user avoid setting the
+  TCP Window size in Iperf3 Windows performance tests.
+- Added flags `--hbase_version` and `--hbase_use_stable` to set the HBase
+  version.  Also upped hadoop to version 2.8.4.
+- Updated cuDNN installation methods.
+- Added support to schedule multiple TPUs.
+- Added GroupZonesIntoRegions support for providers.aws.util.
+- Added function to get the number of TPU cores.
+- Update spec17 copies per run to respect system available memory.
+- Add tensor2tensor benchmark.
+- Change train_steps to train_epochs in TPU test.
+- Add default tags like timeout_utc to GCE.
+- Add validation to all the TPU tests.
+- Add number of Train/Eval TPU shards in metadata.
+- The spark service resource supports a new flag (spark_service_log_level), to control the log level and generated output.
+- Updated openjdk 8 installation to support newer ycsb versions (after 0.13.0);
+  Improved hdrhistogram result reporting in ycsb.py.
+- Added flag `--ntttcp_udp` to allow the user to run UDP tests with ntttcp.
+- Added flag `--ntttcp_packet_size` to allow user to set the packet size in
+  ntttcp tests.
+- Extract more data from the ntttcp results file and put into the metadata of
+  the samples.
+- Updated the default of Cloud Bigtable client version to 1.4.0. Added
+  `--hbase_bin_url` to allow bypassing GetHBaseURL().
+- Remove flag tf_benchmarks_commit_hash, and add tf_cnn_benchmarks_branch.
+  Branch cnn_tf_vX.Y_compatible is compatible with TensorFlow version X.Y.
+- Added flags `--ntttcp_sender_rb`, `--ntttcp_sender_sb`,
+  `--ntttcp_receiver_rb`, `--ntttcp_receiver_sb` to control the socket buffer
+  sizes in ntttcp tests.
+- Move the ycsb_operation_count default from being set in the flag to being set in the workload file.
+- Introducing a new flag gcp_dataproc_subnet which allows a user to specify the subnet that a dataproc cluster will be part of.
+- Added support for running a subset of HPCC benchmarks.
+- Introducing a new multi string flag 'gcp_dataproc_property' which allows a user to modify many common configuration files when creating a Dataproc cluster.
+- Added configuration support for specifying type of the boot disk for a Dataproc cluster.
+- Added AddTag method to AzureResourceGroup.
+- Added some support for IPv6 (on static machines).
+- Added retransmit count to netperf metadata.
+- Added a common base class to PKB, PkbCommonTestCase,
+  which uses absl.testing.flagsaver to save and restore
+  flag values on test setUp / tearDown.
+- Remove all usage of mock_flags and replace with PkbCommonTestCase.
+- Upgraded memtier benchmark to version 1.2.15.
+- Add precision flag in Inception3 benchmark.
+- Support Hadoop 3.x.x in hadoop_terasort
+- Add z1 support for NVME disks.
+- Add default tags to dataproc.
+- Adding default run configurations for spec17 when none
+  of os_type, runspec_config or is_partial_results flags is set.
+- Add a flag to control the number of worker threads used by the
+  memcached server
+- Add default tags to GKE.
+- Add support for using real data from GCS and add support to download GCS data
+  to vm in the Tensorflow benchmark.
+- Added flag `nttcp_config_list` to allow the user to supply a list of test
+  configurations, all to be run in a single run phase.
+- Add support for `--nouse_pkb_logging` to use standard ABSL logging instead.
+- Improved support for booting more than 200 VMs with the cluster_boot benchmark.
+- Adding version support to redis server and setting permissions for newer redis versions.
+- Introduced app service metadata to indicate backend concurrency.
+- Added `--ssh_reuse_connections` to reuse SSH connections which speeds up benchmarks with lots of short commands.
+- Add abstract PreDelete method to the base resource class.
+- Add ability for linux vms to print the dmesg command before termination
+  using the flag '--log_dmesg'.
+- TPU and its GCS bucket should be in the same region.
+- Adding field count and field length flag overrides to ycsb load.
+- Added `--ssh_server_alive_interval` and `ssh_server_alive_count_max` to adjust SSH server alive options.
+- Support for cloud SMB services (no implementation).
+- Added rwmixread option to fio scenarios. This option is ignored unless a split
+  read/write workload is specified.
+- Added gce_local_ssd_count and gce_local_ssd_interface metadata to
+  GceVirtualMachine.
+- Added option to use real training data to the Horovod benchmark.
+- Added support to record individual latency samples in the object_storage_service
+  benchmark using the flag --record_individual_latency_samples.
+- Added `--ssh_retries` to adjust the number of times we retry for errors with a
+  255 error code.
+- Added `--num_benchmark_copies` which controls the number of copies of each
+  configuration to run.
+- Added `--zone multistring` flag as an additional way to specify zones. It can be
+  used in conjunction with the `--zones` flag.
+- Added `--before_cleanup_pause` to ease debugging.
+- Added support for CUDA 10.1.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -176,3 +351,101 @@
   ycsb_record_count is not set.
 - Fixed treatment of the boot time metric so that it is more like any other run
   stage metric.
+- Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
+- Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Fix Kubernetes StorageClass deletion
+- Added `git` installation to `tensorflow_serving` package.
+- MountDisk throws exception if mounting the disk fails.
+- Added support for preprovisioned benchmark data on KubernetesVirtualMachines.
+- Refactored speccpu2006 benchmark to use common elements for both
+  speccpu2006 and speccpu2017.
+- Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
+- Cleanup some redundant logging and duplicate decoder statements.
+- Fixed build_tools package re-installation for speccpu2006.
+- Fixed fio job parsing, section parameters should always overrides global
+  job parameters.
+- Refactored StaticVirtualMachines to use GetResourceClass() pattern.
+- Fixing the Redshift provider implementation to extend the edw benchmarking in pkb.
+- Support using --gcp_min_cpu_platform=none to clear --min-cpu-platform. This
+  lets the flag override a benchmark spec.
+- Fix windows security protocol casting.
+- Added '--iteration' to MNIST benchmark. The default value of 50 is too small
+  and can result in excessive communication overhead which negatively impacts
+  performance.
+- Added support for more AWS regions in the object storage benchmark.
+- Add ability to skip known failing scripts when running edw profiles.
+- Set the control port and data port for nuttcp benchmark.
+- Fix overwriting of bandwidth variable in nuttcp benchmark.
+- Fixed fio histogram parsing.
+- Refactored AwsKeyFileManager out of AwsVirtualMachine.
+- Added delay between server and client initiation to windows benchmarks.
+- Defaulted static machines to linux based.
+- Add time limit to windows fio benchmark.
+- Adding -w buffer parameter to windows iperf3 benchmark.
+- Fixed a bug in how we select images on AWS by introducing an additional
+  regular expression to match against image names.
+- Terminate long running servers on windows benchmarks with timeouts.
+- Updated azure_cli package to match installation instructions.
+- Fix helpmatch for intergerlist.
+- Fix PSPing benchmark so that it runs on AWS and Azure.
+- Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
+- Moved from ACS to AKS for Azure Kubernetes clusters.
+- Cleanup and fix Beam benchmark.
+- Sysbench failover tests added for GCP and AWS Aurora
+- Sysbench qps metric added
+- Fixed a bug of checking TPU exist.
+- Add GetMasterGrpcAddress method to CloudTpu.
+- Fix a bug of getting the number of TPU cores.
+- Set number of images in ResNet benchmark command so it can support other datasets.
+- Sysbench supports benchmarking MySQL 5.6
+- Update memcached server to install from a pre-built package provided by the operating system.
+- TensorFlow Serving benchmark now runs off master branch with optimized binaries
+- Updated HPCC benchmark to version 1.5.0.
+- Psping benchmark no longer report histogram for every sample metadata.
+- Specifies the number of threads to use in MXNet CPU test.
+- Fixed the way several unittests are using flags and mock_flags.
+- Fixed linter issues in several unittests.
+- Add python_pip_package_version as a class attribute of
+  BaseVirtualMachine. Children classes that have the problem of
+  https://github.com/pypa/pip/issues/5247 can use an older pip package.
+- Update AWS Aurora Postgres default version from 9.6.2 to 9.6.8
+- Update speccpu17 to write profiles in different files for each benchmark.
+- Avoid installing unnecessary MySQL server for sysbench when client tools suffice.
+- Added support for running the object service benchmark with a GCP service
+  account.
+- Add missing if __name__ == '__main__' stanza to some unittests, and fix those
+  that were broken.
+- Consolidate FlagDictSubstitution and FlagsDecoder into a simpler context manager,
+  OverrideFlags, which does not abuse the internals of FlagValues.
+- Changed GkeCluster so that it adds PKB metadata to all VMs that it creates.
+- Upgraded OpenMPI from 1.6.5 to 3.1.2.
+- Upgraded OpenBLAS from 0.2.15 to 0.3.3.
+- Add flag to control database machine type for managed relational databases.
+- Ensure randomly generated windows passwords start with a character.
+- Upgrade Tensorflow version to 1.12.
+- Install NCCL when installing Tensorflow with GPU support.
+- Update AzureBlobStorageService to persist for max of `--timeout_minutes` and `--persistent_timeout_minutes`.
+- Update S3Service to persist for max of `--timeout_minutes` and `--persistent_timeout_minutes`.
+- Add --project flag to GoogleCloudStorageService MakeBucket command.
+- Fix virtual_machine.GetResourceMetadata() so that it does not try to gather
+  metadata from a VM that has not been provisioned yet.
+- TPU Pod doesn't support eval. Stop Evaluation in train phrase in MNIST benchmark.
+- Global steps was set incorrectly in Inception3 benchmark.
+- Add AWS T3 instances to list of non-placement group capable machine types.
+- Refactor managed redis resource base class into managed memory store resource base class
+- Remove flag tpu_zone because VM and TPU should be in the same zone.
+- Refactoring managed_memorystore to add GetIp, GetPort and GetPassword class methods for managed_memorystore base class.
+- Run individual stressors in stress-ng one by one.
+- Upgrade gcp cloud redis to use prod gcloud.
+- Upgrade glibc_benchmark's version of glibc to 2.29.
+- Add number of disks for AWS i3.metal instance to configuration
+- Fix bug in Azure disk letter assignment when attaching more than 24 disks.
+- Incremental fixes to support Python3.
+- Fix bug in Azure Windows VM names for long run URIs where the name could be
+  longer than 15 characters.
+- Update aws dynamodb_ycsb_benchmark to use aws credentials from the runner vm.
+- Reboot immediately during call to ApplySysCtlPersient.
+- Set lower tcp keepalive thresholds on netperf vms.
+- Introduced NumCpusForBenchmark() which should be used instead of num_cpus for benchmark configuration.
+- Use stat -c %z /proc/ instead of uptime -s to find a boot timestamp since it
+  is more universal.

@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,13 +19,18 @@ import json
 import unittest
 import contextlib2
 import mock
+from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
-from tests import mock_flags
+from tests import pkb_common_test_case
+from six.moves import builtins
+
+FLAGS = flgs.FLAGS
+FLAGS.kubernetes_anti_affinity = False
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake_run_uri'
@@ -41,10 +46,11 @@ _EXPECTED_CALL_BODY_WITHOUT_GPUS = """
         "volumes": [],
         "containers": [{
             "name": "fake_name",
+            "workingDir": "/root",
             "volumeMounts": [],
             "image": "test_image",
             "securityContext": {
-                "privileged": null
+                "privileged": true
             }
         }]
     },
@@ -68,9 +74,10 @@ _EXPECTED_CALL_BODY_WITH_2_GPUS = """
         "containers": [{
             "name": "fake_name",
             "volumeMounts": [],
+            "workingDir": "/root",
             "image": "test_image",
             "securityContext": {
-                "privileged": null
+                "privileged": true
             },
             "resources" : {
               "limits": {
@@ -102,9 +109,10 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
         "containers": [{
             "name": "fake_name",
             "volumeMounts": [],
+            "workingDir": "/root",
             "image": "nvidia/cuda:9.0-devel-ubuntu16.04",
             "securityContext": {
-                "privileged": null
+                "privileged": true
             },
             "command": [
               "bash",
@@ -142,18 +150,16 @@ def get_write_mock_from_temp_file_mock(temp_file_mock):
 
 
 @contextlib2.contextmanager
-def patch_critical_objects(stdout='', stderr='', return_code=0):
+def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
   with contextlib2.ExitStack() as stack:
     retval = (stdout, stderr, return_code)
 
-    mflags = mock_flags.MockFlags()
-    mflags.gcloud_path = 'gcloud'
-    mflags.run_uri = _RUN_URI
-    mflags.kubectl = _KUBECTL
-    mflags.kubeconfig = _KUBECONFIG
+    flags.gcloud_path = 'gcloud'
+    flags.run_uri = _RUN_URI
+    flags.kubectl = _KUBECTL
+    flags.kubeconfig = _KUBECONFIG
 
-    stack.enter_context(mock_flags.PatchFlags(mflags))
-    stack.enter_context(mock.patch('__builtin__.open'))
+    stack.enter_context(mock.patch(builtins.__name__ + '.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
 
     # Save and return the temp_file mock here so that we can access the write()
@@ -169,7 +175,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0):
     yield issue_command, temp_file
 
 
-class BaseKubernetesVirtualMachineTestCase(unittest.TestCase):
+class BaseKubernetesVirtualMachineTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def assertJsonEqual(self, str1, str2):
     json1 = json.loads(str1)
@@ -338,6 +345,42 @@ class KubernetesVirtualMachineTestCase(
           _EXPECTED_CALL_BODY_WITHOUT_GPUS
       )
 
+  def testDownloadPreprovisionedDataAws(self):
+    spec = self.create_virtual_machine_spec()
+    FLAGS.container_cluster_cloud = 'AWS'
+    with patch_critical_objects(flags=FLAGS) as (issue_command, _):
+      kub_vm = (
+          kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
+      kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
+
+      command = issue_command.call_args[0][0]
+      command_string = ' '.join(command)
+      self.assertIn('s3', command_string)
+
+  def testDownloadPreprovisionedDataAzure(self):
+    spec = self.create_virtual_machine_spec()
+    FLAGS.container_cluster_cloud = 'Azure'
+    with patch_critical_objects() as (issue_command, _):
+      kub_vm = (
+          kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
+      kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
+
+      command = issue_command.call_args[0][0]
+      command_string = ' '.join(command)
+      self.assertIn('az storage blob download', command_string)
+
+  def testDownloadPreprovisionedDataGcp(self):
+    spec = self.create_virtual_machine_spec()
+    FLAGS.container_cluster_cloud = 'GCP'
+    with patch_critical_objects() as (issue_command, _):
+      kub_vm = (
+          kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
+      kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
+
+      command = issue_command.call_args[0][0]
+      command_string = ' '.join(command)
+      self.assertIn('gsutil', command_string)
+
 
 class KubernetesVirtualMachineWithGpusTestCase(
     BaseKubernetesVirtualMachineTestCase):
@@ -417,3 +460,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
           write_mock.call_args[0][0],
           _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE
       )
+
+
+if __name__ == '__main__':
+  unittest.main()

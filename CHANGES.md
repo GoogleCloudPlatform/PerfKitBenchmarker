@@ -231,7 +231,7 @@ Bugfixes and maintenance updates:
 
 # 1.8.1
 
-Bugfixes and maintanence updates:
+Bugfixes and maintenance updates:
 - Fixed default machine type for Azure (GH-1161)
 
 # 1.8.0
@@ -267,7 +267,7 @@ Enhancements:
 - Add top level flags key to configs (GH-1125)
 - Precise resource usage for YCSB benchmarks (GH-1127)
 
-Bugfixes and maintanence updates:
+Bugfixes and maintenance updates:
 - Fix bugs with Terasort (GH-1136)
 - Don't run container commands as sudo with ContainerizedDebianMixin (GH-1130)
 - Automatically use amazon linux if os_type is rhel (GH-1124)
@@ -275,7 +275,7 @@ Bugfixes and maintanence updates:
 - Allow flag_util.ParseKeyValuePairs values to have colons in them (GH-1117)
 - Add ycsb to data directory (GH-1116)
 - Fix bug in mongodb_ycsb_benchmark cleanup (GH-1115)
-- Fix bug where static VM disk specs were overriden (GH-1105)
+- Fix bug where static VM disk specs were overridden (GH-1105)
 - Use string formatting instead of addition to concatenate (GH-1103)
 - Fixed regression with fio flag (GH-1097)
 - Fix flags in static vm files (GH-1093)
@@ -320,7 +320,7 @@ Bugfixes and maintenance updates:
 * Fix in documentation of ParseTimeCommandResult (thanks @skorgu, GH-1079)
 * Replace Pandas dependency with Numpy (GH-1081)
 * Turn off OpenBlas threading, improving HPCC on large vms (GH-1084)
-* Cleanup object_storage_serivce benchmark (GH-1085)
+* Cleanup object_storage_service benchmark (GH-1085)
 * Cleanup aerospike_ycsb benchmarks (GH-1086)
 
 # 1.6.0
@@ -407,7 +407,7 @@ Bugfixes and maintenance updates:
 New features:
 
 * openstack: Add support for optional floating ip pool (thanks @meteorfox, GH-861)
-* openstack: Use Keystone session for handling authentication (thanks @meteorfox, GH-870) 
+* openstack: Use Keystone session for handling authentication (thanks @meteorfox, GH-870)
 * Support object storage classes in object storage service benchmarks (GH-895)
 * Add Object Size Distributions in object storage service benchmarks (GH-888)
 * Add MultiStreamThroughput benchmark to object storage benchmarks (GH-840)

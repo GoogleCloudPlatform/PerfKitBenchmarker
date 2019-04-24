@@ -31,13 +31,16 @@ import datetime
 import posixpath
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import hadoop
 
 flags.DEFINE_string('spark_static_cluster_id', None,
                     'If set, the name of the Spark cluster, assumed to be '
                     'ready.')
+flags.DEFINE_enum('spark_service_log_level', 'INFO', ['DEBUG', 'INFO', 'FATAL'],
+                  'Supported log levels when submitting jobs to spark service'
+                  ' clusters.')
 
 
 # Cloud to use for pkb-created Spark service.
@@ -49,6 +52,7 @@ RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
 SPARK_JOB_TYPE = 'spark'
+PYSPARK_JOB_TYPE = 'pyspark'
 HADOOP_JOB_TYPE = 'hadoop'
 
 SPARK_VM_GROUPS = ('master_group', 'worker_group')
@@ -96,7 +100,9 @@ class BaseSparkService(resource.BaseResource):
     self.zone = spark_service_spec.master_group.vm_spec.zone
 
   @abc.abstractmethod
-  def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
+  def SubmitJob(self, job_jar, class_name,
+                job_script=None,
+                job_poll_interval=None,
                 job_stdout_file=None, job_arguments=None,
                 job_type=SPARK_JOB_TYPE):
     """Submit a job to the spark service.
@@ -106,6 +112,7 @@ class BaseSparkService(resource.BaseResource):
     Args:
       job_jar: Jar file to execute.
       class_name: Name of the main class.
+      job_script: PySpark script to run. job_jar and class_name must be None.
       job_poll_interval: integer saying how often to poll for job
         completion.  Not used by providers for which submit job is a
         synchronous operation.
@@ -120,6 +127,26 @@ class BaseSparkService(resource.BaseResource):
       false otherwise.  The dictionary may also contain an entry for
       running_time and pending_time if the platform reports those
       metrics.
+    """
+    pass
+
+  @abc.abstractmethod
+  def ExecuteOnMaster(self, script_path, script_args):
+    """Execute a script on the master node.
+
+    Args:
+      script_path: local path of the script to execute.
+      script_args: arguments to pass to the script.
+    """
+    pass
+
+  @abc.abstractmethod
+  def CopyFromMaster(self, remote_path, local_path):
+    """Copy a file from the master node.
+
+    Args:
+      remote_path: path of the file to copy.
+      local_path: destination to copy to.
     """
     pass
 
@@ -207,6 +234,12 @@ class PkbSparkService(BaseSparkService):
     if job_type == HADOOP_JOB_TYPE:
       return posixpath.join(
           hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
-          'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
+          'hadoop-mapreduce-examples-{0}.jar'.format(FLAGS.hadoop_version))
     else:
       raise NotImplemented()
+
+  def ExecuteOnMaster(self, script_path, script_args):
+    pass
+
+  def CopyFromMaster(self, remote_path, local_path):
+    pass

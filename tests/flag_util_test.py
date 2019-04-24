@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
 
 """Tests for flag_util.py."""
 
-import copy
 import sys
 import unittest
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 
 
 class TestIntegerList(unittest.TestCase):
+
   def testSimpleLength(self):
     il = flag_util.IntegerList([1, 2, 3])
     self.assertEqual(len(il), 3)
@@ -86,6 +86,7 @@ class TestIntegerList(unittest.TestCase):
 
 
 class TestParseIntegerList(unittest.TestCase):
+
   def setUp(self):
     self.ilp = flag_util.IntegerListParser()
 
@@ -122,6 +123,10 @@ class TestParseIntegerList(unittest.TestCase):
                      [3, 4, 5, 8, 10, 12, 14])
     self.assertEqual(list(self.ilp.parse('3:5,8,10:15:2')),
                      [3, 4, 5, 8, 10, 12, 14])
+
+  def testIncreasingIntegerLists(self):
+    self.assertEqual(list(self.ilp.parse('1-5-2,6-8')),
+                     [1, 3, 5, 6, 7, 8])
 
   def testAnyNegativeValueRequiresNewFormat(self):
     for str_range in ('-1-5', '3--5', '3-1--1'):
@@ -195,8 +200,17 @@ class TestParseIntegerList(unittest.TestCase):
     with self.assertRaises(ValueError):
       ilp.parse('3:1:-2')
 
+  def testIntegerListsWhichAreNotIncreasing(self):
+    ilp = flag_util.IntegerListParser(
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+    with self.assertRaises(ValueError) as cm:
+      ilp.parse('1-5,3-7')
+    self.assertEqual('Integer list 1-5,3-7 is not increasing',
+                     str(cm.exception))
+
 
 class TestIntegerListSerializer(unittest.TestCase):
+
   def testSerialize(self):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5), 9])
@@ -242,7 +256,7 @@ class TestIntegerListSerializer(unittest.TestCase):
                      '1,2-5-2,9')
 
 
-class FlagDictSubstitutionTestCase(unittest.TestCase):
+class OverrideFlagsTestCase(unittest.TestCase):
 
   def assertFlagState(self, flag_values, value, present):
     self.assertEqual(flag_values.test_flag, value)
@@ -253,26 +267,32 @@ class FlagDictSubstitutionTestCase(unittest.TestCase):
     flag_values = flags.FlagValues()
     flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
     flag_values([sys.argv[0]])
-    flag_values_copy = copy.deepcopy(flag_values)
-    flag_values_copy.test_flag = 1
+    flag_values_overrides = {}
+    flag_values_overrides['test_flag'] = 1
     self.assertFlagState(flag_values, 0, False)
-    self.assertFlagState(flag_values_copy, 1, False)
-    if hasattr(flag_values_copy, '_flags'):
-      flag_dict_func = flag_values_copy._flags
-    else:
-      flag_dict_func = flag_values_copy.FlagDict
-    with flag_util.FlagDictSubstitution(flag_values, flag_dict_func):
-      self.assertFlagState(flag_values, 1, False)
-      self.assertFlagState(flag_values_copy, 1, False)
-      flag_values.test_flag = 2
-      flag_values['test_flag'].present += 1
-      self.assertFlagState(flag_values, 2, True)
-      self.assertFlagState(flag_values_copy, 2, True)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
+    with flag_util.OverrideFlags(flag_values, flag_values_overrides):
+      self.assertFlagState(flag_values, 1, True)
+      self.assertEqual(flag_values_overrides['test_flag'], 1)
     self.assertFlagState(flag_values, 0, False)
-    self.assertFlagState(flag_values_copy, 2, True)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
     flag_values.test_flag = 3
     self.assertFlagState(flag_values, 3, False)
-    self.assertFlagState(flag_values_copy, 2, True)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
+
+  def testFlagChangesAreNotReflectedInConfigDict(self):
+    flag_values = flags.FlagValues()
+    flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
+    flag_values([sys.argv[0]])
+    flag_values_overrides = {}
+    flag_values_overrides['test_flag'] = 1
+    self.assertFlagState(flag_values, 0, False)
+    self.assertEqual(flag_values_overrides['test_flag'], 1)
+    with flag_util.OverrideFlags(flag_values, flag_values_overrides):
+      self.assertFlagState(flag_values, 1, True)
+      flag_values.test_flag = 2
+      self.assertFlagState(flag_values, 2, True)
+      self.assertEqual(flag_values_overrides['test_flag'], 1)
 
 
 class TestUnitsParser(unittest.TestCase):
@@ -328,13 +348,15 @@ class TestUnitsParser(unittest.TestCase):
 
 
 class TestStringToBytes(unittest.TestCase):
+
   def testValidString(self):
     self.assertEqual(flag_util.StringToBytes('100KB'),
                      100000)
 
   def testUnparseableString(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       flag_util.StringToBytes('asdf')
+    self.assertEqual("Couldn't parse size asdf", str(cm.exception))
 
   def testBadUnits(self):
     with self.assertRaises(ValueError):
@@ -350,9 +372,10 @@ class TestStringToBytes(unittest.TestCase):
 
 
 class TestStringToRawPct(unittest.TestCase):
+
   def testValidPct(self):
-    self.assertEquals(flag_util.StringToRawPercent('50.5%'),
-                      50.5)
+    self.assertEqual(flag_util.StringToRawPercent('50.5%'),
+                     50.5)
 
   def testNullString(self):
     with self.assertRaises(ValueError):
@@ -389,11 +412,13 @@ class TestYAMLParser(unittest.TestCase):
                      [1, 2, 3])
 
   def testBadYAML(self):
-    with self.assertRaises(ValueError):
+    with self.assertRaises(ValueError) as cm:
       self.parser.parse('{a')
+    self.assertIn("Couldn't parse YAML string '{a': ", str(cm.exception))
 
 
 class MockFlag():
+
   def __init__(self, name, value, present):
     self.name = name
     self.value = value

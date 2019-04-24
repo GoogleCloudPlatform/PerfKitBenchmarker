@@ -84,6 +84,31 @@ flags.DEFINE_boolean('simulate_maintenance', False,
 flags.DEFINE_integer('simulate_maintenance_delay', 0,
                      'The number of seconds to wait to start simulating '
                      'maintenance.')
+flags.DEFINE_boolean('ssh_reuse_connections', True,
+                     'Whether to reuse SSH connections rather than '
+                     'reestablishing a connection for each remote command.')
+flags.DEFINE_string('ssh_control_path', None,
+                    'Overrides the default ControlPath setting for ssh '
+                    'connections if --ssh_reuse_connections is set. This can '
+                    'be helpful on systems whose default temporary directory '
+                    'path is too long (sockets have a max path length) or a '
+                    'version of ssh that doesn\'t support the %C token. See '
+                    'ssh documentation on the ControlPath setting for more '
+                    'detailed information.')
+flags.DEFINE_string('ssh_control_persist', '30m',
+                    'Setting applied to ssh connections if '
+                    '--ssh_reuse_connections is set. Sets how long the '
+                    'connections persist before they are removed. '
+                    'See ssh documentation about the ControlPersist setting '
+                    'for more detailed information.')
+flags.DEFINE_integer('ssh_server_alive_interval', 30,
+                     'Value for ssh -o ServerAliveInterval. Use with '
+                     '--ssh_server_alive_count_max to configure how long to '
+                     'wait for unresponsive servers.')
+flags.DEFINE_integer('ssh_server_alive_count_max', 10,
+                     'Value for ssh -o ServerAliveCountMax. Use with '
+                     '--ssh_server_alive_interval to configure how long to '
+                     'wait for unresponsive servers.')
 
 
 class IpAddressSubset(object):
@@ -159,7 +184,8 @@ def SSHKeyGen():
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       stdin=subprocess.PIPE)
-    create_process.communicate(input='\n' * 7)
+    input_bytes = ('\n' * 7).encode('utf8')
+    create_process.communicate(input=input_bytes)
 
 
 def GetPrivateKeyPath():
@@ -185,10 +211,20 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
       '-o', 'PasswordAuthentication=no',
       '-o', 'ConnectTimeout=%d' % connect_timeout,
       '-o', 'GSSAPIAuthentication=no',
-      '-o', 'ServerAliveInterval=30',
-      '-o', 'ServerAliveCountMax=10',
+      '-o', 'ServerAliveInterval=%d' % FLAGS.ssh_server_alive_interval,
+      '-o', 'ServerAliveCountMax=%d' % FLAGS.ssh_server_alive_count_max,
       '-i', ssh_key_filename
   ]
+  if FLAGS.use_ipv6:
+    options.append('-6')
+  if FLAGS.ssh_reuse_connections:
+    control_path = (FLAGS.ssh_control_path or
+                    os.path.join(temp_dir.GetSshConnectionsDir(), '%C'))
+    options.extend([
+        '-o', 'ControlPath="%s"' % control_path,
+        '-o', 'ControlMaster=auto',
+        '-o', 'ControlPersist=%s' % FLAGS.ssh_control_persist
+    ])
   options.extend(FLAGS.ssh_options)
 
   return options
@@ -289,18 +325,18 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
   if env:
-    logging.debug('Environment variables: %s' % env)
+    logging.debug('Environment variables: %s', env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
   time_file_path = '/usr/bin/time'
 
-  runningOnWindows = RunningOnWindows()
-  runningOnDarwin = RunningOnDarwin()
-  should_time = (not (runningOnWindows or runningOnDarwin) and
+  running_on_windows = RunningOnWindows()
+  running_on_darwin = RunningOnDarwin()
+  should_time = (not (running_on_windows or running_on_darwin) and
                  os.path.isfile(time_file_path) and FLAGS.time_commands)
-  shell_value = runningOnWindows
+  shell_value = running_on_windows
   with tempfile.TemporaryFile() as tf_out, \
       tempfile.TemporaryFile() as tf_err, \
       tempfile.NamedTemporaryFile(mode='r') as tf_timing:
@@ -358,7 +394,7 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
   """
-  logging.debug('Environment variables: %s' % env)
+  logging.debug('Environment variables: %s', env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Spawning: %s', full_cmd)
@@ -406,15 +442,14 @@ def ParseTimeCommandResult(command_result):
   return time_in_seconds
 
 
-
-def ShouldRunOnExternalIpAddress():
+def ShouldRunOnExternalIpAddress(ip_type=None):
   """Returns whether a test should be run on an instance's external IP."""
-  return FLAGS.ip_addresses in (IpAddressSubset.EXTERNAL,
-                                IpAddressSubset.BOTH,
-                                IpAddressSubset.REACHABLE)
+  ip_type_to_check = ip_type or FLAGS.ip_addresses
+  return ip_type_to_check in (IpAddressSubset.EXTERNAL, IpAddressSubset.BOTH,
+                              IpAddressSubset.REACHABLE)
 
 
-def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
+def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm, ip_type=None):
   """Returns whether a test should be run on an instance's internal IP.
 
   Based on the command line flag --ip_addresses. Internal IP addresses are used
@@ -427,14 +462,15 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
   Args:
     sending_vm: VirtualMachine. The client.
     receiving_vm: VirtualMachine. The server.
+    ip_type: optional ip_type to use instead of what is set in the FLAGS
 
   Returns:
     Whether a test should be run on an instance's internal IP.
   """
-  return (FLAGS.ip_addresses in (IpAddressSubset.BOTH,
-                                 IpAddressSubset.INTERNAL) or
-          (FLAGS.ip_addresses == IpAddressSubset.REACHABLE and
-           sending_vm.IsReachable(receiving_vm)))
+  ip_type_to_check = ip_type or FLAGS.ip_addresses
+  return (ip_type_to_check in (IpAddressSubset.BOTH, IpAddressSubset.INTERNAL)
+          or (ip_type_to_check == IpAddressSubset.REACHABLE and
+              sending_vm.IsReachable(receiving_vm)))
 
 
 def GetLastRunUri():
@@ -456,7 +492,8 @@ def GetLastRunUri():
 
 
 @contextlib.contextmanager
-def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
+def NamedTemporaryFile(mode='w+b', prefix='tmp', suffix='', dir=None,
+                       delete=True):
   """Behaves like tempfile.NamedTemporaryFile.
 
   The existing tempfile.NamedTemporaryFile has the annoying property on
@@ -465,8 +502,18 @@ def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
   compatible way. This serves a similar role, but allows the file to be closed
   within a "with" statement without causing the file to be unlinked until the
   context exits.
+
+  Args:
+    mode: see mode in tempfile.NamedTemporaryFile.
+    prefix: see prefix in tempfile.NamedTemporaryFile.
+    suffix: see suffix in tempfile.NamedTemporaryFile.
+    dir: see dir in tempfile.NamedTemporaryFile.
+    delete: see delete in NamedTemporaryFile.
+
+  Yields:
+    A cross platform file-like object which is "with" compatible.
   """
-  f = tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix,
+  f = tempfile.NamedTemporaryFile(mode=mode, prefix=prefix, suffix=suffix,
                                   dir=dir, delete=False)
   try:
     yield f
@@ -512,8 +559,8 @@ def RunningOnWindows():
 
 
 def RunningOnDarwin():
-    """Returns True if PKB is running on a Darwin OS machine."""
-    return os.name != WINDOWS and platform.system() == DARWIN
+  """Returns True if PKB is running on a Darwin OS machine."""
+  return os.name != WINDOWS and platform.system() == DARWIN
 
 
 def ExecutableOnPath(executable_name):
@@ -540,16 +587,17 @@ def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
   # that we can safely use. See
   # https://github.com/Azure/azure-xplat-cli/blob/master/lib/commands/arm/vm/vmOsProfile._js#L145
   special_chars = '*!@#$%+='
+  # Ensure that the password contains at least one of each 4 required
+  # character types starting with letters to avoid starting with chars which
+  # are problematic on the command line e.g. @.
+  prefix = [random.choice(string.ascii_lowercase),
+            random.choice(string.ascii_uppercase),
+            random.choice(string.digits),
+            random.choice(special_chars)]
   password = [
       random.choice(string.ascii_letters + string.digits + special_chars)
       for _ in range(password_length - 4)]
-  # Ensure that the password contains at least one of each 4 required
-  # character types.
-  password.append(random.choice(string.ascii_lowercase))
-  password.append(random.choice(string.ascii_uppercase))
-  password.append(random.choice(string.digits))
-  password.append(random.choice(special_chars))
-  return ''.join(password)
+  return ''.join(prefix + password)
 
 
 def StartSimulatedMaintenance():
@@ -568,3 +616,13 @@ def SetupSimulatedMaintenance(vm):
     t = threading.Thread(target=_SimulateMaintenance)
     t.daemon = True
     t.start()
+
+
+def CopyFileBetweenVms(filename, src_vm, src_path, dest_vm, dest_path):
+  """Copies a file from the src_vm to the dest_vm."""
+  with tempfile.NamedTemporaryFile() as tf:
+    temp_path = tf.name
+    src_vm.RemoteCopy(
+        temp_path, os.path.join(src_path, filename), copy_to=False)
+    dest_vm.RemoteCopy(
+        temp_path, os.path.join(dest_path, filename), copy_to=True)

@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,12 @@
 
 import unittest
 import mock
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import stages
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class TestCreateFailedRunSampleFlag(unittest.TestCase):
@@ -107,6 +111,7 @@ class TestMakeFailedRunSample(unittest.TestCase):
     error_msg = 'error'
     spec = mock.MagicMock()
     spec.vms = []
+    spec.failed_substatus = None
     pkb.MakeFailedRunSample(spec, error_msg, stages.PROVISION)
 
     sample_mock.assert_called_once()
@@ -121,6 +126,7 @@ class TestMakeFailedRunSample(unittest.TestCase):
     error_msg = 'This is a long error message that should be truncated.'
     spec = mock.MagicMock()
     spec.vms = []
+    spec.failed_substatus = 'QuotaExceeded'
     pkb.FLAGS.failed_run_samples_error_length = 7
 
     pkb.MakeFailedRunSample(spec, error_msg, stages.PROVISION)
@@ -129,5 +135,10 @@ class TestMakeFailedRunSample(unittest.TestCase):
     sample_mock.assert_called_with('Run Failed', 1, 'Run Failed', {
         'error_message': 'This is',
         'run_stage': stages.PROVISION,
-        'flags': '{}'
+        'flags': '{}',
+        'failed_substatus': 'QuotaExceeded'
     })
+
+
+if __name__ == '__main__':
+  unittest.main()

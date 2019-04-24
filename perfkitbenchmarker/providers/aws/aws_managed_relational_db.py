@@ -29,12 +29,33 @@ FLAGS = flags.FLAGS
 
 
 DEFAULT_MYSQL_VERSION = '5.7.16'
-DEFAULT_POSTGRES_VERSION = '9.6.2'
+DEFAULT_POSTGRES_VERSION = '9.6.9'
+
+DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
+DEFAULT_MYSQL56_AURORA_VERSION = '5.6.10a'
+DEFAULT_POSTGRES_AURORA_VERSION = '9.6.9'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
+
+_MAP_ENGINE_TO_DEFAULT_VERSION = {
+    managed_relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
+    managed_relational_db.AURORA_MYSQL: DEFAULT_MYSQL_AURORA_VERSION,
+    managed_relational_db.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
+    managed_relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
+    managed_relational_db.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
+}
+
+_AURORA_ENGINES = set([
+    managed_relational_db.AURORA_MYSQL56,
+    managed_relational_db.AURORA_MYSQL,
+    managed_relational_db.AURORA_POSTGRES])
+
+_RDS_ENGINES = set([
+    managed_relational_db.MYSQL,
+    managed_relational_db.POSTGRES])
 
 
 class AwsManagedRelationalDbCrossRegionException(Exception):
@@ -86,6 +107,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.cluster_id = None
     self.all_instance_ids = []
+    self.primary_zone = None
+    self.secondary_zone = None
 
     if hasattr(self.spec, 'zones') and self.spec.zones is not None:
       self.zones = self.spec.zones
@@ -130,28 +153,17 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       engine (string): type of database (my_sql or postgres).
     Returns:
       (string): Default engine version.
+    Raises:
+      Exception: If unrecognized engine is specified.
     """
-    if engine == managed_relational_db.MYSQL:
-      return DEFAULT_MYSQL_VERSION
-    elif engine == managed_relational_db.POSTGRES:
-      return DEFAULT_POSTGRES_VERSION
-    elif engine == managed_relational_db.AURORA_POSTGRES:
-      return DEFAULT_POSTGRES_VERSION
+    if engine not in _MAP_ENGINE_TO_DEFAULT_VERSION:
+      raise Exception('Unspecified default version for {0}'.format(engine))
+    return _MAP_ENGINE_TO_DEFAULT_VERSION[engine]
 
   def _GetNewZones(self):
     """Returns a list of zones, excluding the one that the client VM is in."""
-    zones = self.zones
-    region = self.region
-    get_zones_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-availability-zones',
-        '--region={0}'.format(region)
-    ]
-    stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
-    response = json.loads(stdout)
-    all_zones = [item['ZoneName'] for item in response['AvailabilityZones']
-                 if item['State'] == 'available']
-    for zone in zones:
+    all_zones = util.GetZonesInRegion(self.region)
+    for zone in self.zones:
       all_zones.remove(zone)
     return all_zones
 
@@ -219,15 +231,14 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
 
-    create_db_subnet_group_cmd = util.AWS_PREFIX + [
-        'rds',
-        'create-db-subnet-group',
-        '--db-subnet-group-name', db_subnet_group_name,
-        '--db-subnet-group-description', 'pkb_subnet_group_for_db',
-        '--region', self.region,
-        '--subnet-ids']
-    for subnet in subnets:
-      create_db_subnet_group_cmd.append(subnet.id)
+    create_db_subnet_group_cmd = util.AWS_PREFIX + (
+        ['rds',
+         'create-db-subnet-group',
+         '--db-subnet-group-name', db_subnet_group_name,
+         '--db-subnet-group-description', 'pkb_subnet_group_for_db',
+         '--region', self.region,
+         '--subnet-ids'] + [subnet.id for subnet in subnets] +
+        ['--tags'] + util.MakeFormattedDefaultTags())
 
     vm_util.IssueCommand(create_db_subnet_group_cmd)
 
@@ -238,11 +249,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _SetupNetworking(self):
     """Sets up the networking required for the RDS database."""
-    if (self.spec.engine == managed_relational_db.MYSQL or
-        self.spec.engine == managed_relational_db.POSTGRES):
+    if self.spec.engine in _RDS_ENGINES:
       self.subnets_used_by_db.append(self.client_vm.network.subnet)
       self._CreateSubnetInAdditionalZone()
-    elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+    elif self.spec.engine in _AURORA_ENGINES:
       self._CreateSubnetInAllZonesAssumeClientZoneExists()
     else:
       raise Exception('Unknown how to create network for {0}'.format(
@@ -282,8 +292,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       Exception: if unknown how to create self.spec.engine.
 
     """
-    if (self.spec.engine == managed_relational_db.MYSQL or
-        self.spec.engine == managed_relational_db.POSTGRES):
+    if self.spec.engine in _RDS_ENGINES:
 
       instance_identifier = self.instance_id
       self.all_instance_ids.append(instance_identifier)
@@ -302,8 +311,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--engine-version=%s' % self.spec.engine_version,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
-          '--availability-zone=%s' % self.spec.vm_spec.zone
-      ]
+          '--availability-zone=%s' % self.spec.vm_spec.zone,
+          '--tags'] + util.MakeFormattedDefaultTags()
 
       if self.spec.disk_spec.disk_type == aws_disk.IO1:
         cmd.append('--iops=%s' % self.spec.disk_spec.iops)
@@ -311,8 +320,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
       vm_util.IssueCommand(cmd)
 
-    elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
-
+    elif self.spec.engine in _AURORA_ENGINES:
       zones_needed_for_high_availability = len(self.zones) > 1
       if zones_needed_for_high_availability != self.spec.high_availability:
         raise Exception('When managed_db_high_availability is true, multiple '
@@ -329,14 +337,16 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       cmd = util.AWS_PREFIX + [
           'rds', 'create-db-cluster',
           '--db-cluster-identifier=%s' % cluster_identifier,
-          '--engine=aurora-postgresql',
+          '--engine=%s' % self.spec.engine,
+          '--engine-version=%s' % self.spec.engine_version,
           '--master-username=%s' % self.spec.database_username,
           '--master-user-password=%s' % self.spec.database_password,
           '--region=%s' % self.region,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
-          '--availability-zones=%s' % self.spec.zones[0]
-      ]
+          '--availability-zones=%s' % self.spec.zones[0],
+          '--tags'] + util.MakeFormattedDefaultTags()
+
       self.cluster_id = cluster_identifier
       vm_util.IssueCommand(cmd)
 
@@ -356,17 +366,30 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
             'create-db-instance',
             '--db-instance-identifier=%s' % instance_identifier,
             '--db-cluster-identifier=%s' % cluster_identifier,
-            '--engine=aurora-postgresql',
+            '--engine=%s' % self.spec.engine,
+            '--engine-version=%s' % self.spec.engine_version,
             '--no-auto-minor-version-upgrade',
-            '--db-instance-class=%s' % self.spec.machine_type,
+            '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
             '--region=%s' % self.region,
-            '--availability-zone=%s' % zone
-        ]
+            '--availability-zone=%s' % zone,
+            '--tags'] + util.MakeFormattedDefaultTags()
         vm_util.IssueCommand(cmd)
 
     else:
       raise Exception('Unknown how to create AWS data base engine {0}'.format(
           self.spec.engine))
+
+  def _IsDeleting(self):
+    """See Base class BaseResource in perfkitbenchmarker.resource.py."""
+
+    for instance_id in self.all_instance_ids:
+      json_output = self._DescribeInstance(instance_id)
+      if json_output:
+        state = json_output['DBInstances'][0]['DBInstanceStatus']
+        if state == 'deleting':
+          return True
+
+    return False
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -403,19 +426,13 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     exceptions.
     """
     for current_instance_id in self.all_instance_ids:
-      cmd = util.AWS_PREFIX + [
-          'rds',
-          'describe-db-instances',
-          '--db-instance-identifier=%s' % current_instance_id,
-          '--region=%s' % self.region
-      ]
-      _, _, retcode = vm_util.IssueCommand(cmd)
-      if retcode != 0:
+      json_output = self._DescribeInstance(current_instance_id)
+      if not json_output:
         return False
 
     return True
 
-  def _ParseEndpoint(self, describe_instance_json):
+  def _ParseEndpointFromInstance(self, describe_instance_json):
     """Parses the json output from the CLI and returns the endpoint.
 
     Args:
@@ -427,7 +444,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     return describe_instance_json['DBInstances'][0]['Endpoint']['Address']
 
-  def _ParsePort(self, describe_instance_json):
+  def _ParsePortFromInstance(self, describe_instance_json):
     """Parses the json output from the CLI and returns the port.
 
     Args:
@@ -441,6 +458,32 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       return None
     return int(describe_instance_json['DBInstances'][0]['Endpoint']['Port'])
 
+  def _ParseEndpointFromCluster(self, describe_cluster_json):
+    """Parses the json output from the CLI and returns the endpoint.
+
+    Args:
+      describe_cluster_json: output in json format from calling
+        'aws rds describe-db-clusters'
+
+    Returns:
+      endpoint of the server as a string
+    """
+    return describe_cluster_json['DBClusters'][0]['Endpoint']
+
+  def _ParsePortFromCluster(self, describe_cluster_json):
+    """Parses the json output from the CLI and returns the port.
+
+    Args:
+      describe_cluster_json: output in json format from calling
+        'aws rds describe-db-instances'
+
+    Returns:
+      port on which the server is listening, as an int
+    """
+    if describe_cluster_json is None:
+      return None
+    return int(describe_cluster_json['DBClusters'][0]['Port'])
+
   def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
     """Saves the primary, and secondary (only if HA) zone of the server.
 
@@ -448,11 +491,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       describe_instance_json: output in json format from calling
         'aws rds describe-db-instances'
     """
-    self.primary_zone = (
-        describe_instance_json['DBInstances'][0]['AvailabilityZone'])
-    if self.spec.high_availability:
-      self.secondary_zone = (describe_instance_json['DBInstances'][0]
-                             ['SecondaryAvailabilityZone'])
+
+    if self.spec.engine in _AURORA_ENGINES:
+      self.primary_zone = self.zones[0]
+      if len(self.zones) > 1:
+        self.secondary_zone = ','.join(self.zones[1:])
+    else:
+      db_instance = describe_instance_json['DBInstances'][0]
+      self.primary_zone = (
+          db_instance['AvailabilityZone'])
+      if self.spec.high_availability:
+        if 'SecondaryAvailabilityZone' in db_instance:
+          self.secondary_zone = db_instance['SecondaryAvailabilityZone']
+        else:
+          # the secondary DB for RDS is in the second subnet.
+          self.secondary_zone = self.subnets_used_by_db[1].zone
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
@@ -468,7 +521,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         or an Exception occurred.
     """
 
-    if len(self.all_instance_ids) == 0:
+    if not self.all_instance_ids:
       return False
 
     for instance_id in self.all_instance_ids:
@@ -485,8 +538,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                    multi-az.
     """
 
-    need_ha_modification = (self.spec.engine == managed_relational_db.MYSQL or
-                            self.spec.engine == managed_relational_db.POSTGRES)
+    need_ha_modification = self.spec.engine in _RDS_ENGINES
 
     if self.spec.high_availability and need_ha_modification:
       # When extending the database to be multi-az, the second region
@@ -507,7 +559,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     json_output = self._DescribeInstance(self.instance_id)
     self._SavePrimaryAndSecondaryZones(json_output)
-    self._GetPortsForWriterInstance(self.all_instance_ids[0])
+    if self.cluster_id:
+      self._GetPortsForClusterInstance(self.cluster_id)
+    else:
+      self._GetPortsForWriterInstance(self.all_instance_ids[0])
 
   def _IsInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.
@@ -530,18 +585,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
       json_output = self._DescribeInstance(instance_id)
-      try:
-        state = json_output['DBInstances'][0]['DBInstanceStatus']
-        pending_values = json_output['DBInstances'][0]['PendingModifiedValues']
-        logging.info('Instance state: %s', state)
-        if pending_values:
-          logging.info('Pending values: %s', (str(pending_values)))
+      if json_output:
+        try:
+          state = json_output['DBInstances'][0]['DBInstanceStatus']
+          pending_values = (
+              json_output['DBInstances'][0]['PendingModifiedValues'])
+          logging.info('Instance state: %s', state)
+          if pending_values:
+            logging.info('Pending values: %s', (str(pending_values)))
 
-        if state == 'available' and not pending_values:
-          break
-      except:
-        logging.exception('Error attempting to read stdout. Creation failure.')
-        return False
+          if state == 'available' and not pending_values:
+            break
+        except:
+          logging.exception(
+              'Error attempting to read stdout. Creation failure.')
+          return False
       time.sleep(5)
 
     return True
@@ -553,6 +611,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--db-instance-identifier=%s' % instance_id,
         '--region=%s' % self.region
     ]
+    stdout, _, retcode = vm_util.IssueCommand(cmd, suppress_warning=True)
+    if retcode != 0:
+      return None
+    json_output = json.loads(stdout)
+    return json_output
+
+  def _DescribeCluster(self, cluster_id):
+    cmd = util.AWS_PREFIX + [
+        'rds',
+        'describe-db-clusters',
+        '--db-cluster-identifier=%s' % cluster_id,
+        '--region=%s' % self.region
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
     json_output = json.loads(stdout)
     return json_output
@@ -560,11 +631,20 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _GetPortsForWriterInstance(self, instance_id):
     """Assigns the ports and endpoints from the instance_id to self.
 
-    These will be used to communicate with the data base, tje
+    These will be used to communicate with the data base.
     """
     json_output = self._DescribeInstance(instance_id)
-    self.endpoint = self._ParseEndpoint(json_output)
-    self.port = self._ParsePort(json_output)
+    self.endpoint = self._ParseEndpointFromInstance(json_output)
+    self.port = self._ParsePortFromInstance(json_output)
+
+  def _GetPortsForClusterInstance(self, cluster_id):
+    """Assigns the ports and endpoints from the cluster_id to self.
+
+    These will be used to communicate with the data base.
+    """
+    json_output = self._DescribeCluster(cluster_id)
+    self.endpoint = self._ParseEndpointFromCluster(json_output)
+    self.port = self._ParsePortFromCluster(json_output)
 
   def _AssertClientAndDbInSameRegion(self):
     """Asserts that the client vm is in the same region requested by the server.
@@ -594,3 +674,29 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     flexibility in deleting resource dependencies separately from _Delete().
     """
     self._TeardownNetworking()
+
+  def _FailoverHA(self):
+    """Fail over from master to replica."""
+
+    if self.spec.engine in _RDS_ENGINES:
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'reboot-db-instance',
+          '--db-instance-identifier=%s' % self.instance_id,
+          '--force-failover',
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+    elif self.spec.engine in _AURORA_ENGINES:
+      new_primary_id = self.all_instance_ids[1]
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'failover-db-cluster',
+          '--db-cluster-identifier=%s' % self.cluster_id,
+          '--target-db-instance-identifier=%s' % new_primary_id,
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+    else:
+      raise Exception('Unknown how to failover {0}'.format(
+          self.spec.engine))

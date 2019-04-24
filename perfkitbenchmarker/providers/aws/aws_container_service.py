@@ -86,7 +86,7 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   def __init__(self, registry_spec):
     super(ElasticContainerRegistry, self).__init__(registry_spec)
     self.account = self.project or util.GetAccount()
-    self.region = util.GetRegionFromZone(self.zone)
+    self.region = util.GetRegionFromZone(self.zone.split(',')[0])
     self.repositories = []
 
   def _Delete(self):
@@ -113,6 +113,7 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   def Login(self):
     """Logs in to the registry."""
     get_login_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
         'ecr', 'get-login', '--no-include-email'
     ]
     stdout, _, _ = vm_util.IssueCommand(get_login_cmd)
@@ -344,6 +345,7 @@ class EcsService(container_service.BaseContainerService):
     self.load_balancer.Delete()
     self.target_group.Delete()
 
+  # TODO(ferneyhough): Consider supporting the flag container_cluster_version.
   def _Create(self):
     """Creates the service."""
     create_cmd = util.AWS_PREFIX + [
@@ -413,7 +415,7 @@ class FargateCluster(container_service.BaseContainerCluster):
   """Class representing an AWS Fargate cluster."""
 
   CLOUD = providers.AWS
-  CLUSTER_TYPE = container_service.SERVERLESS
+  CLUSTER_TYPE = 'Fargate'
 
   def __init__(self, cluster_spec):
     super(FargateCluster, self).__init__(cluster_spec)
@@ -484,8 +486,10 @@ class FargateCluster(container_service.BaseContainerCluster):
 
 
 class AwsKopsCluster(container_service.KubernetesCluster):
+  """Class representing a kops based Kubernetes cluster."""
 
   CLOUD = providers.AWS
+  CLUSTER_TYPE = 'kops'
 
   def __init__(self, spec):
     super(AwsKopsCluster, self).__init__(spec)

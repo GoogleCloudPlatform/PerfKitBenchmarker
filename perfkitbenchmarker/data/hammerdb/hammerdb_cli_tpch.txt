@@ -1,0 +1,83 @@
+#!/bin/sh
+## \
+export LD_LIBRARY_PATH=./lib:`$LD_LIBRARY_PATH
+## \
+export PATH=./bin:`$PATH
+## \
+exec ./bin/tclsh8.6 "`$0" `${1+"`$@"}
+
+global hdb_version
+set hdb_version "v3.1"
+set UserDefaultDir [ file dirname [ info script ] ]
+::tcl::tm::path add "`$UserDefaultDir/modules"
+
+append modulelist { Thread msgcat xml tclreadline }
+for { set modcount 0 } { `$modcount < [llength `$modulelist] } { incr modcount } {
+    set m [lindex `$modulelist `$modcount]
+		set loadtext `$m
+	if [catch { package require `$m }] {
+                exit 1
+        }
+    }
+
+append loadlist { gendict.tcl genvu.tcl gentpcc.tcl gentpch.tcl gengen.tcl genxml.tcl geninitcli.tcl gencli.tcl }
+for { set loadcount 0 } { `$loadcount < [llength `$loadlist] } { incr loadcount } {
+    set f [lindex `$loadlist `$loadcount]
+		set loadtext `$f
+	if [catch {source [ file join `$UserDefaultDir src generic `$f ]}] {
+                exit 1
+        }
+    }
+
+for { set dbsrccount 0 } { `$dbsrccount < [llength `$dbsrclist] } { incr dbsrccount } {
+    set f [lindex `$dbsrclist `$dbsrccount]
+		set loadtext `$f
+	if [catch {source [ file join `$UserDefaultDir src `$f ]}] {
+                exit 1
+        }
+    }
+close stdout
+set fp [open tmp_tpch_log.txt "w+"]
+if {*whether_run_tpch*} {
+  source *schema_file_name_tpch*
+  buildschema
+  set substring "ALL VIRTUAL USERS COMPLETE"
+
+  while {True} {
+      read `$fp
+      if {[string first `$substring [read [open tmp_tpch_log.txt r]]] != -1} {
+          break
+      }
+      after 2000 set end 1
+      vwait end
+  }
+  exec osql -E -Q "ALTER DATABASE tpch SET ALLOW_SNAPSHOT_ISOLATION ON"
+  after 1000 set end 1
+  vwait end
+  set end 0
+  exec osql -E -Q "ALTER DATABASE tpch SET READ_COMMITTED_SNAPSHOT ON"
+  after 1000 set end 1
+  vwait end
+  set end 0
+  exec osql -E -Q "BACKUP DATABASE tpch TO DISK='C:\Program Files\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup\tmptmp.bak' WITH FORMAT"
+  after 200000 set end 1
+  vwait end
+  set end 0
+  source *sqlrun_power_file_name*
+
+  exec osql -E -Q "RESTORE DATABASE tpch FROM DISK='C:\Program Files\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup\tmptmp.bak' WITH REPLACE"
+  after 200000 set end 1
+  vwait end
+  set end 0
+  exec osql -E -Q "ALTER DATABASE tpch SET ALLOW_SNAPSHOT_ISOLATION ON"
+  after 1000 set end 1
+  vwait end
+  set end 0
+  exec osql -E -Q "ALTER DATABASE tpch SET READ_COMMITTED_SNAPSHOT ON"
+  after 1000 set end 1
+  vwait end
+  set end 0
+  source *sqlrun_throughput_file_name*
+}
+
+

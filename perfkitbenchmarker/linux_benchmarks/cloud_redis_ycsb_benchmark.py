@@ -16,17 +16,21 @@
 Spins up a cloud redis instance, runs YCSB against it, then spins it down.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('redis_region',
                     'us-central1',
-                    'The region to spin up cloud redis in')
+                    'The region to spin up cloud redis in.')
 
 BENCHMARK_NAME = 'cloud_redis_ycsb'
 
@@ -34,7 +38,7 @@ BENCHMARK_CONFIG = """
 cloud_redis_ycsb:
   description: Run YCSB against cloud redis
   cloud_redis:
-    redis_version: REDIS_3_2
+    redis_version: redis_3_2
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -45,7 +49,12 @@ CLOUD_REDIS_CLASS_NAME = 'CloudRedis'
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['managed_memory_store_version'].present:
+    config['cloud_redis']['redis_version'] = FLAGS.managed_memory_store_version
+  return config
 
 
 def CheckPrerequisites(benchmark_config):
@@ -60,8 +69,10 @@ def CheckPrerequisites(benchmark_config):
   # on the resource. Ideally, the benchmark is not responsible for this task.
   # Instead, BaseResource should check prerequisites as part of creation and
   # child resources can override CheckPrerequisites and benefit from it.
-  cloud_redis_class = cloud_redis.GetCloudRedisClass(
-      benchmark_config.cloud_redis.cloud)
+  cloud_redis_class = (
+      managed_memory_store.GetManagedMemoryStoreClass(
+          FLAGS.cloud,
+          managed_memory_store.REDIS))
   cloud_redis_class.CheckPrerequisites(benchmark_config)
 
 
@@ -76,14 +87,22 @@ def Prepare(benchmark_spec):
 
   ycsb_vms = benchmark_spec.vm_groups['clients']
   vm_util.RunThreaded(_Install, ycsb_vms)
-  instance_details = benchmark_spec.cloud_redis.GetInstanceDetails()
+
+  cloud_redis_class = (
+      managed_memory_store.GetManagedMemoryStoreClass(
+          FLAGS.cloud,
+          managed_memory_store.REDIS))
+  benchmark_spec.cloud_redis_instance = (cloud_redis_class(benchmark_spec))
+  benchmark_spec.cloud_redis_instance.Create()
+
   redis_args = {
       'shardkeyspace': True,
-      'redis.host': instance_details['host'],
-      'redis.port': instance_details['port']
+      'redis.host': benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
+      'redis.port': benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
   }
-  if 'password' in instance_details:
-    redis_args['redis.password'] = instance_details['password']
+  password = benchmark_spec.cloud_redis_instance.GetMemoryStorePassword()
+  if password:
+    redis_args['redis.password'] = password
   benchmark_spec.executor = ycsb.YCSBExecutor('redis', **redis_args)
 
 
@@ -100,6 +119,10 @@ def Run(benchmark_spec):
   ycsb_vms = benchmark_spec.vm_groups['clients']
   samples = benchmark_spec.executor.LoadAndRun(ycsb_vms)
 
+  for sample in samples:
+    sample.metadata.update(
+        benchmark_spec.cloud_redis_instance.GetResourceMetadata())
+
   return samples
 
 
@@ -110,9 +133,9 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  benchmark_spec.cloud_redis.Delete()
+  benchmark_spec.cloud_redis_instance.Delete()
   logging.info('Instance %s deleted successfully',
-               benchmark_spec.cloud_redis.spec.redis_name)
+               benchmark_spec.cloud_redis_instance.name)
 
 
 def _Install(vm):
