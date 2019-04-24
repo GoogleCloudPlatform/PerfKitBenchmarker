@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,13 +55,17 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
      the run_uri.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import getpass
 import itertools
 import json
 import logging
 import multiprocessing
-from os.path import isfile
+from os.path import isfile, os
 import random
 import re
 import sys
@@ -98,6 +102,8 @@ from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.publisher import SampleCollector
+import six
+from six.moves import zip
 
 LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
@@ -117,6 +123,12 @@ flags.DEFINE_string('archive_bucket', None,
                     'Archive results to the given S3/GCS bucket.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
+flags.DEFINE_multi_string(
+    'zone', [],
+    'Similar to the --zones flag, but allows the flag to be specified '
+    'multiple times on the commandline. For example, --zone=a --zone=b is '
+    'equivalent to --zones=a,b. Furthermore, any values specified by --zone '
+    'will be appended to those specfied by --zones.')
 flags.DEFINE_list(
     'zones', [],
     'A list of zones within which to run PerfKitBenchmarker. '
@@ -151,6 +163,11 @@ flags.DEFINE_string('image', None, 'Default image that will be '
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to %d '
                     'characters in length.' % MAX_RUN_URI_LENGTH)
+flags.DEFINE_boolean('use_pkb_logging', True, 'Whether to use PKB-specific '
+                     'logging handlers. Disabling this will use the standard '
+                     'ABSL logging directly.')
+flags.DEFINE_boolean('log_dmesg', False, 'Whether to log dmesg from '
+                     'each VM to the PKB log file before the VM is deleted.')
 
 
 def GetCurrentUser():
@@ -174,10 +191,10 @@ flags.DEFINE_string(
     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
-    log_util.LOG_LEVELS.keys(),
+    list(log_util.LOG_LEVELS.keys()),
     'The log level to run at.')
 flags.DEFINE_enum(
-    'file_log_level', log_util.DEBUG, log_util.LOG_LEVELS.keys(),
+    'file_log_level', log_util.DEBUG, list(log_util.LOG_LEVELS.keys()),
     'Anything logged at this level or higher will be written to the log file.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
@@ -279,6 +296,11 @@ flags.DEFINE_string(
     'helpmatch', '',
     'Shows only flags defined in a module whose name matches the given regex.',
     allow_override_cpp=True)
+flags.DEFINE_string(
+    'helpmatchmd', '',
+    'Markdown friendly help output'
+    'Shows only flags defined in a module whose name matches the given regex.',
+    allow_override_cpp=True)
 flags.DEFINE_boolean(
     'create_failed_run_samples', False,
     'If true, PKB will create a sample specifying that a run stage failed. '
@@ -302,9 +324,17 @@ flags.DEFINE_string(
     'skip_pending_runs_file', None,
     'If file exists, any pending runs will be not be executed.')
 flags.DEFINE_integer(
-    'prepare_sleep_time', 0,
+    'after_prepare_sleep_time', 0,
     'The time in seconds to sleep after the prepare phase. This can be useful '
     'for letting burst tokens accumulate.')
+flags.DEFINE_integer(
+    'after_run_sleep_time', 0,
+    'The time in seconds to sleep after the run phase. This can be useful '
+    'for letting the VM sit idle after the bechmarking phase is complete.')
+flags.DEFINE_bool(
+    'before_cleanup_pause', False,
+    'If true, wait for command line input before executing the cleanup phase. '
+    'This is useful for debugging benchmarks during development.')
 flags.DEFINE_integer(
     'timeout_minutes', 240,
     'An upper bound on the time in minutes that the benchmark is expected to '
@@ -312,10 +342,10 @@ flags.DEFINE_integer(
     'providers.')
 flags.DEFINE_integer(
     'persistent_timeout_minutes', 240,
-    'An upper bound on the time in minutes that resources left behind by the  '
-    'benchmark is expected run. Some benchmarks purposefully create resources '
-    'for other benchmarks to use.   Persistent timeout guages who long '
-    'these shared should live.')
+    'An upper bound on the time in minutes that resources left behind by the '
+    'benchmark. Some benchmarks purposefully create resources for other '
+    'benchmarks to use. Persistent timeout specifies how long these shared '
+    'resources should live.')
 flags.DEFINE_bool('disable_interrupt_moderation', False,
                   'Turn off the interrupt moderation networking feature')
 flags.DEFINE_bool('disable_rss', False,
@@ -382,6 +412,63 @@ def _PrintHelp(matches=None):
       matched the regex. If None then all flags are printed.
   """
   if not matches:
+    print(FLAGS)
+  else:
+    flags_by_module = FLAGS.flags_by_module_dict()
+    modules = sorted(flags_by_module)
+    regex = re.compile(matches)
+    for module_name in modules:
+      if regex.search(module_name):
+        print(FLAGS.module_help(module_name))
+
+
+def _PrintHelpMD(matches=None):
+  """Prints markdown help for flags defined in matching modules. Works just like
+  --helpmatch.
+
+  Eg:
+
+* all flags:
+`./pkb.py --helpmatchmd .*`
+
+* linux benchmarks:
+`./pkb.py --helpmatchmd linux_benchmarks.*`
+
+* specific modules
+`./pkb.py --helpmatchmd iperf`
+
+* windows packages
+`./pkb.py --helpmatchmd windows_packages.*`
+
+* GCP provider:
+`./pkb.py --helpmatchmd providers.gcp.* >> testsuite_docs/providers_gcp.md`
+
+  Args:
+    matches: regex string or None. Filters help to only those whose name
+      matched the regex. If None then all flags are printed.
+  """
+
+  """ example docstring:
+  absl.app:
+  --[no]only_check_args: Set to true to validate args and exit.
+    (default: 'false')
+  --[no]pdb_post_mortem: Set to true to handle uncaught exceptions with PDB post
+    mortem.
+    (default: 'false')
+  --profile_file: Dump profile information to a file (for python -m pstats).
+    Implies --run_with_profiling.
+  --[no]run_with_pdb: Set to true for PDB debug mode
+    (default: 'false')
+  --[no]run_with_profiling: Set to true for profiling the script. Execution will
+    be slower, and the output format might change over time.
+    (default: 'false')
+  --[no]use_cprofile_for_profiling: Use cProfile instead of the profile module
+    for profiling. This has no effect unless --run_with_profiling is set.
+    (default: 'true')
+"""
+
+  # normal helpmatch search from above
+  if not matches:
     print FLAGS
   else:
     flags_by_module = FLAGS.flags_by_module_dict()
@@ -389,13 +476,52 @@ def _PrintHelp(matches=None):
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-        print FLAGS.module_help(module_name)
+        # where are we relative to pkb home?
+        BASE_RELATIVE = '../'
+        # matches module name
+        module_regex = r'^\s+?(.*?):.*'
+        # matches each flag
+        flags_regex = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'
+        # matches flag name in each flag
+        flagsmd_regex = re.compile(r'^\s+?(--.*?)(:.*\Z)',
+                                   re.MULTILINE | re.DOTALL)
+        # matches triple quoted comments
+        docstring_regex = r'"""(.*?|$)"""'
+        # output standard help to string for markdown processing
+        txt = FLAGS.module_help(module_name)
+        # converts module name to github linkable string
+        # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
+        # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
+        module = re.search(module_regex, txt, ).group(1)
+        module_link = module.replace('.', '/') + '.py'
+        # puts flag name in a markdown code block for visibility
+        flags = re.findall(flags_regex, txt, re.MULTILINE | re.DOTALL)
+        flags[:] = [flagsmd_regex.sub(r"`\1`\2", flag) for flag in flags]
+       # get the docstring for the module without importing everything into our
+       # namespace. Probably a better way to do this
+        docstring = 'No description available'
+        # only pull doststrings from inside pkb source files
+        if (os.path.isfile(module_link)):
+          with open(module_link, "r") as f:
+            source = f.read()
+            # get the triple quoted matches
+            dsm = re.search(docstring_regex, source, re.MULTILINE | re.DOTALL)
+            # some modules don't have docstrings
+            # eg perfkitbenchmarker/providers/alicloud/flags.py
+            if dsm is not None:
+              docstring = dsm.group(1)
+           # print docstring
+        # format output
+        print '### [' + module, '](' + BASE_RELATIVE + module_link + ')\n'
+        print '#### Description:\n\n' + docstring + '\n\n#### Flags:\n'
+        print '\n'.join(flags) + '\n'
+
 
 
 def CheckVersionFlag():
   """If the --version flag was specified, prints the version and exits."""
   if FLAGS.version:
-    print version.VERSION
+    print(version.VERSION)
     sys.exit(0)
 
 
@@ -447,7 +573,7 @@ def _CreateBenchmarkSpecs():
 
     # Assign a unique ID to each benchmark run. This differs even between two
     # runs of the same benchmark within a single PKB run.
-    uid = name + str(benchmark_counts[name].next())
+    uid = name + str(next(benchmark_counts[name]))
 
     # Optional step to check flag values and verify files exist.
     check_prereqs = getattr(benchmark_module, 'CheckPrerequisites', None)
@@ -513,10 +639,14 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
+  # CapacityReservations need to be constructed after VirtualMachines because
+  # it needs information about the VMs (machine type, count, zone, etc). The
+  # CapacityReservations will be provisioned before VMs.
+  spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
-  spec.ConstructCloudRedis()
   spec.ConstructNfsService()
+  spec.ConstructSmbService()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
@@ -545,10 +675,10 @@ def DoPreparePhase(spec, timer):
   with timer.Measure('Benchmark Prepare'):
     spec.BenchmarkPrepare(spec)
   spec.StartBackgroundWorkload()
-  if FLAGS.prepare_sleep_time:
-    logging.info('Sleeping %s seconds after the prepare phase.',
-                 FLAGS.prepare_sleep_time)
-    time.sleep(FLAGS.prepare_sleep_time)
+  if FLAGS.after_prepare_sleep_time:
+    logging.info('Sleeping for %s seconds after the prepare phase.',
+                 FLAGS.after_prepare_sleep_time)
+    time.sleep(FLAGS.after_prepare_sleep_time)
 
 
 def DoRunPhase(spec, collector, timer):
@@ -606,17 +736,26 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if _IsRunStageFinished():
+      if FLAGS.after_run_sleep_time:
+        logging.info('Sleeping for %s seconds after the run phase.',
+                     FLAGS.after_run_sleep_time)
+        time.sleep(FLAGS.after_run_sleep_time)
       break
 
 
 def DoCleanupPhase(spec, timer):
   """Performs the Cleanup phase of benchmark execution.
 
+  Cleanup phase work should be delegated to spec.BenchmarkCleanup to allow
+  non-PKB based cleanup if needed.
+
   Args:
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Cleanup function.
   """
+  if FLAGS.before_cleanup_pause:
+    raw_input('Hit enter to begin cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
@@ -627,6 +766,9 @@ def DoCleanupPhase(spec, timer):
 
 def DoTeardownPhase(spec, timer):
   """Performs the Teardown phase of benchmark execution.
+
+  Teardown phase work should be delegated to spec.Delete to allow non-PKB based
+  teardown if needed.
 
   Args:
     spec: The BenchmarkSpec created for the benchmark.
@@ -755,10 +897,9 @@ def RunBenchmark(spec, collector):
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
         if FLAGS.create_failed_run_samples:
-          collector.AddSamples(MakeFailedRunSample(spec, str(e),
-                                                   current_run_stage),
-                               spec.name,
-                               spec)
+          collector.AddSamples(MakeFailedRunSample(
+              spec, str(e), current_run_stage), spec.name, spec)
+
         # If the particular benchmark requests us to always call cleanup, do it
         # here.
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
@@ -806,6 +947,9 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
+  if spec.failed_substatus:
+    metadata['failed_substatus'] = spec.failed_substatus
+
   def UpdateVmStatus(vm):
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)
@@ -850,7 +994,7 @@ def RunBenchmarkTask(spec):
   # Many providers name resources using run_uris. When running multiple
   # benchmarks in parallel, this causes name collisions on resources.
   # By modifying the run_uri, we avoid the collisions.
-  if FLAGS.run_processes > 1:
+  if FLAGS.run_processes and FLAGS.run_processes > 1:
     spec.config.flags['run_uri'] = FLAGS.run_uri + str(spec.sequence_number)
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0
@@ -900,11 +1044,12 @@ def SetUpPKB():
 
   # Initialize logging.
   vm_util.GenTempDir()
-  log_util.ConfigureLogging(
-      stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri,
-      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
+  if FLAGS.use_pkb_logging:
+    log_util.ConfigureLogging(
+        stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
+        log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
+        run_uri=FLAGS.run_uri,
+        file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   # Translate deprecated flags and log all provided flag values.
@@ -921,7 +1066,7 @@ def SetUpPKB():
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
       raise errors.Setup.MissingExecutableError(
-          'Could not find required executable "%s"', executable)
+          'Could not find required executable "%s"' % executable)
 
   # Check mutually exclusive flags
   if FLAGS.run_stage_iterations > 1 and FLAGS.run_stage_time > 0:
@@ -939,6 +1084,16 @@ def SetUpPKB():
 
   benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
   package_lookup.SetPackageModuleFunction(benchmark_sets.PackageModule)
+
+  # Update max_concurrent_threads to use at least as many threads as VMs. This
+  # is important for the cluster_boot benchmark where we want to launch the VMs
+  # in parallel.
+  if not FLAGS.max_concurrent_threads:
+    FLAGS.max_concurrent_threads = max(
+        background_tasks.MAX_CONCURRENT_THREADS,
+        FLAGS.num_vms)
+    logging.info('Setting --max_concurrent_threads=%d.',
+                 FLAGS.max_concurrent_threads)
 
 
 def RunBenchmarkTasksInSeries(tasks):
@@ -963,10 +1118,10 @@ def RunBenchmarks():
   if FLAGS.randomize_run_order:
     random.shuffle(benchmark_specs)
   if FLAGS.dry_run:
-    print 'PKB will run with the following configurations:'
+    print('PKB will run with the following configurations:')
     for spec in benchmark_specs:
-      print spec
-      print ''
+      print(spec)
+      print('')
     return 0
 
   collector = SampleCollector()
@@ -978,7 +1133,7 @@ def RunBenchmarks():
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(
           tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
-    benchmark_specs, sample_lists = zip(*spec_sample_tuples)
+    benchmark_specs, sample_lists = list(zip(*spec_sample_tuples))
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
 
@@ -1028,7 +1183,7 @@ def _GenerateBenchmarkDocumentation():
     total_vm_count = 0
     vm_str = ''
     scratch_disk_str = ''
-    for group in vm_groups.itervalues():
+    for group in six.itervalues(vm_groups):
       group_vm_count = group.get('vm_count', 1)
       if group_vm_count is None:
         vm_str = 'variable'
@@ -1054,6 +1209,9 @@ def Main():
   _ParseFlags()
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
+    return 0
+  if FLAGS.helpmatchmd:
+    _PrintHelpMD(FLAGS.helpmatchmd)
     return 0
   CheckVersionFlag()
   SetUpPKB()

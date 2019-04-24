@@ -34,7 +34,7 @@ Host {{ vm.name }} vm{{ loop.index0 }}
 {% endfor %}
 
 {# Group-based access -#}
-{% for group, group_vms in vm_groups.iteritems() %}
+{% for group, group_vms in vm_groups.items() %}
 {% for vm in group_vms %}
 Host {{group}}-{{ loop.index0 }}
   HostName={{ vm.ip_address }}

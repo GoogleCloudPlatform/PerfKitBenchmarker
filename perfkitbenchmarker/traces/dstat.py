@@ -16,22 +16,27 @@
 http://dag.wiee.rs/home-made/dstat/
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import copy
 import functools
 import logging
-import numpy as np
 import os
 import posixpath
 import re
-import time
 import threading
+import time
 import uuid
+import numpy as np
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dstat
+import six
 
 flags.DEFINE_boolean('dstat', False,
                      'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
@@ -140,7 +145,7 @@ class _DStatCollector(object):
                              end_timestamp=time.time(),
                              metadata={})
     args = []
-    for role, vms in benchmark_spec.vm_groups.iteritems():
+    for role, vms in six.iteritems(benchmark_spec.vm_groups):
       args.extend([((
           vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
     vm_util.RunThreaded(self._StopOnVm, args)
@@ -188,7 +193,7 @@ class _DStatCollector(object):
             [((role, labels, out, e), {}) for e in events.TracingEvent.events])
 
     vm_util.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in self._role_mapping.iteritems()])
+        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)])
 
 
 def Register(parsed_flags):

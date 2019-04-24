@@ -23,13 +23,14 @@ FLAGS = flags.FLAGS
 
 
 class Bigquery(edw_service.EdwService):
-  """Object representing a Bigquery cluster."""
+  """Object representing a Bigquery cluster.
+
+  Attributes:
+    job_id_prefix: A string prefix for the job id for bigquery job.
+  """
 
   CLOUD = providers.GCP
   SERVICE_TYPE = 'bigquery'
-
-  def __init__(self, edw_service_spec):
-    super(Bigquery, self).__init__(edw_service_spec)
 
   def _Create(self):
     """Create a BigQuery cluster.

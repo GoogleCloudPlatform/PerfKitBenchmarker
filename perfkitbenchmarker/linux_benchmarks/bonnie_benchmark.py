@@ -14,11 +14,17 @@
 
 """Runs plain vanilla bonnie++."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+import six
+from six.moves import range
 
 
 BENCHMARK_NAME = 'bonnieplusplus'
@@ -221,7 +227,7 @@ def ParseCSVResults(results):
         metadata.
   """
   field_index_mapping = {}
-  for field, value in BONNIE_RESULTS_MAPPING.iteritems():
+  for field, value in six.iteritems(BONNIE_RESULTS_MAPPING):
     field_index_mapping[value] = field
   results = results.split(',')
   assert len(results) == len(BONNIE_RESULTS_MAPPING)

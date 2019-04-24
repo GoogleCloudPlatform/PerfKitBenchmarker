@@ -62,15 +62,23 @@ VM specs, disk specs, or any component of the benchmark configuration
 dictionary.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import copy
 import logging
 import re
 import contextlib2
-import functools32
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+import six
 import yaml
+
+if six.PY2:
+  import functools32 as functools
+else:
+  import functools
 
 FLAGS = flags.FLAGS
 CONFIG_CONSTANTS = 'default_config_constants.yaml'
@@ -157,7 +165,7 @@ def _LoadUserConfig(path):
     return yaml.load(_ConcatenatedFiles(files))
 
 
-@functools32.lru_cache()
+@functools.lru_cache()
 def _LoadConfigConstants():
   """Reads the config constants file."""
   with open(data.ResourcePath(CONFIG_CONSTANTS, False)) as fp:
@@ -183,7 +191,7 @@ def _GetConfigFromOverrides(overrides):
   return config
 
 
-@functools32.lru_cache()
+@functools.lru_cache()
 def GetConfigFlags():
   """Returns the global flags from the user config."""
   return GetUserConfig().get(FLAGS_KEY, {})
@@ -243,7 +251,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
   def _Merge(d1, d2):
     """Merge two nested dicts."""
     merged_dict = copy.deepcopy(d1)
-    for k, v in d2.iteritems():
+    for k, v in six.iteritems(d2):
       if k not in d1:
         merged_dict[k] = copy.deepcopy(v)
         if warn_new_key:

@@ -26,9 +26,14 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 
-flags.DEFINE_string('dacapo_jar_filename', 'dacapo-9.12-bach.jar',
+_BENCHMARKS = [
+    'avrora', 'batik', 'eclipse', 'fop', 'h2', 'jython', 'luindex', 'lusearch',
+    'pmd', 'sunflow', 'tomcat', 'tradebeans', 'tradesoap', 'xalan'
+]
+
+flags.DEFINE_string('dacapo_jar_filename', 'dacapo-9.12-MR1-bach.jar',
                     'Filename of DaCapo jar file.')
-flags.DEFINE_enum('dacapo_benchmark', 'luindex', ['luindex', 'lusearch'],
+flags.DEFINE_enum('dacapo_benchmark', 'luindex', _BENCHMARKS,
                   'Name of specific DaCapo benchmark to execute.')
 flags.DEFINE_integer('dacapo_num_iters', 1, 'Number of iterations to execute.')
 
@@ -81,7 +86,8 @@ def Run(benchmark_spec):
   for line in stderr.splitlines():
     m = _PASS_PATTERN.match(line)
     if m:
-      return [sample.Sample('run_time', float(m.group(1)), 'ms')]
+      metadata = {'dacapo_benchmark': FLAGS.dacapo_benchmark}
+      return [sample.Sample('run_time', float(m.group(1)), 'ms', metadata)]
   raise errors.Benchmarks.RunError(
       'DaCapo benchmark %s failed.' % FLAGS.dacapo_benchmark)
 

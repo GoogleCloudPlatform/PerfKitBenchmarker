@@ -52,6 +52,12 @@ class FakeTpu(cloud_tpu.BaseTpu):
   def GetNumShards(self):
     pass
 
+  def GetZone(self):
+    pass
+
+  def GetAcceleratorType(self):
+    pass
+
 
 class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -131,17 +137,6 @@ class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **spec)
     self.assertEqual(result.tpu_network, 'default')
 
-  def testDefaultTpuZone(self):
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.minimal_spec)
-    self.assertEqual(result.tpu_zone, None)
-
-  def testCustomTpuZone(self):
-    spec = MergeDicts(self.minimal_spec, {'tpu_zone': 'us-central1-a'})
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **spec)
-    self.assertEqual(result.tpu_zone, 'us-central1-a')
-
   def testDefaultTpuVersion(self):
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.minimal_spec)
@@ -168,7 +163,6 @@ class TpuSpecFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
         'tpu_description': 'My TF Node',
         'tpu_network': 'default',
         'tpu_tf_version': 'nightly',
-        'tpu_zone': 'us-central1-a'
     }
 
     cloud_tpu._CLOUD_TPU_REGISTRY = {
@@ -217,12 +211,6 @@ class TpuSpecFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.tpu_tf_version, '1.2')
-
-  def testTpuZone(self):
-    FLAGS['tpu_zone'].parse('us-central1-c')
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.full_spec)
-    self.assertEqual(result.tpu_zone, 'us-central1-c')
 
 
 if __name__ == '__main__':

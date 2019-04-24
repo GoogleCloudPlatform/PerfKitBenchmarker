@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -73,11 +74,13 @@ def PatchCriticalObjects(retvals=None):
     del unused_kwargs
     return ('', '', 0) if retvals is None else retvals.pop(0)
 
-  with mock.patch(vm_util.__name__ + '.IssueCommand',
-                  side_effect=ReturnVal) as issue_command, \
-          mock.patch('__builtin__.open'), \
-          mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-          mock.patch(util.__name__ + '.GetDefaultProject'):
+  with mock.patch(
+      vm_util.__name__ + '.IssueCommand',
+      side_effect=ReturnVal) as issue_command, mock.patch(
+          builtins.__name__ + '.open'), mock.patch(
+              vm_util.__name__ +
+              '.NamedTemporaryFile'), mock.patch(util.__name__ +
+                                                 '.GetDefaultProject'):
     yield issue_command
 
 
@@ -158,7 +161,8 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -166,6 +170,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='test_machine_type', project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm.created = True
     self.assertDictContainsSubset(
         {'dedicated_host': False, 'machine_type': 'test_machine_type',
          'project': 'p'},
@@ -177,6 +182,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, machine_type='test_machine_type', preemptible=True,
         project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm.created = True
     self.assertDictContainsSubset(
         {'dedicated_host': False, 'machine_type': 'test_machine_type',
          'preemptible': True, 'project': 'p'},
@@ -187,6 +193,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '1.0GiB'}, project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm.created = True
     self.assertDictContainsSubset(
         {'cpus': 1, 'memory_mib': 1024, 'project': 'p',
          'dedicated_host': False},
@@ -198,6 +205,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         preemptible=True,
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm.created = True
     self.assertDictContainsSubset({
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
         'dedicated_host': False, 'preemptible': True}, vm.GetResourceMetadata())
@@ -210,6 +218,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         gpu_type='k80',
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm.created = True
     self.assertDictContainsSubset({
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
         'dedicated_host': False, 'gpu_count': 2, 'gpu_type': 'k80'
@@ -246,7 +255,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_num_cpus = p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -261,6 +271,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
+      vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
@@ -278,6 +289,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
+      vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
@@ -299,6 +311,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
+      vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
@@ -320,6 +333,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
+      vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
@@ -343,6 +357,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
       vm = vm_class(spec)
       vm._Create()
+      vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
@@ -368,6 +383,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
       vm = vm_class(spec)
       vm._Create()
+      vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
@@ -401,7 +417,8 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -449,6 +466,18 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('--image-project bar', cmd)
 
+  def testNetworkTierFlagPremium(self):
+    """Tests that the premium network tier flag is supported."""
+    cmd, call_count = self._CreateVmCommand(gce_network_tier='premium')
+    self.assertEqual(call_count, 1)
+    self.assertIn('--network-tier PREMIUM', cmd)
+
+  def testNetworkTierFlagStandard(self):
+    """Tests that the standard network tier flag is supported."""
+    cmd, call_count = self._CreateVmCommand(gce_network_tier='standard')
+    self.assertEqual(call_count, 1)
+    self.assertIn('--network-tier STANDARD', cmd)
+
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(
         gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')
@@ -490,7 +519,8 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 

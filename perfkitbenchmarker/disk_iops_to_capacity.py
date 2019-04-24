@@ -46,6 +46,9 @@ To utilize this class, initialize an instance of the DiskIOPSToCapacity class
 with the IOPS level desired and the provider you wish to use. The machine
 requirement attributes will be immediately populated.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import math
 import numpy
 
@@ -152,7 +155,7 @@ class DiskIOPSToCapacity(object):
     Raises:
       InvalidProviderError: Incorrect provider type given.
     """
-    if self._provider not in CLOUD_PROVIDERS_INFO.keys():
+    if self._provider not in list(CLOUD_PROVIDERS_INFO.keys()):
       raise InvalidProviderError('Provider given is not supported by '
                                  'storage_utility.')
 
@@ -186,7 +189,7 @@ class DiskIOPSToCapacity(object):
                  'Disks: {}').format(self._iops,
                                      self._provider.upper(), self._size,
                                      self._cpu_count, self._number_disks)
-    print vm_config
+    print(vm_config)
 
   def _SetSize(self):
     """Set minimum size (GB) necessary to achieve _iops level.

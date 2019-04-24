@@ -371,6 +371,7 @@ class BaseContainerRegistry(resource.BaseResource):
         # Build the image remotely using an image building service.
         self.RemoteBuild(image)
         self.remote_build_times[image.name] = time.time() - build_start
+        return
       except NotImplementedError:
         pass
 

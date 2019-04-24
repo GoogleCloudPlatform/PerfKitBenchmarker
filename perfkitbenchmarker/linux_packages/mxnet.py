@@ -14,6 +14,8 @@
 """Module containing MXNet installation and cleanup functions."""
 import posixpath
 from perfkitbenchmarker import flags
+
+flags.DEFINE_string('mx_version', '1.4.0', 'mxnet pip package version')
 FLAGS = flags.FLAGS
 
 
@@ -61,11 +63,14 @@ def Install(vm):
   if FLAGS.mx_device == 'gpu':
     vm.Install('cuda_toolkit')
     if FLAGS.cuda_toolkit_version == '8.0':
-      vm.RemoteCommand('sudo pip install mxnet-cu80', should_log=True)
+      vm.RemoteCommand('sudo pip install mxnet-cu80=={}'.format(
+          FLAGS.mx_version), should_log=True)
     elif FLAGS.cuda_toolkit_version == '9.0':
-      vm.RemoteCommand('sudo pip install mxnet-cu90', should_log=True)
+      vm.RemoteCommand('sudo pip install mxnet-cu90=={}'.format(
+          FLAGS.mx_version), should_log=True)
   elif FLAGS.mx_device == 'cpu':
-    vm.RemoteCommand('sudo pip install mxnet', should_log=True)
+    vm.RemoteCommand('sudo pip install mxnet=={}'.format(
+        FLAGS.mx_version), should_log=True)
 
 
 def Uninstall(vm):

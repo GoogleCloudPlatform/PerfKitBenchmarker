@@ -24,6 +24,8 @@ flags.DEFINE_multi_string('failing_scripts', [],
 
 FLAGS = flags.FLAGS
 DRIVER_NAME = './script_runner.sh'
+JOB_ID_KEY = 'INFO:googleapiclient.model:jobId:'
+API_LOG_FILE = 'apilog.out'
 
 
 def default_logfile_names(script, suffix):
@@ -46,6 +48,7 @@ def execute_script(script, logfile_suffix):
     the script fails)
   """
   response_status = 1  # assume failure by default
+  job_id = 'undefined_job'
   if script not in FLAGS.failing_scripts:
     output, error = default_logfile_names(script, logfile_suffix)
     cmd = provider_specific_script_driver.generate_provider_specific_cmd_list(
@@ -54,14 +57,27 @@ def execute_script(script, logfile_suffix):
     response_status = call(cmd)
   execution_time = -1 if (response_status != 0) else round((time.time() -
                                                             start_time), 2)
-  results = {}
-  results[script] = execution_time
+  try:
+    with open(API_LOG_FILE) as fp:
+      line = fp.readline()
+      while line:
+        line_tokens = line.strip().split()
+        if len(line_tokens) > 1 and line_tokens[0] == JOB_ID_KEY:
+          job_id = line.strip().split()[1]
+          break
+        line = fp.readline()
+  except IOError:
+    pass
+
+  script_execution_details = {'execution_time': execution_time,
+                              'job_id': job_id}
+  results = {script: script_execution_details}
   return json.dumps(results)
 
 
 def main(argv):
   del argv
-  print execute_script(FLAGS.script, FLAGS.logfile_suffix)
+  print (execute_script(FLAGS.script, FLAGS.logfile_suffix))  # pylint: disable=superfluous-parens
 
 
 if __name__ == '__main__':

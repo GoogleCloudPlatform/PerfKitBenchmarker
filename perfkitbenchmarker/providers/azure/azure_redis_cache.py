@@ -16,29 +16,36 @@
 """
 
 import json
-from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 
 FLAGS = flags.FLAGS
+# 15min timeout for issuing az redis delete command.
+TIMEOUT = 900
+REDIS_VERSION = '3.2'
 
 
-class AzureRedisCache(cloud_redis.BaseCloudRedis):
+class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   """Object representing an Azure Redis Cache."""
 
   CLOUD = providers.AZURE
+  MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):
     super(AzureRedisCache, self).__init__(spec)
-    self.name = 'pkb-%s' % FLAGS.run_uri
     self.redis_region = FLAGS.redis_region
     self.resource_group = azure_network.GetResourceGroup(self.redis_region)
-    self.azure_tier = FLAGS.azure_tier
     self.azure_redis_size = FLAGS.azure_redis_size
+    self.failover_style = FLAGS.redis_failover_style
+    if self.failover_style == managed_memory_store.Failover.FAILOVER_SAME_REGION:
+      self.azure_tier = 'Premium'
+    else:
+      self.azure_tier = 'Basic'
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.
@@ -46,10 +53,13 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(AzureRedisCache, self).GetResourceMetadata()
-    result['region'] = self.redis_region
-    result['azure_tier'] = self.azure_tier
-    result['azure_redis_size'] = self.azure_redis_size
+    result = {
+        'cloud_redis_failover_style': self.failover_style,
+        'cloud_redis_region': self.redis_region,
+        'cloud_redis_azure_tier': self.azure_tier,
+        'cloud_redis_azure_redis_size': self.azure_redis_size,
+        'cloud_redis_version': REDIS_VERSION,
+    }
     return result
 
   @staticmethod
@@ -62,10 +72,14 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
     Raises:
       errors.Config.InvalidValue: Input flag parameters are invalid.
     """
-    if FLAGS.redis_failover_style in [cloud_redis.Failover.FAILOVER_SAME_REGION,
-                                      cloud_redis.Failover.FAILOVER_SAME_ZONE]:
+    if FLAGS.managed_memory_store_version:
       raise errors.Config.InvalidValue(
-          'Azure redis with failover is not yet available.')
+          'Custom Redis version not supported on Azure Redis. '
+          'Redis version is {0}.'.format(REDIS_VERSION))
+    if FLAGS.redis_failover_style in [
+        managed_memory_store.Failover.FAILOVER_SAME_ZONE]:
+      raise errors.Config.InvalidValue(
+          'Azure redis with failover in the same zone is not supported.')
 
   def _Create(self):
     """Creates the cache."""
@@ -78,7 +92,7 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
         '--vm-size', self.azure_redis_size,
         '--enable-non-ssl-port',
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=TIMEOUT)
 
   def _Delete(self):
     """Deletes the cache."""
@@ -86,8 +100,9 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
         azure.AZURE_PATH, 'redis', 'delete',
         '--resource-group', self.resource_group.name,
         '--name', self.name,
+        '--yes',
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=TIMEOUT)
 
   def DescribeCache(self):
     """Calls show on the cache to get information about it.
@@ -123,25 +138,27 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
       return True
     return False
 
-  @vm_util.Retry(max_retries=5)
-  def GetInstanceDetails(self):
-    """Returns a dict containing details about the instance.
+  def GetMemoryStorePassword(self):
+    """See base class."""
+    if not self._password:
+      self._PopulateEndpoint()
+    return self._password
 
-    Returns:
-      dict mapping string property key to value.
+  @vm_util.Retry(max_retries=5)
+  def _PopulateEndpoint(self):
+    """Populates endpoint information for the instance.
+
     Raises:
       errors.Resource.RetryableGetError:
       Failed to retrieve information on cache.
     """
-    instance_details = {}
-
     stdout, _, retcode = self.DescribeCache()
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s.', self.name)
     response = json.loads(stdout)
-    instance_details['host'] = response['hostName']
-    instance_details['port'] = response['port']
+    self._ip = response['hostName']
+    self._port = response['port']
 
     stdout, _, retcode = vm_util.IssueCommand([
         azure.AZURE_PATH, 'redis', 'list-keys',
@@ -152,5 +169,4 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s.', self.name)
     response = json.loads(stdout)
-    instance_details['password'] = response['primaryKey']
-    return instance_details
+    self._password = response['primaryKey']

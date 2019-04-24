@@ -103,17 +103,15 @@ def _CreateMetadataDict(benchmark_spec):
   Returns:
     metadata dict
   """
-  metadata = {
-      'use_tpu': benchmark_spec.use_tpu,
-      'tpu': benchmark_spec.tpu,
+  metadata = mnist_benchmark.CreateMetadataDict(benchmark_spec)
+  metadata.update({
       'model': benchmark_spec.model,
       'problem': benchmark_spec.problem,
       'hparams_set': benchmark_spec.hparams_set,
       'data_dir': benchmark_spec.data_dir,
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
-      'eval_steps': benchmark_spec.eval_steps,
-  }
+      'eval_steps': benchmark_spec.eval_steps})
   return metadata
 
 
@@ -199,7 +197,7 @@ def Run(benchmark_spec):
                            hparams_set=benchmark_spec.hparams_set,
                        ))
 
-  if benchmark_spec.use_tpu:
+  if benchmark_spec.tpus:
     t2t_benchmark_cmd += (
         ' --use_tpu=True '
         '--master={master}'.format(

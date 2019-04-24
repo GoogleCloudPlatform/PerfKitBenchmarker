@@ -28,7 +28,7 @@ YUM_PACKAGES = ('jemalloc-devel numactl-devel libdb-cxx-devel mysql-devel '
 
 def _Install(vm):
   """Installs the Silo package on the VM."""
-  nthreads = vm.num_cpus * 2
+  nthreads = vm.NumCpusForBenchmark() * 2
   vm.Install('build_tools')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, SILO_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(SILO_DIR,

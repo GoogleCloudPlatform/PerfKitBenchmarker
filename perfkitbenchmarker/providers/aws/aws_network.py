@@ -443,6 +443,8 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     route_table: an AwsRouteTable instance. The default route table.
   """
 
+  CLOUD = providers.AWS
+
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
 

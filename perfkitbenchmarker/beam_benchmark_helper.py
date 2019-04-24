@@ -30,9 +30,8 @@ BEAM_JAVA_SDK = 'java'
 BEAM_PYTHON_SDK = 'python'
 
 flags.DEFINE_string('gradle_binary', None,
-                    'Set to use a different gradle binary than gradle wrapper from the repository')
-flags.DEFINE_string('python_binary', 'python',
-                    'Set to use a different python binary that is on the PATH.')
+                    'Set to use a different gradle binary than gradle wrapper '
+                    'from the repository')
 flags.DEFINE_string('beam_location', None,
                     'Location of already checked out Beam codebase.')
 flags.DEFINE_string('beam_it_module', None,
@@ -49,9 +48,11 @@ flags.DEFINE_string('beam_version', None,
 flags.DEFINE_enum('beam_sdk', None, [BEAM_JAVA_SDK, BEAM_PYTHON_SDK],
                   'Which BEAM SDK is used to build the benchmark pipeline.')
 flags.DEFINE_string('beam_python_attr', 'IT',
-                    'Test decorator that is used in Beam Python to filter a specific category.')
+                    'Test decorator that is used in Beam Python to filter a '
+                    'specific category.')
 flags.DEFINE_string('beam_python_sdk_location', None,
-                    'Python SDK tar ball location. It is a required option to run Python pipeline.')
+                    'Python SDK tar ball location. It is a required option to '
+                    'run Python pipeline.')
 
 flags.DEFINE_string('beam_extra_properties', None,
                     'Allows to specify list of key-value pairs that will be '
@@ -88,7 +89,9 @@ def AddRunnerArgument(command, runner_name):
     command.append('-DintegrationTestRunner=dataflow')
 
 
-def AddRunnerPipelineOption(beam_pipeline_options, runner_name, runner_option_override):
+def AddRunnerPipelineOption(beam_pipeline_options, runner_name,
+                            runner_option_override):
+  """Add runner to pipeline options."""
   runner_pipeline_option = ''
 
   if runner_name == 'dataflow':
@@ -105,7 +108,6 @@ def AddRunnerPipelineOption(beam_pipeline_options, runner_name, runner_option_ov
 
 
 def AddFilesystemArgument(command, filesystem_name):
-
   if filesystem_name == 'hdfs':
     command.append('-Dfilesystem=hdfs')
 
@@ -115,12 +117,18 @@ def AddExtraProperties(command, extra_properties):
     return
 
   if 'integrationTestPipelineOptions=' in extra_properties:
-    raise ValueError('integrationTestPipelineOptions must not be in beam_extra_properties')
+    raise ValueError('integrationTestPipelineOptions must not be in '
+                     'beam_extra_properties')
 
   extra_properties = extra_properties.rstrip(']').lstrip('[').split(',')
   extra_properties = [p.rstrip('" ').lstrip('" ') for p in extra_properties]
   for p in extra_properties:
     command.append('-D{}'.format(p))
+
+
+def AddPythonAttributes(command, attributes):
+  if attributes:
+    command.append('-Dattr={}'.format(attributes))
 
 
 def InitializeBeamRepo(benchmark_spec):
@@ -146,13 +154,15 @@ def InitializeBeamRepo(benchmark_spec):
     vm_util.IssueCommand(git_clone_command, cwd=vm_util.GetTempDir())
 
   elif not os.path.exists(FLAGS.beam_location):
-    raise errors.Config.InvalidValue('Directory indicated by beam_location does not exist: {}.'.format(FLAGS.beam_location))
+    raise errors.Config.InvalidValue('Directory indicated by beam_location '
+                                     'does not exist: {}.'.format(
+                                         FLAGS.beam_location))
 
   _PrebuildBeam()
 
 
 def _PrebuildBeam():
-  # Rebuild beam if it was not build earlier
+  """Rebuild beam if it was not build earlier."""
   if not FLAGS.beam_prebuilt:
 
     gradle_build_command = ['clean', 'assemble', '--stacktrace', '--info']
@@ -168,7 +178,7 @@ def _PrebuildBeam():
 
 
 def BuildBeamCommand(benchmark_spec, classname, job_arguments):
-  """ Constructs a Beam execution command for the benchmark.
+  """Constructs a Beam execution command for the benchmark.
 
   Args:
     benchmark_spec: The PKB spec for the benchmark to run.
@@ -195,7 +205,7 @@ def BuildBeamCommand(benchmark_spec, classname, job_arguments):
 
 
 def _BuildGradleCommand(classname, job_arguments):
-  """ Constructs a Gradle command for the benchmark.
+  """Constructs a Gradle command for the benchmark.
 
   Args:
     classname: The classname of the class to run.
@@ -209,7 +219,8 @@ def _BuildGradleCommand(classname, job_arguments):
   gradle_executable = _GetGradleCommand()
 
   if not vm_util.ExecutableOnPath(gradle_executable):
-    raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % gradle_executable)
+    raise errors.Setup.MissingExecutableError(
+        'Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
   cmd.append('integrationTest')
@@ -219,7 +230,8 @@ def _BuildGradleCommand(classname, job_arguments):
 
   AddModuleArgument(cmd, FLAGS.beam_it_module)
   AddRunnerArgument(cmd, FLAGS.beam_runner)
-  AddRunnerPipelineOption(beam_args, FLAGS.beam_runner, FLAGS.beam_runner_option)
+  AddRunnerPipelineOption(beam_args, FLAGS.beam_runner,
+                          FLAGS.beam_runner_option)
   AddFilesystemArgument(cmd, FLAGS.beam_filesystem)
   AddExtraProperties(cmd, FLAGS.beam_extra_properties)
 
@@ -233,25 +245,26 @@ def _BuildGradleCommand(classname, job_arguments):
   return cmd
 
 
-def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
-  """ Constructs Gradle command for Python benchmark.
+def _BuildPythonCommand(benchmark_spec, classname, job_arguments):
+  """Constructs Gradle command for Python benchmark.
 
   Python integration tests can be invoked from Gradle task
-  `beam-sdks-python:integrationTest`. How Python Gradle command constructs
-  is different from Java. In order to run tests, we can use following
-  project properties:
+  `integrationTest`. How Python Gradle command constructed
+  is different from Java. We can use following system properties
+  in commandline:
 
-    -Pattr: a nose flag that filters tests by attributes
-    -Ptests: a nose flag that filters tests by name
-    -PpipelineOptions: a set of pipeline options needed to run Beam job
+    -Dtests: fully qualified class/module name of the test to run.
+      e.g. apache_beam.examples.wordcount_it_test:WordCountIT
+    -Dattr: a set of tests that are annotated by this attribute tag.
+    -DpipelineOptions: a set of pipeline options needed to run Beam job
 
   Args:
     benchmark_spec: The PKB spec for the benchmark to run.
-    modulename: The name of the python module to run.
+    classname: The fully qualified class/module name of the test to run.
     job_arguments: The additional job arguments provided for the run.
 
   Returns:
-    cmd: Array containg the built command.
+    cmd: Array holds the execution command.
   """
 
   cmd = []
@@ -259,17 +272,18 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
   gradle_executable = _GetGradleCommand()
 
   if not vm_util.ExecutableOnPath(gradle_executable):
-    raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % gradle_executable)
+    raise errors.Setup.MissingExecutableError(
+        'Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
-  cmd.append('beam-sdks-python:integrationTest')
-  cmd.append('-Ptests={}'.format(modulename))
-  cmd.append('-Pattr={}'.format(FLAGS.beam_python_attr))
+  cmd.append('integrationTest')
+  cmd.append('-Dtests={}'.format(classname))
+  AddModuleArgument(cmd, FLAGS.beam_it_module)
+  AddPythonAttributes(cmd, FLAGS.beam_python_attr)
 
   beam_args = job_arguments if job_arguments else []
-
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    beam_args.append('--runner={}'.format(FLAGS.beam_runner))
+    beam_args.append('"--runner={}"'.format(FLAGS.beam_runner))
 
     sdk_location = FLAGS.beam_python_sdk_location
     if not sdk_location:
@@ -278,9 +292,9 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
         raise RuntimeError('No python sdk tar file is available.')
       else:
         sdk_location = tar_list[0]
-    beam_args.append('--sdk_location={}'.format(sdk_location))
+    beam_args.append('"--sdk_location={}"'.format(sdk_location))
+  cmd.append('-DpipelineOptions={}'.format(' '.join(beam_args)))
 
-  cmd.append('-PpipelineOptions={}'.format(' '.join(beam_args)))
   cmd.append('--info')
   cmd.append('--scan')
 
@@ -305,8 +319,8 @@ def _FindFiles(base_path, pattern):
     raise RuntimeError('No such directory: %s' % base_path)
 
   results = []
-  for root, dirname, files in os.walk(base_path):
-    for file in files:
-      if fnmatch.fnmatch(file, pattern):
-        results.append(os.path.join(root, file))
+  for root, _, files in os.walk(base_path):
+    for f in files:
+      if fnmatch.fnmatch(f, pattern):
+        results.append(os.path.join(root, f))
   return results

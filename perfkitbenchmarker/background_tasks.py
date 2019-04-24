@@ -51,13 +51,16 @@ code in this module is designed to allow interrupting parallel tasks while
 keeping the risk of deadlock low.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 from collections import deque
 import ctypes
 import functools
 import logging
 import os
-import Queue
 import signal
 import threading
 import time
@@ -66,7 +69,12 @@ from concurrent import futures
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
+import six
+from six.moves import queue
+from six.moves import range
+from six.moves import zip
 
 
 # For situations where an interruptable wait is necessary, a loop of waits with
@@ -82,6 +90,18 @@ _WAIT_MAX_RECHECK_DELAY = 0.050  # 50 ms
 _THREAD_STOP_PROCESSING = 0
 _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT = 1
 
+# The default value for max_concurrent_threads.
+MAX_CONCURRENT_THREADS = 200
+
+# The default value is set in pkb.py. It is the greater of
+# MAX_CONCURRENT_THREADS or the value passed to --num_vms. This is particularly
+# important for the cluster_boot benchmark where we want to launch all of the
+# VMs in parallel.
+flags.DEFINE_integer(
+    'max_concurrent_threads', None, 'Maximum number of concurrent threads to '
+    'use when running a benchmark.')
+FLAGS = flags.FLAGS
+
 
 def _GetCallString(target_arg_tuple):
   """Returns the string representation of a function call."""
@@ -93,7 +113,7 @@ def _GetCallString(target_arg_tuple):
     kwargs = inner_kwargs
     target = target.func
   arg_strings = [str(a) for a in args]
-  arg_strings.extend(['{0}={1}'.format(k, v) for k, v in kwargs.iteritems()])
+  arg_strings.extend(['{0}={1}'.format(k, v) for k, v in six.iteritems(kwargs)])
   return '{0}({1})'.format(getattr(target, '__name__', target),
                            ', '.join(arg_strings))
 
@@ -144,7 +164,7 @@ class _SingleReaderQueue(object):
 
   def Get(self, timeout=None):
     if not _WaitForCondition(lambda: self._deque, timeout):
-      raise Queue.Empty
+      raise queue.Empty
     return self._deque.popleft()
 
   def Put(self, item):
@@ -237,15 +257,13 @@ class _BackgroundTask(object):
       self.traceback = traceback.format_exc()
 
 
-class _BackgroundTaskManager(object):
+class _BackgroundTaskManager(six.with_metaclass(abc.ABCMeta, object)):
   """Base class for a context manager that manages state for background tasks.
 
   Attributes:
     tasks: list of _BackgroundTask instances. Contains one _BackgroundTask per
         started task, in the order that they were started.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   def __init__(self, max_concurrency):
     self._max_concurrency = max_concurrency
@@ -338,7 +356,7 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
     self._response_queue = _SingleReaderQueue()
     self._task_queues = []
     self._threads = []
-    self._available_worker_ids = range(self._max_concurrency)
+    self._available_worker_ids = list(range(self._max_concurrency))
     uninitialized_worker_ids = set(self._available_worker_ids)
     for worker_id in self._available_worker_ids:
       task_queue = _NonPollingSingleReaderQueue()
@@ -569,7 +587,7 @@ def RunParallelThreads(target_arg_tuples, max_concurrency, post_task_delay=0):
       errors.VmUtil.ThreadException, post_task_delay)
 
 
-def RunThreaded(target, thread_params, max_concurrent_threads=200):
+def RunThreaded(target, thread_params, max_concurrent_threads=None):
   """Runs the target method in parallel threads.
 
   The method starts up threads with one arg from thread_params as the first arg.
@@ -605,6 +623,10 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
             for i in range(0, 10)]
     RunThreaded(MyThreadedTargetMethod, args)
   """
+  if max_concurrent_threads is None:
+    max_concurrent_threads = (
+        FLAGS.max_concurrent_threads or MAX_CONCURRENT_THREADS)
+
   if not isinstance(thread_params, list):
     raise ValueError('Param "thread_params" must be a list')
 

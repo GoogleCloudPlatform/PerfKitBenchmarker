@@ -27,28 +27,28 @@ FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/act.git'
 ACT_DIR = '%s/act' % INSTALL_DIR
-flags.DEFINE_float('act_load', 1.0, 'Load multiplier for act test per device.')
+flags.DEFINE_list('act_load', ['1.0'],
+                  'Load multiplier for act test per device.')
 flags.DEFINE_boolean('act_parallel', False,
                      'Run act tools in parallel. One copy per device.')
 flags.DEFINE_integer('act_duration', 86400, 'Duration of act test in seconds.')
 flags.DEFINE_integer('act_reserved_partitions', 0,
                      'Number of partitions reserved (not being used by act).')
+flags.DEFINE_integer('act_num_queues', None,
+                     'Total number of transaction queues. Default is number of'
+                     ' cores, detected by ACT at runtime.')
+flags.DEFINE_integer('act_threads_per_queue', None, 'Number of threads per '
+                     'transaction queue. Default is 4 threads/queue.')
 # TODO(user): Support user provided config file.
 ACT_CONFIG_TEMPLATE = """
 device-names: {devices}
-num-queues: 8
-threads-per-queue: 8
 test-duration-sec: {duration}
-report-interval-sec: 1
-large-block-op-kbytes: 128
-record-bytes: 1536
 read-reqs-per-sec: {read_iops}
 write-reqs-per-sec: {write_iops}
-microsecond-histograms: no
-scheduler-mode: noop
 """
 _READ_1X_1D = 2000
 _WRITE_1X_1D = 1000
+ACT_COMMIT = '2cca4113a273cbcf40c30e94fe2f755e50b8ae77'  # ACT 5.0
 
 
 def _Install(vm):
@@ -56,8 +56,13 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('openssl')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, ACT_DIR))
+  # In certain system, O_DSYNC resulting 10x slow down.
+  # Patching O_DSYNC to speed up salting process.
+  # https://github.com/aerospike/act/issues/39
   vm.RemoteCommand(
-      'cd {0} && make && make -f Makesalt '.format(ACT_DIR))
+      'cd {0} && git checkout {1} && '
+      'sed -i "s/O_DSYNC |//" src/prep/act_prep.c && make'.format(
+          ACT_DIR, ACT_COMMIT))
 
 
 def YumInstall(vm):
@@ -80,7 +85,7 @@ def RunActPrep(vm):
   """Runs actprep binary to initialize the drive."""
 
   def _RunActPrep(device):
-    vm.RobustRemoteCommand('cd {0} && sudo ./actprep {1}'.format(
+    vm.RobustRemoteCommand('cd {0} && sudo ./target/bin/act_prep {1}'.format(
         ACT_DIR, device.GetDevicePath()))
 
   assert len(vm.scratch_disks) > FLAGS.act_reserved_partitions, (
@@ -90,24 +95,28 @@ def RunActPrep(vm):
       _RunActPrep, vm.scratch_disks[FLAGS.act_reserved_partitions:])
 
 
-def PrepActConfig(vm, index=None):
+def PrepActConfig(vm, load, index=None):
   """Prepare act config file at remote VM."""
   if index is None:
     disk_lst = vm.scratch_disks
     # Treat first few partitions as reserved.
     disk_lst = disk_lst[FLAGS.act_reserved_partitions:]
-    config_file = 'actconfig.txt'
+    config_file = 'actconfig_{0}.txt'.format(load)
   else:
     disk_lst = [vm.scratch_disks[index]]
-    config_file = 'actconfig_{0}.txt'.format(index)
+    config_file = 'actconfig_{0}_{1}.txt'.format(index, load)
   devices = ','.join([d.GetDevicePath() for d in disk_lst])
   num_disk = len(disk_lst)
   # render template:
   content = ACT_CONFIG_TEMPLATE.format(
       devices=devices,
       duration=FLAGS.act_duration,
-      read_iops=_CalculateReadIops(num_disk, FLAGS.act_load),
-      write_iops=_CalculateWriteIops(num_disk, FLAGS.act_load))
+      read_iops=_CalculateReadIops(num_disk, load),
+      write_iops=_CalculateWriteIops(num_disk, load))
+  if FLAGS.act_num_queues:
+    content += 'num-queues: %d\n' % FLAGS.act_num_queues
+  if FLAGS.act_threads_per_queue:
+    content += 'threads-per-queue: %d\n' % FLAGS.act_threads_per_queue
   logging.info('ACT config: %s', content)
   with tempfile.NamedTemporaryFile(delete=False) as tf:
     tf.write(content)
@@ -115,27 +124,33 @@ def PrepActConfig(vm, index=None):
     vm.PushDataFile(tf.name, config_file)
 
 
-def RunAct(vm, index=None):
+def RunAct(vm, load, index=None):
   """Runs act binary with provided config."""
   if index is None:
-    config = 'actconfig.txt'
-    output = 'output'
+    config = 'actconfig_{0}.txt'.format(load)
+    output = 'output_{0}'.format(load)
     act_config_metadata = {'device_index': 'all'}
   else:
-    config = 'actconfig_{0}.txt'.format(index)
-    output = 'output_{0}'.format(index)
+    config = 'actconfig_{0}_{1}.txt'.format(index, load)
+    output = 'output_{0}_{1}'.format(index, load)
     act_config_metadata = {'device_index': index}
   # Push config file to remote VM.
   vm.RobustRemoteCommand(
-      'cd {0} && sudo ./act ~/{1} > ~/{2}'.format(
+      'cd {0} && sudo ./target/bin/act_storage ~/{1} > ~/{2}'.format(
           ACT_DIR, config, output))
-  # Shows 1,2,4,8,..,64
+  # Shows 1,2,4,8,..,64.
   out, _ = vm.RemoteCommand(
-      'cd {0} && ./latency_calc/act_latency.py -n 7 -e 1 -l ~/{1}'.format(
-          ACT_DIR, output))
+      'cd {0} ; ./analysis/act_latency.py -n 7 -e 1 -x -l ~/{1}; exit 0'.format(
+          ACT_DIR, output), ignore_failure=True)
   samples = ParseRunAct(out)
+  last_output_block, _ = vm.RemoteCommand('tail -n 100 ~/{0}'.format(output))
+
+  # Early termination.
+  if 'drive(s) can\'t keep up - test stopped' in last_output_block:
+    act_config_metadata['ERROR'] = 'cannot keep up'
   act_config_metadata.update(
-      GetActMetadata(len(vm.scratch_disks) - FLAGS.act_reserved_partitions))
+      GetActMetadata(
+          len(vm.scratch_disks) - FLAGS.act_reserved_partitions, load))
   for s in samples:
     s.metadata.update(act_config_metadata)
   return samples
@@ -145,25 +160,16 @@ def ParseRunAct(out):
   """Parse act output.
 
   Raw output format:
-           trans                  device
-         %>(ms)                 %>(ms)
-   slice        1      8     64        1      8     64
-   -----   ------ ------ ------   ------ ------ ------
-       1     1.67   0.00   0.00     1.63   0.00   0.00
-       2     1.38   0.00   0.00     1.32   0.00   0.00
-       3     1.80   0.14   0.00     1.56   0.08   0.00
-       4     1.43   0.00   0.00     1.39   0.00   0.00
-       5     1.68   0.00   0.00     1.65   0.00   0.00
-       6     1.37   0.00   0.00     1.33   0.00   0.00
-       7     1.44   0.00   0.00     1.41   0.00   0.00
-       8     1.41   0.00   0.00     1.35   0.00   0.00
-       9     2.70   0.73   0.00     1.91   0.08   0.00
-      10     1.54   0.00   0.00     1.51   0.00   0.00
-      11     1.53   0.00   0.00     1.48   0.00   0.00
-      12     1.47   0.00   0.00     1.43   0.00   0.00
-   -----   ------ ------ ------   ------ ------ ------
-     avg     1.62   0.07   0.00     1.50   0.01   0.00
-     max     2.70   0.73   0.00     1.91   0.08   0.00
+          reads                             device-reads
+          %>(ms)                            %>(ms)
+  slice        1      2      4       rate        1      2      4       rate
+  -----   ------ ------ ------ ----------   ------ ------ ------ ----------
+      1     0.00   0.00   0.00     6000.0     0.00   0.00   0.00     6000.0
+      2     0.00   0.00   0.00     6000.0     0.00   0.00   0.00     6000.0
+      3     0.01   0.00   0.00     6000.0     0.01   0.00   0.00     6000.0
+  -----   ------ ------ ------ ----------   ------ ------ ------ ----------
+    avg     0.00   0.00   0.00     6000.0     0.00   0.00   0.00     6000.0
+    max     0.01   0.00   0.00     6000.0     0.01   0.00   0.00     6000.0
 
   Args:
     out: string. Output from act test.
@@ -184,7 +190,7 @@ def ParseRunAct(out):
       continue
     if vals[0] == 'slice':
       for v in vals[1:]:
-        buckets.append(int(v))
+        buckets.append(v)
       continue
     if not buckets:
       continue
@@ -192,36 +198,47 @@ def ParseRunAct(out):
     if vals[0] in ('avg', 'max'):
       matrix = '_' + vals[0]
     num_buckets = (len(vals) - 1) / 2
-    for i in xrange(num_buckets):
+    for i in xrange(num_buckets - 1):
       assert buckets[i] == buckets[i + num_buckets]
       ret.append(
-          sample.Sample('trans' + matrix, float(vals[i + 1]), '%>(ms)',
+          sample.Sample('reads' + matrix, float(vals[i + 1]), '%>(ms)',
                         {'slice': vals[0],
-                         'bucket': buckets[i]}))
+                         'bucket': int(buckets[i])}))
       ret.append(
-          sample.Sample('device' + matrix,
+          sample.Sample('device_reads' + matrix,
                         float(vals[i + num_buckets + 1]), '%>(ms)',
                         {'slice': vals[0],
-                         'bucket': buckets[i + num_buckets]}))
+                         'bucket': int(buckets[i + num_buckets])}))
+    ret.append(
+        sample.Sample('read_rate' + matrix,
+                      float(vals[num_buckets]), 'iops',
+                      {'slice': vals[0]}))
+    ret.append(
+        sample.Sample('device_read_rate' + matrix,
+                      float(vals[-1]), 'iops',
+                      {'slice': vals[0]}))
   return ret
 
 
-def GetActMetadata(num_disk):
+def GetActMetadata(num_disk, load):
+  """Returns metadata for act test."""
   # TODO(user): Expose more stats and flags.
-  return {
+  metadata = {
+      'act-version': '5.0',
       'act-parallel': FLAGS.act_parallel,
       'reserved_partition': FLAGS.act_reserved_partitions,
       'device-count': num_disk,
-      'num-queues': 8,
-      'threads-per-queues': 8,
       'test-duration-sec': FLAGS.act_duration,
       'report-interval-sec': 1,
       'large-block-op-kbytes': 128,
       'record-bytes': 1536,
-      'read-reqs-per-sec': _CalculateReadIops(num_disk, FLAGS.act_load),
-      'write-reqs-per-sec': _CalculateWriteIops(num_disk, FLAGS.act_load),
+      'read-reqs-per-sec': _CalculateReadIops(num_disk, load),
+      'write-reqs-per-sec': _CalculateWriteIops(num_disk, load),
       'microsecond-histograms': 'no',
       'scheduler-mode': 'noop'}
+  metadata['num-queues'] = FLAGS.act_num_queues or 'default'
+  metadata['threads-per-queues'] = FLAGS.act_threads_per_queue or 'default'
+  return metadata
 
 
 def _CalculateReadIops(num_disk, load_multiplier):
@@ -230,3 +247,13 @@ def _CalculateReadIops(num_disk, load_multiplier):
 
 def _CalculateWriteIops(num_disk, load_multiplier):
   return int(_WRITE_1X_1D * num_disk * load_multiplier)
+
+
+def IsRunComplete(samples):
+  """Decides if the run is able to complete (regardless of latency)."""
+  for s in samples:
+    if s.metric == 'Failed:NotEnoughSample':
+      return False
+    if 'ERROR' in s.metadata:
+      return False
+  return True

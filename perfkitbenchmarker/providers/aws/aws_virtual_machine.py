@@ -18,9 +18,12 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import base64
 import collections
-from collections import OrderedDict
 import json
 import logging
 import posixpath
@@ -41,13 +44,14 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
 HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3'])
+NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3', 't3'])
 # Following dictionary based on
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
 NUM_LOCAL_VOLUMES = {
@@ -64,6 +68,7 @@ NUM_LOCAL_VOLUMES = {
     'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
     'd2.8xlarge': 24, 'i3.large': 1, 'i3.xlarge': 1,
     'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8,
+    'i3.metal': 8,
     'c5d.large': 1, 'c5d.xlarge': 1, 'c5d.2xlarge': 1, 'c5d.4xlarge': 1,
     'c5d.9xlarge': 1, 'c5d.18xlarge': 2,
     'm5d.large': 1, 'm5d.xlarge': 1, 'm5d.2xlarge': 1, 'm5d.4xlarge': 2,
@@ -75,7 +80,8 @@ NUM_LOCAL_VOLUMES = {
     'x1.16xlarge': 1, 'x1.32xlarge': 2,
     'x1e.xlarge': 1, 'x1e.2xlarge': 1, 'x1e.4xlarge': 1, 'x1e.8xlarge': 1,
     'x1e.16xlarge': 1, 'x1e.32xlarge': 2,
-    'f1.2xlarge': 1, 'f1.4xlarge': 1, 'f1.16xlarge': 4
+    'f1.2xlarge': 1, 'f1.4xlarge': 1, 'f1.16xlarge': 4,
+    'p3dn.24xlarge': 2
 }
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
@@ -199,8 +205,8 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
 
   if (machine_type in NUM_LOCAL_VOLUMES and
       not aws_disk.LocalDriveIsNvme(machine_type)):
-    for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
-      od = OrderedDict()
+    for i in range(NUM_LOCAL_VOLUMES[machine_type]):
+      od = collections.OrderedDict()
       od['VirtualName'] = 'ephemeral%s' % i
       od['DeviceName'] = '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
       mappings.append(od)
@@ -633,9 +639,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append('--placement=%s' % placement)
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
+    if self.capacity_reservation_id:
+      create_cmd.append(
+          '--capacity-reservation-specification=CapacityReservationTarget='
+          '{CapacityReservationId=%s}' % self.capacity_reservation_id)
     if self.use_spot_instance:
-      instance_market_options = OrderedDict()
-      spot_options = OrderedDict()
+      instance_market_options = collections.OrderedDict()
+      spot_options = collections.OrderedDict()
       spot_options['SpotInstanceType'] = 'one-time'
       spot_options['InstanceInterruptionBehavior'] = 'terminate'
       if self.spot_price:

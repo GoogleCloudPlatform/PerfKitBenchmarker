@@ -21,7 +21,8 @@
 - Benchmarks are expected to not modify FLAGS in any way. If FLAGS are modified
   and multiple run configurations are run in a single PKB invocation, benchmark
   configurations may be incorrect.
-- Changed TF Serving benchmark to use ResNet instead of Inception
+- Changed TF Serving benchmark to use ResNet instead of Inception.
+- Renamed prepare_sleep_time flag to after_prepare_sleep_time.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -59,7 +60,7 @@
 - Added support for custom machine types on GKE.
 - Added `container_cluster_version` flag to container_service.py.
 - AWS EFS support via "disk_type: nfs"
-- Added disk_fill_size and prepare_sleep_time flags
+- Added --disk_fill_size and --after_prepare_sleep_time flags
 - Add timeout_minutes flag to assist with cleaning up stale resources
 - All AWS resources and Azure resource groups are now tagged. (including timeout_minutes value).
 - Added windows udp test using iperf3.
@@ -85,6 +86,24 @@
 - Adding support for AWS ARM machine types.
 - Adding support for AWS ARM machines on SPECCPU.
 - Added Horovod distributed Tensorflow traning benchmark.
+- Added support for capacity reservations for VMs and added AWS implementation.
+- Added support for adding additional flags to mount and /etc/fstab.
+- Added support for Windows2012, 2016, and 2019 for GCP.
+- Terasort implementation on dpb backend.
+- Added cluster boot benchmark implementation on dpb backend.
+- Support multiple redis versions in cloud redis.
+- Azure Files support via "disk_type: smb"
+- Added MLPerf benchmark.
+- Added stress-ng benchmark.
+- Added flag --after_run_sleep_time which instructs PKB to sleep for the number
+  of seconds specified after the run stage has completed.
+- Added P5 cache type for Azure managed redis.
+- Added AWS elasticache Memcached provider.
+- Added additional options to the stress-ng benchmark.
+- Added support for launching GCE VMs into the standard network tier.
+- Added a demo under tools/.
+- Added Nginx benchmark.
+- Added support for measuring VM reboot time to the cluster boot benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -120,7 +139,7 @@
 - Added `copy_benchmark_single_file_mb` flag for single file support.
 - Record guest system information.
 - Support for static edw clusters.
-- Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
+- Add more granularity to FAILED benchmarks with FailedSubstatus (AWS, Azure, GCP).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
 - Update configurable parameters for ycsb benchmarks.
@@ -224,6 +243,42 @@
 - Support Hadoop 3.x.x in hadoop_terasort
 - Add z1 support for NVME disks.
 - Add default tags to dataproc.
+- Adding default run configurations for spec17 when none
+  of os_type, runspec_config or is_partial_results flags is set.
+- Add a flag to control the number of worker threads used by the
+  memcached server
+- Add default tags to GKE.
+- Add support for using real data from GCS and add support to download GCS data
+  to vm in the Tensorflow benchmark.
+- Added flag `nttcp_config_list` to allow the user to supply a list of test
+  configurations, all to be run in a single run phase.
+- Add support for `--nouse_pkb_logging` to use standard ABSL logging instead.
+- Improved support for booting more than 200 VMs with the cluster_boot benchmark.
+- Adding version support to redis server and setting permissions for newer redis versions.
+- Introduced app service metadata to indicate backend concurrency.
+- Added `--ssh_reuse_connections` to reuse SSH connections which speeds up benchmarks with lots of short commands.
+- Add abstract PreDelete method to the base resource class.
+- Add ability for linux vms to print the dmesg command before termination
+  using the flag '--log_dmesg'.
+- TPU and its GCS bucket should be in the same region.
+- Adding field count and field length flag overrides to ycsb load.
+- Added `--ssh_server_alive_interval` and `ssh_server_alive_count_max` to adjust SSH server alive options.
+- Support for cloud SMB services (no implementation).
+- Added rwmixread option to fio scenarios. This option is ignored unless a split
+  read/write workload is specified.
+- Added gce_local_ssd_count and gce_local_ssd_interface metadata to
+  GceVirtualMachine.
+- Added option to use real training data to the Horovod benchmark.
+- Added support to record individual latency samples in the object_storage_service
+  benchmark using the flag --record_individual_latency_samples.
+- Added `--ssh_retries` to adjust the number of times we retry for errors with a
+  255 error code.
+- Added `--num_benchmark_copies` which controls the number of copies of each
+  configuration to run.
+- Added `--zone multistring` flag as an additional way to specify zones. It can be
+  used in conjunction with the `--zones` flag.
+- Added `--before_cleanup_pause` to ease debugging.
+- Added support for CUDA 10.1.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -335,7 +390,7 @@
 - Fix PSPing benchmark so that it runs on AWS and Azure.
 - Upgrade CPU pip package version in the Tensorflow benchmark to version 1.6.
 - Moved from ACS to AKS for Azure Kubernetes clusters.
-- Cleanup and fix Beam bechmark.
+- Cleanup and fix Beam benchmark.
 - Sysbench failover tests added for GCP and AWS Aurora
 - Sysbench qps metric added
 - Fixed a bug of checking TPU exist.
@@ -369,3 +424,28 @@
 - Ensure randomly generated windows passwords start with a character.
 - Upgrade Tensorflow version to 1.12.
 - Install NCCL when installing Tensorflow with GPU support.
+- Update AzureBlobStorageService to persist for max of `--timeout_minutes` and `--persistent_timeout_minutes`.
+- Update S3Service to persist for max of `--timeout_minutes` and `--persistent_timeout_minutes`.
+- Add --project flag to GoogleCloudStorageService MakeBucket command.
+- Fix virtual_machine.GetResourceMetadata() so that it does not try to gather
+  metadata from a VM that has not been provisioned yet.
+- TPU Pod doesn't support eval. Stop Evaluation in train phrase in MNIST benchmark.
+- Global steps was set incorrectly in Inception3 benchmark.
+- Add AWS T3 instances to list of non-placement group capable machine types.
+- Refactor managed redis resource base class into managed memory store resource base class
+- Remove flag tpu_zone because VM and TPU should be in the same zone.
+- Refactoring managed_memorystore to add GetIp, GetPort and GetPassword class methods for managed_memorystore base class.
+- Run individual stressors in stress-ng one by one.
+- Upgrade gcp cloud redis to use prod gcloud.
+- Upgrade glibc_benchmark's version of glibc to 2.29.
+- Add number of disks for AWS i3.metal instance to configuration
+- Fix bug in Azure disk letter assignment when attaching more than 24 disks.
+- Incremental fixes to support Python3.
+- Fix bug in Azure Windows VM names for long run URIs where the name could be
+  longer than 15 characters.
+- Update aws dynamodb_ycsb_benchmark to use aws credentials from the runner vm.
+- Reboot immediately during call to ApplySysCtlPersient.
+- Set lower tcp keepalive thresholds on netperf vms.
+- Introduced NumCpusForBenchmark() which should be used instead of num_cpus for benchmark configuration.
+- Use stat -c %z /proc/ instead of uptime -s to find a boot timestamp since it
+  is more universal.

@@ -55,6 +55,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   CLOUD = providers.GCP
   SERVICE_TYPE = 'dataproc'
+  PERSISTENT_FS_PREFIX = 'gs://'
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
@@ -116,6 +117,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.boot_disk_size:
         self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role),
                        self.spec.worker_group.vm_spec.boot_disk_size)
+      # Set boot_disk_type
+      if self.spec.worker_group.vm_spec.boot_disk_type:
+        self._AddToCmd(cmd, '{0}-boot-disk-type'.format(role),
+                       self.spec.worker_group.vm_spec.boot_disk_type)
 
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
@@ -126,6 +131,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     if self.dpb_dataproc_image_version:
       cmd.flags['image-version'] = self.dpb_dataproc_image_version
+
+    if FLAGS.gcp_dataproc_image:
+      cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     # TODO(saksena): Retrieve the cluster create time and hold in a var
@@ -162,7 +170,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """See base class."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['labels'] = util.MakeFormattedDefaultLabels()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if classname:
       cmd.flags['jars'] = jarfile

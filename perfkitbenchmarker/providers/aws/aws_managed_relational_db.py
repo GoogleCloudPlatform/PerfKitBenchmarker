@@ -162,18 +162,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _GetNewZones(self):
     """Returns a list of zones, excluding the one that the client VM is in."""
-    zones = self.zones
-    region = self.region
-    get_zones_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-availability-zones',
-        '--region={0}'.format(region)
-    ]
-    stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
-    response = json.loads(stdout)
-    all_zones = [item['ZoneName'] for item in response['AvailabilityZones']
-                 if item['State'] == 'available']
-    for zone in zones:
+    all_zones = util.GetZonesInRegion(self.region)
+    for zone in self.zones:
       all_zones.remove(zone)
     return all_zones
 
@@ -389,6 +379,18 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       raise Exception('Unknown how to create AWS data base engine {0}'.format(
           self.spec.engine))
 
+  def _IsDeleting(self):
+    """See Base class BaseResource in perfkitbenchmarker.resource.py."""
+
+    for instance_id in self.all_instance_ids:
+      json_output = self._DescribeInstance(instance_id)
+      if json_output:
+        state = json_output['DBInstances'][0]['DBInstanceStatus']
+        if state == 'deleting':
+          return True
+
+    return False
+
   def _Delete(self):
     """Deletes the underlying resource.
 
@@ -424,14 +426,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     exceptions.
     """
     for current_instance_id in self.all_instance_ids:
-      cmd = util.AWS_PREFIX + [
-          'rds',
-          'describe-db-instances',
-          '--db-instance-identifier=%s' % current_instance_id,
-          '--region=%s' % self.region
-      ]
-      _, _, retcode = vm_util.IssueCommand(cmd)
-      if retcode != 0:
+      json_output = self._DescribeInstance(current_instance_id)
+      if not json_output:
         return False
 
     return True
@@ -501,11 +497,15 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       if len(self.zones) > 1:
         self.secondary_zone = ','.join(self.zones[1:])
     else:
+      db_instance = describe_instance_json['DBInstances'][0]
       self.primary_zone = (
-          describe_instance_json['DBInstances'][0]['AvailabilityZone'])
+          db_instance['AvailabilityZone'])
       if self.spec.high_availability:
-        self.secondary_zone = (describe_instance_json['DBInstances'][0]
-                               ['SecondaryAvailabilityZone'])
+        if 'SecondaryAvailabilityZone' in db_instance:
+          self.secondary_zone = db_instance['SecondaryAvailabilityZone']
+        else:
+          # the secondary DB for RDS is in the second subnet.
+          self.secondary_zone = self.subnets_used_by_db[1].zone
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
@@ -521,7 +521,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         or an Exception occurred.
     """
 
-    if len(self.all_instance_ids) == 0:
+    if not self.all_instance_ids:
       return False
 
     for instance_id in self.all_instance_ids:
@@ -585,18 +585,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
       json_output = self._DescribeInstance(instance_id)
-      try:
-        state = json_output['DBInstances'][0]['DBInstanceStatus']
-        pending_values = json_output['DBInstances'][0]['PendingModifiedValues']
-        logging.info('Instance state: %s', state)
-        if pending_values:
-          logging.info('Pending values: %s', (str(pending_values)))
+      if json_output:
+        try:
+          state = json_output['DBInstances'][0]['DBInstanceStatus']
+          pending_values = (
+              json_output['DBInstances'][0]['PendingModifiedValues'])
+          logging.info('Instance state: %s', state)
+          if pending_values:
+            logging.info('Pending values: %s', (str(pending_values)))
 
-        if state == 'available' and not pending_values:
-          break
-      except:
-        logging.exception('Error attempting to read stdout. Creation failure.')
-        return False
+          if state == 'available' and not pending_values:
+            break
+        except:
+          logging.exception(
+              'Error attempting to read stdout. Creation failure.')
+          return False
       time.sleep(5)
 
     return True
@@ -608,7 +611,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--db-instance-identifier=%s' % instance_id,
         '--region=%s' % self.region
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, suppress_warning=True)
+    if retcode != 0:
+      return None
     json_output = json.loads(stdout)
     return json_output
 

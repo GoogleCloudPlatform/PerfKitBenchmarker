@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains classes/functions related to Azure Blob Storage."""
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
@@ -55,7 +57,8 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         azure_network.AzureResourceGroup(
             resource_group_name,
             existing_resource_group is not None,
-            timeout_minutes=FLAGS.persistent_timeout_minutes)
+            timeout_minutes=max(FLAGS.timeout_minutes,
+                                FLAGS.persistent_timeout_minutes))
     self.resource_group.Create()
 
     # We use a different Azure storage account than the VM account

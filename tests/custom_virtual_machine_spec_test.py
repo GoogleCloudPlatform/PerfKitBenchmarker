@@ -18,10 +18,13 @@ import unittest
 
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
+import six
 
 
 _COMPONENT = 'test_component'
 _FLAGS = None
+
+_STRING_TYPE_NAME = six.string_types[0].__name__
 
 
 class MemoryDecoderTestCase(unittest.TestCase):
@@ -97,7 +100,7 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
           _COMPONENT, cpus=1, memory=None)
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.memory value: "None" (of type "NoneType"). '
-        'Value must be one of the following types: basestring.'))
+        'Value must be one of the following types: %s.' % _STRING_TYPE_NAME))
 
 
 class MachineTypeDecoderTestCase(unittest.TestCase):
@@ -124,8 +127,8 @@ class MachineTypeDecoderTestCase(unittest.TestCase):
       self.decoder.Decode(None, _COMPONENT, {})
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.machine_type value: "None" (of type '
-        '"NoneType"). Value must be one of the following types: basestring, '
-        'dict.'))
+        '"NoneType"). Value must be one of the following types: %s, '
+        'dict.' % _STRING_TYPE_NAME))
 
   def testDecodeInvalidValue(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:

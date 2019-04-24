@@ -29,6 +29,9 @@ MEMCACHED_PORT = 11211
 flags.DEFINE_integer('memcached_size_mb', 64,
                      'Size of memcached cache in megabytes.')
 
+flags.DEFINE_integer('memcached_num_threads', 4,
+                     'Number of worker threads.')
+
 
 def _Install(vm):
   """Installs the memcached server on the VM."""
@@ -106,6 +109,10 @@ def ConfigureAndStart(vm):
   vm.RemoteCommand(
       'sudo sed -i "s/-p .*/-m {port}/g" /etc/memcached.conf'.format(
           port=MEMCACHED_PORT))
+
+  vm.RemoteCommand(
+      'echo "-t {threads}" | sudo tee -a /etc/memcached.conf'.format(
+          threads=FLAGS.memcached_num_threads))
 
   # restart the default running memcached to run it with custom configurations.
   vm.RemoteCommand('sudo service memcached restart')

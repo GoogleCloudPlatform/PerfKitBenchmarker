@@ -13,10 +13,6 @@ flags.DEFINE_string('bq_project_id', None, 'Project Id which contains the query'
                                            ' dataset and table.')
 flags.DEFINE_string('bq_dataset_id', None, 'Dataset Id which contains the query'
                                            ' table.')
-flags.DEFINE_boolean('collect_output', False, 'Flag indicating if query results'
-                                              ' should be collected.')
-flags.DEFINE_string('output_table', 'result_table', 'Table for query output.')
-
 flags.mark_flags_as_required(['bq_project_id', 'bq_dataset_id'])
 
 FLAGS = flags.FLAGS
@@ -36,6 +32,4 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
   """
   cmd_list = [driver, FLAGS.bq_project_id, FLAGS.bq_dataset_id,
               script, output, error]
-  if FLAGS.collect_output:
-    cmd_list.extend(['true', FLAGS.output_table])
   return cmd_list

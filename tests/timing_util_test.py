@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
 import re
 import unittest
+import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample

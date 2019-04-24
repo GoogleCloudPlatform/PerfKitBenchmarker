@@ -11,13 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.gcp.util"""
+"""Tests for perfkitbenchmarker.providers.gcp.util."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import unittest
 import mock
 
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
+import six
 
 
 _GCLOUD_PATH = 'path/gcloud'
@@ -26,7 +31,7 @@ _GCLOUD_PATH = 'path/gcloud'
 class GceResource(resource.BaseResource):
 
   def __init__(self, **kwargs):
-    for k, v in kwargs.iteritems():
+    for k, v in six.iteritems(kwargs):
       setattr(self, k, v)
 
   def _Create(self):
@@ -48,25 +53,28 @@ class GcloudCommandTestCase(unittest.TestCase):
   def testCommonFlagsWithoutOptionalFlags(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    self.assertEqual(cmd._GetCommand(), [
+    self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-        '--quiet'])
+        '--quiet'
+    ])
 
   def testCommonFlagsWithOptionalFlags(self):
     gce_resource = GceResource(project='test-project', zone='test-zone')
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    self.assertEqual(cmd._GetCommand(), [
+    self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-        '--quiet', '--project', 'test-project', '--zone', 'test-zone'])
+        '--quiet', '--project', 'test-project', '--zone', 'test-zone'
+    ])
 
   def testListValue(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'instances', 'create')
     cmd.flags['local-ssd'] = ['interface=nvme', 'interface=SCSI']
-    self.assertEqual(cmd._GetCommand(), [
+    self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'instances', 'create', '--format', 'json',
         '--quiet', '--local-ssd', 'interface=nvme', '--local-ssd',
-        'interface=SCSI'])
+        'interface=SCSI'
+    ])
 
   def testIssue(self):
     gce_resource = GceResource(project=None)
@@ -106,6 +114,9 @@ class GcloudCommandTestCase(unittest.TestCase):
                                      '--format', 'json', '--quiet'])
     self.assertEqual(return_value, mock_issue_return_value)
 
+  def testGetRegionFromZone(self):
+    zone = 'us-central1-xyz'
+    self.assertEqual(util.GetRegionFromZone(zone), 'us-central1')
 
 if __name__ == '__main__':
   unittest.main()

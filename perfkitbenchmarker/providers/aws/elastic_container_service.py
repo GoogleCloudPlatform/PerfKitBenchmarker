@@ -15,7 +15,7 @@
 """Contains classes/functions related to EKS (Elastic Container Service).
 
 This requires that the eksServiceRole IAM role has already been created and
-requires that the heptio-authenticator-aws binary has been installed.
+requires that the aws-iam-authenticator binary has been installed.
 See https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html for
 instructions.
 """
@@ -35,32 +35,6 @@ from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 
-_AWS_KUBECONFIG = """
-apiVersion: v1
-clusters:
-- cluster:
-    server: {endpoint}
-    certificate-authority-data: {ca_cert}
-  name: kubernetes
-contexts:
-- context:
-    cluster: kubernetes
-    user: aws
-  name: aws
-current-context: aws
-kind: Config
-preferences: {{}}
-users:
-- name: aws
-  user:
-    exec:
-      apiVersion: client.authentication.k8s.io/v1alpha1
-      command: heptio-authenticator-aws
-      args:
-        - "token"
-        - "-i"
-        - "{name}"
-"""
 _CONFIG_MAP = """
 apiVersion: v1
 kind: ConfigMap
@@ -89,8 +63,6 @@ class _EksControlPlane(resource.BaseResource):
     self.request_token = str(uuid.uuid4())
     self.networks = networks
     self.cluster_version = FLAGS.container_cluster_version
-    self.endpoint = None
-    self.ca_cert = None
 
   def _GetVpcConfig(self):
     """Returns the formatted vpc config for the cluster."""
@@ -142,18 +114,17 @@ class _EksControlPlane(resource.BaseResource):
       describe_cmd.append('--no-verify-ssl')
     stdout, _, _ = vm_util.IssueCommand(describe_cmd)
     response = json.loads(stdout)
-    ready = response['cluster']['status'] != 'CREATING'
-    if ready:
-      self.endpoint = response['cluster']['endpoint']
-      self.ca_cert = response['cluster']['certificateAuthority']['data']
-    return ready
+    return response['cluster']['status'] != 'CREATING'
 
   def _PostCreate(self):
     """Sets up the kubeconfig for the cluster."""
-    kubeconfig = _AWS_KUBECONFIG.format(
-        endpoint=self.endpoint, ca_cert=self.ca_cert, name=self.name)
-    with open(FLAGS.kubeconfig, 'w') as f:
-      f.write(kubeconfig)
+    update_kubeconfig = util.AWS_PREFIX + [
+        '--region', self.region,
+        'eks', 'update-kubeconfig',
+        '--name', self.name,
+        '--kubeconfig', FLAGS.kubeconfig,
+    ]
+    vm_util.IssueCommand(update_kubeconfig)
 
 
 class _EksWorkers(resource.BaseResource):
