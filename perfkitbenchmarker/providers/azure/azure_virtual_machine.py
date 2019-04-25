@@ -25,6 +25,10 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import itertools
 import json
 import posixpath
@@ -46,6 +50,8 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
 
+import six
+from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -229,10 +235,10 @@ class AzureVirtualMachineMetaClass(resource.AutoRegisterResourceMeta):
           '{0} did not override IMAGE_URN'.format(self.__name__))
 
 
-class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
+class AzureVirtualMachine(
+    six.with_metaclass(AzureVirtualMachineMetaClass,
+                       virtual_machine.BaseVirtualMachine)):
   """Object representing an Azure Virtual Machine."""
-
-  __metaclass__ = AzureVirtualMachineMetaClass
   CLOUD = providers.AZURE
   # Subclasses should override IMAGE_URN.
   IMAGE_URN = None
@@ -336,7 +342,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ip_address = self.public_ip.GetIPAddress()
 
   def AddMetadata(self, **tags):
-    tag_list = ['tags.%s=%s' % (k, v) for k, v in tags.iteritems()]
+    tag_list = ['tags.%s=%s' % (k, v) for k, v in six.iteritems(tags)]
     vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'vm', 'update',
          '--name', self.name] + self.resource_group.args +
@@ -353,7 +359,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     disks = []
 
-    for _ in xrange(disk_spec.num_striped_disks):
+    for _ in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.SMB:
         data_disk = self._GetSmbService().CreateSmbDisk()
         disks.append(data_disk)
