@@ -15,9 +15,8 @@
 
 import os
 import unittest
-
-
 from perfkitbenchmarker.linux_packages import wrk
+import six
 
 
 class WrkParseOutputTestCase(unittest.TestCase):
@@ -40,7 +39,7 @@ class WrkParseOutputTestCase(unittest.TestCase):
                 ('throughput', 9605.69, 'requests/sec')]
 
     actual = list(wrk._ParseOutput(self.wrk_results))
-    self.assertItemsEqual(expected, actual)
+    six.assertCountEqual(self, expected, actual)
 
   def testFailsForEmptyString(self):
     with self.assertRaisesRegexp(ValueError, 'bar'):

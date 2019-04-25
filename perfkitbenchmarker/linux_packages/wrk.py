@@ -20,12 +20,11 @@ https://github.com/wg/wrk
 """
 
 import csv
-import io
 import posixpath
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
-
+import six
 
 WRK_URL = 'https://github.com/wg/wrk/archive/4.0.1.tar.gz'
 WRK_DIR = posixpath.join(INSTALL_DIR, 'wrk')
@@ -74,7 +73,7 @@ def _ParseOutput(output_text):
   """
   if _CSV_PREFIX not in output_text:
     raise ValueError('{0} not found in\n{1}'.format(_CSV_PREFIX, output_text))
-  csv_fp = io.BytesIO(str(output_text).rsplit(_CSV_PREFIX, 1)[-1])
+  csv_fp = six.StringIO(str(output_text).rsplit(_CSV_PREFIX, 1)[-1])
   reader = csv.DictReader(csv_fp)
   if (frozenset(reader.fieldnames) !=
       frozenset(['variable', 'value', 'unit'])):
