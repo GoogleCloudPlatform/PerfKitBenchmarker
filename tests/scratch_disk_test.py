@@ -77,7 +77,8 @@ class ScratchDiskTestMixin(object):
     # Patch subprocess.Popen to make sure we don't issue any commands to spin up
     # resources.
     self.patches.append(mock.patch('subprocess.Popen'))
-    self.patches.append(mock.patch(vm_util.__name__ + '.GetTempDir'))
+    self.patches.append(
+        mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir'))
 
     self._PatchCloudSpecific()
 
