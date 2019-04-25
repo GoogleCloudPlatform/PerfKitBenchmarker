@@ -152,9 +152,12 @@ class BaseSparkService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
-    basic_data = {'spark_service': self.SERVICE_NAME,
-                  'spark_svc_cloud': self.CLOUD,
-                  'spark_cluster_id': self.cluster_id}
+    basic_data = {
+        'spark_service': self.SERVICE_NAME,
+        'spark_svc_cloud': self.CLOUD,
+        'spark_cluster_id': self.cluster_id,
+        'spark_cluster_zone': getattr(self, 'zone', None) or 'unknown'
+    }
     # TODO grab this information for user_managed clusters.
     if not self.user_managed:
       basic_data.update({'num_workers': str(self.spec.worker_group.vm_count),
