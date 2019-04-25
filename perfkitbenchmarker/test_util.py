@@ -51,9 +51,8 @@ class SamplesTestMixin(object):
                      msg or 'Samples %s and %s have different values' % (a, b))
     self.assertEqual(a.unit, b.unit,
                      msg or 'Samples %s and %s have different units' % (a, b))
-    self.assertEqual(a.metadata, b.metadata,
-                     msg or 'Samples %s and %s have different metadata' %
-                     (a, b))
+    self.assertDictEqual(a.metadata, b.metadata, msg or
+                         'Samples %s and %s have different metadata' % (a, b))
     # Deliberately don't compare the timestamp fields of the samples.
 
   def assertSampleListsEqualUpToTimestamp(self, a, b, msg=None):
@@ -79,7 +78,7 @@ class SamplesTestMixin(object):
       try:
         self.assertSamplesEqualUpToTimestamp(a[i], b[i], msg=msg)
       except self.failureException as ex:
-        ex.message = ex.message + (' (was item %s in list)' % i)
+        ex.message = str(ex) + (' (was item %s in list)' % i)
         ex.args = (ex.message,)
         raise ex
 
