@@ -54,9 +54,7 @@ def Prepare(benchmark_spec):
     vm.AllowPort(ntttcp.CONTROL_PORT)
     # get the number of ports needed based on the flags
     num_ports = max([c.threads for c in ntttcp.ParseConfigList()])
-    for port in xrange(ntttcp.BASE_DATA_PORT,
-                       ntttcp.BASE_DATA_PORT + num_ports):
-      vm.AllowPort(port)
+    vm.AllowPort(ntttcp.BASE_DATA_PORT, ntttcp.BASE_DATA_PORT + num_ports)
 
 
 def _RunTest(benchmark_spec, sender, receiver, dest_ip, ip_type, conf,

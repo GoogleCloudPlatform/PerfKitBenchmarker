@@ -66,6 +66,12 @@ flags.DEFINE_integer(
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
+flags.DEFINE_bool(
+    'skip_firewall_rules', False,
+    'If set, this run will not create firewall rules. This is useful if the '
+    'user project already has all of the firewall rules in place and/or '
+    'creating new ones is expensive')
+
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.
 VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws']
@@ -324,12 +330,12 @@ class BaseVirtualMachine(resource.BaseResource):
 
   def AllowIcmp(self):
     """Opens ICMP protocol on the firewall corresponding to the VM if exists."""
-    if self.firewall:
+    if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowIcmp(self)
 
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
-    if self.firewall:
+    if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowPort(self, start_port, end_port)
 
   def AllowRemoteAccessPorts(self):
