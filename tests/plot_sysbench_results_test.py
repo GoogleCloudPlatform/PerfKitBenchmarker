@@ -13,8 +13,8 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.scripts.database_scripts.plot_sysbench_results.
 """
-import unittest
 import os
+import unittest
 from perfkitbenchmarker.scripts.database_scripts import plot_sysbench_results
 
 TEST_FILE_1 = '../tests/data/sysbench_stderr_output_sample.txt'
