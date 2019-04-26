@@ -280,6 +280,7 @@
   used in conjunction with the `--zones` flag.
 - Added `--before_cleanup_pause` to ease debugging.
 - Added support for CUDA 10.1.
+- Added `--skip_firewall_rules` flag to help manage firewall rule economy.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
