@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Plots per second output from mysql_service_benchmark STDERR files.
+
 Prerequisites/assumptions:
 Gnuplot must be installed on the machine to use this module.
   To check if gnuplot is installed on the machine enter:
@@ -37,9 +38,13 @@ How to use plot_sysbench_results:
   automatically add files as runs complete and plot after last thread count call
   finishes.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import datetime
-import plot_scatter_points
 import subprocess
+from . import plot_scatter_points
+from six.moves import range
 
 # Assumes Sysbench 0.5 stderr output.
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
@@ -59,6 +64,7 @@ class PatternNotFoundError(Exception):
 
 class Plotter():
   """Plotter generates a per second output graph of TPS vs Thread Values.
+
   Given run configurations, and run stderr filenames for any number of PKB runs,
   Plotter extracts TPS values and generates a gnuplot graph which can be
   uploaded to cloud storage.
@@ -71,13 +77,14 @@ class Plotter():
       run_uri: (string) run identifier.
     """
     self.run_uri = run_uri
-    self.data_entries_per_file = run_seconds / report_interval
+    self.data_entries_per_file = run_seconds // report_interval
     self.filename = self._generate_filename()
     self.max_tps = 0
     self.iterations = 0
 
   def _generate_filename(self):
     """Generates filename for parsed data.
+
     Returns:
       (string): Filename for gnuplot data (tps numbers).
     """
@@ -87,6 +94,7 @@ class Plotter():
 
   def add_file(self, filename):
     """Given STDERR filename for ONE run with a given thread count, add data.
+
     Args:
       filename: (string) Name of file to be parsed.
     Raises:
@@ -105,6 +113,7 @@ class Plotter():
 
   def _parse_file(self, f):
     """Parses stderr file, f, extracts list of TPS values.
+
     Assumes no warmup phase and only one report per file.
     Method will need to be updated if Sysbench output format changes. Assumes
     Sysbench 0.5.
@@ -138,6 +147,7 @@ class Plotter():
 
   def _add_data(self, data):
     """Given data, adds to self.filename.
+
     Args:
       data: list of tps values.
     """
