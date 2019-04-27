@@ -154,7 +154,7 @@ sysbench:
       os_type: ubuntu1604
       vm_spec:
         AWS:
-          machine_type: m4.4xlarge
+          machine_type: m5.4xlarge
           zone: us-west-1a
         Azure:
           machine_type: Standard_A8m_v2
