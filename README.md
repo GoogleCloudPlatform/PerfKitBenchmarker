@@ -85,10 +85,6 @@ Some of the benchmarks invoked require Java. You must also agree with the follow
 
   - `openjdk-7-jre`: [GPL v2 with the Classpath Exception](http://openjdk.java.net/legal/gplv2+ce.html)
 
-[CoreMark](http://www.eembc.org/coremark/) setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
-Benchmarker users must manually download the CoreMark tarball from their website and save it under the
-`perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/coremark_v1.0.tgz`)
-
 [SPEC CPU2006](https://www.spec.org/cpu2006/) benchmark setup cannot be
 automated. SPEC requires that users purchase a license and agree with their
 terms and conditions. PerfKit Benchmarker users must manually download
@@ -235,10 +231,10 @@ variables using an OpenStack RC file. For help, see [`OpenStack` docs](http://do
 Perfkit uses the `kubectl` binary in order to communicate with a Kubernetes cluster - you need to pass the path to the `kubectl` binary using the `--kubectl` flag. It's recommended to use [version 1.0.1](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl).
 Authentication to a Kubernetes cluster is done via a [`kubeconfig` file](https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using the `--kubeconfig` flag.
 
-**Image prerequisites**  
+**Image prerequisites**
 Please refer to the [Image prerequisites for Docker based clouds](#image-prerequisites-for-docker-based-clouds).
 
-**Kubernetes cluster configuration**  
+**Kubernetes cluster configuration**
 If your Kubernetes cluster is running on CoreOS:
 
 1. Fix `$PATH` environment variable so that the appropriate binaries can be found:
@@ -262,7 +258,7 @@ If your Kubernetes cluster is running on CoreOS:
 
 Note that some benchmarks must be run within a privileged container. By default Kubernetes doesn't allow containers to be scheduled in privileged mode - you have to add the `--allow-privileged=true` flag to `kube-apiserver` and each `kubelet` startup command.
 
-**Ceph integration**  
+**Ceph integration**
 When you run benchmarks with the standard scratch disk type (`--scratch_disk_type=standard` - which is a default option), Ceph storage will be used. There are some configuration steps you need to follow before you will be able to spawn Kubernetes PODs with Ceph volume. On each Kubernetes node, and on the machine which is running the Perfkit benchmarks, do the following:
 
 1. Copy `/etc/ceph` directory from Ceph-host.
@@ -305,7 +301,7 @@ You have [two Ceph authentication options](http://kubernetes.io/v1.0/examples/rb
 
    ```bash
    $ ceph auth get-key client.admin | base64
-   QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==  
+   QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==
    ```
 
    Create a file called `create_ceph_admin.yml` and replace the `key` value with the output from the previous command:
@@ -319,7 +315,7 @@ You have [two Ceph authentication options](http://kubernetes.io/v1.0/examples/rb
      key: QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==
    ```
 
-   Add secret to Kubernetes:  
+   Add secret to Kubernetes:
 
    ```bash
    $ kubectl create -f create_ceph_admin.yml
@@ -332,13 +328,13 @@ Mesos provider communicates with Marathon framework in order to manage Docker in
 
 Provider has been tested with Mesos v0.24.1 and Marathon v0.11.1.
 
-**Overlay network**  
+**Overlay network**
 Mesos on its own doesn't provide any solution for overlay networking. You need to configure your cluster so that the instances will live in the same network. For this purpose you may use Flannel, Calico, Weave, etc.
 
-**Mesos cluster configuration**  
+**Mesos cluster configuration**
 Make sure your Mesos-slave nodes are reachable (by hostname) from the machine which is used to run the benchmarks. In case they are not, edit the `/etc/hosts` file appropriately.
 
-**Image prerequisites**  
+**Image prerequisites**
 Please refer to the [Image prerequisites for Docker based clouds](#image-prerequisites-for-docker-based-clouds).
 
 ### Cloudstack: Install dependencies and set the API keys
@@ -437,7 +433,7 @@ Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
    $ sudo pip install -r perfkitbenchmarker/providers/alicloud/requirements.txt
    ```
    In some CentOS version, you may need:
-   
+
    ```bash
    $ sudo yum install libffi-devel.x86_64
    $ sudo yum install openssl-devel.x86_64
@@ -526,13 +522,13 @@ Get started by running:
 $ sudo pip install -r perfkitbenchmarker/providers/profitbricks/requirements.txt
 ```
 
-PerfKit Benchmarker uses the 
-<a href='http://docs.python-requests.org/en/master/'>Requests</a> module 
-to interact with ProfitBricks' REST API. HTTP Basic authentication is used 
+PerfKit Benchmarker uses the
+<a href='http://docs.python-requests.org/en/master/'>Requests</a> module
+to interact with ProfitBricks' REST API. HTTP Basic authentication is used
 to authorize access to the API. Please set this up as follows:
 
-Create a configuration file containing the email address and password 
-associated with your ProfitBricks account, separated by a colon. 
+Create a configuration file containing the email address and password
+associated with your ProfitBricks account, separated by a colon.
 Example:
 
 ```bash
@@ -540,7 +536,7 @@ $ less ~/.config/profitbricks-auth.cfg
 email:password
 ```
 
-The PerfKit Benchmarker will automatically base64 encode your credentials 
+The PerfKit Benchmarker will automatically base64 encode your credentials
 before making any calls to the REST API.
 
 PerfKit Benchmarker uses the file location `~/.config/profitbricks-auth.cfg`

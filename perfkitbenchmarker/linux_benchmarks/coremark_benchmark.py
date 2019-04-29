@@ -22,10 +22,11 @@ Coremark homepage: http://www.eembc.org/coremark/
 """
 
 import logging
+import posixpath
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
@@ -38,10 +39,15 @@ coremark:
       vm_spec: *default_single_core
 """
 
-COREMARK_TAR = 'coremark_v1.0.tgz'
-COREMARK_DIR = 'coremark_v1.0'
+COREMARK_TAR_URL = 'https://github.com/eembc/coremark/archive/v1.01.tar.gz'
+COREMARK_TAR = 'v1.01.tar.gz'
+COREMARK_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'coremark-1.01')
 COREMARK_BUILDFILE = 'linux64/core_portme.mak'
-ITERATIONS_PER_CPU = 200000
+
+# The number of iterations per CPU was chosen such that the runtime will always
+# be greater than 10 seconds as specified in the run rules at
+# https://www.eembc.org/coremark/CoreMarkRunRules.pdf.
+ITERATIONS_PER_CPU = 1000000
 
 
 def GetConfig(user_config):
@@ -49,12 +55,8 @@ def GetConfig(user_config):
 
 
 def CheckPrerequisites(benchmark_config):
-  """Verifies that the required resources are present.
-
-  Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-  """
-  data.ResourcePath(COREMARK_TAR)
+  """Verifies that the required resources are present."""
+  del benchmark_config
 
 
 def Prepare(benchmark_spec):
@@ -68,14 +70,11 @@ def Prepare(benchmark_spec):
   vm = vms[0]
   logging.info('prepare Coremark on %s', vm)
   vm.Install('build_tools')
-  try:
-    file_path = data.ResourcePath(COREMARK_TAR)
-  except data.ResourceNotFound:
-    logging.error('Please provide %s under perfkitbenchmarker/data directory '
-                  'before running coremark benchmark.', COREMARK_TAR)
-    raise errors.Benchmarks.PrepareException('%s not found' % COREMARK_TAR)
-  vm.PushFile(file_path)
-  vm.RemoteCommand('tar xvfz %s' % COREMARK_TAR)
+  vm.Install('wget')
+  vm.RemoteCommand('wget %s -P %s' %
+                   (COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
+  vm.RemoteCommand('cd %s && tar xvfz %s' %
+                   (linux_packages.INSTALL_DIR, COREMARK_TAR))
   vm.RemoteCommand('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
                    '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
 
@@ -89,6 +88,9 @@ def Run(benchmark_spec):
 
   Returns:
     A list of sample.Sample objects.
+
+  Raises:
+    Benchmarks.RunError: If correct operation is not validated.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -98,10 +100,40 @@ def Run(benchmark_spec):
                    '-DMULTITHREAD=%d -DUSE_PTHREAD -DPERFORMANCE_RUN=1"'
                    % (COREMARK_DIR, ITERATIONS_PER_CPU, num_benchmark_cpus))
   logging.info('Coremark Results:')
-  stdout, _ = vm.RemoteCommand(
+  output, _ = vm.RemoteCommand(
       'cat %s/run1.log' % COREMARK_DIR, should_log=True)
-  value = regex_util.ExtractFloat(r'CoreMark 1.0 : ([0-9]*\.[0-9]*)', stdout)
-  metadata = {}
+  return _ParseOutputForSamples(output)
+
+
+def _ParseOutputForSamples(output):
+  """Parses the output from running Coremark to get performance samples.
+
+  Args:
+    output: The output from running Coremark.
+
+  Returns:
+    A list of sample.Sample objects.
+
+  Raises:
+    Benchmarks.RunError: If correct operation is not validated.
+  """
+  if 'Correct operation validated' not in output:
+    raise errors.Benchmarks.RunError('Correct operation not validated.')
+  value = regex_util.ExtractFloat(r'CoreMark 1.0 : ([0-9]*\.[0-9]*)', output)
+  metadata = {
+      'summary':
+          output.splitlines()[-1],  # Last line of output is a summary.
+      'size':
+          regex_util.ExtractInt(r'CoreMark Size\s*:\s*([0-9]*)', output),
+      'total_ticks':
+          regex_util.ExtractInt(r'Total ticks\s*:\s*([0-9]*)', output),
+      'total_time_sec':
+          regex_util.ExtractFloat(r'Total time \(secs\)\s*:\s*([0-9]*\.[0-9]*)',
+                                  output),
+      'iterations':
+          regex_util.ExtractInt(r'Iterations\s*:\s*([0-9]*)', output),
+      'iterations_per_cpu': ITERATIONS_PER_CPU,
+  }
   return [sample.Sample('Coremark Score', value, '', metadata)]
 
 
