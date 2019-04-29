@@ -13,9 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
-import mock
 import unittest
 
+import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -74,7 +74,7 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
-    p = mock.patch(vm_util.__name__ + '.GetTempDir')
+    p = mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')
     p.start()
     self.addCleanup(p.stop)
 
