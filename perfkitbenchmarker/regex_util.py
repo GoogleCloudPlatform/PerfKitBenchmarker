@@ -33,7 +33,7 @@ class TooManyMatchesError(ValueError):
 
 
 def ExtractGroup(regex, text, group=1, flags=0):
-  """Extracts a float from a regular expression matched to 'text'.
+  """Extracts a string from a regular expression matched to 'text'.
 
   Args:
     regex: string or regexp pattern. Regular expression.
@@ -42,7 +42,7 @@ def ExtractGroup(regex, text, group=1, flags=0):
       string.
     flags: int. Flags to pass to re.search().
   Returns:
-    A floating point number matched by 'regex' on 'text'.
+    A string matched by 'regex' on 'text'.
   Raises:
     NoMatchError: when 'regex' does not match 'text'.
     IndexError: when 'group' is not present in the match.
@@ -61,6 +61,11 @@ def ExtractGroup(regex, text, group=1, flags=0):
 def ExtractFloat(regex, text, group=1):
   """Extracts a float from a regular expression matched to 'text'."""
   return float(ExtractGroup(regex, text, group=group))
+
+
+def ExtractInt(regex, text, group=1):
+  """Extracts an int from a regular expression matched to 'text'."""
+  return int(ExtractGroup(regex, text, group=group))
 
 
 def ExtractAllFloatMetrics(text,
@@ -95,7 +100,7 @@ def ExtractIpv4Addresses(text):
     text: string. Text to search.
   Returns:
     A list of ipv4 strings.
-  RaisesL
+  Raises:
     NoMatchError: when no ipv4 address is found.
   """
   match = re.findall(_IPV4_REGEX, text)
@@ -141,8 +146,8 @@ def ExtractExactlyOneMatch(regex, text):
     group is present, the text that matched the expression.
 
   Raises:
-    NoMatchError if 'regex' does not match 'text'.
-    TooManyMatchesError if 'regex' matches 'text' more than once.
+    NoMatchError: if 'regex' does not match 'text'.
+    TooManyMatchesError: if 'regex' matches 'text' more than once.
   """
 
   matches = ExtractAllMatches(regex, text)

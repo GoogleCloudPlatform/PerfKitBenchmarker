@@ -75,6 +75,19 @@ class ExtractFloatTestCase(unittest.TestCase):
                       group=1)
 
 
+class ExtractIntTestCase(unittest.TestCase):
+
+  def testParsesSuccessfully(self):
+    regex = r'test (\d+) string'
+    string = 'test 12435 string'
+    self.assertEqual(12435, regex_util.ExtractInt(regex, string, group=1))
+
+  def testRaisesValueErrorOnInvalidInput(self):
+    regex = r'test (invalid_int) string'
+    string = 'test invalid_int string'
+    self.assertRaises(ValueError, regex_util.ExtractInt, regex, string, group=1)
+
+
 class ExtractAllFloatMetricsTestCase(unittest.TestCase):
 
   def testParseSuccessful(self):
