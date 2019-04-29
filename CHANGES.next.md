@@ -451,3 +451,4 @@
 - Introduced NumCpusForBenchmark() which should be used instead of num_cpus for benchmark configuration.
 - Use stat -c %z /proc/ instead of uptime -s to find a boot timestamp since it
   is more universal.
+- Added support for regex_util.ExtractInt to extract an integer from a string.
