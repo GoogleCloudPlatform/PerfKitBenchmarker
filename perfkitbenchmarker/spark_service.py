@@ -175,7 +175,6 @@ class BaseSparkService(resource.BaseResource):
       raise NotImplemented()
 
 
-
 class PkbSparkService(BaseSparkService):
   """A Spark service created from vms.
 
@@ -204,7 +203,6 @@ class PkbSparkService(BaseSparkService):
     self.leader = self.vms['master_group'][0]
     hadoop.ConfigureAndStart(self.leader,
                              self.vms['worker_group'])
-
 
   def _Delete(self):
     pass
