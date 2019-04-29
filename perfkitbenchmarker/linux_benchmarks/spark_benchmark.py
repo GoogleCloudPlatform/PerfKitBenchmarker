@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs a jar using a cluster that supports Apache Spark.
+r"""Runs a jar using a cluster that supports Apache Spark.
 
 This benchmark takes a jarfile and class name, and runs that class
 using an Apache Spark cluster.  The Apache Spark cluster can be one
@@ -39,7 +39,7 @@ to hadoop, eg:
       --spark_classname=''\
       --spark_job_arguments=bbp,1,1000,10,bbp_dir
 
-For Amazon's EMR service, if the the provided jar file has a main class, you
+For Amazon's EMR service, if the provided jar file has a main class, you
 should pass in an empty class name for hadoop jobs.
 
 For more on Apache Spark, see: http://spark.apache.org/
@@ -52,10 +52,9 @@ import os
 import tempfile
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
-from perfkitbenchmarker import flags
-
 
 
 BENCHMARK_NAME = 'spark'
@@ -157,7 +156,6 @@ def Run(benchmark_spec):
       results.append(sample.Sample('pending_time',
                                    stats[spark_service.WAITING],
                                    'seconds', metadata))
-
 
     if not spark_cluster.user_managed:
       create_time = (spark_cluster.resource_ready_time -
