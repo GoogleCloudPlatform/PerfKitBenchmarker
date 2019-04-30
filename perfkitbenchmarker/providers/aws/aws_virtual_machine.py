@@ -1049,6 +1049,21 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
           'InterruptModeration failed to disable')
 
 
+class Windows2012AwsVirtualMachine(WindowsAwsVirtualMachine,
+                                   windows_virtual_machine.Windows2012Mixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+
+
+class Windows2016AwsVirtualMachine(WindowsAwsVirtualMachine,
+                                   windows_virtual_machine.Windows2016Mixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Core-Base-*'
+
+
+class Windows2019AwsVirtualMachine(WindowsAwsVirtualMachine,
+                                   windows_virtual_machine.Windows2019Mixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
+
+
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""

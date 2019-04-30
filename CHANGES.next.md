@@ -89,7 +89,7 @@
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
-- Added support for Windows2012, 2016, and 2019 for GCP.
+- Added support for Windows2012, 2016, and 2019 for GCP and AWS.
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
