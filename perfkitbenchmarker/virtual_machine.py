@@ -382,7 +382,7 @@ class BaseVirtualMachine(resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
-    # Hack: Silently fail if we have no num_cpus attribute.
+    # Hack: Silently fail if we have no num_cpus or OS_TYPE attribute.
     # This property is defined in BaseOsMixin and should always
     # be available during regular PKB usage because virtual machines
     # always have a mixin. However, in testing virtual machine objects
@@ -392,7 +392,8 @@ class BaseVirtualMachine(resource.BaseResource):
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
-
+    if getattr(self, 'OS_TYPE', None):
+      result['os_type'] = self.OS_TYPE
     return result
 
   def SimulateMaintenanceEvent(self):

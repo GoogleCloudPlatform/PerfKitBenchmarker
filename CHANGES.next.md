@@ -281,6 +281,7 @@
 - Added `--before_cleanup_pause` to ease debugging.
 - Added support for CUDA 10.1.
 - Added `--skip_firewall_rules` flag to help manage firewall rule economy.
+- Added 'os_type' metadata to virtual machines for use in performance samples.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
