@@ -63,7 +63,7 @@ class AzureSmbService(smb_service.BaseSmbService):
 
   CLOUD = providers.AZURE
   SMB_TIERS = ('Standard')
-  # TODO(user): Add smb tier and version to metadata
+  # TODO(spencerkim): Add smb tier and version to metadata
   DEFAULT_SMB_VERSION = '3.0'
   DEFAULT_TIER = 'Standard'
 
