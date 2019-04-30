@@ -454,3 +454,5 @@
   is more universal.
 - Added support for regex_util.ExtractInt to extract an integer from a string.
 - Updated Coremark to v1.01 and improved its error handling and output parsing.
+- Added flag support to Coremark for choosing a parallelism method. Defaults to
+  the existing mechanism of pthreads.
