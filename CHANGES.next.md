@@ -105,6 +105,8 @@
 - Added a demo under tools/.
 - Added Nginx benchmark.
 - Added support for measuring VM reboot time to the cluster boot benchmark.
+- Added Cygwin support to WindowsVirtualMachine and enabled a Windows+Cygwin
+  version of Coremark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
