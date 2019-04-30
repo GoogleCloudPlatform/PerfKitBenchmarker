@@ -49,6 +49,7 @@ class CoremarkBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(2000000, samples[0].metadata['iterations'])
     self.assertEqual(coremark_benchmark.ITERATIONS_PER_CPU,
                      samples[0].metadata['iterations_per_cpu'])
+    self.assertEqual('PTHREAD', samples[0].metadata['parallelism_method'])
 
   def testParseInvalidOutput(self):
     """Tests failing when Coremark does not report valid output."""

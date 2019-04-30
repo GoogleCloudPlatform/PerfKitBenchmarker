@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs coremark.
 
 From Coremark's documentation:
@@ -21,11 +20,11 @@ only a processor's core features.
 Coremark homepage: http://www.eembc.org/coremark/
 """
 
-import logging
 import posixpath
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -49,6 +48,15 @@ COREMARK_BUILDFILE = 'linux64/core_portme.mak'
 # https://www.eembc.org/coremark/CoreMarkRunRules.pdf.
 ITERATIONS_PER_CPU = 1000000
 
+# Methods of parallelism supported by Coremark.
+PARALLELISM_PTHREAD = 'PTHREAD'
+PARALLELISM_FORK = 'FORK'
+PARALLELISM_SOCKET = 'SOCKET'
+flags.DEFINE_enum('coremark_parallelism_method', PARALLELISM_PTHREAD,
+                  [PARALLELISM_PTHREAD, PARALLELISM_FORK, PARALLELISM_SOCKET],
+                  'Method to use for parallelism in the Coremark benchmark.')
+FLAGS = flags.FLAGS
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -64,19 +72,18 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  logging.info('prepare Coremark on %s', vm)
+  vm = benchmark_spec.vms[0]
   vm.Install('build_tools')
   vm.Install('wget')
   vm.RemoteCommand('wget %s -P %s' %
                    (COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' %
                    (linux_packages.INSTALL_DIR, COREMARK_TAR))
-  vm.RemoteCommand('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
-                   '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
+  if FLAGS.coremark_parallelism_method == PARALLELISM_PTHREAD:
+    vm.RemoteCommand('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
+                     '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
 
 
 def Run(benchmark_spec):
@@ -84,7 +91,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -92,14 +99,12 @@ def Run(benchmark_spec):
   Raises:
     Benchmarks.RunError: If correct operation is not validated.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  logging.info('Coremark running on %s', vm)
+  vm = benchmark_spec.vms[0]
   num_benchmark_cpus = vm.NumCpusForBenchmark()
   vm.RemoteCommand('cd %s;make PORT_DIR=linux64 ITERATIONS=%s XCFLAGS="-g -O2 '
-                   '-DMULTITHREAD=%d -DUSE_PTHREAD -DPERFORMANCE_RUN=1"'
-                   % (COREMARK_DIR, ITERATIONS_PER_CPU, num_benchmark_cpus))
-  logging.info('Coremark Results:')
+                   '-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
+                   (COREMARK_DIR, ITERATIONS_PER_CPU, num_benchmark_cpus,
+                    FLAGS.coremark_parallelism_method))
   output, _ = vm.RemoteCommand(
       'cat %s/run1.log' % COREMARK_DIR, should_log=True)
   return _ParseOutputForSamples(output)
@@ -132,7 +137,10 @@ def _ParseOutputForSamples(output):
                                   output),
       'iterations':
           regex_util.ExtractInt(r'Iterations\s*:\s*([0-9]*)', output),
-      'iterations_per_cpu': ITERATIONS_PER_CPU,
+      'iterations_per_cpu':
+          ITERATIONS_PER_CPU,
+      'parallelism_method':
+          FLAGS.coremark_parallelism_method,
   }
   return [sample.Sample('Coremark Score', value, '', metadata)]
 
@@ -142,9 +150,8 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
+  vm = benchmark_spec.vms[0]
   vm.RemoteCommand('rm -rf %s' % COREMARK_DIR)
   vm.RemoteCommand('rm -f %s' % COREMARK_TAR)
