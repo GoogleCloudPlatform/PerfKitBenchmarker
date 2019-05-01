@@ -14,10 +14,11 @@
 """Tests for the tensorflow_serving_client_workload script."""
 
 import datetime
-from StringIO import StringIO
 import sys
 import unittest
+
 import mock
+from six import StringIO
 
 # These imports are mocked so that we don't need to add them to the
 # test dependencies. The script under test for this test module is
@@ -33,7 +34,7 @@ sys.modules['tensorflow'] = mock.Mock()
 sys.modules['tensorflow_serving'] = mock.Mock()
 sys.modules['tensorflow_serving.apis'] = mock.Mock()
 
-from perfkitbenchmarker.scripts import tensorflow_serving_client_workload  # pylint: disable=g-import-not-at-top
+from perfkitbenchmarker.scripts import tensorflow_serving_client_workload  # pylint: disable=g-import-not-at-top,g-bad-import-order
 
 
 class TestTensorflowServingClientWorkload(unittest.TestCase):
