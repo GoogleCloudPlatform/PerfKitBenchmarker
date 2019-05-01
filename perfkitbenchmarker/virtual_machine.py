@@ -815,18 +815,25 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     self.RemoteCopy(local_path, remote_path, copy_to=False)
 
-  def PushDataFile(self, data_file, remote_path=''):
+  def PushDataFile(self, data_file, remote_path='', should_double_copy=None):
     """Upload a file in perfkitbenchmarker.data directory to the VM.
 
     Args:
       data_file: The filename of the file to upload.
       remote_path: The destination for 'data_file' on the VM. If not specified,
         the file will be placed in the user's home directory.
+      should_double_copy: Indicates whether to first copy to the home directory
     Raises:
       perfkitbenchmarker.data.ResourceNotFound: if 'data_file' does not exist.
     """
     file_path = data.ResourcePath(data_file)
-    self.PushFile(file_path, remote_path)
+    if should_double_copy:
+      home_file_path = '~/' + data_file
+      self.PushFile(file_path, home_file_path)
+      copy_cmd = (' '.join(['cp', home_file_path, remote_path]))
+      self.RemoteCommand(copy_cmd)
+    else:
+      self.PushFile(file_path, remote_path)
 
   def RenderTemplate(self, template_path, remote_path, context):
     """Renders a local Jinja2 template and copies it to the remote host.

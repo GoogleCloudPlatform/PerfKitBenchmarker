@@ -458,3 +458,4 @@
 - Updated Coremark to v1.01 and improved its error handling and output parsing.
 - Added flag support to Coremark for choosing a parallelism method. Defaults to
   the existing mechanism of pthreads.
+- Make a temporary copy on VM's disk for scp on SMB.
