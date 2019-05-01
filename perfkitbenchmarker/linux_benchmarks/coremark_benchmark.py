@@ -74,7 +74,7 @@ def PrepareCoremark(remote_command):
     remote_command: Function to run a remote command on the VM.
   """
   remote_command(
-      'wget %s -P %s' %(COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
+      'wget %s -P %s' % (COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
   remote_command(
       'cd %s && tar xvfz %s' % (
           linux_packages.INSTALL_DIR, COREMARK_TAR))
