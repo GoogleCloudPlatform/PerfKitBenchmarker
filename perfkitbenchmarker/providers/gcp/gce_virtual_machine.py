@@ -822,7 +822,6 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
   BOOT_DISK_SIZE_GB = 50
-  BOOT_DISK_TYPE = gce_disk.PD_SSD
 
   NVME_START_INDEX = 0
 
