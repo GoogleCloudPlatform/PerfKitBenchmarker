@@ -156,7 +156,8 @@ class AwsDynamoDBInstance(resource.BaseResource):
         '--table-name', self.table_name,
         '--attribute-definitions', self.part_attributes,
         '--key-schema', self.primary_key,
-        '--provisioned-throughput', self.throughput]
+        '--provisioned-throughput', self.throughput,
+        '--tags'] + util.MakeFormattedDefaultTags()
     if FLAGS.aws_dynamodb_lsi_count > 0 and FLAGS.aws_dynamodb_use_sort:
       cmd[10] = (
           '[' + self.part_attributes + ', ' + self.sort_attributes + ', ' +
