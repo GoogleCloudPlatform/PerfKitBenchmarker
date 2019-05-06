@@ -461,3 +461,4 @@
 - Make a temporary copy on VM's disk for scp on SMB.
 - Change the GCE Windows VM boot disk type to PD-STANDARD by default to better
   match the default for GCE Linux VMs.
+- Fixed azure credentials package to avoid pushing the entire .azure directory.
