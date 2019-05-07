@@ -28,7 +28,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import google_container_engine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
-
+from six.moves import builtins
 FLAGS = flgs.FLAGS
 
 _COMPONENT = 'test_component'
@@ -49,7 +49,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     flags.run_uri = _RUN_URI
     flags.data_search_paths = ''
 
-    stack.enter_context(mock.patch('__builtin__.open'))
+    stack.enter_context(mock.patch(builtins.__name__ + '.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
     stack.enter_context(
