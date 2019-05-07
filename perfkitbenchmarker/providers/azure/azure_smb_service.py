@@ -62,10 +62,10 @@ class AzureSmbService(smb_service.BaseSmbService):
   """
 
   CLOUD = providers.AZURE
-  SMB_TIERS = ('Standard')
+  SMB_TIERS = ('Standard_LRS')
   # TODO(spencerkim): Add smb tier and version to metadata
   DEFAULT_SMB_VERSION = '3.0'
-  DEFAULT_TIER = 'Standard'
+  DEFAULT_TIER = 'Standard_LRS'
 
   def __init__(self, disk_spec, zone):
     super(AzureSmbService, self).__init__(disk_spec, zone)
