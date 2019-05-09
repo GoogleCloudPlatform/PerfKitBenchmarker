@@ -43,13 +43,16 @@ TESTDFSIO_JAR_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
 
 TESTDFSIO_PROGRAM = 'TestDFSIO'
 
+disk_to_hdfs_map = {
+    'pd-standard': 'HDD',
+    'pd-ssd': 'SSD'
+}
 
 
 class GcpDpbDataproc(dpb_service.BaseDpbService):
   """Object representing a GCP Dataproc cluster.
 
   Attributes:
-    cluster_id: ID of the cluster.
     project: ID of the project.
   """
 
@@ -59,7 +62,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
-    self.project = None
+    self.project = FLAGS.project
     self.dpb_dataproc_image_version = FLAGS.dpb_dataproc_image_version
 
   @staticmethod
@@ -88,13 +91,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
-    pass
 
   def _Create(self):
     """Creates the cluster."""
-
-    if self.cluster_id is None:
-      self.cluster_id = 'pkb-' + FLAGS.run_uri
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'create',
                              self.cluster_id)
     if self.project is not None:
@@ -112,22 +111,25 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.machine_type:
         self._AddToCmd(cmd, '{0}-machine-type'.format(role),
                        self.spec.worker_group.vm_spec.machine_type)
-
       # Set boot_disk_size
-      if self.spec.worker_group.vm_spec.boot_disk_size:
-        self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role),
-                       self.spec.worker_group.vm_spec.boot_disk_size)
+      if self.spec.worker_group.disk_spec.disk_size:
+        size_in_gb = '{}GB'.format(
+            str(self.spec.worker_group.disk_spec.disk_size))
+        self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role), size_in_gb)
       # Set boot_disk_type
-      if self.spec.worker_group.vm_spec.boot_disk_type:
+      if self.spec.worker_group.disk_spec.disk_type:
         self._AddToCmd(cmd, '{0}-boot-disk-type'.format(role),
-                       self.spec.worker_group.vm_spec.boot_disk_type)
+                       self.spec.worker_group.disk_spec.disk_type)
+        self.dpb_hdfs_type = disk_to_hdfs_map[
+            self.spec.worker_group.disk_spec.disk_type]
 
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
 
-    self.append_region(cmd, True)
+    if self.dpb_service_zone:
+      cmd.flags['zone'] = self.dpb_service_zone
 
     if self.dpb_dataproc_image_version:
       cmd.flags['image-version'] = self.dpb_dataproc_image_version
@@ -151,8 +153,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
-    self.append_region(cmd)
-
     cmd.Issue()
 
   def _Exists(self):
@@ -207,14 +207,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def CreateBucket(self, source_bucket):
     mb_command = ['gsutil', 'mb']
 
-    if FLAGS.zones:
-      zone = FLAGS.zones[0]
-      region = zone.rsplit('-', 1)[0]
+    if FLAGS.zone:
+      region = FLAGS.zone[0].rsplit('-', 1)[0]
       mb_command.extend(['-c', 'regional', '-l', region])
-
-    mb_command.append(source_bucket)
+    mb_command.append('{}{}'.format(self.PERSISTENT_FS_PREFIX, source_bucket))
     vm_util.IssueCommand(mb_command)
-
 
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to generate data using a distributed job on the cluster."""
