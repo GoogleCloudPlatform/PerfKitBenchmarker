@@ -347,10 +347,11 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     """OS-specific implementation of reboot command."""
     self.RemoteCommand('shutdown -t 0 -r -f', ignore_failure=True)
 
+  @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
     """Returns the time the VM was last rebooted as reported by the VM."""
-    resp, _ = self.RemoteHostCommand('systeminfo | find /i "Boot Time"',
-                                     suppress_warning=True)
+    resp, _ = self.RemoteCommand(
+        'systeminfo | find /i "Boot Time"', suppress_warning=True)
     return resp
 
   def _AfterReboot(self):
