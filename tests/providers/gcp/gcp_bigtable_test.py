@@ -11,17 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.gcp.gcp_bigtable"""
+"""Tests for perfkitbenchmarker.providers.gcp.gcp_bigtable."""
 
-import mock
 import unittest
+import mock
 
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 
 NAME = 'testcluster'
-NUM_NODES = 3
 PROJECT = 'testproject'
 ZONE = 'testzone'
 
@@ -43,7 +42,7 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GcpBigtableTestCase, self).setUp()
-    self.bigtable = gcp_bigtable.GcpBigtableInstance(NAME, NUM_NODES, PROJECT,
+    self.bigtable = gcp_bigtable.GcpBigtableInstance(NAME, PROJECT,
                                                      ZONE)
 
   def testEmptyTableList(self):
