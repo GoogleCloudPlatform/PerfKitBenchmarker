@@ -86,6 +86,8 @@ flags.DEFINE_string('startup_script', None,
                     'Script to run right after vm boot.')
 flags.DEFINE_string('postrun_script', None,
                     'Script to run right after run stage.')
+flags.DEFINE_integer('create_and_boot_post_task_delay', None,
+                     'Delay in seconds to delay in between boot tasks.')
 # pyformat: disable
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
@@ -509,7 +511,10 @@ class BenchmarkSpec(object):
       # We separate out creating, booting, and preparing the VMs into two phases
       # so that we don't slow down the creation of all the VMs by running
       # commands on the VMs that booted.
-      vm_util.RunThreaded(self.CreateAndBootVm, self.vms)
+      vm_util.RunThreaded(
+          self.CreateAndBootVm,
+          self.vms,
+          post_task_delay=FLAGS.create_and_boot_post_task_delay)
       vm_util.RunThreaded(self.PrepareVmAfterBoot, self.vms)
 
       sshable_vms = [
