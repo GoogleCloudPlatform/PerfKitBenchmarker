@@ -285,6 +285,7 @@
 - Added `--skip_firewall_rules` flag to help manage firewall rule economy.
 - Added 'os_type' metadata to virtual machines for use in performance samples.
 - Storage specification related dpb terasort benchmark improvements.
+- Added an optional flag to set a delay between boot tasks.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
