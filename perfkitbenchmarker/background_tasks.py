@@ -587,7 +587,10 @@ def RunParallelThreads(target_arg_tuples, max_concurrency, post_task_delay=0):
       errors.VmUtil.ThreadException, post_task_delay)
 
 
-def RunThreaded(target, thread_params, max_concurrent_threads=None):
+def RunThreaded(target,
+                thread_params,
+                max_concurrent_threads=None,
+                post_task_delay=0):
   """Runs the target method in parallel threads.
 
   The method starts up threads with one arg from thread_params as the first arg.
@@ -598,6 +601,7 @@ def RunThreaded(target, thread_params, max_concurrent_threads=None):
         in the list can either be a singleton or a (args, kwargs) tuple/list.
         Usually this is a list of VMs.
     max_concurrent_threads: The maximum number of concurrent threads to allow.
+    post_task_delay: Delay in seconds between commands.
 
   Returns:
     List of the same length as thread_params. Contains the return value from
@@ -644,7 +648,8 @@ def RunThreaded(target, thread_params, max_concurrent_threads=None):
                          for args, kwargs in thread_params]
 
   return RunParallelThreads(target_arg_tuples,
-                            max_concurrency=max_concurrent_threads)
+                            max_concurrency=max_concurrent_threads,
+                            post_task_delay=post_task_delay)
 
 
 def RunParallelProcesses(target_arg_tuples, max_concurrency,
