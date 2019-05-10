@@ -17,14 +17,14 @@
 import time
 
 from absl import flags
-import gcs_oauth2_boto_plugin  # noqa
-
 import boto_service
+import gcs_oauth2_boto_plugin  # noqa
 
 FLAGS = flags.FLAGS
 
 
 class GCSService(boto_service.BotoService):
+
   def __init__(self):
     super(GCSService, self).__init__('gs', host_to_connect=None)
 

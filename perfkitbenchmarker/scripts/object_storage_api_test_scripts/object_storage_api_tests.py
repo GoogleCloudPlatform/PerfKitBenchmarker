@@ -22,23 +22,33 @@
    run this script.
 """
 
-import cStringIO
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
-import os
-import sys
 import multiprocessing as mp
-from threading import Thread
-import string
+import os
 import random
+import string
+import sys
+from threading import Thread
 import time
-
+from absl import flags
+import six
+from six.moves import range
+from six.moves import zip
 import yaml
 
-from absl import flags
-
-import azure_flags  # noqa
-import s3_flags  # noqa
+try:
+  # imports when running on the VM
+  from providers import azure_flags
+  from providers import s3_flags
+except ImportError:
+  # imports when running tests
+  from perfkitbenchmarker.scripts.object_storage_api_test_scripts import azure_flags
+  from perfkitbenchmarker.scripts.object_storage_api_test_scripts import s3_flags
 
 FLAGS = flags.FLAGS
 
@@ -70,7 +80,7 @@ flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
 flags.DEFINE_integer('objects_per_stream', 1000, 'The number of objects to '
                      'read and write per stream in the MultiStreamThroughput '
                      'scenario.')
-flags.DEFINE_string('object_sizes', "{1024: 100.0}", 'The size of the objects '
+flags.DEFINE_string('object_sizes', '{1024: 100.0}', 'The size of the objects '
                     'to use, as a distribution. Currently only applicable to '
                     'the MultiStreamThroughput scenario, ignored in others. '
                     'Must be a dict-based representation, even for a constant '
@@ -167,10 +177,11 @@ THREAD_STATUS_LOG_INTERVAL = 10
 # stop the benchmarking tests and raise a low availability error back to the
 # caller.
 class LowAvailabilityError(Exception):
-    pass
+  pass
 
 
 # ### Utilities for workload generation ###
+
 
 class SizeDistributionIterator(object):
   """Draw object sizes from a distribution.
@@ -192,7 +203,7 @@ class SizeDistributionIterator(object):
 
     # Sorting the (size, percent change) pairs by size makes for a
     # nicer interface and also simplifies unit testing.
-    sorted_dist = sorted(dist.iteritems(), key=lambda x: x[0])
+    sorted_dist = sorted(six.iteritems(dist), key=lambda x: x[0])
 
     total_percent = 0.0
     for size, percent in sorted_dist:
@@ -210,13 +221,13 @@ class SizeDistributionIterator(object):
   def __iter__(self):
     return self
 
-  def next(self):
+  def __next__(self):
     val = random.random() * 100.0
 
     # binary search has a lower asymptotic complexity than linear
     # scanning, but thanks to caches and sequential access, linear
     # scanning will probably be faster for any realistic distribution.
-    for i in xrange(len(self.sizes)):
+    for i in range(len(self.sizes)):
       if self.cutoffs[i] > val:
         return self.sizes[i]
 
@@ -225,14 +236,18 @@ class SizeDistributionIterator(object):
 
     return self.size
 
+  # this is required for Python2 compatibility
+  next = __next__
+
 
 def MaxSizeInDistribution(dist):
   """Find the maximum object size in a distribution."""
 
-  return max(dist.iterkeys())
+  return max(six.iterkeys(dist))
 
 
 # ### Utilities for data analysis ###
+
 
 def PercentileCalculator(numbers):
   numbers_sorted = sorted(numbers)
@@ -286,29 +301,40 @@ class ObjectNameIterator(object):
 
 
 class PrefixCounterIterator(ObjectNameIterator):
+  """Iterator for a prefixed counter."""
+
   def __init__(self, prefix):
     self.prefix = prefix
     self.counter = 0
 
-  def next(self):
+  def __next__(self):
     name = '%s_%d' % (self.prefix, self.counter)
     self.counter = self.counter + 1
     return name
 
+  # needed for Python2 compatibility
+  next = __next__
+
 
 class PrefixTimestampSuffixIterator(ObjectNameIterator):
+  """Iterator for prefixed and suffixed timestamps."""
+
   def __init__(self, prefix, suffix):
     self.prefix = prefix
     self.suffix = suffix
 
-  def next(self):
+  def __next__(self):
     return '%s_%f_%s' % (self.prefix, time.time(), self.suffix)
+
+  # needed for Python2 compatibility
+  next = __next__
 
 
 # ### Utilities for benchmarking ###
 
+
 def CleanupBucket(service):
-  """ Cleans-up EVERYTHING under a given bucket as specified by FLAGS.bucket.
+  """Cleans-up EVERYTHING under a given bucket as specified by FLAGS.bucket.
 
   Args:
     service: the ObjectStorageServiceBase to use.
@@ -328,7 +354,7 @@ def GenerateWritePayload(size):
     size: the amount of data needed, in bytes.
 
   Returns:
-    A string of the length requested, filled with random data.
+    A byte array of the length requested, filled with random data.
   """
 
   payload_bytes = bytearray(size)
@@ -338,7 +364,7 @@ def GenerateWritePayload(size):
   for i in xrange(size):
     payload_bytes[i] = ord(random.choice(string.letters))
 
-  return payload_bytes.decode('ascii')
+  return payload_bytes
 
 
 def WriteObjects(service, bucket, object_prefix, count,
@@ -364,9 +390,9 @@ def WriteObjects(service, bucket, object_prefix, count,
   """
 
   payload = GenerateWritePayload(size)
-  handle = cStringIO.StringIO(payload)
+  handle = six.BytesIO(payload)
 
-  for i in xrange(count):
+  for i in range(count):
     object_name = '%s_%d' % (object_prefix, i)
 
     try:
@@ -522,7 +548,7 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
 
 
 def SingleStreamThroughputBenchmark(service):
-  """ A benchmark test for single stream upload and download throughput.
+  """A benchmark test for single stream upload and download throughput.
 
   Args:
     service: the ObjectStorageServiceBase object to use.
@@ -596,13 +622,13 @@ def RunWorkerProcesses(worker, worker_args, per_process_args=None):
   if per_process_args is None:
     processes = [mp.Process(target=worker,
                             args=worker_args + (result_queue, i))
-                 for i in xrange(num_streams)]
+                 for i in range(num_streams)]
   else:
     processes = [mp.Process(target=worker,
                             args=worker_args +
                             (per_process_args[i],) +
                             (result_queue, i))
-                 for i in xrange(num_streams)]
+                 for i in range(num_streams)]
   logging.info('Processes created. Starting processes.')
   for process in processes:
     process.start()
@@ -646,7 +672,7 @@ def MultiStreamWrites(service):
 
   """
 
-  size_distribution = yaml.load(FLAGS.object_sizes)
+  size_distribution = yaml.safe_load(FLAGS.object_sizes)
 
   payload = GenerateWritePayload(MaxSizeInDistribution(size_distribution))
 
@@ -729,7 +755,7 @@ def MultiStreamReads(service):
 
   num_workers = FLAGS.num_streams
   objects_by_worker = [object_records[i::num_workers]
-                       for i in xrange(num_workers)]
+                       for i in range(num_workers)]
 
   results = RunWorkerProcesses(
       ReadWorker,
@@ -778,7 +804,7 @@ def WriteWorker(service, payload,
 
   Args:
     service: the ObjectStorageServiceBase object to use.
-    payload: a string. The bytes to upload.
+    payload: a byte array. The bytes to upload.
     size_distribution: the distribution of object sizes to use.
     num_objects: the number of objects to upload.
     start_time: a POSIX timestamp. When to start uploading.
@@ -801,14 +827,14 @@ def WriteWorker(service, payload,
         '%s' % worker_num)
   size_iterator = SizeDistributionIterator(size_distribution)
 
-  payload_handle = cStringIO.StringIO(payload)
+  payload_handle = six.BytesIO(payload)
 
   if start_time is not None:
     SleepUntilTime(start_time)
 
-  for i in xrange(num_objects):
-    object_name = name_iterator.next()
-    object_size = size_iterator.next()
+  for _ in range(num_objects):
+    object_name = next(name_iterator)
+    object_size = next(size_iterator)
 
     try:
       start_time, latency = service.WriteObjectFromBuffer(
@@ -853,7 +879,6 @@ def ReadWorker(service, start_time, object_records,
       logging.info('Worker %s caught exception %s while reading object %s' %
                    (worker_num, e, name))
 
-
   result_queue.put({'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
@@ -861,10 +886,11 @@ def ReadWorker(service, start_time, object_records,
 
 
 def OneByteRWBenchmark(service):
-  """ A benchmark test for one byte object read and write. It uploads and
-  downloads ONE_BYTE_OBJECT_COUNT number of 1-byte objects to the storage
-  service, keeps track of the latency of these operations, and print out the
-  result in JSON format at the end of the test.
+  """A benchmark test for one byte object read and write.
+
+  It uploads and downloads ONE_BYTE_OBJECT_COUNT number of 1-byte objects to the
+  storage service, keeps track of the latency of these operations, and print out
+  the result in JSON format at the end of the test.
 
   Args:
     service: the ObjectStorageServiceBase object to use.
@@ -919,12 +945,13 @@ def OneByteRWBenchmark(service):
 
 
 def ListConsistencyBenchmark(service):
-  """ A benchmark test to measure list-after-write consistency. It uploads
-  a large number of 1-byte objects in a short amount of time, and then issues
-  a list request. If the first list request returns all objects as expected,
-  then the result is deemed consistent. Otherwise, it keeps issuing list request
-  until all expected objects are returned, and the test reports the time
-  it takes from the end of the last write to the time the list returns
+  """A benchmark test to measure list-after-write consistency.
+
+  It uploads a large number of 1-byte objects in a short amount of time, and
+  then issues a list request. If the first list request returns all objects as
+  expected, then the result is deemed consistent. Otherwise, it keeps issuing
+  list request until all expected objects are returned, and the test reports the
+  time it takes from the end of the last write to the time the list returns
   consistent result.
 
   Args:
@@ -1072,28 +1099,28 @@ def Main(argv=sys.argv):
   # statements, but doing it this way allows us to not import the
   # modules of storage providers we're not using.
   if FLAGS.storage_provider == 'AZURE':
-    import azure_service
+    from providers import azure_service
     service = azure_service.AzureService()
   elif FLAGS.storage_provider == 'GCS':
-    import gcs
+    from providers import gcs
     service = gcs.GCSService()
   elif FLAGS.storage_provider == 'S3':
-    import s3
+    from providers import s3
     service = s3.S3Service()
   else:
     raise ValueError('Invalid storage provider %s' % FLAGS.storage_provider)
 
   if FLAGS.storage_provider == 'AZURE':
-      # There are DNS lookup issues with the provider Azure when doing
-      # "high" number of concurrent requests using multiple threads. The error
-      # came from getaddrinfo() called by the azure python library. By reducing
-      # the concurrent thread count to 10 or below, the issue can be mitigated.
-      # If we lower the thread count, we need to lower the total object count
-      # too so the time to write these object remains short
-      global LIST_CONSISTENCY_THREAD_COUNT
-      LIST_CONSISTENCY_THREAD_COUNT = 10
-      global LIST_CONSISTENCY_OBJECT_COUNT
-      LIST_CONSISTENCY_OBJECT_COUNT = 1000
+    # There are DNS lookup issues with the provider Azure when doing
+    # "high" number of concurrent requests using multiple threads. The error
+    # came from getaddrinfo() called by the azure python library. By reducing
+    # the concurrent thread count to 10 or below, the issue can be mitigated.
+    # If we lower the thread count, we need to lower the total object count
+    # too so the time to write these object remains short
+    global LIST_CONSISTENCY_THREAD_COUNT
+    LIST_CONSISTENCY_THREAD_COUNT = 10
+    global LIST_CONSISTENCY_OBJECT_COUNT
+    LIST_CONSISTENCY_OBJECT_COUNT = 1000
 
   if FLAGS.scenario == 'OneByteRW':
     return OneByteRWBenchmark(service)
