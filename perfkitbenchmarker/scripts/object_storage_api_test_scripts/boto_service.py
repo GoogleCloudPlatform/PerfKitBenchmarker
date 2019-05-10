@@ -23,6 +23,7 @@ import object_storage_interface
 
 
 class BotoService(object_storage_interface.ObjectStorageServiceBase):
+
   def __init__(self, storage_schema, host_to_connect=None):
     self.storage_schema = storage_schema
     self.host_to_connect = host_to_connect

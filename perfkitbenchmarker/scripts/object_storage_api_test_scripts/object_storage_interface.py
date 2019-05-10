@@ -14,13 +14,15 @@
 
 """The generic superclass for object storage API providers."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import abc
+import six
 
 
-class ObjectStorageServiceBase(object):
+class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
   """Our interface to an object storage service."""
-
-  __metaclass__ = abc.ABCMeta
 
   @abc.abstractmethod
   def __init__(self):
@@ -33,7 +35,6 @@ class ObjectStorageServiceBase(object):
     # service.
 
     pass
-
 
   @abc.abstractmethod
   def ListObjects(self, bucket, prefix):
@@ -49,7 +50,6 @@ class ObjectStorageServiceBase(object):
 
     pass
 
-
   @abc.abstractmethod
   def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
     """Delete a list of objects.
@@ -62,7 +62,6 @@ class ObjectStorageServiceBase(object):
     """
 
     pass
-
 
   @abc.abstractmethod
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
@@ -83,7 +82,6 @@ class ObjectStorageServiceBase(object):
     """
 
     pass
-
 
   @abc.abstractmethod
   def ReadObject(self, bucket, object):

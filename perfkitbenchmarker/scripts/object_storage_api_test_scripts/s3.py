@@ -25,6 +25,7 @@ FLAGS = flags.FLAGS
 
 
 class S3Service(boto_service.BotoService):
+
   def __init__(self):
     if FLAGS.host is not None:
       logging.info('Will use user-specified host endpoint: %s', FLAGS.host)

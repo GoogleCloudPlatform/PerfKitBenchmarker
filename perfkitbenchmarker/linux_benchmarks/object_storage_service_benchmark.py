@@ -212,11 +212,14 @@ LARGE_DATA_SIZE_IN_MBITS = 8 * LARGE_DATA_SIZE_IN_BYTES / 1000 / 1000
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
 API_TEST_SCRIPTS_DIR = 'object_storage_api_test_scripts'
 
-# Files that will be sent to the remote VM for API tests.
-API_TEST_SCRIPT_FILES = ['object_storage_api_tests.py',
-                         'object_storage_interface.py',
-                         'azure_flags.py',
-                         's3_flags.py']
+# Files that will be sent to the remote VM as a package for API test script.
+API_TEST_SCRIPT_PACKAGE_FILES = ['__init__.py',
+                                 'object_storage_interface.py',
+                                 'azure_flags.py',
+                                 's3_flags.py']
+
+SCRIPT_DIR = '/tmp/run'
+DOWNLOAD_DIRECTORY = posixpath.join(SCRIPT_DIR, 'temp')
 
 # Various constants to name the result metrics.
 THROUGHPUT_UNIT = 'Mbps'
@@ -333,7 +336,7 @@ def _JsonStringToPercentileResults(results, json_input, metric_name,
 
 
 def _GetClientLibVersion(vm, library_name):
-  """ This function returns the version of client lib installed on a vm.
+  """This function returns the version of client lib installed on a vm.
 
   Args:
     vm: the VM to get the client lib version from.
@@ -1180,7 +1183,6 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
   """
 
   data_directory = '/tmp/run/data'
-  download_directory = '/tmp/run/temp'
 
   # The real solution to the iteration count issue is dynamically
   # choosing the number of iterations based on how long they
@@ -1224,13 +1226,13 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
     cli_upload_results.append(throughput)
 
     try:
-      vm.RemoveFile(posixpath.join(download_directory, '*'))
+      vm.RemoveFile(posixpath.join(DOWNLOAD_DIRECTORY, '*'))
     except Exception:
       pass
 
     try:
       _, res = service.CLIDownloadBucket(vm, bucket,
-                                         file_names, download_directory)
+                                         file_names, DOWNLOAD_DIRECTORY)
     except errors.VirtualMachine.RemoteCommandError:
       logging.info('failed to download, skip this iteration.')
       continue
@@ -1274,19 +1276,31 @@ def PrepareVM(vm, service):
 
   # Prepare data on vm, create a run directory in temporary directory, and add
   # permission.
-  vm.RemoteCommand('sudo mkdir -p /tmp/run/')
-  vm.RemoteCommand('sudo chmod 777 /tmp/run/')
 
-  vm.RemoteCommand('sudo mkdir -p /tmp/run/temp/')
-  vm.RemoteCommand('sudo chmod 777 /tmp/run/temp/')
+  vm.RemoteCommand('sudo mkdir -p ' + SCRIPT_DIR)
+  vm.RemoteCommand('sudo chmod 777 ' + SCRIPT_DIR)
+
+  vm.RemoteCommand('sudo mkdir -p ' + DOWNLOAD_DIRECTORY)
+  vm.RemoteCommand('sudo chmod 777 ' + DOWNLOAD_DIRECTORY)
+
+  remote_package_dir = posixpath.join(SCRIPT_DIR, 'providers')
+  vm.RemoteCommand('sudo mkdir -p ' + remote_package_dir)
+  vm.RemoteCommand('sudo chmod 777  ' + remote_package_dir)
 
   file_path = data.ResourcePath(DATA_FILE)
-  vm.PushFile(file_path, '/tmp/run/')
+  vm.PushFile(file_path, SCRIPT_DIR)
 
-  for file_name in API_TEST_SCRIPT_FILES + service.APIScriptFiles():
-    path = data.ResourcePath(os.path.join(API_TEST_SCRIPTS_DIR, file_name))
+  # push the test script
+  script_path = data.ResourcePath(
+      os.path.join(API_TEST_SCRIPTS_DIR, API_TEST_SCRIPT))
+  vm.PushFile(script_path, '/tmp/run/')
+
+  # push the package dependencies of the test script
+  for file_name in API_TEST_SCRIPT_PACKAGE_FILES + service.APIScriptFiles():
+    path = data.ResourcePath(
+        os.path.join(API_TEST_SCRIPTS_DIR, file_name))
     logging.info('Uploading %s to %s', path, vm)
-    vm.PushFile(path, '/tmp/run/')
+    vm.PushFile(path, remote_package_dir)
 
   service.PrepareVM(vm)
 
