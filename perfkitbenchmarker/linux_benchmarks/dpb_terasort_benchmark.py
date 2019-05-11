@@ -135,10 +135,10 @@ def Run(benchmark_spec):
   metadata = {}
   metadata.update(benchmark_spec.dpb_service.GetMetadata())
   metadata.update({'base_dir': base_dir})
-  metadata.update({'dpb_terasort_storage_type':
-                       FLAGS.dpb_terasort_storage_type})
+  metadata.update({
+      'dpb_terasort_storage_type': FLAGS.dpb_terasort_storage_type})
   metadata.update({'terasort_num_record': FLAGS.dpb_terasort_num_records})
-  storage_in_gb = (FLAGS.dpb_terasort_num_records * 100)/(1000 * 1000 * 1000)
+  storage_in_gb = (FLAGS.dpb_terasort_num_records * 100) / (1000 * 1000 * 1000)
   metadata.update({'terasort_dataset_size_in_GB': storage_in_gb})
   logging.info('metadata %s ', str(metadata))
 
