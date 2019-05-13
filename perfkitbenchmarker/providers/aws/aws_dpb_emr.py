@@ -106,6 +106,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
+    self.dpb_service_type = AwsDpbEmr.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
 
@@ -116,7 +117,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.bucket_to_delete = None
-    self.emr_release_label = FLAGS.dpb_emr_release_label
+    self.dpb_version = FLAGS.dpb_emr_release_label
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -175,7 +176,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', self.emr_release_label,
+                             '--release-label', self.dpb_version,
                              '--use-default-roles',
                              '--instance-groups',
                              json.dumps(instance_groups),
@@ -541,9 +542,3 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
       stdout, _, _ = vm_util.IssueCommand(rb_step_cmd)
       return {dpb_service.SUCCESS: True}
-
-  def GetMetadata(self):
-    """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(AwsDpbEmr, self).GetMetadata()
-    basic_data['dpb_service'] = 'emr_{}'.format(self.emr_release_label)
-    return basic_data
