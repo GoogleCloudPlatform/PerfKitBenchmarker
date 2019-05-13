@@ -62,7 +62,7 @@ class AzureSmbService(smb_service.BaseSmbService):
   """
 
   CLOUD = providers.AZURE
-  SMB_TIERS = ('Standard_LRS')
+  SMB_TIERS = ('Standard_LRS', 'Premium_LRS')
   # TODO(spencerkim): Add smb tier and version to metadata
   DEFAULT_SMB_VERSION = '3.0'
   DEFAULT_TIER = 'Standard_LRS'
@@ -91,10 +91,34 @@ class AzureSmbService(smb_service.BaseSmbService):
     return {'user': self.storage_account_name, 'pw': self.storage_account_key}
 
   def _Create(self):
+    """Creates an Azure Files share.
+
+    For Standard Files, see
+    https://docs.microsoft.com/en-us/azure/storage/files/storage-how-to-create-file-share#create-file-share-through-command-line-interface-cli
+    and for Premium Files, see
+    https://docs.microsoft.com/en-us/azure/storage/files/storage-how-to-create-premium-fileshare#create-a-premium-file-share-using-azure-cli
+    """
     logging.info('Creating SMB server %s', self.name)
-    storage_account_number = azure_network.AzureStorageAccount.total_storage_accounts - 1
-    self.storage_account_name = 'pkb%s' % FLAGS.run_uri + 'storage' + str(
-        storage_account_number)
+    if FLAGS.smb_tier == 'Standard_LRS':
+      storage_account_number = azure_network.AzureStorageAccount.total_storage_accounts - 1
+      self.storage_account_name = 'pkb%s' % FLAGS.run_uri + 'storage' + str(
+          storage_account_number)
+    elif FLAGS.smb_tier == 'Premium_LRS':
+      storage_account_number = (
+          azure_network.AzureStorageAccount.total_storage_accounts)
+      self.storage_account_name = 'pkb%s' % FLAGS.run_uri + 'filestorage' + str(
+          storage_account_number)
+      # Premium Files uses a different storage account kind from Standard Files.
+      # See links in description for more details.
+      self.storage_account = azure_network.AzureStorageAccount(
+          storage_type='Premium_LRS',
+          location='westus',
+          name=self.storage_account_name,
+          kind='FileStorage',
+          resource_group=self.resource_group,
+          use_existing=False)
+      self.storage_account.Create()
+
     self.connection_args = util.GetAzureStorageConnectionArgs(
         self.storage_account_name, self.resource_group.args)
     self.storage_account_key = util.GetAzureStorageAccountKey(
