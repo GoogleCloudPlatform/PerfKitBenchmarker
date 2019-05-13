@@ -283,6 +283,7 @@
 - Added `--before_cleanup_pause` to ease debugging.
 - Added support for CUDA 10.1.
 - Added `--skip_firewall_rules` flag to help manage firewall rule economy.
+- Added Azure Premium Files support.
 - Added 'os_type' metadata to virtual machines for use in performance samples.
 - Storage specification related dpb terasort benchmark improvements.
 - Added an optional flag to set a delay between boot tasks.
