@@ -62,8 +62,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
+    self.dpb_service_type = GcpDpbDataproc.SERVICE_TYPE
     self.project = FLAGS.project
-    self.dpb_dataproc_image_version = FLAGS.dpb_dataproc_image_version
+    if FLAGS.dpb_dataproc_image_version:
+      self.dpb_version = FLAGS.dpb_dataproc_image_version
 
   @staticmethod
   def _GetStats(stdout):
@@ -131,8 +133,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if self.dpb_service_zone:
       cmd.flags['zone'] = self.dpb_service_zone
 
-    if self.dpb_dataproc_image_version:
-      cmd.flags['image-version'] = self.dpb_dataproc_image_version
+    if self.dpb_version != 'latest':
+      cmd.flags['image-version'] = self.dpb_version
 
     if FLAGS.gcp_dataproc_image:
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
@@ -288,11 +290,3 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if udpate_default_fs:
       vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
     return {dpb_service.SUCCESS: True}
-
-  def GetMetadata(self):
-    """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(GcpDpbDataproc, self).GetMetadata()
-    if self.dpb_dataproc_image_version:
-      basic_data['dpb_service'] = ('dataproc_{}'.
-                                   format(self.dpb_dataproc_image_version))
-    return basic_data
