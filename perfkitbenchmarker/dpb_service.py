@@ -22,6 +22,7 @@ the corresponding provider directory as a subclass of BaseDpbService.
 import abc
 import datetime
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
@@ -34,6 +35,9 @@ flags.DEFINE_string('dpb_job_jarfile', None,
                     'Executable Jarfile containing workload implementation')
 flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
                     'implementation in the jar file')
+flags.DEFINE_string('dpb_service_zone', None, 'The zone for provisioning the '
+                    'dpb_service instance.')
+
 
 FLAGS = flags.FLAGS
 
@@ -118,10 +122,10 @@ class BaseDpbService(resource.BaseResource):
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
-    if FLAGS.zone:
-      self.dpb_service_zone = FLAGS.zone[0]
-    else:
-      self.dpb_service_zone = None
+    if not FLAGS.dpb_service_zone:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'The flag dpb_service_zone must be provided, for provisioning.')
+    self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_version = 'latest'
     self.dpb_service_type = 'unknown'
 
