@@ -20,13 +20,18 @@ same project. See https://developers.google.com/compute/docs/networking for
 more information about GCE VM networking.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import threading
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
-from perfkitbenchmarker import providers
+import six
 
 FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
@@ -82,11 +87,7 @@ class GceFirewall(network.BaseFirewall):
   CLOUD = providers.GCP
 
   def __init__(self):
-    """Initialize GCE firewall class.
-
-    Args:
-      project: The GCP project name under which firewall is created.
-    """
+    """Initialize GCE firewall class."""
     self._lock = threading.Lock()
     self.firewall_rules = {}
 
@@ -120,7 +121,7 @@ class GceFirewall(network.BaseFirewall):
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
-    for firewall_rule in self.firewall_rules.itervalues():
+    for firewall_rule in six.itervalues(self.firewall_rules):
       firewall_rule.Delete()
 
 
@@ -131,7 +132,7 @@ class GceNetworkSpec(network.BaseNetworkSpec):
 
     Args:
       project: The project for which the Network should be created.
-      kwargs: Additional key word arguments passed to BaseNetworkSpec.
+      **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super(GceNetworkSpec, self).__init__(**kwargs)
     self.project = project
@@ -192,7 +193,6 @@ class GceSubnetResource(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'delete',
                              self.name)
     cmd.Issue()
-
 
 
 class GceNetwork(network.BaseNetwork):
