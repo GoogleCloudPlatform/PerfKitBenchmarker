@@ -129,10 +129,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
-
-    if self.dpb_service_zone:
-      cmd.flags['zone'] = self.dpb_service_zone
-
+    # Set zone
+    cmd.flags['zone'] = self.dpb_service_zone
     if self.dpb_version != 'latest':
       cmd.flags['image-version'] = self.dpb_version
 
@@ -143,13 +141,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
-  def append_region(self, cmd, append_zone=False):
-    if FLAGS.zones:
-      zone = FLAGS.zones[0]
-      region = zone.rsplit('-', 1)[0]
-      cmd.flags['region'] = region
-      if append_zone:
-        cmd.flags['zone'] = zone
+  def append_region(self, cmd):
+    region = self.dpb_service_zone.rsplit('-', 1)[0]
+    cmd.flags['region'] = region
 
   def _Delete(self):
     """Deletes the cluster."""
@@ -161,8 +155,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
-    self.append_region(cmd)
-
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
@@ -179,8 +171,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       cmd.flags['class'] = classname
     else:
       cmd.flags['jar'] = jarfile
-
-    self.append_region(cmd)
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
@@ -208,10 +198,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def CreateBucket(self, source_bucket):
     mb_command = ['gsutil', 'mb']
-
-    if FLAGS.zone:
-      region = FLAGS.zone[0].rsplit('-', 1)[0]
-      mb_command.extend(['-c', 'regional', '-l', region])
+    region = self.dpb_service_zone.rsplit('-', 1)[0]
+    mb_command.extend(['-c', 'regional', '-l', region])
     mb_command.append('{}{}'.format(self.PERSISTENT_FS_PREFIX, source_bucket))
     vm_util.IssueCommand(mb_command)
 

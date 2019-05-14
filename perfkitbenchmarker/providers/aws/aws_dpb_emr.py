@@ -21,6 +21,7 @@ import logging
 
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -109,13 +110,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.dpb_service_type = AwsDpbEmr.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
-
-    if self.dpb_service_zone:
-      region = util.GetRegionFromZone(self.dpb_service_zone)
-      self.cmd_prefix += ['--region', region]
-      self.zone = self.dpb_service_zone
-
-    self.network = aws_network.AwsNetwork.GetNetwork(self)
+    region = util.GetRegionFromZone(self.dpb_service_zone)
+    self.cmd_prefix += ['--region', region]
+    self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
+        network.BaseNetworkSpec(zone=self.dpb_service_zone))
     self.bucket_to_delete = None
     self.dpb_version = FLAGS.dpb_emr_release_label
 
