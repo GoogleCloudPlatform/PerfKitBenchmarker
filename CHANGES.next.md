@@ -466,3 +466,4 @@
   match the default for GCE Linux VMs.
 - Fixed azure credentials package to avoid pushing the entire .azure directory.
 - Update bigtable benchmark to make configurations configurable, and report them.
+- RobustRemoteCommand now retries on ssh connections refused.
