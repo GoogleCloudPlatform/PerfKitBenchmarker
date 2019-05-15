@@ -92,6 +92,10 @@ def main():
       if e.errno == errno.EINTR:
         print('Wait timed out. This will be retried with a subsequent wait.')
         return 0
+      elif e.errno == errno.ECONNREFUSED:
+        print('Connection refused during wait. '
+              'This will be retried with a subsequent wait.')
+        return 0
       raise e
     signal.alarm(0)
     return_code_str = status.read()
