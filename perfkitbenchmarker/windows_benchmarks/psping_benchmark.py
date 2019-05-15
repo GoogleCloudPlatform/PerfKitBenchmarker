@@ -46,11 +46,11 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  """Measure TCP latency between two VMs.
+  """Measure TCP and UDP latency between two VMs.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects with the benchmark results.
