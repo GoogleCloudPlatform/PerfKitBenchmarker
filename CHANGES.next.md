@@ -107,6 +107,8 @@
 - Added support for measuring VM reboot time to the cluster boot benchmark.
 - Added Cygwin support to WindowsVirtualMachine and enabled a Windows+Cygwin
   version of Coremark.
+- Added ssh_via_internal_ip flag to use internal IP addresses when ssh'ing to
+  runner VMs, will use external IP addrs if not set.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
