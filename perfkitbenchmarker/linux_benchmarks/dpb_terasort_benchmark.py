@@ -142,7 +142,19 @@ def Run(benchmark_spec):
   metadata.update({'terasort_dataset_size_in_GB': storage_in_gb})
   logging.info('metadata %s ', str(metadata))
 
+  logging.info('Resource create_start_time %s ',
+               str(dpb_service_instance.create_start_time))
+  logging.info('Resource resource_ready_time %s ',
+               str(dpb_service_instance.resource_ready_time))
+  create_time = (
+      dpb_service_instance.resource_ready_time -
+      dpb_service_instance.create_start_time)
+  logging.info('create_time %s ', str(create_time))
+
   results = []
+  results.append(
+      sample.Sample('dpb_cluster_create_time', create_time, 'seconds',
+                    metadata))
   stages = [(dpb_service.TERAGEN, 'GenerateDataForTerasort'),
             (dpb_service.TERASORT, 'SortDataForTerasort'),
             (dpb_service.TERAVALIDATE, 'ValidateDataForTerasort')]
