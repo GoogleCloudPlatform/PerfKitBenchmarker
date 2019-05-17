@@ -36,6 +36,11 @@ flags.DEFINE_bool(
     'Whether to log passwords for Windows machines. This can be useful in '
     'the event of needing to manually RDP to the instance.')
 
+flags.DEFINE_bool(
+    'set_cpu_priority_high', False,
+    'Allows executables to be set to High (up from Normal) CPU priority '
+    'through the SetProcessPriorityToHigh function.')
+
 SMB_PORT = 445
 WINRM_PORT = 5986
 RDP_PORT = 3389
@@ -561,6 +566,29 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       devices: list of strings. A list of block devices.
     """
     raise NotImplementedError()
+
+  def SetProcessPriorityToHighByFlag(self, executable_name):
+    """Sets the CPU priority for a given executable name.
+
+    Note this only sets the CPU priority if FLAGS.set_cpu_priority_high is set.
+
+    Args:
+      executable_name: string. The executable name.
+    """
+    if not FLAGS.set_cpu_priority_high:
+      return
+
+    command = (
+        "New-Item 'HKLM:\\SOFTWARE\\Microsoft\\Windows "
+        "NT\\CurrentVersion\\Image File Execution Options\\{exe}\\PerfOptions' "
+        '-Force | New-ItemProperty -Name CpuPriorityClass -Value 3 -Force'
+    ).format(exe=executable_name)
+    self.RemoteCommand(command)
+    executables = self.os_metadata.get('high_cpu_priority')
+    if executables:
+      executables.append(executable_name)
+    else:
+      self.os_metadata['high_cpu_priority'] = [executable_name]
 
 
 class Windows2012Mixin(WindowsMixin):

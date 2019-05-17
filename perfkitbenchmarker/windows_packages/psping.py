@@ -57,6 +57,8 @@ def Install(vm):
   zip_path = ntpath.join(vm.temp_dir, PSPING_ZIP)
   vm.DownloadFile(PSPING_URL, zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
+  vm.AllowPort(TEST_PORT)
+  vm.SetProcessPriorityToHighByFlag('psping.exe')
 
 
 def StartPspingServer(vm):
