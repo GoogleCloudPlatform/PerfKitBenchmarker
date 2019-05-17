@@ -42,7 +42,6 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms[:2]
   for vm in vms:
     vm.Install('psping')
-    vm.AllowPort(psping.TEST_PORT)
 
 
 def Run(benchmark_spec):
