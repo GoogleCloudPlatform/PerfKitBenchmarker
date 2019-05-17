@@ -20,6 +20,7 @@ import json
 import logging
 
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
@@ -110,10 +111,14 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.dpb_service_type = AwsDpbEmr.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
-    region = util.GetRegionFromZone(self.dpb_service_zone)
-    self.cmd_prefix += ['--region', region]
-    self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
-        network.BaseNetworkSpec(zone=self.dpb_service_zone))
+    if self.dpb_service_zone:
+      region = util.GetRegionFromZone(self.dpb_service_zone)
+      self.cmd_prefix += ['--region', region]
+      self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
+          network.BaseNetworkSpec(zone=self.dpb_service_zone))
+    else:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service_zone must be provided, for provisioning.')
     self.bucket_to_delete = None
     self.dpb_version = FLAGS.dpb_emr_release_label
 
