@@ -26,11 +26,12 @@ AZURE_CREDENTIAL_PROFILE_FILE = os.path.join(
 
 def Install(vm):
   """Copies Azure credentials to the VM."""
+  vm.RemoteCommand('mkdir -p {0}'.format(AZURE_CREDENTIAL_LOCATION))
   vm.PushFile(
       object_storage_service.FindCredentialFile(
           os.path.join('~', AZURE_CREDENTIAL_TOKENS_FILE)),
-      AZURE_CREDENTIAL_LOCATION)
+      AZURE_CREDENTIAL_TOKENS_FILE)
   vm.PushFile(
       object_storage_service.FindCredentialFile(
           os.path.join('~', AZURE_CREDENTIAL_PROFILE_FILE)),
-      AZURE_CREDENTIAL_LOCATION)
+      AZURE_CREDENTIAL_PROFILE_FILE)
