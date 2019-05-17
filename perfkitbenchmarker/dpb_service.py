@@ -22,7 +22,6 @@ the corresponding provider directory as a subclass of BaseDpbService.
 import abc
 import datetime
 
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
@@ -122,9 +121,6 @@ class BaseDpbService(resource.BaseResource):
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
-    if not FLAGS.dpb_service_zone:
-      raise errors.Setup.InvalidFlagConfigurationError(
-          'The flag dpb_service_zone must be provided, for provisioning.')
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_version = 'latest'
     self.dpb_service_type = 'unknown'

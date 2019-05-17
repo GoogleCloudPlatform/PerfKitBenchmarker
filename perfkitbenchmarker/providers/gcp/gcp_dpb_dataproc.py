@@ -21,6 +21,7 @@ import datetime
 import json
 import logging
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
@@ -66,6 +67,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.project = FLAGS.project
     if FLAGS.dpb_dataproc_image_version:
       self.dpb_version = FLAGS.dpb_dataproc_image_version
+    if not self.dpb_service_zone:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service_zone must be provided, for provisioning.')
 
   @staticmethod
   def _GetStats(stdout):
