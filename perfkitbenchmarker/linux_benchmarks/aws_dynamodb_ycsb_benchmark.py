@@ -41,11 +41,6 @@ aws_dynamodb_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
-                     False,
-                     "Consistent reads cost 2x eventual reads. "
-                     "'false' is default which is eventual")
-
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -113,6 +108,13 @@ def Run(benchmark_spec):
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  benchmark_metadata = {
+      'ycsb_client_vms': len(vms),
+  }
+  for sample in samples:
+    sample.metadata.update(
+        benchmark_spec.dynamodb_instance.GetResourceMetadata())
+    sample.metadata.update(benchmark_metadata)
   return samples
 
 

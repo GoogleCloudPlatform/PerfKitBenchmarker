@@ -44,9 +44,12 @@ flags.DEFINE_enum('aws_dynamodb_attributetype',
                   'S', ['S', 'N', 'B'],
                   'The type of attribute, default to S (String).'
                   'Alternates are N (Number) and B (Binary).')
-flags.DEFINE_string('aws_dynamodb_capacity',
-                    'ReadCapacityUnits=5,WriteCapacityUnits=5',
-                    'Set RCU/WCU for dynamodb table')
+flags.DEFINE_integer('aws_dynamodb_read_capacity',
+                     '5',
+                     'Set RCU for dynamodb table')
+flags.DEFINE_integer('aws_dynamodb_write_capacity',
+                     '5',
+                     'Set WCU for dynamodb table')
 flags.DEFINE_integer('aws_dynamodb_lsi_count',
                      0, 'Set amount of Local Secondary Indexes. Only set 0-5')
 flags.register_validator('aws_dynamodb_lsi_count',
@@ -60,6 +63,10 @@ flags.DEFINE_integer('aws_dynamodb_gsi_count',
 flags.register_validator('aws_dynamodb_gsi_count',
                          lambda value: -1 < value < 6,
                          message='--count must be from 0-5')
+flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
+                     False,
+                     "Consistent reads cost 2x eventual reads. "
+                     "'false' is default which is eventual")
 
 
 class _GetIndexes():
@@ -143,7 +150,9 @@ class AwsDynamoDBInstance(resource.BaseResource):
                             .format(FLAGS.aws_dynamodb_sortkey,
                                     FLAGS.aws_dynamodb_attributetype))
     self.table_name = table_name
-    self.throughput = FLAGS.aws_dynamodb_capacity
+    self.throughput = 'ReadCapacityUnits={read},WriteCapacityUnits={write}'.format(
+        read=FLAGS.aws_dynamodb_read_capacity,
+        write=FLAGS.aws_dynamodb_write_capacity)
     self.lsi_indexes = _GetIndexes().CreateLocalSecondaryIndex()
     self.gsi_indexes = _GetIndexes().CreateGlobalSecondaryIndex()
 
@@ -238,3 +247,21 @@ class AwsDynamoDBInstance(resource.BaseResource):
   def GetEndPoint(self):
     ddbep = 'http://dynamodb.{0}.amazonaws.com'.format(self.region)
     return ddbep
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the dynamodb instance.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    return {
+        'aws_dynamodb_primarykey': FLAGS.aws_dynamodb_primarykey,
+        'aws_dynamodb_use_sort': FLAGS.aws_dynamodb_use_sort,
+        'aws_dynamodb_sortkey': FLAGS.aws_dynamodb_sortkey,
+        'aws_dynamodb_attributetype': FLAGS.aws_dynamodb_attributetype,
+        'aws_dynamodb_read_capacity': FLAGS.aws_dynamodb_read_capacity,
+        'aws_dynamodb_write_capacity': FLAGS.aws_dynamodb_write_capacity,
+        'aws_dynamodb_lsi_count': FLAGS.aws_dynamodb_lsi_count,
+        'aws_dynamodb_gsi_count': FLAGS.aws_dynamodb_gsi_count,
+        'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
+    }
