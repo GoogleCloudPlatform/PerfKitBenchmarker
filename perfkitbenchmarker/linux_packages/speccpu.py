@@ -92,7 +92,7 @@ flags.DEFINE_enum(
     'Run mode to use. Defaults to base. ')
 
 
-_VM_STATE_ATTR = 'speccpu_vm_state'
+VM_STATE_ATTR = 'speccpu_vm_state'
 
 
 def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
@@ -200,7 +200,7 @@ class SpecInstallConfigurations(object):
     base_spec_dir: Optional string. Base directory where spec files are located.
     spec_dir: Optional string. Path of a created directory on the remote machine
         where the SPEC files are stored.
-    base_iso_file_path: Optional string. Base directory of iso file.
+    base_iso_file_path: Optional string. Basename of iso file.
     iso_file_path: Optional string. Path of the iso file on the remote machine.
     base_tar_file_path: Optional string. Base directory of tar file.
     tar_file_path: Optional string. Path of the tar file on the remote machine.
@@ -224,6 +224,20 @@ class SpecInstallConfigurations(object):
     self.log_format = None
     self.runspec_config = None
 
+  def UpdateConfig(self, scratch_dir):
+    """Updates the configuration after other attributes have been set.
+
+    Args:
+      scratch_dir: The scratch directory on the VM that SPEC is installed on.
+    """
+    self.spec_dir = posixpath.join(scratch_dir, self.base_spec_dir)
+    self.cfg_file_path = posixpath.join(
+        self.spec_dir, 'config', os.path.basename(self.runspec_config))
+    if self.base_iso_file_path:
+      self.iso_file_path = posixpath.join(scratch_dir, self.base_iso_file_path)
+    if self.base_mount_dir:
+      self.mount_dir = posixpath.join(scratch_dir, self.base_mount_dir)
+
 
 def InstallSPECCPU(vm, speccpu_vm_state):
   """Installs SPEC CPU2006 or 2017 on the target vm.
@@ -232,11 +246,8 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     vm: Vm on which speccpu is installed.
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
-  setattr(vm, _VM_STATE_ATTR, speccpu_vm_state)
   scratch_dir = vm.GetScratchDir()
   vm.RemoteCommand('chmod 777 {0}'.format(scratch_dir))
-  speccpu_vm_state.spec_dir = posixpath.join(scratch_dir,
-                                             speccpu_vm_state.base_spec_dir)
   try:
     # Since this will override 'build_tools' installation, install this
     # before we install 'build_tools' package
@@ -246,7 +257,7 @@ def InstallSPECCPU(vm, speccpu_vm_state):
                   speccpu_vm_state)
   except errors.Setup.BadPreprovisionedDataError:
     _CheckIsoAndCfgFile(speccpu_vm_state.runspec_config,
-                        speccpu_vm_state.iso_file_path)
+                        speccpu_vm_state.base_iso_file_path)
     _PrepareWithIsoFile(vm, speccpu_vm_state)
   vm.Install('speccpu')
 
@@ -281,8 +292,6 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
                                       scratch_dir)
   vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(
       dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path))
-  speccpu_vm_state.cfg_file_path = posixpath.join(
-      speccpu_vm_state.spec_dir, 'config', speccpu_vm_state.runspec_config)
 
 
 def _PrepareWithIsoFile(vm, speccpu_vm_state):
@@ -302,14 +311,10 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
   vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.spec_dir))
 
   # Copy the iso to the VM.
-  local_iso_file_path = data.ResourcePath(speccpu_vm_state.iso_file_path)
-  speccpu_vm_state.iso_file_path = posixpath.join(
-      scratch_dir, speccpu_vm_state.iso_file_path)
+  local_iso_file_path = data.ResourcePath(speccpu_vm_state.base_iso_file_path)
   vm.PushFile(local_iso_file_path, scratch_dir)
 
   # Extract files from the iso to the cpu2006 or cpu2017 directory.
-  speccpu_vm_state.mount_dir = posixpath.join(
-      scratch_dir, speccpu_vm_state.mount_dir)
   vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.mount_dir))
   vm.RemoteCommand('sudo mount -t iso9660 -o loop {0} {1}'.format(
       speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir))
@@ -319,9 +324,6 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
 
   # Copy the cfg to the VM.
   local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
-  cfg_file_name = os.path.basename(local_cfg_file_path)
-  speccpu_vm_state.cfg_file_path = posixpath.join(
-      speccpu_vm_state.spec_dir, 'config', cfg_file_name)
   vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
 
   # Run SPEC CPU2006 or 2017 installation.
@@ -387,7 +389,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       A list of sample.Sample objects.
   """
   results = []
-  speccpu_vm_state = getattr(vm, _VM_STATE_ATTR, None)
+  speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   re_begin_section = re.compile('^={1,}')
   re_end_section = re.compile(speccpu_vm_state.log_format)
   result_section = []
@@ -517,7 +519,7 @@ def ParseOutput(vm, log_files, is_partial_results, runspec_metric):
   Returns:
     A list of samples to be published (in the same format as Run() returns).
   """
-  speccpu_vm_state = getattr(vm, _VM_STATE_ATTR, None)
+  speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   results = []
 
   for log in log_files:
@@ -543,7 +545,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   Returns:
     A list of sample.Sample objects.
   """
-  speccpu_vm_state = getattr(vm, _VM_STATE_ATTR, None)
+  speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   runspec_flags = [
       ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
       ('tune', FLAGS.spec_runmode), ('size', 'ref'),
@@ -571,7 +573,7 @@ def Uninstall(vm):
   Args:
     vm: The vm on which SPECCPU is uninstalled.
   """
-  speccpu_vm_state = getattr(vm, _VM_STATE_ATTR, None)
+  speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   if speccpu_vm_state:
     if speccpu_vm_state.mount_dir:
       try:

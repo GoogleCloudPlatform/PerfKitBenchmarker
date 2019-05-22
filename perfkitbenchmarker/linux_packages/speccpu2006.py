@@ -34,8 +34,12 @@ _DEFAULT_RUNSPEC_CONFIG = 'linux64-x64-gcc47.cfg'
 PREPROVISIONED_DATA = {_SPECCPU2006_TAR: None}
 
 
-def Install(vm):
-  """Installs SPECCPU 2006."""
+def GetSpecInstallConfig(scratch_dir):
+  """Returns a SpecInstallConfigurations() for SPEC CPU 2006.
+
+  Args:
+    scratch_dir: The scratch directory on the VM that SPEC is installed on.
+  """
   install_config = speccpu.SpecInstallConfigurations()
   install_config.package_name = _PACKAGE_NAME
   install_config.base_mount_dir = _MOUNT_DIR
@@ -46,4 +50,10 @@ def Install(vm):
   install_config.log_format = _LOG_FORMAT
   install_config.runspec_config = (FLAGS.runspec_config or
                                    _DEFAULT_RUNSPEC_CONFIG)
-  speccpu.InstallSPECCPU(vm, install_config)
+  install_config.UpdateConfig(scratch_dir)
+  return install_config
+
+
+def Install(vm):
+  """Installs SPECCPU 2006."""
+  speccpu.InstallSPECCPU(vm, GetSpecInstallConfig(vm.GetScratchDir()))

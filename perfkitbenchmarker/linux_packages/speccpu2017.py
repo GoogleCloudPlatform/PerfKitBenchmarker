@@ -34,8 +34,12 @@ _DEFAULT_RUNSPEC_CONFIG = 'pkb-crosstool-llvm-linux-x86-fdo.cfg'
 PREPROVISIONED_DATA = {_SPECCPU2017_TAR: None}
 
 
-def Install(vm):
-  """Installs SPECCPU 2017."""
+def GetSpecInstallConfig(scratch_dir):
+  """Returns a SpecInstallConfigurations() for SPEC CPU 2017.
+
+  Args:
+    scratch_dir: The scratch directory on the VM that SPEC is installed on.
+  """
   install_config = speccpu.SpecInstallConfigurations()
   install_config.package_name = _PACKAGE_NAME
   install_config.base_spec_dir = _SPECCPU2017_DIR
@@ -44,7 +48,13 @@ def Install(vm):
   install_config.log_format = _LOG_FORMAT
   install_config.runspec_config = (FLAGS.runspec_config or
                                    _DEFAULT_RUNSPEC_CONFIG)
-  speccpu.InstallSPECCPU(vm, install_config)
+  install_config.UpdateConfig(scratch_dir)
+  return install_config
+
+
+def Install(vm):
+  """Installs SPECCPU 2017."""
+  speccpu.InstallSPECCPU(vm, GetSpecInstallConfig(vm.GetScratchDir()))
   vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
       INSTALL_DIR, LLVM_TAR_URL, LLVM_TAR))
   vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
