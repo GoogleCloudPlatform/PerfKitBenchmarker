@@ -17,6 +17,7 @@ import logging
 import ntpath
 import os
 import time
+import uuid
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -98,10 +99,76 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
   def RobustRemoteCommand(self, command, should_log=False, ignore_failure=False,
                           suppress_warning=False, timeout=None):
-    logging.warning('RobustRemoteCommand not implemented for windows.'
-                    ' Using RemoteCommand instead.')
-    return self.RemoteCommand(command, should_log, ignore_failure,
-                              suppress_warning, timeout)
+    """Runs a powershell command on the VM.
+
+    Should be more robust than its counterpart, RemoteCommand. In the event of
+    network failure, the process will continue on the VM, and we continually
+    reconnect to check if it has finished. The tradeoff is this is noticeably
+    slower than the normal RemoteCommand.
+
+    The algorithm works as follows:
+      1. Create a "command started" file
+      2. Run the command
+      3. Create a "command done" file
+
+    If we fail to run step 1, we raise a RemoteCommandError. If we have network
+    failure during step 2, the command will continue running on the VM and we
+    will spin inside this function waiting for the "command done" file to be
+    created.
+
+    Args:
+      command: A valid powershell command.
+      should_log: A boolean indicating whether the command result should be
+        logged at the info level. Even if it is false, the results will still be
+        logged at the debug level.
+      ignore_failure: Ignore any failure if set to true.
+      suppress_warning: Suppress the result logging from IssueCommand when the
+        return code is non-zero.
+      timeout: Float. A timeout in seconds for the command. If None is passed,
+        no timeout is applied. Timeout kills the winrm session which then kills
+        the process being executed.
+
+    Returns:
+      A tuple of stdout and stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem issuing the command or the
+          command timed out.
+    """
+
+    logging.info('Running robust command on %s: %s', self, command)
+    command_id = uuid.uuid4()
+    logged_command = ('New-Item -Path %s.start -ItemType File; powershell "%s" '
+                      '2> %s.err 1> %s.out; New-Item -Path %s.done -ItemType '
+                      'File') % (command_id, command, command_id, command_id,
+                                 command_id)
+    try:
+      self.RemoteCommand(
+          logged_command,
+          should_log=should_log,
+          ignore_failure=ignore_failure,
+          suppress_warning=suppress_warning,
+          timeout=timeout)
+    except errors.VirtualMachine.RemoteCommandError:
+      logging.exception(
+          'Exception while running %s on %s, waiting for command to finish',
+          command, self)
+    start_out, _ = self.RemoteCommand('Test-Path %s.start' % (command_id,))
+    if 'True' not in start_out:
+      raise errors.VirtualMachine.RemoteCommandError(
+          'RobustRemoteCommand did not start on VM.')
+    done_out = ''
+    # Spin on the VM until the "done" file is created. It is better to spin
+    # on the VM rather than creating a new session for each test.
+    while 'True' not in done_out:
+      done_out, _ = self.RemoteCommand(
+          '$retries=0; while ((-not (Test-Path %s.done)) -and '
+          '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
+          'Test-Path %s.done' % (command_id, command_id))
+    stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
+    _, stderr = self.RemoteCommand('Get-Content %s.err' % (command_id,))
+
+    return stdout, stderr
 
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
                     suppress_warning=False, timeout=None):
