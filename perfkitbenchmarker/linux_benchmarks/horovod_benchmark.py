@@ -318,8 +318,8 @@ def Run(benchmark_spec):
 
   if benchmark_spec.synthetic:
     run_command += ' --synthetic'
-     # The use of larc and loss scale is taken from the AWS DLAMI training
-     # script (see comment above).
+    # The use of larc and loss scale is taken from the AWS DLAMI training
+    # script (see comment above).
     if benchmark_spec.total_gpus >= 128:
       run_command += ' --use_larc --loss_scale 256'
   else:
