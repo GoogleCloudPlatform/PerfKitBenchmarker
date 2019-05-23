@@ -292,6 +292,7 @@
 - Added precision flag to Horovod.
 - Added a flag to Horovod that indicates that the VM is using a deep learning
   image.
+- Implemented RobustRemoteCommand for Windows.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
