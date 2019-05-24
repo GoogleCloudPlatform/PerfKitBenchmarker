@@ -147,6 +147,19 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
 
+  def testInstanceQuotaExceededDuringCreate(self):
+    stderr = (
+        'An error occurred (InstanceLimitExceeded) when calling the '
+        'RunInstances operation: You have requested more instances (21) than '
+        'your current instance limit of 20 allows for the specified instance '
+        'type. Please visit http://aws.amazon.com/contact-us/ec2-request to '
+        'request an adjustment to this limit.'
+    )
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
+      self.vm._Create()
+    self.assertEqual(str(e.exception), stderr)
+
   def testInstanceStockedOutDuringCreate(self):
     stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
               'the RunInstances operation (reached max retries: 4): '
