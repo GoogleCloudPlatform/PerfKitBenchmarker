@@ -49,8 +49,6 @@ flags.DEFINE_integer('psping_rr_count', 1000,
 flags.DEFINE_integer('psping_timeout', 10,
                      'The time to allow psping to run')
 
-flags.DEFINE_bool('psping_use_udp', False, 'Use UDP instead of TCP')
-
 
 def Install(vm):
   """Installs the psping package on the VM."""
@@ -84,7 +82,7 @@ def _RunPsping(vm, command):
 def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
   """Run the psping latency test.
 
-  Uses a TCP or UDP request-response time to measure latency.
+  Uses a TCP request-response time to measure latency.
 
   Args:
     sending_vm: the vm to send the tcp request.
@@ -97,18 +95,18 @@ def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
   server_ip = (receiving_vm.internal_ip if use_internal_ip
                else receiving_vm.ip_address)
 
-  client_command = (  # sleep to make sure the server starts first.
-      'cd {psping_exec_dir}; sleep 2;.\\psping.exe /accepteula {use_udp} -l '
-      '{packet_size} -i {outstanding_connections} -q -n {rr_count} -h '
-      '{bucket_count} {ip}:{port} > {out_file}').format(
+  client_command = (
+      'cd {psping_exec_dir}; '
+      'sleep 2;'  # sleep to make sure the server starts first.
+      '.\\psping.exe /accepteula -l {packet_size} -i 0 -q '
+      '-n {rr_count} -h {bucket_count} {ip}:{port}'
+      ' > {out_file}').format(
           psping_exec_dir=sending_vm.temp_dir,
           packet_size=FLAGS.psping_packet_size,
           rr_count=FLAGS.psping_rr_count,
           bucket_count=FLAGS.psping_bucket_count,
           ip=server_ip,
           port=TEST_PORT,
-          use_udp='-u' if FLAGS.psping_use_udp else '',
-          outstanding_connections=1 if FLAGS.psping_use_udp else 0,
           out_file=PSPING_OUTPUT_FILE)
 
   # PSPing does not have a configurable timeout. To get around this, start the
