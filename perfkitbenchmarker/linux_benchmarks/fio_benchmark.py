@@ -152,7 +152,7 @@ flag_util.DEFINE_units('fio_blocksize', None,
 flags.DEFINE_integer('fio_runtime', 600,
                      'The number of seconds to run each fio job for.',
                      lower_bound=1)
-flags.DEFINE_list('fio_parameters', ['randrepeat=0',],
+flags.DEFINE_list('fio_parameters', ['randrepeat=0'],
                   'Parameters to apply to all PKB generated fio jobs. Each '
                   'member of the list should be of the form "param=value".')
 flags.DEFINE_boolean('fio_lat_log', False,
