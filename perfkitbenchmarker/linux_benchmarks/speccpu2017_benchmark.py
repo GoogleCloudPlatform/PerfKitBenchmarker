@@ -27,6 +27,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import speccpu
+from perfkitbenchmarker.linux_packages import speccpu2017
 
 
 INT_SUITE = ['perlbench', 'gcc', 'mcf', 'omnetpp',
@@ -130,6 +131,10 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   CheckVmPrerequisites(vm)
   vm.Install('speccpu2017')
+  # Set attribute outside of the install function, so benchmark will work
+  # even with --install_packages=False.
+  config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
+  setattr(vm, speccpu.VM_STATE_ATTR, config)
 
 
 def Run(benchmark_spec):

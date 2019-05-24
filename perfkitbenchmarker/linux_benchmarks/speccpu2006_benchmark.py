@@ -25,6 +25,7 @@ SPEC CPU2006 homepage: http://www.spec.org/cpu2006/
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import speccpu
+from perfkitbenchmarker.linux_packages import speccpu2006
 
 
 FLAGS = flags.FLAGS
@@ -71,6 +72,10 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   vm.Install('speccpu2006')
+  # Set attribute outside of the install function, so benchmark will work
+  # even with --install_packages=False.
+  config = speccpu2006.GetSpecInstallConfig(vm.GetScratchDir())
+  setattr(vm, speccpu.VM_STATE_ATTR, config)
 
 
 def Run(benchmark_spec):
