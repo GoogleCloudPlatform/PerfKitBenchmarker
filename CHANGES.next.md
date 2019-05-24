@@ -289,6 +289,10 @@
 - Added 'os_type' metadata to virtual machines for use in performance samples.
 - Storage specification related dpb terasort benchmark improvements.
 - Added an optional flag to set a delay between boot tasks.
+- Added precision flag to Horovod.
+- Added a flag to Horovod that indicates that the VM is using a deep learning
+  image.
+- Implemented RobustRemoteCommand for Windows.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

@@ -22,15 +22,12 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_benchmarks import mlperf_benchmark
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 FLAGS = flags.FLAGS
-
-DEEP_LEARNING_EXAMPLES_REPO = 'https://github.com/aws-samples/deep-learning-models.git'
 MACHINEFILE = 'HOSTFILE'
 
-BENCHMARK_VERSION = 0.32
+BENCHMARK_VERSION = 0.33
 BENCHMARK_NAME = 'horovod'
 BENCHMARK_CONFIG = """
 horovod:
@@ -42,18 +39,24 @@ horovod:
         GCP:
           machine_type: n1-standard-4
           zone: us-east1-d
-          boot_disk_size: 200
+          boot_disk_size: 500
           gpu_type: k80
           gpu_count: 1
         AWS:
           machine_type: p2.xlarge
           zone: us-east-1
-          boot_disk_size: 200
+          boot_disk_size: 500
         Azure:
           machine_type: Standard_NC6
           zone: eastus
       vm_count: null
 """
+# The data is downloaded from http://image-net.org/
+# For data preprocessing, please check
+# https://github.com/mlperf/training/tree/master/image_classification#3-datasetenvironment
+BENCHMARK_DATA = {'ILSVRC2012.tar': 'cd2de079dc2e18fc9a9f598b5a38969b'}
+
+GITHUB_MODELS_URL = 'https://github.com/aws-samples/deep-learning-models.git'
 
 flags.DEFINE_enum(
     'horovod_model', 'resnet50',
@@ -61,24 +64,32 @@ flags.DEFINE_enum(
     'name of the model to run.')
 
 flags.DEFINE_integer(
-    'horovod_batch_size', 256, 'Batch size per compute device.')
+    'horovod_batch_size', 64, 'Batch size per compute device.')
 
-# AWS DLAMI example script traines for 90 epochs when using real data.
+# AWS script trained for 90 epochs when using real data.
+# Note that using too small a batch size (1 for example) with
+# 8 GPUs will cause the run script to fail for reasons not understood.
 flags.DEFINE_integer(
-    'horovod_num_epochs', 1, 'Number of epochs to train for.')
+    'horovod_num_epochs', 10,
+    'Number of epochs to train for.')
+
+flags.DEFINE_enum(
+    'horovod_precision', 'fp16', ['fp16', 'fp32'], 'Precision.')
 
 flags.DEFINE_boolean(
     'horovod_synthetic', True, 'Whether to use synthetic data.')
 
-# The example training scripts are taken from the AWS deep learning
-# samples github repo. The script is authored by NVIDIA and AWS and
-# as of March 2018 is more up to date than the NVIDIA examples at
-# https://github.com/NVIDIA/DeepLearningExamples.
 flags.DEFINE_string(
     'horovod_deep_learning_examples_commit',
     '599adf2',
     'Commit hash of the AWS deep learning samples github repo '
     'to use for the benchmark.')
+
+flags.DEFINE_boolean(
+    'horovod_using_deep_learning_image', False,
+    'Whether the VM under test is using a deep learning image. '
+    'This will case PKB to skip the installation of Horovod '
+    'and its dependencies.')
 
 
 class HorovodParseOutputError(errors.Benchmarks.RunError):
@@ -125,6 +136,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.model = FLAGS.horovod_model
   benchmark_spec.batch_size = FLAGS.horovod_batch_size
   benchmark_spec.num_epochs = FLAGS.horovod_num_epochs
+  benchmark_spec.precision = FLAGS.horovod_precision
   benchmark_spec.synthetic = FLAGS.horovod_synthetic
   benchmark_spec.deep_learning_examples_commit = (
       FLAGS.horovod_deep_learning_examples_commit)
@@ -138,7 +150,7 @@ def _CopyAndUpdateRunScripts(vm):
   """
   vm.InstallPackages('git')
   vm.RemoteCommand('rm -rf deep-learning-models')
-  vm.RemoteCommand('git clone %s' % DEEP_LEARNING_EXAMPLES_REPO)
+  vm.RemoteCommand('git clone %s' % GITHUB_MODELS_URL)
   vm.RemoteCommand(
       'cd deep-learning-models && git checkout {}'.format(
           FLAGS.horovod_deep_learning_examples_commit)
@@ -162,12 +174,12 @@ def _PrepareHorovod(vm):
   logging.info('Installing Horovod on %s', vm)
   vm.AuthenticateVm()
   if not FLAGS.horovod_synthetic:
-    # Install ILSVRC2012 from the mlperf benchmark.
-    vm.InstallPreprovisionedBenchmarkData(
-        'mlperf', mlperf_benchmark.BENCHMARK_DATA, vm_util.VM_TMP_DIR)
+    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, BENCHMARK_DATA,
+                                          vm_util.VM_TMP_DIR)
     vm.RemoteCommand('tar xvf %s' % posixpath.join(vm_util.VM_TMP_DIR,
                                                    'ILSVRC2012.tar'))
-
+  if FLAGS.horovod_using_deep_learning_image:
+    return
   vm.Install('tensorflow')
   vm.Install('openmpi')
   vm.RemoteCommand('sudo HOROVOD_GPU_ALLREDUCE=NCCL pip install '
@@ -208,6 +220,7 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['model'] = benchmark_spec.model
   metadata['batch_size'] = benchmark_spec.batch_size
   metadata['num_epochs'] = benchmark_spec.num_epochs
+  metadata['precision'] = benchmark_spec.precision
   metadata['synthetic'] = benchmark_spec.synthetic
   metadata['deep_learning_examples_commit'] = (
       benchmark_spec.deep_learning_examples_commit)
@@ -234,7 +247,7 @@ def _ExtractThroughputAndRuntime(output):
       runtime = float(split_line[2])
       continue
     split_line = line.split()
-    if split_line[0] == '1':  # Done parsing.
+    if split_line[0] == '1':  # We are done parsing.
       break
     throughput_samples.append(float(split_line[2]))
   avg_throughput = sum(throughput_samples) / len(throughput_samples)
@@ -274,8 +287,16 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
 
-  # All this maddness was copied from the horovod example training script in
-  # the tensorflow_p36 environment on the AWS DLAMI.
+  # GCP should work out of the box with the deep learning image but the AWS
+  # image requires us to use the correct Tensorflow Python environment.
+  if FLAGS.cloud == 'AWS' and FLAGS.horovod_using_deep_learning_image:
+    master_vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
+    python_interpreter = 'anaconda3/envs/tensorflow_p36/bin/python'
+  else:
+    python_interpreter = 'python'
+
+  # This mpirun command was copied from the horovod example training script
+  # in the tensorflow_p36 environment on the AWS DLAMI.
   # https://aws.amazon.com/releasenotes/deep-learning-ami-ubuntu-version-21-2
   run_command = (
       'mpirun -np {num_gpus} -hostfile HOSTFILE -mca plm_rsh_no_tree_spawn 1 '
@@ -283,14 +304,17 @@ def Run(benchmark_spec):
       '-x HOROVOD_FUSION_THRESHOLD=16777216 -x NCCL_MIN_NRINGS=4 '
       '-x LD_LIBRARY_PATH -x PATH -mca pml ob1 -mca btl ^openib '
       '-mca btl_tcp_if_exclude lo,docker0 -x TF_CPP_MIN_LOG_LEVEL=0 '
-      'python -W ignore {training_script} --num_epochs {num_epochs} '
-      '-b {batch_size} --model {model} --fp16 --clear_log'
+      '{python} -W ignore {training_script} --num_epochs {num_epochs} '
+      '-b {batch_size} --model {model} {fp16} --clear_log'
   ).format(
       num_gpus=benchmark_spec.total_gpus,
+      python=python_interpreter,
       training_script='train_imagenet_resnet_hvd.py',
       num_epochs=benchmark_spec.num_epochs,
       batch_size=benchmark_spec.batch_size,
-      model=benchmark_spec.model)
+      model=benchmark_spec.model,
+      fp16='--fp16' if benchmark_spec.precision == 'fp16' else '--nofp16'
+  )
 
   if benchmark_spec.synthetic:
     run_command += ' --synthetic'
