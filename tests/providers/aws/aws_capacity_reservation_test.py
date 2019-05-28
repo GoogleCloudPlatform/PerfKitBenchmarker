@@ -4,8 +4,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import datetime
 import unittest
 
+from freezegun import freeze_time
 import mock
 
 from perfkitbenchmarker import flags
@@ -15,7 +17,8 @@ from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
-TIMEOUT_UTC = '2019-01-14T23:34:14.000Z'
+TIMEOUT_UTC = '2019-05-23 03:56:22.703681'
+FAKE_DATETIME_NOW = datetime.datetime(2010, 1, 1)
 
 CREATE_STDOUT_SUCCESSFUL = """
 {
@@ -58,14 +61,13 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AwsCapacityReservationTest, self).setUp()
+    FLAGS.timeout_minutes = 30
 
-    self._create_patch(
-        util.__name__ + '.MakeDefaultTags',
-        return_val={'timeout_utc': TIMEOUT_UTC})
     self._create_patch(
         util.__name__ + '.GetZonesInRegion',
         return_val=['us-west-1a', 'us-west-1b'])
 
+  @freeze_time(FAKE_DATETIME_NOW)
   def test_create(self):
     vm_group = [FakeAwsVirtualMachine()]
     capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(
@@ -77,13 +79,15 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
       capacity_reservation._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
+      expected_end_date = FAKE_DATETIME_NOW + datetime.timedelta(
+          minutes=FLAGS.timeout_minutes)
       expected_command = (
           'aws --output json ec2 create-capacity-reservation '
           '--instance-type=fake_machine_type '
           '--instance-platform=Linux/UNIX --availability-zone=us-west-1a '
           '--instance-count=1 --instance-match-criteria=targeted '
           '--region=us-west-1 --end-date-type=limited --end-date=%s' %
-          TIMEOUT_UTC)
+          expected_end_date)
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(expected_command, command_string)
