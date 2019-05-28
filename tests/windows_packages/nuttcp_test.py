@@ -60,7 +60,7 @@ class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         'bandwidth_requested': bandwidth,
         'network_type': 'external',
         'packet_size': 1420,
-        'sample_time': 10,
+        'sample_time': 60,
         'iteration': 1,
         'receiver cpu 0': 22.7976893740141,
         'receiver cpu 1': 32.6422793196096,

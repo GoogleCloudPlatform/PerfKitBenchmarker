@@ -42,7 +42,7 @@ flags.DEFINE_integer('nuttcp_bandwidth_step_mb', 1000,
                      'The amount of megabytes to increase bandwidth in each '
                      'UDP stream test.')
 
-flags.DEFINE_integer('nuttcp_udp_stream_seconds', 10,
+flags.DEFINE_integer('nuttcp_udp_stream_seconds', 60,
                      'The amount of time to run the UDP stream test.')
 
 flags.DEFINE_integer('nuttcp_udp_packet_size', 1420,
@@ -102,7 +102,7 @@ def _RunNuttcp(vm, options, exec_path):
       options=options)
   # Timeout after expected duration, 5sec server wait plus 25sec buffer
   timeout_duration = FLAGS.nuttcp_udp_stream_seconds + _COMMAND_TIMEOUT_BUFFER
-  vm.RemoteCommand(command, timeout=timeout_duration)
+  vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _GetCpuUsage(vm):
@@ -170,7 +170,7 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
       args=(receiving_vm, receiver_args, exec_path))
   server_process.start()
 
-  receiving_vm.WaitForProcessRunning('nuttcp', 3)
+  receiving_vm.WaitForProcessRunning('nuttcp', 30)
 
   # Process to run the nuttcp client
   client_process = multiprocessing.Process(
@@ -179,7 +179,7 @@ def RunSingleBandwidth(bandwidth, sending_vm, receiving_vm, dest_ip, exec_path):
       args=(sending_vm, sender_args, exec_path))
   client_process.start()
 
-  sending_vm.WaitForProcessRunning('nuttcp', 3)
+  sending_vm.WaitForProcessRunning('nuttcp', 30)
 
   process_args = [
       (_GetCpuUsage, (receiving_vm,), {}),
