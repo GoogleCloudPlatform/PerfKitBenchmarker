@@ -37,13 +37,17 @@ from AWS vm_groups to AwsCapacityReservation instances. This is because all
 VMs in a VM group share the same shape and zone.
 """
 
+import datetime
 import json
 import logging
 from perfkitbenchmarker import capacity_reservation
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
+
+FLAGS = flags.FLAGS
 
 
 class InvalidVmGroupSizeError(Exception):
@@ -114,7 +118,9 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
     else:
       zones_to_try = [self.zone_or_region]
 
-    end_date = util.MakeDefaultTags()['timeout_utc']
+    end_date = (
+        datetime.datetime.utcnow() +
+        datetime.timedelta(minutes=FLAGS.timeout_minutes))
     for zone in zones_to_try:
       cmd = util.AWS_PREFIX + [
           'ec2',
