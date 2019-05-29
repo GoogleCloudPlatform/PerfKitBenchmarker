@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing mixin classes for Windows virtual machines."""
 
 import base64
 import logging
@@ -78,11 +79,12 @@ _CYGWIN_FORMAT = (r"%s\bin\bash.exe -c 'export PATH=$PATH:/usr/bin && "
                   "{command}'" % _CYGWIN_ROOT)
 
 
-class WaitTimeoutException(Exception):
+class WaitTimeoutError(Exception):
   """Exception thrown if a wait operation takes too long."""
 
 
 class WindowsMixin(virtual_machine.BaseOsMixin):
+  """Class that holds Windows related VM methods and attributes."""
 
   OS_TYPE = os_types.WINDOWS
   BASE_OS_TYPE = os_types.WINDOWS
@@ -413,7 +415,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
   def OnStartup(self):
     # Log driver information so that the user has a record of which drivers
     # were used.
-    # TODO: put the driver information in the metadata.
+    # TODO(user): put the driver information in the metadata.
     stdout, _ = self.RemoteCommand('dism /online /get-drivers')
     logging.info(stdout)
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
@@ -477,8 +479,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       timeout: number of seconds to block while the process is not running.
 
     Raises:
-      WaitTimeoutException: raised if the process does not run within "timeout"
-                            seconds.
+      WaitTimeoutError: raised if the process does not run within "timeout"
+                        seconds.
     """
     command = ('$count={timeout};'
                'while( (ps | select-string {process} | measure-object).Count '
@@ -487,7 +489,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
                    timeout=timeout, process=process)
     stdout, _ = self.RemoteCommand(command)
     if 'FAIL' in stdout:
-      raise WaitTimeoutException()
+      raise WaitTimeoutError()
 
   def IsProcessRunning(self, process):
     """Checks if a given process is running on the system.
