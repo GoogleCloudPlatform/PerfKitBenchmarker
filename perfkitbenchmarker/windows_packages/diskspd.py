@@ -224,7 +224,7 @@ def _RunDiskSpdWithOptions(vm, options):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   command = 'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'.format(
       diskspd_exe_dir=diskspd_exe_dir, diskspd_options=options)
-  vm.RemoteCommand(command, timeout=timeout_duration)
+  vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _RemoveXml(vm):
