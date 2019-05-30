@@ -162,6 +162,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
           'RobustRemoteCommand did not start on VM.')
 
     end_command_time = time.time()
+
     @timeout_decorator.timeout(
         timeout - (end_command_time - start_command_time),
         use_signals=False,
