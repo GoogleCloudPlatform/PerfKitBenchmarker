@@ -283,7 +283,7 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
     key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
   else:
     vm.InstallPreprovisionedBenchmarkData(benchmark,
-                                          [FLAGS.gcp_service_account_key_file,],
+                                          [FLAGS.gcp_service_account_key_file],
                                           vm_util.VM_TMP_DIR)
     key_file_name = FLAGS.gcp_service_account_key_file
   activate_cmd = ('{} auth activate-service-account {} --key-file={}/{}'
