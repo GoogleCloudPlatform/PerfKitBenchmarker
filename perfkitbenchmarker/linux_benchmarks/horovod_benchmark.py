@@ -267,7 +267,7 @@ def _MakeSamplesFromOutput(benchmark_spec, output):
   metadata = _CreateMetadataDict(benchmark_spec)
   images_sec, runtime = _ExtractThroughputAndRuntime(output)
   samples = []
-  samples.append(sample.Sample('Training thoughput', images_sec,
+  samples.append(sample.Sample('Training throughput', images_sec,
                                'images/second', metadata))
   samples.append(sample.Sample('Runtime', runtime,
                                'seconds', metadata))
