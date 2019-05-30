@@ -33,3 +33,4 @@ psutil==3.0.0
 gcs-oauth2-boto-plugin
 azure-storage<=0.20.3
 parameterized>=0.6.1
+freezegun
