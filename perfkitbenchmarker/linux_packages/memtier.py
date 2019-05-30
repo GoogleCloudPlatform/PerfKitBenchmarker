@@ -63,6 +63,9 @@ flags.DEFINE_integer('memtier_data_size', 32,
 flags.DEFINE_string('memtier_key_pattern', 'R:R',
                     'Set:Get key pattern. G for Gaussian distribution, R for '
                     'uniform Random, S for Sequential. Defaults to R:R.')
+flags.DEFINE_integer('memtier_pipeline', 1,
+                     'Number of pipelines to use for memtier. Defaults to 1, '
+                     'i.e. no pipelining.')
 
 
 def YumInstall(vm):
@@ -126,6 +129,7 @@ def Run(vm, server_ip, server_port):
         '--ratio {ratio} '
         '--data-size {data_size} '
         '--key-pattern {key_pattern} '
+        '--pipeline {pipeline} '
         '--random-data > {output_file}'.format(
             server_ip=server_ip,
             server_port=server_port,
@@ -137,6 +141,7 @@ def Run(vm, server_ip, server_port):
             ratio=memtier_ratio,
             data_size=FLAGS.memtier_data_size,
             key_pattern=FLAGS.memtier_key_pattern,
+            pipeline=FLAGS.memtier_pipeline,
             output_file=MEMTIER_RESULTS))
 
     results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
