@@ -145,4 +145,3 @@ class BaseCollector(object):
   def Analyze(self, sender, benchmark_spec, samples):
     """Analyze collector file and record samples."""
     pass
-
