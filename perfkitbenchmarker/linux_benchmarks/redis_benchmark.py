@@ -38,7 +38,6 @@ flags.DEFINE_string('redis_setgetratio', '1:0', 'Ratio of reads to write '
                     'performed by the memtier benchmark, default is '
                     '\'1:0\', ie: writes only.')
 
-MEMTIER_COMMIT = '1.2.0'
 FIRST_PORT = 6379
 FLAGS = flags.FLAGS
 
@@ -64,6 +63,13 @@ def PrepareLoadgen(load_vm):
   load_vm.Install('memtier')
 
 
+def GetNumRedisServers(redis_vm):
+  """Get the number of redis servers to install/use for this test."""
+  if FLAGS.num_cpus_override:
+    return FLAGS.num_cpus_override * FLAGS.redis_numprocesses
+  return redis_vm.NumCpusForBenchmark() * FLAGS.redis_numprocesses
+
+
 def Prepare(benchmark_spec):
   """Install Redis on one VM and memtier_benchmark on another.
 
@@ -75,22 +81,25 @@ def Prepare(benchmark_spec):
   redis_vm = vms[0]
   # Install latest redis on the 1st machine.
   redis_vm.Install('redis_server')
+  redis_server.Configure(redis_vm)
+  redis_server.Start(redis_vm)
 
+  # Remove snapshotting
   sed_cmd = (r"sed -i -e '/save 900/d' -e '/save 300/d' -e '/save 60/d' -e 's/#"
              "   save \"\"/save \"\"/g' %s/redis.conf")
-  redis_vm.RemoteCommand(sed_cmd % redis_server.REDIS_DIR)
+  redis_vm.RemoteCommand(sed_cmd % redis_server.GetRedisDir())
 
-  for i in range(redis_vm.NumCpusForBenchmark() * FLAGS.redis_numprocesses):
+  for i in range(GetNumRedisServers(redis_vm)):
     port = FIRST_PORT + i
     redis_vm.RemoteCommand(
         'cp %s/redis.conf %s/redis-%d.conf' %
-        (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
+        (redis_server.GetRedisDir(), redis_server.GetRedisDir(), port))
     redis_vm.RemoteCommand(
         r'sed -i -e "s/port 6379/port %d/g" %s/redis-%d.conf' %
-        (port, redis_server.REDIS_DIR, port))
+        (port, redis_server.GetRedisDir(), port))
     redis_vm.RemoteCommand(
         'nohup sudo %s/src/redis-server %s/redis-%d.conf &> /dev/null &' %
-        (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
+        (redis_server.GetRedisDir(), redis_server.GetRedisDir(), port))
 
   args = [((vm,), {}) for vm in vms[1:]]
   vm_util.RunThreaded(PrepareLoadgen, args)
@@ -108,23 +117,25 @@ def RunLoad(redis_vm, load_vm, threads, port, test_id):
     load_vm: The vm that will run the memtier_benchmark.
     threads: The number of threads to run in this memtier_benchmark process.
     port: the port to target on the redis_vm.
+    test_id: test id to differentiate between tests.
   Returns:
     A throughput, latency tuple, or None if threads was 0.
   """
   if threads == 0:
     return None
-  base_cmd = ('memtier_benchmark -s %s  -p %d  -d 128 '
-              '--ratio %s --key-pattern S:S -x 1 -c 1 -t %d '
+  base_cmd = ('memtier_benchmark -s %s  -p %d  -d %s '
+              '--ratio %s --key-pattern %s --pipeline %d -c 1 -t %d '
               '--test-time=%d --random-data > %s ;')
-  final_cmd = (base_cmd % (redis_vm.internal_ip, port,
-                           FLAGS.redis_setgetratio, threads, 10,
-                           '/dev/null') +
-               base_cmd % (redis_vm.internal_ip, port,
-                           FLAGS.redis_setgetratio, threads, 20,
+  final_cmd = (base_cmd % (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
+                           FLAGS.redis_setgetratio, FLAGS.memtier_key_pattern,
+                           FLAGS.memtier_pipeline, threads, 10, '/dev/null') +
+               base_cmd % (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
+                           FLAGS.redis_setgetratio, FLAGS.memtier_key_pattern,
+                           FLAGS.memtier_pipeline, threads, 20,
                            'outfile-%d' % test_id) +
-               base_cmd % (redis_vm.internal_ip, port,
-                           FLAGS.redis_setgetratio, threads, 10,
-                           '/dev/null'))
+               base_cmd % (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
+                           FLAGS.redis_setgetratio, FLAGS.memtier_key_pattern,
+                           FLAGS.memtier_pipeline, threads, 10, '/dev/null'))
 
   load_vm.RemoteCommand(final_cmd)
   output, _ = load_vm.RemoteCommand('cat outfile-%d | grep Totals | '
@@ -157,7 +168,7 @@ def Run(benchmark_spec):
   latency_threshold = 1000000.0
   threads = 0
   results = []
-  num_servers = redis_vm.NumCpusForBenchmark() * FLAGS.redis_numprocesses
+  num_servers = GetNumRedisServers(redis_vm)
   max_throughput_for_completion_latency_under_1ms = 0.0
 
   while latency < latency_threshold:
