@@ -31,7 +31,6 @@ from perfkitbenchmarker.configs import option_decoders
 
 FLAGS = flags.FLAGS
 
-
 def CreateDisks(disk_specs, vm_name):
   """
   Creates instances of KubernetesDisk child classes depending on

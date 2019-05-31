@@ -34,11 +34,9 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker.providers.docker import docker_disk
 from perfkitbenchmarker.providers.docker import docker_resource_spec
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
@@ -78,11 +76,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #apply flags
     if FLAGS.docker_custom_image:
       self.container_image = FLAGS.docker_custom_image
-
     if FLAGS.docker_sysctl_flags:
       self.docker_sysctl_flags = FLAGS.docker_sysctl_flags
-
-
 
   def _CreateDependencies(self):
     #self._CheckPrerequisites()
@@ -94,48 +89,18 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Create(self):
     """Create a Docker instance"""
 
-    #commands
-    #Docker build dockerfile (or docker pull)
-    #Transfer SSH keys to docker container
-    # docker run -d --name test ubuntu_ssh:latest /usr/sbin/sshd -D
-    # docker cp /home/derek/.ssh/id_rsa.pub test:/root/.ssh/authorized_keys
-    # docker exec test chown root:root /root/.ssh/authorized_keys
-    #Start container and start ssh server
-
-    #NOTE for building Dockerfile, might want to use container_service
-    # logging.info("google container")
-    # registry_spec = 
-    # gcr = google_container_engine.GoogleContainerRegistry()
-
     logging.info('Creating Docker Container')
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
-
-    #logging.info(self.ssh_public_key)
-    #logging.info(public_key)
-    #docker_command = "docker run -d dphanekham/ssh_server"
-
-    ##Try to build container here
-    ##create container object
-    ##build local
-    #containerImage = container_service._ContainerImage("ubuntu_simple")
-
-    #TODO, replace this with removeIfExists type of command
-    #self._Delete()
-
-    #set container image
     
+    #Locally build docker container
     with self.docker_build_lock:
       image_exists = self._LocalImageExists(self.container_image)
       if image_exists == False:
         self._BuildImageLocally()
 
-    #TODO check if container built correctly
-
     create_command = self._FormatCreateCommand()
-
     container_info, _, _ = vm_util.IssueCommand(create_command)
-
     self.container_id = container_info.encode("ascii")
     logging.info("Container with Disk ID: %s", self.container_id)
 
@@ -168,9 +133,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_command.append('/usr/sbin/sshd')
     create_command.append('-D')
 
-    logging.info("CREATE COMMAND:")
-    logging.info(create_command)
-
     return create_command
 
 
@@ -180,7 +142,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     Prepares running container. Gets the IP address, copies public keys,
     and configures the proxy if one is specified
     """
-
     self._GetIpAddresses()
 
     #Copy ssh key to container to enable ssh login
@@ -192,9 +153,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     chown_command = ['docker', 'exec', self.name, 'chown',
                      'root:root', '/root/.ssh/authorized_keys']
     vm_util.IssueCommand(chown_command)
-
     self._ConfigureProxy()
-    #self._SetupDevicesPaths()
 
 
   def _Delete(self):
@@ -210,7 +169,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return
 
-
   @vm_util.Retry(poll_interval=10, max_retries=10)
   def _Exists(self):
     """
@@ -222,7 +180,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info("Checking if Docker Container Exists")
     if len(info) > 0 and returnCode == 0:
       status = info[0]['State']['Running']
-
       if status == "True" or status == True:
         logging.info("Docker Container %s is up and running.", self.name)
         return True
@@ -259,20 +216,16 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     ip = False
 
     if len(info) > 0 and returnCode == 0:
-
       ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
       logging.info("IP: " + str(ip))
       self.ip_address = ip
       self.internal_ip = ip
-
     else:
       logging.warning("IP address information not found")
-
 
   def _RemoveIfExists(self):
     if self._Exists():
       self._Delete()
-
 
   def _GetContainerInfo(self):
     """
@@ -282,11 +235,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info("Finding Container Information")
     inspect_cmd = ['docker', 'inspect', self.name]
     info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
-
     info = json.loads(info)
-
     return info, returnCode
-
 
   def _ConfigureProxy(self):
     """
@@ -306,14 +256,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       ftp_proxy = "sed -i '1i export ftp_proxy=%s' /etc/bash.bashrc"
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
-  # def _SetupDevicesPaths(self):
-  #   """
-  #   Sets the path to each scratch disk device.
-  #   """
-  #   for scratch_disk in self.scratch_disks:
-  #     scratch_disk.SetDevicePath(self)
-
-
   def _BuildVolumesBody(self):
     """
     Constructs volumes-related part of create command for Docker Container
@@ -322,12 +264,10 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for scratch_disk in self.scratch_disks:
       vol_string = scratch_disk.volume_name + ":" + scratch_disk.mount_point
-
       volumes.append('-v')
       volumes.append(vol_string)
 
     return volumes
-
 
   def _LocalImageExists(self, docker_image_name):
     """
@@ -337,34 +277,25 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info("Finding Image Information")
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
     info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
-
     info = json.loads(info)
-
     logging.info("Checking if Docker Image Exists")
     if len(info) > 0 and returnCode == 0:
       logging.info("Image exists")
       return True
-
     logging.info("Image does not exist")
     return False
 
-
   def _BuildImageLocally(self):
+    """
+    Build Container Image Locally
+    """
 
-    ##Try to build container here
-    ##create container object
-    ##build local
-    #containerImage = container_service._ContainerImage("ubuntu_simple")
-    
+    #Dockerfiles located at PerfKitBenchmarker/docker/<containerImage>/Dockerfile
     directory = os.path.dirname(
       data.ResourcePath(os.path.join('docker', self.container_image, 'Dockerfile')))
-
-    
-
     build_cmd = [
         'docker', 'build', '--no-cache',
-        '-t', self.container_image, directory
-    ]
+        '-t', self.container_image, directory]
 
     vm_util.IssueCommand(build_cmd)
 
@@ -382,13 +313,13 @@ class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
     logging.warn("Sysctl flags NOT applied to Docker container. "
                  "Please use --docker_sysctl_flags if sysctl need to be applied")
 
-# class Ubuntu1404BasedDockerVirtualMachine(
-#     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
-#   DEFAULT_IMAGE = 'ubuntu:14.04'
-
 class Ubuntu1604BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
+
+# class Ubuntu1404BasedDockerVirtualMachine(
+#     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
+#   DEFAULT_IMAGE = 'ubuntu:14.04'
 
 # class Ubuntu1710BasedDockerVirtualMachine(
 #     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
