@@ -1112,4 +1112,3 @@ def Main():
   CheckVersionFlag()
   SetUpPKB()
   return RunBenchmarks()
-  
