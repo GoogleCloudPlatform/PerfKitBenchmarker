@@ -3,7 +3,7 @@
 FROM ubuntu:xenial
 
 RUN apt-get update && apt-get install -y ssh
-RUN apt-get install -y sudo
+RUN apt-get install -y sudo iputils-ping
 RUN mkdir /var/run/sshd ;\
     mkdir /root/.ssh ;\
     sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd ;\

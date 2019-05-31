@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Docker
-"""
+""" Provider info for Docker"""
 
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
 
 
 class DockerProviderInfo(provider_info.BaseProviderInfo):
-  SUPPORTED_BENCHMARKS = ['iperf', 'netperf']
+  SUPPORTED_BENCHMARKS = []
 
   UNSUPPORTED_BENCHMARKS = ['sysbench']
 
@@ -28,10 +27,8 @@ class DockerProviderInfo(provider_info.BaseProviderInfo):
 
   @classmethod
   def IsBenchmarkSupported(cls, benchmark):
-    if benchmark in cls.SUPPORTED_BENCHMARKS:
-      return True
-    elif benchmark in cls.UNSUPPORTED_BENCHMARKS:
+    if benchmark in cls.UNSUPPORTED_BENCHMARKS:
       return False
     else:
-      return None
+      return True
       

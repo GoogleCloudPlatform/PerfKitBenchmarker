@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import json
 import logging
 import posixpath
 import os
+import threading
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import context
@@ -56,6 +57,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
+  docker_build_lock = threading.Lock()
 
   def __init__(self, vm_spec):
     """Initialize a Docker Container.
@@ -68,14 +70,17 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.container_id = ''
     self.user_name = FLAGS.username
     self.image = self.image or self.DEFAULT_IMAGE
-    self.cpus = vm_spec.docker_cpus
-    self.memory_mb = vm_spec.docker_memory_mb
+    self.cpus = vm_spec.docker_provider_cpus
+    self.memory_mb = vm_spec.docker_provider_memory_mb
     self.privileged = vm_spec.privileged_docker
     self.container_image = DEFAULT_DOCKER_IMAGE
-
+    self.docker_sysctl_flags = ''
     #apply flags
-    if FLAGS.custom_docker_image:
-      self.container_image = FLAGS.custom_docker_image
+    if FLAGS.docker_custom_image:
+      self.container_image = FLAGS.docker_custom_image
+
+    if FLAGS.docker_sysctl_flags:
+      self.docker_sysctl_flags = FLAGS.docker_sysctl_flags
 
 
 
@@ -120,11 +125,10 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     #set container image
     
-
-    image_exists = self._LocalImageExists(self.container_image)
-
-    if image_exists == False:
-      self._BuildImageLocally()
+    with self.docker_build_lock:
+      image_exists = self._LocalImageExists(self.container_image)
+      if image_exists == False:
+        self._BuildImageLocally()
 
     #TODO check if container built correctly
 
@@ -155,6 +159,10 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.memory_mb > 0:
       create_command.append('-m')
       create_command.append(str(self.memory_mb) + 'm')
+
+    if self.docker_sysctl_flags:
+      create_command.append('--sysctl')
+      create_command.append(self.docker_sysctl_flags)
 
     create_command.append(self.container_image)
     create_command.append('/usr/sbin/sshd')
@@ -188,7 +196,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._ConfigureProxy()
     #self._SetupDevicesPaths()
 
-  #TODO add checks to see if Delete fails
+
   def _Delete(self):
     """Kill and Remove Docker Container"""
 
@@ -364,6 +372,15 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
                                           linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
+
+  def ApplySysctlPersistent(self, sysctl_params):
+    """Override ApplySysctlPeristent function for Docker provider
+    Parent function causes errors with Docker because it shutdowns container
+    Args:
+      sysctl_params: dict - the keys and values to write
+    """
+    logging.warn("Sysctl flags NOT applied to Docker container. "
+                 "Please use --docker_sysctl_flags if sysctl need to be applied")
 
 # class Ubuntu1404BasedDockerVirtualMachine(
 #     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):

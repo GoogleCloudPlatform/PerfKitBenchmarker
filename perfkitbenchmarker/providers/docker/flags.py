@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,34 +14,27 @@
 
 from perfkitbenchmarker import flags
 
-flags.DEFINE_string('remote_image_repository', None,
-                    'Remote Repository to use')
-
-flags.DEFINE_boolean('use_google_container_builder', False,
-                     'Chooses whether to build locally or use Google container builder')
-
-flags.DEFINE_string('custom_docker_image', None,
+flags.DEFINE_string('docker_custom_image', None,
                     'Custom docker image location')
-
-# _DOCKER_VOLUME_TYPES = ['something', 'something_else']
-
-# flags.DEFINE_enum('docker_volume_type', None, _DOCKER_VOLUME_TYPES,
-#                   'The name of the types of Docker volumes available')
 
 flags.DEFINE_boolean('privileged_docker', False,
                      'If set to True, will attempt to create Docker containers '
                      'in a privileged mode. Note that some benchmarks execute '
                      'commands which are only allowed in privileged mode.')
 
-
 flags.DEFINE_string('docker_cli', 'docker',
                     'Path to docker cli. You can set it here if it is'
                     'not in your system PATH or not at a default location')
 
+flags.DEFINE_string('docker_sysctl_flags', None,
+                    'This flag can be used to pass sysctl changes to the '
+                    'Docker container. If you need to pass multiple sysctl flags, '
+                    'Pass them in a string separated by spaces'
+                    'Ex. --sysctl "net.ipv4.tcp_keepalive_time=60 '
+                    'net.ipv4.tcp_keepalive_intvl=60"')
 
-# Defined in providers/mesos/flags.py
-# flags.DEFINE_integer('docker_memory_mb', 2048,
-#                      'Memory limit for docker containers.')
+flags.DEFINE_integer('docker_provider_memory_mb', 0,
+                     'Memory limit for docker containers.')
 
-# flags.DEFINE_float('docker_cpus', 1,
-#                    'CPU limit for docker containers.')
+flags.DEFINE_float('docker_provider_cpus', 0,
+                   'CPU limit for docker containers.')
