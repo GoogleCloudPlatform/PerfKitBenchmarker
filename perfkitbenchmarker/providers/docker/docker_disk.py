@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2018 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing classes related to DigitalOcean disks.
-At this time, DigitalOcean does not implement any standalone disk objects,
-the instances come with directly integrated storage.
-"""
+
+"""Module containing classes related to Docker disks."""
 
 import json
 import logging

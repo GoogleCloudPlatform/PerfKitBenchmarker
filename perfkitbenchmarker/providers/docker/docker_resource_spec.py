@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains code related Kubernetes pod spec decoding."""
+"""Contains code related to Docker resource specs"""
 
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
@@ -36,18 +36,18 @@ class DockerSpec(virtual_machine.BaseVmSpec):
   def _GetOptionDecoderConstructions(cls):
     result = super(DockerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'docker_cpus': (option_decoders.FloatDecoder, {'default': 0}),
-        'docker_memory_mb': (option_decoders.IntDecoder, {'default': 0}),
+        'docker_provider_cpus': (option_decoders.FloatDecoder, {'default': 0}),
+        'docker_provider_memory_mb': (option_decoders.IntDecoder, {'default': 0}),
         'privileged_docker': (option_decoders.BooleanDecoder,
                                     {'default': False})})
     return result
 
   def _ApplyFlags(self, config_values, flag_values):
     super(DockerSpec, self)._ApplyFlags(config_values, flag_values)
-    if flag_values['docker_cpus'].present:
-      config_values['docker_cpus'] = flag_values.docker_cpus
-    if flag_values['docker_memory_mb'].present:
-      config_values['docker_memory_mb'] = flag_values.docker_memory_mb
+    if flag_values['docker_provider_cpus'].present:
+      config_values['docker_provider_cpus'] = flag_values.docker_provider_cpus
+    if flag_values['docker_provider_memory_mb'].present:
+      config_values['docker_provider_memory_mb'] = flag_values.docker_provider_memory_mb
     if flag_values['privileged_docker'].present:
       config_values['privileged_docker'] =\
           flag_values.privileged_docker
