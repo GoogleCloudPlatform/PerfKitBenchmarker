@@ -24,9 +24,9 @@ class DockerSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a MesosDockerInstance.
 
   Attributes:
-    docker_cpus: None or float. Number of CPUs for Docker instances.
-    docker_memory_mb: None or int. Memory limit (in MB) for Docker instances.
-    mesos_privileged_docker: None of boolean. Indicates if Docker container
+    docker_provider_cpus: None or float. Number of CPUs for Docker instances.
+    docker_provider_memory_mb: None or int. Memory limit (in MB) for Docker instances.
+    privileged_docker: None of boolean. Indicates if Docker container
         should be run in privileged mode.
   """
 
