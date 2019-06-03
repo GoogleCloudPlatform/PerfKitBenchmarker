@@ -324,5 +324,3 @@ class Ubuntu1604BasedDockerVirtualMachine(
 # class Ubuntu1710BasedDockerVirtualMachine(
 #     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
 #   DEFAULT_IMAGE = 'ubuntu:17.10'
-
-

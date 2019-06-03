@@ -31,4 +31,3 @@ class DockerProviderInfo(provider_info.BaseProviderInfo):
       return False
     else:
       return True
-      
