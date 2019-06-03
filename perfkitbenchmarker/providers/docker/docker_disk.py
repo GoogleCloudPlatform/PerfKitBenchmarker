@@ -86,4 +86,3 @@ class DockerDisk(disk.BaseDisk):
     vol_string = (scratch_disk.volume_name + ":" + scratch_disk.mount_point)
 
     return vol_string
-    
