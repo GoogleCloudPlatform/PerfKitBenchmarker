@@ -73,6 +73,11 @@ flags.DEFINE_boolean(
     'If True, automatically find the max passing score for each benchmark. '
     'This ignores other flags such as specsfs2014_load, specsfs2014_incr_load, '
     'and specsfs2014_num_runs.')
+flags.DEFINE_float(
+    'specsfs2014_auto_mode_upper_bound', float('inf'),
+    'The upper bound for specsfs load. Relevant when specsfs2014_auto_mode '
+    'is set to True.')
+
 
 BENCHMARK_NAME = 'specsfs2014'
 BENCHMARK_CONFIG = """
@@ -316,7 +321,7 @@ def _FindBestPassingScore(benchmark_spec, benchmark):
   load = 1
 
   lower_bound = 1
-  upper_bound = float('inf')
+  upper_bound = FLAGS.specsfs2014_auto_mode_upper_bound
   while (upper_bound - lower_bound) > 1:
     logging.info('Running SPEC SFS with LOAD=%s', load)
     _ConfigureSpec(prime_client, clients, benchmark, load=[load], num_runs=1)
@@ -330,8 +335,13 @@ def _FindBestPassingScore(benchmark_spec, benchmark):
       lower_bound = load
     else:
       upper_bound = load
-    if upper_bound == float('inf'):
-      load *= 2
+    # Double the load until we reach the upper bound, then binary search.
+    # If we pass everything up to the upper bound, we finish immediately.
+    if upper_bound == FLAGS.specsfs2014_auto_mode_upper_bound:
+      if load * 2 <= upper_bound:
+        load *= 2
+      else:
+        load = upper_bound - 1
     else:
       load = (upper_bound + lower_bound) // 2
   return results

@@ -293,6 +293,7 @@
 - Added precision flag to Horovod.
 - Added a flag to Horovod that indicates that the VM is using a deep learning
   image.
+- Add support to set load upper bound for specsfs2014.
 - Implemented RobustRemoteCommand for Windows.
 
 ### Bug fixes and maintenance updates:
