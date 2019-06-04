@@ -294,6 +294,7 @@
 - Added a flag to Horovod that indicates that the VM is using a deep learning
   image.
 - Add support to set load upper bound for specsfs2014.
+- Add support for different workload sizes for stress-ng.
 - Implemented RobustRemoteCommand for Windows.
 
 ### Bug fixes and maintenance updates:
