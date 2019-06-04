@@ -54,6 +54,15 @@ flags.DEFINE_list('stress_ng_custom_stressors', [],
                   'List of stressors to run against. Default combines cpu,'
                   'cpu-cache, and memory suites')
 
+ALL_WORKLOADS = ['small', 'medium', 'large']
+flags.DEFINE_list('stress_ng_thread_workloads', ['large'],
+                  'List of threads sizes to run against. Options are'
+                  'small (1 thread total), medium (1 thread per 2 cpus), and '
+                  'large (1 thread per cpu).')
+flags.register_validator(
+    'stress_ng_thread_workloads',
+    lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS))
+
 
 def _GeoMeanOverflow(iterable):
   """Returns the geometric mean.
@@ -144,21 +153,20 @@ def _ParseStressngResult(metadata, output):
       metadata=metadata)
 
 
-def Run(benchmark_spec):
+def _RunWorkload(vm, num_threads):
   """Runs stress-ng on the target vm.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+    vm: The target vm to run on.
+    num_threads: Number of instances of stressors to launch.
 
   Returns:
     A list of sample.Sample objects.
   """
-  vm = benchmark_spec.vms[0]
 
   metadata = {
       'duration_sec': FLAGS.stress_ng_duration,
-      'threads': vm.NumCpusForBenchmark()
+      'threads': num_threads
   }
 
   # Rather than running stress-ng with --class cpu,cpu-cache,memory all in one
@@ -197,7 +205,7 @@ def Run(benchmark_spec):
   for stressor in stressors:
     cmd = ('stress-ng --{stressor} {numthreads} --metrics-brief '
            '-t {duration}'.format(stressor=stressor,
-                                  numthreads=vm.NumCpusForBenchmark(),
+                                  numthreads=num_threads,
                                   duration=FLAGS.stress_ng_duration))
     stdout, _ = vm.RemoteCommand(cmd)
     stressng_sample = _ParseStressngResult(metadata, stdout)
@@ -216,6 +224,31 @@ def Run(benchmark_spec):
         unit='bogus_ops_sec',
         metadata=geomean_metadata)
     samples.append(geomean_sample)
+
+  return samples
+
+
+def Run(benchmark_spec):
+  """Runs stress-ng on the target vm.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
+
+  vm = benchmark_spec.vms[0]
+
+  samples = []
+  for workload in FLAGS.stress_ng_thread_workloads:
+    if workload == 'small':
+      samples.extend(_RunWorkload(vm, 1))
+    elif workload == 'medium':
+      samples.extend(_RunWorkload(vm, vm.NumCpusForBenchmark() / 2))
+    elif workload == 'large':
+      samples.extend(_RunWorkload(vm, vm.NumCpusForBenchmark()))
 
   return samples
 
