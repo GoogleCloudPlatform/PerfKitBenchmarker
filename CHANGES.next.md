@@ -110,6 +110,7 @@
 - Added sar trace utility to measure cpu steal time.
 - Added ssh_via_internal_ip flag to use internal IP addresses when ssh'ing to
   runner VMs, will use external IP addrs if not set.
+- Added support for launching GCP VM with shielded VM secure boot
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
