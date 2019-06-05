@@ -220,7 +220,7 @@ class GceNetwork(network.BaseNetwork):
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns a BaseNetworkSpec created from VM attributes."""
-    return GceNetworkSpec(project=vm.project)
+    return GceNetworkSpec(project=vm.project, zone=vm.zone)
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
