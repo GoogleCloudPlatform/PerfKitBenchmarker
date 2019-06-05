@@ -386,6 +386,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
+    self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
 
   @property
   def host_list(self):
@@ -431,6 +432,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['node-group'] = self.node_group.name
     if self.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
+    if self.gce_shielded_secure_boot:
+      cmd.flags['shielded-secure-boot'] = True
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
@@ -694,6 +697,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
     result['gce_network_tier'] = self.gce_network_tier
+    result[
+        'gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     return result
 
   def SimulateMaintenanceEvent(self):
