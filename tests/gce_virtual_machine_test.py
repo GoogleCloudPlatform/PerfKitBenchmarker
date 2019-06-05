@@ -31,6 +31,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
@@ -551,6 +552,24 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
                     issue_command.call_args[0][0])
       self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
       self.assertIn('TERMINATE', issue_command.call_args[0][0])
+
+
+class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(GceNetworkTest, self).setUp()
+    # need a benchmarkspec in the context to run
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        'cluster_boot', flag_values=FLAGS)
+    benchmark_spec.BenchmarkSpec(mock.Mock(), config_spec, 'uid')
+
+  def testGetNetwork(self):
+    project = 'myproject'
+    zone = 'us-east1-a'
+    vm = mock.Mock(zone=zone, project=project)
+    net = gce_network.GceNetwork.GetNetwork(vm)
+    self.assertEqual(project, net.project)
+    self.assertEqual(zone, net.zone)
 
 
 if __name__ == '__main__':

@@ -477,3 +477,4 @@
 - Update bigtable benchmark to make configurations configurable, and report them.
 - RobustRemoteCommand now retries on ssh connections refused.
 - Fixed a bug that was causing AWS capacity reservation creation to fail.
+- GceNetworkSpec's zone is equal to the VM's zone
