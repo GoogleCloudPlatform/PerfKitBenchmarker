@@ -506,6 +506,13 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('--tags perfkitbenchmarker,testtag ',
                   self._CreateVmCommand(gce_tags=['testtag'])[0])
 
+  def testShieldedSecureBootFlag(self):
+    """Tests that the custom shielded secure boot flag is supported."""
+    cmd, call_count = self._CreateVmCommand(
+        gce_shielded_secure_boot=True)
+    self.assertEqual(call_count, 1)
+    self.assertIn('--shielded-secure-boot', cmd)
+
 
 class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
 

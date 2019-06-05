@@ -126,3 +126,6 @@ flags.DEFINE_enum('gce_network_tier', 'premium', ['premium', 'standard'],
                   'Network tier to use for all GCE VMs. Note that standard '
                   'networking is only available in certain regions. See '
                   'https://cloud.google.com/network-tiers/docs/overview')
+flags.DEFINE_boolean(
+    'gce_shielded_secure_boot', False,
+    'Whether the image uses the shielded VM feature')
