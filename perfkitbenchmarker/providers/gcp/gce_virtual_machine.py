@@ -372,7 +372,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
     self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
     self.backfill_image = False
-    self.network = gce_network.GceNetwork.GetNetwork(self)
+    self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
     self.boot_disk_type = vm_spec.boot_disk_type
@@ -387,6 +387,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
+
+  def _GetNetwork(self):
+    """Returns the GceNetwork to use."""
+    return gce_network.GceNetwork.GetNetwork(self)
 
   @property
   def host_list(self):
