@@ -297,6 +297,7 @@
 - Add support to set load upper bound for specsfs2014.
 - Add support for different workload sizes for stress-ng.
 - Implemented RobustRemoteCommand for Windows.
+- Extract GceVirtualMachine's GetNetwork into a method.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
