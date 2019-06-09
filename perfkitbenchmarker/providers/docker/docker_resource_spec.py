@@ -21,7 +21,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
 class DockerSpec(virtual_machine.BaseVmSpec):
-  """Object containing the information needed to create a MesosDockerInstance.
+  """Object containing the information needed to create a Docker Instance.
 
   Attributes:
     docker_provider_cpus: None or float. Number of CPUs for Docker instances.

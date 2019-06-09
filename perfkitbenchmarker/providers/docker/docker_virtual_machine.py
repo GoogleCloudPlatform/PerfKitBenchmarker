@@ -14,18 +14,8 @@
 
 """Contains code related to lifecycle management of Docker Containers."""
 
-
-#TODO
-#add Docker build functionality
-#1) local build using a Dockerfile
-#2) build using GCloud Repo
-#3) build from custom dockerfile (To support different flavors)
-#4) make sure container builds only once
-#5) Add in resource management (specify cpu/mem etc)
-
 import json
 import logging
-import posixpath
 import os
 import threading
 
@@ -40,8 +30,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.docker import docker_disk
 from perfkitbenchmarker.providers.docker import docker_resource_spec
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
-
-from perfkitbenchmarker.providers.gcp import google_container_engine
 
 FLAGS = flags.FLAGS
 
@@ -73,14 +61,13 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.privileged = vm_spec.privileged_docker
     self.container_image = DEFAULT_DOCKER_IMAGE
     self.docker_sysctl_flags = ''
-    #apply flags
+    # apply flags
     if FLAGS.docker_custom_image:
       self.container_image = FLAGS.docker_custom_image
     if FLAGS.docker_sysctl_flags:
       self.docker_sysctl_flags = FLAGS.docker_sysctl_flags
 
   def _CreateDependencies(self):
-    #self._CheckPrerequisites()
     self._CreateVolumes()
 
   def _DeleteDependencies(self):
@@ -88,15 +75,14 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a Docker instance"""
-
     logging.info('Creating Docker Container')
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
-    
-    #Locally build docker container
+
+    # Locally build docker container
     with self.docker_build_lock:
       image_exists = self._LocalImageExists(self.container_image)
-      if image_exists == False:
+      if image_exists is False:
         self._BuildImageLocally()
 
     create_command = self._FormatCreateCommand()
@@ -109,22 +95,19 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     create_command = ['docker', 'run', '-d', '--name', self.name]
 
-    #format scratch disks
+    # format scratch disks
     for vol in self.scratch_disks:
       vol_string = vol.volume_name + ":" + vol.mount_point
       create_command.append('-v')
       create_command.append(vol_string)
-
-    #format cpus option
+    # format cpus option
     if self.cpus > 0:
       create_command.append('--cpus')
       create_command.append(self.cpus)
-
-    #format memory option
+    # format memory option
     if self.memory_mb > 0:
       create_command.append('-m')
       create_command.append(str(self.memory_mb) + 'm')
-
     if self.docker_sysctl_flags:
       create_command.append('--sysctl')
       create_command.append(self.docker_sysctl_flags)
@@ -135,7 +118,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return create_command
 
-
   @vm_util.Retry()
   def _PostCreate(self):
     """
@@ -144,17 +126,16 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     self._GetIpAddresses()
 
-    #Copy ssh key to container to enable ssh login
+    # Copy ssh key to container to enable ssh login
     copy_ssh_command = ['docker', 'cp', self.ssh_public_key,
-                         '%s:/root/.ssh/authorized_keys' % self.name]
+                        '%s:/root/.ssh/authorized_keys' % self.name]
     vm_util.IssueCommand(copy_ssh_command)
 
-    #change ownership of authorized_key file to root in container
+    # change ownership of authorized_key file to root in container
     chown_command = ['docker', 'exec', self.name, 'chown',
                      'root:root', '/root/.ssh/authorized_keys']
     vm_util.IssueCommand(chown_command)
     self._ConfigureProxy()
-
 
   def _Delete(self):
     """Kill and Remove Docker Container"""
@@ -204,7 +185,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.scratch_disks.remove(scratch_disk)
     pass
 
-
   def DeleteScratchDisks(self):
     pass
 
@@ -232,7 +212,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     Gets Container information from Docker Inspect. Returns the information, 
     if there is any and a return code. 0  
     """
-    logging.info("Finding Container Information")
+    logging.info("Checking Container Information")
     inspect_cmd = ['docker', 'inspect', self.name]
     info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
     info = json.loads(info)
@@ -274,7 +254,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     Checks if an image exists locally
     Returns boolean
     """
-    logging.info("Finding Image Information")
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
     info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
     info = json.loads(info)
