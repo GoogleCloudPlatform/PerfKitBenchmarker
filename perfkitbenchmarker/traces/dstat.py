@@ -21,14 +21,9 @@ from __future__ import division
 from __future__ import print_function
 
 import copy
-import functools
 import logging
 import os
-import posixpath
 import re
-import threading
-import time
-import uuid
 import numpy as np
 
 from perfkitbenchmarker import events
@@ -36,6 +31,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dstat
+from perfkitbenchmarker.traces import base_collector
 import six
 
 flags.DEFINE_boolean('dstat', False,
@@ -61,43 +57,25 @@ flags.DEFINE_string('dstat_publish_regex', None, 'Requires setting '
 FLAGS = flags.FLAGS
 
 
-class _DStatCollector(object):
+class _DStatCollector(base_collector.BaseCollector):
   """dstat collector.
 
   Installs and runs dstat on a collection of VMs.
   """
 
-  def __init__(self, interval=None, output_directory=None):
-    """Runs dstat on 'vms'.
+  def _CollectorName(self):
+    return 'dstat'
 
-    Start dstat collection via `Start`. Stop via `Stop`.
-
-    Args:
-      interval: Optional int. Interval in seconds in which to collect samples.
-    """
-    self.interval = interval
-    self.output_directory = output_directory or vm_util.GetTempDir()
-    self._lock = threading.Lock()
-    self._pids = {}
-    self._file_names = {}
-    self._role_mapping = {}  # mapping vm role to dstat file
-    self._start_time = 0
-
-    if not os.path.isdir(self.output_directory):
-      raise IOError('dstat output directory does not exist: {0}'.format(
-          self.output_directory))
-
-  def _StartOnVm(self, vm, suffix='-dstat'):
+  def _InstallCollector(self, vm):
     vm.Install('dstat')
 
+  def _CollectorRunCommand(self, vm, collector_file):
     num_cpus = vm.num_cpus
 
     # List block devices so that I/O to each block device can be recorded.
     block_devices, _ = vm.RemoteCommand(
         'lsblk --nodeps --output NAME --noheadings')
     block_devices = block_devices.splitlines()
-    dstat_file = posixpath.join(
-        vm_util.VM_TMP_DIR, '{0}{1}.csv'.format(vm.name, suffix))
     cmd = ('dstat --epoch -C total,0-{max_cpu} '
            '-D total,{block_devices} '
            '-clrdngyi -pms --fs --ipc --tcp '
@@ -106,49 +84,9 @@ class _DStatCollector(object):
            'echo $!').format(
                max_cpu=num_cpus - 1,
                block_devices=','.join(block_devices),
-               output=dstat_file,
+               output=collector_file,
                dstat_interval=self.interval or '')
-    stdout, _ = vm.RemoteCommand(cmd)
-    with self._lock:
-      self._pids[vm.name] = stdout.strip()
-      self._file_names[vm.name] = dstat_file
-
-  def _StopOnVm(self, vm, vm_role):
-    """Stop dstat on 'vm', copy the results to the run temporary directory."""
-    if vm.name not in self._pids:
-      logging.warn('No dstat PID for %s', vm.name)
-      return
-    else:
-      with self._lock:
-        pid = self._pids.pop(vm.name)
-        file_name = self._file_names.pop(vm.name)
-    cmd = 'kill {0} || true'.format(pid)
-    vm.RemoteCommand(cmd)
-    try:
-      vm.PullFile(self.output_directory, file_name)
-      self._role_mapping[vm_role] = file_name
-    except Exception:
-      logging.exception('Failed fetching dstat result from %s.', vm.name)
-
-  def Start(self, sender, benchmark_spec):
-    """Install and start dstat on all VMs in 'benchmark_spec'."""
-    suffix = '-{0}-{1}-dstat'.format(benchmark_spec.uid,
-                                     str(uuid.uuid4())[:8])
-    start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
-    vm_util.RunThreaded(start_on_vm, benchmark_spec.vms)
-    self._start_time = time.time()
-
-  def Stop(self, sender, benchmark_spec):
-    """Stop dstat on all VMs in 'benchmark_spec', fetch results."""
-    events.record_event.send(sender, event='dstat',
-                             start_timestamp=self._start_time,
-                             end_timestamp=time.time(),
-                             metadata={})
-    args = []
-    for role, vms in six.iteritems(benchmark_spec.vm_groups):
-      args.extend([((
-          vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
-    vm_util.RunThreaded(self._StopOnVm, args)
+    return cmd
 
   def Analyze(self, sender, benchmark_spec, samples):
     """Analyze dstat file and record samples."""

@@ -55,6 +55,8 @@ def Install(vm):
   zip_path = ntpath.join(vm.temp_dir, PSPING_ZIP)
   vm.DownloadFile(PSPING_URL, zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
+  vm.AllowPort(TEST_PORT)
+  vm.SetProcessPriorityToHighByFlag('psping.exe')
 
 
 def StartPspingServer(vm):
@@ -111,7 +113,7 @@ def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
   # server as a background job, then kill it after 10 seconds
   server_command = (
       '{psping_exec_dir}\\psping.exe /accepteula -s 0.0.0.0:{port};').format(
-          psping_exec_dir=sending_vm.temp_dir,
+          psping_exec_dir=receiving_vm.temp_dir,
           port=TEST_PORT)
 
   process_args = [(_RunPsping, (receiving_vm, server_command), {}),

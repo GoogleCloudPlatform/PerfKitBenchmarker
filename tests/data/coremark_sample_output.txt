@@ -1,0 +1,22 @@
+2K performance run parameters for coremark.
+CoreMark Size    : 666
+Total ticks      : 67787
+Total time (secs): 67.787000
+Iterations/Sec   : 29504.182218
+Iterations       : 2000000
+Compiler version : GCC7.3.0
+Compiler flags   : -O2 -g -O2 -DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 -DPERFORMANCE_RUN=1  -lrt -lpthread
+Parallel PThreads : 2
+Memory location  : Please put data memory location here
+      (e.g. code in flash, data on heap etc)
+seedcrc          : 0xe9f5
+[0]crclist       : 0xe714
+[1]crclist       : 0xe714
+[0]crcmatrix     : 0x1fd7
+[1]crcmatrix     : 0x1fd7
+[0]crcstate      : 0x8e3a
+[1]crcstate      : 0x8e3a
+[0]crcfinal      : 0x988c
+[1]crcfinal      : 0x988c
+Correct operation validated. See readme.txt for run and reporting rules.
+CoreMark 1.0 : 29504.182218 / GCC7.3.0 -O2 -g -O2 -DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 -DPERFORMANCE_RUN=1  -lrt -lpthread / Heap / 2:PThreads

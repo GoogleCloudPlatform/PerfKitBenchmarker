@@ -257,23 +257,38 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
     raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
 
 
-def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud'):
-  """Authorize gcloud to access Cloud Platform with a Google service account.
+def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
+  """Authorize gcloud to access Google Cloud Platform with a service account.
 
   If you want gcloud (and other tools in the Cloud SDK) to use service account
   credentials to make requests, use this method to authenticate.
   Account name is provided by FLAGS.gcp_service_account
   Credentials are fetched from a file whose local path is provided by
-  FLAGS.gcp_service_account_key_filethat. It contains private authorization key.
+  FLAGS.gcp_service_account_key_file, which contains private authorization key.
+  In the absence of a locally supplied credential file, the file is retrieved
+  from pre-provisioned data bucket.
 
   Args:
     vm: vm on which the gcloud library needs to be authenticated.
     vm_gcloud_path: Optional path to the gcloud binary on the vm.
+    benchmark: The module for retrieving the associated service account file.
   """
-  vm.PushFile(FLAGS.gcp_service_account_key_file)
-  activate_cmd = ('{} auth activate-service-account {} --key-file={}'
+  if not FLAGS.gcp_service_account_key_file:
+    raise errors.Setup.InvalidFlagConfigurationError('Authentication requires '
+                                                     'the service account '
+                                                     'credential json to be '
+                                                     'specified.')
+  if '/' in FLAGS.gcp_service_account_key_file:
+    vm.PushFile(FLAGS.gcp_service_account_key_file, vm_util.VM_TMP_DIR)
+    key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
+  else:
+    vm.InstallPreprovisionedBenchmarkData(benchmark,
+                                          [FLAGS.gcp_service_account_key_file],
+                                          vm_util.VM_TMP_DIR)
+    key_file_name = FLAGS.gcp_service_account_key_file
+  activate_cmd = ('{} auth activate-service-account {} --key-file={}/{}'
                   .format(vm_gcloud_path, FLAGS.gcp_service_account,
-                          FLAGS.gcp_service_account_key_file.split('/')[-1]))
+                          vm_util.VM_TMP_DIR, key_file_name))
   vm.RemoteCommand(activate_cmd)
 
 

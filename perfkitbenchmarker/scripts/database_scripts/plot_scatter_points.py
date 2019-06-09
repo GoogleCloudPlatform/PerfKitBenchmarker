@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Generates gnuplot info file.
+
 Given the filename of a text file with a list of TPS values,
 returns a gnuplot info file. This file can create a per second chart by
 calling:
@@ -22,8 +23,8 @@ calling:
 Designed to be used with plot_sysbench_results.py.
 """
 
-import os
 import datetime
+import os
 
 
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
@@ -41,7 +42,6 @@ DEFAULT_ITERATIONS = '10'
 
 class GnuplotInfo():
 
-
   def __init__(self, gnuplot_data_filename,
                entries_per_run,
                run_uri,
@@ -49,6 +49,7 @@ class GnuplotInfo():
                iterations=DEFAULT_ITERATIONS,
                title=None):
     """Initialize GnuplotInfo object.
+
     Args:
       gnuplot_data_filename: filename of TPS data.
       entries_per_run: Number of TPS values collected for each run.
@@ -65,6 +66,7 @@ class GnuplotInfo():
 
   def _generate_filenames(self, run_uri):
     """Sets filename (with path) of gnuplot input and chart.
+
     Args:
       run_uri: (string) run identifier.
     """
@@ -79,6 +81,7 @@ class GnuplotInfo():
 
   def create_file(self):
     """Generates a gnuplot info file.
+
     Returns:
       output_file (string): Name of gnuplot output file.
       output_chart (string): Name of output chart file.

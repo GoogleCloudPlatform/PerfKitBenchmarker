@@ -42,38 +42,31 @@ BENCHMARK_CONFIG = """
 dpb_terasort_benchmark:
   description: Run terasort on dataproc and emr
   dpb_service:
-    service_type: dataproc
+    service_type: emr
     worker_group:
       vm_spec:
         GCP:
           machine_type: n1-standard-1
-          boot_disk_size: 50
         AWS:
-          machine_type: m5.large
+          machine_type: m5.xlarge
       disk_spec:
         GCP:
-          disk_type: nodisk
+          disk_size: 200
+          disk_type: pd-standard
         AWS:
-          disk_size: 1500
-          disk_type: gp2
+          disk_size: 500
+          disk_type: st1
     worker_count: 2
 """
 
 _FS_TYPE_EPHEMERAL = 'ephemeral'
 _FS_TYPE_PERSISTENT = 'persistent'
 
-flags.DEFINE_enum('dpb_terasort_fs_type', _FS_TYPE_EPHEMERAL,
+flags.DEFINE_enum('dpb_terasort_storage_type', _FS_TYPE_PERSISTENT,
                   [_FS_TYPE_EPHEMERAL, _FS_TYPE_PERSISTENT],
-                  'The type of File System to use in the Terasort benchmark')
-
-flags.DEFINE_enum(
-    'dpb_terasort_fs', BaseDpbService.GCS_FS,
-    [BaseDpbService.GCS_FS, BaseDpbService.S3_FS, BaseDpbService.HDFS_FS],
-    'File System to use in the Terasort benchmark')
-
+                  'The type of storage for executing the Terasort benchmark')
 flags.DEFINE_integer('dpb_terasort_num_records', 10000,
                      'Number of 100-byte rows to generate.')
-
 flags.DEFINE_bool(
     'dpb_terasort_pre_cleanup', False,
     'Cleanup the terasort directories on the specified filesystem.')
@@ -129,38 +122,55 @@ def Run(benchmark_spec):
     The samples have associated metadata detailing the cluster details and used
     filesystem.
   """
-
   dpb_service_instance = benchmark_spec.dpb_service
-
   terasort_jar = dpb_service_instance.GetExecutionJar(JOB_CATEGORY, JOB_TYPE)
-  results = []  # list of the samples that will be returned
 
-  metadata = {
-      'terasort_num_record': FLAGS.dpb_terasort_num_records,
-      'terasort_fs_type': FLAGS.dpb_terasort_fs_type
-  }
-  metadata.update(benchmark_spec.dpb_service.GetMetadata())
-
-  if FLAGS.dpb_terasort_fs_type == _FS_TYPE_PERSISTENT:
+  if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
     run_uri = benchmark_spec.uuid.split('-')[0]
     dpb_service_instance.CreateBucket(run_uri)
     base_dir = dpb_service_instance.PERSISTENT_FS_PREFIX + run_uri + '/'
   else:
     base_dir = '/'
 
+  metadata = {}
+  metadata.update(benchmark_spec.dpb_service.GetMetadata())
   metadata.update({'base_dir': base_dir})
+  metadata.update({
+      'dpb_terasort_storage_type': FLAGS.dpb_terasort_storage_type})
+  metadata.update({'terasort_num_record': FLAGS.dpb_terasort_num_records})
+  storage_in_gb = (FLAGS.dpb_terasort_num_records * 100) / (1000 * 1000 * 1000)
+  metadata.update({'terasort_dataset_size_in_GB': storage_in_gb})
   logging.info('metadata %s ', str(metadata))
 
+  logging.info('Resource create_start_time %s ',
+               str(dpb_service_instance.create_start_time))
+  logging.info('Resource resource_ready_time %s ',
+               str(dpb_service_instance.resource_ready_time))
+  create_time = (
+      dpb_service_instance.resource_ready_time -
+      dpb_service_instance.create_start_time)
+  logging.info('create_time %s ', str(create_time))
+
+  results = []
+  results.append(
+      sample.Sample('dpb_cluster_create_time', create_time, 'seconds',
+                    metadata))
   stages = [(dpb_service.TERAGEN, 'GenerateDataForTerasort'),
             (dpb_service.TERASORT, 'SortDataForTerasort'),
             (dpb_service.TERAVALIDATE, 'ValidateDataForTerasort')]
+  cumulative_runtime = 0
   for (phase, phase_execution_method) in stages:
     func = getattr(dpb_service_instance, phase_execution_method)
     wall_time, phase_stats = func(base_dir, terasort_jar, JOB_CATEGORY)
-    results.append(
-        sample.Sample(phase + '_wall_time', wall_time, 'seconds', metadata))
     logging.info(phase_stats)
-
+    results.append(sample.Sample(phase + '_wall_time', wall_time, 'seconds',
+                                 metadata))
+    results.append(sample.Sample(phase + '_run_time',
+                                 phase_stats['running_time'],
+                                 'seconds', metadata))
+    cumulative_runtime += phase_stats['running_time']
+  results.append(sample.Sample('cumulative_runtime', cumulative_runtime,
+                               'seconds', metadata))
   return results
 
 

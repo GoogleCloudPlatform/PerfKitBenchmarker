@@ -21,6 +21,7 @@ import datetime
 import json
 import logging
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
@@ -43,13 +44,16 @@ TESTDFSIO_JAR_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
 
 TESTDFSIO_PROGRAM = 'TestDFSIO'
 
+disk_to_hdfs_map = {
+    'pd-standard': 'HDD',
+    'pd-ssd': 'SSD'
+}
 
 
 class GcpDpbDataproc(dpb_service.BaseDpbService):
   """Object representing a GCP Dataproc cluster.
 
   Attributes:
-    cluster_id: ID of the cluster.
     project: ID of the project.
   """
 
@@ -59,8 +63,13 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
-    self.project = None
-    self.dpb_dataproc_image_version = FLAGS.dpb_dataproc_image_version
+    self.dpb_service_type = GcpDpbDataproc.SERVICE_TYPE
+    self.project = FLAGS.project
+    if FLAGS.dpb_dataproc_image_version:
+      self.dpb_version = FLAGS.dpb_dataproc_image_version
+    if not self.dpb_service_zone:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service_zone must be provided, for provisioning.')
 
   @staticmethod
   def _GetStats(stdout):
@@ -88,13 +97,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
-    pass
 
   def _Create(self):
     """Creates the cluster."""
-
-    if self.cluster_id is None:
-      self.cluster_id = 'pkb-' + FLAGS.run_uri
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'create',
                              self.cluster_id)
     if self.project is not None:
@@ -112,25 +117,26 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.machine_type:
         self._AddToCmd(cmd, '{0}-machine-type'.format(role),
                        self.spec.worker_group.vm_spec.machine_type)
-
       # Set boot_disk_size
-      if self.spec.worker_group.vm_spec.boot_disk_size:
-        self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role),
-                       self.spec.worker_group.vm_spec.boot_disk_size)
+      if self.spec.worker_group.disk_spec.disk_size:
+        size_in_gb = '{}GB'.format(
+            str(self.spec.worker_group.disk_spec.disk_size))
+        self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role), size_in_gb)
       # Set boot_disk_type
-      if self.spec.worker_group.vm_spec.boot_disk_type:
+      if self.spec.worker_group.disk_spec.disk_type:
         self._AddToCmd(cmd, '{0}-boot-disk-type'.format(role),
-                       self.spec.worker_group.vm_spec.boot_disk_type)
+                       self.spec.worker_group.disk_spec.disk_type)
+        self.dpb_hdfs_type = disk_to_hdfs_map[
+            self.spec.worker_group.disk_spec.disk_type]
 
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
-
-    self.append_region(cmd, True)
-
-    if self.dpb_dataproc_image_version:
-      cmd.flags['image-version'] = self.dpb_dataproc_image_version
+    # Set zone
+    cmd.flags['zone'] = self.dpb_service_zone
+    if self.dpb_version != 'latest':
+      cmd.flags['image-version'] = self.dpb_version
 
     if FLAGS.gcp_dataproc_image:
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
@@ -139,28 +145,20 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
-  def append_region(self, cmd, append_zone=False):
-    if FLAGS.zones:
-      zone = FLAGS.zones[0]
-      region = zone.rsplit('-', 1)[0]
-      cmd.flags['region'] = region
-      if append_zone:
-        cmd.flags['zone'] = zone
+  def append_region(self, cmd):
+    region = self.dpb_service_zone.rsplit('-', 1)[0]
+    cmd.flags['region'] = region
 
   def _Delete(self):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
-    self.append_region(cmd)
-
     cmd.Issue()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
-    self.append_region(cmd)
-
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
@@ -177,8 +175,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       cmd.flags['class'] = classname
     else:
       cmd.flags['jar'] = jarfile
-
-    self.append_region(cmd)
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
@@ -206,15 +202,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def CreateBucket(self, source_bucket):
     mb_command = ['gsutil', 'mb']
-
-    if FLAGS.zones:
-      zone = FLAGS.zones[0]
-      region = zone.rsplit('-', 1)[0]
-      mb_command.extend(['-c', 'regional', '-l', region])
-
-    mb_command.append(source_bucket)
+    region = self.dpb_service_zone.rsplit('-', 1)[0]
+    mb_command.extend(['-c', 'regional', '-l', region])
+    mb_command.append('{}{}'.format(self.PERSISTENT_FS_PREFIX, source_bucket))
     vm_util.IssueCommand(mb_command)
-
 
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to generate data using a distributed job on the cluster."""
@@ -291,11 +282,3 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if udpate_default_fs:
       vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
     return {dpb_service.SUCCESS: True}
-
-  def GetMetadata(self):
-    """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(GcpDpbDataproc, self).GetMetadata()
-    if self.dpb_dataproc_image_version:
-      basic_data['dpb_service'] = ('dataproc_{}'.
-                                   format(self.dpb_dataproc_image_version))
-    return basic_data

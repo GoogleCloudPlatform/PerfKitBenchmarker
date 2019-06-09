@@ -52,12 +52,31 @@ flags.DEFINE_integer('diskspd_thread_number_per_file', 1,
                      'perform read and write. '
                      'Defaults: 1.')
 
+flags.DEFINE_enum('diskspd_access_pattern', 's', ['s', 'r'],
+                  'the access patten of the read and write'
+                  'the performance will be downgrade a little bit if use'
+                  'different hints'
+                  'available option: r|s, '
+                  'r: random access'
+                  's: sequential access. '
+                  'Defaults: s.')
+
+flags.DEFINE_integer('diskspd_write_read_ratio', 0,
+                     'The ratio of write workload to read workload.'
+                     'Example: 50 means 50%, and write and read each takes'
+                     '50% of the total I/O data.'
+                     'To test read speed, set this value to 0. '
+                     'To test write speed, set this value to 100. '
+                     'Defaults: 0. Unit: percent.')
+
 flags.DEFINE_integer('diskspd_block_size', 64,
                      'The block size used when reading and writing data. '
-                     'Defaults: 64K. Unit: KB, can be set')
+                     'Defaults: 64K. Unit: KB, '
+                     'can be set via --diskspd_block_unit')
 
 flags.DEFINE_enum('diskspd_block_unit', 'K', ['K', 'M', 'G'],
                   'The unit of the block size, available option: K|M|G. '
+                  'Will be used as the unit for --diskspd_block_size '
                   'Defaults: K.')
 
 flags.DEFINE_integer('diskspd_stride_or_alignment', 64,
@@ -108,10 +127,13 @@ flags.DEFINE_integer('diskspd_file_size', 819200,
 
 flags.DEFINE_list(
     'diskspd_config_list',
-    'FALSE:TRUE:64,FALSE:FALSE:64,TRUE:TRUE:64,TRUE:FALSE:64',
+    None,
     'comma separated list of configs to run with diskspd. The '
     'format for a single config is RANDOM_ACCESS:IS_READ:BLOCK_SIZE, '
-    'for example FALSE:TRUE:64')
+    'for example FALSE:TRUE:64. '
+    'Default Behavior: diskspd benchmark test will try to combine'
+    '--diskspd_access_pattern, --diskspd_write_read_ratio, '
+    '--diskspd_block_size together and form a set a config to run.')
 
 DISKSPD_RETRIES = 10
 DISKSPD_DIR = 'DiskSpd-2.0.21a'
@@ -137,7 +159,7 @@ DiskspdConf = collections.namedtuple('DiskspdConf',
 def DiskspdConfigListValidator(value):
   """Returns whether or not the config list flag is valid."""
   if not value:
-    return False
+    return True
   for config in value:
     config_vals = config.split(':')
     if len(config_vals) < _NUM_PARAMS_IN_CONFIG:
@@ -167,6 +189,15 @@ flags.register_validator('diskspd_config_list', DiskspdConfigListValidator,
 def ParseConfigList():
   """Get the list of configs for the test from the flags."""
   conf_list = []
+
+  if FLAGS.diskspd_config_list is None:
+    return [
+        DiskspdConf(
+            access_pattern=FLAGS.diskspd_access_pattern,
+            write_ratio=FLAGS.diskspd_write_read_ratio,
+            block_size=FLAGS.diskspd_block_size)
+    ]
+
   for config in FLAGS.diskspd_config_list:
     confs = config.split(':')
 
@@ -175,7 +206,6 @@ def ParseConfigList():
             access_pattern='r' if (confs[0] in TRUE_VALS) else 's',
             write_ratio=0 if (confs[1] in TRUE_VALS) else 100,
             block_size=int(confs[2])))
-
   return conf_list
 
 
@@ -194,7 +224,7 @@ def _RunDiskSpdWithOptions(vm, options):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   command = 'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'.format(
       diskspd_exe_dir=diskspd_exe_dir, diskspd_options=options)
-  vm.RemoteCommand(command, timeout=timeout_duration)
+  vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _RemoveXml(vm):

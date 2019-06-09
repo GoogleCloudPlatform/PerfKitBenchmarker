@@ -14,9 +14,9 @@
 
 """Test the translation of disk type names."""
 
-import mock
 import unittest
 
+import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
@@ -39,7 +39,8 @@ class _DiskTypeRenamingTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
-    get_tmp_dir_mock = mock.patch(vm_util.__name__ + '.GetTempDir')
+    get_tmp_dir_mock = mock.patch(
+        vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -78,7 +79,7 @@ class GcpDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
         }
     }
     spec = self._CreateBenchmarkSpec(config)
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'pd-standard')
+    self.assertEqual(spec.vms[0].disk_specs[0].disk_type, 'pd-standard')
 
   def testPDSSD(self):
     config = {
@@ -100,10 +101,11 @@ class GcpDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
         }
     }
     spec = self._CreateBenchmarkSpec(config)
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'pd-ssd')
+    self.assertEqual(spec.vms[0].disk_specs[0].disk_type, 'pd-ssd')
 
 
 class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
+
   def testEBSStandard(self):
     config = {
         'vm_groups': {
@@ -125,7 +127,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
         }
     }
     spec = self._CreateBenchmarkSpec(config)
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'standard')
+    self.assertEqual(spec.vms[0].disk_specs[0].disk_type, 'standard')
 
   def testEBSGP(self):
     config = {
@@ -148,7 +150,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
         }
     }
     spec = self._CreateBenchmarkSpec(config)
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'gp2')
+    self.assertEqual(spec.vms[0].disk_specs[0].disk_type, 'gp2')
 
   def testEBSPIOPS(self):
     config = {
@@ -171,7 +173,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
         }
     }
     spec = self._CreateBenchmarkSpec(config)
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'io1')
+    self.assertEqual(spec.vms[0].disk_specs[0].disk_type, 'io1')
 
 
 if __name__ == '__main__':

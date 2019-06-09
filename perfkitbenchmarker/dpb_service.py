@@ -34,6 +34,9 @@ flags.DEFINE_string('dpb_job_jarfile', None,
                     'Executable Jarfile containing workload implementation')
 flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
                     'implementation in the jar file')
+flags.DEFINE_string('dpb_service_zone', None, 'The zone for provisioning the '
+                    'dpb_service instance.')
+
 
 FLAGS = flags.FLAGS
 
@@ -113,7 +116,14 @@ class BaseDpbService(resource.BaseResource):
     # user_managed resources in a special manner and skips creation attempt
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
-    self.cluster_id = dpb_service_spec.static_dpb_service_instance
+    self.dpb_hdfs_type = None
+    if dpb_service_spec.static_dpb_service_instance:
+      self.cluster_id = dpb_service_spec.static_dpb_service_instance
+    else:
+      self.cluster_id = 'pkb-' + FLAGS.run_uri
+    self.dpb_service_zone = FLAGS.dpb_service_zone
+    self.dpb_version = 'latest'
+    self.dpb_service_type = 'unknown'
 
   @abc.abstractmethod
   def SubmitJob(self,
@@ -147,10 +157,15 @@ class BaseDpbService(resource.BaseResource):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = {
-        'dpb_service': self.SERVICE_TYPE,
+        'dpb_service': self.dpb_service_type,
+        'dpb_version': self.dpb_version,
+        'dpb_service_version': '{}_{}'.format(self.dpb_service_type,
+                                              self.dpb_version),
         'dpb_cluster_id': self.cluster_id,
         'dpb_cluster_shape': self.spec.worker_group.vm_spec.machine_type,
-        'dpb_cluster_size': self.spec.worker_count
+        'dpb_cluster_size': self.spec.worker_count,
+        'dpb_hdfs_type': self.dpb_hdfs_type,
+        'dpb_service_zone': self.dpb_service_zone
     }
     return basic_data
 

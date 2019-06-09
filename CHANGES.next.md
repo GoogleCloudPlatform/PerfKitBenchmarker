@@ -23,6 +23,7 @@
   configurations may be incorrect.
 - Changed TF Serving benchmark to use ResNet instead of Inception.
 - Renamed prepare_sleep_time flag to after_prepare_sleep_time.
+- multichase_taskset_options flag changed to multichase_numactl_options.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -88,7 +89,7 @@
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
-- Added support for Windows2012, 2016, and 2019 for GCP.
+- Added support for Windows2012, 2016, and 2019 for GCP and AWS.
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
@@ -104,6 +105,12 @@
 - Added a demo under tools/.
 - Added Nginx benchmark.
 - Added support for measuring VM reboot time to the cluster boot benchmark.
+- Added Cygwin support to WindowsVirtualMachine and enabled a Windows+Cygwin
+  version of Coremark.
+- Added sar trace utility to measure cpu steal time.
+- Added ssh_via_internal_ip flag to use internal IP addresses when ssh'ing to
+  runner VMs, will use external IP addrs if not set.
+- Added support for launching GCP VM with shielded VM secure boot
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -279,6 +286,18 @@
   used in conjunction with the `--zones` flag.
 - Added `--before_cleanup_pause` to ease debugging.
 - Added support for CUDA 10.1.
+- Added `--skip_firewall_rules` flag to help manage firewall rule economy.
+- Added Azure Premium Files support.
+- Added 'os_type' metadata to virtual machines for use in performance samples.
+- Storage specification related dpb terasort benchmark improvements.
+- Added an optional flag to set a delay between boot tasks.
+- Added precision flag to Horovod.
+- Added a flag to Horovod that indicates that the VM is using a deep learning
+  image.
+- Add support to set load upper bound for specsfs2014.
+- Add support for different workload sizes for stress-ng.
+- Implemented RobustRemoteCommand for Windows.
+- Extract GceVirtualMachine's GetNetwork into a method.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -449,3 +468,15 @@
 - Introduced NumCpusForBenchmark() which should be used instead of num_cpus for benchmark configuration.
 - Use stat -c %z /proc/ instead of uptime -s to find a boot timestamp since it
   is more universal.
+- Added support for regex_util.ExtractInt to extract an integer from a string.
+- Updated Coremark to v1.01 and improved its error handling and output parsing.
+- Added flag support to Coremark for choosing a parallelism method. Defaults to
+  the existing mechanism of pthreads.
+- Make a temporary copy on VM's disk for scp on SMB.
+- Change the GCE Windows VM boot disk type to PD-STANDARD by default to better
+  match the default for GCE Linux VMs.
+- Fixed azure credentials package to avoid pushing the entire .azure directory.
+- Update bigtable benchmark to make configurations configurable, and report them.
+- RobustRemoteCommand now retries on ssh connections refused.
+- Fixed a bug that was causing AWS capacity reservation creation to fail.
+- GceNetworkSpec's zone is equal to the VM's zone

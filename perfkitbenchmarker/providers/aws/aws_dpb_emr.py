@@ -20,7 +20,9 @@ import json
 import logging
 
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -32,7 +34,7 @@ GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
                        'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('dpb_emr_release_label', 'emr-5.8.0',
+flags.DEFINE_string('dpb_emr_release_label', 'emr-5.23.0',
                     'The emr version to use for the cluster.')
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
@@ -47,6 +49,11 @@ EMR_TIMEOUT = 3600
 
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
+
+disk_to_hdfs_map = {
+    'st1': 'HDD',
+    'gp2': 'SSD'
+}
 
 
 class EMRRetryableException(Exception):
@@ -101,22 +108,23 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
+    self.dpb_service_type = AwsDpbEmr.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
-
-    if FLAGS.zones:
-      self.zone = FLAGS.zones[0]
-      region = util.GetRegionFromZone(self.zone)
+    if self.dpb_service_zone:
+      region = util.GetRegionFromZone(self.dpb_service_zone)
       self.cmd_prefix += ['--region', region]
-
-    self.network = aws_network.AwsNetwork.GetNetwork(self)
+      self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
+          network.BaseNetworkSpec(zone=self.dpb_service_zone))
+    else:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service_zone must be provided, for provisioning.')
     self.bucket_to_delete = None
-    self.emr_release_label = FLAGS.dpb_emr_release_label
+    self.dpb_version = FLAGS.dpb_emr_release_label
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
-    pass
 
   def _CreateLogBucket(self):
     bucket_name = 's3://pkb-{0}-emr'.format(FLAGS.run_uri)
@@ -145,6 +153,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
               'VolumeType': self.spec.worker_group.disk_spec.disk_type},
               'VolumesPerInstance':
                   self.spec.worker_group.disk_spec.num_striped_disks}]}
+      self.dpb_hdfs_type = disk_to_hdfs_map[
+          self.spec.worker_group.disk_spec.disk_type]
 
     # Create the specification for the master and the worker nodes
     instance_groups = []
@@ -169,7 +179,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', self.emr_release_label,
+                             '--release-label', self.dpb_version,
                              '--use-default-roles',
                              '--instance-groups',
                              json.dumps(instance_groups),
@@ -262,7 +272,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def _IsReady(self):
     """Check to see if the cluster is ready."""
-    logging.info('Checking _Ready cluster:', self.cluster_id)
+    logging.info('Checking _Ready cluster: %s', self.cluster_id)
     cmd = self.cmd_prefix + ['emr',
                              'describe-cluster', '--cluster-id',
                              self.cluster_id]
@@ -350,7 +360,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     pass
 
   def CreateBucket(self, source_bucket):
-    mb_cmd = self.cmd_prefix + ['s3', 'mb', source_bucket]
+    mb_cmd = self.cmd_prefix + ['s3', 'mb', '{}{}'.format(
+        self.PERSISTENT_FS_PREFIX, source_bucket)]
     stdout, _, _ = vm_util.IssueCommand(mb_cmd)
 
   def generate_data(self, source_dir, udpate_default_fs, num_files,
@@ -534,9 +545,3 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
       stdout, _, _ = vm_util.IssueCommand(rb_step_cmd)
       return {dpb_service.SUCCESS: True}
-
-  def GetMetadata(self):
-    """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(AwsDpbEmr, self).GetMetadata()
-    basic_data['dpb_service'] = 'emr_{}'.format(self.emr_release_label)
-    return basic_data

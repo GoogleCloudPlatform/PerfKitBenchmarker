@@ -23,6 +23,7 @@ import itertools
 import posixpath
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
@@ -101,7 +102,11 @@ def Run(benchmark_spec):
   if FLAGS.ior_num_procs and FLAGS.ior_script:
     remote_script_path = posixpath.join(master_vm.scratch_disks[0].mount_point,
                                         FLAGS.ior_script)
-    master_vm.PushDataFile(FLAGS.ior_script, remote_script_path)
+    master_vm.PushDataFile(
+        FLAGS.ior_script,
+        remote_script_path,
+        # SCP directly to SMB returns an error, so first copy to disk.
+        should_double_copy=(FLAGS.data_disk_type == disk.SMB))
     results += ior.RunIOR(master_vm, FLAGS.ior_num_procs, remote_script_path)
 
   # Run mdtest benchmark.

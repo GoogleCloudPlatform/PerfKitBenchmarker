@@ -46,8 +46,8 @@ time_based
 filename=/test/filename
 do_verify=0
 verify_fatal=0
-randrepeat=0
 group_reporting=1
+randrepeat=0
 
 [sequential_read-io-depth-1-num-jobs-1]
 stonewall
@@ -70,7 +70,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read'],
             [1, 2], [1],
-            None, None, 600, {}),
+            None, None, 600, ['randrepeat=0']),
         expected_jobfile)
 
   def testMultipleScenarios(self):
@@ -84,8 +84,8 @@ time_based
 filename=/test/filename
 do_verify=0
 verify_fatal=0
-randrepeat=0
 group_reporting=1
+randrepeat=0
 
 [sequential_read-io-depth-1-num-jobs-1]
 stonewall
@@ -108,7 +108,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read', 'sequential_write'],
             [1], [1],
-            None, None, 600, {}),
+            None, None, 600, ['randrepeat=0']),
         expected_jobfile)
 
   def testCustomBlocksize(self):

@@ -41,11 +41,6 @@ aws_dynamodb_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
-                     False,
-                     "Consistent reads cost 2x eventual reads. "
-                     "'false' is default which is eventual")
-
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -113,6 +108,13 @@ def Run(benchmark_spec):
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  benchmark_metadata = {
+      'ycsb_client_vms': len(vms),
+  }
+  for sample in samples:
+    sample.metadata.update(
+        benchmark_spec.dynamodb_instance.GetResourceMetadata())
+    sample.metadata.update(benchmark_metadata)
   return samples
 
 
@@ -129,11 +131,10 @@ def Cleanup(benchmark_spec):
 def GetRemoteVMCredentialsFullPath(vm):
   """Returns the full path for AWS credentials file."""
   home_dir, _ = vm.RemoteCommand('echo ~')
-  # aws credentials are always located in the 'credentials' directory of .aws
-  # configurations folder
-  # https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-  return os.path.join(home_dir.rstrip('\n'),
-                      FLAGS.aws_credentials_remote_path, 'credentials')
+  search_path = os.path.join(home_dir.rstrip('\n'),
+                             FLAGS.aws_credentials_remote_path)
+  result, _ = vm.RemoteCommand('grep -irl "key" {0}'.format(search_path))
+  return result.rstrip('\n')
 
 
 def _Install(vm):

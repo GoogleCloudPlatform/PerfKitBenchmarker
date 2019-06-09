@@ -25,6 +25,13 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer('bigtable_node_count', 3,
+                     'Number of nodes to create in the bigtable cluster.')
+flags.DEFINE_enum('bigtable_storage_type', 'ssd', ['ssd', 'hdd'],
+                  'Storage class for the cluster')
+flags.DEFINE_string('google_bigtable_zone', 'us-central1-b',
+                    'Bigtable zone.')
+
 
 class GcpBigtableInstance(resource.BaseResource):
   """Object representing a GCP Bigtable Instance.
@@ -36,9 +43,10 @@ class GcpBigtableInstance(resource.BaseResource):
     zone: zone of the instance's cluster.
   """
 
-  def __init__(self, name, num_nodes, project, zone):
+  def __init__(self, name, project, zone):
     super(GcpBigtableInstance, self).__init__()
-    self.num_nodes = num_nodes
+    self.num_nodes = FLAGS.bigtable_node_count
+    self.storage_type = FLAGS.bigtable_storage_type
     self.name = name
     self.zone = zone
     self.project = project
@@ -49,7 +57,8 @@ class GcpBigtableInstance(resource.BaseResource):
                              self.name)
     cmd.flags['display-name'] = self.name
     cmd.flags['cluster'] = self.name
-    cmd.flags['cluster-num-nodes'] = str(self.num_nodes)
+    cmd.flags['cluster-num-nodes'] = self.num_nodes
+    cmd.flags['cluster-storage-type'] = self.storage_type
     cmd.flags['cluster-zone'] = self.zone
     cmd.flags['project'] = self.project
     # The zone flag makes this command fail.

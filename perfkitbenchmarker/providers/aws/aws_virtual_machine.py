@@ -682,6 +682,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.spot_status_code = 'SpotMaxPriceTooLow'
       self.early_termination = True
       raise errors.Resource.CreationError(stderr)
+    if 'InstanceLimitExceeded' in stderr:
+      raise errors.Benchmarks.QuotaFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
           '%s return code: %s' % (retcode, stderr))
@@ -1047,6 +1049,21 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
     if registry_query_result[2] != '0':
       raise AwsUnexpectedWindowsAdapterOutputError(
           'InterruptModeration failed to disable')
+
+
+class Windows2012AwsVirtualMachine(WindowsAwsVirtualMachine,
+                                   windows_virtual_machine.Windows2012Mixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+
+
+class Windows2016AwsVirtualMachine(WindowsAwsVirtualMachine,
+                                   windows_virtual_machine.Windows2016Mixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Core-Base-*'
+
+
+class Windows2019AwsVirtualMachine(WindowsAwsVirtualMachine,
+                                   windows_virtual_machine.Windows2019Mixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

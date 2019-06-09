@@ -14,12 +14,17 @@
 
 """Utilities for working with Azure resources."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+import six
 
 AZURE_PATH = azure.AZURE_PATH
 AZURE_SUFFIX = ['--output', 'json']
@@ -69,7 +74,7 @@ def FormatTags(tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag' parameter.
   """
-  return [FormatTag(k, v) for k, v in tags_dict.iteritems()]
+  return [FormatTag(k, v) for k, v in six.iteritems(tags_dict)]
 
 
 def GetResourceTags(timeout_minutes):

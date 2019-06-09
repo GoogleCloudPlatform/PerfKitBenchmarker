@@ -66,6 +66,12 @@ flags.DEFINE_integer(
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
+flags.DEFINE_bool(
+    'skip_firewall_rules', False,
+    'If set, this run will not create firewall rules. This is useful if the '
+    'user project already has all of the firewall rules in place and/or '
+    'creating new ones is expensive')
+
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.
 VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws']
@@ -324,12 +330,12 @@ class BaseVirtualMachine(resource.BaseResource):
 
   def AllowIcmp(self):
     """Opens ICMP protocol on the firewall corresponding to the VM if exists."""
-    if self.firewall:
+    if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowIcmp(self)
 
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
-    if self.firewall:
+    if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowPort(self, start_port, end_port)
 
   def AllowRemoteAccessPorts(self):
@@ -376,7 +382,7 @@ class BaseVirtualMachine(resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
-    # Hack: Silently fail if we have no num_cpus attribute.
+    # Hack: Silently fail if we have no num_cpus or OS_TYPE attribute.
     # This property is defined in BaseOsMixin and should always
     # be available during regular PKB usage because virtual machines
     # always have a mixin. However, in testing virtual machine objects
@@ -386,7 +392,8 @@ class BaseVirtualMachine(resource.BaseResource):
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
-
+    if getattr(self, 'OS_TYPE', None):
+      result['os_type'] = self.OS_TYPE
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -808,18 +815,25 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     self.RemoteCopy(local_path, remote_path, copy_to=False)
 
-  def PushDataFile(self, data_file, remote_path=''):
+  def PushDataFile(self, data_file, remote_path='', should_double_copy=None):
     """Upload a file in perfkitbenchmarker.data directory to the VM.
 
     Args:
       data_file: The filename of the file to upload.
       remote_path: The destination for 'data_file' on the VM. If not specified,
         the file will be placed in the user's home directory.
+      should_double_copy: Indicates whether to first copy to the home directory
     Raises:
       perfkitbenchmarker.data.ResourceNotFound: if 'data_file' does not exist.
     """
     file_path = data.ResourcePath(data_file)
-    self.PushFile(file_path, remote_path)
+    if should_double_copy:
+      home_file_path = '~/' + data_file
+      self.PushFile(file_path, home_file_path)
+      copy_cmd = (' '.join(['cp', home_file_path, remote_path]))
+      self.RemoteCommand(copy_cmd)
+    else:
+      self.PushFile(file_path, remote_path)
 
   def RenderTemplate(self, template_path, remote_path, context):
     """Renders a local Jinja2 template and copies it to the remote host.

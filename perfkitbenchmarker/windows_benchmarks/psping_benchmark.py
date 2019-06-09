@@ -42,7 +42,6 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms[:2]
   for vm in vms:
     vm.Install('psping')
-    vm.AllowPort(psping.TEST_PORT)
 
 
 def Run(benchmark_spec):
@@ -50,7 +49,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects with the benchmark results.

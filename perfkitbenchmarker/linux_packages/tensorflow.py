@@ -108,8 +108,12 @@ def Install(vm):
   vm.RemoteCommand(
       'sudo pip install --upgrade %s' % FLAGS.t2t_pip_package, should_log=True)
   vm.InstallPackages('git')
-  vm.RemoteCommand(
-      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
+  _, _, retcode = vm.RemoteHostCommandWithReturnCode(
+      'test -d benchmarks', ignore_failure=True, suppress_warning=True)
+  if retcode != 0:
+    vm.RemoteCommand(
+        'git clone https://github.com/tensorflow/benchmarks.git',
+        should_log=True)
   vm.RemoteCommand(
       'cd benchmarks && git checkout {}'.format(FLAGS.tf_cnn_benchmarks_branch)
   )
