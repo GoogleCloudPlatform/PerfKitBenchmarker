@@ -33,15 +33,11 @@ FLAGS = flags.FLAGS
 
 def CreateDisks(disk_specs, vm_name):
   """
-  Creates instances of KubernetesDisk child classes depending on
-  scratch disk type.
+  Creates scratch disks (Docker Volumes)
   """
   scratch_disks = []
   for disk_num, disk_spec in enumerate(disk_specs):
 
-    #disk_class = GetKubernetesDiskClass(disk_spec.disk_type)
-    #scratch_disk = disk_class(disk_num, disk_spec, vm_name)
-    #scratch_disk.Create()
     logging.info("Creating Disk number: " + str(disk_num))
 
     volume_disk = DockerDisk(disk_spec, disk_num, vm_name)
@@ -52,8 +48,7 @@ def CreateDisks(disk_specs, vm_name):
 
 
 class DockerDisk(disk.BaseDisk):
-  """Dummy Object representing a Docker Disk."""
-  # Will support additional disk functionalality later
+  """ Object representing a Docker Volume."""
 
   def __init__(self, disk_spec, disk_num, vm_name):
     super(DockerDisk, self).__init__(disk_spec)
@@ -71,9 +66,6 @@ class DockerDisk(disk.BaseDisk):
     raise errors.Error('GetDevicePath not supported for Docker.')
 
   def _Create(self):
-    #volume_name = self.vm_name + '-volume' + str(self.disk_num)
-    logging.info("Creating a new Docker Volume: " + self.volume_name)
-
     #docker volume create volume_name
     cmd = ['docker', 'volume', 'create', self.volume_name]
     output = vm_util.IssueCommand(cmd)
