@@ -36,13 +36,13 @@ default_single_core: &default_single_core
     image: null
   Kubernetes:
     image: null
-  Docker:
-    image: null
   Mesos:
     image: null
   ProfitBricks:
     machine_type: Small
     zone: ZONE_1
+    image: null
+  Docker:
     image: null
 
 # TODO: update the two core machines for more providers
@@ -107,6 +107,10 @@ default_500_gb: &default_500_gb
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
+  Docker:
+    disk_type: local
+    disk_size: 500
+    mount_point: /scratch
 
 
 # TODO(nlavine): update the disk types below as more providers are
@@ -153,5 +157,9 @@ default_50_gb: &default_50_gb
     mount_point: /scratch
   ProfitBricks:
     disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  Docker:
+    disk_type: local
     disk_size: 50
     mount_point: /scratch
