@@ -37,9 +37,9 @@ class DockerSpec(virtual_machine.BaseVmSpec):
   def _GetOptionDecoderConstructions(cls):
     result = super(DockerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-      'docker_provider_cpus': (option_decoders.FloatDecoder, {'default': 0}),
-      'docker_provider_memory_mb': (option_decoders.IntDecoder, {'default': 0}),
-      'privileged_docker': (option_decoders.BooleanDecoder, {'default': False})})
+        'docker_provider_cpus': (option_decoders.FloatDecoder, {'default': 0}),
+        'docker_provider_memory_mb': (option_decoders.IntDecoder, {'default': 0}),
+        'privileged_docker': (option_decoders.BooleanDecoder, {'default': False})})
     return result
 
   def _ApplyFlags(self, config_values, flag_values):

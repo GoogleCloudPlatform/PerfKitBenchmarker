@@ -76,9 +76,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a Docker instance"""
-    logging.info('Creating Docker Container')
-    with open(self.ssh_public_key) as f:
-      public_key = f.read().rstrip('\n')
 
     # Locally build docker container
     with self.docker_build_lock:
@@ -89,7 +86,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_command = self._FormatCreateCommand()
     container_info, _, _ = vm_util.IssueCommand(create_command)
     self.container_id = container_info.encode("ascii")
-    logging.info("Container with Disk ID: %s", self.container_id)
 
   def _FormatCreateCommand(self):
     """Formats the command for Docker based on vm_spec and flags"""
@@ -156,7 +152,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     Checks if Container has successful been created an is running
     """
-    
+
     info, returnCode = self._GetContainerInfo()
 
     logging.info("Checking if Docker Container Exists")
