@@ -31,6 +31,7 @@ from perfkitbenchmarker.configs import option_decoders
 
 FLAGS = flags.FLAGS
 
+
 def CreateDisks(disk_specs, vm_name):
   """
   Creates scratch disks (Docker Volumes)
@@ -66,15 +67,13 @@ class DockerDisk(disk.BaseDisk):
     raise errors.Error('GetDevicePath not supported for Docker.')
 
   def _Create(self):
-    #docker volume create volume_name
+    # docker volume create volume_name
     cmd = ['docker', 'volume', 'create', self.volume_name]
-    output = vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)
 
   def _Delete(self):
     cmd = ['docker', 'volume', 'rm', self.volume_name]
-    output = vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)
 
   def AttachVolumeInfo(self, volume_mounts):
-    vol_string = (scratch_disk.volume_name + ":" + scratch_disk.mount_point)
-
-    return vol_string
+    pass

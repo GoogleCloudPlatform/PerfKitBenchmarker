@@ -36,6 +36,7 @@ FLAGS = flags.FLAGS
 UBUNTU_IMAGE = 'ubuntu:xenial'
 DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16_ssh'
 
+
 class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
   Object representing a Docker Container instance
@@ -161,7 +162,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info("Checking if Docker Container Exists")
     if len(info) > 0 and returnCode == 0:
       status = info[0]['State']['Running']
-      if status == "True" or status == True:
+      if status == "True" or status is True:
         logging.info("Docker Container %s is up and running.", self.name)
         return True
 
@@ -209,8 +210,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetContainerInfo(self):
     """
-    Gets Container information from Docker Inspect. Returns the information, 
-    if there is any and a return code. 0  
+    Gets Container information from Docker Inspect. Returns the information,
+    if there is any and a return code. 0
     """
     logging.info("Checking Container Information")
     inspect_cmd = ['docker', 'inspect', self.name]
@@ -269,9 +270,9 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     Build Container Image Locally
     """
 
-    #Dockerfiles located at PerfKitBenchmarker/docker/<containerImage>/Dockerfile
+    # Dockerfiles located at PerfKitBenchmarker/docker/<containerImage>/Dockerfile
     directory = os.path.dirname(
-      data.ResourcePath(os.path.join('docker', self.container_image, 'Dockerfile')))
+        data.ResourcePath(os.path.join('docker', self.container_image, 'Dockerfile')))
     build_cmd = [
         'docker', 'build', '--no-cache',
         '-t', self.container_image, directory]
@@ -280,7 +281,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
-                                          linux_virtual_machine.DebianMixin):
+                                      linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
   def ApplySysctlPersistent(self, sysctl_params):
@@ -291,6 +292,7 @@ class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
     """
     logging.warn("Sysctl flags NOT applied to Docker container. "
                  "Please use --docker_sysctl_flags if sysctl need to be applied")
+
 
 class Ubuntu1604BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
