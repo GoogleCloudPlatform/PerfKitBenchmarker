@@ -1147,6 +1147,11 @@ class RhelMixin(BaseLinuxMixin):
           FLAGS.http_proxy, yum_proxy_file))
 
 
+class AmazonLinux2Mixin(RhelMixin):
+  """Class holding Amazon Linux2 vm methods and attributes."""
+  OS_TYPE = os_types.AMAZONLINUX2
+
+
 class Centos7Mixin(RhelMixin):
   """Class holding Centos 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7

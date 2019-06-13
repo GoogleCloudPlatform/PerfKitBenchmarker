@@ -15,6 +15,7 @@
 
 from perfkitbenchmarker import flags
 
+AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
 DEBIAN = 'debian'
 DEBIAN9 = 'debian9'
@@ -32,6 +33,7 @@ WINDOWS2016 = 'windows2016'
 WINDOWS2019 = 'windows2019'
 
 LINUX_OS_TYPES = [
+    AMAZONLINUX2,
     CENTOS7,
     DEBIAN,
     DEBIAN9,
