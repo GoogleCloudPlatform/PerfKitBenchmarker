@@ -111,6 +111,7 @@
 - Added ssh_via_internal_ip flag to use internal IP addresses when ssh'ing to
   runner VMs, will use external IP addrs if not set.
 - Added support for launching GCP VM with shielded VM secure boot
+- Added Amazon Linux 2 os type. `--os_type=amazonlinux2`
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
