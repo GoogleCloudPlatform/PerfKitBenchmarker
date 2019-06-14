@@ -21,5 +21,13 @@ def Install(vm):
   vm.RemoteCommand('sudo pip install awscli')
 
 
+def YumInstall(vm):
+  """Installs the awscli package on the VM."""
+  # amazon linux 2 has preinstalled awscli.
+  stdout, _ = vm.RemoteCommand('yum list installed awscli')
+  if stdout.find('awscli') == -1:
+    Install(vm)
+
+
 def Uninstall(vm):
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
