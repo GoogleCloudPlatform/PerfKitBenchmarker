@@ -112,6 +112,7 @@
   runner VMs, will use external IP addrs if not set.
 - Added support for launching GCP VM with shielded VM secure boot
 - Added Amazon Linux 2 os type. `--os_type=amazonlinux2`
+- Redis enterprise benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
