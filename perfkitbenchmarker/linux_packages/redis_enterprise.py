@@ -143,7 +143,7 @@ def SetUpCluster(vm, redis_port):
         'oss_cluster': True,
         'shard_key_regex':
             [{'regex': '.*\\{(?<tag>.*)\\}.*'}, {'regex': '(?<tag>.*)'}]
-        })
+    })
 
   cmd = (
       """curl -v -k -u {username}:{password} """
