@@ -1482,7 +1482,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'cloud_redis': (_CloudRedisDecoder, {
             'default': None
-        })
+        }),
         'vpn_service': (_VPNServiceDecoder, {
             'default': None
         }),

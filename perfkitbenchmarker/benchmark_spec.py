@@ -879,7 +879,7 @@ def test_pickle(xThing, lTested=[]):
             for x in xAttribute:
                 lTested = test_pickle(x, lTested)
             print('...finished testing iter values for {0}.{1}'.format(sType, s))
-            print repr(oIter)
+            #print repr(oIter)
 
         try:
             xAttribute.__dict__
