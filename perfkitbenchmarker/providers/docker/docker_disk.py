@@ -1,4 +1,4 @@
-# Copyright 2018 Google Inc. All rights reserved.
+# Copyright 2019 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,8 +25,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
-    OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 
 FLAGS = flags.FLAGS

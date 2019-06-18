@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
 
-class DockerSpec(virtual_machine.BaseVmSpec):
+class DockerContainerSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Docker Instance.
 
   Attributes:
@@ -35,7 +35,7 @@ class DockerSpec(virtual_machine.BaseVmSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    result = super(DockerSpec, cls)._GetOptionDecoderConstructions()
+    result = super(DockerContainerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'docker_provider_cpus': (option_decoders.FloatDecoder, {'default': 0}),
         'docker_provider_memory_mb': (option_decoders.IntDecoder, {'default': 0}),
@@ -43,7 +43,7 @@ class DockerSpec(virtual_machine.BaseVmSpec):
     return result
 
   def _ApplyFlags(self, config_values, flag_values):
-    super(DockerSpec, self)._ApplyFlags(config_values, flag_values)
+    super(DockerContainerSpec, self)._ApplyFlags(config_values, flag_values)
     if flag_values['docker_provider_cpus'].present:
       config_values['docker_provider_cpus'] = flag_values.docker_provider_cpus
     if flag_values['docker_provider_memory_mb'].present:

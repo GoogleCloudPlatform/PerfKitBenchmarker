@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,11 +25,12 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker.providers.docker import docker_disk
-from perfkitbenchmarker.providers.docker import docker_resource_spec
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
+from perfkitbenchmarker.providers.docker import docker_container_spec
 
 FLAGS = flags.FLAGS
 
@@ -37,10 +38,17 @@ UBUNTU_IMAGE = 'ubuntu:xenial'
 DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16_ssh'
 
 
-class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
+class DockerContainer(virtual_machine.BaseVirtualMachine):
   """
   Object representing a Docker Container instance
+
+  Attributes:
+  docker_provider_cpus: None or float. Number of CPUs for Docker instances.
+  docker_provider_memory_mb: None or int. Memory limit (in MB) for Docker instances.
+  privileged_docker: None of boolean. Indicates if Docker container
+      should be run in privileged mode.
   """
+
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
@@ -52,7 +60,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec
     """
-    super(DockerVirtualMachine, self).__init__(vm_spec)
+    super(DockerContainer, self).__init__(vm_spec)
     self.name = self.name.replace('_', '-')
     self.container_id = ''
     self.user_name = FLAGS.username
@@ -65,8 +73,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     # apply flags
     if FLAGS.docker_custom_image:
       self.container_image = FLAGS.docker_custom_image
-    if FLAGS.docker_sysctl_flags:
-      self.docker_sysctl_flags = FLAGS.docker_sysctl_flags
+    if FLAGS.sysctl:
+      self.docker_sysctl_flags = FLAGS.sysctl
 
   def _CreateDependencies(self):
     self._CreateVolumes()
@@ -149,9 +157,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=10)
   def _Exists(self):
-    """
-    Checks if Container has successful been created an is running
-    """
+    """Returns whether the container is up and running"""
 
     info, returnCode = self._GetContainerInfo()
 
@@ -206,6 +212,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetContainerInfo(self):
     """
+    Returns information about a container
+
     Gets Container information from Docker Inspect. Returns the information,
     if there is any and a return code. 0
     """
@@ -217,6 +225,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _ConfigureProxy(self):
     """
+    Configure network proxy for Docker Container
+
     In Docker containers environment variables from /etc/environment
     are not sourced - this results in connection problems when running
     behind proxy. Prepending proxy environment variables to bashrc
@@ -234,9 +244,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _BuildVolumesBody(self):
-    """
-    Constructs volumes-related part of create command for Docker Container
-    """
+    """Constructs volumes-related part of create command for Docker Container"""
     volumes = []
 
     for scratch_disk in self.scratch_disks:
@@ -247,10 +255,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     return volumes
 
   def _LocalImageExists(self, docker_image_name):
-    """
-    Checks if an image exists locally
-    Returns boolean
-    """
+    """Returns whether a Docker image exists locally."""
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
     info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
     info = json.loads(info)
@@ -264,9 +269,9 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _BuildImageLocally(self):
     """
     Build Container Image Locally
-    """
 
-    # Dockerfiles located at PerfKitBenchmarker/docker/<containerImage>/Dockerfile
+    Dockerfiles located at PerfKitBenchmarker/docker/<containerImage>/Dockerfile
+    """
     directory = os.path.dirname(
         data.ResourcePath(os.path.join('docker', self.container_image, 'Dockerfile')))
     build_cmd = [
@@ -276,7 +281,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(build_cmd)
 
 
-class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
+class DebianBasedDockerContainer(DockerContainer,
                                       linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
@@ -286,12 +291,11 @@ class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
     Args:
       sysctl_params: dict - the keys and values to write
     """
-    logging.warn("Sysctl flags NOT applied to Docker container. "
-                 "Please use --docker_sysctl_flags if sysctl need to be applied")
+    logging.warn("sysctl flags are applied when container is created ")
 
 
-class Ubuntu1604BasedDockerVirtualMachine(
-    DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
+class Ubuntu1604BasedDockerContainer(
+    DebianBasedDockerContainer, linux_virtual_machine.Ubuntu1604Mixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
 # class Ubuntu1404BasedDockerVirtualMachine(
