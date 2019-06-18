@@ -26,13 +26,6 @@ flags.DEFINE_string('docker_cli', 'docker',
                     'Path to docker cli. You can set it here if it is'
                     'not in your system PATH or not at a default location')
 
-flags.DEFINE_string('docker_sysctl_flags', None,
-                    'This flag can be used to pass sysctl changes to the '
-                    'Docker container. If you need to pass multiple sysctl flags, '
-                    'Pass them in a string separated by spaces'
-                    'Ex. --sysctl "net.ipv4.tcp_keepalive_time=60 '
-                    'net.ipv4.tcp_keepalive_intvl=60"')
-
 flags.DEFINE_integer('docker_provider_memory_mb', 0,
                      'Memory limit for docker containers.')
 

@@ -32,9 +32,8 @@ FLAGS = flags.FLAGS
 
 
 def CreateDisks(disk_specs, vm_name):
-  """
-  Creates scratch disks (Docker Volumes)
-  """
+  """Creates scratch disks (Docker Volumes)"""
+  
   scratch_disks = []
   for disk_num, disk_spec in enumerate(disk_specs):
 

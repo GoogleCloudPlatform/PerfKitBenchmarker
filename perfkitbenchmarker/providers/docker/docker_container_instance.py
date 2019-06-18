@@ -39,15 +39,7 @@ DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16_ssh'
 
 
 class DockerContainer(virtual_machine.BaseVirtualMachine):
-  """
-  Object representing a Docker Container instance
-
-  Attributes:
-  docker_provider_cpus: None or float. Number of CPUs for Docker instances.
-  docker_provider_memory_mb: None or int. Memory limit (in MB) for Docker instances.
-  privileged_docker: None of boolean. Indicates if Docker container
-      should be run in privileged mode.
-  """
+  """Object representing a Docker Container instance"""
 
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
@@ -55,11 +47,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
   docker_build_lock = threading.Lock()
 
   def __init__(self, vm_spec):
-    """Initialize a Docker Container.
-
-    Args:
-      vm_spec
-    """
+    """Initialize a Docker Container."""
     super(DockerContainer, self).__init__(vm_spec)
     self.name = self.name.replace('_', '-')
     self.container_id = ''
@@ -114,8 +102,13 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
       create_command.append('-m')
       create_command.append(str(self.memory_mb) + 'm')
     if self.docker_sysctl_flags:
+      logging.info(self.docker_sysctl_flags)
+      sysctl_string = ''
+      for sysctl_flag in self.docker_sysctl_flags:
+        sysctl_string = sysctl_string + sysctl_flag + ' '
+      logging.info(sysctl_string)
       create_command.append('--sysctl')
-      create_command.append(self.docker_sysctl_flags)
+      create_command.append(sysctl_string)
 
     create_command.append(self.container_image)
     create_command.append('/usr/sbin/sshd')
@@ -126,7 +119,9 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry()
   def _PostCreate(self):
     """
-    Prepares running container. Gets the IP address, copies public keys,
+    Prepares running container. 
+
+    Gets the IP address, copies public keys,
     and configures the proxy if one is specified
     """
     self._GetIpAddresses()
@@ -172,7 +167,9 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
   def _CreateVolumes(self):
     """
-    Creates volumes for scratch disks. These volumes have to be created
+    Creates volumes for scratch disks.
+
+    These volumes have to be created
     BEFORE containers creation because Docker doesn't allow to attach
     volume to currently running containers.
     """
@@ -180,9 +177,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _DeleteVolumes(self):
-    """
-    Deletes volumes.
-    """
+    """Deletes volumes."""
     for scratch_disk in self.scratch_disks[:]:
       scratch_disk.Delete()
       self.scratch_disks.remove(scratch_disk)
@@ -192,9 +187,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     pass
 
   def _GetIpAddresses(self):
-    """
-    Sets the internal and external IP address for the Container.
-    """
+    """Sets the internal and external IP address for the Container."""
     info, returnCode = self._GetContainerInfo()
     ip = False
 
@@ -286,12 +279,20 @@ class DebianBasedDockerContainer(DockerContainer,
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
   def ApplySysctlPersistent(self, sysctl_params):
-    """Override ApplySysctlPeristent function for Docker provider
+    """
+    Override ApplySysctlPeristent function for Docker provider
+
     Parent function causes errors with Docker because it shutdowns container
     Args:
       sysctl_params: dict - the keys and values to write
     """
-    logging.warn("sysctl flags are applied when container is created ")
+    logging.warn("sysctl flags are applied when container is created. "
+                 "Not all sysctl flags work with Docker. It does not "
+                 "support flags that modify the host system")
+
+  def _RebootIfNecessary(self):
+    """Will reboot the VM if self._needs_reboot has been set."""
+    logging.warn("Docker Containers cannot be rebooted to apply flags")
 
 
 class Ubuntu1604BasedDockerContainer(
