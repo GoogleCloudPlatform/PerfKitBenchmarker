@@ -44,6 +44,8 @@ flags.DEFINE_integer('enterprise_redis_max_threads', 40,
                      'Maximum number of memtier threads to use.')
 flags.DEFINE_integer('enterprise_redis_min_threads', 18,
                      'Minimum number of memtier threads to use.')
+flags.DEFINE_integer('enterprise_redis_thread_increment', 1,
+                     'Number of memtier threads to increment by.')
 
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
@@ -272,7 +274,7 @@ def Run(redis_vm, load_vms, redis_port):
       logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
                    latency_threshold)
 
-    threads += 1
+    threads += FLAGS.enterprise_redis_thread_increment
 
   if cur_max_latency >= 1000:
     results.append(sample.Sample(
