@@ -46,6 +46,9 @@ flags.DEFINE_integer('enterprise_redis_min_threads', 18,
                      'Minimum number of memtier threads to use.')
 flags.DEFINE_integer('enterprise_redis_thread_increment', 1,
                      'Number of memtier threads to increment by.')
+flags.DEFINE_integer('enterprise_redis_latency_threshold', 1100,
+                     'The latency threshold in microseconds '
+                     'until the test stops.')
 
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
@@ -234,7 +237,7 @@ def Run(redis_vm, load_vms, redis_port):
   """
   results = []
   cur_max_latency = 0.0
-  latency_threshold = 1100  # stop the test when we hit 1100 microsec latency
+  latency_threshold = FLAGS.enterprise_redis_latency_threshold
   threads = FLAGS.enterprise_redis_min_threads
   max_throughput_for_completion_latency_under_1ms = 0.0
 
