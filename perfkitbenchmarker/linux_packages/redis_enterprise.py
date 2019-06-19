@@ -49,6 +49,8 @@ flags.DEFINE_integer('enterprise_redis_thread_increment', 1,
 flags.DEFINE_integer('enterprise_redis_latency_threshold', 1100,
                      'The latency threshold in microseconds '
                      'until the test stops.')
+flags.DEFINE_boolean('enterprise_redis_pin_workers', False,
+                     'Whether to pin the proxy threads after startup.')
 
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
@@ -128,6 +130,42 @@ def TuneProxy(vm):
   ]
   vm.RemoteCommand(' '.join(command))
   vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
+
+
+def PinWorkers(vm):
+  """Splits the Redis worker threads across the NUMA nodes evenly.
+
+  This function is no-op if --enterprise_redis_pin_workers is not set.
+
+  Args:
+    vm: The VM with the Redis workers to pin.
+  """
+  if not FLAGS.enterprise_redis_pin_workers:
+    return
+
+  # Grab the number of NUMA nodes by counting the number of node0, node1, node2,
+  # etc. directories in sysfs.
+  numa_nodes = int(
+      vm.RemoteCommand('ls /sys/devices/system/node | '
+                       'grep -E "node[0-9]+" | '
+                       'wc -l')[0].strip())
+  proxies_per_node = FLAGS.enterprise_redis_proxy_threads / numa_nodes
+  for node in range(numa_nodes):
+    node_cpu_list = vm.RemoteCommand(
+        'cat /sys/devices/system/node/node%d/cpulist' % node)[0].strip()
+    # List the PIDs of the Redis worker processes and pin a sliding window of
+    # `proxies_per_node` workers to the NUMA nodes in increasing order.
+    vm.RemoteCommand(r'sudo /opt/redislabs/bin/dmc-cli -ts root list | '
+                     r'grep worker | '
+                     r'head -n -{proxies_already_partitioned} | '
+                     r'tail -n {proxies_per_node} | '
+                     r"awk '"
+                     r'{{printf "%i\n",$3}}'
+                     r"' | "
+                     r'xargs -i sudo taskset -pc {node_cpu_list} {{}} '.format(
+                         proxies_already_partitioned=proxies_per_node * node,
+                         proxies_per_node=proxies_per_node,
+                         node_cpu_list=node_cpu_list))
 
 
 def SetUpCluster(vm, redis_port):
@@ -272,6 +310,7 @@ def Run(redis_vm, load_vms, redis_port):
           FLAGS.enterprise_redis_proxy_threads)
       sample_metadata['redis_loadgen_clients'] = (
           FLAGS.enterprise_redis_loadgen_clients)
+      sample_metadata['pin_workers'] = FLAGS.enterprise_redis_pin_workers
       results.append(sample.Sample('throughput', throughput, 'ops/s',
                                    sample_metadata))
       if latency < 1000:
