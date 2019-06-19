@@ -41,7 +41,7 @@ DOCKERFILE_DIRECTORY = 'perfkitbenchmarker/data/docker'
 
 class DockerContainer(virtual_machine.BaseVirtualMachine):
   """Object representing a Docker Container instance"""
-
+  
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
@@ -119,8 +119,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry()
   def _PostCreate(self):
-    """
-    Prepares running container. 
+    """Prepares running container. 
 
     Gets the IP address, copies public keys,
     and configures the proxy if one is specified
@@ -143,11 +142,11 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
     delete_command = ['docker', 'kill', self.name]
     output = vm_util.IssueCommand(delete_command)
-    logging.info(output[STDOUT].rstrip())
+    logging.info(output[vm_util.OUTPUT_STDOUT].rstrip())
 
     remove_command = ['docker', 'rm', self.name]
     output = vm_util.IssueCommand(remove_command)
-    logging.info(output[STDOUT].rstrip())
+    logging.info(output[vm_util.OUTPUT_STDOUT].rstrip())
 
     return
 
@@ -167,8 +166,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     return False
 
   def _CreateVolumes(self):
-    """
-    Creates volumes for scratch disks.
+    """Creates volumes for scratch disks.
 
     These volumes have to be created
     BEFORE containers creation because Docker doesn't allow to attach
@@ -205,8 +203,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
       self._Delete()
 
   def _GetContainerInfo(self):
-    """
-    Returns information about a container
+    """Returns information about a container
 
     Gets Container information from Docker Inspect. Returns the information,
     if there is any and a return code. 0
@@ -218,8 +215,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     return info, returnCode
 
   def _ConfigureProxy(self):
-    """
-    Configure network proxy for Docker Container
+    """Configure network proxy for Docker Container
 
     In Docker containers environment variables from /etc/environment
     are not sourced - this results in connection problems when running
@@ -261,8 +257,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     return False
 
   def _BuildImageLocally(self):
-    """
-    Build Container Image Locally
+    """Build Container Image Locally
 
     Dockerfiles located at PerfKitBenchmarker/data/docker/pkb/<containerImage>/Dockerfile
     """
@@ -282,8 +277,7 @@ class DebianBasedDockerContainer(DockerContainer,
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
   def ApplySysctlPersistent(self, sysctl_params):
-    """
-    Override ApplySysctlPeristent function for Docker provider
+    """Override ApplySysctlPeristent function for Docker provider
 
     Parent function causes errors with Docker because it shutdowns container
     Args:
@@ -294,7 +288,7 @@ class DebianBasedDockerContainer(DockerContainer,
                  "support flags that modify the host system")
 
   def _RebootIfNecessary(self):
-    """Will reboot the VM if self._needs_reboot has been set."""
+    """Override RebootIfNecessary for Docker Provider"""
     logging.warn("Docker Containers cannot be rebooted to apply flags")
 
 

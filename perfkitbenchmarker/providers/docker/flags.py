@@ -18,7 +18,7 @@ flags.DEFINE_string('docker_custom_image', None,
                     'Custom docker image location')
 
 flags.DEFINE_boolean('privileged_docker', False,
-                     'If set to True, will attempt to create Docker containers '
+                     'If True, will attempt to create Docker containers '
                      'in a privileged mode. Note that some benchmarks execute '
                      'commands which are only allowed in privileged mode.')
 

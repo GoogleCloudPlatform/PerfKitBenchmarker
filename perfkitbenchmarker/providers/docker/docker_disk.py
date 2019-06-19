@@ -14,26 +14,19 @@
 
 """Module containing classes related to Docker disks."""
 
-import json
 import logging
-import re
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.configs import option_decoders
 
 FLAGS = flags.FLAGS
 
 
 def CreateDisks(disk_specs, vm_name):
   """Creates scratch disks (Docker Volumes)"""
-  
+
   scratch_disks = []
   for disk_num, disk_spec in enumerate(disk_specs):
 
@@ -65,7 +58,6 @@ class DockerDisk(disk.BaseDisk):
     raise errors.Error('GetDevicePath not supported for Docker.')
 
   def _Create(self):
-    # docker volume create volume_name
     cmd = ['docker', 'volume', 'create', self.volume_name]
     vm_util.IssueCommand(cmd)
 
