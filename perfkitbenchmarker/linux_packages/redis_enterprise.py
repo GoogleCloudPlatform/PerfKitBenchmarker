@@ -143,13 +143,8 @@ def PinWorkers(vm):
   if not FLAGS.enterprise_redis_pin_workers:
     return
 
-  # Grab the number of NUMA nodes by counting the number of node0, node1, node2,
-  # etc. directories in sysfs.
-  numa_nodes = int(
-      vm.RemoteCommand('ls /sys/devices/system/node | '
-                       'grep -E "node[0-9]+" | '
-                       'wc -l')[0].strip())
-  proxies_per_node = FLAGS.enterprise_redis_proxy_threads / numa_nodes
+  numa_nodes = vm.CheckLsCpu().numa_node_count
+  proxies_per_node = FLAGS.enterprise_redis_proxy_threads // numa_nodes
   for node in range(numa_nodes):
     node_cpu_list = vm.RemoteCommand(
         'cat /sys/devices/system/node/node%d/cpulist' % node)[0].strip()
