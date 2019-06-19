@@ -262,6 +262,10 @@ def Run(redis_vm, load_vms, redis_port):
       latency = interval.get('avg_latency')
       cur_max_latency = max(cur_max_latency, latency)
       sample_metadata = interval
+      sample_metadata['redis_tune_on_startup'] = (
+          FLAGS.enterprise_redis_tune_on_startup)
+      sample_metadata['redis_pipeline'] = (
+          FLAGS.enterprise_redis_pipeline)
       sample_metadata['threads'] = threads
       sample_metadata['shard_count'] = FLAGS.enterprise_redis_shard_count
       sample_metadata['redis_proxy_threads'] = (
