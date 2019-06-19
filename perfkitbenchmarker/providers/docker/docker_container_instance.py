@@ -35,7 +35,8 @@ from perfkitbenchmarker.providers.docker import docker_container_spec
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu:xenial'
-DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16_ssh'
+DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16'
+DOCKERFILE_DIRECTORY = 'perfkitbenchmarker/data/docker'
 
 
 class DockerContainer(virtual_machine.BaseVirtualMachine):
@@ -263,10 +264,12 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     """
     Build Container Image Locally
 
-    Dockerfiles located at PerfKitBenchmarker/docker/<containerImage>/Dockerfile
+    Dockerfiles located at PerfKitBenchmarker/data/docker/pkb/<containerImage>/Dockerfile
     """
     directory = os.path.dirname(
-        data.ResourcePath(os.path.join('docker', self.container_image, 'Dockerfile')))
+        data.ResourcePath(os.path.join(DOCKERFILE_DIRECTORY, 
+                                       self.container_image, 
+                                       'Dockerfile')))
     build_cmd = [
         'docker', 'build', '--no-cache',
         '-t', self.container_image, directory]
