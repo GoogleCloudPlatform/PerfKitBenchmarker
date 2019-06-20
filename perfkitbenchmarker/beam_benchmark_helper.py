@@ -35,8 +35,8 @@ flags.DEFINE_string('gradle_binary', None,
 flags.DEFINE_string('beam_location', None,
                     'Location of already checked out Beam codebase.')
 flags.DEFINE_string('beam_it_module', None,
-                    'Module containing integration test. For Python SDK, use '
-                    'comma-separated list to include multiple modules.')
+                    'Module containing integration test. For Python, use '
+                    'full Gradle module separated by colon, like :sdk:python')
 flags.DEFINE_boolean('beam_prebuilt', False,
                      'Set this to indicate that the repo in beam_location '
                      'does not need to be rebuilt before being used')
@@ -129,6 +129,12 @@ def AddExtraProperties(command, extra_properties):
 def AddPythonAttributes(command, attributes):
   if attributes:
     command.append('-Dattr={}'.format(attributes))
+
+
+def AddTaskArgument(command, task_name, module):
+  if not task_name or not module:
+    raise ValueError('task_name and module should not be empty.')
+  command.append('{}:{}'.format(module, task_name))
 
 
 def InitializeBeamRepo(benchmark_spec):
@@ -276,9 +282,8 @@ def _BuildPythonCommand(benchmark_spec, classname, job_arguments):
         'Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
-  cmd.append('integrationTest')
+  AddTaskArgument(cmd, 'integrationTest', FLAGS.beam_it_module)
   cmd.append('-Dtests={}'.format(classname))
-  AddModuleArgument(cmd, FLAGS.beam_it_module)
   AddPythonAttributes(cmd, FLAGS.beam_python_attr)
 
   beam_args = job_arguments if job_arguments else []
