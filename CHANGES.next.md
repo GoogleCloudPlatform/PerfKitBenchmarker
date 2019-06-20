@@ -113,6 +113,8 @@
 - Added support for launching GCP VM with shielded VM secure boot
 - Added Amazon Linux 2 os type. `--os_type=amazonlinux2`
 - Redis enterprise benchmark.
+- Added flag `--append_kernel_command_line`, which allows appending to the
+  kernel command line when using Linux os types.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

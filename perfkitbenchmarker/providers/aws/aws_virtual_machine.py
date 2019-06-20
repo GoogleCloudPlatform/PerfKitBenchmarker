@@ -929,13 +929,9 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
   """Class with configuration for AWS Centos7 virtual machines."""
   # Documentation on finding the Centos 7 image:
   # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
-  IMAGE_NAME_FILTER = 'CentOS*Linux*7*'
+  IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   IMAGE_OWNER = 'aws-marketplace'
-
-  # Centos 7 images on AWS use standard EBS rather than GP2. See the bug at
-  # https://bugs.centos.org/view.php?id=13301.
-  DEFAULT_ROOT_DISK_TYPE = 'standard'
 
   def __init__(self, vm_spec):
     super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
