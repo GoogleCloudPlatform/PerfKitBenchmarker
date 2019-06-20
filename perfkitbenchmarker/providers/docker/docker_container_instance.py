@@ -41,7 +41,7 @@ DOCKERFILE_DIRECTORY = 'perfkitbenchmarker/data/docker'
 
 class DockerContainer(virtual_machine.BaseVirtualMachine):
   """Object representing a Docker Container instance"""
-  
+
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
@@ -55,10 +55,6 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     self.user_name = FLAGS.username
     self.image = self.image or self.DEFAULT_IMAGE
     self.cpus = vm_spec.machine_type.cpus
-    logging.warn("MACHINE TYPE")
-    print(vm_spec.machine_type)
-    print(vm_spec.machine_type.cpus)
-    print(vm_spec.machine_type.memory)
     self.memory_mb = vm_spec.machine_type.memory
     self.privileged = vm_spec.privileged_docker
     self.container_image = DEFAULT_DOCKER_IMAGE
@@ -123,7 +119,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry()
   def _PostCreate(self):
-    """Prepares running container. 
+    """Prepares running container.
 
     Gets the IP address, copies public keys,
     and configures the proxy if one is specified
@@ -266,15 +262,14 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     Dockerfiles located at PerfKitBenchmarker/data/docker/pkb/<containerImage>/Dockerfile
     """
     directory = os.path.dirname(
-        data.ResourcePath(os.path.join(DOCKERFILE_DIRECTORY, 
-                                       self.container_image, 
+        data.ResourcePath(os.path.join(DOCKERFILE_DIRECTORY,
+                                       self.container_image,
                                        'Dockerfile')))
     build_cmd = [
         'docker', 'build', '--no-cache',
         '-t', self.container_image, directory]
 
     vm_util.IssueCommand(build_cmd)
-
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.
@@ -289,7 +284,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedDockerContainer(DockerContainer,
-                                      linux_virtual_machine.DebianMixin):
+                                 linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
   def _GetNumCpus(self):

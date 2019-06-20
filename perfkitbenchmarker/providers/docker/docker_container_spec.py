@@ -35,15 +35,6 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = providers.DOCKER
 
-  def __init__(self, *args, **kwargs):
-    super(DockerContainerSpec, self).__init__(*args, **kwargs)
-    print("HERE")
-    print(self.machine_type)
-    print(type(self.machine_type))
-    if isinstance(self.machine_type,
-                  custom_virtual_machine_spec.CustomMachineTypeSpec):
-      logging.warn("HEREEEEEE")
-
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     result = super(DockerContainerSpec, cls)._GetOptionDecoderConstructions()
