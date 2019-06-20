@@ -27,8 +27,6 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Docker Instance.
 
   Attributes:
-    docker_provider_cpus: None or float. Number of CPUs for Docker instances.
-    docker_provider_memory_mb: None or int. Memory limit (in MB) for Docker instances.
     privileged_docker: None of boolean. Indicates if Docker container
         should be run in privileged mode.
   """
