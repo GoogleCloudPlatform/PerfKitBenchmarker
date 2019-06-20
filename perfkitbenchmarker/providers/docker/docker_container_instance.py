@@ -54,8 +54,12 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     self.container_id = ''
     self.user_name = FLAGS.username
     self.image = self.image or self.DEFAULT_IMAGE
-    self.cpus = vm_spec.docker_provider_cpus
-    self.memory_mb = vm_spec.docker_provider_memory_mb
+    self.cpus = vm_spec.machine_type.cpus
+    logging.warn("MACHINE TYPE")
+    print(vm_spec.machine_type)
+    print(vm_spec.machine_type.cpus)
+    print(vm_spec.machine_type.memory)
+    self.memory_mb = vm_spec.machine_type.memory
     self.privileged = vm_spec.privileged_docker
     self.container_image = DEFAULT_DOCKER_IMAGE
     self.docker_sysctl_flags = ''
@@ -97,7 +101,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     # format cpus option
     if self.cpus > 0:
       create_command.append('--cpus')
-      create_command.append(self.cpus)
+      create_command.append(str(self.cpus))
     # format memory option
     if self.memory_mb > 0:
       create_command.append('-m')
@@ -272,9 +276,24 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(build_cmd)
 
 
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(DockerContainer, self).GetResourceMetadata()
+    logging.warn("GET RESOURCE METADATA")
+    print(result)
+    return result
+
+
 class DebianBasedDockerContainer(DockerContainer,
                                       linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
+
+  def _GetNumCpus(self):
+    return self.cpus
 
   def ApplySysctlPersistent(self, sysctl_params):
     """Override ApplySysctlPeristent function for Docker provider

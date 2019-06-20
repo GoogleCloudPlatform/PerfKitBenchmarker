@@ -25,9 +25,3 @@ flags.DEFINE_boolean('privileged_docker', False,
 flags.DEFINE_string('docker_cli', 'docker',
                     'Path to docker cli. You can set it here if it is'
                     'not in your system PATH or not at a default location')
-
-flags.DEFINE_integer('docker_provider_memory_mb', 0,
-                     'Memory limit for docker containers.')
-
-flags.DEFINE_float('docker_provider_cpus', 0,
-                   'CPU limit for docker containers.')

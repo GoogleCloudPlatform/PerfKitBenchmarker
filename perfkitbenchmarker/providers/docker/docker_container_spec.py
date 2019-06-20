@@ -19,6 +19,8 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+import logging
+import yaml
 
 
 class DockerContainerSpec(virtual_machine.BaseVmSpec):
@@ -33,21 +35,31 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = providers.DOCKER
 
+  def __init__(self, *args, **kwargs):
+    super(DockerContainerSpec, self).__init__(*args, **kwargs)
+    print("HERE")
+    print(self.machine_type)
+    print(type(self.machine_type))
+    if isinstance(self.machine_type,
+                  custom_virtual_machine_spec.CustomMachineTypeSpec):
+      logging.warn("HEREEEEEE")
+
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     result = super(DockerContainerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'docker_provider_cpus': (option_decoders.FloatDecoder, {'default': 0}),
-        'docker_provider_memory_mb': (option_decoders.IntDecoder, {'default': 0}),
-        'privileged_docker': (option_decoders.BooleanDecoder, {'default': False})})
+        'privileged_docker': (option_decoders.BooleanDecoder, {'default': False}),
+        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {
+            'default': None
+        })
+    })
+    logging.warn(result)
     return result
 
   def _ApplyFlags(self, config_values, flag_values):
     super(DockerContainerSpec, self)._ApplyFlags(config_values, flag_values)
-    if flag_values['docker_provider_cpus'].present:
-      config_values['docker_provider_cpus'] = flag_values.docker_provider_cpus
-    if flag_values['docker_provider_memory_mb'].present:
-      config_values['docker_provider_memory_mb'] = flag_values.docker_provider_memory_mb
+    logging.warn("APPLY FLAGS")
     if flag_values['privileged_docker'].present:
-      config_values['privileged_docker'] =\
-          flag_values.privileged_docker
+      config_values['privileged_docker'] = flag_values.privileged_docker
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = yaml.load(flag_values.machine_type)
