@@ -22,6 +22,9 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import collections
 import csv
 import io
@@ -36,6 +39,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
+from six.moves import zip
 
 flags.DEFINE_integer('netperf_max_iter', None,
                      'Maximum number of iterations to run during '
