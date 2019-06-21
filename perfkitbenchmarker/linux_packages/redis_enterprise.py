@@ -125,10 +125,9 @@ def CreateCluster(vm):
 
 def OfflineCores(vm):
   """Offline specific cores."""
-  if FLAGS.enterprise_redis_disable_cpu_ids:
-    for x in FLAGS.enterprise_redis_disable_cpu_ids:
-      vm.RemoteCommand('sudo bash -c '
-                       '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' % x)
+  for cpu_id in FLAGS.enterprise_redis_disable_cpu_ids or []:
+    vm.RemoteCommand('sudo bash -c '
+                     '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' % cpu_id)
 
 
 def TuneProxy(vm):
