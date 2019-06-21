@@ -77,6 +77,7 @@ def Prepare(benchmark_spec):
   server_vm.AllowPort(REDIS_PORT)
   server_vm.AllowPort(REDIS_UI_PORT)
 
+  redis_enterprise.OfflineCores(server_vm)
   redis_enterprise.CreateCluster(server_vm)
   redis_enterprise.TuneProxy(server_vm)
   redis_enterprise.SetUpCluster(server_vm, REDIS_PORT)

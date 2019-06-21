@@ -51,6 +51,8 @@ flags.DEFINE_integer('enterprise_redis_latency_threshold', 1100,
                      'until the test stops.')
 flags.DEFINE_boolean('enterprise_redis_pin_workers', False,
                      'Whether to pin the proxy threads after startup.')
+flags.DEFINE_list('enterprise_redis_disable_cpu_ids', None,
+                  'List of cpus to disable by id.')
 
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
@@ -119,6 +121,14 @@ def CreateCluster(vm):
       'password', FLAGS.run_uri,
   ]
   vm.RemoteCommand(' '.join(command))
+
+
+def OfflineCores(vm):
+  """Offline specific cores."""
+  if FLAGS.enterprise_redis_disable_cpu_ids:
+    for x in FLAGS.enterprise_redis_disable_cpu_ids:
+      vm.RemoteCommand('sudo bash -c '
+                       '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' % x)
 
 
 def TuneProxy(vm):
@@ -307,6 +317,7 @@ def Run(redis_vm, load_vms, redis_port):
       sample_metadata['redis_loadgen_clients'] = (
           FLAGS.enterprise_redis_loadgen_clients)
       sample_metadata['pin_workers'] = FLAGS.enterprise_redis_pin_workers
+      sample_metadata['disable_cpus'] = FLAGS.enterprise_redis_disable_cpu_ids
       results.append(sample.Sample('throughput', throughput, 'ops/s',
                                    sample_metadata))
       if latency < 1000:
