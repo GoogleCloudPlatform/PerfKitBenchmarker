@@ -82,7 +82,6 @@ def Prepare(benchmark_spec):
   redis_enterprise.TuneProxy(server_vm)
   redis_enterprise.SetUpCluster(server_vm, REDIS_PORT)
   redis_enterprise.PinWorkers(server_vm)
-  # TODO(ruwa): Add offlining
   redis_enterprise.WaitForClusterUp(server_vm, REDIS_PORT)
   redis_enterprise.LoadCluster(server_vm, REDIS_PORT)
 
