@@ -92,7 +92,7 @@ def _Install(vm):
     vm.RemoteCommand(
         'sudo ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf')
     vm.RemoteCommand('sudo service systemd-resolved restart')
-  install_cmd = '/install.sh -y'
+  install_cmd = './install.sh -y'
   if not FLAGS.enterprise_redis_tune_on_startup:
     install_cmd = 'CONFIG_systune=no ./install.sh -y -n'
   vm.RemoteCommand('cd {dir} && sudo {install}'.format(
