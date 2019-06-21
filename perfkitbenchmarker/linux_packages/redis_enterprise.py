@@ -218,10 +218,10 @@ def LoadCluster(vm, redis_port):
       '/opt/redislabs/bin/memtier_benchmark',
       '-s localhost',
       '-p', str(redis_port),
-      '-t 6',
+      '-t 1',  # Set -t and -c to 1 to avoid duplicated work in writing the same
+      '-c 1',  # key/value pairs repeatedly.
       '--ratio 1:0',
       '--pipeline 100',
-      '-c 128',
       '-d 100',
       '--key-pattern S:S',
       '--key-minimum 1',
