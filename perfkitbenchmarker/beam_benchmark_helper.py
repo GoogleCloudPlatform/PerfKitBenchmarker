@@ -35,8 +35,8 @@ flags.DEFINE_string('gradle_binary', None,
 flags.DEFINE_string('beam_location', None,
                     'Location of already checked out Beam codebase.')
 flags.DEFINE_string('beam_it_module', None,
-                    'Module containing integration test. For Python, use '
-                    'full Gradle module separated by colon, like :sdk:python')
+                    'Gradle module containing integration test. Use full '
+                    'module starting and separated by colon, like :sdk:python')
 flags.DEFINE_boolean('beam_prebuilt', False,
                      'Set this to indicate that the repo in beam_location '
                      'does not need to be rebuilt before being used')
@@ -73,12 +73,6 @@ SUPPORTED_RUNNERS = [dpb_service.DATAFLOW]
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 
 DEFAULT_PYTHON_TAR_PATTERN = 'apache-beam-*.tar.gz'
-
-
-def AddModuleArgument(command, module):
-  if module:
-    command.append('-p')
-    command.append(module)
 
 
 def AddRunnerArgument(command, runner_name):
@@ -171,11 +165,13 @@ def _PrebuildBeam():
   """Rebuild beam if it was not build earlier."""
   if not FLAGS.beam_prebuilt:
 
-    gradle_build_command = ['clean', 'assemble', '--stacktrace', '--info']
+    gradle_prebuild_tasks = ['clean', 'assemble']
+    gradle_prebuild_flags = ['--stacktrace', '--info']
     build_command = [_GetGradleCommand()]
-    build_command.extend(gradle_build_command)
+    build_command.extend(gradle_prebuild_flags)
 
-    AddModuleArgument(build_command, FLAGS.beam_it_module)
+    for task in gradle_prebuild_tasks:
+      AddTaskArgument(build_command, task, FLAGS.beam_it_module)
     AddRunnerArgument(build_command, FLAGS.beam_runner)
     AddFilesystemArgument(build_command, FLAGS.beam_filesystem)
     AddExtraProperties(build_command, FLAGS.beam_extra_properties)
@@ -229,12 +225,11 @@ def _BuildGradleCommand(classname, job_arguments):
         'Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
-  cmd.append('integrationTest')
   cmd.append('--tests={}'.format(classname))
 
   beam_args = job_arguments if job_arguments else []
 
-  AddModuleArgument(cmd, FLAGS.beam_it_module)
+  AddTaskArgument(cmd, 'integrationTest', FLAGS.beam_it_module)
   AddRunnerArgument(cmd, FLAGS.beam_runner)
   AddRunnerPipelineOption(beam_args, FLAGS.beam_runner,
                           FLAGS.beam_runner_option)
