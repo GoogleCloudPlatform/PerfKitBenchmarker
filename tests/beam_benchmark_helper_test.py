@@ -32,91 +32,102 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
     # TODO(ferneyhough): See exactly why this is needed and find a better way
     # to do this. Unittests in PKB should not have to add this call manually.
     FLAGS.mark_as_parsed()
+    super(BeamBenchmarkHelperTestCase, self).setUp()
 
   def test_runner_option_override_use_override(self):
-    testOptionVal = "TestVal"
+    test_option_val = 'TestVal'
     actual_options = []
-    beam_benchmark_helper.AddRunnerPipelineOption(actual_options, None, testOptionVal)
-    self.assertListEqual(["--runner=" + testOptionVal], actual_options)
+    beam_benchmark_helper.AddRunnerPipelineOption(actual_options, None,
+                                                  test_option_val)
+    self.assertListEqual(['--runner=' + test_option_val], actual_options)
 
   def test_runner_option_override_empty_override(self):
-    testOptionVal = ""
+    test_option_val = ''
     actual_options = []
-    beam_benchmark_helper.AddRunnerPipelineOption(actual_options, None, testOptionVal)
+    beam_benchmark_helper.AddRunnerPipelineOption(actual_options, None,
+                                                  test_option_val)
     self.assertListEqual([], actual_options)
 
   def test_dataflow_runner_name_added(self):
-    testOptionVal = "dataflow"
+    test_option_val = 'dataflow'
     actual_command = []
-    beam_benchmark_helper.AddRunnerArgument(actual_command, testOptionVal)
-    self.assertListEqual(["-DintegrationTestRunner=" + testOptionVal], actual_command)
+    beam_benchmark_helper.AddRunnerArgument(actual_command, test_option_val)
+    self.assertListEqual(['-DintegrationTestRunner=' + test_option_val],
+                         actual_command)
 
   def test_direct_runner_name_added(self):
-    testOptionVal = "direct"
+    test_option_val = 'direct'
     actual_command = []
-    beam_benchmark_helper.AddRunnerArgument(actual_command, testOptionVal)
-    self.assertListEqual(["-DintegrationTestRunner=" + testOptionVal], actual_command)
-
+    beam_benchmark_helper.AddRunnerArgument(actual_command, test_option_val)
+    self.assertListEqual(['-DintegrationTestRunner=' + test_option_val],
+                         actual_command)
 
   def test_runner_name_empty(self):
-    testOptionVal = ""
+    test_option_val = ''
     actual_command = []
-    beam_benchmark_helper.AddRunnerArgument(actual_command, testOptionVal)
+    beam_benchmark_helper.AddRunnerArgument(actual_command, test_option_val)
     self.assertListEqual([], actual_command)
 
   def test_extra_property_empty_property(self):
-    testOptionVal = ""
+    test_option_val = ''
     actual_command = []
-    beam_benchmark_helper.AddExtraProperties(actual_command, testOptionVal)
+    beam_benchmark_helper.AddExtraProperties(actual_command, test_option_val)
     self.assertListEqual([], actual_command)
 
   def test_extra_property_single_property(self):
-    testOptionVal = "[key=value]"
+    test_option_val = '[key=value]'
     actual_mvn_command = []
-    beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
-    self.assertListEqual(["-Dkey=value"], actual_mvn_command)
+    beam_benchmark_helper.AddExtraProperties(actual_mvn_command,
+                                             test_option_val)
+    self.assertListEqual(['-Dkey=value'], actual_mvn_command)
 
   def test_extra_property_single_property_quoted(self):
-    testOptionVal = "[\"key=value\"]"
+    test_option_val = '["key=value"]'
     actual_mvn_command = []
-    beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
-    self.assertListEqual(["-Dkey=value"], actual_mvn_command)
+    beam_benchmark_helper.AddExtraProperties(actual_mvn_command,
+                                             test_option_val)
+    self.assertListEqual(['-Dkey=value'], actual_mvn_command)
 
   def test_extra_property_multiple_properties(self):
-    testOptionVal = "[\"key=value\", \"key2=value2\"]"
+    test_option_val = '["key=value", "key2=value2"]'
     actual_mvn_command = []
-    beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
-    self.assertListEqual(["-Dkey=value", "-Dkey2=value2"], actual_mvn_command)
+    beam_benchmark_helper.AddExtraProperties(actual_mvn_command,
+                                             test_option_val)
+    self.assertListEqual(['-Dkey=value', '-Dkey2=value2'], actual_mvn_command)
 
   def test_integrationPipelineOptions_rejection(self):
-    testOptionVal = "[\"integrationTestPipelineOptions=...\"]"
+    test_option_val = '["integrationTestPipelineOptions=..."]'
     actual_mvn_command = []
     with self.assertRaises(ValueError):
-      beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
+      beam_benchmark_helper.AddExtraProperties(actual_mvn_command,
+                                               test_option_val)
 
   def test_hdfs_filesystem_addition(self):
-    testOptionVal = "hdfs"
+    test_option_val = 'hdfs'
     actual_command = []
-    beam_benchmark_helper.AddFilesystemArgument(actual_command, testOptionVal)
-    self.assertListEqual(["-Dfilesystem=hdfs"], actual_command)
+    beam_benchmark_helper.AddFilesystemArgument(actual_command, test_option_val)
+    self.assertListEqual(['-Dfilesystem=hdfs'], actual_command)
 
   def test_empty_filesystem(self):
-    testOptionVal = ""
+    test_option_val = ''
     actual_command = []
-    beam_benchmark_helper.AddFilesystemArgument(actual_command, testOptionVal)
+    beam_benchmark_helper.AddFilesystemArgument(actual_command, test_option_val)
     self.assertListEqual([], actual_command)
 
-  def test_add_module(self):
-    testOptionVal = "sdks/java/io/tests"
+  def test_add_task(self):
+    test_module_val = ':sdks:java:io'
+    test_task_val = 'tests'
     actual_command = []
-    beam_benchmark_helper.AddModuleArgument(actual_command, testOptionVal)
-    self.assertListEqual(['-p', testOptionVal], actual_command)
+    beam_benchmark_helper.AddTaskArgument(actual_command, test_task_val,
+                                          test_module_val)
+    self.assertListEqual([':sdks:java:io:tests'], actual_command)
 
-  def test_add_empty_module(self):
-    testOptionVal = ""
+  def test_add_empty_task(self):
+    test_option_val = ''
     actual_command = []
-    beam_benchmark_helper.AddModuleArgument(actual_command, testOptionVal)
-    self.assertListEqual([], actual_command)
+    with self.assertRaises(ValueError):
+      beam_benchmark_helper.AddTaskArgument(actual_command, test_option_val,
+                                            test_option_val)
 
   def test_initialize_beam_repo_beam_exists(self):
     FLAGS.beam_location = tempfile.mkdtemp()
@@ -150,7 +161,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
 
   def test_beam_prebuild(self):
     FLAGS.beam_prebuilt = False
-    FLAGS.beam_it_module = 'sdks/java'
+    FLAGS.beam_it_module = ':sdks:java'
     FLAGS.beam_runner = 'dataflow'
     FLAGS.beam_filesystem = 'hdfs'
     FLAGS.beam_extra_properties = '[extra_key=extra_value]'
@@ -164,12 +175,10 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
 
       expected_cmd = [
           'gradlew',
-          'clean',
-          'assemble',
           '--stacktrace',
           '--info',
-          '-p',
-          'sdks/java',
+          ':sdks:java:clean',
+          ':sdks:java:assemble',
           '-DintegrationTestRunner=dataflow',
           '-Dfilesystem=hdfs',
           '-Dextra_key=extra_value'
@@ -210,7 +219,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
       exec_check.assert_called_once()
 
   def test_build_java_gradle_command(self):
-    FLAGS.beam_it_module = 'sdks/java'
+    FLAGS.beam_it_module = ':sdks:java'
     FLAGS.beam_runner = 'dataflow'
     FLAGS.beam_filesystem = 'hdfs'
     FLAGS.beam_extra_properties = '["extra_key=extra_value"]'
@@ -229,10 +238,8 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
                                                              ['--args'])
       expected_cmd = [
           'gradlew',
-          'integrationTest',
           '--tests=org.apache.beam.sdk.java',
-          '-p',
-          'sdks/java',
+          ':sdks:java:integrationTest',
           '-DintegrationTestRunner=dataflow',
           '-Dfilesystem=hdfs',
           '-Dextra_key=extra_value',
