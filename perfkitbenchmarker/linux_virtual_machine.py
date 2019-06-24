@@ -316,6 +316,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
     self.DoConfigureNetworkForBBR()
+    self.UpdateEnvironmentPath()
     self._RebootIfNecessary()
     self._DisableCpus()
     self.RecordAdditionalMetadata()
@@ -359,6 +360,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('sudo bash -c '
                          '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
                          x)
+
+  def UpdateEnvironmentPath(self):
+    """Specific Linux flavors should override this."""
+    pass
 
   def FillDisk(self):
     """Fills the primary scratch disk with a zeros file."""
@@ -1399,6 +1404,16 @@ class Ubuntu1710Mixin(UbuntuMixin):
 class Ubuntu1804Mixin(UbuntuMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804
+
+  def UpdateEnvironmentPath(self):
+    """Add /snap/bin to default search path for Ubuntu1804.
+
+    See https://bugs.launchpad.net/snappy/+bug/1659719.
+    """
+    self.RemoteCommand(
+        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc')
+    self.RemoteCommand(
+        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
 class Ubuntu1604Cuda9Mixin(UbuntuMixin):
