@@ -70,6 +70,11 @@ PREPROVISIONED_DATA = {
 
 
 def _GetTarName():
+  """Returns the Redis Enterprise package to use depending on the os.
+
+  For information about available packages, see
+  https://redislabs.com/redis-enterprise/software/downloads/.
+  """
   if FLAGS.os_type in [os_types.RHEL, os_types.AMAZONLINUX2, os_types.CENTOS7]:
     return _RHEL_TAR
   if FLAGS.os_type in [os_types.UBUNTU1604, os_types.DEBIAN, os_types.DEBIAN9]:
@@ -78,8 +83,8 @@ def _GetTarName():
     return _BIONIC_TAR
 
 
-def _Install(vm):
-  """Installs redis enterprise on the VM."""
+def Install(vm):
+  """Installs Redis Enterprise package on the VM."""
   vm.InstallPackages('wget')
   vm.InstallPreprovisionedPackageData(_PACKAGE_NAME,
                                       [_GetTarName(), _LICENSE],
@@ -88,6 +93,7 @@ def _Install(vm):
       dir=_WORKING_DIR, tar=_GetTarName()))
 
   if FLAGS.os_type == os_types.UBUNTU1804:
+    # Fix Ubuntu 18.04 DNS conflict
     vm.RemoteCommand(
         'echo "DNSStubListener=no" | sudo tee -a /etc/systemd/resolved.conf')
     vm.RemoteCommand('sudo mv /etc/resolv.conf /etc/resolv.conf.orig')
@@ -101,26 +107,17 @@ def _Install(vm):
       dir=_WORKING_DIR, install=install_cmd))
 
 
-def YumInstall(vm):
-  """Installs the redis package on the VM."""
-  _Install(vm)
-
-
-def AptInstall(vm):
-  """Installs the redis package on the VM."""
-  _Install(vm)
-
-
 def CreateCluster(vm):
-  """Create an enterprise redis cluster on the vm."""
-  command = [
-      'sudo /opt/redislabs/bin/rladmin cluster create',
-      'license_file', posixpath.join(_WORKING_DIR, _LICENSE),
-      'name', 'redis-cluster',
-      'username', _USERNAME,
-      'password', FLAGS.run_uri,
-  ]
-  vm.RemoteCommand(' '.join(command))
+  """Create an Redis Enterprise cluster on the vm."""
+  vm.RemoteCommand(
+      'sudo /opt/redislabs/bin/rladmin cluster create '
+      'license_file {license_file} '
+      'name redis-cluster '
+      'username {username} '
+      'password {password} '.format(
+          license_file=posixpath.join(_WORKING_DIR, _LICENSE),
+          username=_USERNAME,
+          password=FLAGS.run_uri))
 
 
 def OfflineCores(vm):
@@ -131,14 +128,13 @@ def OfflineCores(vm):
 
 
 def TuneProxy(vm):
-  """Tune the number of redis proxies on the server vm."""
-  command = [
-      'sudo /opt/redislabs/bin/rladmin tune',
-      'proxy all',
-      'max_threads', str(FLAGS.enterprise_redis_proxy_threads),
-      'threads', str(FLAGS.enterprise_redis_proxy_threads),
-  ]
-  vm.RemoteCommand(' '.join(command))
+  """Tune the number of Redis proxies on the server vm."""
+  vm.RemoteCommand(
+      'sudo /opt/redislabs/bin/rladmin tune '
+      'proxy all '
+      'max_threads {proxy_threads} '
+      'threads {proxy_threads} '.format(
+          proxy_threads=str(FLAGS.enterprise_redis_proxy_threads)))
   vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
 
 
@@ -193,18 +189,17 @@ def SetUpCluster(vm, redis_port):
             [{'regex': '.*\\{(?<tag>.*)\\}.*'}, {'regex': '(?<tag>.*)'}]
     })
 
-  cmd = (
-      """curl -v -k -u {username}:{password} """
-      """https://localhost:9443/v1/bdbs """
-      """-H "Content-type: application/json" -d '{content}'""".format(
+  vm.RemoteCommand(
+      "curl -v -k -u {username}:{password} https://localhost:9443/v1/bdbs "
+      "-H 'Content-type: application/json' -d '{content}'".format(
           username=_USERNAME,
           password=FLAGS.run_uri,
           content=json.dumps(content)))
-  vm.RemoteCommand(cmd)
 
 
 @vm_util.Retry()
 def WaitForClusterUp(vm, redis_port):
+  """Waits for the Redis Enterprise cluster to respond to commands."""
   stdout, _ = vm.RemoteCommand(
       '/opt/redislabs/bin/redis-cli -h localhost -p {port} ping'.format(
           port=redis_port))
@@ -214,22 +209,22 @@ def WaitForClusterUp(vm, redis_port):
 
 def LoadCluster(vm, redis_port):
   """Load the cluster before performing tests."""
-  load_command = [
-      '/opt/redislabs/bin/memtier_benchmark',
-      '-s localhost',
-      '-p', str(redis_port),
-      '-t 1',  # Set -t and -c to 1 to avoid duplicated work in writing the same
-      '-c 1',  # key/value pairs repeatedly.
-      '--ratio 1:0',
-      '--pipeline 100',
-      '-d 100',
-      '--key-pattern S:S',
-      '--key-minimum 1',
-      '--key-maximum', str(FLAGS.enterprise_redis_load_records),
-      '-n allkeys',
-      '--cluster-mode',
-  ]
-  vm.RemoteCommand(' '.join(load_command))
+  vm.RemoteCommand(
+      '/opt/redislabs/bin/memtier_benchmark '
+      '-s localhost '
+      '-p {port} '
+      '-t 1 '  # Set -t and -c to 1 to avoid duplicated work in writing the same
+      '-c 1 '  # key/value pairs repeatedly.
+      '--ratio 1:0 '
+      '--pipeline 100 '
+      '-d 100 '
+      '--key-pattern S:S '
+      '--key-minimum 1 '
+      '--key-maximum {load_records} '
+      '-n allkeys '
+      '--cluster-mode '.format(
+          port=str(redis_port),
+          load_records=str(FLAGS.enterprise_redis_load_records)))
 
 
 def BuildRunCommand(redis_vm, threads, port):
@@ -246,29 +241,34 @@ def BuildRunCommand(redis_vm, threads, port):
   if threads == 0:
     return None
 
-  run_command = [
-      '/opt/redislabs/bin/memtier_benchmark',
-      '-s', redis_vm.internal_ip,
-      '-p', str(port),
-      '-t', str(threads),
-      '--ratio 1:1',
-      '--pipeline', str(FLAGS.enterprise_redis_pipeline),
-      '-c', str(FLAGS.enterprise_redis_loadgen_clients),
-      '-d 100',
-      '--key-minimum 1',
-      '--key-maximum', str(FLAGS.enterprise_redis_load_records),
-      '-n', str(FLAGS.enterprise_redis_run_records),
-      '--cluster-mode',
-  ]
-  return ' '.join(run_command)
-
-
-def RunCommand(vm, command):
-  vm.RemoteCommand(command)
+  return ('/opt/redislabs/bin/memtier_benchmark '
+          '-s {ip_address} '
+          '-p {port} '
+          '-t {threads} '
+          '--ratio 1:1 '
+          '--pipeline {pipeline} '
+          '-c {clients} '
+          '-d 100 '
+          '--key-minimum 1 '
+          '--key-maximum {key_maximum} '
+          '-n {run_records} '
+          '--cluster-mode '.format(
+              ip_address=redis_vm.internal_ip,
+              port=str(port),
+              threads=str(threads),
+              pipeline=str(FLAGS.enterprise_redis_pipeline),
+              clients=str(FLAGS.enterprise_redis_loadgen_clients),
+              key_maximum=str(FLAGS.enterprise_redis_load_records),
+              run_records=str(FLAGS.enterprise_redis_run_records)))
 
 
 def Run(redis_vm, load_vms, redis_port):
   """Run memtier against enterprise redis and measure latency and throughput.
+
+  This function runs memtier against the redis server vm with increasing memtier
+  threads until one of following conditions is reached:
+    - FLAGS.enterprise_redis_max_threads is reached
+    - FLAGS.enterprise_redis_latency_threshold is reached
 
   Args:
     redis_vm: Redis server vm.
@@ -295,7 +295,7 @@ def Run(redis_vm, load_vms, redis_port):
             password=FLAGS.run_uri,))
     args = [((load_vm, load_command), {}) for load_vm in load_vms]
     args += [((redis_vm, measurement_command), {})]
-    vm_util.RunThreaded(RunCommand, args)
+    vm_util.RunThreaded(lambda vm, command: vm.RemoteCommand(command), args)
     stdout, _ = redis_vm.RemoteCommand('cat ~/output')
     output = json.loads(stdout)[0]
     intervals = output.get('intervals')
