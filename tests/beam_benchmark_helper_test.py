@@ -238,8 +238,8 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
                                                              ['--args'])
       expected_cmd = [
           'gradlew',
-          '--tests=org.apache.beam.sdk.java',
           ':sdks:java:integrationTest',
+          '--tests=org.apache.beam.sdk.java',
           '-DintegrationTestRunner=dataflow',
           '-Dfilesystem=hdfs',
           '-Dextra_key=extra_value',
