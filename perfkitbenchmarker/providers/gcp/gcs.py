@@ -79,6 +79,19 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         ['gsutil', '-m', 'rm', '-r',
          'gs://%s/*' % bucket])
 
+  def ChmodBucket(self, account, access, bucket):
+    """Updates access control lists.
+
+    Args:
+      account: string, the user to be granted.
+      access: string, the permission to be granted.
+      bucket: string, the name of the bucket to change
+    """
+    vm_util.IssueCommand([
+        'gsutil', 'acl', 'ch', '-u',
+        '{account}:{access}'.format(account=account, access=access),
+        'gs://{}'.format(bucket)])
+
   def PrepareVM(self, vm):
     vm.Install('wget')
     # Unfortunately there isn't one URL scheme that works for both
