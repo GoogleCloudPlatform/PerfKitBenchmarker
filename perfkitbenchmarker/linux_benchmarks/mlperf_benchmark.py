@@ -221,6 +221,8 @@ def Run(benchmark_spec):
       'export PYTHONPATH=$PYTHONPATH:$PWD/tpu/models && '
       'cd results/v0.5.0/google/{code_path} && '
       'sed -i "s/python /python3 /g" run_helper*.sh && '
+      'sed -i "s/tpu_zone=[^[:space:]]*/tpu_zone={tpu_zone}/g" '
+      'run_helper*.sh && '
       'mkdir -p $MLP_HOST_OUTPUT_DIR && '
       '{cmd}'.format(
           model_dir=benchmark_spec.model_dir,
@@ -230,6 +232,8 @@ def Run(benchmark_spec):
           tpu_eval=(benchmark_spec.tpu_groups['eval'].GetName()
                     if benchmark_spec.tpus else ''),
           code_path=code_path,
+          tpu_zone=(benchmark_spec.tpu_groups['train'].GetZone()
+                    if benchmark_spec.tpus else ''),
           cmd=cmd))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(
