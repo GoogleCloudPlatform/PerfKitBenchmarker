@@ -93,6 +93,25 @@ class ObjectStorageService(object):
     pass
 
   @abc.abstractmethod
+  def Copy(self, src_url, dst_url):
+    """Copy files and objects.
+
+    Args:
+      src_url: string, the source url path.
+      dst_url: string, the destination url path.
+    """
+    pass
+
+  @abc.abstractmethod
+  def List(self, bucket):
+    """List providers, buckets, or objects.
+
+    Args:
+      bucket: the name of the bucket to create.
+    """
+    pass
+
+  @abc.abstractmethod
   def DeleteBucket(self, bucket):
     """Delete an object storage bucket.
 

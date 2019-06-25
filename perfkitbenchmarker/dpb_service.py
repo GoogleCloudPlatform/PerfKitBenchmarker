@@ -90,6 +90,8 @@ class BaseDpbService(resource.BaseResource):
   S3_FS = 's3'
 
   # Job types that are supported on the dpb service backends
+  PYSPARK_JOB_TYPE = 'pyspark'
+  SPARKSQL_JOB_TYPE = 'spark-sql'
   SPARK_JOB_TYPE = 'spark'
   HADOOP_JOB_TYPE = 'hadoop'
   DATAFLOW_JOB_TYPE = 'dataflow'
@@ -129,6 +131,8 @@ class BaseDpbService(resource.BaseResource):
   def SubmitJob(self,
                 job_jar,
                 class_name,
+                pyspark_file=None,
+                query_file=None,
                 job_poll_interval=None,
                 job_stdout_file=None,
                 job_arguments=None,
@@ -138,6 +142,10 @@ class BaseDpbService(resource.BaseResource):
     Args:
       job_jar: Jar file to execute.
       class_name: Name of the main class.
+      pyspark_file: Comma separated list of Python files to be provided to the
+        job. Must be one of the following file formats ".py, .zip, or .egg".
+      query_file: HCFS URI of file containing Spark SQL script to execute as the
+        job.
       job_poll_interval: integer saying how often to poll for job completion.
         Not used by providers for which submit job is a synchronous operation.
       job_stdout_file: String giving the location of the file in which to put
