@@ -59,6 +59,15 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
     vm_util.IssueCommand(command)
 
+  def Copy(self, src_url, dst_url):
+    """See base class."""
+    vm_util.IssueCommand(['gsutil', 'cp', src_url, dst_url])
+
+  def List(self, buckets):
+    """See base class."""
+    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', buckets])
+    return stdout
+
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
     # We want to retry rm and rb together because it's possible that
