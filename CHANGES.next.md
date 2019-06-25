@@ -484,3 +484,7 @@
 - RobustRemoteCommand now retries on ssh connections refused.
 - Fixed a bug that was causing AWS capacity reservation creation to fail.
 - GceNetworkSpec's zone is equal to the VM's zone
+- Creates the bucket from PKB rather than from within the VM that PKB launches
+  in TPU test.
+- Sets TPU zone MLPerf benchmark.
+
