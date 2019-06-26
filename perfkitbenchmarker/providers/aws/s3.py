@@ -57,6 +57,15 @@ class S3Service(object_storage_service.ObjectStorageService):
          '--bucket', bucket_name,
          '--tagging', 'TagSet=[%s]' % tag_set])
 
+  def Copy(self, src_url, dst_url):
+    """See base class."""
+    vm_util.IssueCommand(['aws', 's3', 'cp', src_url, dst_url])
+
+  def List(self, buckets):
+    """See base class."""
+    stdout, _, _ = vm_util.IssueCommand(['aws', 's3', 'ls', buckets])
+    return stdout
+
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
     vm_util.IssueCommand(
