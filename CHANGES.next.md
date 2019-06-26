@@ -488,4 +488,5 @@
 - Creates the bucket from PKB rather than from within the VM that PKB launches
   in TPU test.
 - Sets TPU zone MLPerf benchmark.
-
+- Added gce_firewall_rules_clean_all option to network resource: clean up all
+  the firewall rules that depend on the PKB-created network.
