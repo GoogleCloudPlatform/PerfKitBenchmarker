@@ -24,6 +24,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import json
 import threading
 
 from perfkitbenchmarker import flags
@@ -36,6 +37,13 @@ import six
 FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
+
+flags.DEFINE_bool('gce_firewall_rules_clean_all', False,
+                  'Determines whether all the gce firewall rules should be '
+                  'cleaned up before deleting the network. If firewall rules '
+                  'are added manually, PKB will not know about all of them. '
+                  'However, they must be deleted in order to successfully '
+                  'delete the PKB-created network.')
 
 
 class GceFirewallRule(resource.BaseResource):
@@ -155,6 +163,10 @@ class GceNetworkResource(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the Network resource."""
+    if FLAGS.gce_firewall_rules_clean_all:
+      for firewall_rule in self._GetAllFirewallRules():
+        firewall_rule.Delete()
+
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'delete', self.name)
     cmd.Issue()
 
@@ -163,6 +175,16 @@ class GceNetworkResource(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
+
+  def _GetAllFirewallRules(self):
+    """Returns all the firewall rules that use the network."""
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'list')
+    cmd.flags['filter'] = 'network=%s' % self.name
+
+    stdout, _, _ = cmd.Issue(suppress_warning=True)
+    result = json.loads(stdout)
+    return [GceFirewallRule(entry['name'], self.project, ALLOW_ALL, self.name,
+                            NETWORK_RANGE) for entry in result]
 
 
 class GceSubnetResource(resource.BaseResource):
@@ -186,12 +208,16 @@ class GceSubnetResource(resource.BaseResource):
   def _Exists(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'describe',
                              self.name)
+    if self.region:
+      cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def _Delete(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'delete',
                              self.name)
+    if self.region:
+      cmd.flags['region'] = self.region
     cmd.Issue()
 
 
