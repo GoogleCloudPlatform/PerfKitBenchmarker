@@ -225,11 +225,11 @@ def _BuildGradleCommand(classname, job_arguments):
         'Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
+  AddTaskArgument(cmd, 'integrationTest', FLAGS.beam_it_module)
   cmd.append('--tests={}'.format(classname))
 
   beam_args = job_arguments if job_arguments else []
 
-  AddTaskArgument(cmd, 'integrationTest', FLAGS.beam_it_module)
   AddRunnerArgument(cmd, FLAGS.beam_runner)
   AddRunnerPipelineOption(beam_args, FLAGS.beam_runner,
                           FLAGS.beam_runner_option)
