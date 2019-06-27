@@ -21,10 +21,10 @@ import datetime
 import json
 import logging
 
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
@@ -162,19 +162,28 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None,
-                job_type=None):
+  def SubmitJob(self, jarfile, classname, pyspark_file=None, query_file=None,
+                job_poll_interval=None, job_arguments=None,
+                job_stdout_file=None, job_type=None):
     """See base class."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
+    args = ['jobs', 'submit', job_type]
+
+    if job_type == self.PYSPARK_JOB_TYPE:
+      args.append(pyspark_file)
+
+    cmd = util.GcloudCommand(self, 'dataproc', *args)
+
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if classname:
       cmd.flags['jars'] = jarfile
       cmd.flags['class'] = classname
-    else:
+    elif jarfile:
       cmd.flags['jar'] = jarfile
+
+    if query_file:
+      cmd.flags['file'] = query_file
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
@@ -191,6 +200,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       return {dpb_service.SUCCESS: False}
 
     stats = self._GetStats(stdout)
+    stats[dpb_service.SUCCESS] = True
     return stats
 
   def SetClusterProperty(self):

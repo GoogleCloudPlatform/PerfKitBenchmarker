@@ -111,6 +111,11 @@
 - Added ssh_via_internal_ip flag to use internal IP addresses when ssh'ing to
   runner VMs, will use external IP addrs if not set.
 - Added support for launching GCP VM with shielded VM secure boot
+- Added Amazon Linux 2 os type. `--os_type=amazonlinux2`
+- Redis enterprise benchmark.
+- Added flag `--append_kernel_command_line`, which allows appending to the
+  kernel command line when using Linux os types.
+- Added Spark SQL benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -480,3 +485,8 @@
 - RobustRemoteCommand now retries on ssh connections refused.
 - Fixed a bug that was causing AWS capacity reservation creation to fail.
 - GceNetworkSpec's zone is equal to the VM's zone
+- Creates the bucket from PKB rather than from within the VM that PKB launches
+  in TPU test.
+- Sets TPU zone MLPerf benchmark.
+- Added gce_firewall_rules_clean_all option to network resource: clean up all
+  the firewall rules that depend on the PKB-created network.
