@@ -116,6 +116,7 @@
 - Added flag `--append_kernel_command_line`, which allows appending to the
   kernel command line when using Linux os types.
 - Added Spark SQL benchmark.
+- Added helpmatchmd flag to dump markdown formatted help strings
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
