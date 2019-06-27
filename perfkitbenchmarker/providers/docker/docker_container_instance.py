@@ -310,10 +310,7 @@ class Ubuntu1604BasedDockerContainer(
     DebianBasedDockerContainer, linux_virtual_machine.Ubuntu1604Mixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
-# class Ubuntu1404BasedDockerVirtualMachine(
-#     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
-#   DEFAULT_IMAGE = 'ubuntu:14.04'
-
-# class Ubuntu1710BasedDockerVirtualMachine(
-#     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
-#   DEFAULT_IMAGE = 'ubuntu:17.10'
+# Note: to add support for ubuntu 14 and ubuntu 18, we simply need to 
+#       create/test Dockerfiles for those distros. This should be 
+#       fairly simple, but may require a few changes from the 
+#       ubuntu16 Dockerfile.
