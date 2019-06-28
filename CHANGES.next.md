@@ -116,6 +116,8 @@
 - Added flag `--append_kernel_command_line`, which allows appending to the
   kernel command line when using Linux os types.
 - Added Spark SQL benchmark.
+- Added aws_dynamodb_connectMax flag to vary the maximum number of connections
+  to dynamodb.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

@@ -99,6 +99,7 @@ def Run(benchmark_spec):
   }
   if FLAGS.aws_dynamodb_use_sort:
     run_kwargs.update({'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
+                       'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
                        'dynamodb.hashKeyName': FLAGS.aws_dynamodb_primarykey,
                        'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey})
   if FLAGS.aws_dynamodb_ycsb_consistentReads:
