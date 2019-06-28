@@ -45,6 +45,10 @@ stress_ng:
       vm_spec: *default_single_core
       disk_spec: *default_50_gb
 """
+STRESS_NG_DIR = '~/stress_ng'
+GIT_REPO = 'https://github.com/ColinIanKing/stress-ng'
+GIT_TAG = '54722768329c9f8184c1c98db63435f201377df1'  # version 0.05.23
+
 
 flags.DEFINE_integer('stress_ng_duration', 10,
                      'Number of seconds to run the test.')
@@ -117,7 +121,12 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.InstallPackages('stress-ng')
+  vm.InstallPackages(
+      'build-essential libaio-dev libapparmor-dev libattr1-dev libbsd-dev libcap-dev libgcrypt11-dev libkeyutils-dev libsctp-dev zlib1g-dev'
+  )
+  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, STRESS_NG_DIR))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(STRESS_NG_DIR, GIT_TAG))
+  vm.RemoteCommand('cd {0} && make && sudo make install'.format(STRESS_NG_DIR))
 
 
 def _ParseStressngResult(metadata, output):
@@ -213,11 +222,12 @@ def _RunWorkload(vm, num_threads):
       samples.append(stressng_sample)
       values_to_geomean_list.append(stressng_sample.value)
 
-  # Only calculate geomean if each stressors provided a value
-  if FLAGS.stress_ng_calc_geomean and len(values_to_geomean_list) == len(
-      stressors):
+  if FLAGS.stress_ng_calc_geomean:
     geomean_metadata = metadata.copy()
     geomean_metadata['stressors'] = stressors
+    # True only if each stressor provided a value
+    geomean_metadata['valid_run'] = (
+        len(values_to_geomean_list) == len(stressors))
     geomean_sample = sample.Sample(
         metric='STRESS_NG_GEOMEAN',
         value=_GeoMeanOverflow(values_to_geomean_list),
@@ -261,4 +271,4 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.Uninstall('stress-ng')
+  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(STRESS_NG_DIR))
