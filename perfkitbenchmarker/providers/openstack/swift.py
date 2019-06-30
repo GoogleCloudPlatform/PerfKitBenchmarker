@@ -67,6 +67,14 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
     vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['delete', bucket])
 
+  def Copy(self, src_url, dst_url):
+    """See base class."""
+    raise NotImplementedError()
+
+  def List(self, buckets):
+    """See base class."""
+    raise NotImplementedError()
+
   def EmptyBucket(self, bucket):
     vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['delete', bucket])
