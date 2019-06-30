@@ -112,6 +112,13 @@ REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 MAX_RUN_URI_LENGTH = 12
 FLAGS = flags.FLAGS
 
+# Define patterns for help text processing.
+BASE_RELATIVE = '../' # Relative path from markdown output to PKB home for link writing.
+MODULE_REGEX = r'^\s+?(.*?):.*' # Pattern that matches module names.
+FLAGS_REGEX = r'(^\s\s--.*?(?=^\s\s--|\Z))+?' # Pattern that matches each flag.
+FLAGNAME_REGEX = r'^\s+?(--.*?)(:.*\Z)' # Pattern that matches flag name in each flag.
+DOCSTRING_REGEX = r'"""(.*?|$)"""' # Pattern that matches triple quoted comments.
+
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
@@ -298,7 +305,7 @@ flags.DEFINE_string(
     allow_override_cpp=True)
 flags.DEFINE_string(
     'helpmatchmd', '',
-    'Markdown friendly help output'
+    'helpmatch query with markdown friendly output. '
     'Shows only flags defined in a module whose name matches the given regex.',
     allow_override_cpp=True)
 flags.DEFINE_boolean(
@@ -423,96 +430,69 @@ def _PrintHelp(matches=None):
 
 
 def _PrintHelpMD(matches=None):
-  """Prints markdown help for flags defined in matching modules. Works just like
-  --helpmatch.
+    """Prints markdown formatted help for flags defined in matching modules. Works just like
+    --helpmatch.
 
-  Eg:
-
-* all flags:
-`./pkb.py --helpmatchmd .*`
-
-* linux benchmarks:
-`./pkb.py --helpmatchmd linux_benchmarks.*`
-
-* specific modules
-`./pkb.py --helpmatchmd iperf`
-
-* windows packages
-`./pkb.py --helpmatchmd windows_packages.*`
-
-* GCP provider:
-`./pkb.py --helpmatchmd providers.gcp.* >> testsuite_docs/providers_gcp.md`
-
-  Args:
+    Args:
     matches: regex string or None. Filters help to only those whose name
       matched the regex. If None then all flags are printed.
-  """
+    Eg:
 
-  """ example docstring:
-  absl.app:
-  --[no]only_check_args: Set to true to validate args and exit.
-    (default: 'false')
-  --[no]pdb_post_mortem: Set to true to handle uncaught exceptions with PDB post
-    mortem.
-    (default: 'false')
-  --profile_file: Dump profile information to a file (for python -m pstats).
-    Implies --run_with_profiling.
-  --[no]run_with_pdb: Set to true for PDB debug mode
-    (default: 'false')
-  --[no]run_with_profiling: Set to true for profiling the script. Execution will
-    be slower, and the output format might change over time.
-    (default: 'false')
-  --[no]use_cprofile_for_profiling: Use cProfile instead of the profile module
-    for profiling. This has no effect unless --run_with_profiling is set.
-    (default: 'true')
-"""
+    * all flags:
+    `./pkb.py --helpmatchmd .*`  > testsuite_docs/all.md
 
-  # normal helpmatch search from above
-  if not matches:
-    print(FLAGS)
-  else:
+    * linux benchmarks:
+    `./pkb.py --helpmatchmd linux_benchmarks.*`  > testsuite_docs/linux_benchmarks.md
+
+    * specific modules
+    `./pkb.py --helpmatchmd iperf`  > testsuite_docs/iperf.md
+
+    * windows packages
+    `./pkb.py --helpmatchmd windows_packages.*`  > testsuite_docs/windows_packages.md
+
+    * GCP provider:
+    `./pkb.py --helpmatchmd providers.gcp.* > testsuite_docs/providers_gcp.md`
+    """
+
     flags_by_module = FLAGS.flags_by_module_dict()
     modules = sorted(flags_by_module)
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-        # where are we relative to pkb home?
-        BASE_RELATIVE = '../'
-        # matches module name
-        module_regex = r'^\s+?(.*?):.*'
-        # matches each flag
-        flags_regex = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'
-        # matches flag name in each flag
-        flagsmd_regex = re.compile(r'^\s+?(--.*?)(:.*\Z)',
-                                   re.MULTILINE | re.DOTALL)
-        # matches triple quoted comments
-        docstring_regex = r'"""(.*?|$)"""'
-        # output standard help to string for markdown processing
-        txt = FLAGS.module_help(module_name)
-        # converts module name to github linkable string
+        # Compile regex patterns.
+        module_regex = re.compile(MODULE_REGEX)
+        flags_regex = re.compile(FLAGS_REGEX, re.MULTILINE | re.DOTALL)
+        flagname_regex = re.compile(FLAGNAME_REGEX, re.MULTILINE | re.DOTALL)
+        docstring_regex = re.compile(DOCSTRING_REGEX, re.MULTILINE | re.DOTALL)
+        # Retrieve the helpmatch text to format.
+        helptext_raw = FLAGS.module_help(module_name)
+
+        # Converts module name to github linkable string.
         # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
         # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
-        module = re.search(module_regex, txt, ).group(1)
+        #module = re.search(MODULE_REGEX, helptext_raw, ).group(1)
+        module = re.search(module_regex, helptext_raw, ).group(1)
         module_link = module.replace('.', '/') + '.py'
-        # puts flag name in a markdown code block for visibility
-        flags = re.findall(flags_regex, txt, re.MULTILINE | re.DOTALL)
-        flags[:] = [flagsmd_regex.sub(r"`\1`\2", flag) for flag in flags]
-       # get the docstring for the module without importing everything into our
+        # Put flag name in a markdown code block for visibility.
+        flags = re.findall(flags_regex, helptext_raw)
+        flags[:] = [flagname_regex.sub(r"`\1`\2", flag) for flag in flags]
+       # Get the docstring for the module without importing everything into our
        # namespace. Probably a better way to do this
         docstring = 'No description available'
-        # only pull doststrings from inside pkb source files
+        # Only pull doststrings from inside pkb source files.
         if (isfile(module_link)):
           with open(module_link, "r") as f:
             source = f.read()
-            # get the triple quoted matches
-            dsm = re.search(docstring_regex, source, re.MULTILINE | re.DOTALL)
-            # some modules don't have docstrings
+            # Get the triple quoted matches.
+            docstring_match = re.search(docstring_regex, source)
+            # Some modules don't have docstrings.
             # eg perfkitbenchmarker/providers/alicloud/flags.py
-            if dsm is not None:
-              docstring = dsm.group(1)
-           # print docstring
-        # format output
-        print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
+            if docstring_match is not None:
+              docstring = docstring_match.group(1)
+        # Format output here.
+        if (isfile(module_link)): # Only print links for modules we can find.
+            print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
+        else: print('### ' + module + '\n')
         print('#### Description:\n\n' + docstring + '\n\n#### Flags:\n')
         print('\n'.join(flags) + '\n')
 
