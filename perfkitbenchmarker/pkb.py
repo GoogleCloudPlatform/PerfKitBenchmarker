@@ -470,14 +470,13 @@ def _PrintHelpMD(matches=None):
         # Converts module name to github linkable string.
         # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
         # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
-        #module = re.search(MODULE_REGEX, helptext_raw, ).group(1)
         module = re.search(module_regex, helptext_raw, ).group(1)
         module_link = module.replace('.', '/') + '.py'
         # Put flag name in a markdown code block for visibility.
         flags = re.findall(flags_regex, helptext_raw)
         flags[:] = [flagname_regex.sub(r"`\1`\2", flag) for flag in flags]
-       # Get the docstring for the module without importing everything into our
-       # namespace. Probably a better way to do this
+        # Get the docstring for the module without importing everything into our
+        # namespace. Probably a better way to do this
         docstring = 'No description available'
         # Only pull doststrings from inside pkb source files.
         if (isfile(module_link)):
@@ -489,7 +488,7 @@ def _PrintHelpMD(matches=None):
             # eg perfkitbenchmarker/providers/alicloud/flags.py
             if docstring_match is not None:
               docstring = docstring_match.group(1)
-        # Format output here.
+        # Format output and print here.
         if (isfile(module_link)): # Only print links for modules we can find.
             print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
         else: print('### ' + module + '\n')
