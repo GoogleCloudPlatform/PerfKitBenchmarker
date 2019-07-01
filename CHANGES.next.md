@@ -496,3 +496,4 @@
 - Compile Stress-ng version 0.05.23 rather than installing its package.
 - Added `--gce_firewall_rules_clean_all` option to network resource: clean up
   all the firewall rules that depend on the PKB-created network.
+- Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
