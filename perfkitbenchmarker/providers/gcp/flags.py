@@ -129,3 +129,9 @@ flags.DEFINE_enum('gce_network_tier', 'premium', ['premium', 'standard'],
 flags.DEFINE_boolean(
     'gce_shielded_secure_boot', False,
     'Whether the image uses the shielded VM feature')
+flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
+                     'Determines whether all the gce firewall rules should be '
+                     'cleaned up before deleting the network. If firewall '
+                     'rules are added manually, PKB will not know about all of '
+                     'them. However, they must be deleted in order to '
+                     'successfully delete the PKB-created network.')
