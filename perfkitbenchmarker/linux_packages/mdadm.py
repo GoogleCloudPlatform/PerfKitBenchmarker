@@ -32,4 +32,4 @@ def AptInstall(vm):
 
 
 def SwupdInstall(vm):
-  vm.Install("storage_tools")
+  vm.Install("storage-utils")

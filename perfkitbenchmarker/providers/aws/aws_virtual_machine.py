@@ -768,7 +768,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _GetNvmeBootIndex(self):
     if aws_disk.LocalDriveIsNvme(self.machine_type) and \
        aws_disk.EbsDriveIsNvme(self.machine_type):
-      self.Install('storage_tools')
       # identify boot drive
       cmd = 'lsblk | grep "part /$" | grep -o "nvme[0-9]*"'
       boot_drive = self.RemoteCommand(cmd, ignore_failure=True)[0].strip()
