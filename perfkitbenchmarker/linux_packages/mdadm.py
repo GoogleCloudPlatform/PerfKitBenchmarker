@@ -30,5 +30,6 @@ def AptInstall(vm):
   """Installs the mdadm package on the VM."""
   _Install(vm)
 
+
 def SwupdInstall(vm):
   vm.Install("storage_tools")
