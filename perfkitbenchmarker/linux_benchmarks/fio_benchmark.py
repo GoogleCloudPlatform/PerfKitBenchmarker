@@ -22,6 +22,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import json
 import logging
 import posixpath
@@ -35,6 +36,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
@@ -174,6 +176,10 @@ flags.DEFINE_integer('fio_log_hist_msec', 1000,
                      'Same as fio_log_avg_msec, but logs entries for '
                      'completion latency histograms. If set to 0, histogram '
                      'logging is disabled.')
+flags.DEFINE_boolean(  # TODO(user): Add support for simultaneous read.
+    'fio_write_against_multiple_clients', False,
+    'Whether to run fio against multiple nfs. Only applicable '
+    'when running fio against network mounts and rw=write.')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -225,6 +231,7 @@ fio:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
+      vm_count: null
 """
 
 
@@ -447,7 +454,8 @@ def CheckPrerequisites(benchmark_config):
 
 def Prepare(benchmark_spec):
   exec_path = fio.GetFioExec()
-  return PrepareWithExec(benchmark_spec, exec_path)
+  vms = benchmark_spec.vms
+  vm_util.RunThreaded(lambda vm: PrepareWithExec(vm, exec_path), vms)
 
 
 def GetFileAsString(file_path):
@@ -457,7 +465,7 @@ def GetFileAsString(file_path):
     return jobfile.read()
 
 
-def PrepareWithExec(benchmark_spec, exec_path):
+def PrepareWithExec(vm, exec_path):
   """Prepare the virtual machine to run FIO.
 
      This includes installing fio, bc, and libaio1 and pre-filling the
@@ -465,12 +473,10 @@ def PrepareWithExec(benchmark_spec, exec_path):
      at the same path on the local machine.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+    vm: The virtual machine to prepare the benchmark on.
     exec_path: string path to the fio executable
 
   """
-  vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
 
@@ -491,22 +497,60 @@ def PrepareWithExec(benchmark_spec, exec_path):
     vm.FormatDisk(disk.GetDevicePath(), disk_spec.disk_type)
     vm.MountDisk(disk.GetDevicePath(), disk.mount_point,
                  disk_spec.disk_type, disk.mount_options, disk.fstab_options)
+  if FLAGS.fio_write_against_multiple_clients:
+    vm.RemoteCommand('sudo rm -rf %s/%s' % (disk.mount_point, vm.name))
+    vm.RemoteCommand('sudo mkdir -p %s/%s' % (disk.mount_point, vm.name))
 
 
 def Run(benchmark_spec):
+  """Spawn fio on vm(s) and gather results."""
   fio_exe = fio.GetFioExec()
   default_job_file_contents = GetFileAsString(data.ResourcePath('fio.job'))
-  return RunWithExec(benchmark_spec, fio_exe, REMOTE_JOB_FILE_PATH,
-                     default_job_file_contents)
+  vms = benchmark_spec.vms
+  samples = []
+
+  path = REMOTE_JOB_FILE_PATH
+  samples_list = vm_util.RunThreaded(
+      lambda vm: RunWithExec(vm, fio_exe, path, default_job_file_contents), vms)
+  for i, _ in enumerate(samples_list):
+    for item in samples_list[i]:
+      item.metadata['machine_instance'] = i
+    samples.extend(samples_list[i])
+
+  if FLAGS.fio_write_against_multiple_clients:
+    metrics = collections.defaultdict(list)
+    if not metrics:
+      return samples
+    for item in samples:
+      # example metric: 'filestore-bandwidth:write:bandwidth'
+      metrics[item.metric.split(':', 1)[-1]].append(item.value)
+
+    samples.append(
+        sample.Sample('Total_write_throughput', sum(metrics['write:bandwidth']),
+                      'KB/s'))
+    samples.append(
+        sample.Sample('Total_write_iops', sum(metrics['write:iops']), 'ops'))
+    earliest_start = min(metrics['start_time'])
+    latest_start = max(metrics['start_time'])
+    earliest_end = min(metrics['end_time'])
+    latest_end = max(metrics['end_time'])
+    # Invalid run if the start and end times don't overlap 95%.
+    nonoverlap_percent = (latest_end - earliest_end + latest_start -
+                          earliest_start) / (
+                              earliest_end - latest_start)
+    valid_run = (nonoverlap_percent < 0.05)
+    for item in samples:
+      item.metadata['valid_run'] = valid_run
+      item.metadata['nonoverlap_percentage'] = nonoverlap_percent
+
+  return samples
 
 
-def RunWithExec(benchmark_spec, exec_path, remote_job_file_path,
-                job_file_contents):
+def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   """Spawn fio and gather the results.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+    vm: vm to run the benchmark on.
     exec_path: string path to the fio executable.
     remote_job_file_path: path, on the vm, to the location of the job file.
     job_file_contents: string contents of the fio job file.
@@ -514,11 +558,13 @@ def RunWithExec(benchmark_spec, exec_path, remote_job_file_path,
   Returns:
     A list of sample.Sample objects.
   """
-  vm = benchmark_spec.vms[0]
   logging.info('FIO running on %s', vm)
 
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
+  if FLAGS.fio_write_against_multiple_clients:
+    mount_point = '%s/%s' % (disk.mount_point, vm.name)
+    logging.info('FIO mount point changed to %s', mount_point)
 
   job_file_string = GetOrGenerateJobFileString(
       FLAGS.fio_jobfile,
@@ -560,7 +606,9 @@ def RunWithExec(benchmark_spec, exec_path, remote_job_file_path,
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
+  start_time = time.time()
   stdout, _ = vm.RobustRemoteCommand(fio_command, should_log=True)
+  end_time = time.time()
   bin_vals = []
   if collect_logs:
     vm.PullFile(vm_util.GetTempDir(), '%s*.log' % log_file_base)
@@ -572,6 +620,11 @@ def RunWithExec(benchmark_spec, exec_path, remote_job_file_path,
               log_file_base, idx + 1)) for idx in range(num_logs)]
   samples = fio.ParseResults(job_file_string, json.loads(stdout),
                              log_file_base=log_file_base, bin_vals=bin_vals)
+
+  samples.append(
+      sample.Sample('start_time', start_time, 'sec', samples[0].metadata))
+  samples.append(
+      sample.Sample('end_time', end_time, 'sec', samples[0].metadata))
 
   return samples
 

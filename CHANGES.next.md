@@ -297,6 +297,7 @@
 - Added Azure Premium Files support.
 - Added 'os_type' metadata to virtual machines for use in performance samples.
 - Storage specification related dpb terasort benchmark improvements.
+- Added support to run fio against multiple clients.
 - Added an optional flag to set a delay between boot tasks.
 - Added precision flag to Horovod.
 - Added a flag to Horovod that indicates that the VM is using a deep learning
