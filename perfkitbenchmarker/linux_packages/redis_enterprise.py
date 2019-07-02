@@ -177,7 +177,8 @@ def SetUpCluster(vm, redis_port):
       'type': 'redis',
       'proxy_policy': 'all-master-shards',
       'port': redis_port,
-      'sharding': False
+      'sharding': False,
+      'authentication_redis_pass': FLAGS.run_uri,
   }
   if FLAGS.enterprise_redis_shard_count > 1:
     content.update({
@@ -201,7 +202,12 @@ def SetUpCluster(vm, redis_port):
 def WaitForClusterUp(vm, redis_port):
   """Waits for the Redis Enterprise cluster to respond to commands."""
   stdout, _ = vm.RemoteCommand(
-      '/opt/redislabs/bin/redis-cli -h localhost -p {port} ping'.format(
+      '/opt/redislabs/bin/redis-cli '
+      '-h localhost '
+      '-p {port} '
+      '-a {password} '
+      'ping'.format(
+          password=FLAGS.run_uri,
           port=redis_port))
   if stdout.find('PONG') == -1:
     raise errors.Resource.RetryableCreationError()
@@ -212,6 +218,7 @@ def LoadCluster(vm, redis_port):
   vm.RemoteCommand(
       '/opt/redislabs/bin/memtier_benchmark '
       '-s localhost '
+      '-a {password} '
       '-p {port} '
       '-t 1 '  # Set -t and -c to 1 to avoid duplicated work in writing the same
       '-c 1 '  # key/value pairs repeatedly.
@@ -223,6 +230,7 @@ def LoadCluster(vm, redis_port):
       '--key-maximum {load_records} '
       '-n allkeys '
       '--cluster-mode '.format(
+          password=FLAGS.run_uri,
           port=str(redis_port),
           load_records=str(FLAGS.enterprise_redis_load_records)))
 
@@ -243,6 +251,7 @@ def BuildRunCommand(redis_vm, threads, port):
 
   return ('/opt/redislabs/bin/memtier_benchmark '
           '-s {ip_address} '
+          '-a {password} '
           '-p {port} '
           '-t {threads} '
           '--ratio 1:1 '
@@ -254,6 +263,7 @@ def BuildRunCommand(redis_vm, threads, port):
           '-n {run_records} '
           '--cluster-mode '.format(
               ip_address=redis_vm.internal_ip,
+              password=FLAGS.run_uri,
               port=str(port),
               threads=str(threads),
               pipeline=str(FLAGS.enterprise_redis_pipeline),
