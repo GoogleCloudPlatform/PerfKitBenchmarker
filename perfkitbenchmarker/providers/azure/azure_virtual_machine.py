@@ -486,6 +486,21 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
          '--protected-settings=%s' % config] + self.resource_group.args)
 
 
+class Windows2012AzureVirtualMachine(WindowsAzureVirtualMachine,
+                                     windows_virtual_machine.Windows2012Mixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
+
+
+class Windows2016AzureVirtualMachine(WindowsAzureVirtualMachine,
+                                     windows_virtual_machine.Windows2016Mixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
+
+
+class Windows2019AzureVirtualMachine(WindowsAzureVirtualMachine,
+                                     windows_virtual_machine.Windows2019Mixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
+
+
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""
