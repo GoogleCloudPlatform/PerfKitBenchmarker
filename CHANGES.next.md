@@ -89,7 +89,7 @@
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
-- Added support for Windows2012, 2016, and 2019 for GCP and AWS.
+- Added support for Windows2012, 2016, and 2019 for AWS, Azure, and GCP.
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
@@ -116,6 +116,8 @@
 - Added flag `--append_kernel_command_line`, which allows appending to the
   kernel command line when using Linux os types.
 - Added Spark SQL benchmark.
+- Added aws_dynamodb_connectMax flag to vary the maximum number of connections
+  to dynamodb.
 - Added helpmatchmd flag to dump markdown formatted help strings
 
 ### Enhancements:
@@ -296,6 +298,7 @@
 - Added Azure Premium Files support.
 - Added 'os_type' metadata to virtual machines for use in performance samples.
 - Storage specification related dpb terasort benchmark improvements.
+- Added support to run fio against multiple clients.
 - Added an optional flag to set a delay between boot tasks.
 - Added precision flag to Horovod.
 - Added a flag to Horovod that indicates that the VM is using a deep learning
@@ -489,5 +492,6 @@
 - Creates the bucket from PKB rather than from within the VM that PKB launches
   in TPU test.
 - Sets TPU zone MLPerf benchmark.
-- Added gce_firewall_rules_clean_all option to network resource: clean up all
-  the firewall rules that depend on the PKB-created network.
+- Compile Stress-ng version 0.05.23 rather than installing its package.
+- Added `--gce_firewall_rules_clean_all` option to network resource: clean up
+  all the firewall rules that depend on the PKB-created network.

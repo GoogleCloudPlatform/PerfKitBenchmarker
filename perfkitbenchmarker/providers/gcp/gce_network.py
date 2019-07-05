@@ -38,13 +38,6 @@ FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
-flags.DEFINE_bool('gce_firewall_rules_clean_all', False,
-                  'Determines whether all the gce firewall rules should be '
-                  'cleaned up before deleting the network. If firewall rules '
-                  'are added manually, PKB will not know about all of them. '
-                  'However, they must be deleted in order to successfully '
-                  'delete the PKB-created network.')
-
 
 class GceFirewallRule(resource.BaseResource):
   """An object representing a GCE Firewall Rule."""
