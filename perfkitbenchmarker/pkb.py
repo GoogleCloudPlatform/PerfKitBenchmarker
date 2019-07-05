@@ -113,11 +113,11 @@ MAX_RUN_URI_LENGTH = 12
 FLAGS = flags.FLAGS
 
 # Define patterns for help text processing.
-BASE_RELATIVE = '../' # Relative path from markdown output to PKB home for link writing.
-MODULE_REGEX = r'^\s+?(.*?):.*' # Pattern that matches module names.
-FLAGS_REGEX = r'(^\s\s--.*?(?=^\s\s--|\Z))+?' # Pattern that matches each flag.
-FLAGNAME_REGEX = r'^\s+?(--.*?)(:.*\Z)' # Pattern that matches flag name in each flag.
-DOCSTRING_REGEX = r'"""(.*?|$)"""' # Pattern that matches triple quoted comments.
+BASE_RELATIVE = '../'  # Relative path from markdown output to PKB home for link writing.
+MODULE_REGEX = r'^\s+?(.*?):.*'  # Pattern that matches module names.
+FLAGS_REGEX = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'  # Pattern that matches each flag.
+FLAGNAME_REGEX = r'^\s+?(--.*?)(:.*\Z)'  # Pattern that matches flag name in each flag.
+DOCSTRING_REGEX = r'"""(.*?|$)"""'  # Pattern that matches triple quoted comments.
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
@@ -489,9 +489,10 @@ def _PrintHelpMD(matches=None):
             if docstring_match is not None:
               docstring = docstring_match.group(1)
         # Format output and print here.
-        if (isfile(module_link)): # Only print links for modules we can find.
+        if (isfile(module_link)):  # Only print links for modules we can find.
             print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
-        else: print('### ' + module + '\n')
+        else:
+            print('### ' + module + '\n')
         print('#### Description:\n\n' + docstring + '\n\n#### Flags:\n')
         print('\n'.join(flags) + '\n')
 
