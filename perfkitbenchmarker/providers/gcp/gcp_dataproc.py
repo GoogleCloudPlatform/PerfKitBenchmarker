@@ -31,8 +31,6 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
 
 class GcpDataproc(spark_service.BaseSparkService):
   """Object representing a GCP Dataproc cluster.
@@ -50,20 +48,32 @@ class GcpDataproc(spark_service.BaseSparkService):
     self.project = self.spec.master_group.vm_spec.project
 
   @staticmethod
+  def _ParseTime(state_time):
+    """Parses time from json output.
+
+    Args:
+      state_time: string. the state start time.
+
+    Returns:
+      datetime.
+    """
+    try:
+      return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%S.%fZ')
+    except ValueError:
+      return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%SZ')
+
+  @staticmethod
   def _GetStats(stdout):
     results = json.loads(stdout)
     stats = {}
-    done_time = datetime.datetime.strptime(
-        results['status']['stateStartTime'], GCP_TIME_FORMAT)
+    done_time = GcpDataproc._ParseTime(results['status']['stateStartTime'])
     pending_time = None
     start_time = None
     for state in results['statusHistory']:
       if state['state'] == 'PENDING':
-        pending_time = datetime.datetime.strptime(state['stateStartTime'],
-                                                  GCP_TIME_FORMAT)
+        pending_time = GcpDataproc._ParseTime(state['stateStartTime'])
       elif state['state'] == 'RUNNING':
-        start_time = datetime.datetime.strptime(state['stateStartTime'],
-                                                GCP_TIME_FORMAT)
+        start_time = GcpDataproc._ParseTime(state['stateStartTime'])
 
     if done_time and start_time:
       stats[spark_service.RUNTIME] = (done_time - start_time).total_seconds()

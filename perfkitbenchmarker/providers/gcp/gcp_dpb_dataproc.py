@@ -34,8 +34,6 @@ flags.DEFINE_string('dpb_dataproc_image_version', None,
 flags.DEFINE_integer('dpb_dataproc_distcp_num_maps', None,
                      'Number of maps to copy data.')
 
-GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
 
@@ -72,20 +70,32 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
           'dpb_service_zone must be provided, for provisioning.')
 
   @staticmethod
+  def _ParseTime(state_time):
+    """Parses time from json output.
+
+    Args:
+      state_time: string. the state start time.
+
+    Returns:
+      datetime.
+    """
+    try:
+      return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%S.%fZ')
+    except ValueError:
+      return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%SZ')
+
+  @staticmethod
   def _GetStats(stdout):
     results = json.loads(stdout)
     stats = {}
-    done_time = datetime.datetime.strptime(
-        results['status']['stateStartTime'], GCP_TIME_FORMAT)
+    done_time = GcpDpbDataproc._ParseTime(results['status']['stateStartTime'])
     pending_time = None
     start_time = None
     for state in results['statusHistory']:
       if state['state'] == 'PENDING':
-        pending_time = datetime.datetime.strptime(state['stateStartTime'],
-                                                  GCP_TIME_FORMAT)
+        pending_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
       elif state['state'] == 'RUNNING':
-        start_time = datetime.datetime.strptime(state['stateStartTime'],
-                                                GCP_TIME_FORMAT)
+        start_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
 
     if done_time and start_time:
       stats[dpb_service.RUNTIME] = (done_time - start_time).total_seconds()
