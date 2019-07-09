@@ -118,6 +118,7 @@
 - Added Spark SQL benchmark.
 - Added aws_dynamodb_connectMax flag to vary the maximum number of connections
   to dynamodb.
+- Added helpmatchmd flag to dump markdown formatted help strings
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
