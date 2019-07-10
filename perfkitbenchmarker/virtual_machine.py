@@ -333,10 +333,17 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowIcmp(self)
 
-  def AllowPort(self, start_port, end_port=None):
-    """Opens the port on the firewall corresponding to the VM if one exists."""
+  def AllowPort(self, start_port, end_port=None, source_range=None):
+    """Opens the port on the firewall corresponding to the VM if one exists.
+
+    Args:
+      start_port: The first local port to open in a range.
+      end_port: The last local port to open in a range. If None, only start_port
+        will be opened.
+      source_range: list of CIDRs. If none, all sources are allowed.
+    """
     if self.firewall and not FLAGS.skip_firewall_rules:
-      self.firewall.AllowPort(self, start_port, end_port)
+      self.firewall.AllowPort(self, start_port, end_port, source_range)
 
   def AllowRemoteAccessPorts(self):
     """Allow all ports in self.remote_access_ports."""
