@@ -401,7 +401,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
                     (retcode, cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  @vm_util.Retry(log_errors=False, poll_interval=1)
+  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
     stdout, _ = self.RemoteCommand('hostname', suppress_warning=True)
