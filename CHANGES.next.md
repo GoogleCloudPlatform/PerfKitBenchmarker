@@ -498,3 +498,4 @@
 - Added `--gce_firewall_rules_clean_all` option to network resource: clean up
   all the firewall rules that depend on the PKB-created network.
 - Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
+- Increased default timeout for booting Windows VMs to 40 minutes.
