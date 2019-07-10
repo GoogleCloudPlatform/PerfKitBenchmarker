@@ -234,7 +234,7 @@ class AliFirewall(network.BaseFirewall):
       authorize_cmd = util.GetEncodedCmd(authorize_cmd)
       vm_util.IssueRetryableCommand(authorize_cmd)
 
-  def AllowPort(self, vm, start_port, end_port=None):
+  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
 
     Args:
@@ -242,6 +242,7 @@ class AliFirewall(network.BaseFirewall):
       start_port: The first local port in a range of ports to open.
       end_port: The last port in a range of ports to open. If None, only
         start_port will be opened.
+      source_range: unsupported at present.
     """
 
     if not end_port:

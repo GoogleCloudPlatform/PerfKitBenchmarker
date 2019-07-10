@@ -100,16 +100,19 @@ class GceFirewall(network.BaseFirewall):
       start_port: The first local port to open in a range.
       end_port: The last local port to open in a range. If None, only start_port
         will be opened.
-      source_range: The source ip range to allow for this port.
+      source_range: List of source CIDRs to allow for this port. If none, all
+        sources are allowed.
     """
     if vm.is_static:
       return
+    if source_range:
+      source_range = ','.join(source_range)
     with self._lock:
       if end_port is None:
         end_port = start_port
       firewall_name = ('perfkit-firewall-%s-%d-%d' %
                        (FLAGS.run_uri, start_port, end_port))
-      key = (vm.project, start_port, end_port)
+      key = (vm.project, start_port, end_port, source_range)
       if key in self.firewall_rules:
         return
       allow = ','.join('{0}:{1}-{2}'.format(protocol, start_port, end_port)

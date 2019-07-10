@@ -327,7 +327,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     self.args = ['--nsg', self.name]
 
     self.rules_lock = threading.Lock()
-    # Mapping of (start_port, end_port) -> rule name, used to
+    # Mapping of (start_port, end_port, source) -> rule name, used to
     # deduplicate rules. We expect duplicate rules because PKB will
     # call AllowPort() for each VM on a subnet, but the rules are
     # actually applied to the entire subnet.
@@ -368,25 +368,31 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       vm: the virtual machine to open the port for.
       start_port: either a single port or the start of a range.
       end_port: if given, the end of the port range.
-      source_range: unsupported at present.
+      source_range: List of source CIDRs to allow for this port. If None, all
+        sources are allowed. i.e. ['0.0.0.0/0']
 
     Raises:
       ValueError: when there are too many firewall rules.
     """
+    source_range = source_range or ['0.0.0.0/0']
+    end_port = end_port or start_port
 
+    source_range.sort()
+    # Replace slashes as they are not allowed in an azure rule name.
+    source_range_str = ','.join(source_range).replace('/', '_')
+    rule = (start_port, end_port, source_range_str)
     with self.rules_lock:
-      end_port = end_port or start_port
-
-      if (start_port, end_port) in self.rules:
+      if rule in self.rules:
         return
       port_range = '%s-%s' % (start_port, end_port)
-      rule_name = 'allow-%s' % port_range
+      rule_name = 'allow-%s-%s' % (
+          port_range, source_range_str)
       # Azure priorities are between 100 and 4096, but we reserve 4095
       # for the special DenyAll rule created by DisallowAllPorts.
       rule_priority = 100 + len(self.rules)
       if rule_priority >= 4095:
         raise ValueError('Too many firewall rules!')
-      self.rules[(start_port, end_port)] = rule_name
+      self.rules[rule] = rule_name
 
     vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
@@ -394,6 +400,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
          '--destination-port-range', port_range,
          '--access', 'Allow',
          '--priority', str(rule_priority)]
+        + ['--source-address-prefixes'] + source_range
         + self.resource_group.args
         + self.args)
 
