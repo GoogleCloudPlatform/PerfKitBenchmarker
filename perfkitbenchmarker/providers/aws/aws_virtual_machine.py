@@ -839,6 +839,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
 
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    self.Install('aws_credentials')
+    self.Install('awscli')
+    return FLAGS.aws_preprovisioned_data_bucket and self.TryRemoteCommand(
+        GenerateStatPreprovisionedDataCommand(module_name, filename))
+
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
 
@@ -1084,3 +1091,9 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   return 'aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
       FLAGS.aws_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))
+
+
+def GenerateStatPreprovisionedDataCommand(module_name, filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'aws s3api head-object --bucket %s --key %s/%s' % (
+      FLAGS.aws_preprovisioned_data_bucket, module_name, filename)
