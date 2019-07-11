@@ -34,7 +34,6 @@ from __future__ import print_function
 import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import memtier
 
@@ -101,12 +100,13 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  client = benchmark_spec.vm_groups['client']
-  server = benchmark_spec.vm_groups['server']
+  client = benchmark_spec.vm_groups['client'][0]
+  server = benchmark_spec.vm_groups['server'][0]
 
-  vm_util.RunThreaded(_InstallMemtier, client)
-  vm_util.RunThreaded(_InstallMemcached, server)
-  vm_util.RunThreaded(memcached_server.ConfigureAndStart, server)
+  _InstallMemtier(client)
+  _InstallMemcached(server)
+  memcached_server.ConfigureAndStart(server)
+  memtier.Load(client, server.internal_ip, memcached_server.MEMCACHED_PORT)
 
 
 def Run(benchmark_spec):
