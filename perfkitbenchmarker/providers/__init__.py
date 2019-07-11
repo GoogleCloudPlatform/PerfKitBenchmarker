@@ -32,9 +32,12 @@ CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 MESOS = 'Mesos'
 PROFITBRICKS = 'ProfitBricks'
+# Though Docker is not a cloud provider, it's inclusion is useful
+# for performing on premise to cloud benchmarks
+DOCKER = 'Docker'
 
 VALID_CLOUDS = (GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS)
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS, DOCKER)
 
 
 _imported_providers = set()

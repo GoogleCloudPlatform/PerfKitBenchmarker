@@ -1,0 +1,19 @@
+# This config file is an example of performing
+# a network benchmark between a Docker container
+# running locally and an n1-standard-1 instance
+# on GCP
+#
+#./pkb.py --benchmarks=netperf --benchmark_config_file=example_docker_to_cloud.yaml
+
+netperf:
+  flags:
+    ip_addresses: EXTERNAL
+  vm_groups:
+    vm_1:
+      cloud: Docker
+    vm_2:
+      cloud: GCP
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-1
+          zone: us-central1-a
