@@ -728,6 +728,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
 
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
+        GenerateStatPreprovisionedDataCommand(module_name, filename))
+
   @vm_util.Retry(max_retries=5)
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
@@ -931,3 +936,9 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   return 'gsutil -q cp gs://%s/%s/%s %s' % (
       FLAGS.gcp_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))
+
+
+def GenerateStatPreprovisionedDataCommand(module_name, filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'gsutil stat gs://%s/%s/%s' % (
+      FLAGS.gcp_preprovisioned_data_bucket, module_name, filename)

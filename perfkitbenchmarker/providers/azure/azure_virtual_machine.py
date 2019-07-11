@@ -405,6 +405,13 @@ class AzureVirtualMachine(
         GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                                   filename))
 
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+    return FLAGS.azure_preprovisioned_data_bucket and self.TryRemoteCommand(
+        GenerateStatPreprovisionedDataCommand(module_name, filename))
+
   def GetResourceMetadata(self):
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
@@ -521,3 +528,16 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                           filename,
                           destpath))
   return '{0} && {1}'.format(mkdir_command, download_command)
+
+
+def GenerateStatPreprovisionedDataCommand(module_name, filename):
+  """Returns a string used to download preprovisioned data."""
+  module_name_with_underscores_removed = module_name.replace(
+      '_', '-')
+  return ('az storage blob show '
+          '--account-name %s '
+          '--container-name %s '
+          '--name %s' % (
+              FLAGS.azure_preprovisioned_data_bucket,
+              module_name_with_underscores_removed,
+              filename))

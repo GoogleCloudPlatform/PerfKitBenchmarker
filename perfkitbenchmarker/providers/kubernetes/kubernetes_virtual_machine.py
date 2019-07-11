@@ -486,6 +486,22 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     self.RemoteCommand(
         download_function(install_path, module_name, filename))
 
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    cloud = FLAGS.container_cluster_cloud
+    if cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
+      stat_function = (gce_virtual_machine.
+                       GenerateStatPreprovisionedDataCommand)
+    elif cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
+      stat_function = (aws_virtual_machine.
+                       GenerateStatPreprovisionedDataCommand)
+    elif cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
+      stat_function = (azure_virtual_machine.
+                       GenerateStatPreprovisionedDataCommand)
+    else:
+      return False
+    return self.TryRemoteCommand(stat_function(module_name, filename))
+
 
 def _install_sudo_command():
   """Return a bash command that installs sudo and runs tail indefinitely.
