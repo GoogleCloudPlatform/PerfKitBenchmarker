@@ -308,6 +308,7 @@
 - Add support for different workload sizes for stress-ng.
 - Implemented RobustRemoteCommand for Windows.
 - Extract GceVirtualMachine's GetNetwork into a method.
+- Add Clear Linux support for AWS stripe disks.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -496,3 +497,4 @@
 - Compile Stress-ng version 0.05.23 rather than installing its package.
 - Added `--gce_firewall_rules_clean_all` option to network resource: clean up
   all the firewall rules that depend on the PKB-created network.
+- Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
