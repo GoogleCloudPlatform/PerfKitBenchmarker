@@ -29,3 +29,7 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the mdadm package on the VM."""
   _Install(vm)
+
+
+def SwupdInstall(vm):
+  vm.Install("storage-utils")
