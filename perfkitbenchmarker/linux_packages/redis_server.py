@@ -31,6 +31,7 @@ flags.DEFINE_string('redis_server_version', '5.0.5',
 REDIS_FIRST_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
+REDIS_GIT = 'https://github.com/antirez/redis.git'
 
 
 def _GetRedisTarName():
@@ -38,17 +39,18 @@ def _GetRedisTarName():
 
 
 def GetRedisDir():
-  return '%s/redis-%s' % (INSTALL_DIR, FLAGS.redis_server_version)
+  return '%s/redis' % INSTALL_DIR
 
 
 def _Install(vm):
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  redis_url = 'http://download.redis.io/releases/' + _GetRedisTarName()
-  vm.RemoteCommand('wget %s -P %s' % (redis_url, INSTALL_DIR))
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, _GetRedisTarName()))
-  vm.RemoteCommand('cd %s && make' % GetRedisDir())
+  vm.RemoteCommand(
+      'cd %s; git clone %s' % (
+          INSTALL_DIR, REDIS_GIT))
+  vm.RemoteCommand('cd %s && git checkout %s && make' % (
+      GetRedisDir(), FLAGS.redis_server_version))
 
 
 def YumInstall(vm):
