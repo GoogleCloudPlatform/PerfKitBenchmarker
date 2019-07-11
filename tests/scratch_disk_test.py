@@ -181,6 +181,11 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _PatchCloudSpecific(self):
     self.patches.append(mock.patch(aws_disk.__name__ + '.AwsDisk'))
     self.patches.append(mock.patch(aws_util.__name__ + '.AddDefaultTags'))
+    # In Python3 the mocking of subprocess.Popen in setup() is problematic for
+    # platform.system(). It is called by RemoteCommand() in
+    # _GetNvmeBootIndex() so we'll mock that instead.
+    self.patches.append(mock.patch(
+        aws_virtual_machine.__name__ + '.AwsVirtualMachine._GetNvmeBootIndex'))
 
   def _CreateVm(self):
     vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
