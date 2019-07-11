@@ -408,7 +408,7 @@ class BaseVirtualMachine(resource.BaseResource):
     raise NotImplementedError()
 
   def _InstallData(self, preprovisioned_data, module_name, filenames,
-                   install_path):
+                   install_path, fallback_url):
     """Installs preprovisioned_data on this VM.
 
     Args:
@@ -417,6 +417,7 @@ class BaseVirtualMachine(resource.BaseResource):
       filenames: An iterable of preprovisioned data filenames for a particular
       module.
       install_path: The path to download the data file.
+      fallback_url: The dict mapping filenames to fallback url for downloading.
 
     Raises:
       errors.Setup.BadPreProvisionedDataError: If the module or filename are
@@ -428,17 +429,31 @@ class BaseVirtualMachine(resource.BaseResource):
         local_tar_file_path = data.ResourcePath(filename)
         self.PushFile(local_tar_file_path, install_path)
         continue
+      url = fallback_url.get(filename)
       md5sum = preprovisioned_data.get(filename)
-      if md5sum:
+      preprovisioned = self.ShouldDownloadPreprovisionedData(
+          module_name, filename)
+      if not md5sum:
+        raise errors.Setup.BadPreprovisionedDataError(
+            'Cannot find md5sum hash for file %s in module %s. See README.md '
+            'for information about preprovisioned data. '
+            'Cannot find file in /data directory either, fail to upload from '
+            'local directory.' % (filename, module_name))
+
+      if preprovisioned:
         self.DownloadPreprovisionedData(install_path, module_name, filename)
-        self.CheckPreprovisionedData(
-            install_path, module_name, filename, md5sum)
-        continue
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Cannot find md5sum hash for file %s in module %s. See README.md '
-          'for information about preprovisioned data. '
-          'Cannot find file in /data directory either, fail to upload from '
-          'local directory.' % (filename, module_name))
+      elif url:
+        self.RemoteCommand('wget -P {0} {1}'.format(install_path, url))
+      else:
+        raise errors.Setup.BadPreProvisionedDataError(
+            'Cannot find preprovisioned file %s inside preprovisioned bucket '
+            'in module %s. See README.md for information about '
+            'preprovisioned data. '
+            'Cannot find fallback url of the file to download from web. '
+            'Cannot find file in /data directory either, fail to upload from '
+            'local directory.' % (filename, module_name))
+      self.CheckPreprovisionedData(
+          install_path, module_name, filename, md5sum)
 
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
@@ -484,8 +499,9 @@ class BaseVirtualMachine(resource.BaseResource):
       raise errors.Setup.BadPreprovisionedDataError(
           'Benchmark %s does not define a BENCHMARK_DATA dict with '
           'preprovisioned data.' % benchmark_name)
+    fallback_url = getattr(benchmark_module, 'BENCHMARK_DATA_URL', {})
     self._InstallData(preprovisioned_data, benchmark_name, filenames,
-                      install_path)
+                      install_path, fallback_url)
 
   def InstallPreprovisionedPackageData(self, package_name, filenames,
                                        install_path):
@@ -531,8 +547,23 @@ class BaseVirtualMachine(resource.BaseResource):
       raise errors.Setup.BadPreprovisionedDataError(
           'Package %s does not define a PREPROVISIONED_DATA dict with '
           'preprovisioned data.' % package_name)
+    fallback_url = getattr(package_module, 'PACKAGE_DATA_URL', {})
     self._InstallData(preprovisioned_data, package_name, filenames,
-                      install_path)
+                      install_path, fallback_url)
+
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available.
+
+    This function should be overridden by each cloud provider VM.
+
+    Args:
+      module_name: Name of the module associated with this data file.
+      filename: The name of the file that was downloaded.
+
+    Returns:
+      A boolean indicates if preprovisioned data is available.
+    """
+    raise NotImplementedError()
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads preprovisioned benchmark data.
