@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Docker"""
+"""Provider info for Docker."""
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 
 
 class DockerProviderInfo(provider_info.BaseProviderInfo):

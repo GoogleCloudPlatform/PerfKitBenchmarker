@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains code related to Docker resource specs"""
+"""Contains code related to Docker resource specs."""
 
+import logging
+from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.configs import spec
-import logging
 import yaml
 
 
@@ -37,7 +36,8 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
   def _GetOptionDecoderConstructions(cls):
     result = super(DockerContainerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'privileged_docker': (option_decoders.BooleanDecoder, {'default': False}),
+        'privileged_docker': (option_decoders.BooleanDecoder,
+                              {'default': False}),
         'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {
             'default': None
         })
@@ -47,8 +47,8 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
 
   def _ApplyFlags(self, config_values, flag_values):
     super(DockerContainerSpec, self)._ApplyFlags(config_values, flag_values)
-    logging.warn("APPLY FLAGS")
+    logging.warn('APPLY FLAGS')
     if flag_values['privileged_docker'].present:
       config_values['privileged_docker'] = flag_values.privileged_docker
     if flag_values['machine_type'].present:
-      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+      config_values['machine_type'] = yaml.safe_load(flag_values.machine_type)

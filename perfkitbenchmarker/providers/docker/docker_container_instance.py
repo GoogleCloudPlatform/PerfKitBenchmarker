@@ -19,18 +19,18 @@ import logging
 import os
 import threading
 
-from perfkitbenchmarker import data
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
+from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import container_service
-from perfkitbenchmarker.providers.docker import docker_disk
 from perfkitbenchmarker.providers.docker import docker_container_spec
+from perfkitbenchmarker.providers.docker import docker_disk
 
 FLAGS = flags.FLAGS
 
@@ -40,7 +40,7 @@ DOCKERFILE_DIRECTORY = 'perfkitbenchmarker/data/docker'
 
 
 class DockerContainer(virtual_machine.BaseVirtualMachine):
-  """Object representing a Docker Container instance"""
+  """Object representing a Docker Container instance."""
 
   CLOUD = providers.DOCKER
   DEFAULT_IMAGE = None
@@ -72,7 +72,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     self._DeleteVolumes()
 
   def _Create(self):
-    """Create a Docker instance"""
+    """Create a Docker instance."""
 
     # Locally build docker container
     with self.docker_build_lock:
@@ -82,16 +82,16 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
     create_command = self._FormatCreateCommand()
     container_info, _, _ = vm_util.IssueCommand(create_command)
-    self.container_id = container_info.encode("ascii")
+    self.container_id = container_info.encode('ascii')
 
   def _FormatCreateCommand(self):
-    """Formats the command for Docker based on vm_spec and flags"""
+    """Formats the command for Docker based on vm_spec and flags."""
 
     create_command = ['docker', 'run', '-d', '--name', self.name]
 
     # format scratch disks
     for vol in self.scratch_disks:
-      vol_string = vol.volume_name + ":" + vol.mount_point
+      vol_string = vol.volume_name + ':' + vol.mount_point
       create_command.append('-v')
       create_command.append(vol_string)
     # format cpus option
@@ -138,7 +138,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     self._ConfigureProxy()
 
   def _Delete(self):
-    """Kill and Remove Docker Container"""
+    """Kill and Remove Docker Container."""
 
     delete_command = ['docker', 'kill', self.name]
     output = vm_util.IssueCommand(delete_command)
@@ -152,15 +152,15 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=10)
   def _Exists(self):
-    """Returns whether the container is up and running"""
+    """Returns whether the container is up and running."""
 
-    info, returnCode = self._GetContainerInfo()
+    info, return_code = self._GetContainerInfo()
 
-    logging.info("Checking if Docker Container Exists")
-    if len(info) > 0 and returnCode == 0:
+    logging.info('Checking if Docker Container Exists')
+    if info and return_code == 0:
       status = info[0]['State']['Running']
-      if status == "True" or status is True:
-        logging.info("Docker Container %s is up and running.", self.name)
+      if status:
+        logging.info('Docker Container %s is up and running.', self.name)
         return True
 
     return False
@@ -180,42 +180,42 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     for scratch_disk in self.scratch_disks[:]:
       scratch_disk.Delete()
       self.scratch_disks.remove(scratch_disk)
-    pass
 
   def DeleteScratchDisks(self):
     pass
 
   def _GetIpAddresses(self):
     """Sets the internal and external IP address for the Container."""
-    info, returnCode = self._GetContainerInfo()
+    info, return_code = self._GetContainerInfo()
     ip = False
 
-    if len(info) > 0 and returnCode == 0:
+    if info and return_code == 0:
       ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
-      logging.info("IP: " + str(ip))
+      logging.info('IP: %d', ip)
       self.ip_address = ip
       self.internal_ip = ip
     else:
-      logging.warning("IP address information not found")
+      logging.warning('IP address information not found')
 
   def _RemoveIfExists(self):
     if self._Exists():
       self._Delete()
 
   def _GetContainerInfo(self):
-    """Returns information about a container
+    """Returns information about a container.
 
     Gets Container information from Docker Inspect. Returns the information,
     if there is any and a return code. 0
     """
-    logging.info("Checking Container Information")
+    logging.info('Checking Container Information')
     inspect_cmd = ['docker', 'inspect', self.name]
-    info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
+    info, _, return_code = vm_util.IssueCommand(inspect_cmd,
+                                                suppress_warning=True)
     info = json.loads(info)
-    return info, returnCode
+    return info, return_code
 
   def _ConfigureProxy(self):
-    """Configure network proxy for Docker Container
+    """Configure network proxy for Docker Container.
 
     In Docker containers environment variables from /etc/environment
     are not sourced - this results in connection problems when running
@@ -234,11 +234,11 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _BuildVolumesBody(self):
-    """Constructs volumes-related part of create command for Docker Container"""
+    """Construct volumes-related part of create command for Docker Container."""
     volumes = []
 
     for scratch_disk in self.scratch_disks:
-      vol_string = scratch_disk.volume_name + ":" + scratch_disk.mount_point
+      vol_string = scratch_disk.volume_name + ':' + scratch_disk.mount_point
       volumes.append('-v')
       volumes.append(vol_string)
 
@@ -247,19 +247,21 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
   def _LocalImageExists(self, docker_image_name):
     """Returns whether a Docker image exists locally."""
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
-    info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
+    info, _, return_code = vm_util.IssueCommand(inspect_cmd,
+                                                suppress_warning=True)
     info = json.loads(info)
-    logging.info("Checking if Docker Image Exists")
-    if len(info) > 0 and returnCode == 0:
-      logging.info("Image exists")
+    logging.info('Checking if Docker Image Exists')
+    if info and return_code == 0:
+      logging.info('Image exists')
       return True
-    logging.info("Image does not exist")
+    logging.info('Image does not exist')
     return False
 
   def _BuildImageLocally(self):
-    """Build Container Image Locally
+    """Build Container Image Locally.
 
-    Dockerfiles located at PerfKitBenchmarker/data/docker/pkb/<containerImage>/Dockerfile
+    Dockerfiles located at
+    PerfKitBenchmarker/data/docker/pkb/<containerImage>/Dockerfile
     """
     directory = os.path.dirname(
         data.ResourcePath(os.path.join(DOCKERFILE_DIRECTORY,
@@ -278,8 +280,8 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
       dict mapping string property key to value.
     """
     result = super(DockerContainer, self).GetResourceMetadata()
-    logging.warn("GET RESOURCE METADATA")
-    print(result)
+    logging.warn('GET RESOURCE METADATA')
+
     return result
 
 
@@ -291,19 +293,19 @@ class DebianBasedDockerContainer(DockerContainer,
     return self.cpus
 
   def ApplySysctlPersistent(self, sysctl_params):
-    """Override ApplySysctlPeristent function for Docker provider
+    """Override ApplySysctlPeristent function for Docker provider.
 
     Parent function causes errors with Docker because it shutdowns container
     Args:
       sysctl_params: dict - the keys and values to write
     """
-    logging.warn("sysctl flags are applied when container is created. "
-                 "Not all sysctl flags work with Docker. It does not "
-                 "support flags that modify the host system")
+    logging.warn('sysctl flags are applied when container is created. '
+                 'Not all sysctl flags work with Docker. It does not '
+                 'support flags that modify the host system')
 
   def _RebootIfNecessary(self):
-    """Override RebootIfNecessary for Docker Provider"""
-    logging.warn("Docker Containers cannot be rebooted to apply flags")
+    """Override RebootIfNecessary for Docker Provider."""
+    logging.warn('Docker Containers cannot be rebooted to apply flags')
 
 
 class Ubuntu1604BasedDockerContainer(
