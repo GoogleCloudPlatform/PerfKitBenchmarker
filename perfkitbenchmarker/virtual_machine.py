@@ -443,6 +443,7 @@ class BaseVirtualMachine(resource.BaseResource):
       if preprovisioned:
         self.DownloadPreprovisionedData(install_path, module_name, filename)
       elif url:
+        self.Install('wget')
         self.RemoteCommand('wget -P {0} {1}'.format(install_path, url))
       else:
         raise errors.Setup.BadPreProvisionedDataError(
