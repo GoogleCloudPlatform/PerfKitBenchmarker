@@ -678,7 +678,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Benchmarks.QuotaFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
-          '%s return code: %s' % (retcode, stderr))
+          'Failed to create VM: %s return code: %s' % (retcode, stderr))
 
   def _Delete(self):
     """Delete a VM instance."""

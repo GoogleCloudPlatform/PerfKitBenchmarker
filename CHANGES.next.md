@@ -383,7 +383,7 @@
 - Fixed treatment of the boot time metric so that it is more like any other run
   stage metric.
 - Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
-- Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Made failures to create VMs on AWS, Azure, and GCP fail PKB quickly.
 - Fix Kubernetes StorageClass deletion
 - Added `git` installation to `tensorflow_serving` package.
 - MountDisk throws exception if mounting the disk fails.
