@@ -141,9 +141,6 @@ class TestVM(virtual_machine.BaseVirtualMachine):
   def __repr__(self):
     pass
 
-  def Install(self):
-    pass
-
   def Uninstall(self):
     pass
 
@@ -161,6 +158,9 @@ class TestVM(virtual_machine.BaseVirtualMachine):
 
   def CheckPreprovisionedData(self):
     pass
+
+  def Install(self, pkg):
+    del pkg
 
 
 class TestInstallData(

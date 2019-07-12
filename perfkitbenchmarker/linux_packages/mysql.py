@@ -15,14 +15,28 @@
 
 """Module containing mysql installation and cleanup functions."""
 
-MYSQL_RPM = 'http://dev.mysql.com/get/mysql-community-release-el6-5.noarch.rpm'
+import posixpath
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
+
+MYSQL_RPM = 'mysql-community-release-el6-5.noarch.rpm'
 MYSQL_PSWD = 'perfkitbenchmarker'
+MYSQL_URL = 'https://dev.mysql.com/get/' + MYSQL_RPM
+PACKAGE_NAME = 'mysql'
+PREPROVISIONED_DATA = {
+    MYSQL_RPM: '1cbcf6b4ae7592b9ac100d9e7cd2ceb4'
+}
+PACKAGE_DATA_URL = {
+    MYSQL_RPM: MYSQL_URL
+}
 
 
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
   vm.RemoteCommand('sudo setenforce 0')
-  vm.RemoteCommand('sudo rpm -ivh --force %s' % MYSQL_RPM)
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
+  vm.RemoteCommand(
+      'sudo rpm -ivh --force %s' % posixpath.join(INSTALL_DIR, MYSQL_RPM))
   vm.InstallPackages('mysql-server')
   vm.RemoteCommand('sudo service mysqld start')
   vm.RemoteCommand('/usr/bin/mysqladmin -u root password "%s"' % MYSQL_PSWD)
@@ -39,19 +53,23 @@ def AptInstall(vm):
 
 def YumGetPathToConfig(vm):
   """Returns the path to the mysql config file."""
+  del vm
   return '/etc/my.cnf'
 
 
 def AptGetPathToConfig(vm):
   """Returns the path to the mysql config file."""
+  del vm
   return '/etc/mysql/my.cnf'
 
 
 def YumGetServiceName(vm):
   """Returns the name of the mysql service."""
+  del vm
   return 'mysqld'
 
 
 def AptGetServiceName(vm):
   """Returns the name of the mysql service."""
+  del vm
   return 'mysql'
