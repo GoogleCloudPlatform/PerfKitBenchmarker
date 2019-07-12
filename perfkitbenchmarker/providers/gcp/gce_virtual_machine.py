@@ -513,6 +513,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.error(STOCKOUT_MESSAGE)
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
+    if retcode:
+      raise errors.Resource.CreationError(
+          'Failed to create VM: %s return code: %s' % (retcode, stderr))
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
