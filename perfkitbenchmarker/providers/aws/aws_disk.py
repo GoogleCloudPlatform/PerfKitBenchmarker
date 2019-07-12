@@ -183,9 +183,9 @@ class AwsDisk(disk.BaseDisk):
        EbsDriveIsNvme(self.machine_type):
       first_device_letter = 'b'
       local_drive_number = ord(letter_suggestion) - ord(first_device_letter)
-      logging.info('local drive number is: %d' % local_drive_number)
+      logging.info('local drive number is: %d', local_drive_number)
       if local_drive_number < nvme_boot_drive_index:
-       self.device_letter = letter_suggestion
+        self.device_letter = letter_suggestion
       else:
         # skip the boot drive
         self.device_letter = chr(ord(letter_suggestion) + 1)

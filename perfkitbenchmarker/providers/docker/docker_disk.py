@@ -17,20 +17,20 @@
 import logging
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import errors
 
 FLAGS = flags.FLAGS
 
 
 def CreateDisks(disk_specs, vm_name):
-  """Creates scratch disks (Docker Volumes)"""
+  """Creates scratch disks (Docker Volumes)."""
 
   scratch_disks = []
   for disk_num, disk_spec in enumerate(disk_specs):
 
-    logging.info("Creating Disk number: " + str(disk_num))
+    logging.info('Creating Disk number: %d', disk_num)
 
     volume_disk = DockerDisk(disk_spec, disk_num, vm_name)
     volume_disk.Create()
@@ -40,7 +40,7 @@ def CreateDisks(disk_specs, vm_name):
 
 
 class DockerDisk(disk.BaseDisk):
-  """ Object representing a Docker Volume."""
+  """Object representing a Docker Volume."""
 
   def __init__(self, disk_spec, disk_num, vm_name):
     super(DockerDisk, self).__init__(disk_spec)
