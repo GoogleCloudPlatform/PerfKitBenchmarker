@@ -191,7 +191,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
     if info and return_code == 0:
       ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
-      logging.info('IP: %d', ip)
+      logging.info('IP: %s', ip)
       self.ip_address = ip
       self.internal_ip = ip
     else:
