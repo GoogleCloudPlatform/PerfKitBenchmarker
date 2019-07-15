@@ -55,10 +55,6 @@ import yaml
 
 FLAGS = flags.FLAGS
 
-EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '6/x86_64/Packages/e/epel-release-6-8.noarch.rpm')
-EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '7/x86_64/Packages/e/epel-release-7-11.noarch.rpm')
 
 LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
 UPDATE_RETRIES = 5
@@ -1089,20 +1085,7 @@ class RhelMixin(BaseLinuxMixin):
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
-    try:
-      self.InstallPackages('epel-release')
-    except errors.VirtualMachine.RemoteCommandError as e:
-      stdout, _ = self.RemoteCommand('cat /etc/redhat-release')
-      major_version = int(re.search('release ([0-9])', stdout).group(1))
-      if major_version == 6:
-        epel_rpm = EPEL6_RPM
-      elif major_version == 7:
-        epel_rpm = EPEL7_RPM
-      else:
-        raise e
-      self.RemoteCommand('sudo rpm -ivh --force %s' % epel_rpm)
-    self.InstallPackages('yum-utils')
-    self.RemoteCommand('sudo yum-config-manager --enable epel')
+    self.Install('epel_release')
 
   def PackageCleanup(self):
     """Cleans up all installed packages.
