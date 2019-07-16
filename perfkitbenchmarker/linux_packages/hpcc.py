@@ -28,8 +28,17 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import openblas
 
+
+PACKAGE_NAME = 'hpcc'
 HPCC_TAR = 'hpcc-1.5.0.tar.gz'
-HPCC_URL = 'http://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
+HPCC_URL = 'https://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
+PREPROVISIONED_DATA = {
+    HPCC_TAR: 'bf6df65a2d690034db79151d53cf0791'
+}
+PACKAGE_DATA_URL = {
+    HPCC_TAR: HPCC_URL
+}
+
 HPCC_DIR = '%s/hpcc-1.5.0' % INSTALL_DIR
 HPCC_VERSION = '1.5.0'
 
@@ -249,7 +258,8 @@ def _Install(vm):
   """Installs the HPCC package on the VM."""
   vm.Install('wget')
   vm.Install('openmpi')
-  vm.RemoteCommand('wget %s -P %s' % (HPCC_URL, INSTALL_DIR))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
   vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, HPCC_TAR))
 
   if FLAGS.hpcc_benchmarks:
@@ -289,6 +299,9 @@ def _CompileHpccMKL(vm):
   Intel MKL Cluster FFT. Such that we have to at first install OpenBlas and
   build hpcc binary using OpenBlas. Need to investigate how to build hpcc
   binary without 'interfaces/fftw2x_cdft'.
+
+  Args:
+    vm: VirtualMachine object. The VM to install hpcc.
   """
   _CompileHpccOpenblas(vm)
   vm.RemoteCommand('cd %s; rm hpcc' % HPCC_DIR)
