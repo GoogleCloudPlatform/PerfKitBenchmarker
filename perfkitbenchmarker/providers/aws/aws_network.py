@@ -35,6 +35,11 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
+flags.DEFINE_string('aws_vpc', None,
+                    'The static AWS VPC id to use. Default creates a new one')
+flags.DEFINE_string(
+    'aws_subnet', None,
+    'The static AWS subnet id to use.  Default creates a new one')
 FLAGS = flags.FLAGS
 
 
@@ -112,17 +117,18 @@ class AwsFirewall(network.BaseFirewall):
 class AwsVpc(resource.BaseResource):
   """An object representing an Aws VPC."""
 
-  def __init__(self, region):
-    super(AwsVpc, self).__init__()
+  def __init__(self, region, vpc_id=None):
+    super(AwsVpc, self).__init__(vpc_id is not None)
     self.region = region
-    self.id = None
-
+    self.id = vpc_id
     # Subnets are assigned per-AZ.
     # _subnet_index tracks the next unused 10.0.x.0/24 block.
     self._subnet_index = 0
     # Lock protecting _subnet_index
     self._subnet_index_lock = threading.Lock()
     self.default_security_group_id = None
+    if self.id:
+      self._SetSecurityGroupId()
 
   def _Create(self):
     """Creates the VPC."""
@@ -223,12 +229,12 @@ class AwsVpc(resource.BaseResource):
 class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
 
-  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24'):
-    super(AwsSubnet, self).__init__()
+  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24', subnet_id=None):
+    super(AwsSubnet, self).__init__(subnet_id is not None)
     self.zone = zone
     self.region = util.GetRegionFromZone(zone)
     self.vpc_id = vpc_id
-    self.id = None
+    self.id = subnet_id
     self.cidr_block = cidr_block
 
   def _Create(self):
@@ -290,12 +296,16 @@ class AwsSubnet(resource.BaseResource):
 class AwsInternetGateway(resource.BaseResource):
   """An object representing an Aws Internet Gateway."""
 
-  def __init__(self, region):
-    super(AwsInternetGateway, self).__init__()
+  def __init__(self, region, vpc_id=None):
+    super(AwsInternetGateway, self).__init__(vpc_id is not None)
     self.region = region
     self.vpc_id = None
     self.id = None
     self.attached = False
+    if vpc_id:
+      self.vpc_id = vpc_id
+      self.id = self.GetDict()['InternetGatewayId']
+      self.attached = True
 
   def _Create(self):
     """Creates the internet gateway."""
@@ -362,7 +372,7 @@ class AwsInternetGateway(resource.BaseResource):
 
   def Detach(self):
     """Detaches the internetgateway from the VPC."""
-    if self.attached:
+    if self.attached and not self.user_managed:
       detach_cmd = util.AWS_PREFIX + [
           'ec2',
           'detach-internet-gateway',
@@ -489,10 +499,10 @@ class _AwsRegionalNetwork(network.BaseNetwork):
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
-  def __init__(self, region):
+  def __init__(self, region, vpc_id=None):
     self.region = region
-    self.vpc = AwsVpc(self.region)
-    self.internet_gateway = AwsInternetGateway(region)
+    self.vpc = AwsVpc(self.region, vpc_id)
+    self.internet_gateway = AwsInternetGateway(region, vpc_id)
     self.route_table = None
     self.created = False
 
@@ -507,11 +517,12 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     self._reference_count_lock = threading.Lock()
 
   @classmethod
-  def GetForRegion(cls, region):
+  def GetForRegion(cls, region, vpc_id=None):
     """Retrieves or creates an _AwsRegionalNetwork.
 
     Args:
       region: string. AWS region name.
+      vpc_id: string. AWS VPC id.
 
     Returns:
       _AwsRegionalNetwork. If an _AwsRegionalNetwork for the same region already
@@ -527,7 +538,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     # is only called from AwsNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
     if key not in benchmark_spec.networks:
-      benchmark_spec.networks[key] = cls(region)
+      benchmark_spec.networks[key] = cls(region, vpc_id)
     return benchmark_spec.networks[key]
 
   def Create(self):
@@ -571,7 +582,22 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 
 class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
-  pass
+
+  def __init__(self, zone, vpc_id=None, subnet_id=None):
+    super(AwsNetworkSpec, self).__init__(zone)
+    if vpc_id or subnet_id:
+      logging.info('Confirming vpc (%s) and subnet (%s) selections', vpc_id,
+                   subnet_id)
+      my_subnet = AwsSubnet(self.zone, vpc_id, subnet_id=subnet_id).GetDict()
+      self.vpc_id = my_subnet['VpcId']
+      self.subnet_id = my_subnet['SubnetId']
+      self.cidr_block = my_subnet['CidrBlock']
+      logging.info('Using vpc %s subnet %s cidr %s', self.vpc_id,
+                   self.subnet_id, self.cidr_block)
+    else:
+      self.vpc_id = None
+      self.subnet_id = None
+      self.cidr_block = None
 
 
 class AwsNetwork(network.BaseNetwork):
@@ -597,15 +623,23 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region)
+    self.regional_network = _AwsRegionalNetwork.GetForRegion(
+        self.region, spec.vpc_id)
     self.subnet = None
     self.placement_group = AwsPlacementGroup(self.region)
     self.is_static = False
+    if spec.vpc_id:
+      self.is_static = True
+      self.subnet = AwsSubnet(
+          self.zone,
+          spec.vpc_id,
+          cidr_block=spec.cidr_block,
+          subnet_id=spec.subnet_id)
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
-    """Returns an AwsNetworkSpec created from VM attributes."""
-    return AwsNetworkSpec(vm.zone)
+    """Returns an AwsNetworkSpec created from VM attributes and flags."""
+    return AwsNetworkSpec(vm.zone, FLAGS.aws_vpc, FLAGS.aws_subnet)
 
   def Create(self):
     """Creates the network."""

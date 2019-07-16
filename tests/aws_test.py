@@ -80,7 +80,6 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AwsVpcTestCase, self).setUp()
-
     p = mock.patch('perfkitbenchmarker.providers.aws.'
                    'util.IssueRetryableCommand')
     p.start()
@@ -119,6 +118,9 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     zone = 'us-west-1a'
     spec = aws_network.AwsNetworkSpec(zone)
     self.assertEqual(zone, spec.zone)
+    self.assertIsNone(spec.vpc_id)
+    self.assertIsNone(spec.subnet_id)
+    self.assertIsNone(spec.cidr_block)
 
   @mock.patch.object(vm_util, 'IssueCommand')
   def testInternetGatewayLifecycle(self, mock_cmd):
@@ -196,6 +198,45 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     subnet.Delete()
     mock_cmd.assert_called_with(delete_cmd)
     util.IssueRetryableCommand.assert_called_with(describe_cmd)
+
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testStaticVpc(self, mock_cmd):
+    vpc_id = 'vpc-1234'
+    security_group_id = 'sg-1234'
+    security_group_res = {'SecurityGroups': [{'GroupId': security_group_id}]}
+    does_exist_res = {'Vpcs': [1,]}
+    does_not_exist_res = {'Vpcs': []}
+    mock_cmd.return_value = json.dumps(security_group_res), '', 0
+    util.IssueRetryableCommand.side_effect = [(json.dumps(does_exist_res), ''),
+                                              (json.dumps(does_not_exist_res),
+                                               '')]
+    vpc = aws_network.AwsVpc('region', vpc_id)
+    self.assertTrue(vpc.user_managed)
+    # show Create() works
+    vpc.Create()
+    self.assertEqual(vpc_id, vpc.id)
+    self.assertEqual(security_group_id, vpc.default_security_group_id)
+    # show Delete() doesn't delete, but it does call _Exists() again
+    vpc.Delete()
+
+  def testNetworkSpecWithVpcId(self):
+    zone = 'us-west-1a'
+    vpc_id = 'vpc-1234'
+    subnet_id = 'subnet-1234'
+    cidr = '10.0.0.0/24'
+    res = {
+        'Subnets': [{
+            'VpcId': vpc_id,
+            'SubnetId': subnet_id,
+            'CidrBlock': cidr
+        }]
+    }
+    util.IssueRetryableCommand.return_value = json.dumps(res), None
+    spec = aws_network.AwsNetworkSpec(zone, vpc_id)
+    self.assertEqual(zone, spec.zone)
+    self.assertEqual(vpc_id, spec.vpc_id)
+    self.assertEqual(subnet_id, spec.subnet_id)
+    self.assertEqual(cidr, spec.cidr_block)
 
 
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
