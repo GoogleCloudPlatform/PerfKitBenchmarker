@@ -62,7 +62,7 @@ class AwsFirewall(network.BaseFirewall):
       source_range: List of source CIDRs to allow for this port. If None, all
         sources are allowed. i.e. ['0.0.0.0/0']
     """
-    if vm.is_static:
+    if vm.is_static or vm.network.is_static:
       return
     self.AllowPortInSecurityGroup(vm.region, vm.group_id, start_port, end_port,
                                   source_range)
@@ -138,6 +138,9 @@ class AwsVpc(resource.BaseResource):
     util.AddDefaultTags(self.id, self.region)
 
   def _PostCreate(self):
+    self._SetSecurityGroupId()
+
+  def _SetSecurityGroupId(self):
     """Looks up the VPC default security group."""
     cmd = util.AWS_PREFIX + [
         'ec2',
@@ -259,16 +262,29 @@ class AwsSubnet(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the subnet exists."""
+    return bool(self.GetDict())
+
+  def GetDict(self):
+    """The 'aws ec2 describe-subnets' for this VPC / subnet id.
+
+    Returns:
+      A dict of the single subnet or an empty dict if there are no subnets.
+
+    Raises:
+      AssertionError: If there is more than one subnet.
+    """
     describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-subnets',
+        'ec2', 'describe-subnets',
         '--region=%s' % self.region,
-        '--filter=Name=subnet-id,Values=%s' % self.id]
+        '--filter=Name=vpc-id,Values=%s' % self.vpc_id
+    ]
+    if self.id:
+      describe_cmd.append('--filter=Name=subnet-id,Values=%s' % self.id)
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     subnets = response['Subnets']
     assert len(subnets) < 2, 'Too many subnets.'
-    return len(subnets) > 0
+    return subnets[0] if subnets else {}
 
 
 class AwsInternetGateway(resource.BaseResource):
@@ -303,16 +319,33 @@ class AwsInternetGateway(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the internet gateway exists."""
+    return bool(self.GetDict())
+
+  def GetDict(self):
+    """The 'aws ec2 describe-internet-gateways' for this VPC / gateway id.
+
+    Returns:
+      A dict of the single gateway or an empty dict if there are no gateways.
+
+    Raises:
+      AssertionError: If there is more than one internet gateway.
+    """
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-internet-gateways',
         '--region=%s' % self.region,
-        '--filter=Name=internet-gateway-id,Values=%s' % self.id]
+    ]
+    if self.id:
+      describe_cmd.append('--filter=Name=internet-gateway-id,Values=%s' %
+                          self.id)
+    if self.vpc_id:
+      describe_cmd.append('--filter=Name=attachment.vpc-id,Values=%s' %
+                          self.vpc_id)
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     internet_gateways = response['InternetGateways']
     assert len(internet_gateways) < 2, 'Too many internet gateways.'
-    return len(internet_gateways) > 0
+    return internet_gateways[0] if internet_gateways else {}
 
   def Attach(self, vpc_id):
     """Attaches the internetgateway to the VPC."""
@@ -536,6 +569,11 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     self.vpc.Delete()
 
 
+class AwsNetworkSpec(network.BaseNetworkSpec):
+  """Configuration for creating an AWS network."""
+  pass
+
+
 class AwsNetwork(network.BaseNetwork):
   """Object representing an AWS Network.
 
@@ -555,13 +593,19 @@ class AwsNetwork(network.BaseNetwork):
     """Initializes AwsNetwork instances.
 
     Args:
-      spec: A BaseNetworkSpec object.
+      spec: An AwsNetworkSpec object.
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
     self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region)
     self.subnet = None
     self.placement_group = AwsPlacementGroup(self.region)
+    self.is_static = False
+
+  @staticmethod
+  def _GetNetworkSpecFromVm(vm):
+    """Returns an AwsNetworkSpec created from VM attributes."""
+    return AwsNetworkSpec(vm.zone)
 
   def Create(self):
     """Creates the network."""
