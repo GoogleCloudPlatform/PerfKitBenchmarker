@@ -33,7 +33,7 @@ PACKAGE_NAME = 'hpcc'
 HPCC_TAR = 'hpcc-1.5.0.tar.gz'
 HPCC_URL = 'https://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
 PREPROVISIONED_DATA = {
-    HPCC_TAR: 'bf6df65a2d690034db79151d53cf0791'
+    HPCC_TAR: '0a6fef7ab9f3347e549fed65ebb98234feea9ee18aea0c8f59baefbe3cf7ffb8'
 }
 PACKAGE_DATA_URL = {
     HPCC_TAR: HPCC_URL

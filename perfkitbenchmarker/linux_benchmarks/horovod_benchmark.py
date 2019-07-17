@@ -54,7 +54,9 @@ horovod:
 # The data is downloaded from http://image-net.org/
 # For data preprocessing, please check
 # https://github.com/mlperf/training/tree/master/image_classification#3-datasetenvironment
-BENCHMARK_DATA = {'ILSVRC2012.tar': 'cd2de079dc2e18fc9a9f598b5a38969b'}
+BENCHMARK_DATA = {
+    'ILSVRC2012.tar':
+        'ae83026644feeaf42a387d29765980830387756eff3293bb96fa91f3911a1b15'}
 
 GITHUB_MODELS_URL = 'https://github.com/aws-samples/deep-learning-models.git'
 

@@ -30,7 +30,7 @@ _DEFAULT_RUNSPEC_CONFIG = 'linux64-x64-gcc47.cfg'
 # This benchmark can be run with an .iso file in the data directory, a tar file
 # in the data directory, or a tar file preprovisioned in cloud storage. To run
 # this benchmark with tar file preprovisioned in cloud storage, update the
-# following dict with md5sum of the file in cloud storage.
+# following dict with sha256sum of the file in cloud storage.
 PREPROVISIONED_DATA = {_SPECCPU2006_TAR: None}
 
 

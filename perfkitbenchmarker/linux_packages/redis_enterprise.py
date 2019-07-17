@@ -62,10 +62,14 @@ _XENIAL_TAR = 'redislabs-5.4.2-24-xenial-amd64.tar'
 _BIONIC_TAR = 'redislabs-5.4.2-24-bionic-amd64.tar'
 _USERNAME = 'user@google.com'
 PREPROVISIONED_DATA = {
-    _RHEL_TAR: '2c7b6847e8383d81d9e17e63ffed1ce1',
-    _XENIAL_TAR: 'b5338c5c3a3e432ef1c47a3b3bc8174b',
-    _BIONIC_TAR: 'e827d4811270d4a5a63497b0333b5ca7',
-    _LICENSE: '28196ad6138ffa0bb5b856e44c0ba609',
+    _RHEL_TAR:
+        '8db83074b3e4e6de9c249ce34b6bb899ed158a6a4801f36c530e79bdb97a4c20',
+    _XENIAL_TAR:
+        'ef2da8b5eaa02b53488570392df258c0d5d3890a9085c2495aeb5c96f336e639',
+    _BIONIC_TAR:
+        'ef0c58d6d11683aac07d3f2cae6b9544cb53064c9f7a7419d63b6d14cd858d53',
+    _LICENSE:
+        'd336e9fb8574519ab90a54155727c5c73dda122d906a617368bdfa6a32b03a42',
 }
 
 

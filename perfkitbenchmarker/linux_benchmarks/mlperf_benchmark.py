@@ -52,7 +52,9 @@ mlperf:
 # For data preprocessing, please check
 # https://github.com/mlperf/training/tree/master/image_classification#3-datasetenvironment
 _ILSVRC2012_TAR = 'ILSVRC2012.tar'
-BENCHMARK_DATA = {_ILSVRC2012_TAR: 'cd2de079dc2e18fc9a9f598b5a38969b'}
+BENCHMARK_DATA = {
+    _ILSVRC2012_TAR:
+        'ae83026644feeaf42a387d29765980830387756eff3293bb96fa91f3911a1b15'}
 
 flags.DEFINE_enum('mlperf_benchmark', 'resnet', ['resnet'],
                   'MLPerf benchmark test to run.')
