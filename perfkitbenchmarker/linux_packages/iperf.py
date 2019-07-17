@@ -24,7 +24,8 @@ PACKAGE_NAME = 'iperf'
 IPERF_ZIP = '2.0.4-RELEASE.zip'
 IPERF_DIR = 'iperf-2.0.4-RELEASE'
 PREPROVISIONED_DATA = {
-    IPERF_ZIP: 'c3aec97a653fa8705dc167700d002963'
+    IPERF_ZIP:
+        '84000784e9286531c227b14c999b236f9cc5679564ba1bff8702f28c30513853'
 }
 PACKAGE_DATA_URL = {
     IPERF_ZIP: posixpath.join('https://github.com/esnet/iperf/archive',

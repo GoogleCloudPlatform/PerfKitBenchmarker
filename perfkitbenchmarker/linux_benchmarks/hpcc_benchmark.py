@@ -72,7 +72,8 @@ BENCHMARK_DATA = {
     # "Intel Performance Libraries for Linux*", choose the version
     # "2018 Update 2" and choose the download option "Intel
     # Math Kernel Library(Intel Mkl)".
-    MKL_TGZ: 'fd31b656a8eb859c89495b9cc41230b4',
+    MKL_TGZ:
+        'e28d12173bef9e615b0ded2f95f59a42b3e9ad0afa713a79f8801da2bfb31936',
 }
 
 BENCHMARK_NAME = 'hpcc'

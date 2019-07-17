@@ -26,8 +26,10 @@ EPEL_BASE_URL = 'http://dl.fedoraproject.org/pub/epel/'
 EPEL_URL_PATH = 'x86_64/Packages/e'
 
 PREPROVISIONED_DATA = {
-    EPEL6_RPM: '2cd0ae668a585a14e07c2ea4f264d79b',
-    EPEL7_RPM: 'd512508b8629428e7c3f535cc8012680'
+    EPEL6_RPM:
+        'e5ed9ecf22d0c4279e92075a64c757ad2b38049bcf5c16c4f2b75d5f6860dc0d',
+    EPEL7_RPM:
+        '33b8b8250960874014d7c66d04ef12df3a71277b9eb6f2146bba7553daeaf910'
 }
 PACKAGE_DATA_URL = {
     EPEL6_RPM: posixpath.join(
