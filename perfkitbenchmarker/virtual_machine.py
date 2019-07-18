@@ -74,7 +74,7 @@ flags.DEFINE_bool(
 
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.
-VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws']
+VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws', 't4']
 
 
 def GetVmSpecClass(cloud):

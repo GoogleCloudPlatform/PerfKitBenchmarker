@@ -120,6 +120,7 @@
   to dynamodb.
 - Added helpmatchmd flag to dump markdown formatted help strings
 - Enable specifying source ip when creating a firewall rule.
+- Added support for T4 GPUs on GCE.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
