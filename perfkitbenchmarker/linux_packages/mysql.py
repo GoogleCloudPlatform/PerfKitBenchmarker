@@ -23,7 +23,8 @@ MYSQL_PSWD = 'perfkitbenchmarker'
 MYSQL_URL = 'https://dev.mysql.com/get/' + MYSQL_RPM
 PACKAGE_NAME = 'mysql'
 PREPROVISIONED_DATA = {
-    MYSQL_RPM: '1cbcf6b4ae7592b9ac100d9e7cd2ceb4'
+    MYSQL_RPM:
+        '81b2256f778bb3972054257edda2c2a82fcec455cae3d45ba9c8778a46aa8eb3'
 }
 PACKAGE_DATA_URL = {
     MYSQL_RPM: MYSQL_URL

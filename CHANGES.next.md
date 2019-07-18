@@ -120,6 +120,7 @@
   to dynamodb.
 - Added helpmatchmd flag to dump markdown formatted help strings
 - Enable specifying source ip when creating a firewall rule.
+- Added support for T4 GPUs on GCE.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -310,6 +311,7 @@
 - Extract GceVirtualMachine's GetNetwork into a method.
 - Add Clear Linux support for AWS stripe disks.
 - Load memcached server before running benchmark.
+- Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

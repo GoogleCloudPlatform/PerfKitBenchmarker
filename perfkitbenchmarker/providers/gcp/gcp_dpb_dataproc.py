@@ -224,6 +224,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     mb_command = ['gsutil', 'mb']
     region = self.dpb_service_zone.rsplit('-', 1)[0]
     mb_command.extend(['-c', 'regional', '-l', region])
+
+    if self.project is not None:
+      mb_command.extend(['-p', self.project])
+
     mb_command.append('{}{}'.format(self.PERSISTENT_FS_PREFIX, source_bucket))
     vm_util.IssueCommand(mb_command)
 

@@ -996,19 +996,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'sudo blockdev --setra {0} {1}; sudo blockdev --setfra {0} {1};'.format(
             num_sectors, ' '.join(devices)))
 
-  def GetMd5sum(self, path, filename):
-    """Gets the md5sum hash for a filename in a path on the VM.
+  def GetSha256sum(self, path, filename):
+    """Gets the sha256sum hash for a filename in a path on the VM.
 
     Args:
       path: string; Path on the VM.
       filename: string; Name of the file in the path.
 
     Returns:
-      string; The md5sum hash.
+      string; The sha256sum hash.
     """
-    stdout, _ = self.RemoteCommand('md5sum %s' % posixpath.join(path, filename))
-    md5sum, _ = stdout.split()
-    return md5sum
+    stdout, _ = self.RemoteCommand(
+        'sha256sum %s' % posixpath.join(path, filename))
+    sha256sum, _ = stdout.split()
+    return sha256sum
 
   def _GetNfsService(self):
     """Returns the NfsService created in the benchmark spec.

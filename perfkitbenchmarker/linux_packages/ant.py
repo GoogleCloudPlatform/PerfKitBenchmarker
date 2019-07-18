@@ -23,7 +23,9 @@ ANT_TAR = 'apache-ant-1.9.6-bin.tar.gz'
 ANT_TAR_URL = 'https://archive.apache.org/dist/ant/binaries/' + ANT_TAR
 
 PACKAGE_NAME = 'ant'
-PREPROVISIONED_DATA = {ANT_TAR: 'f1d2e99df927a141c355210d55fe4d32'}
+PREPROVISIONED_DATA = {
+    ANT_TAR:
+        '90d28c0202871bd9875a5da6d982f362bb3114d346b9d8ae58860b8d3312c21c'}
 PACKAGE_DATA_URL = {ANT_TAR: ANT_TAR_URL}
 ANT_HOME_DIR = posixpath.join(INSTALL_DIR, PACKAGE_NAME)
 

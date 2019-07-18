@@ -170,7 +170,7 @@ class TestInstallData(
     super(TestInstallData, self).setUp()
     self.vm = TestVM(None)
     self.preprovisioned_data = {
-        'fake_pkg': 'fake_md5'
+        'fake_pkg': 'fake_checksum'
     }
     self.module_name = 'fake_module'
     self.filenames = ['fake_pkg']
@@ -194,7 +194,7 @@ class TestInstallData(
     remote_command.assert_called_once_with(
         'wget -P /fake_path fake_url')
     check.assert_called_once_with(
-        self.install_path, self.module_name, 'fake_pkg', 'fake_md5')
+        self.install_path, self.module_name, 'fake_pkg', 'fake_checksum')
 
   def testPreprovisionSucceed(self):
     with mock.patch.object(
@@ -212,7 +212,7 @@ class TestInstallData(
         self.install_path, self.module_name, 'fake_pkg')
     remote_command.assert_not_called()
     check.assert_called_once_with(
-        self.install_path, self.module_name, 'fake_pkg', 'fake_md5')
+        self.install_path, self.module_name, 'fake_pkg', 'fake_checksum')
 
   def testPreprovisionNotAvailableFallBackNotAvailable(self):
     with mock.patch.object(
