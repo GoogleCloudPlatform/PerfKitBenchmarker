@@ -41,6 +41,12 @@ _BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
+def _AwsCommand(region, topic, *args):
+  return [
+      'aws', '--output', 'json', 'ec2', topic, '--region={}'.format(region)
+  ] + list(args)
+
+
 class AwsVolumeExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
@@ -70,16 +76,30 @@ class AwsVolumeExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(self.disk._Exists())
 
 
-class AwsVpcExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
+class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsVpcExistsTestCase, self).setUp()
+    super(AwsVpcTestCase, self).setUp()
     p = mock.patch('perfkitbenchmarker.providers.aws.'
                    'util.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
     self.vpc = aws_network.AwsVpc('region')
-    self.vpc.id = 'vpc-foo'
+
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testCreateNormalVpc(self, mock_cmd):
+    vpc_id = 'vpc-1234'
+    security_group_id = 'sg-1234'
+    res1 = {'Vpc': {'VpcId': vpc_id}}
+    res2 = {'Vpcs': [1]}
+    res3 = {'SecurityGroups': [{'GroupId': security_group_id}]}
+    mock_cmd.side_effect = [(json.dumps(res1), '', 0),
+                            (json.dumps(res3), '', 0)]
+    util.IssueRetryableCommand.return_value = json.dumps(res2), ''
+    self.assertFalse(self.vpc.user_managed)
+    self.vpc.Create()
+    self.assertEqual(vpc_id, self.vpc.id)
+    self.assertEqual(security_group_id, self.vpc.default_security_group_id)
 
   def testVpcDeleted(self):
     response = '{"Vpcs": [] }'
@@ -93,6 +113,130 @@ class AwsVpcExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
                 '}]}')
     util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertTrue(self.vpc._Exists())
+
+  def testNetworkSpec(self):
+    zone = 'us-west-1a'
+    spec = aws_network.AwsNetworkSpec(zone)
+    self.assertEqual(zone, spec.zone)
+    self.assertIsNone(spec.vpc_id)
+    self.assertIsNone(spec.subnet_id)
+    self.assertIsNone(spec.cidr_block)
+
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testInternetGatewayLifecycle(self, mock_cmd):
+    region = 'us-west-1'
+    gateway_id = 'igw-123'
+    create_response = {'InternetGateway': {'InternetGatewayId': gateway_id}}
+    exists_response = {'InternetGateways': [{'InternetGatewayId': gateway_id}]}
+    exists_response_no_resources = {'InternetGateways': []}
+    delete_response = {}
+    create_cmd = _AwsCommand(region, 'create-internet-gateway')
+    describe_cmd = _AwsCommand(
+        region, 'describe-internet-gateways',
+        '--filter=Name=internet-gateway-id,Values={}'.format(gateway_id))
+    delete_cmd = _AwsCommand(region, 'delete-internet-gateway',
+                             '--internet-gateway-id={}'.format(gateway_id))
+
+    # Test the Create() command
+    mock_cmd.side_effect = [(json.dumps(create_response), '', 0)]
+    util.IssueRetryableCommand.side_effect = [(json.dumps(exists_response), '')]
+    gateway = aws_network.AwsInternetGateway(region)
+    gateway.Create()
+    mock_cmd.assert_called_with(create_cmd)
+    util.IssueRetryableCommand.assert_called_with(describe_cmd)
+
+    # Reset the mocks and call the Delete() command.
+    mock_cmd.reset_mock()
+    util.IssueRetryableCommand.reset_mock()
+    # Confirms that _Delete() is called twice as the first describe response
+    # still shows the gateway id as active.
+    mock_cmd.side_effect = [(json.dumps(delete_response), '', 0)] * 2
+    util.IssueRetryableCommand.side_effect = [
+        (json.dumps(exists_response), ''),
+        (json.dumps(exists_response_no_resources), '')
+    ]
+    gateway.Delete()
+    mock_cmd.assert_called_with(delete_cmd)
+    util.IssueRetryableCommand.assert_called_with(describe_cmd)
+
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testSubnetLifecycle(self, mock_cmd):
+    zone = 'us-west-1a'
+    vpc_id = 'vpc-1234'
+    region = 'us-west-1'
+    subnet_id = 'subnet-1234'
+    create_response = {'Subnet': {'SubnetId': subnet_id}}
+    exists_response = {'Subnets': [{'SubnetId': subnet_id, 'VpcId': vpc_id}]}
+    exists_response_no_resources = {'Subnets': []}
+    delete_response = {}
+    create_cmd = _AwsCommand(region, 'create-subnet',
+                             '--vpc-id={}'.format(vpc_id),
+                             '--cidr-block=10.0.0.0/24',
+                             '--availability-zone={}'.format(zone))
+    describe_cmd = _AwsCommand(
+        region, 'describe-subnets',
+        '--filter=Name=vpc-id,Values={}'.format(vpc_id),
+        '--filter=Name=subnet-id,Values={}'.format(subnet_id))
+    delete_cmd = _AwsCommand(region, 'delete-subnet',
+                             '--subnet-id={}'.format(subnet_id))
+
+    # Test the Create() command
+    mock_cmd.side_effect = [(json.dumps(create_response), '', 0)]
+    util.IssueRetryableCommand.side_effect = [(json.dumps(exists_response), '')]
+    subnet = aws_network.AwsSubnet(zone, vpc_id)
+    subnet.Create()
+    mock_cmd.assert_called_with(create_cmd)
+    util.IssueRetryableCommand.assert_called_with(describe_cmd)
+
+    # Reset the mocks and call the Delete() command.
+    mock_cmd.reset_mock()
+    util.IssueRetryableCommand.reset_mock()
+    mock_cmd.side_effect = [(json.dumps(delete_response), '', 0)]
+    util.IssueRetryableCommand.side_effect = [
+        (json.dumps(exists_response_no_resources), '')
+    ]
+    subnet.Delete()
+    mock_cmd.assert_called_with(delete_cmd)
+    util.IssueRetryableCommand.assert_called_with(describe_cmd)
+
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testStaticVpc(self, mock_cmd):
+    vpc_id = 'vpc-1234'
+    security_group_id = 'sg-1234'
+    security_group_res = {'SecurityGroups': [{'GroupId': security_group_id}]}
+    does_exist_res = {'Vpcs': [1]}
+    does_not_exist_res = {'Vpcs': []}
+    mock_cmd.return_value = json.dumps(security_group_res), '', 0
+    util.IssueRetryableCommand.side_effect = [(json.dumps(does_exist_res), ''),
+                                              (json.dumps(does_not_exist_res),
+                                               '')]
+    vpc = aws_network.AwsVpc('region', vpc_id)
+    self.assertTrue(vpc.user_managed)
+    # show Create() works
+    vpc.Create()
+    self.assertEqual(vpc_id, vpc.id)
+    self.assertEqual(security_group_id, vpc.default_security_group_id)
+    # show Delete() doesn't delete, but it does call _Exists() again
+    vpc.Delete()
+
+  def testNetworkSpecWithVpcId(self):
+    zone = 'us-west-1a'
+    vpc_id = 'vpc-1234'
+    subnet_id = 'subnet-1234'
+    cidr = '10.0.0.0/24'
+    res = {
+        'Subnets': [{
+            'VpcId': vpc_id,
+            'SubnetId': subnet_id,
+            'CidrBlock': cidr
+        }]
+    }
+    util.IssueRetryableCommand.return_value = json.dumps(res), None
+    spec = aws_network.AwsNetworkSpec(zone, vpc_id)
+    self.assertEqual(zone, spec.zone)
+    self.assertEqual(vpc_id, spec.vpc_id)
+    self.assertEqual(subnet_id, spec.subnet_id)
+    self.assertEqual(cidr, spec.cidr_block)
 
 
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -142,6 +286,8 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.response = self.open_json_data('aws-describe-instance.json')
     self.sir_response = self.open_json_data(
         'aws-describe-spot-instance-requests.json')
+    self.vm.network.is_static = False
+    self.vm.network.regional_network.vpc.default_security_group_id = 'sg-1234'
 
   def testInstancePresent(self):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
@@ -250,6 +396,26 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
          'cancel-spot-instance-requests',
          '--spot-instance-request-ids=sir-abc'])
     self.vm.use_spot_instance = False
+
+  def testFirewallAllowPortNonStatic(self):
+    self.vm.firewall.AllowPort(self.vm, 22)
+    # only checking that the 2nd of the tcp/udp calls are done
+    cmd = _AwsCommand('us-east-1', 'authorize-security-group-ingress',
+                      '--group-id=sg-1234', '--port=22-22', '--cidr=0.0.0.0/0',
+                      '--protocol=udp')
+    util.IssueRetryableCommand.assert_called_with(cmd)
+
+  def testFirewallAllowPortStaticVm(self):
+    self.vm.is_static = True
+    self.vm.firewall.AllowPort(self.vm, 22)
+    util.IssueRetryableCommand.assert_not_called()
+    self.vm.is_static = False
+
+  def testFirewallAllowPortStaticNetwork(self):
+    self.vm.network.is_static = True
+    self.vm.firewall.AllowPort(self.vm, 22)
+    util.IssueRetryableCommand.assert_not_called()
+    self.vm.network.is_static = False
 
 
 class AwsIsRegionTestCase(pkb_common_test_case.PkbCommonTestCase):

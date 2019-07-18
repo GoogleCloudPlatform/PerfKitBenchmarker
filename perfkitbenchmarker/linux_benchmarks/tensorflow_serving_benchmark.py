@@ -67,12 +67,14 @@ BENCHMARK_DATA = {
     # official TF models repo. It takes in JPG as input and is channels-last
     # (NHWC), which is generally better for CPU. It is available here:
     # http://download.tensorflow.org/models/official/20181001_resnet/savedmodels/resnet_v2_fp32_savedmodel_NHWC_jpg.tar.gz
-    RESNET_NHWC_SAVEDMODEL_TGZ: 'a354fb68325f75b1510e2f6868680d8d',
+    RESNET_NHWC_SAVEDMODEL_TGZ:
+        '545965f0f85c87386e51076abc7ef4f9f1decaf641e8a90906f98c6774547e3f',
 
     # Collection of 50,000 imagenet 2012 validation images.
     # Available here:
     # http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_val.tar
-    ILSVRC_VALIDATION_IMAGES_TAR: '29b22e2961454d5413ddabcf34fc5622',
+    ILSVRC_VALIDATION_IMAGES_TAR:
+        'c7e06a6c0baccf06d8dbeb6577d71efff84673a5dbdd50633ab44f8ea0456ae0',
 }
 
 BENCHMARK_NAME = 'tensorflow_serving'

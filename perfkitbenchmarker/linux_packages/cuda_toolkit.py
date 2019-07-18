@@ -33,6 +33,7 @@ NVIDIA_TESLA_K80 = 'k80'
 NVIDIA_TESLA_P4 = 'p4'
 NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
+NVIDIA_TESLA_T4 = 't4'
 GPU_DEFAULTS = {
     NVIDIA_TESLA_K80: {
         'base_clock': [2505, 562],
@@ -52,6 +53,11 @@ GPU_DEFAULTS = {
     NVIDIA_TESLA_V100: {
         'base_clock': [877, 1312],
         'max_clock': [877, 1530],
+        'autoboost_enabled': None,
+    },
+    NVIDIA_TESLA_T4: {
+        'base_clock': [5001, 585],
+        'max_clock': [5001, 1590],
         'autoboost_enabled': None,
     },
 }
@@ -197,6 +203,8 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_P100
   if 'V100' in gpu_types[0]:
     return NVIDIA_TESLA_V100
+  if 'T4' in gpu_types[0]:
+    return NVIDIA_TESLA_T4
   raise UnsupportedClockSpeedException(
       'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
