@@ -91,7 +91,7 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     vpc_id = 'vpc-1234'
     security_group_id = 'sg-1234'
     res1 = {'Vpc': {'VpcId': vpc_id}}
-    res2 = {'Vpcs': [1,]}
+    res2 = {'Vpcs': [1]}
     res3 = {'SecurityGroups': [{'GroupId': security_group_id}]}
     mock_cmd.side_effect = [(json.dumps(res1), '', 0),
                             (json.dumps(res3), '', 0)]
@@ -204,7 +204,7 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     vpc_id = 'vpc-1234'
     security_group_id = 'sg-1234'
     security_group_res = {'SecurityGroups': [{'GroupId': security_group_id}]}
-    does_exist_res = {'Vpcs': [1,]}
+    does_exist_res = {'Vpcs': [1]}
     does_not_exist_res = {'Vpcs': []}
     mock_cmd.return_value = json.dumps(security_group_res), '', 0
     util.IssueRetryableCommand.side_effect = [(json.dumps(does_exist_res), ''),
