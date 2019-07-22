@@ -70,7 +70,7 @@ class BaseCollector(object):
     self.output_directory = output_directory or vm_util.GetTempDir()
     self._lock = threading.Lock()
     self._pid_files = {}
-    self._role_mapping = {}  # mapping vm role to dstat file
+    self._role_mapping = {}  # mapping vm role to output file
     self._start_time = 0
 
     if not os.path.isdir(self.output_directory):
@@ -121,21 +121,41 @@ class BaseCollector(object):
 
   def Start(self, sender, benchmark_spec):
     """Install and start collector on all VMs in 'benchmark_spec'."""
-    del sender  # unused by Start
     suffix = '-{0}-{1}'.format(benchmark_spec.uid, str(uuid.uuid4())[:8])
-    start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
-    vm_util.RunThreaded(start_on_vm, benchmark_spec.vms)
+    self.StartOnVms(sender, benchmark_spec.vms, suffix)
+
+  def StartOnVms(self, sender, vms, id_suffix):
+    """Install and start collector on given subset of vms.
+
+    Args:
+      sender: sender of the request/event to start collector.
+      vms: vms to run the collector on.
+      id_suffix: id_suffix of the collector output file.
+    """
+    del sender  # unused
+    func = functools.partial(self._StartOnVm, suffix=id_suffix)
+    vm_util.RunThreaded(func, vms)
     self._start_time = time.time()
     return
 
   def Stop(self, sender, benchmark_spec, name=''):
     """Stop collector on all VMs in 'benchmark_spec', fetch results."""
+    self.StopOnVms(sender, benchmark_spec.vm_groups, name)
+
+  def StopOnVms(self, sender, vm_groups, name):
+    """Stop collector on given subset of vms, fetch results.
+
+    Args:
+      sender: sender of the event to stop the collector.
+      vm_groups: vm_groups to stop the collector on.
+      name: name of event to be stopped.
+    """
     events.record_event.send(sender, event=name,
                              start_timestamp=self._start_time,
                              end_timestamp=time.time(),
                              metadata={})
     args = []
-    for role, vms in six.iteritems(benchmark_spec.vm_groups):
+    for role, vms in six.iteritems(vm_groups):
       args.extend([((
           vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
     vm_util.RunThreaded(self._StopOnVm, args)
