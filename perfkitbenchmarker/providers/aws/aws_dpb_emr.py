@@ -22,7 +22,6 @@ import logging
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -115,7 +114,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       region = util.GetRegionFromZone(self.dpb_service_zone)
       self.cmd_prefix += ['--region', region]
       self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
-          network.BaseNetworkSpec(zone=self.dpb_service_zone))
+          aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
     else:
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
