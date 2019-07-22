@@ -121,6 +121,7 @@
 - Added helpmatchmd flag to dump markdown formatted help strings
 - Enable specifying source ip when creating a firewall rule.
 - Added support for T4 GPUs on GCE.
+- Added mpstat utility to measure cpu processor stats.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
