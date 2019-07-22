@@ -25,7 +25,6 @@ import re
 import uuid
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -211,7 +210,7 @@ class EksCluster(container_service.KubernetesCluster):
 
     self.networks = [
         aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
-            network.BaseNetworkSpec(zone))
+            aws_network.AwsNetworkSpec(zone))
         for zone in self.zones
     ]
     self.eks_control_plane = _EksControlPlane(

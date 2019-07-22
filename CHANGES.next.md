@@ -503,3 +503,5 @@
   all the firewall rules that depend on the PKB-created network.
 - Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
 - Increased default timeout for booting Windows VMs to 40 minutes.
+- Fixed problem with AWS network creation in aws_dpb_emr, aws_nfs_service, and
+  elastic_container_service.
