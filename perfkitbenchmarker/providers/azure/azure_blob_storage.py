@@ -89,6 +89,14 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         azure.AZURE_PATH, 'storage', 'container', 'delete',
         '--name', bucket] + self.storage_account.connection_args)
 
+  def Copy(self, src_url, dst_url):
+    """See base class."""
+    raise NotImplementedError()
+
+  def List(self, buckets):
+    """See base class."""
+    raise NotImplementedError()
+
   def EmptyBucket(self, bucket):
     # Emptying buckets on Azure is hard. We pass for now - this will
     # increase our use of storage space, but should not affect the

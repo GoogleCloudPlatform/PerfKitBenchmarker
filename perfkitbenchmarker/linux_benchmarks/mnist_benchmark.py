@@ -134,21 +134,14 @@ def Prepare(benchmark_spec):
   vm.Install('tensorflow_models')
   if benchmark_spec.tpus:
     storage_service = gcs.GoogleCloudStorageService()
-    storage_service.PrepareVM(vm)
     benchmark_spec.storage_service = storage_service
-    model_dir = 'gs://{}'.format(FLAGS.run_uri)
-    benchmark_spec.model_dir = model_dir
-    vm.RemoteCommand(
-        '{gsutil} mb -c regional -l {location} {model_dir}'.format(
-            gsutil=vm.gsutil_path,
-            location=util.GetRegionFromZone(
-                benchmark_spec.tpu_groups['train'].GetZone()),
-            model_dir=benchmark_spec.model_dir), should_log=True)
-    vm.RemoteCommand(
-        '{gsutil} acl ch -u {service_account}:W {model_dir}'.format(
-            gsutil=vm.gsutil_path,
-            service_account=benchmark_spec.gcp_service_account,
-            model_dir=benchmark_spec.model_dir), should_log=True)
+    bucket = 'pkb{}'.format(FLAGS.run_uri)
+    benchmark_spec.bucket = bucket
+    benchmark_spec.model_dir = 'gs://{}'.format(bucket)
+    location = benchmark_spec.tpu_groups['train'].GetZone()
+    storage_service.PrepareService(util.GetRegionFromZone(location))
+    storage_service.MakeBucket(bucket)
+    storage_service.ChmodBucket(benchmark_spec.gcp_service_account, 'W', bucket)
   else:
     benchmark_spec.model_dir = '/tmp'
 
@@ -364,9 +357,4 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   if benchmark_spec.tpus:
-    vm = benchmark_spec.vms[0]
-    vm.RemoteCommand(
-        '{gsutil} rm -r {model_dir}'.format(
-            gsutil=vm.gsutil_path,
-            model_dir=benchmark_spec.model_dir), should_log=True)
-    benchmark_spec.storage_service.CleanupVM(vm)
+    benchmark_spec.storage_service.DeleteBucket(benchmark_spec.bucket)

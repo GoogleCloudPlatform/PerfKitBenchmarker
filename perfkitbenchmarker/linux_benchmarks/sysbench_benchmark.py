@@ -106,7 +106,8 @@ flags.DEFINE_integer('sysbench_post_failover_seconds', 0,
                      'of failover.')
 
 BENCHMARK_DATA = {
-    'sysbench-tpcc.tar.gz': '23a6cd5d3efeff66b346ba7fe416aa39',
+    'sysbench-tpcc.tar.gz':
+        'a116f0a6f58212b568bd339e65223eaf5ed59437503700002f016302d8a9c6ed',
 }
 
 _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {

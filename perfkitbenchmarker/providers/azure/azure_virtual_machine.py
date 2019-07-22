@@ -304,6 +304,9 @@ class AzureVirtualMachine(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
     if retcode and 'AllocationFailed' in stderr:
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+    if retcode:
+      raise errors.Resource.CreationError(
+          'Failed to create VM: %s return code: %s' % (retcode, stderr))
 
   def _Exists(self):
     """Returns True if the VM exists."""
@@ -405,6 +408,13 @@ class AzureVirtualMachine(
         GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                                   filename))
 
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+    return FLAGS.azure_preprovisioned_data_bucket and self.TryRemoteCommand(
+        GenerateStatPreprovisionedDataCommand(module_name, filename))
+
   def GetResourceMetadata(self):
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
@@ -486,6 +496,21 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
          '--protected-settings=%s' % config] + self.resource_group.args)
 
 
+class Windows2012AzureVirtualMachine(WindowsAzureVirtualMachine,
+                                     windows_virtual_machine.Windows2012Mixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
+
+
+class Windows2016AzureVirtualMachine(WindowsAzureVirtualMachine,
+                                     windows_virtual_machine.Windows2016Mixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
+
+
+class Windows2019AzureVirtualMachine(WindowsAzureVirtualMachine,
+                                     windows_virtual_machine.Windows2019Mixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
+
+
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""
@@ -506,3 +531,16 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                           filename,
                           destpath))
   return '{0} && {1}'.format(mkdir_command, download_command)
+
+
+def GenerateStatPreprovisionedDataCommand(module_name, filename):
+  """Returns a string used to download preprovisioned data."""
+  module_name_with_underscores_removed = module_name.replace(
+      '_', '-')
+  return ('az storage blob show '
+          '--account-name %s '
+          '--container-name %s '
+          '--name %s' % (
+              FLAGS.azure_preprovisioned_data_bucket,
+              module_name_with_underscores_removed,
+              filename))

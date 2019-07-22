@@ -45,7 +45,7 @@ READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
-EMR_TIMEOUT = 3600
+EMR_TIMEOUT = 14400
 
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
@@ -178,13 +178,14 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     # Create the log bucket to hold job's log output
     logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
+    # Spark SQL needs to access Hive
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
                              '--release-label', self.dpb_version,
                              '--use-default-roles',
                              '--instance-groups',
                              json.dumps(instance_groups),
                              '--application', 'Name=Spark',
-                             'Name=Hadoop',
+                             'Name=Hadoop', 'Name=Hive',
                              '--log-uri', logs_bucket]
 
     if self.network:
@@ -302,8 +303,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     else:
       return None
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=5,
-                job_arguments=None, job_stdout_file=None,
+  def SubmitJob(self, jarfile, classname, pyspark_file=None, query_file=None,
+                job_poll_interval=5, job_arguments=None, job_stdout_file=None,
                 job_type=None):
     """See base class."""
     @vm_util.Retry(timeout=EMR_TIMEOUT,
@@ -324,14 +325,26 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       if job_arguments:
         arg_spec = '[' + ','.join(job_arguments) + ']'
         step_list.append('Args=' + arg_spec)
-    else:
-      # assumption: spark job will always have a jar and a class
+    elif job_type == self.SPARK_JOB_TYPE:
       arg_list = ['--class', classname, jarfile]
       if job_arguments:
         arg_list += job_arguments
       arg_spec = '[' + ','.join(arg_list) + ']'
       step_type_spec = 'Type=Spark'
       step_list = [step_type_spec, 'Args=' + arg_spec]
+    elif job_type == self.PYSPARK_JOB_TYPE:
+      arg_list = [pyspark_file]
+      if job_arguments:
+        arg_list += job_arguments
+      arg_spec = 'Args=[{}]'.format(','.join(arg_list))
+      step_list = ['Type=Spark', arg_spec]
+    elif job_type == self.SPARKSQL_JOB_TYPE:
+      jar_spec = 'Jar="command-runner.jar"'
+      arg_list = [query_file]
+      if job_arguments:
+        arg_list += job_arguments
+      arg_spec = 'Args=[{},-f,{}]'.format(job_type, ','.join(arg_list))
+      step_list = [jar_spec, arg_spec]
 
     step_string = ','.join(step_list)
 

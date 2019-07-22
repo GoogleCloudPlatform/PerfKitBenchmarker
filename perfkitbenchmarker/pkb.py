@@ -112,6 +112,13 @@ REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 MAX_RUN_URI_LENGTH = 12
 FLAGS = flags.FLAGS
 
+# Define patterns for help text processing.
+BASE_RELATIVE = '../'  # Relative path from markdown output to PKB home for link writing.
+MODULE_REGEX = r'^\s+?(.*?):.*'  # Pattern that matches module names.
+FLAGS_REGEX = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'  # Pattern that matches each flag.
+FLAGNAME_REGEX = r'^\s+?(--.*?)(:.*\Z)'  # Pattern that matches flag name in each flag.
+DOCSTRING_REGEX = r'"""(.*?|$)"""'  # Pattern that matches triple quoted comments.
+
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
@@ -153,7 +160,7 @@ flags.DEFINE_integer(
     'specified.')
 flags.DEFINE_enum(
     'gpu_type', None,
-    ['k80', 'p100', 'v100', 'p4', 'p4-vws'],
+    ['k80', 'p100', 'v100', 'p4', 'p4-vws', 't4'],
     'Type of gpus to attach to the VM. Requires gpu_count to be '
     'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
@@ -296,6 +303,11 @@ flags.DEFINE_string(
     'helpmatch', '',
     'Shows only flags defined in a module whose name matches the given regex.',
     allow_override_cpp=True)
+flags.DEFINE_string(
+    'helpmatchmd', '',
+    'helpmatch query with markdown friendly output. '
+    'Shows only flags defined in a module whose name matches the given regex.',
+    allow_override_cpp=True)
 flags.DEFINE_boolean(
     'create_failed_run_samples', False,
     'If true, PKB will create a sample specifying that a run stage failed. '
@@ -418,6 +430,75 @@ def _PrintHelp(matches=None):
     for module_name in modules:
       if regex.search(module_name):
         print(FLAGS.module_help(module_name))
+
+
+def _PrintHelpMD(matches=None):
+    """Prints markdown formatted help for flags defined in matching modules. Works just like
+    --helpmatch.
+
+    Args:
+    matches: regex string or None. Filters help to only those whose name
+      matched the regex. If None then all flags are printed.
+    Eg:
+
+    * all flags:
+    `./pkb.py --helpmatchmd .*`  > testsuite_docs/all.md
+
+    * linux benchmarks:
+    `./pkb.py --helpmatchmd linux_benchmarks.*`  > testsuite_docs/linux_benchmarks.md
+
+    * specific modules
+    `./pkb.py --helpmatchmd iperf`  > testsuite_docs/iperf.md
+
+    * windows packages
+    `./pkb.py --helpmatchmd windows_packages.*`  > testsuite_docs/windows_packages.md
+
+    * GCP provider:
+    `./pkb.py --helpmatchmd providers.gcp.* > testsuite_docs/providers_gcp.md`
+    """
+
+    flags_by_module = FLAGS.flags_by_module_dict()
+    modules = sorted(flags_by_module)
+    regex = re.compile(matches)
+    for module_name in modules:
+      if regex.search(module_name):
+        # Compile regex patterns.
+        module_regex = re.compile(MODULE_REGEX)
+        flags_regex = re.compile(FLAGS_REGEX, re.MULTILINE | re.DOTALL)
+        flagname_regex = re.compile(FLAGNAME_REGEX, re.MULTILINE | re.DOTALL)
+        docstring_regex = re.compile(DOCSTRING_REGEX, re.MULTILINE | re.DOTALL)
+        # Retrieve the helpmatch text to format.
+        helptext_raw = FLAGS.module_help(module_name)
+
+        # Converts module name to github linkable string.
+        # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
+        # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
+        module = re.search(module_regex, helptext_raw, ).group(1)
+        module_link = module.replace('.', '/') + '.py'
+        # Put flag name in a markdown code block for visibility.
+        flags = re.findall(flags_regex, helptext_raw)
+        flags[:] = [flagname_regex.sub(r"`\1`\2", flag) for flag in flags]
+        # Get the docstring for the module without importing everything into our
+        # namespace. Probably a better way to do this
+        docstring = 'No description available'
+        # Only pull doststrings from inside pkb source files.
+        if (isfile(module_link)):
+          with open(module_link, "r") as f:
+            source = f.read()
+            # Get the triple quoted matches.
+            docstring_match = re.search(docstring_regex, source)
+            # Some modules don't have docstrings.
+            # eg perfkitbenchmarker/providers/alicloud/flags.py
+            if docstring_match is not None:
+              docstring = docstring_match.group(1)
+        # Format output and print here.
+        if (isfile(module_link)):  # Only print links for modules we can find.
+            print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
+        else:
+            print('### ' + module + '\n')
+        print('#### Description:\n\n' + docstring + '\n\n#### Flags:\n')
+        print('\n'.join(flags) + '\n')
+
 
 
 def CheckVersionFlag():
@@ -1112,6 +1193,9 @@ def Main():
   _ParseFlags()
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
+    return 0
+  if FLAGS.helpmatchmd:
+    _PrintHelpMD(FLAGS.helpmatchmd)
     return 0
   CheckVersionFlag()
   SetUpPKB()

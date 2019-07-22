@@ -59,6 +59,15 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
     vm_util.IssueCommand(command)
 
+  def Copy(self, src_url, dst_url):
+    """See base class."""
+    vm_util.IssueCommand(['gsutil', 'cp', src_url, dst_url])
+
+  def List(self, buckets):
+    """See base class."""
+    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', buckets])
+    return stdout
+
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
     # We want to retry rm and rb together because it's possible that
@@ -78,6 +87,19 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     vm_util.IssueCommand(
         ['gsutil', '-m', 'rm', '-r',
          'gs://%s/*' % bucket])
+
+  def ChmodBucket(self, account, access, bucket):
+    """Updates access control lists.
+
+    Args:
+      account: string, the user to be granted.
+      access: string, the permission to be granted.
+      bucket: string, the name of the bucket to change
+    """
+    vm_util.IssueCommand([
+        'gsutil', 'acl', 'ch', '-u',
+        '{account}:{access}'.format(account=account, access=access),
+        'gs://{}'.format(bucket)])
 
   def PrepareVM(self, vm):
     vm.Install('wget')

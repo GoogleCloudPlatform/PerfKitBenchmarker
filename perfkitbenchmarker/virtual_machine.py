@@ -74,7 +74,7 @@ flags.DEFINE_bool(
 
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.
-VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws']
+VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws', 't4']
 
 
 def GetVmSpecClass(cloud):
@@ -338,10 +338,17 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowIcmp(self)
 
-  def AllowPort(self, start_port, end_port=None):
-    """Opens the port on the firewall corresponding to the VM if one exists."""
+  def AllowPort(self, start_port, end_port=None, source_range=None):
+    """Opens the port on the firewall corresponding to the VM if one exists.
+
+    Args:
+      start_port: The first local port to open in a range.
+      end_port: The last local port to open in a range. If None, only start_port
+        will be opened.
+      source_range: list of CIDRs. If none, all sources are allowed.
+    """
     if self.firewall and not FLAGS.skip_firewall_rules:
-      self.firewall.AllowPort(self, start_port, end_port)
+      self.firewall.AllowPort(self, start_port, end_port, source_range)
 
   def AllowRemoteAccessPorts(self):
     """Allow all ports in self.remote_access_ports."""
@@ -408,37 +415,53 @@ class BaseVirtualMachine(resource.BaseResource):
     raise NotImplementedError()
 
   def _InstallData(self, preprovisioned_data, module_name, filenames,
-                   install_path):
+                   install_path, fallback_url):
     """Installs preprovisioned_data on this VM.
 
     Args:
-      preprovisioned_data: The dict mapping filenames to md5sum hashes.
+      preprovisioned_data: The dict mapping filenames to sha256sum hashes.
       module_name: The name of the module defining the preprovisioned data.
       filenames: An iterable of preprovisioned data filenames for a particular
       module.
       install_path: The path to download the data file.
+      fallback_url: The dict mapping filenames to fallback url for downloading.
 
     Raises:
       errors.Setup.BadPreProvisionedDataError: If the module or filename are
-          not defined with preprovisioned data, or if the md5sum hash in the
-          code does not match the md5sum of the file.
+          not defined with preprovisioned data, or if the sha256sum hash in the
+          code does not match the sha256 of the file.
     """
     for filename in filenames:
       if data.ResourceExists(filename):
         local_tar_file_path = data.ResourcePath(filename)
         self.PushFile(local_tar_file_path, install_path)
         continue
-      md5sum = preprovisioned_data.get(filename)
-      if md5sum:
+      url = fallback_url.get(filename)
+      sha256sum = preprovisioned_data.get(filename)
+      preprovisioned = self.ShouldDownloadPreprovisionedData(
+          module_name, filename)
+      if not sha256sum:
+        raise errors.Setup.BadPreprovisionedDataError(
+            'Cannot find sha256sum hash for file %s in module %s. See '
+            'README.md for information about preprovisioned data. '
+            'Cannot find file in /data directory either, fail to upload from '
+            'local directory.' % (filename, module_name))
+
+      if preprovisioned:
         self.DownloadPreprovisionedData(install_path, module_name, filename)
-        self.CheckPreprovisionedData(
-            install_path, module_name, filename, md5sum)
-        continue
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Cannot find md5sum hash for file %s in module %s. See README.md '
-          'for information about preprovisioned data. '
-          'Cannot find file in /data directory either, fail to upload from '
-          'local directory.' % (filename, module_name))
+      elif url:
+        self.Install('wget')
+        self.RemoteCommand('wget -P {0} {1}'.format(install_path, url))
+      else:
+        raise errors.Setup.BadPreProvisionedDataError(
+            'Cannot find preprovisioned file %s inside preprovisioned bucket '
+            'in module %s. See README.md for information about '
+            'preprovisioned data. '
+            'Cannot find fallback url of the file to download from web. '
+            'Cannot find file in /data directory either, fail to upload from '
+            'local directory.' % (filename, module_name))
+      self.CheckPreprovisionedData(
+          install_path, module_name, filename, sha256sum)
 
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
@@ -462,15 +485,15 @@ class BaseVirtualMachine(resource.BaseResource):
     Args:
       benchmark_name: The name of the benchmark defining the preprovisioned
           data. The benchmark's module must define the dict BENCHMARK_DATA
-          mapping filenames to md5sum hashes.
+          mapping filenames to sha256sum hashes.
       filenames: An iterable of preprovisioned data filenames for a particular
           benchmark.
       install_path: The path to download the data file.
 
     Raises:
       errors.Setup.BadPreProvisionedDataError: If the benchmark or filename are
-          not defined with preprovisioned data, or if the md5sum hash in the
-          code does not match the md5sum of the file.
+          not defined with preprovisioned data, or if the sha256sum hash in the
+          code does not match the sha256sum of the file.
     """
     benchmark_module = benchmark_lookup.BenchmarkModule(benchmark_name)
     if not benchmark_module:
@@ -484,8 +507,9 @@ class BaseVirtualMachine(resource.BaseResource):
       raise errors.Setup.BadPreprovisionedDataError(
           'Benchmark %s does not define a BENCHMARK_DATA dict with '
           'preprovisioned data.' % benchmark_name)
+    fallback_url = getattr(benchmark_module, 'BENCHMARK_DATA_URL', {})
     self._InstallData(preprovisioned_data, benchmark_name, filenames,
-                      install_path)
+                      install_path, fallback_url)
 
   def InstallPreprovisionedPackageData(self, package_name, filenames,
                                        install_path):
@@ -510,15 +534,15 @@ class BaseVirtualMachine(resource.BaseResource):
       package_name: The name of the package file defining the preprovisoned
       data. The default vaule is None. If the package_name is provided, the
       package file must define the dict PREPROVISIONED_DATA mapping filenames to
-      md5sum hashes.
+      sha256sum hashes.
       filenames: An iterable of preprovisioned data filenames for a particular
       package.
       install_path: The path to download the data file.
 
     Raises:
       errors.Setup.BadPreProvisionedDataError: If the package or filename are
-          not defined with preprovisioned data, or if the md5sum hash in the
-          code does not match the md5sum of the file.
+          not defined with preprovisioned data, or if the sha256sum hash in the
+          code does not match the sha256sum of the file.
     """
     package_module = package_lookup.PackageModule(package_name)
     if not package_module:
@@ -531,8 +555,23 @@ class BaseVirtualMachine(resource.BaseResource):
       raise errors.Setup.BadPreprovisionedDataError(
           'Package %s does not define a PREPROVISIONED_DATA dict with '
           'preprovisioned data.' % package_name)
+    fallback_url = getattr(package_module, 'PACKAGE_DATA_URL', {})
     self._InstallData(preprovisioned_data, package_name, filenames,
-                      install_path)
+                      install_path, fallback_url)
+
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available.
+
+    This function should be overridden by each cloud provider VM.
+
+    Args:
+      module_name: Name of the module associated with this data file.
+      filename: The name of the file that was downloaded.
+
+    Returns:
+      A boolean indicates if preprovisioned data is available.
+    """
+    raise NotImplementedError()
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads preprovisioned benchmark data.
@@ -1014,24 +1053,24 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  def GetMd5sum(self, path, filename):
-    """Gets the md5sum hash for a filename in a path on the VM.
+  def GetSha256sum(self, path, filename):
+    """Gets the sha256sum hash for a filename in a path on the VM.
 
     Args:
       path: string; Path on the VM.
       filename: string; Name of the file in the path.
 
     Returns:
-      string; The md5sum hash.
+      string; The sha256sum hash.
     """
     raise NotImplementedError()
 
   def CheckPreprovisionedData(self, install_path, module_name, filename,
-                              expected_md5sum):
+                              expected_sha256):
     """Checks preprovisioned data for a checksum.
 
-    Checks the expected md5sum against the actual md5sum. Called after the file
-    is downloaded.
+    Checks the expected 256sum against the actual sha256sum. Called after the
+    file is downloaded.
 
     This function should be overridden by each OS-specific MixIn.
 
@@ -1040,10 +1079,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           this path in a subdirectory of the benchmark name.
       module_name: Name of the benchmark associated with this data file.
       filename: The name of the file that was downloaded.
-      expected_md5sum: The expected md5sum checksum value.
+      expected_sha256: The expected sha256 checksum value.
     """
-    actual_md5sum = self.GetMd5sum(install_path, filename)
-    if actual_md5sum != expected_md5sum:
+    actual_sha256 = self.GetSha256sum(install_path, filename)
+    if actual_sha256 != expected_sha256:
       raise errors.Setup.BadPreprovisionedDataError(
-          'Invalid md5sum for %s/%s: %s (actual) != %s (expected)' % (
-              module_name, filename, actual_md5sum, expected_md5sum))
+          'Invalid sha256sum for %s/%s: %s (actual) != %s (expected)' % (
+              module_name, filename, actual_sha256, expected_sha256))

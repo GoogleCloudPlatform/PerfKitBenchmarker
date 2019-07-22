@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.virtual_machine."""
 
 import unittest
+import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
@@ -127,6 +128,106 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(str(cm.exception), (
         'Invalid test_component.gpu_count value: "0". '
         'Value must be at least 1.'))
+
+
+class TestVM(virtual_machine.BaseVirtualMachine):
+
+  def __init__(self, _):
+    pass
+
+  def __str__(self):
+    return ''
+
+  def __repr__(self):
+    pass
+
+  def Uninstall(self):
+    pass
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
+    pass
+
+  def SimulateMaintenanceEvent(self):
+    pass
+
+  def RemoteCommand(self):
+    pass
+
+  def CheckPreprovisionedData(self):
+    pass
+
+  def Install(self, pkg):
+    del pkg
+
+
+class TestInstallData(
+    pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(TestInstallData, self).setUp()
+    self.vm = TestVM(None)
+    self.preprovisioned_data = {
+        'fake_pkg': 'fake_checksum'
+    }
+    self.module_name = 'fake_module'
+    self.filenames = ['fake_pkg']
+    self.install_path = '/fake_path'
+    self.fallback_url = {
+        'fake_pkg': 'fake_url'}
+
+  def testPreprovisionNotAvailableFallBackInstallation(self):
+    with mock.patch.object(
+        self.vm, 'ShouldDownloadPreprovisionedData') as show:
+      with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+        with mock.patch.object(self.vm, 'CheckPreprovisionedData') as check:
+          show.side_effect = [False]
+          remote_command.side_effect = None
+          self.vm._InstallData(self.preprovisioned_data,
+                               self.module_name,
+                               self.filenames,
+                               self.install_path,
+                               self.fallback_url)
+    show.assert_called_once_with(self.module_name, 'fake_pkg')
+    remote_command.assert_called_once_with(
+        'wget -P /fake_path fake_url')
+    check.assert_called_once_with(
+        self.install_path, self.module_name, 'fake_pkg', 'fake_checksum')
+
+  def testPreprovisionSucceed(self):
+    with mock.patch.object(
+        self.vm, 'ShouldDownloadPreprovisionedData') as show:
+      with mock.patch.object(self.vm, 'DownloadPreprovisionedData') as download:
+        with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+          with mock.patch.object(self.vm, 'CheckPreprovisionedData') as check:
+            show.side_effect = [True]
+            self.vm._InstallData(self.preprovisioned_data,
+                                 self.module_name,
+                                 self.filenames,
+                                 self.install_path,
+                                 self.fallback_url)
+    download.assert_called_once_with(
+        self.install_path, self.module_name, 'fake_pkg')
+    remote_command.assert_not_called()
+    check.assert_called_once_with(
+        self.install_path, self.module_name, 'fake_pkg', 'fake_checksum')
+
+  def testPreprovisionNotAvailableFallBackNotAvailable(self):
+    with mock.patch.object(
+        self.vm, 'ShouldDownloadPreprovisionedData') as show:
+      with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+        with mock.patch.object(self.vm, 'CheckPreprovisionedData') as check:
+          show.side_effect = [False]
+          with self.assertRaises(errors.Setup.BadPreprovisionedDataError):
+            self.vm._InstallData({},
+                                 self.module_name,
+                                 self.filenames,
+                                 self.install_path,
+                                 {})
+    remote_command.assert_not_called()
+    check.assert_not_called()
 
 
 if __name__ == '__main__':

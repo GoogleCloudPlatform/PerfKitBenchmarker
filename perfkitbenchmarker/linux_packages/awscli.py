@@ -14,11 +14,23 @@
 
 """Package for installing the AWS CLI."""
 
+from perfkitbenchmarker import errors
+
 
 def Install(vm):
   """Installs the awscli package on the VM."""
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install awscli')
+
+
+def YumInstall(vm):
+  """Installs the awscli package on the VM."""
+  # amazon linux 2 has awscli pre-installed. Check to see if it exists and
+  # install it if it does not.
+  try:
+    vm.RemoteCommand('yum list installed awscli')
+  except errors.VirtualMachine.RemoteCommandError:
+    Install(vm)
 
 
 def Uninstall(vm):

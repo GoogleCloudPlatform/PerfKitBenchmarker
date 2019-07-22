@@ -179,7 +179,7 @@ def _RunNtttcp(vm, options):
   ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
   command = 'cd {ntttcp_exe_dir}; .\\NTttcp.exe {ntttcp_options}'.format(
       ntttcp_exe_dir=ntttcp_exe_dir, ntttcp_options=options)
-  vm.RemoteCommand(command, timeout=timeout_duration)
+  vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _RemoveXml(vm):

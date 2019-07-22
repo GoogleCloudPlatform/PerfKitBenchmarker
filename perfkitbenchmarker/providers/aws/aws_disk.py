@@ -178,6 +178,20 @@ class AwsDisk(disk.BaseDisk):
     if self.iops:
       self.metadata['iops'] = self.iops
 
+  def AssignDeviceLetter(self, letter_suggestion, nvme_boot_drive_index):
+    if LocalDriveIsNvme(self.machine_type) and \
+       EbsDriveIsNvme(self.machine_type):
+      first_device_letter = 'b'
+      local_drive_number = ord(letter_suggestion) - ord(first_device_letter)
+      logging.info('local drive number is: %d', local_drive_number)
+      if local_drive_number < nvme_boot_drive_index:
+        self.device_letter = letter_suggestion
+      else:
+        # skip the boot drive
+        self.device_letter = chr(ord(letter_suggestion) + 1)
+    else:
+      self.device_letter = letter_suggestion
+
   def _Create(self):
     """Creates the disk."""
     create_cmd = util.AWS_PREFIX + [
@@ -270,10 +284,6 @@ class AwsDisk(disk.BaseDisk):
     if self.disk_type == disk.LOCAL:
       if LocalDriveIsNvme(self.machine_type):
         first_device_letter = 'b'
-        if EbsDriveIsNvme(self.machine_type):
-          # If the root drive is also NVME, assume the second drive is the
-          # local drive.
-          first_device_letter = 'a'
         return '/dev/nvme%sn1' % str(
             ord(self.device_letter) - ord(first_device_letter))
       return '/dev/xvd%s' % self.device_letter

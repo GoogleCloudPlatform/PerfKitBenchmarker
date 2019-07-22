@@ -21,10 +21,10 @@ import datetime
 import json
 import logging
 
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
@@ -33,8 +33,6 @@ flags.DEFINE_string('dpb_dataproc_image_version', None,
                     'The image version to use for the cluster.')
 flags.DEFINE_integer('dpb_dataproc_distcp_num_maps', None,
                      'Number of maps to copy data.')
-
-GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
@@ -72,20 +70,32 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
           'dpb_service_zone must be provided, for provisioning.')
 
   @staticmethod
+  def _ParseTime(state_time):
+    """Parses time from json output.
+
+    Args:
+      state_time: string. the state start time.
+
+    Returns:
+      datetime.
+    """
+    try:
+      return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%S.%fZ')
+    except ValueError:
+      return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%SZ')
+
+  @staticmethod
   def _GetStats(stdout):
     results = json.loads(stdout)
     stats = {}
-    done_time = datetime.datetime.strptime(
-        results['status']['stateStartTime'], GCP_TIME_FORMAT)
+    done_time = GcpDpbDataproc._ParseTime(results['status']['stateStartTime'])
     pending_time = None
     start_time = None
     for state in results['statusHistory']:
       if state['state'] == 'PENDING':
-        pending_time = datetime.datetime.strptime(state['stateStartTime'],
-                                                  GCP_TIME_FORMAT)
+        pending_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
       elif state['state'] == 'RUNNING':
-        start_time = datetime.datetime.strptime(state['stateStartTime'],
-                                                GCP_TIME_FORMAT)
+        start_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
 
     if done_time and start_time:
       stats[dpb_service.RUNTIME] = (done_time - start_time).total_seconds()
@@ -162,19 +172,28 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None,
-                job_type=None):
+  def SubmitJob(self, jarfile, classname, pyspark_file=None, query_file=None,
+                job_poll_interval=None, job_arguments=None,
+                job_stdout_file=None, job_type=None):
     """See base class."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
+    args = ['jobs', 'submit', job_type]
+
+    if job_type == self.PYSPARK_JOB_TYPE:
+      args.append(pyspark_file)
+
+    cmd = util.GcloudCommand(self, 'dataproc', *args)
+
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if classname:
       cmd.flags['jars'] = jarfile
       cmd.flags['class'] = classname
-    else:
+    elif jarfile:
       cmd.flags['jar'] = jarfile
+
+    if query_file:
+      cmd.flags['file'] = query_file
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
@@ -191,6 +210,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       return {dpb_service.SUCCESS: False}
 
     stats = self._GetStats(stdout)
+    stats[dpb_service.SUCCESS] = True
     return stats
 
   def SetClusterProperty(self):
@@ -204,6 +224,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     mb_command = ['gsutil', 'mb']
     region = self.dpb_service_zone.rsplit('-', 1)[0]
     mb_command.extend(['-c', 'regional', '-l', region])
+
+    if self.project is not None:
+      mb_command.extend(['-p', self.project])
+
     mb_command.append('{}{}'.format(self.PERSISTENT_FS_PREFIX, source_bucket))
     vm_util.IssueCommand(mb_command)
 

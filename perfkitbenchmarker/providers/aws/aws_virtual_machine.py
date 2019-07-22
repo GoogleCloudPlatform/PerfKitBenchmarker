@@ -414,8 +414,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # images considered.
   IMAGE_NAME_REGEX = None
 
-  ARCHITECTURE_TO_GENERATION_MAP = None
-
   IMAGE_OWNER = None
   IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
@@ -526,15 +524,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if cls.IMAGE_NAME_REGEX:
       # Further filter images by the IMAGE_NAME_REGEX filter.
-      if not cls.ARCHITECTURE_TO_GENERATION_MAP:
-        raise errors.Setup.InvalidConfigurationError(
-            '%s must define an ARCHITECTURE_TO_GENERATION_MAP to parse '
-            'IMAGE_NAME_REGEX.' % cls)
-      generation = cls.ARCHITECTURE_TO_GENERATION_MAP[processor_architecture]
-
       image_name_regex = cls.IMAGE_NAME_REGEX.format(
           virt_type=virt_type, disk_type=cls.DEFAULT_ROOT_DISK_TYPE,
-          generation=generation, architecture=processor_architecture)
+          architecture=processor_architecture)
       images = []
       excluded_images = []
       for image in json.loads(stdout):
@@ -686,7 +678,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Benchmarks.QuotaFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
-          '%s return code: %s' % (retcode, stderr))
+          'Failed to create VM: %s return code: %s' % (retcode, stderr))
 
   def _Delete(self):
     """Delete a VM instance."""
@@ -773,6 +765,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           instances[0]['StateReason']['Message'])
     return status in INSTANCE_EXISTS_STATUSES
 
+  def _GetNvmeBootIndex(self):
+    if aws_disk.LocalDriveIsNvme(self.machine_type) and \
+       aws_disk.EbsDriveIsNvme(self.machine_type):
+      # identify boot drive
+      cmd = 'lsblk | grep "part /$" | grep -o "nvme[0-9]*"'
+      boot_drive = self.RemoteCommand(cmd, ignore_failure=True)[0].strip()
+      if len(boot_drive) > 0:
+        # get the boot drive index by dropping the nvme prefix
+        boot_idx = int(boot_drive[4:])
+        logging.info("found boot drive at nvme index %d" % boot_idx)
+        return boot_idx
+      else:
+        # boot drive is not nvme
+        return 0
+
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
 
@@ -784,14 +791,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     # Instantiate the disk(s) that we want to create.
     disks = []
+    nvme_boot_drive_index = self._GetNvmeBootIndex()
     for _ in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.NFS:
         data_disk = self._GetNfsService().CreateNfsDisk()
       else:
         data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
-        data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
-                                      self.local_disk_counter)
+        device_letter = chr(ord(DRIVE_START_LETTER) + self.local_disk_counter)
+        data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)
         # Local disk numbers start at 1 (0 is the system disk).
         data_disk.disk_number = self.local_disk_counter + 1
         self.local_disk_counter += 1
@@ -830,6 +838,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # TODO(deitz): Add retry logic.
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
+
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    self.Install('aws_credentials')
+    self.Install('awscli')
+    return FLAGS.aws_preprovisioned_data_bucket and self.TryRemoteCommand(
+        GenerateStatPreprovisionedDataCommand(module_name, filename))
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -895,23 +910,31 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
+class AmazonLinux2BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2Mixin):
+  """Class with configuration for AWS Amazon Linux 2 Redhat virtual machines."""
+  IMAGE_NAME_FILTER = 'amzn2-ami-*-*-*'
+
+  def __init__(self, vm_spec):
+    super(AmazonLinux2BasedAwsVirtualMachine, self).__init__(vm_spec)
+    user_name_set = FLAGS['aws_user_name'].present
+    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
+
+    # package_config
+    self.python_package_config = 'python27'
+    self.python_dev_package_config = 'python27-devel'
+    self.python_pip_package_config = 'python27-pip'
+
+
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
   """Class with configuration for AWS Redhat virtual machines."""
-  IMAGE_NAME_FILTER = 'amzn*-ami-*-*-*'
+  IMAGE_NAME_FILTER = 'amzn-ami-*-*-*'
   # IMAGE_NAME_REGEX tightens up the image filter for Amazon Linux to avoid
   # non-standard Amazon Linux images. This fixes a bug in which we were
   # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
   IMAGE_NAME_REGEX = (
-      r'^amzn{generation}-ami-{virt_type}-\d+\.\d+\.\d+.\d+-'
-      '{architecture}-{disk_type}$')
-
-  # Amazon Linux currently has 2 generations.
-  # See documentation at https://aws.amazon.com/amazon-linux-2/
-  ARCHITECTURE_TO_GENERATION_MAP = {
-      X86: '',
-      ARM: '2',
-  }
+      r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
@@ -929,13 +952,9 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
   """Class with configuration for AWS Centos7 virtual machines."""
   # Documentation on finding the Centos 7 image:
   # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
-  IMAGE_NAME_FILTER = 'CentOS*Linux*7*'
+  IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   IMAGE_OWNER = 'aws-marketplace'
-
-  # Centos 7 images on AWS use standard EBS rather than GP2. See the bug at
-  # https://bugs.centos.org/view.php?id=13301.
-  DEFAULT_ROOT_DISK_TYPE = 'standard'
 
   def __init__(self, vm_spec):
     super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
@@ -1072,3 +1091,9 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   return 'aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
       FLAGS.aws_preprovisioned_data_bucket, module_name, filename,
       posixpath.join(install_path, filename))
+
+
+def GenerateStatPreprovisionedDataCommand(module_name, filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'aws s3api head-object --bucket %s --key %s/%s' % (
+      FLAGS.aws_preprovisioned_data_bucket, module_name, filename)

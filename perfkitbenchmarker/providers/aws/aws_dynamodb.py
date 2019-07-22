@@ -67,6 +67,9 @@ flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
                      False,
                      "Consistent reads cost 2x eventual reads. "
                      "'false' is default which is eventual")
+flags.DEFINE_integer('aws_dynamodb_connectMax', 50,
+                     'Maximum number of concurrent dynamodb connections. '
+                     'Defaults to 50.')
 
 
 class _GetIndexes():
@@ -264,4 +267,5 @@ class AwsDynamoDBInstance(resource.BaseResource):
         'aws_dynamodb_lsi_count': FLAGS.aws_dynamodb_lsi_count,
         'aws_dynamodb_gsi_count': FLAGS.aws_dynamodb_gsi_count,
         'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
+        'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
     }

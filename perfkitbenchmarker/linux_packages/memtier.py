@@ -110,6 +110,28 @@ def AptUninstall(vm):
   _Uninstall(vm)
 
 
+def Load(client_vm, server_ip, server_port):
+  """Preload the server with data."""
+  client_vm.RemoteCommand(
+      'memtier_benchmark '
+      '-s {server_ip} '
+      '-p {server_port} '
+      '-P {protocol} '
+      '--clients 1 '
+      '--threads 1 '
+      '--ratio 1:0 '
+      '--data-size {data_size} '
+      '--pipeline 100 '
+      '--key-minimum 1 '
+      '--key-maximum {requests} '
+      '-n allkeys '.format(
+          server_ip=server_ip,
+          server_port=server_port,
+          protocol=FLAGS.memtier_protocol,
+          data_size=FLAGS.memtier_data_size,
+          requests=FLAGS.memtier_requests))
+
+
 def Run(vm, server_ip, server_port):
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
@@ -130,6 +152,8 @@ def Run(vm, server_ip, server_port):
         '--data-size {data_size} '
         '--key-pattern {key_pattern} '
         '--pipeline {pipeline} '
+        '--key-minimum 1 '
+        '--key-maximum {requests} '
         '--random-data > {output_file}'.format(
             server_ip=server_ip,
             server_port=server_port,

@@ -15,14 +15,21 @@
 
 """Module containing iperf installation and cleanup functions."""
 
-import re
+import posixpath
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-IPERF_EL6_RPM = ('http://pkgs.repoforge.org/iperf/'
-                 'iperf-2.0.4-1.el6.rf.x86_64.rpm')
-IPERF_EL7_RPM = ('http://pkgs.repoforge.org/iperf/'
-                 'iperf-2.0.4-1.el7.rf.x86_64.rpm')
+PACKAGE_NAME = 'iperf'
+IPERF_ZIP = '2.0.4-RELEASE.zip'
+IPERF_DIR = 'iperf-2.0.4-RELEASE'
+PREPROVISIONED_DATA = {
+    IPERF_ZIP:
+        '84000784e9286531c227b14c999b236f9cc5679564ba1bff8702f28c30513853'
+}
+PACKAGE_DATA_URL = {
+    IPERF_ZIP: posixpath.join('https://github.com/esnet/iperf/archive',
+                              IPERF_ZIP)}
 
 
 def _Install(vm):
@@ -36,16 +43,14 @@ def YumInstall(vm):
     vm.InstallEpelRepo()
     _Install(vm)
   # RHEL 7 does not have an iperf package in the standard/EPEL repositories
-  except errors.VirtualMachine.RemoteCommandError as e:
-    stdout, _ = vm.RemoteCommand('cat /etc/redhat-release')
-    major_version = int(re.search('release ([0-9])', stdout).group(1))
-    if major_version == 6:
-      iperf_rpm = IPERF_EL6_RPM
-    elif major_version == 7:
-      iperf_rpm = IPERF_EL7_RPM
-    else:
-      raise e
-    vm.RemoteCommand('sudo rpm -ivh %s' % iperf_rpm)
+  except errors.VirtualMachine.RemoteCommandError:
+    vm.Install('build_tools')
+    vm.Install('unzip')
+    vm.InstallPreprovisionedPackageData(
+        PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
+    vm.RemoteCommand(
+        'cd %s; unzip %s; cd %s; ./configure; make; sudo make install' % (
+            INSTALL_DIR, IPERF_ZIP, IPERF_DIR))
 
 
 def AptInstall(vm):

@@ -52,7 +52,9 @@ mlperf:
 # For data preprocessing, please check
 # https://github.com/mlperf/training/tree/master/image_classification#3-datasetenvironment
 _ILSVRC2012_TAR = 'ILSVRC2012.tar'
-BENCHMARK_DATA = {_ILSVRC2012_TAR: 'cd2de079dc2e18fc9a9f598b5a38969b'}
+BENCHMARK_DATA = {
+    _ILSVRC2012_TAR:
+        'ae83026644feeaf42a387d29765980830387756eff3293bb96fa91f3911a1b15'}
 
 flags.DEFINE_enum('mlperf_benchmark', 'resnet', ['resnet'],
                   'MLPerf benchmark test to run.')
@@ -221,6 +223,8 @@ def Run(benchmark_spec):
       'export PYTHONPATH=$PYTHONPATH:$PWD/tpu/models && '
       'cd results/v0.5.0/google/{code_path} && '
       'sed -i "s/python /python3 /g" run_helper*.sh && '
+      'sed -i "s/tpu_zone=[^[:space:]]*/tpu_zone={tpu_zone}/g" '
+      'run_helper*.sh && '
       'mkdir -p $MLP_HOST_OUTPUT_DIR && '
       '{cmd}'.format(
           model_dir=benchmark_spec.model_dir,
@@ -230,6 +234,8 @@ def Run(benchmark_spec):
           tpu_eval=(benchmark_spec.tpu_groups['eval'].GetName()
                     if benchmark_spec.tpus else ''),
           code_path=code_path,
+          tpu_zone=(benchmark_spec.tpu_groups['train'].GetZone()
+                    if benchmark_spec.tpus else ''),
           cmd=cmd))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(

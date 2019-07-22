@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Module containing classes related to GCE VM networking.
 
 The Firewall class provides a way of opening VM ports. The Network class allows
@@ -26,12 +24,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import json
 import threading
 import collections
 import logging
 import uuid
 
-from perfkitbenchmarker import flags, context, errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -526,16 +525,19 @@ class GceFirewall(network.BaseFirewall):
       start_port: The first local port to open in a range.
       end_port: The last local port to open in a range. If None, only start_port
         will be opened.
-      source_range: The source ip range to allow for this port.
+      source_range: List of source CIDRs to allow for this port. If none, all
+        sources are allowed.
     """
     if vm.is_static:
       return
+    if source_range:
+      source_range = ','.join(source_range)
     with self._lock:
       if end_port is None:
         end_port = start_port
       firewall_name = ('perfkit-firewall-%s-%s-%d-%d' %
                        (vm.zone, FLAGS.run_uri, start_port, end_port))
-      key = (vm.project, vm.zone, start_port, end_port)
+      key = (vm.project, vm.zone, start_port, end_port, source_range)
       if key in self.firewall_rules:
         return
       allow = ','.join('{0}:{1}-{2}'.format(protocol, start_port, end_port)
@@ -582,6 +584,10 @@ class GceNetworkResource(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the Network resource."""
+    if FLAGS.gce_firewall_rules_clean_all:
+      for firewall_rule in self._GetAllFirewallRules():
+        firewall_rule.Delete()
+
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'delete', self.name)
     cmd.Issue()
 
@@ -590,6 +596,16 @@ class GceNetworkResource(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
+
+  def _GetAllFirewallRules(self):
+    """Returns all the firewall rules that use the network."""
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'list')
+    cmd.flags['filter'] = 'network=%s' % self.name
+
+    stdout, _, _ = cmd.Issue(suppress_warning=True)
+    result = json.loads(stdout)
+    return [GceFirewallRule(entry['name'], self.project, ALLOW_ALL, self.name,
+                            NETWORK_RANGE) for entry in result]
 
 
 class GceSubnetResource(resource.BaseResource):
@@ -613,14 +629,16 @@ class GceSubnetResource(resource.BaseResource):
   def _Exists(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'describe',
                              self.name)
-    cmd.flags['region'] = self.region
+    if self.region:
+      cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def _Delete(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'delete',
                              self.name)
-    cmd.flags['region'] = self.region
+    if self.region:
+      cmd.flags['region'] = self.region
     cmd.Issue()
 
 
@@ -632,7 +650,7 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
-    name = FLAGS.gce_network_name or 'vpnpkb-network-%s' % FLAGS.run_uri
+    name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
     self.vpngw = {}
 
     # add support for zone, cidr, and separate networks
@@ -646,13 +664,10 @@ class GceNetwork(network.BaseNetwork):
     if FLAGS.gce_subnet_region is None:
       self.subnet_resource = None
     else:
-      #  do we need distinct subnet_name? subnets duplicate network_name now
-      #  subnet_name = FLAGS.gce_subnet_name or 'pkb-subnet-%s' % FLAGS.run_uri
       self.subnet_resource = GceSubnetResource(name, name,
                                                FLAGS.gce_subnet_region,
                                                FLAGS.gce_subnet_addr,
                                                self.project)
-
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
     # allow 192.168.0.0/16 addresses
     firewall_name2 = 'default-internal2-%s' % FLAGS.run_uri

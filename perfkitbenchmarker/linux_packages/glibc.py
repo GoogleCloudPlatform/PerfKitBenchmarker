@@ -13,14 +13,28 @@
 # limitations under the License.
 
 """Module containing Glibc Benchmark installation and cleanup functions."""
+import posixpath
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
+PACKAGE_NAME = 'glibc'
 GLIBC_DIR = '%s/glibc' % INSTALL_DIR
 GLIBC_VERSION = '2.29'
 GLIBC_TAR = 'glibc-{}.tar.xz'.format(GLIBC_VERSION)
 
 BINUTILS_DIR = '%s/binutils' % INSTALL_DIR
 BINUTILS_TAR = 'binutils-2.30.tar.gz'
+PREPROVISIONED_DATA = {
+    BINUTILS_TAR:
+        '8c3850195d1c093d290a716e20ebcaa72eda32abf5e3d8611154b39cff79e9ea',
+    GLIBC_TAR:
+        'f3eeb8d57e25ca9fc13c2af3dae97754f9f643bc69229546828e3a240e2af04b'
+}
+PACKAGE_DATA_URL = {
+    BINUTILS_TAR: posixpath.join(
+        'https://ftp.gnu.org/gnu/binutils', BINUTILS_TAR),
+    GLIBC_TAR: posixpath.join(
+        'https://fossies.org/linux/misc', GLIBC_TAR)
+}
 
 
 def _Install(vm):
@@ -30,10 +44,8 @@ def _Install(vm):
   vm.InstallPackages('bison')
 
   vm.RemoteCommand('cd {0} && mkdir binutils'.format(INSTALL_DIR))
-  vm.RemoteCommand(
-      'cd {0} && '
-      'wget http://ftp.gnu.org/gnu/binutils/binutils-2.30.tar.gz'.format(
-          BINUTILS_DIR))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, [BINUTILS_TAR], BINUTILS_DIR)
   vm.RemoteCommand('cd {0} && tar xvf {1}'.format(BINUTILS_DIR, BINUTILS_TAR))
   vm.RemoteCommand('cd {0} && mkdir binutils-build && '
                    'cd binutils-build/ && '
@@ -43,9 +55,8 @@ def _Install(vm):
   vm.Install('gcc5')
 
   vm.RemoteCommand('cd {0} && mkdir glibc'.format(INSTALL_DIR))
-  vm.RemoteCommand(
-      'cd {0} && '
-      'wget https://fossies.org/linux/misc/{1}'.format(GLIBC_DIR, GLIBC_TAR))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, [GLIBC_TAR], GLIBC_DIR)
   vm.RemoteCommand('cd {0} && tar xvf {1}'.format(GLIBC_DIR, GLIBC_TAR))
   vm.RemoteCommand(
       'cd {0} && mkdir glibc-build && cd glibc-build && '

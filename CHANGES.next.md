@@ -89,7 +89,7 @@
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
-- Added support for Windows2012, 2016, and 2019 for GCP and AWS.
+- Added support for Windows2012, 2016, and 2019 for AWS, Azure, and GCP.
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
@@ -111,6 +111,16 @@
 - Added ssh_via_internal_ip flag to use internal IP addresses when ssh'ing to
   runner VMs, will use external IP addrs if not set.
 - Added support for launching GCP VM with shielded VM secure boot
+- Added Amazon Linux 2 os type. `--os_type=amazonlinux2`
+- Redis enterprise benchmark.
+- Added flag `--append_kernel_command_line`, which allows appending to the
+  kernel command line when using Linux os types.
+- Added Spark SQL benchmark.
+- Added aws_dynamodb_connectMax flag to vary the maximum number of connections
+  to dynamodb.
+- Added helpmatchmd flag to dump markdown formatted help strings
+- Enable specifying source ip when creating a firewall rule.
+- Added support for T4 GPUs on GCE.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -290,6 +300,7 @@
 - Added Azure Premium Files support.
 - Added 'os_type' metadata to virtual machines for use in performance samples.
 - Storage specification related dpb terasort benchmark improvements.
+- Added support to run fio against multiple clients.
 - Added an optional flag to set a delay between boot tasks.
 - Added precision flag to Horovod.
 - Added a flag to Horovod that indicates that the VM is using a deep learning
@@ -298,6 +309,9 @@
 - Add support for different workload sizes for stress-ng.
 - Implemented RobustRemoteCommand for Windows.
 - Extract GceVirtualMachine's GetNetwork into a method.
+- Add Clear Linux support for AWS stripe disks.
+- Load memcached server before running benchmark.
+- Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -371,7 +385,7 @@
 - Fixed treatment of the boot time metric so that it is more like any other run
   stage metric.
 - Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
-- Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Made failures to create VMs on AWS, Azure, and GCP fail PKB quickly.
 - Fix Kubernetes StorageClass deletion
 - Added `git` installation to `tensorflow_serving` package.
 - MountDisk throws exception if mounting the disk fails.
@@ -480,3 +494,11 @@
 - RobustRemoteCommand now retries on ssh connections refused.
 - Fixed a bug that was causing AWS capacity reservation creation to fail.
 - GceNetworkSpec's zone is equal to the VM's zone
+- Creates the bucket from PKB rather than from within the VM that PKB launches
+  in TPU test.
+- Sets TPU zone MLPerf benchmark.
+- Compile Stress-ng version 0.05.23 rather than installing its package.
+- Added `--gce_firewall_rules_clean_all` option to network resource: clean up
+  all the firewall rules that depend on the PKB-created network.
+- Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
+- Increased default timeout for booting Windows VMs to 40 minutes.

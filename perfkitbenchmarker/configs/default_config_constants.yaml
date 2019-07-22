@@ -42,6 +42,11 @@ default_single_core: &default_single_core
     machine_type: Small
     zone: ZONE_1
     image: null
+  Docker:
+    image: null
+    machine_type:
+      cpus: 1
+      memory: 2.0GiB
 
 # TODO: update the two core machines for more providers
 default_dual_core: &default_dual_core
@@ -57,7 +62,11 @@ default_dual_core: &default_dual_core
     machine_type: m5.large
     zone: us-east-1
     image: null
-
+  Docker:
+    image: null
+    machine_type:
+      cpus: 2
+      memory: 4.0GiB
 
 # TODO(nlavine): update the disk types below as more providers are
 # updated for the disk types refactor.
@@ -103,6 +112,10 @@ default_500_gb: &default_500_gb
     mount_point: /scratch
   ProfitBricks:
     disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Docker:
+    disk_type: local
     disk_size: 500
     mount_point: /scratch
 
@@ -151,5 +164,9 @@ default_50_gb: &default_50_gb
     mount_point: /scratch
   ProfitBricks:
     disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  Docker:
+    disk_type: local
     disk_size: 50
     mount_point: /scratch
