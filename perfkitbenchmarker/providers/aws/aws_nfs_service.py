@@ -38,7 +38,6 @@ import logging
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import network
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -74,7 +73,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
 
   @property
   def network(self):
-    network_spec = network.BaseNetworkSpec(self.zone)
+    network_spec = aws_network.AwsNetworkSpec(self.zone)
     return aws_network.AwsNetwork.GetNetworkFromNetworkSpec(network_spec)
 
   @property
