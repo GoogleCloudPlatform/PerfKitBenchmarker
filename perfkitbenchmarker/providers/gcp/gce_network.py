@@ -30,7 +30,7 @@ import collections
 import logging
 import uuid
 
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import flags, context, errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -40,6 +40,8 @@ import six
 FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'  # @TODO alias rfc1918 addys for single rule
 NETWORK_RANGE2 = '192.168.0.0/16'
+NETWORK_RANGE3 = '172.16.0.0/12'
+
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 

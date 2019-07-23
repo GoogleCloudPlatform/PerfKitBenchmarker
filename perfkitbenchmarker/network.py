@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# from perfkitbenchmarker.configs.spec import BaseSpec
 
 """Module containing abstract classes related to VM networking.
 
@@ -84,6 +83,7 @@ class BaseNetworkSpec(object):
 
     Args:
       zone: The zone in which to create the network.
+      cidr: The subnet this network belongs to in CIDR notation
     """
     self.zone = zone
     self.cidr = cidr
@@ -102,7 +102,7 @@ class BaseVPNGW(object):
     Args:
       zone: The zone in which to create the VPNGW.
     """
-    self.ZONE = zone
+    self.zone = zone
     self.cidr = cidr
     self.require_target_to_init = False  # True if we need taget GW up front (AWS)
 

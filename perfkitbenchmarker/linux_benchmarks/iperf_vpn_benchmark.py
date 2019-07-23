@@ -48,31 +48,34 @@ BENCHMARK_NAME = 'iperf_vpn'
 BENCHMARK_CONFIG = """
 # VPN iperf config.
 iperf_vpn:
-  description: Run iperf over vpn
+  description: Run iperf over vpn 
   flags:
-    iperf_vpn_sending_thread_count: 5
+    iperf_vpn_sending_thread_count: 20
     use_vpn: True
+    vpn_service_gateway_count: 3 # gw_count needs to be in global flags so it's available to network setup
   vpn_service:
-    shared_key: DEADBEEF
-    ike_version: 1
+    tunnel_count: 1
+    #gateway_count: 1
+    ike_version: 2
     routing_type: static
-    tunnel_count: 1  # create multiple tunnels for ecmp load balance testing
   vm_groups:
     vm_1:
       cloud: GCP
       cidr: 10.0.1.0/24
-      zone: us-west1-b
-      vm_spec:
+      #zone: us-west1-b
+      vm_spec: 
         GCP:
+            zone: us-west1-b
             machine_type: n1-standard-4
             #zone: us-central1-a
     vm_2:
-      cloud: AWS
+      cloud: GCP
       cidr: 192.168.1.0/24
-      zone: us-east-1b
+      #zone: us-central1-b
       vm_spec:
-        AWS:
-            machine_type: t2.micro
+        GCP:
+            zone: us-central1-b
+            machine_type: n1-standard-4
             #zone: us-west1-c
 """
 
