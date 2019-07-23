@@ -155,7 +155,7 @@ sysbench:
       os_type: ubuntu1604
       vm_spec:
         AWS:
-          machine_type: m5.4xlarge
+          machine_type: m4.4xlarge
           zone: us-west-1a
         Azure:
           machine_type: Standard_A8m_v2
@@ -261,7 +261,9 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
     raise ValueError('Duration must be greater than zero.')
 
   db = benchmark_spec.managed_relational_db
-  run_cmd_tokens = ['sysbench',
+  run_cmd_tokens = ['nice',  # run with a niceness of lower priority
+                    '-15',   # to encourage cpu time for ssh commands
+                    'sysbench',
                     FLAGS.sysbench_testname,
                     '--tables=%d' % FLAGS.sysbench_tables,
                     ('--table_size=%d' % FLAGS.sysbench_table_size
@@ -305,7 +307,7 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
         duration,
         benchmark_spec,
         sysbench_thread_count)
-    stdout, stderr = vm.RobustRemoteCommand(run_cmd)
+    stdout, stderr = vm.RobustRemoteCommand(run_cmd, timeout=duration + 60)
     logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
                  stdout, stderr)
 
@@ -327,7 +329,8 @@ def _IssueSysbenchCommandWithReturnCode(
         run_cmd,
         should_log=show_results,
         ignore_failure=True,
-        suppress_warning=True)
+        suppress_warning=True,
+        timeout=duration + 60)
     if show_results:
       logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
                    stdout, stderr)
@@ -662,7 +665,9 @@ def _PrepareSysbench(vm, benchmark_spec):
   # gets very large.
   num_threads = min(FLAGS.sysbench_tables, 64)
 
-  data_load_cmd_tokens = ['sysbench',
+  data_load_cmd_tokens = ['nice',  # run with a niceness of lower priority
+                          '-15',   # to encourage cpu time for ssh commands
+                          'sysbench',
                           FLAGS.sysbench_testname,
                           '--tables=%d' % FLAGS.sysbench_tables,
                           ('--table_size=%d' % FLAGS.sysbench_table_size
