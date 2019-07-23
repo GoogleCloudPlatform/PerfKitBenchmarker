@@ -40,11 +40,24 @@ _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
 
 
+def CreateMockClientVM(db_class):
+  client_vm_spec = virtual_machine.BaseVmSpec(
+      'NAME',
+      **{
+          'machine_type': 'n1-standard-16',
+          'zone': 'us-west1-b',
+      })
+  client_vm_spec.HasIpAddress = True
+  client_vm_spec.ip_address = '192.168.0.1'
+  db_class.client_vm = client_vm_spec
+
+
 def CreateManagedDbFromSpec(spec_dict):
   mock_db_spec = mock.Mock(
       spec=benchmark_config_spec._ManagedRelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
   db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
+  CreateMockClientVM(db_class)
   return db_class
 
 
@@ -74,6 +87,7 @@ class GcpMysqlManagedRelationalDbTestCase(
                                          })
     vm_spec.cpus = None
     vm_spec.memory = None
+
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
@@ -111,8 +125,9 @@ class GcpMysqlManagedRelationalDbTestCase(
 
   def testCreate(self):
     with PatchCriticalObjects() as issue_command:
-      vm = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
-      vm._Create()
+      db = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      CreateMockClientVM(db)
+      db._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -131,8 +146,9 @@ class GcpMysqlManagedRelationalDbTestCase(
     with PatchCriticalObjects() as issue_command:
       spec = self.mock_db_spec
       spec.backup_enabled = False
-      vm = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
-      vm._Create()
+      db = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      CreateMockClientVM(db)
+      db._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -147,8 +163,8 @@ class GcpMysqlManagedRelationalDbTestCase(
 
   def testDelete(self):
     with PatchCriticalObjects() as issue_command:
-      vm = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
-      vm._Delete()
+      db = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      db._Delete()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
