@@ -75,15 +75,23 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
+  def _GetAuthorizedNetworks(self, vms):
+    """Get CIDR connections for list of VM specs that need to access the db."""
+    for vm in vms:
+      if not vm.HasIpAddress:
+        raise Exception('Client vm needs to be initialized before database can '
+                        'discover authorized network.')
+    # create the CIDR of the client VM that is configured to access
+    # the database
+    return ','.join('{0}/32'.format(vm.ip_address) for vm in vms)
+
   def _Create(self):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
 
-    # TODO: We should create the client VM with a static IP, and
-    # only authorize that specific IP address. The client VM can be accessed
-    # like so: self.client_vm
-    authorized_network = '0.0.0.0/0'
+    authorized_network = self._GetAuthorizedNetworks([self.client_vm])
+
     database_version_string = self._GetEngineVersionString(
         self.spec.engine, self.spec.engine_version)
 
