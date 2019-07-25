@@ -143,7 +143,7 @@ class AwsVpc(resource.BaseResource):
   """An object representing an Aws VPC."""
 
   def __init__(self, region, vpc_id=None, cidr_block='10.0.0.0/16'):
-    super(AwsVpc, self).__init__()
+    super(AwsVpc, self).__init__(vpc_id is not None)
     self.region = region
     self.id = vpc_id
     # Subnets are assigned per-AZ.
@@ -528,7 +528,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 
   def __init__(self, region, vpc_id=None, cidr_block='10.0.0.0/16'):
     self.region = region
-    self.vpc = AwsVpc(self.region, cidr_block, vpc_id)
+    self.vpc = AwsVpc(self.region, vpc_id, cidr_block)
     self.internet_gateway = AwsInternetGateway(region)
     self.route_table = None
     self.created = False
@@ -610,7 +610,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
 
-  def __init__(self, zone, vpc_id=None, subnet_id=None):
+  def __init__(self, zone, vpc_id=None, subnet_id=None, cidr=None):
     super(AwsNetworkSpec, self).__init__(zone)
     if vpc_id or subnet_id:
       logging.info('Confirming vpc (%s) and subnet (%s) selections', vpc_id,
@@ -621,6 +621,11 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
       self.cidr_block = my_subnet['CidrBlock']
       logging.info('Using vpc %s subnet %s cidr %s', self.vpc_id,
                    self.subnet_id, self.cidr_block)
+    elif cidr: #  user  provided subnet
+        self.cidr_block = cidr
+        self.cidr = cidr
+        self.vpc_id = None
+        self.subnet_id = None
     else:
       self.vpc_id = None
       self.subnet_id = None
@@ -650,7 +655,7 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    if spec.zone and spec.cidr and FLAGS.use_vpn:
+    if spec.cidr and FLAGS.use_vpn:
       self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region, spec.vpc_id, spec.cidr)
     else:
       self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region, spec.vpc_id)
@@ -669,27 +674,28 @@ class AwsNetwork(network.BaseNetwork):
     self.vpngw = {}
     self.az = spec.zone
 
-    name = 'vpnpkb-network-%s' % FLAGS.run_uri
-    if spec.zone and spec.cidr and FLAGS.use_vpn:
+    name = 'pkb-network-%s' % FLAGS.run_uri
+    if spec.cidr and FLAGS.use_vpn:
       self.cidr = spec.cidr
-      for tunnelnum in range(0, FLAGS.vpn_service_tunnel_count):
+      for vpngw_num in range(0, FLAGS.vpn_service_gateway_count):
         vpngw_name = 'vpngw-%s-%s-%s' % (
-            spec.zone, tunnelnum, FLAGS.run_uri)
+            spec.zone, vpngw_num, FLAGS.run_uri)
         self.vpngw[vpngw_name] = AwsVPNGW(
             vpngw_name, name, spec.zone,
             spec.cidr)
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns an AwsNetworkSpec created from VM attributes and flags."""
-    return AwsNetworkSpec(vm.zone, FLAGS.aws_vpc, FLAGS.aws_subnet)
+    return AwsNetworkSpec(vm.zone, FLAGS.aws_vpc, FLAGS.aws_subnet, vm.cidr)
 
   def Create(self):
     """Creates the network."""
     self.regional_network.Create()
 
-    if FLAGS.use_vpn and self.subnet is None:
+    if FLAGS.use_vpn and self.cidr:
       self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
                               cidr_block=self.cidr)
+      self.subnet.Create()
     if self.subnet is None:
       cidr = self.regional_network.vpc.NextSubnetCidrBlock()
       self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
@@ -974,21 +980,6 @@ class AwsVPNGW(network.BaseVPNGW):
     if self.customer_gw and self.customer_gw.Exists():
       self.customer_gw.Delete()
 
-#     if self.forwarding_rules:
-#       for fr in self.forwarding_rules:
-#         self.forwarding_rules[fr].Delete()
-
-#     if self.tunnels:
-#       for tun in self.tunnels:
-#         if self.TunnelExists(tun):
-#           self.DeleteTunnel(tun)
-
-#     if self.routes:
-#       for route in self.routes:
-#         if self.RouteExists(route):
-#           self.DeleteRoute(route)
-#     self.created = False
-
     # vpngws need deleted last
     if self.vpngw_resource:
       self.vpngw_resource.Detach()
@@ -1022,38 +1013,14 @@ class AwsVPNConnection(resource.BaseResource):
         '--type=%s' % self.type,
         '--options=%s' % self._getCnxnOpts()]
     response, _ = util.IssueRetryableCommand(create_cmd)
-#     logging.log(logging.INFO, response)
     response_xml = response[response.find("<"):response.rfind(">") + 1].replace("\\n", "").replace("\\", "")
     self.cnxn_details = xmltodict.parse(response_xml)
     response_json = re.sub(r'<.*>', '', response)
     response_json = json.loads(response_json)
-#     logging.log(logging.INFO, self.id)
-#     logging.log(logging.INFO, response_json)
     self.id = response_json["VpnConnection"]["VpnConnectionId"]
     #     self.ip = response_json["VpnConnection"]["VgwTelemetry"][0]["OutsideIpAddress"] # @TODO find "VgwTelemetry" from aws docs
     response_xml_dict = xmltodict.parse(response_xml)
     self.ip = response_xml_dict["vpn_connection"]["ipsec_tunnel"][0]["vpn_gateway"]["tunnel_outside_address"]["ip_address"].encode()
-
-#     logging.log(logging.INFO, response_xml_dict)
-#   @vm_util.Retry()
-#   def _PostCreate(self):
-#     """Gets data about the VPN cnxn."""
-#     cmd = util.AWS_PREFIX + [
-#     'ec2',
-#     'describe-vpn-connections',
-#     '--region=%s' % self.region,
-#     '--filter=Name=vpn-connection-id,Values=%s' % self.id]
-#     response = vm_util.IssueCommand(cmd)
-#     logging.log(logging.INFO, response)
-#     response, _ = util.IssueRetryableCommand(cmd)
-#     logging.log(logging.INFO, response)
-#     #response = response[0]
-# #     response_xml = response[response.find("<"):response.rfind(">") + 1].replace("\\n","").replace("\\","")
-# #     logging.log(logging.INFO, response_xml)
-# #     response_xml_dict = xmltodict.parse(response_xml)
-#     response_json = re.sub(r'<.*>','',response.rstrip())
-#     response_json = json.loads(response_json)
-#     self.ip = response_json["VpnConnection"]["VgwTelemetry"][0]["OutsideIpAddress"] # @TODO top level cnxn/endpont bean?
 
   def _Delete(self):
     "Deletes the VPN Connection"
@@ -1063,7 +1030,6 @@ class AwsVPNConnection(resource.BaseResource):
         '--region=%s' % self.region,
         '--vpn-connection-id=%s' % self.id]
     response, _ = util.IssueRetryableCommand(delete_cmd)
-#     logging.log(logging.INFO, response)
 
   def _Exists(self):
     """Returns True if the VPNConnection exists."""
@@ -1072,20 +1038,10 @@ class AwsVPNConnection(resource.BaseResource):
         'describe-vpn-connections',
         '--region=%s' % self.region,
         '--filter=Name=vpn-connection-id,Values=%s' % self.id]
-    response = vm_util.IssueCommand(cmd)
-#     logging.log(logging.INFO, response)
     response, _ = util.IssueRetryableCommand(cmd)
-#     logging.log(logging.INFO, response)
-    # response = response[0]
-#     response_xml = response[response.find("<"):response.rfind(">") + 1].replace("\\n", "").replace("\\", "")
-#     logging.log(logging.INFO, response_xml)
-#     response_xml_dict = xmltodict.parse(response_xml)
     response_json = re.sub(r'<.*>', '', response)
     response_json = json.loads(response_json)
     return len(response_json["VpnConnections"]) > 0 and response_json["VpnConnections"][0]["State"] in ["available", "pending"]
-#     logging.log(logging.INFO, self.id)
-#     logging.log(logging.INFO, response_json)
-#     logging.log(logging.INFO, response_xml_dict)
 
   def IsReady(self):
     """Returns True if the VPNConnection exists."""
@@ -1094,20 +1050,10 @@ class AwsVPNConnection(resource.BaseResource):
         'describe-vpn-connections',
         '--region=%s' % self.region,
         '--filter=Name=vpn-connection-id,Values=%s' % self.id]
-    response = vm_util.IssueCommand(cmd)
-#     logging.log(logging.INFO, response)
     response, _ = util.IssueRetryableCommand(cmd)
-#     logging.log(logging.INFO, response)
-    # response = response[0]
-#     response_xml = response[response.find("<"):response.rfind(">") + 1].replace("\\n", "").replace("\\", "")
-#     logging.log(logging.INFO, response_xml)
-#     response_xml_dict = xmltodict.parse(response_xml)
     response_json = re.sub(r'<.*>', '', response)
     response_json = json.loads(response_json)
     return len(response_json["VpnConnections"]) > 0 and response_json["VpnConnections"][0]["State"] in ["available"]
-#     logging.log(logging.INFO, self.id)
-#     logging.log(logging.INFO, response_json)
-#     logging.log(logging.INFO, response_xml_dict)
 
   def Create_VPN_Cnxn_Route(self, target_cidr):
     """sets up routes to target."""
@@ -1118,8 +1064,6 @@ class AwsVPNConnection(resource.BaseResource):
         '--destination-cidr-block=%s' % target_cidr,
         '--vpn-connection-id=%s' % self.id]
     response, _ = util.IssueRetryableCommand(create_cmd)
-#     response = json.loads(response)
-#     logging.log(logging.INFO, response)
 
   def _getCnxnOpts(self):
     """
@@ -1148,11 +1092,10 @@ class AwsVPNConnection(resource.BaseResource):
     logging.info("Get VPN Cnxn Options<routing>:  %s" % str(opts))
     logging.info("Get VPN Cnxn Options<routing>:  %s" % repr(opts))
     logging.info("Get VPN Cnxn Options<self.psk>:  %s" % str(self.psk))
-#     if self.psk != None:
+
     key = 'key' + FLAGS.run_uri  # psk restrictions on some runuris
     opts["TunnelOptions"] = [{'PreSharedKey': key}, {'PreSharedKey': key}]
     logging.info("Get VPN Cnxn Options<tun_opts>:  %s" % str(opts))
-#     return json.dumps(opts).replace("\"", "\\\"")
     # https://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html
     logging.info("Get VPN Cnxn Options:  %s" % str(json.dumps(json.dumps(opts))[1:-1].replace('\\', '')))
     return json.dumps(json.dumps(opts))[1:-1].replace('\\', '')
