@@ -2,28 +2,30 @@
 iperf_vpn:
   description: Run iperf over vpn 
   flags:
-    iperf_vpn_sending_thread_count: 5
-    use_vpn: True
-    vpn_service_gateway_count: 2 # gw_count needs to be in global flags so it's available to network setup
+    iperf_vpn_sending_thread_count: 1
+    #use_vpn: True
+    vpn_service_gateway_count: 1 # gw_count needs to be in global flags so it's available to network setup
   vpn_service:
     tunnel_count: 1
-    gateway_count: 1
+    #gateway_count: 1
     ike_version: 2
     routing_type: static
   vm_groups:
     vm_1:
       cloud: GCP
       cidr: 10.0.1.0/24
-      zone: us-west1-b
+      #zone: us-west1-b
       vm_spec: 
         GCP:
+            zone: us-west1-b
             machine_type: n1-standard-4
             #zone: us-central1-a
     vm_2:
       cloud: GCP
       cidr: 192.168.1.0/24
-      zone: us-central1-b
+      #zone: us-central1-b
       vm_spec:
         GCP:
+            zone: us-central1-c
             machine_type: n1-standard-4
             #zone: us-west1-c

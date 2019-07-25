@@ -26,9 +26,7 @@ from __future__ import print_function
 
 import json
 import threading
-import collections
 import logging
-import uuid
 
 from perfkitbenchmarker import flags, context, errors
 from perfkitbenchmarker import network
@@ -38,9 +36,9 @@ from perfkitbenchmarker.providers.gcp import util
 import six
 
 FLAGS = flags.FLAGS
-NETWORK_RANGE = '10.0.0.0/8'  # @TODO alias rfc1918 addys for single rule
+NETWORK_RANGE = '10.0.0.0/8'
 NETWORK_RANGE2 = '192.168.0.0/16'
-NETWORK_RANGE3 = '172.16.0.0/12'
+# NETWORK_RANGE3 = '172.16.0.0/12' # necessary?
 
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
@@ -65,7 +63,6 @@ class GceVPNGW(network.BaseVPNGW):
 
     self.ip_address = None
     self.created = False
-#     self.suffix = collections.defaultdict(dict)  # @TODO remove - holds uuid tokens for naming/finding things (double dict)
     self.require_target_to_init = False
     self.routing = None
     self.psk = None
@@ -97,7 +94,6 @@ class GceVPNGW(network.BaseVPNGW):
     if 'ip_address' not in tunnel_config.endpoints[self.name]:
       logging.info('tunnel_config: Configuring IP for %s' % self.name)
       tunnel_config.endpoints[self.name]['ip_address'] = self.ip_address
-#       logging.info(tunnel_config)
 
     # configure forwarding
     # requires: -
@@ -123,18 +119,11 @@ class GceVPNGW(network.BaseVPNGW):
     if not hasattr(tunnel_config, 'psk'):
       logging.info('tunnel_config: PSK not provided... setting to runid')
       tunnel_config.psk = 'key' + FLAGS.run_uri
-#     if 'suffix' not in tunnel_config.endpoints[self.name]:
-#       tunnel_config.endpoints[self.name]['suffix'] = format(uuid.uuid4().fields[1], 'x')  # unique enough
-#       logging.info('tunnel_config: setting suffix to %s, %s' % (tunnel_config.endpoints[self.name]['suffix'], type(tunnel_config.endpoints[self.name]['suffix'])))
-
-#     if 'ike_version' not in tunnel_config.endpoints[self.name]:
-#       tunnel_config.endpoints[self.name]['ike_version'] = '2'
     self._SetupTunnel(tunnel_config)
 
     # configure routing
     # requires: next_hop_tunnel_id, target_cidr,
     dest_cidr = tunnel_config.endpoints[target_endpoint].get('cidr')
-#     logging.info('tunnel_config: dest_cidr- %s, %s, %s' % (dest_cidr, tunnel_config.endpoints[target_endpoint]['cidr'], dest_cidr.strip()))
     if not dest_cidr or not dest_cidr.strip():
       logging.info('tunnel_config: destination CIDR needed... waiting for target to configure')
       return
@@ -172,15 +161,6 @@ class GceVPNGW(network.BaseVPNGW):
     """
     if len(self.forwarding_rules) == 3:
       return  # backout if already set
-
-#     self.suffix[suffix]['fr_suffix'] = self.region + '-' + suffix
-#     # GCP doesnt like uppercase names?!?
-#     fr_UDP500_name = ('fr-udp500-%s-%s' %
-#                       (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
-#     fr_UDP4500_name = ('fr-udp4500-%s-%s' %
-#                        (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
-#     fr_ESP_name = ('fr-esp-%s-%s' %
-#                    (self.suffix[suffix]['fr_suffix'], FLAGS.run_uri))
     suffix = tunnel_config.suffix
     # GCP doesnt like uppercase names?!?
     fr_UDP500_name = ('fr-udp500-%s-%s' %
@@ -190,7 +170,6 @@ class GceVPNGW(network.BaseVPNGW):
     fr_ESP_name = ('fr-esp-%s-%s' %
                    (suffix, FLAGS.run_uri))
 
-    # with self._lock:
     if fr_UDP500_name not in self.forwarding_rules:
       fr_UDP500 = GceForwardingRule(
           fr_UDP500_name, 'UDP', self, 500)
@@ -225,13 +204,11 @@ class GceVPNGW(network.BaseVPNGW):
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    # with self._lock:
     if self.created:
       return
     if self.vpngw_resource:
       self.vpngw_resource.Create()
     key = self.name
-    # with benchmark_spec.vpngws_lock:
     if key not in benchmark_spec.vpngws:
       benchmark_spec.vpngws[key] = self
 
@@ -372,7 +349,6 @@ class GceStaticTunnel(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe', self.name)
     cmd.flags['region'] = self.region
     response = cmd.Issue(suppress_warning=True)
-#     logging.info('GCP Tunnel Status: %s' % repr(response))
     return 'established' in str(response).lower()
 
 
@@ -673,7 +649,7 @@ class GceNetwork(network.BaseNetwork):
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
     # allow 192.168.0.0/16 addresses
     firewall_name2 = 'default-internal2-%s' % FLAGS.run_uri
-    # add support for zone, cidr, and separate networks
+    # add support for cidr and separate networks
     # @TODO alias RFC1918 private networks in a single rule
     if network_spec.zone and network_spec.cidr:
       firewall_name = 'default-internal-%s-%s' % (network_spec.zone, FLAGS.run_uri)
@@ -726,7 +702,4 @@ class GceNetwork(network.BaseNetwork):
       self.default_firewall_rule2.Delete()
       if self.subnet_resource:
         self.subnet_resource.Delete()
-#       if getattr(self, 'vpngw', False):
-#         for gw in self.vpngw:
-#           self.vpngw[gw].Delete()
       self.network_resource.Delete()

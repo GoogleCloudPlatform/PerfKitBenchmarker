@@ -50,11 +50,11 @@ BENCHMARK_CONFIG = """
 iperf_vpn:
   description: Run iperf over vpn 
   flags:
-    iperf_vpn_sending_thread_count: 20
+    iperf_vpn_sending_thread_count: 1
     use_vpn: True
-    vpn_service_gateway_count: 3 # gw_count needs to be in global flags so it's available to network setup
+    vpn_service_gateway_count: 1 # gw_count needs to be in global flags so it's available to network setup
   vpn_service:
-    tunnel_count: 1
+    tunnel_count: 2
     #gateway_count: 1
     ike_version: 2
     routing_type: static
@@ -67,16 +67,13 @@ iperf_vpn:
         GCP:
             zone: us-west1-b
             machine_type: n1-standard-4
-            #zone: us-central1-a
     vm_2:
       cloud: GCP
       cidr: 192.168.1.0/24
-      #zone: us-central1-b
       vm_spec:
         GCP:
             zone: us-central1-b
             machine_type: n1-standard-4
-            #zone: us-west1-c
 """
 
 # """
