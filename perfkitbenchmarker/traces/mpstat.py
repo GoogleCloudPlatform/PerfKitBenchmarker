@@ -187,7 +187,7 @@ class MpstatCollector(base_collector.BaseCollector):
 
   def _CollectorRunCommand(self, vm, collector_file):
     return ('mpstat -I {breakdown} -u -P {processor_number} {interval} {count} '
-            '> {output}'.format(
+            '> {output} 2>&1 &'.format(
                 breakdown=FLAGS.mpstat_breakdown,
                 processor_number=FLAGS.mpstat_cpus,
                 interval=self.interval,
