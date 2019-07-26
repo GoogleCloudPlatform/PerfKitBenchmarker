@@ -310,6 +310,7 @@
 - Add support for different workload sizes for stress-ng.
 - Implemented RobustRemoteCommand for Windows.
 - Extract GceVirtualMachine's GetNetwork into a method.
+- Updated redis memtier benchmark to pre-populate the redis db before testing.
 - Add Clear Linux support for AWS stripe disks.
 - Load memcached server before running benchmark.
 - Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
