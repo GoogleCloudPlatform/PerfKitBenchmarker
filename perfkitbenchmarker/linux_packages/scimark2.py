@@ -14,8 +14,9 @@
 
 
 """Module containing scimark2 installation and cleanup functions."""
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
+import posixpath
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 # Use this directory for all data stored in the VM for this test.
 PATH = '{0}/scimark2'.format(INSTALL_DIR)
@@ -36,6 +37,18 @@ C_SRC = '{0}/src'.format(PATH)
 # https://llvm.org/bugs/show_bug.cgi?id=22589 .
 C_CFLAGS = '-O3 -march=native'
 
+PACKAGE_NAME = 'scimark2'
+
+PREPROVISIONED_DATA = {
+    JAVA_JAR:
+        '6f84f949c3167b385da1a9957ecd53fe0111b42e981e0c481be53dba0504305f',
+    C_ZIP: '223464cd7e90b4c22e2af08dbae6f6faa33e65b01e1c58e5a176837bc67958be'
+}
+PACKAGE_DATA_URL = {
+    JAVA_JAR: posixpath.join(BASE_URL, JAVA_JAR),
+    C_ZIP: posixpath.join(BASE_URL, C_ZIP)
+}
+
 
 def Install(vm):
   """Installs scimark2 on the vm."""
@@ -43,10 +56,10 @@ def Install(vm):
   vm.Install('wget')
   vm.Install('openjdk')
   vm.Install('unzip')
+  vm.RemoteCommand('rm -rf {0} && mkdir {0}'.format(PATH))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), PATH)
   cmds = [
-      'rm -rf {0} && mkdir {0}'.format(PATH),
-      'wget {0}/{1} -O {2}/{1}'.format(BASE_URL, JAVA_JAR, PATH),
-      'wget {0}/{1} -O {2}/{1}'.format(BASE_URL, C_ZIP, PATH),
       '(mkdir {0} && cd {0} && unzip {1}/{2})'.format(C_SRC, PATH, C_ZIP),
       '(cd {0} && make CFLAGS="{1}")'.format(C_SRC, C_CFLAGS),
   ]
