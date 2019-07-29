@@ -420,7 +420,7 @@ class BaseVirtualMachine(resource.BaseResource):
       fallback_url: The dict mapping filenames to fallback url for downloading.
 
     Raises:
-      errors.Setup.BadPreProvisionedDataError: If the module or filename are
+      errors.Setup.BadPreprovisionedDataError: If the module or filename are
           not defined with preprovisioned data, or if the sha256sum hash in the
           code does not match the sha256 of the file.
     """
@@ -446,7 +446,7 @@ class BaseVirtualMachine(resource.BaseResource):
         self.Install('wget')
         self.RemoteCommand('wget -P {0} {1}'.format(install_path, url))
       else:
-        raise errors.Setup.BadPreProvisionedDataError(
+        raise errors.Setup.BadPreprovisionedDataError(
             'Cannot find preprovisioned file %s inside preprovisioned bucket '
             'in module %s. See README.md for information about '
             'preprovisioned data. '
@@ -484,7 +484,7 @@ class BaseVirtualMachine(resource.BaseResource):
       install_path: The path to download the data file.
 
     Raises:
-      errors.Setup.BadPreProvisionedDataError: If the benchmark or filename are
+      errors.Setup.BadPreprovisionedDataError: If the benchmark or filename are
           not defined with preprovisioned data, or if the sha256sum hash in the
           code does not match the sha256sum of the file.
     """
@@ -533,7 +533,7 @@ class BaseVirtualMachine(resource.BaseResource):
       install_path: The path to download the data file.
 
     Raises:
-      errors.Setup.BadPreProvisionedDataError: If the package or filename are
+      errors.Setup.BadPreprovisionedDataError: If the package or filename are
           not defined with preprovisioned data, or if the sha256sum hash in the
           code does not match the sha256sum of the file.
     """
