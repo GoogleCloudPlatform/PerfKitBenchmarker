@@ -20,17 +20,27 @@ from perfkitbenchmarker import vm_util
 LAPACK_VERSION = '3.6.1'
 LAPACK_FOLDER = 'lapack-%s' % LAPACK_VERSION
 LAPACK_TAR = '%s.tgz' % LAPACK_FOLDER
-LAPACK_URL = 'http://www.netlib.org/lapack/%s' % LAPACK_TAR
+LAPACK_URL = 'https://www.netlib.org/lapack/%s' % LAPACK_TAR
 LAPACK_DIR = os.path.join(vm_util.VM_TMP_DIR, LAPACK_FOLDER)
+PACKAGE_NAME = 'lapack'
+PREPROVISIONED_DATA = {
+    LAPACK_TAR:
+        '888a50d787a9d828074db581c80b2d22bdb91435a673b1bf6cd6eb51aa50d1de'
+}
+PACKAGE_DATA_URL = {
+    LAPACK_TAR: LAPACK_URL
+}
 
 
 def _Install(vm):
   """Install LAPACK lib."""
   vm.Install('fortran')
   vm.Install('cmake')
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), vm_util.VM_TMP_DIR)
   vm.RemoteCommand(
-      'cd %s; wget %s; tar xf %s' % (
-          vm_util.VM_TMP_DIR, LAPACK_URL, LAPACK_TAR))
+      'cd %s; tar xf %s' % (
+          vm_util.VM_TMP_DIR, LAPACK_TAR))
   vm.RemoteCommand(
       'cd %s; mv make.inc.example make.inc; cmake .; make -j %s' % (
           LAPACK_DIR, vm.num_cpus))
