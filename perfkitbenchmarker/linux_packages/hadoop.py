@@ -58,7 +58,7 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('openjdk')
   vm.Install('curl')
-  hadoop_url = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
+  hadoop_url = ('https://www-us.apache.org/dist/hadoop/common/hadoop-{0}/'
                 'hadoop-{0}.tar.gz').format(FLAGS.hadoop_version)
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
