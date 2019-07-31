@@ -28,18 +28,15 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
-from six.moves import urllib
 
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('hbase_version', '1.3.2.1', 'HBase version.')
-flags.DEFINE_boolean('hbase_use_stable', False,
-                     'Whether to use the current stable release of HBase.')
+flags.DEFINE_string('hbase_version', '1.3.5', 'HBase version.')
 flags.DEFINE_string('hbase_bin_url', None,
                     'Specify to override url from HBASE_URL_BASE.')
 
-HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase'
+HBASE_URL_BASE = 'https://www-us.apache.org/dist/hbase'
 HBASE_PATTERN = r'>(hbase-([\d\.]+)-bin.tar.gz)<'
 HBASE_VERSION_PATTERN = re.compile('HBase (.*)$', re.IGNORECASE | re.MULTILINE)
 
@@ -59,25 +56,9 @@ def _GetHBaseURL():
 
   Returns:
     The HBase download url.
-
-  Raises:
-    ValueError: If the download link cannot be found on the download page or
-      if the download version does not match the hbase_version flag.
   """
-  url = '{}/{}/'.format(
-      HBASE_URL_BASE,
-      'stable' if FLAGS.hbase_use_stable else FLAGS.hbase_version)
-  response = urllib.request.urlopen(url)
-  html = response.read()
-  m = re.search(HBASE_PATTERN, html)
-  if not m:
-    raise ValueError('Response {} from url {}, no {} in {}'.format(
-        response.getcode(), url, HBASE_PATTERN, html))
-  link, the_version = m.groups()
-  if not FLAGS.hbase_use_stable and the_version != FLAGS.hbase_version:
-    raise ValueError('Found version {} in {} expected {}'.format(
-        the_version, url, FLAGS.hbase_version))
-  return url + link
+  return '{0}/{1}/hbase-{1}-bin.tar.gz'.format(
+      HBASE_URL_BASE, FLAGS.hbase_version)
 
 
 def GetHBaseVersion(vm):
