@@ -176,7 +176,7 @@ class TestInstallData(
     self.filenames = ['fake_pkg']
     self.install_path = '/fake_path'
     self.fallback_url = {
-        'fake_pkg': 'fake_url'}
+        'fake_pkg': 'https://fake_url/fake_pkg.tar.gz'}
 
   def testPreprovisionNotAvailableFallBackInstallation(self):
     with mock.patch.object(
@@ -192,7 +192,7 @@ class TestInstallData(
                                self.fallback_url)
     show.assert_called_once_with(self.module_name, 'fake_pkg')
     remote_command.assert_called_once_with(
-        'wget -P /fake_path fake_url')
+        'wget -O /fake_path/fake_pkg.tar.gz https://fake_url/fake_pkg.tar.gz')
     check.assert_called_once_with(
         self.install_path, self.module_name, 'fake_pkg', 'fake_checksum')
 
