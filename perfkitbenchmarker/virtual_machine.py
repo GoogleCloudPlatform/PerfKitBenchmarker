@@ -444,7 +444,10 @@ class BaseVirtualMachine(resource.BaseResource):
         self.DownloadPreprovisionedData(install_path, module_name, filename)
       elif url:
         self.Install('wget')
-        self.RemoteCommand('wget -P {0} {1}'.format(install_path, url))
+        file_name = os.path.basename(url)
+        self.RemoteCommand(
+            'wget -O {0} {1}'.format(
+                os.path.join(install_path, file_name), url))
       else:
         raise errors.Setup.BadPreprovisionedDataError(
             'Cannot find preprovisioned file %s inside preprovisioned bucket '
