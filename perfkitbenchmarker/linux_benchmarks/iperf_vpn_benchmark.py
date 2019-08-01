@@ -48,7 +48,7 @@ BENCHMARK_NAME = 'iperf_vpn'
 BENCHMARK_CONFIG = """
 # VPN iperf config.
 iperf_vpn:
-  description: Run iperf over vpn 
+  description: Run iperf over vpn
   flags:
     iperf_vpn_sending_thread_count: 1
     use_vpn: True
@@ -63,7 +63,7 @@ iperf_vpn:
       cloud: GCP
       cidr: 10.0.1.0/24
       #zone: us-west1-b
-      vm_spec: 
+      vm_spec:
         GCP:
             zone: us-west1-b
             machine_type: n1-standard-4

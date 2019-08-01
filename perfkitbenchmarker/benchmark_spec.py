@@ -35,7 +35,6 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
@@ -49,6 +48,8 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import vpn_service
+
 import six
 from six.moves import range
 import six.moves._thread
@@ -803,4 +804,3 @@ class BenchmarkSpec(object):
     spec.status = benchmark_status.SKIPPED
     context.SetThreadBenchmarkSpec(spec)
     return spec
-

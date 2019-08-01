@@ -621,7 +621,7 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
       self.cidr_block = my_subnet['CidrBlock']
       logging.info('Using vpc %s subnet %s cidr %s', self.vpc_id,
                    self.subnet_id, self.cidr_block)
-    elif cidr: #  user  provided subnet
+    elif cidr:  # user  provided subnet
         self.cidr_block = cidr
         self.cidr = cidr
         self.vpc_id = None
@@ -683,6 +683,7 @@ class AwsNetwork(network.BaseNetwork):
         self.vpngw[vpngw_name] = AwsVPNGW(
             vpngw_name, name, spec.zone,
             spec.cidr)
+
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns an AwsNetworkSpec created from VM attributes and flags."""

@@ -1288,8 +1288,10 @@ class _VPNServiceDecoder(option_decoders.TypeVerifier):
         **vpn_service_config)
     return result
 
+
 class _AppGroupSpec(spec.BaseSpec):
   """Configurable options of a AppService group."""
+
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

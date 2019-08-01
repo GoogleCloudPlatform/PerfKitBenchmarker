@@ -184,6 +184,26 @@ class VPNService(resource.BaseResource):
     self.spec = spec
     self.vpns = {}
 
+  def GetResourceMetadata(self):
+    """Returns a dictionary of metadata about the resource."""
+
+
+    if not self.created:
+      return {}
+    result = self.metadata.copy()
+    if self.routing is not None:
+      result['vpn_service_routing_type'] = self.routing
+    if self.ike_version is not None:
+      result['vpn_service_ike_version'] = self.ike_version
+    if self.tunnel_count is not None:
+      result['vpn_service_tunnel_count'] = self.tunnel_count
+    if self.gateway_count is not None:
+      result['gateway_count'] = self.gateway_count
+    # if self.psk is not None:
+    #   result['num_disable_cpus'] = self.psk
+
+    return result
+
   def _Create(self):
     """Creates VPN objects for VPNGW pairs.
     """
@@ -193,9 +213,9 @@ class VPNService(resource.BaseResource):
       raise errors.Error('CreateVPN Service. called in a thread without a '
                          'BenchmarkSpec.')
 
-    # with benchmark_spec.vpngws_lock:
-    self.vpngw_pairs = self.GetVPNGWPairs(benchmark_spec.vpngws)  # @TODO change to ndpoient pair
-    # with benchmark_spec.vpns_lock:
+
+    self.vpngw_pairs = self.GetVPNGWPairs(benchmark_spec.vpngws)
+
 
     for gwpair in self.vpngw_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
@@ -213,11 +233,13 @@ class VPNService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for VPNs created."""
-    basic_data = {'vpn_service': self.name,
-                  'routing_type': self.routing,
-                  'ike_version': self.ike_version,
-                  'tunnel_count': self.tunnel_count,
-                  'gateway_count': self.gateway_count}
+    basic_data = {'vpn_service_name': self.name,
+                  'vpn_service_routing_type': self.routing_type,
+                  'vpn_service_ike_version': self.ike_version,
+                  'vpn_service_tunnel_count': self.tunnel_count,
+                  'vpn_service_gateway_count': self.gateway_count,
+                  # 'vpn_service_psk': self.psk,
+                  }
     return basic_data
 
   def GetVPNGWPairs(self, vpngws):
