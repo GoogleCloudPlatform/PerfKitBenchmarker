@@ -121,6 +121,7 @@
 - Added helpmatchmd flag to dump markdown formatted help strings
 - Enable specifying source ip when creating a firewall rule.
 - Added support for T4 GPUs on GCE.
+- Added mpstat utility to measure cpu processor stats.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -309,6 +310,7 @@
 - Add support for different workload sizes for stress-ng.
 - Implemented RobustRemoteCommand for Windows.
 - Extract GceVirtualMachine's GetNetwork into a method.
+- Updated redis memtier benchmark to pre-populate the redis db before testing.
 - Add Clear Linux support for AWS stripe disks.
 - Load memcached server before running benchmark.
 - Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
@@ -502,3 +504,5 @@
   all the firewall rules that depend on the PKB-created network.
 - Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
 - Increased default timeout for booting Windows VMs to 40 minutes.
+- Fixed problem with AWS network creation in aws_dpb_emr, aws_nfs_service, and
+  elastic_container_service.

@@ -20,8 +20,9 @@ from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
 
+
 LLVM_TAR = 'clang+llvm-3.9.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
-LLVM_TAR_URL = 'http://releases.llvm.org/3.9.0/{0}'.format(LLVM_TAR)
+LLVM_TAR_URL = 'https://releases.llvm.org/3.9.0/{0}'.format(LLVM_TAR)
 OPENMP_TAR = 'libomp_20160808_oss.tgz'
 OPENMP_TAR_URL = 'https://www.openmprtl.org/sites/default/files/{0}'.format(
     OPENMP_TAR)
@@ -31,7 +32,17 @@ _SPECCPU2017_TAR = 'speccpu2017.tgz'
 _TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
 _LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
 _DEFAULT_RUNSPEC_CONFIG = 'pkb-crosstool-llvm-linux-x86-fdo.cfg'
-PREPROVISIONED_DATA = {_SPECCPU2017_TAR: None}
+PREPROVISIONED_DATA = {
+    _SPECCPU2017_TAR: None,
+    LLVM_TAR:
+        'e189a9e605ec035bfa1cfebf37374a92109b61291dc17c6f712398ecccb3498a',
+    OPENMP_TAR:
+        'a528f8949387ae8e2a05faa2f3a471fc4558142fac98bf5801659e695292e652'
+}
+PACKAGE_DATA_URL = {
+    LLVM_TAR: LLVM_TAR_URL,
+    OPENMP_TAR: OPENMP_TAR_URL
+}
 
 
 def GetSpecInstallConfig(scratch_dir):
@@ -55,10 +66,10 @@ def GetSpecInstallConfig(scratch_dir):
 def Install(vm):
   """Installs SPECCPU 2017."""
   speccpu.InstallSPECCPU(vm, GetSpecInstallConfig(vm.GetScratchDir()))
-  vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
-      INSTALL_DIR, LLVM_TAR_URL, LLVM_TAR))
-  vm.RemoteCommand('cd {0} && wget {1} && tar xf {2}'.format(
-      INSTALL_DIR, OPENMP_TAR_URL, OPENMP_TAR))
+  vm.InstallPreprovisionedPackageData(
+      _PACKAGE_NAME, [LLVM_TAR, OPENMP_TAR], INSTALL_DIR)
+  vm.RemoteCommand('cd {0} && tar xf {1} && tar xf {2}'.format(
+      INSTALL_DIR, LLVM_TAR, OPENMP_TAR))
   vm.RemoteCommand('sudo apt-get install libjemalloc1 libjemalloc-dev')
   vm.RemoteCommand('sudo apt-get update && sudo apt-get install -y libomp-dev')
   # spec17 tarball comes pre-packages with runner scripts for x86 architecture.

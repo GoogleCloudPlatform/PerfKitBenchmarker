@@ -14,21 +14,28 @@
 
 """Module containing LMbench installation and cleanup functions."""
 
+import posixpath
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-# LMBENCH_DIR = '%s/LMBENCH' % INSTALL_DIR
-LMBENCH_TAG = 'lmbench3'
-LMBENCH_TAR = '%s.tar.gz' % LMBENCH_TAG
-LMBENCH_DIR = '%s/%s' % (INSTALL_DIR, LMBENCH_TAG)
-LMBENCH_URL = 'http://www.bitmover.com/lmbench/' + LMBENCH_TAR
+LMBENCH_DIR = posixpath.join(INSTALL_DIR, 'lmbench-master')
+PACKAGE_NAME = 'lmbench'
+LMBENCH_ZIP = 'master.zip'
+PREPROVISIONED_DATA = {
+    LMBENCH_ZIP:
+        '85ea189c2a7adf1e2c9c136eb9775ff8fc3c6cd873d1354b10deb33148a19913'
+}
+PACKAGE_DATA_URL = {
+    LMBENCH_ZIP: 'https://github.com/intel/lmbench/archive/master.zip'
+}
 
 
 def _Install(vm):
   """Installs the Lmbench package on the VM."""
 
   vm.Install('build_tools')
-  vm.RemoteCommand('wget %s -P %s' % (LMBENCH_URL, INSTALL_DIR))
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, LMBENCH_TAR))
+  vm.Install('unzip')
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [LMBENCH_ZIP], INSTALL_DIR)
+  vm.RemoteCommand('cd %s && unzip %s' % (INSTALL_DIR, LMBENCH_ZIP))
   # Fix the bug in the source code
   # See more in:
   # https://github.com/zhanglongqi/linux-tips/blob/master/tools/benchmark.md
