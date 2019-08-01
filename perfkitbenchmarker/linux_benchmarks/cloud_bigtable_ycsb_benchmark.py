@@ -79,14 +79,16 @@ cloud_bigtable_ycsb:
 
 # Starting from version 1.4.0, there is no need to install a separate boring ssl
 # via TCNATIVE_BORINGSSL_URL.
-TCNATIVE_BORINGSSL_URL = (
-    'http://search.maven.org/remotecontent?filepath='
-    'io/netty/netty-tcnative-boringssl-static/'
-    '1.1.33.Fork13/'
+TCNATIVE_BORINGSSL_JAR = (
     'netty-tcnative-boringssl-static-1.1.33.Fork13-linux-x86_64.jar')
-DROPWIZARD_METRICS_CORE_URL = (
-    'http://search.maven.org/remotecontent?filepath='
-    'io/dropwizard/metrics/metrics-core/3.1.2/metrics-core-3.1.2.jar')
+TCNATIVE_BORINGSSL_URL = posixpath.join(
+    'https://search.maven.org/remotecontent?filepath='
+    'io/netty/netty-tcnative-boringssl-static/'
+    '1.1.33.Fork13/', TCNATIVE_BORINGSSL_JAR)
+METRICS_CORE_JAR = 'metrics-core-3.1.2.jar'
+DROPWIZARD_METRICS_CORE_URL = posixpath.join(
+    'https://search.maven.org/remotecontent?filepath='
+    'io/dropwizard/metrics/metrics-core/3.1.2/', METRICS_CORE_JAR)
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
 HBASE_BINDING = 'hbase10-binding'
@@ -99,6 +101,16 @@ REQUIRED_SCOPES = (
 
 # TODO(connormccoy): Make table parameters configurable.
 COLUMN_FAMILY = 'cf'
+BENCHMARK_DATA = {
+    METRICS_CORE_JAR:
+        '245ba2a66a9bc710ce4db14711126e77bcb4e6d96ef7e622659280f3c90cbb5c',
+    TCNATIVE_BORINGSSL_JAR:
+        '027d87e77a08dedf2005d9333db49aa37e08d599aff64ea18da9893912bdf314'
+}
+BENCHMARK_DATA_URL = {
+    METRICS_CORE_JAR: DROPWIZARD_METRICS_CORE_URL,
+    TCNATIVE_BORINGSSL_JAR: TCNATIVE_BORINGSSL_URL
+}
 
 
 def GetConfig(user_config):
@@ -197,15 +209,19 @@ def _Install(vm):
                    'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
 
-  urls = [FLAGS.google_bigtable_hbase_jar_url, TCNATIVE_BORINGSSL_URL]
+  preprovisioned_pkgs = [TCNATIVE_BORINGSSL_JAR]
   if 'hbase-1.x' in FLAGS.google_bigtable_hbase_jar_url:
-    urls.append(DROPWIZARD_METRICS_CORE_URL)
+    preprovisioned_pkgs.append(METRICS_CORE_JAR)
+  vm.InstallPreprovisionedBenchmarkData(
+      BENCHMARK_NAME, preprovisioned_pkgs, YCSB_HBASE_LIB)
+  vm.InstallPreprovisionedBenchmarkData(
+      BENCHMARK_NAME, preprovisioned_pkgs, hbase_lib)
 
-  for url in urls:
-    jar_name = os.path.basename(url)
-    jar_path = posixpath.join(YCSB_HBASE_LIB, jar_name)
-    vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
-    vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
+  url = FLAGS.google_bigtable_hbase_jar_url
+  jar_name = os.path.basename(url)
+  jar_path = posixpath.join(YCSB_HBASE_LIB, jar_name)
+  vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
+  vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
 
   vm.RemoteCommand('echo "export JAVA_HOME=/usr" >> {0}/hbase-env.sh'.format(
       hbase.HBASE_CONF_DIR))
