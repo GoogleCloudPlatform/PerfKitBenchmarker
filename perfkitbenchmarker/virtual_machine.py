@@ -901,7 +901,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     prefix = 'pkb-' + os.path.basename(template_path)
 
     with vm_util.NamedTemporaryFile(prefix=prefix, dir=vm_util.GetTempDir(),
-                                    delete=False) as tf:
+                                    delete=False, mode='w') as tf:
       tf.write(template.render(vm=self, **context))
       tf.close()
       self.RemoteCopy(tf.name, remote_path)
