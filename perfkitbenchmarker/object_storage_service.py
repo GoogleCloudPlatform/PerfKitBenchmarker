@@ -14,11 +14,16 @@
 
 """An interface to object storage services."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import abc
 import os
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+import six
 
 flags.DEFINE_string('object_storage_credential_file', None,
                     'Directory of credential file.')
@@ -34,12 +39,13 @@ _OBJECT_STORAGE_REGISTRY = {}
 
 
 def GetObjectStorageClass(storage_name):
-  """Return the ObjectStorageService subclass corresponding to 'storage_name'"""
+  """Return the ObjectStorageService subclass corresponding to storage_name."""
 
   return _OBJECT_STORAGE_REGISTRY[storage_name]
 
 
 class AutoRegisterObjectStorageMeta(abc.ABCMeta):
+
   def __init__(cls, name, bases, dct):
     super(AutoRegisterObjectStorageMeta, cls).__init__(name, bases, dct)
     if cls.STORAGE_NAME in _OBJECT_STORAGE_REGISTRY:
@@ -48,9 +54,9 @@ class AutoRegisterObjectStorageMeta(abc.ABCMeta):
     _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME] = cls
 
 
-class ObjectStorageService(object):
-  __metaclass__ = AutoRegisterObjectStorageMeta
-
+class ObjectStorageService(
+    six.with_metaclass(AutoRegisterObjectStorageMeta, object)):
+  """Base class for ObjectStorageServices."""
   STORAGE_NAME = None
 
   # Keeping the location in the service object is not very clean, but
@@ -251,8 +257,7 @@ def FindCredentialFile(default_location):
   if not (os.path.isfile(credential_file) or
           os.path.isdir(credential_file)):
     raise errors.Benchmarks.MissingObjectCredentialException(
-        'Credential cannot be found in %s',
-        credential_file)
+        'Credential cannot be found in %s' % credential_file)
 
   return credential_file
 
