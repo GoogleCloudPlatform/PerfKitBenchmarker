@@ -237,8 +237,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
 
-    self.append_region(cmd)
-
     job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:
       job_arguments.append('-Dfs.default.name={}'.format(source_dir))
@@ -254,8 +252,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
-
-    self.append_region(cmd)
 
     job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:
@@ -274,8 +270,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['class'] = 'org.apache.hadoop.tools.DistCp'
 
-    self.append_region(cmd)
-
     job_arguments = (['-m={}'.format(FLAGS.dpb_dataproc_distcp_num_maps)]
                      if FLAGS.dpb_dataproc_distcp_num_maps is not None else [])
 
@@ -291,8 +285,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
-
-    self.append_region(cmd)
 
     job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:

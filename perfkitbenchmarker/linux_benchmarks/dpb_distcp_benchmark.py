@@ -43,12 +43,12 @@ dpb_distcp_benchmark:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
-          boot_disk_size: 1500
         AWS:
           machine_type: m4.xlarge
       disk_spec:
         GCP:
-          disk_type: nodisk
+          disk_size: 1500
+          disk_type: pd-standard
         AWS:
           disk_size: 1500
           disk_type: gp2
@@ -106,12 +106,12 @@ def Run(benchmark_spec):
     A list of samples
   """
   run_uri = benchmark_spec.uuid.split('-')[0]
-  source = '/{}'.format(run_uri)
+  source = '{}'.format(run_uri)
   update_source_default_fs = False
 
   if FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS:
-    source = '{}:/{}'.format(FLAGS.distcp_source_fs, source)
     benchmark_spec.dpb_service.CreateBucket(source)
+    source = '{}://{}'.format(FLAGS.distcp_source_fs, source)
     update_source_default_fs = True
 
   source_dir = '{}{}'.format(source, '/dfsio')
