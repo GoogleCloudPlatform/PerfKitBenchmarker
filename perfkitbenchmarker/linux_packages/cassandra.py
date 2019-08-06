@@ -19,6 +19,10 @@ See 'perfkitbenchmarker/data/cassandra/' for configuration files used.
 Cassandra homepage: http://cassandra.apache.org
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import os
 import posixpath
@@ -31,6 +35,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages.ant import ANT_HOME_DIR
+from six.moves import range
 
 
 JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
@@ -113,14 +118,15 @@ def JujuInstall(vm, vm_group_name):
           'null',
           'null']
 
-  vm.JujuSet('cassandra', [
-             # Allow authentication from all units
-             'authenticator=AllowAllAuthenticator',
-             'install_sources="[%s]"' %
-             ', '.join(map(lambda x: "'" + x + "'", sources)),
-             'install_keys="[%s]"'
-             % ', '.join(keys)
-             ])
+  vm.JujuSet(
+      'cassandra',
+      [
+          # Allow authentication from all units
+          'authenticator=AllowAllAuthenticator',
+          'install_sources="[%s]"' %
+          ', '.join(["'" + x + "'" for x in sources]),
+          'install_keys="[%s]"' % ', '.join(keys)
+      ])
 
   # Wait for cassandra to be installed and configured
   vm.JujuWait()
@@ -271,7 +277,7 @@ def StartCluster(seed_vm, vms):
   Start(seed_vm)
   logging.info('Waiting %ds for seed to start', NODE_START_SLEEP)
   time.sleep(NODE_START_SLEEP)
-  for i in xrange(5):
+  for i in range(5):
     if not IsRunning(seed_vm):
       logging.warn('Seed %s: Cassandra not running yet (try %d). Waiting %ds.',
                    seed_vm, i, NODE_START_SLEEP)
@@ -294,7 +300,7 @@ def StartCluster(seed_vm, vms):
     logging.info('Waiting %ds for nodes to join', CLUSTER_START_SLEEP)
     time.sleep(CLUSTER_START_SLEEP)
 
-  for i in xrange(CLUSTER_START_TRIES):
+  for i in range(CLUSTER_START_TRIES):
     vms_up = GetNumberOfNodesUp(seed_vm)
     if vms_up == vm_count:
       logging.info('All %d nodes up!', vm_count)
