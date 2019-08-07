@@ -42,6 +42,7 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
         'tpu_description': 'MyTFNode',
         'tpu_network': 'default',
         'tpu_tf_version': 'nightly',
+        'tpu_zone': 'us-central1-a',
         'tpu_preemptible': True
     }
 
@@ -58,7 +59,6 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.project = ''
     FLAGS.tpu_cores_per_donut = 8
     FLAGS.gcloud_path = 'gcloud'
-    FLAGS.zones = ['us-central1-a']
 
     mock_tpu_spec_attrs = self.CreateTpuSpecDict()
     self.mock_tpu_spec = mock.Mock(

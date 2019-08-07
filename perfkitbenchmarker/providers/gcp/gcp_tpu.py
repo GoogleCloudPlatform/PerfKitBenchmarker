@@ -62,9 +62,10 @@ class GcpTpu(cloud_tpu.BaseTpu):
       cmd.flags['network'] = self.spec.tpu_network
     if self.spec.tpu_tf_version:
       cmd.flags['version'] = self.spec.tpu_tf_version
+    if self.spec.tpu_zone:
+      cmd.flags['zone'] = self.spec.tpu_zone
     if self.spec.tpu_preemptible:
       cmd.flags['preemptible'] = self.spec.tpu_preemptible
-    cmd.flags['zone'] = self.GetZone()
     cmd.flags['project'] = self.project
     _, _, retcode = cmd.Issue()
     if retcode != 0:
@@ -74,7 +75,8 @@ class GcpTpu(cloud_tpu.BaseTpu):
     """Deletes the cloud TPU."""
     cmd = util.GcloudCommand(self, 'compute', 'tpus', 'delete',
                              self.spec.tpu_name)
-    cmd.flags['zone'] = self.GetZone()
+    if self.spec.tpu_zone:
+      cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
     _, _, retcode = cmd.Issue(timeout=TPU_TIMEOUT)
     if retcode != 0:
@@ -86,7 +88,8 @@ class GcpTpu(cloud_tpu.BaseTpu):
     """Gets the cloud TPU description."""
     cmd = util.GcloudCommand(self, 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
-    cmd.flags['zone'] = self.GetZone()
+    if self.spec.tpu_zone:
+      cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
     stdout, _, retcode = cmd.Issue()
     if retcode != 0:
@@ -119,7 +122,7 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def GetZone(self):
     """Gets the TPU zone."""
-    return FLAGS.zones[0]
+    return self.spec.tpu_zone
 
   def GetAcceleratorType(self):
     """Gets the TPU accelerator type."""

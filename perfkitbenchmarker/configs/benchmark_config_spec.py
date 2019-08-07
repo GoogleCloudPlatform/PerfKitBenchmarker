@@ -205,6 +205,9 @@ class _TpuGroupSpec(spec.BaseSpec):
         'tpu_tf_version': (option_decoders.StringDecoder, {
             'default': None
         }),
+        'tpu_zone': (option_decoders.StringDecoder, {
+            'default': None
+        }),
         'tpu_name': (option_decoders.StringDecoder, {
             'default': None
         }),
@@ -239,6 +242,8 @@ class _TpuGroupSpec(spec.BaseSpec):
       config_values['tpu_network'] = flag_values.tpu_network
     if flag_values['tpu_tf_version'].present:
       config_values['tpu_tf_version'] = flag_values.tpu_tf_version
+    if flag_values['tpu_zone'].present:
+      config_values['tpu_zone'] = flag_values.tpu_zone
     if flag_values['tpu_name'].present:
       config_values['tpu_name'] = flag_values.tpu_name
     if flag_values['tpu_preemptible'].present:
