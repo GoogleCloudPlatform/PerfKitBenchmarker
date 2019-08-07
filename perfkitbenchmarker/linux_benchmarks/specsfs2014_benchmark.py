@@ -25,6 +25,10 @@ eventually become a "disk type" so that any benchmark that runs
 against a filesystem can run against Gluster.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import posixpath
 import xml.etree.ElementTree
@@ -37,6 +41,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.linux_packages import gluster
+import six
 
 FLAGS = flags.FLAGS
 BENCHMARKS = ['VDI', 'DATABASE', 'SWBUILD', 'VDA']
@@ -182,13 +187,14 @@ def _ConfigureSpec(prime_client, clients, benchmark,
   }
   # Any special characters in the overrides dictionary should be escaped so
   # that they don't interfere with sed.
-  sed_expressions = ' '.join(
-      ['-e "s/{0}=.*/{0}={1}/"'.format(k, v)
-       for k, v in configuration_overrides.iteritems()])
+  sed_expressions = ' '.join([
+      '-e "s/{0}=.*/{0}={1}/"'.format(k, v)
+      for k, v in six.iteritems(configuration_overrides)
+  ])
   sed_cmd = 'sudo sed -i {0} {1}'.format(sed_expressions, config_path)
   prime_client.RemoteCommand(sed_cmd)
 
-  with vm_util.NamedTemporaryFile() as tf:
+  with vm_util.NamedTemporaryFile(mode='w') as tf:
     for client in clients:
       tf.write('%s %s\n' % (client.internal_ip, _MOUNT_POINT))
     tf.close()
