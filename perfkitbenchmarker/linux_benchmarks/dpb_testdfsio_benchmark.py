@@ -42,12 +42,12 @@ dpb_testdfsio_benchmark:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
-          boot_disk_size: 1500
         AWS:
           machine_type: m4.xlarge
       disk_spec:
         GCP:
-          disk_type: nodisk
+          disk_size: 1500
+          disk_type: pd-standard
         AWS:
           disk_size: 1500
           disk_type: gp2
@@ -103,12 +103,11 @@ def Run(benchmark_spec):
   Returns:
     A list of samples
   """
-  run_uri = benchmark_spec.uuid.split('-')[0]
-  source = '/{}'.format(run_uri)
+  source = '{}'.format(benchmark_spec.uuid.split('-')[0])
   update_source_default_fs = False
 
   if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
-    source = '{}:/{}'.format(FLAGS.dfsio_fs, source)
+    source = '{}://{}'.format(FLAGS.dfsio_fs, source)
     update_source_default_fs = True
 
   source_dir = '{}{}'.format(source, '/dfsio')
@@ -116,7 +115,7 @@ def Run(benchmark_spec):
   results = []
   for file_size in FLAGS.dfsio_file_sizes_list:
     for num_files in FLAGS.dfsio_num_files_list:
-      benchmark_spec.dpb_service.CreateBucket(source)
+      benchmark_spec.dpb_service.CreateBucket(benchmark_spec.uuid.split('-')[0])
       # TODO(saksena): Respond to data generation failure
       start = datetime.datetime.now()
       benchmark_spec.dpb_service.generate_data(source_dir,
