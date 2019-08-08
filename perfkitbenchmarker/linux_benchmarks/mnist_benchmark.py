@@ -15,7 +15,6 @@
 """Run MNIST benchmarks."""
 
 import copy
-import os
 import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -144,20 +143,6 @@ def Prepare(benchmark_spec):
     storage_service.ChmodBucket(benchmark_spec.gcp_service_account, 'W', bucket)
   else:
     benchmark_spec.model_dir = '/tmp'
-
-  if (FLAGS.imagenet_data_dir or FLAGS.t2t_data_dir) and FLAGS.cloud != 'GCP':
-    vm.Install('google_cloud_sdk')
-    vm.RemoteCommand('echo "export {}" >> ~/.bashrc'.format(GCP_ENV),
-                     login_shell=True)
-    credential_path = os.path.join('~', '.config', 'gcloud')
-    vm.RemoteCommand('mkdir -p {}'.format(credential_path), login_shell=True)
-    credential_file = os.path.join(credential_path,
-                                   'application_default_credentials.json')
-    vm.PushFile(FLAGS.gcp_credential, credential_file)
-    vm.RemoteCommand('{env} gcloud auth '
-                     'activate-service-account --key-file {key_file}'.format(
-                         env=GCP_ENV, key_file=credential_file),
-                     login_shell=True)
 
 
 def CreateMetadataDict(benchmark_spec):
