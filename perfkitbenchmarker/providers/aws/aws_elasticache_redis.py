@@ -138,7 +138,10 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
 
     cmd += ['--tags']
     cmd += util.MakeFormattedDefaultTags()
-    vm_util.IssueCommand(cmd)
+    _, stderr, _ = vm_util.IssueCommand(cmd)
+
+    if 'InsufficientCacheClusterCapacity' in stderr:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
 
   def _Delete(self):
     """Deletes the cluster."""
