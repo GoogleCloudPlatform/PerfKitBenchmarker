@@ -21,6 +21,10 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import logging
 
@@ -30,6 +34,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_server
+from six.moves import range
 
 flags.DEFINE_integer('redis_numprocesses', 1, 'Number of Redis processes to '
                      'spawn per processor.')
@@ -189,10 +194,9 @@ def Run(benchmark_spec):
   while latency < latency_threshold:
     threads += max(1, int(threads * .15))
     num_loaders = len(load_vms) * num_servers
-    args = [((redis_vm, load_vms[i % len(load_vms)], threads / num_loaders +
+    args = [((redis_vm, load_vms[i % len(load_vms)], threads // num_loaders +
               (0 if (i + 1) > threads % num_loaders else 1),
-              FIRST_PORT + i % num_servers, i),
-             {}) for i in range(num_loaders)]
+              FIRST_PORT + i % num_servers, i), {}) for i in range(num_loaders)]
     client_results = [i for i in vm_util.RunThreaded(RunLoad, args)
                       if i is not None]
     logging.info('Redis results by client: %s', client_results)
@@ -208,9 +212,9 @@ def Run(benchmark_spec):
                throughput)
 
     if latency < 1.0:
-        max_throughput_for_completion_latency_under_1ms = max(
-            max_throughput_for_completion_latency_under_1ms,
-            throughput)
+      max_throughput_for_completion_latency_under_1ms = max(
+          max_throughput_for_completion_latency_under_1ms,
+          throughput)
     results.append(sample.Sample('throughput', throughput, 'req/s',
                                  {'latency': latency, 'threads': threads}))
     logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
@@ -219,9 +223,9 @@ def Run(benchmark_spec):
       latency_threshold = latency * 20
 
   results.append(sample.Sample(
-                 'max_throughput_for_completion_latency_under_1ms',
-                 max_throughput_for_completion_latency_under_1ms,
-                 'req/s'))
+      'max_throughput_for_completion_latency_under_1ms',
+      max_throughput_for_completion_latency_under_1ms,
+      'req/s'))
 
   return results
 
