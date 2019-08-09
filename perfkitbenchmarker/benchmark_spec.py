@@ -468,7 +468,7 @@ class BenchmarkSpec(object):
     """Prepares the VMs and networks necessary for the benchmark to run."""
     # Create capacity reservations if the cloud supports it. Note that the
     # capacity reservation class may update the VMs themselves. This is true
-    # on AWS, because the VM needs to be aware of the capacity resrevation id
+    # on AWS, because the VM needs to be aware of the capacity reservation id
     # before its Create() method is called. Furthermore, if the user does not
     # specify an AWS zone, but a region instead, the AwsCapacityReservation
     # class will make a reservation in a zone that has sufficient capacity.
