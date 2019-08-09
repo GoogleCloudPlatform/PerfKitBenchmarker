@@ -61,7 +61,7 @@ TYPE_2_MODULE = dict([('redshift',
                       ('azuresqldatawarehouse',
                        'perfkitbenchmarker.providers.azure.'
                        'azure_sql_data_warehouse')])
-DEFAULT_NUMBER_OF_NODES = 2
+DEFAULT_NUMBER_OF_NODES = 1
 
 
 class EdwService(resource.BaseResource):
