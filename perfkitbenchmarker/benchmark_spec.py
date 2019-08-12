@@ -542,7 +542,7 @@ class BenchmarkSpec(object):
         # already provisioned virtual private cloud (vpc).
         for network in networks:
           if network.__class__.__name__ == 'AwsNetwork':
-            self.config.edw_service.subnet_id = network.subnet.id
+            self.edw_service.cluster_subnet_group.subnet_id = network.subnet.id
       self.edw_service.Create()
 
   def Delete(self):
