@@ -30,8 +30,8 @@ AWS_ZONE_US_EAST_1A = 'us-east-1a'
 FLAGS = flags.FLAGS
 
 
-class RedshiftClusterSubnetGroupTestCase(pkb_common_test_case.PkbCommonTestCase
-                                        ):
+class RedshiftClusterSubnetGroupTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(RedshiftClusterSubnetGroupTestCase, self).setUp()
