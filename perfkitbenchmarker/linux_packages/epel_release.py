@@ -22,7 +22,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 EPEL6_RPM = 'epel-release-6-8.noarch.rpm'
 EPEL7_RPM = 'epel-release-7-11.noarch.rpm'
 PACKAGE_NAME = 'epel_release'
-EPEL_BASE_URL = 'http://dl.fedoraproject.org/pub/epel/'
+EPEL_BASE_URL = 'https://dl.fedoraproject.org/pub/epel/'
 EPEL_URL_PATH = 'x86_64/Packages/e'
 
 PREPROVISIONED_DATA = {
