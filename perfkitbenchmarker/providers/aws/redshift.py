@@ -18,20 +18,22 @@ and deleted.
 """
 
 import json
+
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_cluster_parameter_group
+from perfkitbenchmarker.providers.aws import aws_cluster_subnet_group
 from perfkitbenchmarker.providers.aws import util
 
-
 FLAGS = flags.FLAGS
-
 
 VALID_EXIST_STATUSES = ['creating', 'available']
 DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
+ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = '--automated-snapshot-retention-period=0'
 
 
 def AddTags(resource_arn, region):
@@ -54,88 +56,6 @@ def GetDefaultRegion():
   default_region_cmd = cmd_prefix + ['configure', 'get', 'region']
   stdout, _, _ = vm_util.IssueCommand(default_region_cmd)
   return stdout
-
-
-class RedshiftClusterSubnetGroup(object):
-  """Cluster Subnet Group associated with a Redshift cluster launched in a vpc.
-
-  A cluster subnet group allows you to specify a set of subnets in your VPC.
-
-
-  Attributes:
-    name: A string name of the cluster subnet group.
-    subnet_id: A string name of the subnet id associated with the group.
-  """
-
-  def __init__(self, subnet_id, cmd_prefix):
-    self.cmd_prefix = cmd_prefix
-    self.name = 'pkb-' + FLAGS.run_uri
-    self.subnet_id = subnet_id
-    cmd = self.cmd_prefix + ['redshift',
-                             'create-cluster-subnet-group',
-                             '--cluster-subnet-group-name',
-                             self.name,
-                             '--description',
-                             'Cluster Subnet Group for run uri {}'
-                             .format(FLAGS.run_uri),
-                             '--subnet-ids',
-                             self.subnet_id]
-    vm_util.IssueCommand(cmd)
-
-  def Delete(self):
-    """Delete a redshift cluster subnet group."""
-    cmd = self.cmd_prefix + ['redshift',
-                             'delete-cluster-subnet-group',
-                             '--cluster-subnet-group-name',
-                             self.name]
-    vm_util.IssueCommand(cmd)
-
-
-class RedshiftClusterParameterGroup(object):
-  """Cluster Paramemter Group associated with a Redshift cluster.
-
-  A cluster parameter group allows you to specify concurrency for the cluster.
-
-
-  Attributes:
-    name: A string name of the cluster parameter group.
-    concurrency: An integer concurrency value for the cluster.
-  """
-
-  def __init__(self, concurrency, cmd_prefix):
-    self.cmd_prefix = cmd_prefix
-    self.name = 'pkb-' + FLAGS.run_uri
-    cmd = self.cmd_prefix + ['redshift',
-                             'create-cluster-parameter-group',
-                             '--parameter-group-name',
-                             self.name,
-                             '--parameter-group-family',
-                             'redshift-1.0',
-                             '--description',
-                             'Cluster Parameter group for run uri {}'
-                             .format(FLAGS.run_uri)]
-    vm_util.IssueCommand(cmd)
-    wlm_concurrency_parameter_prefix = ('[{"ParameterName":"wlm_json_configurat'
-                                        'ion","ParameterValue":"[{\\\"query_con'
-                                        'currency\\\":')
-    wlm_concurrency_parameter_postfix = '}]","ApplyType":"dynamic"}]'
-    cmd = self.cmd_prefix + ['redshift',
-                             'modify-cluster-parameter-group',
-                             '--parameter-group-name',
-                             self.name,
-                             '--parameters',
-                             '{}{}{}'.format(wlm_concurrency_parameter_prefix,
-                                             str(concurrency),
-                                             wlm_concurrency_parameter_postfix)]
-    vm_util.IssueCommand(cmd)
-
-  def Delete(self):
-    """Delete a redshift cluster parameter group."""
-    cmd = self.cmd_prefix + ['redshift',
-                             'delete-cluster-parameter-group',
-                             '--parameter-group-name',
-                             self.name]
-    vm_util.IssueCommand(cmd)
 
 
 class Redshift(edw_service.EdwService):
@@ -167,18 +87,84 @@ class Redshift(edw_service.EdwService):
     self.cluster_subnet_group = None
     self.cluster_parameter_group = None
     self.arn = ''
+    self.cluster_subnet_group = aws_cluster_subnet_group.RedshiftClusterSubnetGroup(
+        self.cmd_prefix)
+    self.cluster_parameter_group = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
+        edw_service_spec.concurrency, self.cmd_prefix)
+
+  def _CreateDependencies(self):
+    self.cluster_subnet_group.Create()
+    self.cluster_parameter_group.Create()
 
   def _Create(self):
     """Create the redshift cluster resource."""
-    self.cluster_subnet_group = RedshiftClusterSubnetGroup(self.spec.subnet_id,
-                                                           self.cmd_prefix)
-    self.cluster_parameter_group = RedshiftClusterParameterGroup(
-        self.concurrency, self.cmd_prefix)
     if self.snapshot:
       self.Restore(self.snapshot, self.cluster_identifier)
     else:
-      # TODO(saksena@): Implmement the new Redshift cluster creation
-      raise NotImplementedError()
+      self.Initialize(self.cluster_identifier, self.node_type, self.node_count,
+                      self.user, self.password, self.cluster_parameter_group,
+                      self.cluster_subnet_group)
+
+  def Initialize(self, cluster_identifier, node_type, node_count, user,
+                 password, cluster_parameter_group, cluster_subnet_group):
+    """Method to initialize a Redshift cluster from an configuration parameters.
+
+    The cluster is initialized in the EC2-VPC platform, that runs it in a
+    virtual private cloud (VPC). This allows control access to the cluster by
+    associating one or more VPC security groups with the cluster.
+
+    To create a cluster in a VPC, first create an Amazon Redshift cluster subnet
+    group by providing subnet information of the VPC, and then provide the
+    subnet group when launching the cluster.
+
+
+    Args:
+      cluster_identifier: A unique identifier for the cluster.
+      node_type: The node type to be provisioned for the cluster.
+       Valid Values: ds2.xlarge | ds2.8xlarge | ds2.xlarge | ds2.8xlarge |
+         dc1.large | dc1.8xlarge | dc2.large | dc2.8xlarge
+      node_count: The number of compute nodes in the cluster.
+      user: The user name associated with the master user account for the
+        cluster that is being created.
+      password: The password associated with the master user account for the
+        cluster that is being created.
+      cluster_parameter_group: Cluster Parameter Group associated with the
+        cluster.
+      cluster_subnet_group: Cluster Subnet Group associated with the cluster.
+
+    Returns:
+      None
+
+
+    Raises:
+      MissingOption: If any of the required parameters is missing.
+    """
+    if not (cluster_identifier and node_type and user and password):
+      raise errors.MissingOption('Need cluster_identifier, user and password '
+                                 'set for creating a cluster.')
+
+    prefix = [
+        'redshift', 'create-cluster', '--cluster-identifier', cluster_identifier
+    ]
+
+    if node_count == 1:
+      worker_count_cmd = ['--cluster-type', 'single-node']
+    else:
+      worker_count_cmd = ['--number-of-nodes', str(node_count)]
+
+    postfix = [
+        '--node-type', node_type, '--master-username', user,
+        '--master-user-password', password, '--cluster-parameter-group-name',
+        cluster_parameter_group.name, '--cluster-subnet-group-name',
+        cluster_subnet_group.name, '--publicly-accessible',
+        ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION
+    ]
+
+    cmd = self.cmd_prefix + prefix + worker_count_cmd + postfix
+    stdout, stderr, _ = vm_util.IssueCommand(cmd)
+    if not stdout:
+      raise errors.Resource.CreationError('Cluster creation failure: '
+                                          '{}'.format(stderr))
 
   def _ValidateSnapshot(self, snapshot_identifier):
     """Validate the presence of a cluster snapshot based on its metadata."""

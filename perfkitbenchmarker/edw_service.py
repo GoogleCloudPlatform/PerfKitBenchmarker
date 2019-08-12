@@ -92,7 +92,11 @@ class EdwService(resource.BaseResource):
     # Cluster related attributes
     self.concurrency = edw_service_spec.concurrency
     self.node_type = edw_service_spec.node_type
-    self.node_count = edw_service_spec.node_count
+
+    if edw_service_spec.node_count:
+      self.node_count = edw_service_spec.node_count
+    else:
+      self.node_count = DEFAULT_NUMBER_OF_NODES
 
     # Interaction related attributes
     if edw_service_spec.endpoint:
