@@ -314,6 +314,8 @@
 - Add Clear Linux support for AWS stripe disks.
 - Load memcached server before running benchmark.
 - Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
+- Added support to append a region name to a bucket name for object storage
+  benchmarking.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
