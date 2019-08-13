@@ -18,7 +18,7 @@
 import posixpath
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-MYSQL_RPM = 'mysql-community-release-el6-5.noarch.rpm'
+MYSQL_RPM = 'mysql56-community-release-el6-5.noarch.rpm'
 MYSQL_PSWD = 'perfkitbenchmarker'
 MYSQL_URL = 'https://dev.mysql.com/get/' + MYSQL_RPM
 PACKAGE_NAME = 'mysql'
@@ -45,9 +45,9 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
-  vm.RemoteCommand('echo "mysql-server-5.5 mysql-server/root_password password '
+  vm.RemoteCommand('echo "mysql-server-5.6 mysql-server/root_password password '
                    '%s" | sudo debconf-set-selections' % MYSQL_PSWD)
-  vm.RemoteCommand('echo "mysql-server-5.5 mysql-server/root_password_again '
+  vm.RemoteCommand('echo "mysql-server-5.6 mysql-server/root_password_again '
                    'password %s" | sudo debconf-set-selections' % MYSQL_PSWD)
   vm.InstallPackages('mysql-server')
 

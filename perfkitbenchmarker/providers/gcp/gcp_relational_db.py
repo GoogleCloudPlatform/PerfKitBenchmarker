@@ -30,8 +30,9 @@ import logging
 import time
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import relational_db
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
 
@@ -58,7 +59,7 @@ class UnsupportedDatabaseEngineException(Exception):
   pass
 
 
-class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
+class GCPRelationalDb(relational_db.BaseRelationalDb):
   """A GCP CloudSQL database resource.
 
   This class contains logic required to provision and teardown the database.
@@ -69,11 +70,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   CLOUD = providers.GCP
   GCP_PRICING_PLAN = 'PACKAGE'
 
-  def __init__(self, managed_relational_db_spec):
-    super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
-    self.spec = managed_relational_db_spec
+  def __init__(self, relational_db_spec):
+    super(GCPRelationalDb, self).__init__(relational_db_spec)
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+
+    if self.is_managed_db:
+      self.unmanaged_db_exists = False
 
   def _GetAuthorizedNetworks(self, vms):
     """Get CIDR connections for list of VM specs that need to access the db."""
@@ -85,8 +88,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # the database
     return ','.join('{0}/32'.format(vm.ip_address) for vm in vms)
 
-  def _Create(self):
-    """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
+  def _CreateGcloudSqlInstance(self):
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
 
@@ -112,7 +114,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size,
     ]
-    if self.spec.engine == managed_relational_db.MYSQL:
+    if self.spec.engine == relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
 
     if (self.spec.vm_spec.cpus and
@@ -143,6 +145,30 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     _, _, _ = cmd.Issue()
 
+  def _Create(self):
+    """Creates the Cloud SQL instance and authorizes traffic from anywhere.
+
+    Raises:
+      UnsupportedDatabaseEngineException:
+        if the database is unmanaged and the engine isn't MYSQL.
+    """
+    if self.spec.engine == relational_db.MYSQL:
+      self._InstallMySQLClient()
+    if self.is_managed_db:
+      self._CreateGcloudSqlInstance()
+    else:
+      self.endpoint = self.server_vm.ip_address
+      if self.spec.engine == relational_db.MYSQL:
+        self._InstallMySQLServer()
+      else:
+        raise UnsupportedDatabaseEngineException(
+            'Engine {0} not supported for unmanaged databases.'.format(
+                self.spec.engine))
+      self.firewall = gce_network.GceFirewall()
+      self.firewall.AllowPort(
+          self.server_vm, 3306, source_range=[self.client_vm.ip_address])
+      self.unmanaged_db_exists = True
+
   def _GetHighAvailabilityFlag(self):
     """Returns a flag that enables high-availability for the specified engine.
 
@@ -153,10 +179,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       UnsupportedDatabaseEngineException:
         if engine does not support high availability.
     """
-    if self.spec.engine == managed_relational_db.MYSQL:
+    if self.spec.engine == relational_db.MYSQL:
       self.replica_instance_id = 'replica-' + self.instance_id
       return '--failover-replica-name=' + self.replica_instance_id
-    elif self.spec.engine == managed_relational_db.POSTGRES:
+    elif self.spec.engine == relational_db.POSTGRES:
       return '--availability-type=REGIONAL'
     else:
       raise UnsupportedDatabaseEngineException(
@@ -225,6 +251,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
+    if not self.is_managed_db:
+      if hasattr(self, 'firewall'):
+        self.firewall.DisallowAllPorts()
+      self.unmanaged_db_exists = False
+      return
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                                self.replica_instance_id, '--quiet')
@@ -241,6 +272,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
+    if not self.is_managed_db:
+      return self.unmanaged_db_exists
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
     stdout, _, _ = cmd.Issue()
@@ -281,11 +314,15 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     without being ready.  If the subclass does not implement
     it then it just returns true.
 
-    timeout: how long to wait when checking if the DB is ready.
+    Args:
+      timeout: how long to wait when checking if the DB is ready.
 
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
+    if not self.is_managed_db:
+      return self._IsReadyUnmanaged()
+
     if not self._IsDBInstanceReady(self.instance_id, timeout):
       return False
     if self.spec.high_availability and hasattr(self, 'replica_instance_id'):
@@ -320,6 +357,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _PostCreate(self):
     """Creates the PKB user and sets the password.
     """
+    if not self.is_managed_db:
+      return
 
     # The hostname '%' means unrestricted access from any host.
     cmd = util.GcloudCommand(
@@ -331,7 +370,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # this is a fix for b/71594701
     # by default the empty password on 'postgres'
     # is a security violation.  Change the password to a non-default value.
-    if self.spec.engine == managed_relational_db.POSTGRES:
+    if self.spec.engine == relational_db.POSTGRES:
       cmd = util.GcloudCommand(
           self, 'sql', 'users', 'set-password', 'postgres',
           '--host=dummy_host', '--instance={0}'.format(self.instance_id),
@@ -348,9 +387,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       (string): Default version for the given database engine.
     """
-    if engine == managed_relational_db.MYSQL:
+    if engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
-    elif engine == managed_relational_db.POSTGRES:
+    elif engine == relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
 
   @staticmethod
@@ -367,12 +406,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Raises:
       NotImplementedError on invalid engine / version combination.
     """
-    if engine == managed_relational_db.MYSQL:
+    if engine == relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
       elif version == '5.6':
         return 'MYSQL_5_6'
-    elif engine == managed_relational_db.POSTGRES:
+    elif engine == relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'

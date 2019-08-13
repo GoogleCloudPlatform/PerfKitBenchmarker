@@ -60,7 +60,7 @@ BENCHMARK_NAME = 'pgbench'
 BENCHMARK_CONFIG = """
 pgbench:
   description: pgbench benchmark for managed PostgreSQL databases
-  managed_relational_db:
+  relational_db:
     engine: postgres
     vm_spec:
       GCP:
@@ -156,7 +156,7 @@ def Prepare(benchmark_spec):
 
   UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec)
 
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   connection_string = db.MakePsqlConnectionString(DEFAULT_DB_NAME)
 
   CreateDatabase(benchmark_spec, DEFAULT_DB_NAME, TEST_DB_NAME)
@@ -223,7 +223,7 @@ def DoesDatabaseExist(client_vm, connection_string, database_name):
 
 def _IssueDatabaseCommand(benchmark_spec, database_name, command):
   client_vm = benchmark_spec.vms[0]
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   connection_string = db.MakePsqlConnectionString(database_name)
   command = 'psql {0} -c "{1};"'.format(
       connection_string,
@@ -246,7 +246,7 @@ def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
     new_database_name: name of the new database to create, or drop and recreate
   """
   client_vm = benchmark_spec.vms[0]
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   connection_string = db.MakePsqlConnectionString(default_database_name)
 
   if DoesDatabaseExist(client_vm, connection_string, new_database_name):
@@ -308,7 +308,7 @@ def Run(benchmark_spec):
   """
   UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
 
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   connection_string = db.MakePsqlConnectionString(TEST_DB_NAME)
 
   common_metadata = {

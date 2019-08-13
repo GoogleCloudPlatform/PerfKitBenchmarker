@@ -20,7 +20,7 @@ import uuid
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
-# TODO (ferneyhough): change to enum
+# TODO(ferneyhough): change to enum
 flags.DEFINE_string('managed_db_engine', None,
                     'Managed database flavor to use (mysql, postgres)')
 flags.DEFINE_string('managed_db_engine_version', None,
@@ -56,6 +56,10 @@ flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
 flags.DEFINE_string('managed_db_disk_type', None,
                     'Machine type of the database.')
+flags.DEFINE_boolean(
+    'use_managed_db', True, 'If true, uses the managed MySql '
+    'service for the requested cloud provider. If false, uses '
+    'MySql installed on a VM.')
 
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
@@ -75,11 +79,15 @@ FLAGS = flags.FLAGS
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
 
-class ManagedRelationalDbPropertyNotSet(Exception):
+class RelationalDbPropertyNotSet(Exception):
   pass
 
 
-class ManagedRelationalDbEngineNotFoundException(Exception):
+class RelationalDbEngineNotFoundException(Exception):
+  pass
+
+
+class UnsupportedError(Exception):
   pass
 
 
@@ -88,28 +96,44 @@ def GenerateRandomDbPassword():
   return str(uuid.uuid4())[:10]
 
 
-def GetManagedRelationalDbClass(cloud):
-  """Get the ManagedRelationalDb class corresponding to 'cloud'.
+def GetRelationalDbClass(cloud):
+  """Get the RelationalDb class corresponding to 'cloud'.
 
   Args:
     cloud: name of cloud to get the class for
+
+  Returns:
+    BaseRelationalDb class with the cloud attribute of 'cloud'.
   """
-  return resource.GetResourceClass(BaseManagedRelationalDb, CLOUD=cloud)
+  return resource.GetResourceClass(BaseRelationalDb, CLOUD=cloud)
 
 
-class BaseManagedRelationalDb(resource.BaseResource):
-  """Object representing a managed relational database Service."""
+class BaseRelationalDb(resource.BaseResource):
+  """Object representing a relational database Service."""
 
-  RESOURCE_TYPE = 'BaseManagedRelationalDb'
+  RESOURCE_TYPE = 'BaseRelationalDb'
 
-  def __init__(self, managed_relational_db_spec):
-    """Initialize the managed relational database object
+  def __init__(self, relational_db_spec):
+    """Initialize the managed relational database object.
 
     Args:
-      managed_relational_db_spec: spec of the managed database
+      relational_db_spec: spec of the managed database.
+
+    Raises:
+      UnsupportedError: if high availability is requested for an unmanaged db.
     """
-    super(BaseManagedRelationalDb, self).__init__()
-    self.spec = managed_relational_db_spec
+    super(BaseRelationalDb, self).__init__()
+    self.spec = relational_db_spec
+    if not FLAGS.use_managed_db:
+      if self.spec.high_availability:
+        raise UnsupportedError('High availability is unsupported for unmanaged '
+                               'databases.')
+      self.endpoint = ''
+      self.spec.database_username = 'root'
+      self.spec.database_password = 'perfkitbenchmarker'
+      self.is_managed_db = False
+    else:
+      self.is_managed_db = True
 
   @property
   def client_vm(self):
@@ -118,9 +142,15 @@ class BaseManagedRelationalDb(resource.BaseResource):
     This is required by subclasses to perform client-vm
     network-specific tasks, such as getting information about
     the VPC, IP address, etc.
+
+    Raises:
+      RelationalDbPropertyNotSet: if the client_vm is missing.
+
+    Returns:
+      The client_vm.
     """
     if not hasattr(self, '_client_vm'):
-      raise ManagedRelationalDbPropertyNotSet('client_vm is not set')
+      raise RelationalDbPropertyNotSet('client_vm is not set')
     return self._client_vm
 
   @client_vm.setter
@@ -134,23 +164,24 @@ class BaseManagedRelationalDb(resource.BaseResource):
         self.spec.database_password,
         database_name)
 
-  def MakeMysqlConnectionString(self):
-    return '-h {0} -u {1} -p{2}'.format(
-        self.endpoint,
-        self.spec.database_username,
-        self.spec.database_password)
+  def MakeMysqlConnectionString(self, use_localhost=False):
+    return '-h {0}{1} -u {2} -p{3}'.format(
+        self.endpoint if not use_localhost else 'localhost',
+        ' -P 3306' if not self.is_managed_db else '',
+        self.spec.database_username, self.spec.database_password)
 
   def MakeSysbenchConnectionString(self):
-    return '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" '.format(
-        self.endpoint,
-        self.spec.database_username,
-        self.spec.database_password)
+    return (
+        '--mysql-host={0}{1} --mysql-user={2} --mysql-password="{3}" ').format(
+            self.endpoint,
+            ' --mysql-port=3306' if not self.is_managed_db else '',
+            self.spec.database_username, self.spec.database_password)
 
   @property
   def endpoint(self):
     """Endpoint of the database server (exclusing port)."""
     if not hasattr(self, '_endpoint'):
-      raise ManagedRelationalDbPropertyNotSet('endpoint not set')
+      raise RelationalDbPropertyNotSet('endpoint not set')
     return self._endpoint
 
   @endpoint.setter
@@ -161,7 +192,7 @@ class BaseManagedRelationalDb(resource.BaseResource):
   def port(self):
     """Port (int) on which the database server is listening."""
     if not hasattr(self, '_port'):
-      raise ManagedRelationalDbPropertyNotSet('port not set')
+      raise RelationalDbPropertyNotSet('port not set')
     return self._port
 
   @port.setter
@@ -174,7 +205,7 @@ class BaseManagedRelationalDb(resource.BaseResource):
     Child classes can extend this if needed.
 
     Raises:
-       ManagedRelationalDbPropertyNotSet:  if any expected metadata is missing.
+       RelationalDbPropertyNotSet: if any expected metadata is missing.
     """
     metadata = {
         'zone': self.spec.vm_spec.zone,
@@ -209,7 +240,7 @@ class BaseManagedRelationalDb(resource.BaseResource):
           'compute_units': self.spec.vm_spec.compute_units,
       })
     else:
-      raise ManagedRelationalDbPropertyNotSet(
+      raise RelationalDbPropertyNotSet(
           'Machine type of the database must be set.')
 
     return metadata
@@ -223,6 +254,100 @@ class BaseManagedRelationalDb(resource.BaseResource):
 
     Returns: default version as a string for the given engine.
     """
+
+  def _IsReadyUnmanaged(self):
+    """Return true if the underlying resource is ready.
+
+    Returns:
+      True if MySQL was installed successfully, False if not.
+
+    Raises:
+      Exception: If this method is called when the database is a managed one.
+        Shouldn't happen.
+    """
+    if self.is_managed_db:
+      raise Exception('Checking state of unmanaged database when the database '
+                      'is managed.')
+    if (self.spec.engine_version == '5.6' or
+        self.spec.engine_version.startswith('5.6.')):
+      mysql_name = 'mysql56'
+    elif (self.spec.engine_version == '5.7' or
+          self.spec.engine_version.startswith('5.7.')):
+      mysql_name = 'mysql57'
+    else:
+      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
+                      'are supported.' % FLAGS.managed_db_engine_version)
+    stdout, stderr = self.server_vm.RemoteCommand(
+        'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
+    return stdout and not stderr
+
+  def _InstallMySQLClient(self):
+    """Installs MySQL Client on the client vm.
+
+    Raises:
+      Exception: If the requested engine version is unsupported.
+    """
+    if (self.spec.engine_version == '5.6' or
+        self.spec.engine_version.startswith('5.6.')):
+      self.client_vm.Install('mysqlclient56')
+    elif (self.spec.engine_version == '5.7' or
+          self.spec.engine_version.startswith('5.7.')):
+      self.client_vm.Install('mysqlclient')
+    else:
+      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
+                      'are supported.' % FLAGS.managed_db_engine_version)
+
+  def _InstallMySQLServer(self):
+    """Installs MySQL Server on the server vm.
+
+    Raises:
+      Exception: If the requested engine version is unsupported, or if this
+        method is called when the database is a managed one. The latter
+        shouldn't happen.
+    """
+    if self.is_managed_db:
+      raise Exception('Can\'t install MySQL Server when using a managed '
+                      'database.')
+    if (self.spec.engine_version == '5.6' or
+        self.spec.engine_version.startswith('5.6.')):
+      mysql_name = 'mysql56'
+      self.server_vm.Install(mysql_name)
+    elif (self.spec.engine_version == '5.7' or
+          self.spec.engine_version.startswith('5.7.')):
+      mysql_name = 'mysql57'
+      self.server_vm.Install(mysql_name)
+    else:
+      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
+                      'are supported.' % FLAGS.managed_db_engine_version)
+    self.server_vm.RemoteCommand('chmod 777 %s' %
+                                 self.server_vm.GetScratchDir())
+    self.server_vm.RemoteCommand('sudo service %s stop' %
+                                 self.server_vm.GetServiceName(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo sed -i '
+        '"s/datadir=\\/var\\/lib\\/mysql/datadir=\\%s\\/mysql/" '
+        '%s' % (self.server_vm.GetScratchDir(),
+                self.server_vm.GetPathToConfig(mysql_name)))
+    self.server_vm.RemoteCommand('sudo cp -R -p /var/lib/mysql %s/' %
+                                 self.server_vm.GetScratchDir())
+    # Comments out the bind-address line in mysqld.cnf.
+    self.server_vm.RemoteCommand(
+        'sudo sed -i \'s/bind-address/#bind-address/g\' '
+        '/etc/mysql/mysql.conf.d/mysqld.cnf')
+    self.server_vm.RemoteCommand('sudo service %s restart' %
+                                 self.server_vm.GetServiceName(mysql_name))
+    self.server_vm.RemoteCommand(
+        ('mysql %s -e "CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';"') %
+        (self.MakeMysqlConnectionString(use_localhost=True),
+         self.spec.database_username, self.client_vm.ip_address,
+         self.spec.database_password))
+    self.server_vm.RemoteCommand(
+        ('mysql %s -e "GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';"') %
+        (self.MakeMysqlConnectionString(use_localhost=True),
+         self.spec.database_username, self.client_vm.ip_address))
+    self.server_vm.RemoteCommand(
+        'mysql %s -e "FLUSH PRIVILEGES;"' %
+        self.MakeMysqlConnectionString(use_localhost=True))
 
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""

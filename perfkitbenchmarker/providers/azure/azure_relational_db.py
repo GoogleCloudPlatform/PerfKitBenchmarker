@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Managed relational database provisioning and teardown for Azure RDS."""
+"""Relational database provisioning and teardown for Azure RDS."""
 
 import datetime
 import json
 import logging
 import time
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -34,8 +34,8 @@ DEFAULT_POSTGRES_PORT = 5432
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 
 
-class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
-  """An object representing an Azure RDS managed relational database.
+class AzureRelationalDb(relational_db.BaseRelationalDb):
+  """An object representing an Azure RDS relational database.
 
   Currently Postgres is supported. This class requires that a
   client vm be available as an attribute on the instance before Create() is
@@ -55,24 +55,26 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """
   CLOUD = providers.AZURE
 
-  def __init__(self, managed_relational_db_spec):
-    super(AzureManagedRelationalDb, self).__init__(managed_relational_db_spec)
-    self.spec = managed_relational_db_spec
+  def __init__(self, relational_db_spec):
+    super(AzureRelationalDb, self).__init__(relational_db_spec)
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.region = self.spec.vm_spec.zone
     self.resource_group = azure_network.GetResourceGroup(self.region)
 
+    if self.is_managed_db:
+      self.unmanaged_db_exists = False
+
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 
-    All keys will be prefaced with managed_relational_db before
+    All keys will be prefaced with relational_db before
     being published (done in publisher.py).
 
     Returns:
-      metadata: dict of Azure Managed DB metadata.
+      metadata: dict of Azure  DB metadata.
 
     """
-    metadata = super(AzureManagedRelationalDb, self).GetResourceMetadata()
+    metadata = super(AzureRelationalDb, self).GetResourceMetadata()
     metadata.update({
         'zone': self.spec.vm_spec.zone,
     })
@@ -93,15 +95,15 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       (string): Default engine version.
     Raises:
-      ManagedRelationalDbEngineNotFoundException: if an unknown engine is
+      RelationalDbEngineNotFoundException: if an unknown engine is
                                                   requested.
     """
-    if engine == managed_relational_db.POSTGRES:
+    if engine == relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
-    elif engine == managed_relational_db.MYSQL:
+    elif engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
     else:
-      raise managed_relational_db.ManagedRelationalDbEngineNotFoundException(
+      raise relational_db.RelationalDbEngineNotFoundException(
           'Unsupported engine {0}'.format(engine))
 
   def GetDefaultPort(self):
@@ -110,36 +112,29 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       (string): Default port
     Raises:
-      ManagedRelationalDbEngineNotFoundException: if an unknown engine is
+      RelationalDbEngineNotFoundException: if an unknown engine is
                                                   requested.
     """
     engine = self.spec.engine
-    if engine == managed_relational_db.POSTGRES:
+    if engine == relational_db.POSTGRES:
       return DEFAULT_POSTGRES_PORT
-    elif engine == managed_relational_db.MYSQL:
+    elif engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_PORT
-    raise managed_relational_db.ManagedRelationalDbEngineNotFoundException(
+    raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
   def GetAzCommandForEngine(self):
     engine = self.spec.engine
-    if engine == managed_relational_db.POSTGRES:
+    if engine == relational_db.POSTGRES:
       return 'postgres'
-    elif engine == managed_relational_db.MYSQL:
+    elif engine == relational_db.MYSQL:
       return 'mysql'
-    raise managed_relational_db.ManagedRelationalDbEngineNotFoundException(
+    raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
-  def _Create(self):
-    """Creates the Azure RDS instance.
-
-    Raises:
-      NotImplementedError: if unknown how to create self.spec.engine.
-      Exception:  if attempting to create a non high availability database.
-
-    """
-    if self.spec.engine == managed_relational_db.POSTGRES or (
-        self.spec.engine == managed_relational_db.MYSQL):
+  def _CreateAzureSqlInstance(self):
+    if self.spec.engine == relational_db.POSTGRES or (
+        self.spec.engine == relational_db.MYSQL):
 
       if not self.spec.high_availability:
         raise Exception('Azure databases can only be used in high '
@@ -167,6 +162,33 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       raise NotImplementedError('Unknown how to create Azure data base '
                                 'engine {0}'.format(self.spec.engine))
 
+  def _Create(self):
+    """Creates the Azure RDS instance.
+
+    Raises:
+      NotImplementedError: if unknown how to create self.spec.engine.
+      Exception: if attempting to create a non high availability database.
+
+    """
+    if self.spec.engine == relational_db.MYSQL:
+      self._InstallMySQLClient()
+    if self.is_managed_db:
+      self._CreateAzureSqlInstance()
+    else:
+      self.endpoint = self.server_vm.ip_address
+      if self.spec.engine == relational_db.MYSQL:
+        self._InstallMySQLServer()
+      else:
+        raise Exception(
+            'Engine {0} not supported for unmanaged databases.'.format(
+                self.spec.engine))
+      self.firewall = azure_network.AzureFirewall()
+      self.firewall.AllowPort(
+          self.server_vm,
+          '3306',
+          source_range=['%s/32' % self.client_vm.ip_address])
+      self.unmanaged_db_exists = True
+
   def _Delete(self):
     """Deletes the underlying resource.
 
@@ -174,6 +196,11 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
+    if not self.is_managed_db:
+      if hasattr(self, 'firewall'):
+        self.firewall.DisallowAllPorts()
+      self.unmanaged_db_exists = False
+      return
 
     cmd = [
         azure.AZURE_PATH,
@@ -193,6 +220,8 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
+    if not self.is_managed_db:
+      return self.unmanaged_db_exists
 
     json_server_show = self._AzServerShow()
     if json_server_show is None:
@@ -219,6 +248,8 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """Perform general post create operations on the cluster.
 
     """
+    if not self.is_managed_db:
+      return
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -247,6 +278,9 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       True if the resource was ready in time, False if the wait timed out
         or an Exception occurred.
     """
+    if not self.is_managed_db:
+      return self._IsReadyUnmanaged()
+
     start_time = datetime.datetime.now()
 
     while True:
@@ -312,17 +346,22 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.spec.database_password,
         database_name)
 
-  def MakeMysqlConnectionString(self):
+  def MakeMysqlConnectionString(self, use_localhost=False):
     """Makes the connection string used to connect via mysql command.
+
     Override implemenation in base class.  Azure postgres needs this format.
+
+    Args:
+      use_localhost: Whether to use 'localhost' instead of the endpoint or not.
 
     Returns:
         The connection string to use.
     """
-    return '-h {0} -u {1}@{2} -p{3}'.format(
-        self.endpoint,
-        self.spec.database_username,
-        self.endpoint,
+    return '-h {0}{1} -u {2}{3} -p{4}'.format(
+        self.endpoint if not use_localhost else 'localhost',
+        ' -P 3306' if not self.is_managed_db else '',
+        self.spec.database_username, ('@%s' % self.endpoint) if
+        (self.is_managed_db and not use_localhost) else '',
         self.spec.database_password)
 
   def MakeSysbenchConnectionString(self):
@@ -333,11 +372,11 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
         The connection string to use.
     """
-    return '--mysql-host={0} --mysql-user={1}@{2} --mysql-password="{3}" '.format(
-        self.endpoint,
-        self.spec.database_username,
-        self.endpoint,
-        self.spec.database_password)
+    return ('--mysql-host={0}{1} --mysql-user={2}@{0} '
+            '--mysql-password="{3}" '.format(
+                self.endpoint,
+                ' --mysql-port=3306' if not self.is_managed_db else '',
+                self.spec.database_username, self.spec.database_password))
 
   def _FailoverHA(self):
     raise NotImplementedError()
