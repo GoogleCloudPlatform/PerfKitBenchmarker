@@ -436,7 +436,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
   def InstallGcloudCli(self):
     """Installs the Gcloud CLI; used for downloading preprovisioned data."""
     self.InstallPackages('curl')
-    self.RemoteCommand('echo "deb http://packages.cloud.google.com/apt '
+    self.RemoteCommand('echo "deb https://packages.cloud.google.com/apt '
                        'cloud-sdk-$(lsb_release -c -s) main" | sudo tee -a '
                        '/etc/apt/sources.list.d/google-cloud-sdk.list')
     self.RemoteCommand('curl https://packages.cloud.google.com/apt/doc/'
