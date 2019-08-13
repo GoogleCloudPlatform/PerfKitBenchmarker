@@ -116,6 +116,9 @@ flags.DEFINE_integer('num_disable_cpus', None,
                      lower_bound=1)
 flags.DEFINE_integer('disk_fill_size', 0,
                      'Size of file to create in GBs.')
+flags.DEFINE_enum('disk_fs_type', _DEFAULT_DISK_FS_TYPE,
+                  [_DEFAULT_DISK_FS_TYPE, 'xfs'],
+                  'File system type used to format disk.')
 
 flags.DEFINE_bool(
     'enable_transparent_hugepages', None, 'Whether to enable or '
@@ -552,10 +555,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       return
     if disk.SMB == disk_type:
       return
-    fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
-               'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
-               '^has_journal -t ext4 -b 4096 %s' % device_path)
-    self.RemoteHostCommand(fmt_cmd)
+    umount_cmd = '[[ -d /mnt ]] && sudo umount /mnt; '
+    # TODO(user): Allow custom disk formatting options.
+    if FLAGS.disk_fs_type == 'xfs':
+      fmt_cmd = ('sudo mkfs.xfs -f -i size=512 %s' % device_path)
+    else:
+      fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,discard -O '
+                 '^has_journal -t ext4 -b 4096 %s' % device_path)
+    self.RemoteHostCommand(umount_cmd + fmt_cmd)
 
   def MountDisk(self, device_path, mount_path, disk_type=None,
                 mount_options=disk.DEFAULT_MOUNT_OPTIONS,
@@ -569,7 +576,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       mount_options = '-t cifs %s' % mount_options
       fs_type = 'smb'
     else:
-      fs_type = _DEFAULT_DISK_FS_TYPE
+      fs_type = FLAGS.disk_fs_type
     fstab_options = fstab_options or ''
     mnt_cmd = ('sudo mkdir -p {mount_path};'
                'sudo mount {mount_options} {device_path} {mount_path} && '

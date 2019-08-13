@@ -313,6 +313,7 @@
 - Updated redis memtier benchmark to pre-populate the redis db before testing.
 - Add Clear Linux support for AWS stripe disks.
 - Load memcached server before running benchmark.
+- Add support for xfs disk formatting.
 - Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
 - Added support to append a region name to a bucket name for object storage
   benchmarking.
