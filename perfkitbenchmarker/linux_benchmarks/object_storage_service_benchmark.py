@@ -94,6 +94,9 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
 flags.DEFINE_string('object_storage_bucket_name', None,
                     'If set, the bucket will be created with this name')
 
+flags.DEFINE_boolean('object_storage_apply_region_suffix_to_bucket_name', False,
+                     'If set, the region will be appended to the bucket name.')
+
 flags.DEFINE_enum('cli_test_size', 'normal',
                   ['normal', 'large'],
                   'size of the cli tests. Normal means a mixture of various \n'
@@ -1142,10 +1145,21 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
+  Args:
+    benchmark_config: Benchmark config to verify.
+
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    perfkitbenchmarker.errors.Setup.InvalidFlagConfigurationError: On invalid
+        flags.
   """
+  del benchmark_config
   data.ResourcePath(DATA_FILE)
+  if FLAGS.object_storage_apply_region_suffix_to_bucket_name:
+    if not FLAGS.object_storage_region:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Please specify --object_storage_region if using '
+          '--object_storage_apply_region_suffix_to_bucket_name.')
 
 
 def _AppendPercentilesToResults(output_results, input_results, metric_name,
@@ -1400,6 +1414,8 @@ def Prepare(benchmark_spec):
   else:
     # Make the bucket(s)
     bucket_name = FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
+    if FLAGS.object_storage_apply_region_suffix_to_bucket_name:
+      bucket_name = '%s-%s' % (bucket_name, FLAGS.object_storage_region)
     if FLAGS.storage == 'GCP' and FLAGS.object_storage_gcs_multiregion:
       # Use a GCS multiregional bucket
       multiregional_service = gcs.GoogleCloudStorageService()
