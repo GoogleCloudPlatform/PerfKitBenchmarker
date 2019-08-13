@@ -37,11 +37,11 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
@@ -138,7 +138,7 @@ class BenchmarkSpec(object):
     self.spark_service = None
     self.dpb_service = None
     self.container_cluster = None
-    self.managed_relational_db = None
+    self.relational_db = None
     self.tpus = []
     self.tpu_groups = {}
     self.edw_service = None
@@ -208,16 +208,14 @@ class BenchmarkSpec(object):
         self.config.dpb_service.service_type)
     self.dpb_service = dpb_service_class(self.config.dpb_service)
 
-  def ConstructManagedRelationalDb(self):
-    """Create the managed relational db and create groups for its vms."""
-    if self.config.managed_relational_db is None:
+  def ConstructRelationalDb(self):
+    """Create the relational db and create groups for its vms."""
+    if self.config.relational_db is None:
       return
-    cloud = self.config.managed_relational_db.cloud
+    cloud = self.config.relational_db.cloud
     providers.LoadProvider(cloud)
-    managed_relational_db_class = (
-        managed_relational_db.GetManagedRelationalDbClass(cloud))
-    self.managed_relational_db = managed_relational_db_class(
-        self.config.managed_relational_db)
+    relational_db_class = (relational_db.GetRelationalDbClass(cloud))
+    self.relational_db = relational_db_class(self.config.relational_db)
 
   def ConstructTpuGroup(self, group_spec):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -531,9 +529,11 @@ class BenchmarkSpec(object):
       self.spark_service.Create()
     if self.dpb_service:
       self.dpb_service.Create()
-    if self.managed_relational_db:
-      self.managed_relational_db.client_vm = self.vms[0]
-      self.managed_relational_db.Create()
+    if self.relational_db:
+      self.relational_db.client_vm = self.vm_groups['clients'][0]
+      if 'servers' in self.vm_groups:
+        self.relational_db.server_vm = self.vm_groups['servers'][0]
+      self.relational_db.Create()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.edw_service:
@@ -555,8 +555,8 @@ class BenchmarkSpec(object):
       self.spark_service.Delete()
     if self.dpb_service:
       self.dpb_service.Delete()
-    if self.managed_relational_db:
-      self.managed_relational_db.Delete()
+    if self.relational_db:
+      self.relational_db.Delete()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
     if self.edw_service:

@@ -19,8 +19,8 @@ import json
 import logging
 import time
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
@@ -41,28 +41,26 @@ DEFAULT_POSTGRES_PORT = 5432
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 _MAP_ENGINE_TO_DEFAULT_VERSION = {
-    managed_relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
-    managed_relational_db.AURORA_MYSQL: DEFAULT_MYSQL_AURORA_VERSION,
-    managed_relational_db.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
-    managed_relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
-    managed_relational_db.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
+    relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
+    relational_db.AURORA_MYSQL: DEFAULT_MYSQL_AURORA_VERSION,
+    relational_db.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
+    relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
+    relational_db.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
 }
 
 _AURORA_ENGINES = set([
-    managed_relational_db.AURORA_MYSQL56,
-    managed_relational_db.AURORA_MYSQL,
-    managed_relational_db.AURORA_POSTGRES])
+    relational_db.AURORA_MYSQL56, relational_db.AURORA_MYSQL,
+    relational_db.AURORA_POSTGRES
+])
 
-_RDS_ENGINES = set([
-    managed_relational_db.MYSQL,
-    managed_relational_db.POSTGRES])
+_RDS_ENGINES = set([relational_db.MYSQL, relational_db.POSTGRES])
 
 
-class AwsManagedRelationalDbCrossRegionException(Exception):
+class AwsRelationalDbCrossRegionException(Exception):
   pass
 
 
-class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
+class AwsRelationalDb(relational_db.BaseRelationalDb):
   """An object representing an AWS RDS managed relational database.
 
   Currenty MySQL and Postgres are supported. This class requires that a
@@ -88,22 +86,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   At the moment there is no way to specify the primary zone when creating a
   high availability instance, which means that the client and server may
   be launched in different zones, which hurts network performance.
-  In other words, the 'zone' attribute on the managed_relational_db vm_spec
+  In other words, the 'zone' attribute on the relational_db vm_spec
   has no effect, and is only used to specify the region.
 
   To filter out runs that cross zones, be sure to check the sample metadata for
-  'zone' (client's zone), 'managed_relational_db_zone' (primary RDS zone),
-  and 'managed_relational_db_secondary_zone' (secondary RDS zone).
+  'zone' (client's zone), 'relational_db_zone' (primary RDS zone),
+  and 'relational_db_secondary_zone' (secondary RDS zone).
 
   If the instance was NOT launched in the high availability configuration, the
   server will be launched in the zone requested, and
-  managed_relational_db_secondary_zone will not exist in the metadata.
+  relational_db_secondary_zone will not exist in the metadata.
   """
   CLOUD = providers.AWS
 
-  def __init__(self, managed_relational_db_spec):
-    super(AwsManagedRelationalDb, self).__init__(managed_relational_db_spec)
-    self.spec = managed_relational_db_spec
+  def __init__(self, relational_db_spec):
+    super(AwsRelationalDb, self).__init__(relational_db_spec)
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.cluster_id = None
     self.all_instance_ids = []
@@ -119,16 +116,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.subnets_owned_by_db = []
     self.subnets_used_by_db = []
 
+    if self.is_managed_db:
+      self.unmanaged_db_exists = False
+
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 
-    All keys will be prefaced with managed_relational_db before
+    All keys will be prefaced with relational_db before
     being published (done in publisher.py).
 
     Returns:
       metadata: dict of AWS Managed DB metadata.
     """
-    metadata = super(AwsManagedRelationalDb, self).GetResourceMetadata()
+    metadata = super(AwsRelationalDb, self).GetResourceMetadata()
     metadata.update({
         'zone': self.primary_zone,
     })
@@ -285,15 +285,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     for subnet_for_db in self.subnets_owned_by_db:
       subnet_for_db.Delete()
 
-  def _Create(self):
-    """Creates the AWS RDS instance.
-
-    Raises:
-      Exception: if unknown how to create self.spec.engine.
-
-    """
+  def _CreateAwsSqlInstance(self):
     if self.spec.engine in _RDS_ENGINES:
-
       instance_identifier = self.instance_id
       self.all_instance_ids.append(instance_identifier)
       cmd = util.AWS_PREFIX + [
@@ -323,11 +316,11 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     elif self.spec.engine in _AURORA_ENGINES:
       zones_needed_for_high_availability = len(self.zones) > 1
       if zones_needed_for_high_availability != self.spec.high_availability:
-        raise Exception('When managed_db_high_availability is true, multiple '
+        raise Exception('When db_high_availability is true, multiple '
                         'zones must be specified.  When '
-                        'managed_db_high_availability is false, one zone '
+                        'db_high_availability is false, one zone '
                         'should be specified.   '
-                        'managed_db_high_availability: {0}  '
+                        'db_high_availability: {0}  '
                         'zone count: {1} '.format(
                             zones_needed_for_high_availability,
                             len(self.zones)))
@@ -379,6 +372,32 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       raise Exception('Unknown how to create AWS data base engine {0}'.format(
           self.spec.engine))
 
+  def _Create(self):
+    """Creates the AWS RDS instance.
+
+    Raises:
+      Exception: if unknown how to create self.spec.engine.
+
+    """
+    if self.spec.engine in _RDS_ENGINES:
+      self._InstallMySQLClient()
+    if self.is_managed_db:
+      self._CreateAwsSqlInstance()
+    else:
+      self.endpoint = self.server_vm.ip_address
+      if self.spec.engine == relational_db.MYSQL:
+        self._InstallMySQLServer()
+      else:
+        raise Exception(
+            'Engine {0} not supported for unmanaged databases.'.format(
+                self.spec.engine))
+      self.firewall = aws_network.AwsFirewall()
+      self.firewall.AllowPortInSecurityGroup(
+          self.server_vm.region,
+          self.server_vm.network.regional_network.vpc.default_security_group_id,
+          '3306', '3306', ['%s/32' % self.client_vm.ip_address])
+      self.unmanaged_db_exists = True
+
   def _IsDeleting(self):
     """See Base class BaseResource in perfkitbenchmarker.resource.py."""
 
@@ -398,6 +417,12 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
+    if not self.is_managed_db:
+      if hasattr(self, 'firewall'):
+        self.firewall.DisallowAllPorts()
+      self.unmanaged_db_exists = False
+      return
+
     for current_instance_id in self.all_instance_ids:
       cmd = util.AWS_PREFIX + [
           'rds',
@@ -425,6 +450,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
+    if not self.is_managed_db:
+      return self.unmanaged_db_exists
     for current_instance_id in self.all_instance_ids:
       json_output = self._DescribeInstance(current_instance_id)
       if not json_output:
@@ -520,6 +547,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       True if the resource was ready in time, False if the wait timed out
         or an Exception occurred.
     """
+    if not self.is_managed_db:
+      return self._IsReadyUnmanaged()
 
     if not self.all_instance_ids:
       return False
@@ -537,6 +566,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
        Exception:  If could not ready the instance after modification to
                    multi-az.
     """
+    if not self.is_managed_db:
+      return
 
     need_ha_modification = self.spec.engine in _RDS_ENGINES
 
@@ -650,13 +681,13 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """Asserts that the client vm is in the same region requested by the server.
 
     Raises:
-      AwsManagedRelationalDbCrossRegionException: if the client vm is in a
+      AwsRelationalDbCrossRegionException: if the client vm is in a
         different region that is requested by the server.
     """
     if self.client_vm.region != self.region:
-      raise AwsManagedRelationalDbCrossRegionException((
-          'client_vm and managed_relational_db server '
-          'must be in the same region'))
+      raise AwsRelationalDbCrossRegionException(
+          ('client_vm and relational_db server '
+           'must be in the same region'))
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.

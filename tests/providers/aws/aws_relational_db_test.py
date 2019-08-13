@@ -11,25 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.aws.aws_managed_relational_db."""
+"""Tests for perfkitbenchmarker.providers.aws.aws_relational_db."""
 
 import contextlib
 import json
 import os
 import unittest
+import mock
 
 from mock import patch, Mock
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.managed_relational_db import AURORA_POSTGRES
-from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.aws import aws_disk
-from perfkitbenchmarker.providers.aws import aws_managed_relational_db
-from perfkitbenchmarker.providers.aws.aws_managed_relational_db import (
-    AwsManagedRelationalDb)
+from perfkitbenchmarker.providers.aws import aws_relational_db
+from perfkitbenchmarker.providers.aws.aws_relational_db import (AwsRelationalDb)
+from perfkitbenchmarker.relational_db import AURORA_POSTGRES
+from perfkitbenchmarker.relational_db import MYSQL
 from six.moves import builtins
+
+FLAGS = flags.FLAGS
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -46,23 +49,24 @@ def readTestDataFile(filename):
     return fp.read()
 
 
-class AwsManagedRelationalDbSpecTestCase(unittest.TestCase):
-  """Class that tests the creation of an AwsManagedRelationalDbSpec."""
+class AwsRelationalDbSpecTestCase(unittest.TestCase):
+  """Class that tests the creation of an AwsRelationalDbSpec."""
   pass
 
 
-class AwsManagedRelationalDbFlagsTestCase(unittest.TestCase):
-  """Class that tests the flags defined in AwsManagedRelationalDb."""
+class AwsRelationalDbFlagsTestCase(unittest.TestCase):
+  """Class that tests the flags defined in AwsRelationalDb."""
   pass
 
 
-class AwsManagedRelationalDbTestCase(unittest.TestCase):
+class AwsRelationalDbTestCase(unittest.TestCase):
 
   def setUp(self):
     flag_values = {'run_uri': '123', 'project': None}
-    p = patch(aws_managed_relational_db.__name__ + '.FLAGS')
+    p = patch(aws_relational_db.__name__ + '.FLAGS')
     flags_mock = p.start()
     flags_mock.configure_mock(**flag_values)
+    FLAGS['use_managed_db'].parse(True)
     self.addCleanup(p.stop)
 
   @contextlib.contextmanager
@@ -76,7 +80,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
                                                 '.NamedTemporaryFile'):
       yield issue_command
 
-  def createMockSpec(self, additional_spec_items={}):
+  def CreateMockSpec(self, additional_spec_items={}):
     default_server_disk_spec = aws_disk.AwsDiskSpec(
         _COMPONENT,
         disk_size=5,
@@ -99,32 +103,38 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = Mock(
-        spec=benchmark_config_spec._ManagedRelationalDbSpec)
+    mock_db_spec = Mock(spec=benchmark_config_spec._RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
-  def createDbFromMockSpec(self, mock_spec):
-    aws_db = AwsManagedRelationalDb(mock_spec)
+  def CreateMockClientVM(self, db_class):
+    m = mock.MagicMock()
+    m.HasIpAddress = True
+    m.ip_address = '192.168.0.1'
+    db_class.client_vm = m
+
+  def CreateDbFromMockSpec(self, mock_spec):
+    aws_db = AwsRelationalDb(mock_spec)
 
     # Set necessary instance attributes that are not part of the spec
     aws_db.security_group_name = 'fake_security_group'
     aws_db.db_subnet_group_name = 'fake_db_subnet'
     aws_db.security_group_id = 'fake_security_group_id'
+    self.CreateMockClientVM(aws_db)
     return aws_db
 
-  def createManagedDbFromSpec(self, additional_spec_items={}):
-    mock_spec = self.createMockSpec(additional_spec_items)
-    return self.createDbFromMockSpec(mock_spec)
+  def CreateDbFromSpec(self, additional_spec_items={}):
+    mock_spec = self.CreateMockSpec(additional_spec_items)
+    return self.CreateDbFromMockSpec(mock_spec)
 
-  def create(self, additional_spec_items={}):
+  def Create(self, additional_spec_items={}):
     with self._PatchCriticalObjects() as issue_command:
-      db = self.createManagedDbFromSpec(additional_spec_items)
+      db = self.CreateDbFromSpec(additional_spec_items)
       db._Create()
       return ' '.join(issue_command.call_args[0][0])
 
   def testCreate(self):
-    command_string = self.create()
+    command_string = self.Create()
 
     self.assertTrue(
         command_string.startswith('%s rds create-db-instance' % _AWS_PREFIX))
@@ -134,8 +144,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     self.assertIn('--engine=mysql', command_string)
     self.assertIn('--master-user-password=fakepassword', command_string)
 
-  def createAuroraMockSpec(self, additional_spec_items={}):
-
+  def CreateAuroraMockSpec(self, additional_spec_items={}):
     default_server_vm_spec = virtual_machine.BaseVmSpec(
         'NAME', **{'machine_type': 'db.t1.micro',
                    'zone': 'us-west-2b'})
@@ -153,18 +162,17 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = Mock(
-        spec=benchmark_config_spec._ManagedRelationalDbSpec)
+    mock_db_spec = Mock(spec=benchmark_config_spec._RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
-  def createAuroraDbFromSpec(self, additional_spec_items={}):
-    mock_spec = self.createAuroraMockSpec(additional_spec_items)
-    return self.createDbFromMockSpec(mock_spec)
+  def CreateAuroraDbFromSpec(self, additional_spec_items={}):
+    mock_spec = self.CreateAuroraMockSpec(additional_spec_items)
+    return self.CreateDbFromMockSpec(mock_spec)
 
-  def createAurora(self, additional_spec_items={}):
+  def CreateAurora(self, additional_spec_items={}):
     with self._PatchCriticalObjects() as issue_command:
-      db = self.createAuroraDbFromSpec(additional_spec_items)
+      db = self.CreateAuroraDbFromSpec(additional_spec_items)
       db._Create()
       call_results = []
       for call in issue_command.call_args_list:
@@ -172,7 +180,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       return call_results
 
   def testCreateAurora(self):
-    command_strings = self.createAurora()
+    command_strings = self.CreateAurora()
 
     self.assertIn(
         '%s rds create-db-cluster' % _AWS_PREFIX, command_strings[0])
@@ -191,17 +199,17 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     spec_dict = {
         'multi_az': False,
     }
-    command_string = self.create(spec_dict)
+    command_string = self.Create(spec_dict)
 
     self.assertNotIn('--multi-az', command_string)
 
   def testHighAvailability(self):
-    command_string = self.create()
+    command_string = self.Create()
 
     self.assertNotIn('--multi-az', command_string)
 
   def testDiskWithIops(self):
-    command_string = self.create()
+    command_string = self.Create()
 
     self.assertIn('--allocated-storage=5', command_string)
     self.assertIn('--storage-type=%s' % aws_disk.IO1, command_string)
@@ -212,14 +220,14 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'disk_spec': aws_disk.AwsDiskSpec(
             _COMPONENT, disk_size=5, disk_type=aws_disk.GP2)
     }
-    command_string = self.create(spec_dict)
+    command_string = self.Create(spec_dict)
 
     self.assertIn('--allocated-storage=5', command_string)
     self.assertIn('--storage-type=%s' % aws_disk.GP2, command_string)
     self.assertNotIn('--iops', command_string)
 
   def testUnspecifiedDatabaseVersion(self):
-    command_string = self.create()
+    command_string = self.Create()
 
     self.assertIn('--engine-version=5.7.11', command_string)
 
@@ -227,14 +235,14 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     spec_dict = {
         'engine_version': '5.6.29',
     }
-    command_string = self.create(spec_dict)
+    command_string = self.Create(spec_dict)
 
     self.assertIn('--engine-version=5.6.29', command_string)
 
   def testIsNotReady(self):
     test_data = readTestDataFile('aws-describe-db-instances-creating.json')
     with self._PatchCriticalObjects(stdout=test_data):
-      db = self.createManagedDbFromSpec()
+      db = self.CreateDbFromSpec()
       db.all_instance_ids.append('pkb-db-instance-123')
 
       self.assertEqual(False, db._IsReady(timeout=0))
@@ -242,7 +250,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
   def testIsReady(self):
     test_data = readTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects(stdout=test_data):
-      db = self.createManagedDbFromSpec()
+      db = self.CreateDbFromSpec()
       db.all_instance_ids.append('pkb-db-instance-123')
 
       self.assertEqual(True, db._IsReady())
@@ -250,7 +258,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
   def testParseEndpoint(self):
     test_data = readTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects():
-      db = self.createManagedDbFromSpec()
+      db = self.CreateDbFromSpec()
 
       self.assertEqual(
           'pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
@@ -259,13 +267,13 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
   def testParsePort(self):
     test_data = readTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects():
-      db = self.createManagedDbFromSpec()
+      db = self.CreateDbFromSpec()
 
       self.assertEqual(3306, db._ParsePortFromInstance(json.loads(test_data)))
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
-      db = self.createManagedDbFromSpec()
+      db = self.CreateDbFromSpec()
       db.all_instance_ids.append('pkb-db-instance-123')
       db._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])

@@ -121,10 +121,12 @@ _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
 
 
 BENCHMARK_NAME = 'sysbench'
+# TODO(user): Move or copy the server definitions into the relational_db
+# object since that's what they're ultimately a part of.
 BENCHMARK_CONFIG = """
 sysbench:
   description: Sysbench OLTP benchmarks.
-  managed_relational_db:
+  relational_db:
     engine: mysql
     vm_spec:
       GCP:
@@ -151,18 +153,44 @@ sysbench:
         #increments of 128000 MB up to maximum of 1024000 MB.
         disk_size: 128
   vm_groups:
-    default:
-      os_type: ubuntu1604
+    clients:
       vm_spec:
+        GCP:
+          machine_type: n1-standard-16
+          zone: us-central1-c
         AWS:
           machine_type: m4.4xlarge
           zone: us-west-1a
         Azure:
-          machine_type: Standard_A8m_v2
+          machine_type: Standard_A4m_v2
           zone: westus
+      disk_spec: *default_500_gb
+    servers:
+      os_type: ubuntu1604
+      vm_spec:
         GCP:
           machine_type: n1-standard-16
           zone: us-central1-c
+        AWS:
+          machine_type: m4.4xlarge
+          zone: us-west-1a
+        Azure:
+          machine_type: Standard_A4m_v2
+          zone: westus
+      disk_spec: *default_500_gb
+    replications:
+      os_type: ubuntu1604
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-16
+          zone: us-central1-b
+        AWS:
+          machine_type: m4.4xlarge
+          zone: us-east-1a
+        Azure:
+          machine_type: Standard_A4m_v2
+          zone: eastus
+      disk_spec: *default_500_gb
 """
 
 # Constants defined for Sysbench tests.
@@ -260,7 +288,7 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
   if duration <= 0:
     raise ValueError('Duration must be greater than zero.')
 
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   run_cmd_tokens = ['nice',  # run with a niceness of lower priority
                     '-15',   # to encourage cpu time for ssh commands
                     'sysbench',
@@ -295,7 +323,7 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
     benchmark_spec: The benchmark specification. Contains all data that is
                     required to run the benchmark.
     sysbench_thread_count: count of number of threads to use in --threads
-                           parameter to sysbench
+                           parameter to sysbench.
 
   Returns:
     stdout, stderr: the result of the command.
@@ -340,7 +368,7 @@ def _IssueSysbenchCommandWithReturnCode(
 
 def _IssueMysqlPingCommandWithReturnCode(vm, benchmark_spec):
   """Ping mysql with mysqladmin."""
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   run_cmd_tokens = ['mysqladmin',
                     '--count=1',
                     '--sleep=1',
@@ -361,7 +389,7 @@ def _RunSysbench(
   """Runs the Sysbench OLTP test.
 
   Args:
-    vm: The client VM that will issue the sysbench test.
+    vm: The VM that will issue the sysbench test.
     metadata: The PKB metadata to be passed along to the final results.
     benchmark_spec: The benchmark specification. Contains all data that is
                     required to run the benchmark.
@@ -396,7 +424,7 @@ def _RunSysbench(
 
 def _GetDatabaseSize(vm, benchmark_spec):
   """Get the size of the database in MB."""
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   get_db_size_cmd = (
       'mysql %s '
       '-e \''
@@ -610,53 +638,52 @@ def _FailOverThread(benchmark_spec):
   The failover test requires 2 threads of execution.   The
   workload thread waits for the database to fail and then waits for the database
   to be useful again.   The failover thread is responsible for programmatically
-  making the database fail There is a pause time before failure so that
+  making the database fail. There is a pause time before failure so that
   we can make sure the database is under sufficient load at the point of
-  failure. Doing a failover on an idle database would not be as
+  failure. Doing a failover on an idle database would not be an
   interesting test.
 
   Args:
       benchmark_spec:   The benchmark spec of the database to failover
   """
   time.sleep(FLAGS.sysbench_pre_failover_seconds)
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
   db.Failover()
 
 
-def _PrepareSysbench(vm, benchmark_spec):
+def _PrepareSysbench(client_vm, benchmark_spec):
   """Prepare the Sysbench OLTP test with data loading stage.
 
   Args:
-    vm: The client VM that will issue the sysbench test.
+    client_vm: The client VM that will issue the sysbench test.
     benchmark_spec: The benchmark specification. Contains all data that is
                     required to run the benchmark.
   Returns:
     results: A list of results of the data loading step.
   """
 
-  _InstallLuaScriptsIfNecessary(vm)
+  _InstallLuaScriptsIfNecessary(client_vm)
 
   results = []
 
-  db = benchmark_spec.managed_relational_db
+  db = benchmark_spec.relational_db
 
   # every cloud provider has a different mechansim for setting root password
   # on initialize.  GCP doesnt support setting password at creation though.
   # So initialize root password here early as possible.
-  if FLAGS.cloud == 'GCP':
+  if FLAGS.cloud == 'GCP' and FLAGS.use_managed_db:
     set_db_root_password_command = 'mysqladmin -h %s -u root password %s' % (
         db.endpoint,
         db.spec.database_password)
-    stdout, stderr = vm.RemoteCommand(set_db_root_password_command)
+    stdout, stderr = client_vm.RemoteCommand(set_db_root_password_command)
     logging.info('Root password is set to %s.', db.spec.database_password)
 
   # Create the sbtest database for Sysbench.
   create_sbtest_db_cmd = ('mysql %s '
                           '-e \'create database sbtest;\'') % (
                               db.MakeMysqlConnectionString())
-  stdout, stderr = vm.RemoteCommand(create_sbtest_db_cmd)
-  logging.info('sbtest db created, stdout is %s, stderr is %s',
-               stdout, stderr)
+  stdout, stderr = client_vm.RemoteCommand(create_sbtest_db_cmd)
+  logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
@@ -682,14 +709,14 @@ def _PrepareSysbench(vm, benchmark_spec):
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.
-  stdout, stderr = vm.RobustRemoteCommand(data_load_cmd)
+  stdout, stderr = client_vm.RobustRemoteCommand(data_load_cmd)
   load_duration = time.time() - data_load_start_time
   logging.info('It took %d seconds to finish the data loading step',
                load_duration)
   logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
                stdout, stderr)
 
-  db.mysql_db_size_MB = _GetDatabaseSize(vm, benchmark_spec)
+  db.mysql_db_size_MB = _GetDatabaseSize(client_vm, benchmark_spec)
   metadata = CreateMetadataFromFlags(db)
 
   results.append(sample.Sample(
@@ -753,20 +780,14 @@ def Prepare(benchmark_spec):
 
   benchmark_spec.always_call_cleanup = True
 
-  vm = benchmark_spec.vms[0]
+  client_vm = benchmark_spec.vm_groups['clients'][0]
 
   UpdateBenchmarkSpecWithFlags(benchmark_spec)
 
-  db_spec = benchmark_spec.managed_relational_db.spec
   # Setup common test tools required on the client VM
-  vm.Install('sysbench1')
-  if (db_spec.engine_version == '5.6' or
-      db_spec.engine_version.startswith('5.6.')):
-    vm.Install('mysqlclient56')
-  else:
-    vm.Install('mysqlclient')
+  client_vm.Install('sysbench1')
 
-  prepare_results = _PrepareSysbench(vm, benchmark_spec)
+  prepare_results = _PrepareSysbench(client_vm, benchmark_spec)
   print(prepare_results)
 
 
@@ -782,24 +803,26 @@ def Run(benchmark_spec):
   """
   logging.info('Start benchmarking MySQL Service, '
                'Cloud Provider is %s.', FLAGS.cloud)
-  vm = benchmark_spec.vms[0]
-  db = benchmark_spec.managed_relational_db
+  client_vm = benchmark_spec.vms[0]
+  db = benchmark_spec.relational_db
 
   for thread_count in FLAGS.sysbench_thread_counts:
     metadata = CreateMetadataFromFlags(db)
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.
-    run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
+    run_results = _RunSysbench(client_vm, metadata, benchmark_spec,
+                               thread_count)
     print(run_results)
     publisher.PublishRunStageSamples(benchmark_spec, run_results)
 
-  if (benchmark_spec.managed_relational_db.spec.high_availability and
+  if (FLAGS.use_managed_db and
+      benchmark_spec.relational_db.spec.high_availability and
       FLAGS.sysbench_pre_failover_seconds):
     last_client_count = FLAGS.sysbench_thread_counts[
         len(FLAGS.sysbench_thread_counts) - 1]
-    failover_results = _PerformFailoverTest(
-        vm, metadata, benchmark_spec, last_client_count)
+    failover_results = _PerformFailoverTest(client_vm, metadata, benchmark_spec,
+                                            last_client_count)
     print(failover_results)
     publisher.PublishRunStageSamples(benchmark_spec, failover_results)
 

@@ -430,72 +430,68 @@ def _PrintHelp(matches=None):
 
 
 def _PrintHelpMD(matches=None):
-    """Prints markdown formatted help for flags defined in matching modules. Works just like
-    --helpmatch.
+  """Prints markdown formatted help for flags defined in matching modules.
 
-    Args:
-    matches: regex string or None. Filters help to only those whose name
-      matched the regex. If None then all flags are printed.
-    Eg:
+  Works just like --helpmatch.
 
-    * all flags:
-    `./pkb.py --helpmatchmd .*`  > testsuite_docs/all.md
+  Args:
+    matches: regex string or None. Filters help to only those whose name matched
+      the regex. If None then all flags are printed.
+  Eg:
+  * all flags: `./pkb.py --helpmatchmd .*`  > testsuite_docs/all.md
+  * linux benchmarks: `./pkb.py --helpmatchmd linux_benchmarks.*`  >
+    testsuite_docs/linux_benchmarks.md  * specific modules `./pkb.py
+    --helpmatchmd iperf`  > testsuite_docs/iperf.md  * windows packages
+    `./pkb.py --helpmatchmd windows_packages.*`  >
+    testsuite_docs/windows_packages.md
+  * GCP provider: `./pkb.py --helpmatchmd providers.gcp.* >
+    testsuite_docs/providers_gcp.md`
+  """
 
-    * linux benchmarks:
-    `./pkb.py --helpmatchmd linux_benchmarks.*`  > testsuite_docs/linux_benchmarks.md
+  flags_by_module = FLAGS.flags_by_module_dict()
+  modules = sorted(flags_by_module)
+  regex = re.compile(matches)
+  for module_name in modules:
+    if regex.search(module_name):
+      # Compile regex patterns.
+      module_regex = re.compile(MODULE_REGEX)
+      flags_regex = re.compile(FLAGS_REGEX, re.MULTILINE | re.DOTALL)
+      flagname_regex = re.compile(FLAGNAME_REGEX, re.MULTILINE | re.DOTALL)
+      docstring_regex = re.compile(DOCSTRING_REGEX, re.MULTILINE | re.DOTALL)
+      # Retrieve the helpmatch text to format.
+      helptext_raw = FLAGS.module_help(module_name)
 
-    * specific modules
-    `./pkb.py --helpmatchmd iperf`  > testsuite_docs/iperf.md
-
-    * windows packages
-    `./pkb.py --helpmatchmd windows_packages.*`  > testsuite_docs/windows_packages.md
-
-    * GCP provider:
-    `./pkb.py --helpmatchmd providers.gcp.* > testsuite_docs/providers_gcp.md`
-    """
-
-    flags_by_module = FLAGS.flags_by_module_dict()
-    modules = sorted(flags_by_module)
-    regex = re.compile(matches)
-    for module_name in modules:
-      if regex.search(module_name):
-        # Compile regex patterns.
-        module_regex = re.compile(MODULE_REGEX)
-        flags_regex = re.compile(FLAGS_REGEX, re.MULTILINE | re.DOTALL)
-        flagname_regex = re.compile(FLAGNAME_REGEX, re.MULTILINE | re.DOTALL)
-        docstring_regex = re.compile(DOCSTRING_REGEX, re.MULTILINE | re.DOTALL)
-        # Retrieve the helpmatch text to format.
-        helptext_raw = FLAGS.module_help(module_name)
-
-        # Converts module name to github linkable string.
-        # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
-        # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
-        module = re.search(module_regex, helptext_raw, ).group(1)
-        module_link = module.replace('.', '/') + '.py'
-        # Put flag name in a markdown code block for visibility.
-        flags = re.findall(flags_regex, helptext_raw)
-        flags[:] = [flagname_regex.sub(r"`\1`\2", flag) for flag in flags]
-        # Get the docstring for the module without importing everything into our
-        # namespace. Probably a better way to do this
-        docstring = 'No description available'
-        # Only pull doststrings from inside pkb source files.
-        if (isfile(module_link)):
-          with open(module_link, "r") as f:
-            source = f.read()
-            # Get the triple quoted matches.
-            docstring_match = re.search(docstring_regex, source)
-            # Some modules don't have docstrings.
-            # eg perfkitbenchmarker/providers/alicloud/flags.py
-            if docstring_match is not None:
-              docstring = docstring_match.group(1)
-        # Format output and print here.
-        if (isfile(module_link)):  # Only print links for modules we can find.
-            print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
-        else:
-            print('### ' + module + '\n')
-        print('#### Description:\n\n' + docstring + '\n\n#### Flags:\n')
-        print('\n'.join(flags) + '\n')
-
+      # Converts module name to github linkable string.
+      # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
+      # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
+      module = re.search(
+          module_regex,
+          helptext_raw,
+      ).group(1)
+      module_link = module.replace('.', '/') + '.py'
+      # Put flag name in a markdown code block for visibility.
+      flags = re.findall(flags_regex, helptext_raw)
+      flags[:] = [flagname_regex.sub(r'`\1`\2', flag) for flag in flags]
+      # Get the docstring for the module without importing everything into our
+      # namespace. Probably a better way to do this
+      docstring = 'No description available'
+      # Only pull doststrings from inside pkb source files.
+      if isfile(module_link):
+        with open(module_link, 'r') as f:
+          source = f.read()
+          # Get the triple quoted matches.
+          docstring_match = re.search(docstring_regex, source)
+          # Some modules don't have docstrings.
+          # eg perfkitbenchmarker/providers/alicloud/flags.py
+          if docstring_match is not None:
+            docstring = docstring_match.group(1)
+      # Format output and print here.
+      if isfile(module_link):  # Only print links for modules we can find.
+        print('### [' + module, '](' + BASE_RELATIVE + module_link + ')\n')
+      else:
+        print('### ' + module + '\n')
+      print('#### Description:\n\n' + docstring + '\n\n#### Flags:\n')
+      print('\n'.join(flags) + '\n')
 
 
 def CheckVersionFlag():
@@ -617,8 +613,8 @@ def DoProvisionPhase(spec, timer):
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
   spec.ConstructDpbService()
-  spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
+  spec.ConstructRelationalDb()
   # CapacityReservations need to be constructed after VirtualMachines because
   # it needs information about the VMs (machine type, count, zone, etc). The
   # CapacityReservations will be provisioned before VMs.
