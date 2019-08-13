@@ -32,9 +32,9 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
@@ -425,11 +425,11 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
 
 
-class _ManagedRelationalDbSpec(spec.BaseSpec):
-  """Configurable options of a managed database service."""
+class _RelationalDbSpec(spec.BaseSpec):
+  """Configurable options of a database service."""
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_ManagedRelationalDbSpec, self).__init__(
+    super(_RelationalDbSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
     # TODO(ferneyhough): This is a lot of boilerplate, and is repeated
     # below in VmGroupSpec. See if some can be consolidated. Maybe we can
@@ -465,16 +465,14 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
     if not self.engine_version:
-      managed_db_class = managed_relational_db.GetManagedRelationalDbClass(
-          self.cloud)
-      self.engine_version = managed_db_class.GetDefaultEngineVersion(
-          self.engine)
+      db_class = relational_db.GetRelationalDbClass(self.cloud)
+      self.engine_version = db_class.GetDefaultEngineVersion(self.engine)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
     if not self.database_username:
       self.database_username = 'pkb%s' % flag_values.run_uri
     if not self.database_password:
-      self.database_password = managed_relational_db.GenerateRandomDbPassword()
+      self.database_password = relational_db.GenerateRandomDbPassword()
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -485,19 +483,18 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_ManagedRelationalDbSpec,
-                   cls)._GetOptionDecoderConstructions()
+    result = super(_RelationalDbSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
         }),
         'engine': (option_decoders.EnumDecoder, {
             'valid_values': [
-                managed_relational_db.MYSQL,
-                managed_relational_db.POSTGRES,
-                managed_relational_db.AURORA_POSTGRES,
-                managed_relational_db.AURORA_MYSQL,
-                managed_relational_db.AURORA_MYSQL56,
+                relational_db.MYSQL,
+                relational_db.POSTGRES,
+                relational_db.AURORA_POSTGRES,
+                relational_db.AURORA_MYSQL,
+                relational_db.AURORA_MYSQL56,
             ]
         }),
         'zones': (option_decoders.ListDecoder, {
@@ -544,23 +541,23 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     """
     # TODO(ferneyhough): Add flags for disk_spec.
     # Currently the only way to modify the disk_spec of the
-    # managed_db is to change the benchmark spec in the benchmark source code
+    # db is to change the benchmark spec in the benchmark source code
     # itself.
-    super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
+    super(_RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
 
-    has_managed_db_machine_type = flag_values['managed_db_machine_type'].present
-    has_managed_db_cpus = flag_values['managed_db_cpus'].present
-    has_managed_db_memory = flag_values['managed_db_memory'].present
-    has_custom_machine_type = has_managed_db_cpus and has_managed_db_memory
+    # TODO(user): Rename flags 'managed_db_' -> 'db_'.
+    has_db_machine_type = flag_values['managed_db_machine_type'].present
+    has_db_cpus = flag_values['managed_db_cpus'].present
+    has_db_memory = flag_values['managed_db_memory'].present
+    has_custom_machine_type = has_db_cpus and has_db_memory
 
-    if has_custom_machine_type and has_managed_db_machine_type:
+    if has_custom_machine_type and has_db_machine_type:
       raise errors.config.UnrecognizedOption(
-          'managed_db_cpus/managed_db_memory can not be specified with '
-          'managed_db_machine_type.   Either specify a custom machine '
+          'db_cpus/db_memory can not be specified with '
+          'db_machine_type.   Either specify a custom machine '
           'with cpus and memory or specify a predefined machine type.')
 
-    if (not has_custom_machine_type and (
-        has_managed_db_cpus or has_managed_db_memory)):
+    if (not has_custom_machine_type and (has_db_cpus or has_db_memory)):
       raise errors.config.MissingOption(
           'To specify a custom database machine instance, both managed_db_cpus '
           'and managed_db_memory must be specified.')
@@ -583,18 +580,16 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['high_availability'] = (
           flag_values.managed_db_high_availability)
     if flag_values['managed_db_backup_enabled'].present:
-      config_values['backup_enabled'] = (
-          flag_values.managed_db_backup_enabled)
+      config_values['backup_enabled'] = (flag_values.managed_db_backup_enabled)
     if flag_values['managed_db_backup_start_time'].present:
       config_values['backup_start_time'] = (
           flag_values.managed_db_backup_start_time)
 
     cloud = config_values['cloud']
     if flag_values['managed_db_zone'].present:
-      config_values['vm_spec'][cloud]['zone'] = (
-          flag_values.managed_db_zone[0])
+      config_values['vm_spec'][cloud]['zone'] = (flag_values.managed_db_zone[0])
       config_values['zones'] = flag_values.managed_db_zone
-    if has_managed_db_machine_type:
+    if has_db_machine_type:
       config_values['vm_spec'][cloud]['machine_type'] = (
           flag_values.managed_db_machine_type)
     if has_custom_machine_type:
@@ -620,8 +615,7 @@ class _SparkServiceSpec(spec.BaseSpec):
 
   Attributes:
     service_type: string.  pkb_managed or managed_service
-    static_cluster_id: if user has created a cluster, the id of the
-      cluster.
+    static_cluster_id: if user has created a cluster, the id of the cluster.
     worker_group: Vm group spec for workers.
     master_group: Vm group spec for master
   """
@@ -782,6 +776,14 @@ class _VmGroupSpec(spec.BaseSpec):
       config_values['os_type'] = flag_values.os_type
     if 'vm_count' in config_values and config_values['vm_count'] is None:
       config_values['vm_count'] = flag_values.num_vms
+    if (flag_values['use_managed_db'] and
+        flag_values['managed_db_machine_type'].present):
+      config_values['vm_spec'][flag_values.cloud][
+          'machine_type'] = flag_values.managed_db_machine_type
+    if (not flag_values['use_managed_db'] and
+        flag_values['machine_type'].present):
+      config_values['vm_spec'][
+          flag_values.cloud]['machine_type'] = flag_values.machine_type
 
 
 class _VmGroupsDecoder(option_decoders.TypeVerifier):
@@ -1039,36 +1041,34 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
-class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
-  """Validate the managed_relational_db dictionary of a benchmark config object.
-  """
+class _RelationalDbDecoder(option_decoders.TypeVerifier):
+  """Validate the relational_db dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(_ManagedRelationalDbDecoder, self).__init__(
-        valid_types=(dict,), **kwargs)
+    super(_RelationalDbDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verify managed_relational_db dict of a benchmark config object.
+    """Verify relational_db dict of a benchmark config object.
 
     Args:
       value: dict. Config dictionary
       component_full_name: string.  Fully qualified name of the configurable
-      component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues.  Runtime flag values to be propagated to
         BaseSpec constructors.
 
     Returns:
-      _ManagedRelationalDbService built from the config passed in in value.
+      _RelationalDbService built from the config passed in in value.
 
     Raises:
       errors.Config.InvalidateValue upon invalid input value.
     """
-    managed_relational_db_config = super(
-        _ManagedRelationalDbDecoder, self).Decode(value, component_full_name,
-                                                  flag_values)
-    result = _ManagedRelationalDbSpec(
+    relational_db_config = super(_RelationalDbDecoder,
+                                 self).Decode(value, component_full_name,
+                                              flag_values)
+    result = _RelationalDbSpec(
         self._GetOptionFullName(component_full_name), flag_values,
-        **managed_relational_db_config)
+        **relational_db_config)
     return result
 
 
@@ -1368,7 +1368,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'dpb_service': (_DpbServiceDecoder, {
             'default': None
         }),
-        'managed_relational_db': (_ManagedRelationalDbDecoder, {
+        'relational_db': (_RelationalDbDecoder, {
             'default': None
         }),
         'tpu_groups': (_TpuGroupsDecoder, {

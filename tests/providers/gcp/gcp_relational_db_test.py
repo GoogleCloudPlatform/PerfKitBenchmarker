@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.providers.gcp.gcp_managed_relational_db."""
+"""Tests for perfkitbenchmarker.providers.gcp.gcp_relational_db."""
 
 import contextlib
 import json
@@ -25,11 +25,11 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.managed_relational_db import MYSQL
-from perfkitbenchmarker.managed_relational_db import POSTGRES
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
-from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
+from perfkitbenchmarker.providers.gcp import gcp_relational_db
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.relational_db import MYSQL
+from perfkitbenchmarker.relational_db import POSTGRES
 from tests import pkb_common_test_case
 from six.moves import builtins
 
@@ -41,22 +41,16 @@ _COMPONENT = 'test_component'
 
 
 def CreateMockClientVM(db_class):
-  client_vm_spec = virtual_machine.BaseVmSpec(
-      'NAME',
-      **{
-          'machine_type': 'n1-standard-16',
-          'zone': 'us-west1-b',
-      })
-  client_vm_spec.HasIpAddress = True
-  client_vm_spec.ip_address = '192.168.0.1'
-  db_class.client_vm = client_vm_spec
+  m = mock.MagicMock()
+  m.HasIpAddress = True
+  m.ip_address = '192.168.0.1'
+  db_class.client_vm = m
 
 
-def CreateManagedDbFromSpec(spec_dict):
-  mock_db_spec = mock.Mock(
-      spec=benchmark_config_spec._ManagedRelationalDbSpec)
+def CreateDbFromSpec(spec_dict):
+  mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
-  db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
+  db_class = gcp_relational_db.GCPRelationalDb(mock_db_spec)
   CreateMockClientVM(db_class)
   return db_class
 
@@ -76,8 +70,7 @@ def PatchCriticalObjects(stdout='', stderr='', return_code=0):
     yield issue_command
 
 
-class GcpMysqlManagedRelationalDbTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def createMySQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
@@ -87,7 +80,6 @@ class GcpMysqlManagedRelationalDbTestCase(
                                          })
     vm_spec.cpus = None
     vm_spec.memory = None
-
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
@@ -103,19 +95,18 @@ class GcpMysqlManagedRelationalDbTestCase(
     }
 
   def setUp(self):
-    super(GcpMysqlManagedRelationalDbTestCase, self).setUp()
-    FLAGS.project = ''
-    FLAGS.run_uri = '123'
-    FLAGS.gcloud_path = 'gcloud'
+    super(GcpMysqlRelationalDbTestCase, self).setUp()
+    FLAGS['run_uri'].parse('123')
+    FLAGS['gcloud_path'].parse('gcloud')
+    FLAGS['use_managed_db'].parse(True)
 
     mock_db_spec_attrs = self.createMySQLSpecDict()
-    self.mock_db_spec = mock.Mock(
-        spec=benchmark_config_spec._ManagedRelationalDbSpec)
+    self.mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
     self.mock_db_spec.configure_mock(**mock_db_spec_attrs)
 
   def testNoHighAvailability(self):
     with PatchCriticalObjects() as issue_command:
-      db = CreateManagedDbFromSpec(self.createMySQLSpecDict())
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
       db._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -125,7 +116,7 @@ class GcpMysqlManagedRelationalDbTestCase(
 
   def testCreate(self):
     with PatchCriticalObjects() as issue_command:
-      db = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      db = gcp_relational_db.GCPRelationalDb(self.mock_db_spec)
       CreateMockClientVM(db)
       db._Create()
       self.assertEqual(issue_command.call_count, 1)
@@ -146,7 +137,7 @@ class GcpMysqlManagedRelationalDbTestCase(
     with PatchCriticalObjects() as issue_command:
       spec = self.mock_db_spec
       spec.backup_enabled = False
-      db = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      db = gcp_relational_db.GCPRelationalDb(self.mock_db_spec)
       CreateMockClientVM(db)
       db._Create()
       self.assertEqual(issue_command.call_count, 1)
@@ -163,7 +154,7 @@ class GcpMysqlManagedRelationalDbTestCase(
 
   def testDelete(self):
     with PatchCriticalObjects() as issue_command:
-      db = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      db = gcp_relational_db.GCPRelationalDb(self.mock_db_spec)
       db._Delete()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -179,7 +170,7 @@ class GcpMysqlManagedRelationalDbTestCase(
       test_output = fp.read()
 
     with PatchCriticalObjects(stdout=test_output):
-      db = CreateManagedDbFromSpec(self.createMySQLSpecDict())
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
       self.assertEqual(True, db._IsReady())
 
   def testExists(self):
@@ -190,14 +181,14 @@ class GcpMysqlManagedRelationalDbTestCase(
       test_output = fp.read()
 
     with PatchCriticalObjects(stdout=test_output):
-      db = CreateManagedDbFromSpec(self.createMySQLSpecDict())
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
       self.assertEqual(True, db._Exists())
 
   def testHighAvailability(self):
     with PatchCriticalObjects() as issue_command:
       spec = self.createMySQLSpecDict()
       spec['high_availability'] = True
-      db = CreateManagedDbFromSpec(spec)
+      db = CreateDbFromSpec(spec)
       db._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -213,17 +204,16 @@ class GcpMysqlManagedRelationalDbTestCase(
       test_output = fp.read()
 
     with PatchCriticalObjects():
-      db = CreateManagedDbFromSpec(self.createMySQLSpecDict())
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
       self.assertEqual('', db._ParseEndpoint(None))
       self.assertIn('10.10.0.35',
                     db._ParseEndpoint(json.loads(test_output)))
 
 
-class GcpPostgresManagedRelationlDbTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcpPostgresManagedRelationlDbTestCase, self).setUp()
+    super(GcpPostgresRelationlDbTestCase, self).setUp()
     FLAGS.project = ''
     FLAGS.run_uri = ''
     FLAGS.gcloud_path = ''
@@ -250,12 +240,12 @@ class GcpPostgresManagedRelationlDbTestCase(
 
   def testValidateSpec(self):
     with PatchCriticalObjects():
-      db_postgres = CreateManagedDbFromSpec(self.createPostgresSpecDict())
+      db_postgres = CreateDbFromSpec(self.createPostgresSpecDict())
       db_postgres._ValidateSpec()
 
   def testValidateMachineType(self):
     with PatchCriticalObjects():
-      db = CreateManagedDbFromSpec(self.createPostgresSpecDict())
+      db = CreateDbFromSpec(self.createPostgresSpecDict())
       self.assertRaises(ValueError, db._ValidateMachineType, 0, 0)
       self.assertRaises(ValueError, db._ValidateMachineType, 3840, 0)
       self.assertRaises(ValueError, db._ValidateMachineType, 255, 1)
@@ -269,7 +259,7 @@ class GcpPostgresManagedRelationlDbTestCase(
       spec = self.createPostgresSpecDict()
       spec['engine'] = 'postgres'
       spec['engine_version'] = '9.6'
-      db = CreateManagedDbFromSpec(spec)
+      db = CreateDbFromSpec(spec)
       db._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -284,7 +274,7 @@ class GcpPostgresManagedRelationlDbTestCase(
       spec['high_availability'] = True
       spec['engine'] = 'postgres'
       spec['engine_version'] = '9.6'
-      db = CreateManagedDbFromSpec(spec)
+      db = CreateDbFromSpec(spec)
       db._Create()
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
