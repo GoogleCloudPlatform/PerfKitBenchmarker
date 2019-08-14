@@ -67,7 +67,7 @@ def AptInstall(vm):
     else:
       raise Exception('No CUDNN version found for given CUDA version.')
     vm.RemoteCommand(
-        'sudo bash -c \'echo "deb http://developer.download.nvidia.com/compute/'
+        'sudo bash -c \'echo "deb https://developer.download.nvidia.com/compute/'
         'machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/'
         'nvidia-ml.list\'', should_log=True)
     vm.RemoteCommand('sudo apt-get update', should_log=True)
