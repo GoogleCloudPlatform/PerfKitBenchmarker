@@ -62,7 +62,7 @@ flags.DEFINE_integer('nuttcp_cpu_sample_time', 3,
 
 NUTTCP_DIR = 'nuttcp-8.1.4.win64'
 NUTTCP_ZIP = NUTTCP_DIR + '.zip'
-NUTTCP_URL = 'http://nuttcp.net/nuttcp/nuttcp-8.1.4/binaries/' + NUTTCP_ZIP
+NUTTCP_URL = 'https://nuttcp.net/nuttcp/nuttcp-8.1.4/binaries/' + NUTTCP_ZIP
 
 _COMMAND_TIMEOUT_BUFFER = 30
 
