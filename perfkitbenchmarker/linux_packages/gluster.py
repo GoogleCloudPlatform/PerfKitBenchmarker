@@ -46,6 +46,9 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the gluster package on the VM."""
+  vm.RemoteCommand('sudo apt update -y && sudo apt upgrade -y')
+  vm.RemoteCommand(
+      'sudo add-apt-repository ppa:gluster/glusterfs-6 && sudo apt-get update')
   vm.InstallPackages('glusterfs-server')
 
 
@@ -103,6 +106,12 @@ def ConfigureServers(gluster_servers, volume_name):
     volume_name: The name of the volume to be created.
   """
   vm_util.RunThreaded(lambda vm: vm.Install('gluster'), gluster_servers)
+  vm_util.RunThreaded(
+      lambda vm: vm.RemoteCommand('sudo systemctl enable glusterd'),
+      gluster_servers)
+  vm_util.RunThreaded(
+      lambda vm: vm.RemoteCommand('sudo systemctl start glusterd'),
+      gluster_servers)
 
   bricks = []
   for vm in gluster_servers:
