@@ -34,7 +34,7 @@ from six.moves import range
 import six.moves.configparser
 
 FIO_DIR = '%s/fio' % INSTALL_DIR
-GIT_REPO = 'http://git.kernel.dk/fio.git'
+GIT_REPO = 'https://github.com/axboe/fio.git'
 GIT_TAG = 'fio-2.17'
 FIO_PATH = FIO_DIR + '/fio'
 FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH
