@@ -17,7 +17,10 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
+import json
+import os
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
@@ -39,11 +42,6 @@ flags.DEFINE_string('edw_service_cluster_user', None,
 flags.DEFINE_string('edw_service_cluster_password', None,
                     'If set, the password authorized on cluster (only '
                     'applicable when using snapshots).')
-flags.DEFINE_enum('edw_query_execution_mode', 'sequential', ['sequential',
-                                                             'concurrent'],
-                  'The mode for executing the queries on the edw cluster.')
-flags.DEFINE_string('edw_service_resource_group', None,
-                    'Needed to manage Azure clusters.')
 
 FLAGS = flags.FLAGS
 
@@ -62,6 +60,8 @@ TYPE_2_MODULE = dict([('redshift',
                        'perfkitbenchmarker.providers.azure.'
                        'azure_sql_data_warehouse')])
 DEFAULT_NUMBER_OF_NODES = 1
+# The order of stages is important to the successful lifecycle completion.
+EDW_SERVICE_LIFECYCLE_STAGES = ['create', 'load', 'query', 'delete']
 
 
 class EdwService(resource.BaseResource):
@@ -135,3 +135,70 @@ class EdwService(resource.BaseResource):
       vm: Client vm on which the script will be run.
     """
     raise NotImplementedError
+
+  def PrepareClientVm(self, vm):
+    """Prepare phase to install the runtime environment on the client vm.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    vm.Install('pip')
+    vm.RemoteCommand('sudo pip install absl-py')
+
+  def PushDataDefinitionDataManipulationScripts(self, vm):
+    """Method to push the database bootstrap and teardown scripts to the vm.
+
+    Args:
+      vm: Client vm on which the scripts will be run.
+    """
+    raise NotImplementedError
+
+  def PushScriptExecutionFramework(self, vm):
+    """Method to push the runner to execute sql scripts on the vm.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    # Push generic runner
+    vm.PushFile(data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+
+  def GenerateLifecycleStageScriptName(self, lifecycle_stage):
+    """Computes the default name for script implementing an edw lifecycle stage.
+
+    Args:
+      lifecycle_stage: Stage for which the corresponding sql script is desired.
+
+    Returns:
+      script name for implementing the argument lifecycle_stage.
+    """
+    return os.path.basename(
+        os.path.normpath('database_%s.sql' % lifecycle_stage))
+
+  def GenerateScriptExecutionCommand(self, script):
+    """Method to generate the command for running the sql script on the vm.
+
+    Args:
+      script: Script to execute on the client vm.
+
+    Returns:
+      base command components to run the sql script on the vm.
+    """
+    return ['python', 'script_driver.py', '--script={}'.format(script)]
+
+  def GetScriptExecutionResults(self, script_name, client_vm):
+    """A function to trigger single/multi script execution and return performance.
+
+    Args:
+      script_name: Script to execute on the client vm.
+      client_vm: Client vm on which the script will be executed.
+
+    Returns:
+      A tuple of script execution performance results.
+      - latency of executing the script.
+      - reference job_id executed on the edw_service.
+    """
+    script_execution_command = self.GenerateScriptExecutionCommand(script_name)
+    stdout, _ = client_vm.RemoteCommand(script_execution_command)
+    all_script_performance = json.loads(stdout)
+    script_performance = all_script_performance[script_name]
+    return script_performance['execution_time'], script_performance['job_id']

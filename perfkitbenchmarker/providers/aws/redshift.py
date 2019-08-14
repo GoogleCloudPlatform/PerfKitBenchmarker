@@ -18,7 +18,9 @@ and deleted.
 """
 
 import json
+import os
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -34,6 +36,8 @@ VALID_EXIST_STATUSES = ['creating', 'available']
 DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
 ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = '--automated-snapshot-retention-period=0'
+DEFAULT_DATABASE_NAME = 'dev'
+BOOTSTRAP_DB = 'sample'
 
 
 def AddTags(resource_arn, region):
@@ -91,6 +95,9 @@ class Redshift(edw_service.EdwService):
         self.cmd_prefix)
     self.cluster_parameter_group = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
         edw_service_spec.concurrency, self.cmd_prefix)
+
+    if self.db is None:
+      self.db = DEFAULT_DATABASE_NAME
 
   def _CreateDependencies(self):
     self.cluster_subnet_group.Create()
@@ -323,3 +330,55 @@ class Redshift(edw_service.EdwService):
       vm: Client vm on which the script will be run.
     """
     vm.Install('pgbench')
+
+  def PrepareClientVm(self, vm):
+    """Prepare phase to install the runtime environment on the client vm.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    super(Redshift, self).PrepareClientVm(vm)
+    self.InstallAndAuthenticateRunner(vm)
+
+  def PushDataDefinitionDataManipulationScripts(self, vm):
+    """Prepare phase to install the runtime environment on the client vm.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    service_specific_dir = os.path.join('edw', self.SERVICE_TYPE)
+    use_case_specific_dir = os.path.join(service_specific_dir, BOOTSTRAP_DB)
+    bootstrap_script_list = ['database_%s.sql' % x
+                             for x in edw_service.EDW_SERVICE_LIFECYCLE_STAGES]
+    for script in bootstrap_script_list:
+      create_script_path = os.path.join(use_case_specific_dir, script)
+      vm.PushFile(data.ResourcePath(create_script_path))
+
+  def PushScriptExecutionFramework(self, vm):
+    """Prepare phase to install the runtime environment on the client vm.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    super(Redshift, self).PushScriptExecutionFramework(vm)
+    service_specific_dir = os.path.join('edw', self.SERVICE_TYPE)
+    service_specific_script_list = ['script_runner.sh',
+                                    'provider_specific_script_driver.py']
+    for script in service_specific_script_list:
+      vm.PushFile(data.ResourcePath(os.path.join(service_specific_dir, script)))
+    runner_perms_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    vm.RemoteCommand(runner_perms_update_cmd)
+
+  def GenerateScriptExecutionCommand(self, script):
+    """Method to generate the command for running the sql script on the vm.
+
+    Args:
+      script: Script to execute on the client vm.
+
+    Returns:
+      Instance specific command to execute the sql script.
+    """
+    launch_command = super(Redshift,
+                           self).GenerateScriptExecutionCommand(script)
+    launch_command.append(self.RunCommandHelper())
+    return ' '.join(launch_command)
