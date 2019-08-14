@@ -150,7 +150,8 @@ def FioParametersToJob(fio_parameters):
 
 
 def ParseResults(job_file, fio_json_result, base_metadata=None,
-                 log_file_base='', bin_vals=None):
+                 log_file_base='', bin_vals=None,
+                 skip_latency_individual_stats=False):
   """Parse fio json output into samples.
 
   Args:
@@ -161,6 +162,8 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
     bin_vals: A 2-D list of int. Each list represents a list of
       bin values in histgram log. Calculated from remote VM using
       fio/tools/hist/fiologparser_hist.py
+    skip_latency_individual_stats: Bool. If true, skips pulling latency stats
+      that are not aggregate.
 
   Returns:
     A list of sample.Sample objects.
@@ -214,28 +217,28 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
             return value
 
         percentiles = clat_section['percentile']
-        lat_statistics = [
-            ('min', _ConvertClat(clat_section['min'])),
-            ('max', _ConvertClat(clat_section['max'])),
-            ('mean', _ConvertClat(clat_section['mean'])),
-            ('stddev', _ConvertClat(clat_section['stddev'])),
-            ('p1', _ConvertClat(percentiles['1.000000'])),
-            ('p5', _ConvertClat(percentiles['5.000000'])),
-            ('p10', _ConvertClat(percentiles['10.000000'])),
-            ('p20', _ConvertClat(percentiles['20.000000'])),
-            ('p30', _ConvertClat(percentiles['30.000000'])),
-            ('p40', _ConvertClat(percentiles['40.000000'])),
-            ('p50', _ConvertClat(percentiles['50.000000'])),
-            ('p60', _ConvertClat(percentiles['60.000000'])),
-            ('p70', _ConvertClat(percentiles['70.000000'])),
-            ('p80', _ConvertClat(percentiles['80.000000'])),
-            ('p90', _ConvertClat(percentiles['90.000000'])),
-            ('p95', _ConvertClat(percentiles['95.000000'])),
-            ('p99', _ConvertClat(percentiles['99.000000'])),
-            ('p99.5', _ConvertClat(percentiles['99.500000'])),
-            ('p99.9', _ConvertClat(percentiles['99.900000'])),
-            ('p99.95', _ConvertClat(percentiles['99.950000'])),
-            ('p99.99', _ConvertClat(percentiles['99.990000']))]
+        lat_statistics = [('min', _ConvertClat(clat_section['min'])),
+                          ('max', _ConvertClat(clat_section['max'])),
+                          ('mean', _ConvertClat(clat_section['mean'])),
+                          ('stddev', _ConvertClat(clat_section['stddev']))]
+        if not skip_latency_individual_stats:
+          lat_statistics += [('p1', _ConvertClat(percentiles['1.000000'])),
+                             ('p5', _ConvertClat(percentiles['5.000000'])),
+                             ('p10', _ConvertClat(percentiles['10.000000'])),
+                             ('p20', _ConvertClat(percentiles['20.000000'])),
+                             ('p30', _ConvertClat(percentiles['30.000000'])),
+                             ('p40', _ConvertClat(percentiles['40.000000'])),
+                             ('p50', _ConvertClat(percentiles['50.000000'])),
+                             ('p60', _ConvertClat(percentiles['60.000000'])),
+                             ('p70', _ConvertClat(percentiles['70.000000'])),
+                             ('p80', _ConvertClat(percentiles['80.000000'])),
+                             ('p90', _ConvertClat(percentiles['90.000000'])),
+                             ('p95', _ConvertClat(percentiles['95.000000'])),
+                             ('p99', _ConvertClat(percentiles['99.000000'])),
+                             ('p99.5', _ConvertClat(percentiles['99.500000'])),
+                             ('p99.9', _ConvertClat(percentiles['99.900000'])),
+                             ('p99.95', _ConvertClat(percentiles['99.950000'])),
+                             ('p99.99', _ConvertClat(percentiles['99.990000']))]
 
         lat_metadata = parameters.copy()
         for name, val in lat_statistics:
