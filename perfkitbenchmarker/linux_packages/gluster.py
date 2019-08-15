@@ -46,9 +46,8 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the gluster package on the VM."""
-  vm.RemoteCommand('sudo apt update -y && sudo apt upgrade -y')
-  vm.RemoteCommand(
-      'sudo add-apt-repository ppa:gluster/glusterfs-6 && sudo apt-get update')
+  vm.RemoteCommand('sudo add-apt-repository ppa:gluster/glusterfs-6')
+  vm.AptUpdate()
   vm.InstallPackages('glusterfs-server')
 
 
