@@ -321,6 +321,7 @@
 - Added support to append a region name to a bucket name for object storage
   benchmarking.
 - Added sysbench benchmarking for MySQL in a VM.
+- Added check that cuda_toolkit is installed when installing cudnn.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
