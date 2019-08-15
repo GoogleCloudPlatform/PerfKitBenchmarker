@@ -16,6 +16,7 @@
 """Module containing CUDA Deep Neural Network library installation functions."""
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 CUDNN_7_4_9 = 'libcudnn7=7.4.2.24-1+cuda9.0'
 CUDNN_7_4_10 = 'libcudnn7=7.4.2.24-1+cuda10.0'
@@ -26,6 +27,8 @@ FLAGS = flags.FLAGS
 
 def AptInstall(vm):
   """Installs the cudnn package on the VM."""
+  if not cuda_toolkit.CheckNvidiaSmiExists(vm):
+    raise Exception('CUDA Toolkit is a prerequisite for installing CUDNN.')
   if FLAGS.cuda_toolkit_version == '9.0':
     cudnn_version = CUDNN_7_4_9
   elif FLAGS.cuda_toolkit_version == '10.0':

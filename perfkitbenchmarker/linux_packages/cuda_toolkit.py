@@ -372,7 +372,7 @@ def QueryGpuClockSpeed(vm, device_id):
   return (int(matches[0]), int(matches[1]))
 
 
-def _CheckNvidiaSmiExists(vm):
+def CheckNvidiaSmiExists(vm):
   """Returns whether nvidia-smi is installed or not"""
   resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
                                  ignore_failure=True,
@@ -464,7 +464,7 @@ def _InstallCuda10Point1(vm):
 
 def AptInstall(vm):
   """Installs CUDA toolkit on the VM if not already installed"""
-  if _CheckNvidiaSmiExists(vm):
+  if CheckNvidiaSmiExists(vm):
     DoPostInstallActions(vm)
     return
 
