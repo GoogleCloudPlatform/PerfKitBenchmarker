@@ -110,7 +110,7 @@ def JujuInstall(vm, vm_group_name):
   # The charm defaults to Cassandra 2.2.x, which has deprecated
   # cassandra-cli. Specify the sources to downgrade to Cassandra 2.1.x
   # to match the cassandra benchmark(s) expectations.
-  sources = ['deb http://www.apache.org/dist/cassandra/debian 21x main',
+  sources = ['deb https://www.apache.org/dist/cassandra/debian 21x main',
              'ppa:openjdk-r/ppa',
              'ppa:stub/cassandra']
 
