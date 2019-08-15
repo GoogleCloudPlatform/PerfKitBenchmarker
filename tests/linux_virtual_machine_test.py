@@ -154,6 +154,8 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
                         '-O ^has_journal -t ext4 -b 4096 dp')
     self.vm.FormatDisk('dp')
     self.assertRemoteHostCalled(expected_command)
+    self.assertEqual('ext4', self.vm.os_metadata['disk_filesystem_type'])
+    self.assertEqual(4096, self.vm.os_metadata['disk_filesystem_blocksize'])
 
   def testNfsMountDisk(self):
     mkdir_cmd = ('sudo mkdir -p mp;'
