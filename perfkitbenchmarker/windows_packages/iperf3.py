@@ -63,7 +63,8 @@ flags.DEFINE_bool('run_udp', False,
 
 IPERF3_DIR = 'iperf-3.1.3-win64'
 IPERF3_ZIP = IPERF3_DIR + '.zip'
-IPERF3_URL = 'http://iperf.fr/download/windows/' + IPERF3_ZIP
+# TODO(user): Add checksum for windows packages.
+IPERF3_URL = 'https://iperf.fr/download/windows/' + IPERF3_ZIP
 
 IPERF3_OUT_FILE = 'iperf_results'
 IPERF3_UDP_PORT = 5201
