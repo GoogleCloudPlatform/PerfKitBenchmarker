@@ -24,6 +24,8 @@
 - Changed TF Serving benchmark to use ResNet instead of Inception.
 - Renamed prepare_sleep_time flag to after_prepare_sleep_time.
 - multichase_taskset_options flag changed to multichase_numactl_options.
+- Deprecated CUDA version 8.
+- Remove support for supplying CUDNN package path via the 'cudnn' flag.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
