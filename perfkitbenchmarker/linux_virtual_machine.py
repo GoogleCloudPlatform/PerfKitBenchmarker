@@ -119,6 +119,9 @@ flags.DEFINE_integer('disk_fill_size', 0,
 flags.DEFINE_enum('disk_fs_type', _DEFAULT_DISK_FS_TYPE,
                   [_DEFAULT_DISK_FS_TYPE, 'xfs'],
                   'File system type used to format disk.')
+flags.DEFINE_integer(
+    'disk_block_size', None, 'Block size to format disk with.'
+    'Defaults to 4096 for ext4.')
 
 flags.DEFINE_bool(
     'enable_transparent_hugepages', None, 'Whether to enable or '
@@ -558,10 +561,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     umount_cmd = '[[ -d /mnt ]] && sudo umount /mnt; '
     # TODO(user): Allow custom disk formatting options.
     if FLAGS.disk_fs_type == 'xfs':
-      fmt_cmd = ('sudo mkfs.xfs -f -i size=512 %s' % device_path)
+      block_size = FLAGS.disk_block_size or 512
+      fmt_cmd = ('sudo mkfs.xfs -f -i size={0} {1}'.format(
+          block_size, device_path))
     else:
+      block_size = FLAGS.disk_block_size or 4096
       fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,discard -O '
-                 '^has_journal -t ext4 -b 4096 %s' % device_path)
+                 '^has_journal -t ext4 -b {0} {1}'.format(
+                     block_size, device_path))
+    self.os_metadata['disk_filesystem_type'] = FLAGS.disk_fs_type
+    self.os_metadata['disk_filesystem_blocksize'] = block_size
     self.RemoteHostCommand(umount_cmd + fmt_cmd)
 
   def MountDisk(self, device_path, mount_path, disk_type=None,

@@ -1415,7 +1415,10 @@ def Prepare(benchmark_spec):
     # Make the bucket(s)
     bucket_name = FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
     if FLAGS.object_storage_apply_region_suffix_to_bucket_name:
-      bucket_name = '%s-%s' % (bucket_name, FLAGS.object_storage_region)
+      # Avoid non-alphanumeric characters in the region as bucket names on some
+      # clouds cannot contain non-alphanumeric characters.
+      bucket_name = '%s%s' % (bucket_name,
+                              re.sub(r'[\W_]', '', FLAGS.object_storage_region))
     if FLAGS.storage == 'GCP' and FLAGS.object_storage_gcs_multiregion:
       # Use a GCS multiregional bucket
       multiregional_service = gcs.GoogleCloudStorageService()

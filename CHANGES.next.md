@@ -24,6 +24,8 @@
 - Changed TF Serving benchmark to use ResNet instead of Inception.
 - Renamed prepare_sleep_time flag to after_prepare_sleep_time.
 - multichase_taskset_options flag changed to multichase_numactl_options.
+- Deprecated CUDA version 8.
+- Remove support for supplying CUDNN package path via the 'cudnn' flag.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
@@ -509,5 +511,6 @@
   all the firewall rules that depend on the PKB-created network.
 - Fix AWS stripe disks assumption that the NVME index for the boot drive is always 0.
 - Increased default timeout for booting Windows VMs to 40 minutes.
+- Expose filesystem type and block size in vm metadata.
 - Fixed problem with AWS network creation in aws_dpb_emr, aws_nfs_service, and
   elastic_container_service.
