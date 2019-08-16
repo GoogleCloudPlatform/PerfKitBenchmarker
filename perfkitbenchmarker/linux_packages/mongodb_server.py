@@ -16,43 +16,77 @@
 """Module containing mongodb installation and cleanup functions."""
 
 
-def YumInstall(vm):
-  """Installs the mongodb package on the VM."""
-  vm.RemoteCommand('sudo setenforce 0')
-  mongodb_repo = (
-      '[mongodb]\nname=MongoDB Repository\nbaseurl='
-      'http://downloads-distro.mongodb.org/repo/redhat/os/x86_64/\n'
-      'gpgcheck=0\nenabled=1')
-  vm.RemoteCommand('echo "%s" | sudo tee /etc/yum.repos.d/mongodb.repo' %
-                   mongodb_repo)
-  vm.InstallPackages('mongodb-org-server')
-
-
-def AptInstall(vm):
-  """Installs the mongodb package on the VM."""
-  vm.InstallPackages('mongodb-server')
-
-
-def YumUninstall(vm):
-  """Uninstalls the mongodb package on the VM."""
-  vm.RemoteCommand('sudo rm /etc/yum.repos.d/mongodb.repo')
-
-
-def YumGetServiceName(vm):
+def _GetServiceName():
   """Returns the name of the mongodb service."""
   return 'mongod'
 
 
-def AptGetServiceName(vm):
-  """Returns the name of the mongodb service."""
-  return 'mongodb'
-
-
-def YumGetPathToConfig(vm):
+def _GetConfigPath():
   """Returns the path to the mongodb config file."""
   return '/etc/mongod.conf'
 
 
+def _Setup(vm):
+  """Setup mongodb."""
+  vm.RemoteCommand(
+      'sudo sed -i "s|bindIp|# bindIp|" {}'.format(_GetConfigPath()))
+
+
+def YumInstall(vm):
+  """Installs the mongodb package on the VM."""
+  vm.RemoteCommand('sudo setenforce 0')
+  releasever, _ = vm.RemoteCommand(
+      'distro=$(sed -n \'s/^distroverpkg=//p\' /etc/yum.conf);'
+      'echo $(rpm -q --qf "%{version}" -f /etc/$distro)')
+  mongodb_repo = (
+      '[mongodb-org-3.0]\nname=MongoDB Repository\nbaseurl='
+      'https://repo.mongodb.org/yum/redhat/{0}/mongodb-org/3.0/x86_64/'
+      '\ngpgcheck=0\nenabled=1').format(releasever.strip())
+  vm.RemoteCommand(
+      'echo "%s" | sudo tee /etc/yum.repos.d/mongodb-org-3.0.repo' %
+      mongodb_repo)
+  vm.InstallPackages('mongodb-org')
+  _Setup(vm)
+
+
+def AptInstall(vm):
+  """Installs the mongodb package on the VM."""
+  vm.RemoteCommand(
+      'wget -qO - https://www.mongodb.org/static/pgp/server-3.0.asc'
+      ' | sudo apt-key add -')
+  vm.RemoteCommand(
+      'echo "deb http://repo.mongodb.org/apt/ubuntu '
+      '$(lsb_release -c -s)/mongodb-org/3.0 multiverse" | '
+      'sudo tee /etc/apt/sources.list.d/mongodb-org-3.0.list')
+  vm.AptUpdate()
+  vm.RemoteCommand('sudo apt-get install mongodb-org -y --force-yes')
+  _Setup(vm)
+
+
+def YumUninstall(vm):
+  """Uninstalls the mongodb package on the VM."""
+  vm.RemoteCommand('sudo rm /etc/yum.repos.d/mongodb-org-3.0.repo')
+
+
+def YumGetServiceName(vm):
+  """Returns the name of the mongodb service."""
+  del vm
+  return _GetServiceName()
+
+
+def AptGetServiceName(vm):
+  """Returns the name of the mongodb service."""
+  del vm
+  return _GetServiceName()
+
+
+def YumGetPathToConfig(vm):
+  """Returns the path to the mongodb config file."""
+  del vm
+  return _GetConfigPath()
+
+
 def AptGetPathToConfig(vm):
   """Returns the path to the mongodb config file."""
-  return '/etc/mongodb.conf'
+  del vm
+  return _GetConfigPath()
