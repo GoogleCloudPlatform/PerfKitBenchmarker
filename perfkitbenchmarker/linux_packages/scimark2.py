@@ -22,7 +22,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 PATH = '{0}/scimark2'.format(INSTALL_DIR)
 
 # Download location for both the C and Java tests.
-BASE_URL = 'http://math.nist.gov/scimark2'
+BASE_URL = 'https://math.nist.gov/scimark2'
 
 # Java-specific constants.
 JAVA_JAR = 'scimark2lib.jar'
