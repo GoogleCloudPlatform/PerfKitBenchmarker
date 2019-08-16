@@ -19,6 +19,7 @@ import uuid
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 
 # TODO(ferneyhough): change to enum
 flags.DEFINE_string('managed_db_engine', None,
@@ -60,6 +61,10 @@ flags.DEFINE_boolean(
     'use_managed_db', True, 'If true, uses the managed MySql '
     'service for the requested cloud provider. If false, uses '
     'MySql installed on a VM.')
+flags.DEFINE_list(
+    'mysql_flags', '', 'Flags to apply to the implementation of '
+    'MySQL on the cloud that\'s being used. Example: '
+    'binlog_cache_size=4096,innodb_log_buffer_size=4294967295')
 
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
@@ -243,6 +248,11 @@ class BaseRelationalDb(resource.BaseResource):
       raise RelationalDbPropertyNotSet(
           'Machine type of the database must be set.')
 
+    if FLAGS.mysql_flags:
+      metadata.update({
+          'mysql_flags': FLAGS.mysql_flags,
+      })
+
     return metadata
 
   @abstractmethod
@@ -348,6 +358,14 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm.RemoteCommand(
         'mysql %s -e "FLUSH PRIVILEGES;"' %
         self.MakeMysqlConnectionString(use_localhost=True))
+
+  def _ApplyMySqlFlags(self):
+    if FLAGS.mysql_flags:
+      for flag in FLAGS.mysql_flags:
+        cmd = 'mysql %s -e \'SET %s;\'' % self.MakeMysqlConnectionString(), flag
+        _, stderr, _ = vm_util.IssueCommand(cmd)
+        if stderr:
+          raise Exception('Invalid MySQL flags: %s' % stderr)
 
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""
