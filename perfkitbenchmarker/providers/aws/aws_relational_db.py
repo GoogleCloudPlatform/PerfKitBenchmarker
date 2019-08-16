@@ -566,6 +566,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
        Exception:  If could not ready the instance after modification to
                    multi-az.
     """
+    self._ApplyMySqlFlags()
+
     if not self.is_managed_db:
       return
 
