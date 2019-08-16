@@ -18,7 +18,7 @@ from perfkitbenchmarker import errors
 
 RHEL_REPO = ('[nginx]\n'
              'name=nginx repo\n'
-             'baseurl=http://nginx.org/packages/rhel/$releasever/$basearch/\n'
+             'baseurl=https://nginx.org/packages/rhel/$releasever/$basearch/\n'
              'gpgcheck=0\n'
              'enabled=1')
 
