@@ -24,7 +24,8 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
-  vm.RemoteCommand('sudo add-apt-repository '
-                   "'deb http://archive.ubuntu.com/ubuntu trusty universe'")
+  vm.RemoteCommand(
+      'sudo add-apt-repository '
+      "'deb https://mirror.ubuntu.serverforge.org trusty universe'")
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get -y install mysql-client-5.6')
