@@ -77,6 +77,7 @@ def GetConfig(user_config):
 
 def _ConfigureNginx(server):
   content_path = '/var/www/html/random_content'
+  server.RemoteCommand('sudo mkdir -p /var/www/html')  # create folder if needed
   server.RemoteCommand('sudo dd  bs=1 count=%s if=/dev/urandom of=%s' %
                        (FLAGS.nginx_content_size, content_path))
   if FLAGS.nginx_conf:
