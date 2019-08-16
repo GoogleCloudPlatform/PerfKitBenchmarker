@@ -158,6 +158,19 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       ]
       vm_util.IssueCommand(cmd)
 
+      for flag in FLAGS.mysql_flags:
+        name_and_value = flag.split('=')
+        cmd = [
+            azure.AZURE_PATH,
+            self.GetAzCommandForEngine(), 'server', 'configuration', 'set',
+            '--name', name_and_value[0], '--resource-group',
+            self.resource_group.name, '--server', self.instance_id, '--value',
+            name_and_value[1]
+        ]
+        _, stderr, _ = vm_util.IssueCommand(cmd)
+        if stderr:
+          raise Exception('Invalid MySQL flags: %s' % stderr)
+
     else:
       raise NotImplementedError('Unknown how to create Azure data base '
                                 'engine {0}'.format(self.spec.engine))
@@ -188,6 +201,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           '3306',
           source_range=['%s/32' % self.client_vm.ip_address])
       self.unmanaged_db_exists = True
+      self._ApplyMySqlFlags()
 
   def _Delete(self):
     """Deletes the underlying resource.

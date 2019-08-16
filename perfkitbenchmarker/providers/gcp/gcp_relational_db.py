@@ -145,12 +145,23 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     _, _, _ = cmd.Issue()
 
+    if FLAGS.mysql_flags:
+      cmd_string = [
+          self, 'sql', 'instances', 'patch', self.instance_id,
+          '--database-flags=%s' % ','.join(FLAGS.mysql_flags)
+      ]
+      cmd = util.GcloudCommand(*cmd_string)
+      _, stderr, _ = cmd.Issue()
+      if stderr:
+        raise Exception('Invalid MySQL flags: %s' % stderr)
+
   def _Create(self):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere.
 
     Raises:
       UnsupportedDatabaseEngineException:
         if the database is unmanaged and the engine isn't MYSQL.
+      Exception: if an invalid MySQL flag was used.
     """
     if self.spec.engine == relational_db.MYSQL:
       self._InstallMySQLClient()
@@ -168,6 +179,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       self.firewall.AllowPort(
           self.server_vm, 3306, source_range=[self.client_vm.ip_address])
       self.unmanaged_db_exists = True
+      self._ApplyMySqlFlags()
 
   def _GetHighAvailabilityFlag(self):
     """Returns a flag that enables high-availability for the specified engine.

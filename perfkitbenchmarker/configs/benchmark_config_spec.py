@@ -597,6 +597,8 @@ class _RelationalDbSpec(spec.BaseSpec):
           'cpus': flag_values.managed_db_cpus,
           'memory': flag_values.managed_db_memory
       }
+    if flag_values['mysql_flags'].present:
+      config_values['vm_spec'][cloud]['mysql_flags'] = (flag_values.mysql_flags)
     if flag_values['managed_db_disk_size'].present:
       config_values['disk_spec'][cloud]['disk_size'] = (
           flag_values.managed_db_disk_size)
