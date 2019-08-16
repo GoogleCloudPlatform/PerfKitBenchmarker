@@ -73,7 +73,7 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
 # that runs under Cygwin.
 _CYGWIN32_URL = 'https://cygwin.com/setup-x86.exe'
 _CYGWIN64_URL = 'https://cygwin.com/setup-x86_64.exe'
-_CYGWIN_MIRROR = 'http://cygwin.mirror.constant.com'
+_CYGWIN_MIRROR = 'https://mirrors.kernel.org/sourceware/cygwin/'
 _CYGWIN_ROOT = r'%PROGRAMFILES%\cygwinx86\cygwin'
 _CYGWIN_FORMAT = (r"%s\bin\bash.exe -c 'export PATH=$PATH:/usr/bin && "
                   "{command}'" % _CYGWIN_ROOT)
