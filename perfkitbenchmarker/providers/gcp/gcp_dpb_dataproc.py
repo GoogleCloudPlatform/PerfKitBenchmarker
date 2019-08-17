@@ -155,6 +155,21 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
+  def _PostCreate(self):
+    """Get the cluster's data and tag it."""
+    cmd = util.GcloudCommand(
+        self, 'dataproc', 'clusters', 'describe', self.cluster_id)
+    stdout, _, _ = cmd.Issue()
+    config = json.loads(stdout)['config']
+    master = config['masterConfig']
+    worker = config['workerConfig']
+    for disk in master['instanceNames'] + worker['instanceNames']:
+      cmd = util.GcloudCommand(
+          self, 'compute', 'disks', 'add-labels', disk)
+      cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+      cmd.flags['zone'] = self.dpb_service_zone
+      cmd.Issue()
+
   def append_region(self, cmd):
     region = self.dpb_service_zone.rsplit('-', 1)[0]
     cmd.flags['region'] = region
