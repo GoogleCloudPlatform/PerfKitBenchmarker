@@ -75,8 +75,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
-    if self.is_managed_db:
-      self.unmanaged_db_exists = False
+    self.unmanaged_db_exists = None if self.is_managed_db else False
 
   def _GetAuthorizedNetworks(self, vms):
     """Get CIDR connections for list of VM specs that need to access the db."""
