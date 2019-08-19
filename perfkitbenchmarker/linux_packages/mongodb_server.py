@@ -55,7 +55,7 @@ def AptInstall(vm):
       'wget -qO - https://www.mongodb.org/static/pgp/server-3.0.asc'
       ' | sudo apt-key add -')
   vm.RemoteCommand(
-      'echo "deb http://repo.mongodb.org/apt/ubuntu '
+      'echo "deb https://repo.mongodb.org/apt/ubuntu '
       '$(lsb_release -c -s)/mongodb-org/3.0 multiverse" | '
       'sudo tee /etc/apt/sources.list.d/mongodb-org-3.0.list')
   vm.AptUpdate()
