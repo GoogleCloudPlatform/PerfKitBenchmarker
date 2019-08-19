@@ -60,20 +60,16 @@ gpu_pcie_bandwidth:
     default:
       vm_spec:
         GCP:
-          image: ubuntu-1604-xenial-v20161115
-          image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
           gpu_type: k80
           gpu_count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-d15a75c7
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
         Azure:
-          image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
 """
