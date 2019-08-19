@@ -289,7 +289,7 @@ def _AddCpuUtilization(samples, instance_id):
       client, project=(FLAGS.project or _GetDefaultProject()),
       metric_type='bigtable.googleapis.com/cluster/cpu_load',
       end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
-      minutes=int((end_timestamp-start_timestamp)/60))
+      minutes=int((end_timestamp - start_timestamp) / 60))
   cpu_query = cpu_query.select_resources(instance=instance_id)
   time_series = list(cpu_query)
   if not time_series:
