@@ -23,6 +23,7 @@ Compared to hbase_ycsb, this benchmark:
   * Adds netty-tcnative-boringssl, used for communication with Bigtable.
 """
 
+import datetime
 import json
 import logging
 import os
@@ -30,6 +31,7 @@ import pipes
 import posixpath
 import subprocess
 
+import numpy
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -61,6 +63,14 @@ flags.DEFINE_string(
         HBASE_CLIENT_VERSION,
         BIGTABLE_CLIENT_VERSION),
     'URL for the Bigtable-HBase client JAR.')
+flags.DEFINE_boolean('get_bigtable_cluster_cpu_utilization', False,
+                     'If true, will gather bigtable cluster cpu utilization '
+                     'for the duration of performance test run stage, and add '
+                     'it to the metadata of relevant metrics. To enable this '
+                     'functionality, need to set environment variable '
+                     'GOOGLE_APPLICATION_CREDENTIALS as described in '
+                     'https://cloud.google.com/docs/authentication/'
+                     'getting-started.')
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
 BENCHMARK_CONFIG = """
@@ -111,6 +121,9 @@ BENCHMARK_DATA_URL = {
     METRICS_CORE_JAR: DROPWIZARD_METRICS_CORE_URL,
     TCNATIVE_BORINGSSL_JAR: TCNATIVE_BORINGSSL_URL
 }
+
+# Used to get bigtable cluster cpu utilization at different percentiles.
+CPU_UTILIZATION_PERCENTILES = [80, 90, 95, 99]
 
 
 def GetConfig(user_config):
@@ -244,6 +257,67 @@ def _Install(vm):
       vm.RemoteCopy(file_path, remote_path)
 
 
+def _AddCpuUtilization(samples, instance_id):
+  """Add cpu utilization to the metadata of relevant metric samples.
+
+  Note that the utilization only covers the run stage.
+
+  Args:
+    samples: list of sample.Sample. The expected ordering is: (1) table loading
+      metrics, (2) table read/write metrics.
+    instance_id: the bigtable instance id.
+
+  Returns:
+    a list of updated sample.Sample.
+  """
+  # Check the pre-requisite
+  if (len(samples) < 2 or
+      samples[0].metadata.get('stage') != 'load' or
+      samples[-1].metadata.get('stage') != 'run'):
+    return None
+
+  # pylint: disable=g-import-not-at-top
+  from google.cloud import monitoring_v3
+  from google.cloud.monitoring_v3 import query
+
+  # Query the cpu utilization, which are gauged values at each minute in the
+  # time window.
+  client = monitoring_v3.MetricServiceClient()
+  start_timestamp = samples[0].timestamp
+  end_timestamp = samples[-1].timestamp
+  cpu_query = query.Query(
+      client, project=(FLAGS.project or _GetDefaultProject()),
+      metric_type='bigtable.googleapis.com/cluster/cpu_load',
+      end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+      minutes=int((end_timestamp-start_timestamp)/60))
+  cpu_query = cpu_query.select_resources(instance=instance_id)
+  time_series = list(cpu_query)
+  if not time_series:
+    return None
+
+  # Build the dict to be added to samples.
+  utilization_data = []
+  for cluster_number, cluster_time_series in enumerate(time_series):
+    utilization = numpy.array(
+        [point.value.double_value for point in cluster_time_series.points])
+
+    for percentile in CPU_UTILIZATION_PERCENTILES:
+      utilization_data.append(
+          {'cluster_number': cluster_number,
+           'percentile': percentile,
+           'utilization_percentage': (
+               '%.2f' % (numpy.percentile(utilization, percentile) * 100))})
+
+  additional_metadata = {'cpu_utilization': json.dumps(utilization_data)}
+
+  # Update the samples.
+  for sample in samples:
+    if sample.metadata.get('stage') == 'run':
+      sample.metadata.update(additional_metadata)
+
+  return samples
+
+
 def Prepare(benchmark_spec):
   """Prepare the virtual machines to run cloud bigtable.
 
@@ -331,6 +405,10 @@ def Run(benchmark_spec):
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
   for sample in samples:
     sample.metadata.update(metadata)
+
+  # Optionally add new samples for cluster cpu utilization.
+  if FLAGS.get_bigtable_cluster_cpu_utilization:
+    samples = _AddCpuUtilization(samples, instance_name)
 
   return samples
 
