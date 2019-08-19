@@ -61,8 +61,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     self.region = self.spec.vm_spec.zone
     self.resource_group = azure_network.GetResourceGroup(self.region)
 
-    if self.is_managed_db:
-      self.unmanaged_db_exists = False
+    self.unmanaged_db_exists = None if self.is_managed_db else False
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.

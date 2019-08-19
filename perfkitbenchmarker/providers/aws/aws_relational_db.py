@@ -116,8 +116,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     self.subnets_owned_by_db = []
     self.subnets_used_by_db = []
 
-    if self.is_managed_db:
-      self.unmanaged_db_exists = False
+    self.unmanaged_db_exists = None if self.is_managed_db else False
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
