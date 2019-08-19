@@ -31,7 +31,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('hadoop_version', '2.8.4', 'Version of hadoop.')
+flags.DEFINE_string('hadoop_version', '3.2.0', 'Version of hadoop.')
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml',
