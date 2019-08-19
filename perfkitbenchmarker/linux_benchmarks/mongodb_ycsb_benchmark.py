@@ -75,8 +75,12 @@ def _PrepareServer(vm):
   if FLAGS.mongodb_readahead_kb is not None:
     vm.SetReadAhead(FLAGS.mongodb_readahead_kb * 2,
                     [d.GetDevicePath() for d in vm.scratch_disks])
-  vm.RemoteCommand('sudo service %s restart' %
-                   vm.GetServiceName('mongodb_server'))
+
+  vm.RemoteCommand('sudo pkill mongod', ignore_failure=True)
+
+  vm.RemoteCommand(
+      'nohup sudo /usr/bin/mongod --fork --config %s &' %
+      vm.GetPathToConfig('mongodb_server'))
 
 
 def _PrepareClient(vm):
