@@ -378,7 +378,10 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       Exception: if unknown how to create self.spec.engine.
 
     """
-    if self.spec.engine in _RDS_ENGINES:
+    if self.spec.engine in [
+        relational_db.AURORA_MYSQL56, relational_db.AURORA_MYSQL,
+        relational_db.MYSQL
+    ]:
       self._InstallMySQLClient()
     if self.is_managed_db:
       self._CreateAwsSqlInstance()
