@@ -530,7 +530,10 @@ class BenchmarkSpec(object):
     if self.dpb_service:
       self.dpb_service.Create()
     if hasattr(self, 'relational_db') and self.relational_db:
-      self.relational_db.client_vm = self.vm_groups['clients'][0]
+      if 'clients' in self.vm_groups:
+        self.relational_db.client_vm = self.vm_groups['clients'][0]
+      else:
+        self.relational_db.client_vm = self.vm_groups['default'][0]
       if 'servers' in self.vm_groups:
         self.relational_db.server_vm = self.vm_groups['servers'][0]
       self.relational_db.Create()

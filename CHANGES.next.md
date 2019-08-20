@@ -518,3 +518,5 @@
 - Expose filesystem type and block size in vm metadata.
 - Fixed problem with AWS network creation in aws_dpb_emr, aws_nfs_service, and
   elastic_container_service.
+- Create the client_vm of the relational_db attribute of BenchmarkSpec from the
+  default vm_group if there's no clients group. Fixes pgbench benchmark failure.
