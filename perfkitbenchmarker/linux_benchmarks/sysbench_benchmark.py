@@ -121,7 +121,7 @@ _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
 
 
 BENCHMARK_NAME = 'sysbench'
-# TODO(user): Move or copy the server definitions into the relational_db
+# TODO(jerlawson): Move or copy the server definitions into the relational_db
 # object since that's what they're ultimately a part of.
 BENCHMARK_CONFIG = """
 sysbench:
