@@ -558,7 +558,7 @@ class BenchmarkSpec(object):
       self.spark_service.Delete()
     if self.dpb_service:
       self.dpb_service.Delete()
-    if self.relational_db:
+    if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.Delete()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
