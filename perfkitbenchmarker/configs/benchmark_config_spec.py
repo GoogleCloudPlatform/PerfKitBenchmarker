@@ -545,7 +545,7 @@ class _RelationalDbSpec(spec.BaseSpec):
     # itself.
     super(_RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
 
-    # TODO(user): Rename flags 'managed_db_' -> 'db_'.
+    # TODO(jerlawson): Rename flags 'managed_db_' -> 'db_'.
     has_db_machine_type = flag_values['managed_db_machine_type'].present
     has_db_cpus = flag_values['managed_db_cpus'].present
     has_db_memory = flag_values['managed_db_memory'].present
