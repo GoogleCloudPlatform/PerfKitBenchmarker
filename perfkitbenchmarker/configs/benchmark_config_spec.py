@@ -778,14 +778,6 @@ class _VmGroupSpec(spec.BaseSpec):
       config_values['os_type'] = flag_values.os_type
     if 'vm_count' in config_values and config_values['vm_count'] is None:
       config_values['vm_count'] = flag_values.num_vms
-    if (flag_values['use_managed_db'] and
-        flag_values['managed_db_machine_type'].present):
-      config_values['vm_spec'][flag_values.cloud][
-          'machine_type'] = flag_values.managed_db_machine_type
-    if (not flag_values['use_managed_db'] and
-        flag_values['machine_type'].present):
-      config_values['vm_spec'][
-          flag_values.cloud]['machine_type'] = flag_values.machine_type
 
 
 class _VmGroupsDecoder(option_decoders.TypeVerifier):
