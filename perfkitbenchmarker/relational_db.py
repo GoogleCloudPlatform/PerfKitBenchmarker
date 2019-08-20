@@ -286,7 +286,7 @@ class BaseRelationalDb(resource.BaseResource):
       mysql_name = 'mysql57'
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % FLAGS.managed_db_engine_version)
+                      'are supported.' % self.spec.engine_version)
     stdout, stderr = self.server_vm.RemoteCommand(
         'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
     return stdout and not stderr
@@ -305,7 +305,7 @@ class BaseRelationalDb(resource.BaseResource):
       self.client_vm.Install('mysqlclient')
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % FLAGS.managed_db_engine_version)
+                      'are supported.' % self.spec.engine_version)
 
   def _InstallMySQLServer(self):
     """Installs MySQL Server on the server vm.
@@ -328,7 +328,7 @@ class BaseRelationalDb(resource.BaseResource):
       self.server_vm.Install(mysql_name)
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % FLAGS.managed_db_engine_version)
+                      'are supported.' % self.spec.engine_version)
     self.server_vm.RemoteCommand('chmod 777 %s' %
                                  self.server_vm.GetScratchDir())
     self.server_vm.RemoteCommand('sudo service %s stop' %
