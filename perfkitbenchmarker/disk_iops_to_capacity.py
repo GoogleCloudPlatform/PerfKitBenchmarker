@@ -210,7 +210,7 @@ class DiskIOPSToCapacity(object):
       value = self._iops
       value = numpy.array(value)
       self._size = int(
-          numpy.piecewise(value, [[value <= 100], [(value > 100) & (
+          numpy.piecewise([value], [[value <= 100], [(value > 100) & (
               value <= 9999)], [value > 9999]], [
                   lambda x: int(math.ceil(1.07374)),
                   lambda x: int(math.ceil(3 * value)),
@@ -239,7 +239,7 @@ class DiskIOPSToCapacity(object):
     if self._provider == GCP:
       value = self._iops
       self._cpu_count = int(
-          numpy.piecewise(value, [[value <= 15000], [
+          numpy.piecewise([value], [[value <= 15000], [
               (value > 15000) & (value <= 25000)
           ], [value > 25000]], [lambda x: 1, lambda x: 16, lambda x: 32]))
     elif self._provider == AWS:
