@@ -55,7 +55,8 @@ class S3Service(object_storage_service.ObjectStorageService):
     vm_util.IssueCommand(
         ['aws', 's3api', 'put-bucket-tagging',
          '--bucket', bucket_name,
-         '--tagging', 'TagSet=[%s]' % tag_set])
+         '--tagging', 'TagSet=[%s]' % tag_set,
+         '--region=%s' % self.region])
 
   def Copy(self, src_url, dst_url):
     """See base class."""
