@@ -126,7 +126,9 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--no-enable-autoupgrade')
 
     user = util.GetDefaultUser()
-    if 'gserviceaccount.com' in user:
+    if FLAGS.gcp_service_account:
+      cmd.flags['service-account'] = FLAGS.gcp_service_account
+    elif 'gserviceaccount.com' in user:
       cmd.flags['service-account'] = user
       self.use_application_default_credentials = False
     else:
@@ -212,11 +214,11 @@ class GkeCluster(container_service.KubernetesCluster):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'delete', self.name)
-    cmd.Issue()
+    cmd.Issue(timeout=450)
 
   def _Exists(self):
     """Returns True if the cluster exits."""
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'describe', self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return retcode == 0

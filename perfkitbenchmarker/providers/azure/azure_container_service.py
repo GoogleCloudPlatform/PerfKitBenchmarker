@@ -178,7 +178,7 @@ class AksCluster(container_service.KubernetesCluster):
                                          raise_on_failure=False)
     if retcode:
       return False
-    # POD creation will fail until the default service account in created.
+    # POD creation will fail until the default service account is created.
     get_cmd = [
         FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'get', 'serviceAccounts'

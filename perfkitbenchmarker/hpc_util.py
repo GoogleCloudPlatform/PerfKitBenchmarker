@@ -33,7 +33,7 @@ def CreateMachineFile(vms, num_slots=lambda vm: vm.NumCpusForBenchmark(),
       for each vm. Defaults to vm.NumCpusForBenchmark()
     remote_path: remote path of the machine file. Defaults to MACHINEFILE
   """
-  with vm_util.NamedTemporaryFile() as machine_file:
+  with vm_util.NamedTemporaryFile(mode='w') as machine_file:
     master_vm = vms[0]
     machine_file.write('localhost slots=%d\n' % num_slots(master_vm))
     for vm in vms[1:]:

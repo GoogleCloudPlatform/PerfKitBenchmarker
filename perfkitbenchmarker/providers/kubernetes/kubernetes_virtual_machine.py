@@ -112,9 +112,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
                         '--ceph_monitors flag.')
 
   def _CreatePod(self):
-    """
-    Creates a POD (Docker container with optional volumes).
-    """
+    """Creates a POD (Docker container with optional volumes)."""
     create_rc_body = self._BuildPodBody()
     logging.info('About to create a pod with the following configuration:')
     logging.info(create_rc_body)
@@ -123,7 +121,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPodBootCompletion(self):
     """
-    Need to wait for the PODs to get up  - PODs are created with a little delay.
+    Need to wait for the PODs to get up - PODs are created with a little delay.
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
@@ -153,7 +151,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """POD should have been already created but this is a double check."""
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
-    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    pod_info, _, _ = vm_util.IssueCommand(
+        exists_cmd, suppress_warning=True, raise_on_failure=False)
     if pod_info:
       return True
     return False
@@ -415,6 +414,9 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
 
+    # Needed for the MKL math library.
+    self.InstallPackages('cpio')
+
     # Don't assume the relevant CLI is installed in the Kubernetes environment.
     if FLAGS.container_cluster_cloud == 'GCP':
       self.InstallGcloudCli()
@@ -437,6 +439,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
   def InstallGcloudCli(self):
     """Installs the Gcloud CLI; used for downloading preprovisioned data."""
     self.InstallPackages('curl')
+    # The driver /usr/lib/apt/methods/https is sometimes needed for apt-get.
+    self.InstallPackages('apt-transport-https')
     self.RemoteCommand('echo "deb https://packages.cloud.google.com/apt '
                        'cloud-sdk-$(lsb_release -c -s) main" | sudo tee -a '
                        '/etc/apt/sources.list.d/google-cloud-sdk.list')
