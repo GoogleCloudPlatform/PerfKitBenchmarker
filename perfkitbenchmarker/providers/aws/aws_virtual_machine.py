@@ -330,10 +330,16 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(AwsVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'use_spot_instance': (option_decoders.BooleanDecoder,
-                              {'default': False}),
-        'spot_price': (option_decoders.FloatDecoder, {'default': None}),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None})})
+        'use_spot_instance': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'spot_price': (option_decoders.FloatDecoder, {
+            'default': None
+        }),
+        'boot_disk_size': (option_decoders.IntDecoder, {
+            'default': None
+        })
+    })
 
     return result
 
@@ -867,6 +873,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns: Early termination code.
     """
     return self.spot_status_code
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(AwsVirtualMachine, self).GetResourceMetadata()
+    result['boot_disk_type'] = self.DEFAULT_ROOT_DISK_TYPE
+    result['boot_disk_size'] = self.boot_disk_size or 'default'
+    return result
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,

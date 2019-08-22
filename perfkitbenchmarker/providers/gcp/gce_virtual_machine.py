@@ -374,8 +374,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.backfill_image = False
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
-    self.boot_disk_size = vm_spec.boot_disk_size
-    self.boot_disk_type = vm_spec.boot_disk_type
+    self.boot_disk_size = vm_spec.boot_disk_size or self.BOOT_DISK_SIZE_GB
+    self.boot_disk_type = vm_spec.boot_disk_type or self.BOOT_DISK_TYPE
     self.id = None
     self.node_type = vm_spec.node_type
     self.node_group = None
@@ -420,8 +420,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
     cmd.flags['boot-disk-auto-delete'] = True
-    cmd.flags['boot-disk-size'] = self.boot_disk_size or self.BOOT_DISK_SIZE_GB
-    cmd.flags['boot-disk-type'] = self.boot_disk_type or self.BOOT_DISK_TYPE
+    cmd.flags['boot-disk-size'] = self.boot_disk_size
+    cmd.flags['boot-disk-type'] = self.boot_disk_type
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
@@ -713,6 +713,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['gce_network_tier'] = self.gce_network_tier
     result[
         'gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
+    result['boot_disk_type'] = self.boot_disk_type
+    result['boot_disk_size'] = self.boot_disk_size
     return result
 
   def SimulateMaintenanceEvent(self):

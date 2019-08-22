@@ -69,6 +69,8 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     tier: None or string. performance tier of the machine.
     compute_units: int.  number of compute units for the machine.
     accelerated_networking: boolean. True if supports accelerated_networking.
+    boot_disk_size: None or int. The size of the boot disk in GB.
+    boot_disk_type: string or None. The type of the boot disk.
   """
 
   CLOUD = providers.AZURE
@@ -114,10 +116,17 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(AzureVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'machine_type': (custom_virtual_machine_spec.AzureMachineTypeDecoder,
-                         {}),
-        'accelerated_networking': (
-            option_decoders.BooleanDecoder, {'default': False}),
+        'machine_type':
+            (custom_virtual_machine_spec.AzureMachineTypeDecoder, {}),
+        'accelerated_networking': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'boot_disk_size': (option_decoders.IntDecoder, {
+            'default': None
+        }),
+        'boot_disk_type': (option_decoders.StringDecoder, {
+            'default': None
+        }),
     })
     return result
 
@@ -265,6 +274,10 @@ class AzureVirtualMachine(
     self.image = vm_spec.image or self.IMAGE_URN
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
+    disk_spec.disk_type = (
+        vm_spec.boot_disk_type or self.storage_account.storage_type)
+    if vm_spec.boot_disk_size:
+      disk_spec.disk_size = vm_spec.boot_disk_size
     self.os_disk = azure_disk.AzureDisk(disk_spec,
                                         self.name,
                                         self.machine_type,
@@ -278,17 +291,16 @@ class AzureVirtualMachine(
     self.nic.Create()
 
   def _Create(self):
-    create_cmd = (
-        [azure.AZURE_PATH, 'vm', 'create',
-         '--location', self.zone,
-         '--image', self.image,
-         '--size', self.machine_type,
-         '--admin-username', self.user_name,
-         '--availability-set', self.network.avail_set.name,
-         '--storage-sku', self.storage_account.storage_type,
-         '--name', self.name] +
-        self.resource_group.args +
-        self.nic.args)
+    if self.os_disk.disk_size:
+      disk_size_args = ['--os-disk-size-gb', str(self.os_disk.disk_size)]
+    else:
+      disk_size_args = []
+    create_cmd = ([
+        azure.AZURE_PATH, 'vm', 'create', '--location', self.zone, '--image',
+        self.image, '--size', self.machine_type, '--admin-username',
+        self.user_name, '--availability-set', self.network.avail_set.name,
+        '--storage-sku', self.os_disk.disk_type, '--name', self.name
+    ] + disk_size_args + self.resource_group.args + self.nic.args)
 
     if self.password:
       create_cmd.extend(['--admin-password', self.password])
@@ -419,6 +431,8 @@ class AzureVirtualMachine(
   def GetResourceMetadata(self):
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
+    result['boot_disk_type'] = self.os_disk.disk_type
+    result['boot_disk_size'] = self.os_disk.disk_size or 'default'
     return result
 
 
