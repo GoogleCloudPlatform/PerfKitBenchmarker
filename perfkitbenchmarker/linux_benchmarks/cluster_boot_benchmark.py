@@ -29,7 +29,18 @@ cluster_boot:
       Specify the cluster size with --num_vms.
   vm_groups:
     default:
-      vm_spec: *default_dual_core
+      vm_spec:
+        AWS:
+          machine_type: m5.large
+          zone: us-east-1
+        Azure:
+          machine_type: Standard_D2s_v3
+          zone: eastus
+          boot_disk_type: StandardSSD_LRS
+        GCP:
+          machine_type: n1-standard-2
+          zone: us-central1-a
+          boot_disk_type: pd-ssd
       vm_count: null
 """
 
