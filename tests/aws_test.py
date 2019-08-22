@@ -196,7 +196,7 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
         (json.dumps(exists_response_no_resources), '')
     ]
     subnet.Delete()
-    mock_cmd.assert_called_with(delete_cmd)
+    mock_cmd.assert_called_with(delete_cmd, raise_on_failure=False)
     util.IssueRetryableCommand.assert_called_with(describe_cmd)
 
   @mock.patch.object(vm_util, 'IssueCommand')
