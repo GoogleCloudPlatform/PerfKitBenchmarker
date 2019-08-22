@@ -574,5 +574,6 @@ class AwsKopsCluster(container_service.KubernetesCluster):
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     _, _, retcode = vm_util.IssueCommand(validate_cmd, env=env,
-                                         suppress_warning=True)
+                                         suppress_warning=True,
+                                         raise_on_failure=False)
     return not retcode

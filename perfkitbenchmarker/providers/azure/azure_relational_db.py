@@ -166,7 +166,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
             self.resource_group.name, '--server', self.instance_id, '--value',
             name_and_value[1]
         ]
-        _, stderr, _ = vm_util.IssueCommand(cmd)
+        _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
 
@@ -326,7 +326,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--resource-group', self.resource_group.name,
         '--name', self.instance_id
     ]
-    stdout, _, retcode = vm_util.IssueCommand(cmd)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return None
     json_output = json.loads(stdout)

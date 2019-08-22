@@ -339,7 +339,7 @@ class AwsEfsCommandsTest(BaseTest):
   def assertCalled(self, *args):
     cmd = ['aws', '--output', 'json', '--region', _AWS_REGION,
            'efs'] + list(args)
-    self.issue_cmd.assert_called_with(cmd)
+    self.issue_cmd.assert_called_with(cmd, raise_on_failure=False)
 
   def testCreateFiler(self):
     self._SetResponse(_FILER.create)

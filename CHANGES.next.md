@@ -26,6 +26,10 @@
 - multichase_taskset_options flag changed to multichase_numactl_options.
 - Deprecated CUDA version 8.
 - Remove support for supplying CUDNN package path via the 'cudnn' flag.
+- Raise IssueCommandError by default when vm_util.IssueCommand return code is
+  non-zero.  Previous behavior can be emulated by setting
+  `raise_on_failure=False`.
+
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.

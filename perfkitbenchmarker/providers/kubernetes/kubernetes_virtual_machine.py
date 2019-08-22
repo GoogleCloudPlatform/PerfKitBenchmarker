@@ -346,7 +346,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
            self.name, '--', '/bin/bash', '-c', command]
     stdout, stderr, retcode = vm_util.IssueCommand(
         cmd, force_info_log=should_log,
-        suppress_warning=suppress_warning, timeout=timeout)
+        suppress_warning=suppress_warning, timeout=timeout,
+        raise_on_failure=False)
     if not ignore_failure and retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
@@ -388,7 +389,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
     cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
            'cp', src_spec, dest_spec]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'STDOUT: %sSTDERR: %s' %

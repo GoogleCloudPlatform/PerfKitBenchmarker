@@ -190,7 +190,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
       logging.info('adding to --attribute definitions')
       cmd.append('--global-secondary-indexes')
       cmd.append(self.gsi_indexes[0])
-    _, stderror, retcode = vm_util.IssueCommand(cmd)
+    _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       logging.warn('Failed to create table! {0}'.format(stderror))
 
@@ -224,7 +224,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
         'describe-table',
         '--region', self.region,
         '--table-name', self.table_name]
-    _, _, retcode = vm_util.IssueCommand(cmd)
+    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return False
     else:
@@ -237,7 +237,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
         'describe-table',
         '--region', self.region,
         '--table-name', self.table_name]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       logging.info(
           'Could not find table {0}, {1}'.format(self.table_name, stderr))

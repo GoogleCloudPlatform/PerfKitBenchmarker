@@ -114,7 +114,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         azure.AZURE_PATH, 'redis', 'show',
         '--resource-group', self.resource_group.name,
         '--name', self.name,
-    ])
+    ], raise_on_failure=False)
     return stdout, stderr, retcode
 
   def _Exists(self):
@@ -164,7 +164,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         azure.AZURE_PATH, 'redis', 'list-keys',
         '--resource-group', self.resource_group.name,
         '--name', self.name,
-    ])
+    ], raise_on_failure=False)
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s.', self.name)

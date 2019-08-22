@@ -170,7 +170,7 @@ class _EksWorkers(resource.BaseResource):
         'cloudformation', 'wait', 'stack-create-complete',
         '--stack-name', self.name,
     ]
-    _, _, retcode = vm_util.IssueCommand(wait_cmd)
+    _, _, retcode = vm_util.IssueCommand(wait_cmd, raise_on_failure=False)
     return retcode == 0
 
   def _IsDeleting(self):

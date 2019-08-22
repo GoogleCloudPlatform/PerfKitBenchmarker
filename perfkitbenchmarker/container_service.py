@@ -342,7 +342,8 @@ class BaseContainerRegistry(resource.BaseResource):
     full_image = self.GetFullRegistryTag(image)
     if not FLAGS.force_container_build:
       inspect_cmd = ['docker', 'image', 'inspect', full_image]
-      _, _, retcode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
+      _, _, retcode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True,
+                                           raise_on_failure=False)
       if retcode == 0:
         return full_image
     self._Build(image)

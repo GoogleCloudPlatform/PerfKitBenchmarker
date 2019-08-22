@@ -98,7 +98,7 @@ class RedshiftTestCase(pkb_common_test_case.PkbCommonTestCase):
           'fake_redshift_cluster_parameter_group',
           '--cluster-subnet-group-name', 'fake_redshift_cluster_subnet_group',
           '--publicly-accessible', '--automated-snapshot-retention-period=0'
-      ])
+      ], raise_on_failure=False)
 
   def testMultiNodeClusterCreation(self):
     kwargs = copy.copy(BASE_REDSHIFT_SPEC)
@@ -124,7 +124,7 @@ class RedshiftTestCase(pkb_common_test_case.PkbCommonTestCase):
           'fake_redshift_cluster_parameter_group',
           '--cluster-subnet-group-name', 'fake_redshift_cluster_subnet_group',
           '--publicly-accessible', '--automated-snapshot-retention-period=0'
-      ])
+      ], raise_on_failure=False)
 
 
 if __name__ == '__main__':

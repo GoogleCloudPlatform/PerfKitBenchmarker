@@ -42,7 +42,8 @@ def DoctlAndParse(arg_list):
   stdout, _, retcode = vm_util.IssueCommand(
       ['doctl'] +
       [str(arg) for arg in arg_list] +
-      ['--output=json'])
+      ['--output=json'],
+      raise_on_failure=False)
 
   # In case of error, doctl sometimes prints "null" before printing a
   # JSON error string to stdout. TODO(noahl): improve parsing of

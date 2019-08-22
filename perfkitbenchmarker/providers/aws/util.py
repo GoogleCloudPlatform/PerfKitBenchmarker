@@ -203,7 +203,8 @@ def IssueRetryableCommand(cmd, env=None):
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
-  stdout, stderr, retcode = vm_util.IssueCommand(cmd, env=env)
+  stdout, stderr, retcode = vm_util.IssueCommand(cmd, env=env,
+                                                 raise_on_failure=False)
   if retcode:
     raise errors.VmUtil.CalledProcessException(
         'Command returned a non-zero exit code.\n')
