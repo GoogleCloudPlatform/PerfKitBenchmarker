@@ -149,7 +149,7 @@ class AzureSmbService(smb_service.BaseSmbService):
     if verb == 'create':
       cmd += ['--quota', str(FLAGS.data_disk_size)]
     cmd += self.connection_args
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
       raise errors.Error('Error running command %s : %s' % (verb, stderr))
     return json.loads(stdout)

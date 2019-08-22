@@ -78,7 +78,7 @@ class GceFirewallRule(resource.BaseResource):
     """Returns True if the Firewall Rule exists."""
     cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'describe',
                              self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return not retcode
 
 

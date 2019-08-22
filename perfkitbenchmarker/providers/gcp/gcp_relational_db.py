@@ -270,11 +270,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                                self.replica_instance_id, '--quiet')
-      cmd.Issue()
+      cmd.Issue(raise_on_failure=False)
 
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                              self.instance_id, '--quiet')
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the underlying resource exists.
@@ -287,7 +287,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       return self.unmanaged_db_exists
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    stdout, _, _ = cmd.Issue()
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
     try:
       json_output = json.loads(stdout)
       return json_output['kind'] == 'sql#instance'
@@ -303,7 +303,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       if (datetime.datetime.now() - start_time).seconds > timeout:
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
-      stdout, _, _ = cmd.Issue(suppress_warning=True)
+      stdout, _, _ = cmd.Issue(suppress_warning=True, raise_on_failure=False)
 
       try:
         json_output = json.loads(stdout)

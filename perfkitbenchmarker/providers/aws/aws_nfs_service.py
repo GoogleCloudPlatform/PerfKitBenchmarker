@@ -220,7 +220,7 @@ class AwsEfsCommands(object):
   def DeleteFiler(self, file_system_id):
     args = self.efs_prefix + [
         'delete-file-system', '--file-system-id', file_system_id]
-    _, stderr, retcode = vm_util.IssueCommand(args)
+    _, stderr, retcode = vm_util.IssueCommand(args, raise_on_failure=False)
     if retcode and 'FileSystemInUse' in stderr:
       raise Exception('Mount Point hasn\'t finished deleting.')
 
@@ -251,7 +251,7 @@ class AwsEfsCommands(object):
 
   def _IssueAwsCommand(self, args, return_json=True):
     args = self.efs_prefix + [str(arg) for arg in args]
-    stdout, _, retcode = vm_util.IssueCommand(args)
+    stdout, _, retcode = vm_util.IssueCommand(args, raise_on_failure=False)
     if retcode:
       return None
     return json.loads(stdout) if return_json else stdout

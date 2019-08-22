@@ -174,7 +174,8 @@ class AksCluster(container_service.KubernetesCluster):
         '--file', FLAGS.kubeconfig,
     ] + self.resource_group.args, suppress_warning=True)
     version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, suppress_warning=True)
+    _, _, retcode = vm_util.IssueCommand(version_cmd, suppress_warning=True,
+                                         raise_on_failure=False)
     if retcode:
       return False
     # POD creation will fail until the default service account in created.

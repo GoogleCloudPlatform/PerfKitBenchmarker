@@ -363,7 +363,7 @@ class BaseRelationalDb(resource.BaseResource):
     if FLAGS.mysql_flags:
       for flag in FLAGS.mysql_flags:
         cmd = 'mysql %s -e \'SET %s;\'' % self.MakeMysqlConnectionString(), flag
-        _, stderr, _ = vm_util.IssueCommand(cmd)
+        _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
 

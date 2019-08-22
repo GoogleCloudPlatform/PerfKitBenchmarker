@@ -134,7 +134,8 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           '--end-date-type=limited',
           '--end-date=%s' % end_date,
       ]
-      stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+      stdout, stderr, retcode = vm_util.IssueCommand(cmd,
+                                                     raise_on_failure=False)
       if retcode:
         logging.info('Unable to create CapacityReservation in %s. '
                      'This may be retried. Details: %s', zone, stderr)
@@ -165,7 +166,7 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
         '--capacity-reservation-id=%s' % self.capacity_reservation_id,
         '--region=%s' % self.region,
     ]
-    stdout, _, retcode = vm_util.IssueCommand(cmd)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return False
 

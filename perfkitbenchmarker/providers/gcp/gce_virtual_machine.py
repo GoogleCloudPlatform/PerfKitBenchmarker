@@ -276,7 +276,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
                              'node-groups', 'create', self.name)
     cmd.flags['node-template'] = self.node_template.name
     cmd.flags['target-size'] = 1
-    _, stderr, retcode = cmd.Issue()
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _CreateDependencies(self):
@@ -493,7 +493,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.close()
       create_cmd = self._GenerateCreateCommand(tf.name)
-      _, stderr, retcode = create_cmd.Issue(timeout=_GCE_VM_CREATE_TIMEOUT)
+      _, stderr, retcode = create_cmd.Issue(timeout=_GCE_VM_CREATE_TIMEOUT,
+                                            raise_on_failure=False)
 
     if (self.use_dedicated_host and retcode and
         _INSUFFICIENT_HOST_CAPACITY in stderr and not self.num_vms_per_host):
@@ -595,7 +596,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Returns true if the VM exists."""
     getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
                                          'describe', self.name)
-    stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True)
+    stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True,
+                                         raise_on_failure=False)
     try:
       response = json.loads(stdout)
     except ValueError:

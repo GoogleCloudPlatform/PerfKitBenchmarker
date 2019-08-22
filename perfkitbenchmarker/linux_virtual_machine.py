@@ -641,7 +641,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     else:
       scp_cmd.extend([remote_location, file_path])
 
-    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd, timeout=None)
+    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd, timeout=None,
+                                                   raise_on_failure=False)
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
@@ -737,7 +738,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         stdout, stderr, retcode = vm_util.IssueCommand(
             ssh_cmd, force_info_log=should_log,
             suppress_warning=suppress_warning,
-            timeout=timeout)
+            timeout=timeout, raise_on_failure=False)
         if retcode != 255:  # Retry on 255 because this indicates an SSH failure
           break
     finally:

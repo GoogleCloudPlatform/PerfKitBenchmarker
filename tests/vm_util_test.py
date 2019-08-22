@@ -132,7 +132,8 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch('threading.Timer', new=WaitUntilSleepTimer)
   def testTimeoutReached(self):
-    _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=1)
+    _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=1,
+                                         raise_on_failure=False)
     self.assertEqual(retcode, -9)
     self.assertFalse(HaveSleepSubprocess())
 
