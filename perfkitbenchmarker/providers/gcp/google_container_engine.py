@@ -214,7 +214,7 @@ class GkeCluster(container_service.KubernetesCluster):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'delete', self.name)
-    cmd.Issue(timeout=450)
+    cmd.Issue(timeout=450, raise_on_failure=False)
 
   def _Exists(self):
     """Returns True if the cluster exits."""
