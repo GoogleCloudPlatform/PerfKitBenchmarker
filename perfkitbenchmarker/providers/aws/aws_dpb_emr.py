@@ -36,8 +36,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('dpb_emr_release_label', 'emr-5.23.0',
                     'The emr version to use for the cluster.')
 
-SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
-                         'spark-examples.jar')
+SPARK_SAMPLE_LOCATION = '/usr/lib/spark/lib/spark-examples.jar'
 
 INVALID_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
 READY_CHECK_SLEEP = 30

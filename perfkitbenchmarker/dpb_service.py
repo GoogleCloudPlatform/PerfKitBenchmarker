@@ -129,8 +129,8 @@ class BaseDpbService(resource.BaseResource):
 
   @abc.abstractmethod
   def SubmitJob(self,
-                job_jar,
-                class_name,
+                jarfile,
+                classname,
                 pyspark_file=None,
                 query_file=None,
                 job_poll_interval=None,
@@ -140,8 +140,8 @@ class BaseDpbService(resource.BaseResource):
     """Submit a data processing job to the backend.
 
     Args:
-      job_jar: Jar file to execute.
-      class_name: Name of the main class.
+      jarfile: Jar file to execute.
+      classname: Name of the main class.
       pyspark_file: Comma separated list of Python files to be provided to the
         job. Must be one of the following file formats ".py, .zip, or .egg".
       query_file: HCFS URI of file containing Spark SQL script to execute as the
@@ -150,8 +150,8 @@ class BaseDpbService(resource.BaseResource):
         Not used by providers for which submit job is a synchronous operation.
       job_stdout_file: String giving the location of the file in which to put
         the standard out of the job.
-      job_arguments: Arguments to pass to class_name.  These are not the
-        arguments passed to the wrapper that submits the job.
+      job_arguments: List of string arguments to pass to classname. These are
+       not the arguments passed to the wrapper that submits the job.
       job_type: Spark or Hadoop job
 
     Returns:
@@ -317,5 +317,31 @@ class BaseDpbService(resource.BaseResource):
         job_arguments=validate_args,
         job_stdout_file=None,
         job_type=validate_job_category)
+    end_time = datetime.datetime.now()
+    return self._ProcessWallTime(start_time, end_time), stats
+
+  def SubmitSparkJob(self, spark_application_jar, spark_application_classname,
+                     spark_application_args):
+    """Submit a SparkJob to the service instance, returning performance stats.
+
+    Args:
+      spark_application_jar: String path to the spark application executable
+       that containing workload implementation.
+      spark_application_classname: Classname of the spark job's implementation
+       in the spark_application_jar file.
+      spark_application_args: Arguments to pass to spark application. These are
+       not the arguments passed to the wrapper that submits the job.
+
+    Returns:
+      Wall time for executing the Spark application.
+      The statistics from running the Validate job.
+    """
+    start_time = datetime.datetime.now()
+    stats = self.SubmitJob(
+        jarfile=spark_application_jar,
+        job_type='spark',
+        classname=spark_application_classname,
+        job_arguments=spark_application_args
+    )
     end_time = datetime.datetime.now()
     return self._ProcessWallTime(start_time, end_time), stats
