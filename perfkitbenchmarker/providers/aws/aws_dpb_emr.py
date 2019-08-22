@@ -149,8 +149,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
           {'VolumeSpecification': {
               'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
               'VolumeType': self.spec.worker_group.disk_spec.disk_type},
-              'VolumesPerInstance':
-                  self.spec.worker_group.disk_spec.num_striped_disks}]}
+           'VolumesPerInstance':
+               self.spec.worker_group.disk_spec.num_striped_disks}]}
       self.dpb_hdfs_type = disk_to_hdfs_map[
           self.spec.worker_group.disk_spec.disk_type]
 
@@ -260,8 +260,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              'describe-cluster',
                              '--cluster-id',
                              self.cluster_id]
-    stdout, _, rc = vm_util.IssueCommand(cmd)
-    if rc != 0:
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
       return False
     result = json.loads(stdout)
     if result['Cluster']['Status']['State'] in INVALID_STATES:
@@ -275,11 +275,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     cmd = self.cmd_prefix + ['emr',
                              'describe-cluster', '--cluster-id',
                              self.cluster_id]
-    stdout, _, rc = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     # TODO(saksena): Handle error outcomees when spinning up emr clusters
     return result['Cluster']['Status']['State'] == READY_STATE
-
 
   def _IsStepDone(self, step_id):
     """Determine whether the step is done.
@@ -373,7 +372,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def CreateBucket(self, source_bucket):
     mb_cmd = self.cmd_prefix + ['s3', 'mb', '{}{}'.format(
         self.PERSISTENT_FS_PREFIX, source_bucket)]
-    stdout, _, _ = vm_util.IssueCommand(mb_cmd)
+    _, _, _ = vm_util.IssueCommand(mb_cmd)
 
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):
@@ -464,7 +463,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     else:
       return {dpb_service.SUCCESS: True}
 
-
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
     @vm_util.Retry(timeout=EMR_TIMEOUT,
@@ -533,8 +531,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     jar_spec = GENERATE_HADOOP_JAR
 
     # How will we handle a class name ????
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec
-                 ]
+    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
     step_list.append('Args=' + arg_spec)
     step_string = ','.join(step_list)
 
