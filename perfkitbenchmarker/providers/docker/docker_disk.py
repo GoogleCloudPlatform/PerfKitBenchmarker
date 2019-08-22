@@ -59,11 +59,11 @@ class DockerDisk(disk.BaseDisk):
 
   def _Create(self):
     cmd = ['docker', 'volume', 'create', self.volume_name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Delete(self):
     cmd = ['docker', 'volume', 'rm', self.volume_name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def AttachVolumeInfo(self, volume_mounts):
     pass
