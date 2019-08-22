@@ -99,9 +99,10 @@ class AzureResourceGroup(resource.BaseResource):
       return False
 
   def _Delete(self):
+    # Ignore delete failures (potentially already deleted)
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
-        timeout=600)
+        timeout=600, raise_on_failure=False)
 
   def AddTag(self, key, value):
     """Add a single tag to an existing Resource Group.
@@ -115,7 +116,7 @@ class AzureResourceGroup(resource.BaseResource):
     """
     _, _, retcode = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
-         '--set', 'tags.' + util.FormatTag(key, value)])
+         '--set', 'tags.' + util.FormatTag(key, value)], raise_on_failure=False)
     if retcode:
       raise errors.resource.CreationError('Error tagging Azure resource group.')
 
