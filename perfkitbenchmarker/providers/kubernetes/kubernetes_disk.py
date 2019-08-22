@@ -162,12 +162,12 @@ class CephDisk(KubernetesDisk):
     """Creates Rados Block Device volumes and installs filesystem on them."""
     cmd = ['rbd', '-p', FLAGS.rbd_pool, 'create', self.name, '--size',
            str(1024 * self.disk_size)]
-    output = vm_util.IssueCommand(cmd)
+    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if output[EXIT_CODE] != 0:
       raise Exception('Creating RBD image failed: %s' % output[STDERR])
 
     cmd = ['rbd', 'map', FLAGS.rbd_pool + '/' + self.name]
-    output = vm_util.IssueCommand(cmd)
+    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if output[EXIT_CODE] != 0:
       raise Exception('Mapping RBD image failed: %s' % output[STDERR])
     rbd_device = output[STDOUT].rstrip()
@@ -175,7 +175,7 @@ class CephDisk(KubernetesDisk):
       # Sometimes 'rbd map' command doesn't return any output.
       # Trying to find device location another way.
       cmd = ['rbd', 'showmapped']
-      output = vm_util.IssueCommand(cmd)
+      output = vm_util.IssueCommand(cmd, raise_on_failure=False)
       for image_device in output[STDOUT].split('\n'):
         if self.name in image_device:
           pattern = re.compile('/dev/rbd.*')
@@ -184,19 +184,19 @@ class CephDisk(KubernetesDisk):
           break
 
     cmd = ['/sbin/mkfs.ext4', rbd_device]
-    output = vm_util.IssueCommand(cmd)
+    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if output[EXIT_CODE] != 0:
       raise Exception('Formatting partition failed: %s' % output[STDERR])
 
     cmd = ['rbd', 'unmap', rbd_device]
-    output = vm_util.IssueCommand(cmd)
+    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if output[EXIT_CODE] != 0:
       raise Exception('Unmapping block device failed: %s' % output[STDERR])
 
   def _Delete(self):
     """Deletes RBD image."""
     cmd = ['rbd', 'rm', FLAGS.rbd_pool + '/' + self.name]
-    output = vm_util.IssueCommand(cmd)
+    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if output[EXIT_CODE] != 0:
       msg = 'Removing RBD image failed. Reattempting.'
       logging.warning(msg)
@@ -239,7 +239,8 @@ class PersistentVolumeClaim(resource.BaseResource):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pvc', '-o=json', self.name]
     logging.info('Waiting for PVC %s', self.name)
-    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
+                                          raise_on_failure=False)
     if pvc_info:
       pvc_info = json.loads(pvc_info)
       pvc = pvc_info['status']['phase']
@@ -304,7 +305,8 @@ class StorageClass(resource.BaseResource):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'sc', '-o=json', self.name]
 
-    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
+                                         raise_on_failure=False)
     if sc_info:
       sc_info = json.loads(sc_info)
       sc_name = sc_info['metadata']['name']

@@ -58,7 +58,7 @@ class AliDisk(disk.BaseDisk):
         '--Size %s' % self.disk_size,
         '--DiskCategory %s' % DISK_TYPE[self.disk_type]]
     create_cmd = util.GetEncodedCmd(create_cmd)
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
     response = json.loads(stdout)
     self.id = response['DiskId']
 
@@ -72,7 +72,7 @@ class AliDisk(disk.BaseDisk):
     logging.info('Deleting AliCloud disk %s. This may fail if the disk is not '
                  'yet detached, but will be retried.', self.id)
     delete_cmd = util.GetEncodedCmd(delete_cmd)
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def Attach(self, vm):
     """Attaches the disk to a VM.

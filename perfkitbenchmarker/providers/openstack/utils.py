@@ -90,6 +90,8 @@ class OpenStackCLICommand(object):
     Returns:
       A tuple of stdout, stderr, and retcode from running the openstack command.
     """
+    if 'raise_on_failure' not in kwargs:
+      kwargs['raise_on_failure'] = False
     return vm_util.IssueCommand(self._GetCommand(), **kwargs)
 
   def IssueRetryable(self, **kwargs):
