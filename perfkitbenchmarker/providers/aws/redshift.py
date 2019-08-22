@@ -168,7 +168,7 @@ class Redshift(edw_service.EdwService):
     ]
 
     cmd = self.cmd_prefix + prefix + worker_count_cmd + postfix
-    stdout, stderr, _ = vm_util.IssueCommand(cmd)
+    stdout, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if not stdout:
       raise errors.Resource.CreationError('Cluster creation failure: '
                                           '{}'.format(stderr))

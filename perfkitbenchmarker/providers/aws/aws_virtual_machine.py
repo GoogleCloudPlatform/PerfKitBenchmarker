@@ -646,7 +646,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       instance_market_options['SpotOptions'] = spot_options
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options))
-    _, stderr, retcode = vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(create_cmd,
+                                              raise_on_failure=False)
 
     machine_type_prefix = self.machine_type.split('.')[0]
     host_arch = _MACHINE_TYPE_PREFIX_TO_HOST_ARCH.get(machine_type_prefix)

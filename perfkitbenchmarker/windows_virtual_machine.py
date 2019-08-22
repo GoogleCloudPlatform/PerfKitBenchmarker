@@ -345,7 +345,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
         '--port', str(self.smb_port),
         '--command', smb_command
     ]
-    stdout, stderr, retcode = vm_util.IssueCommand(smb_copy)
+    stdout, stderr, retcode = vm_util.IssueCommand(smb_copy,
+                                                   raise_on_failure=False)
     if retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'STDOUT: %sSTDERR: %s' %
@@ -393,7 +394,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
                     copy_item, delete_connection])
 
     stdout, stderr, retcode = vm_util.IssueCommand(
-        ['powershell', '-Command', cmd], timeout=None)
+        ['powershell', '-Command', cmd], timeout=None, raise_on_failure=False)
 
     if retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'

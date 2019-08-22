@@ -279,7 +279,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
           'delete-db-subnet-group',
           '--db-subnet-group-name', self.db_subnet_group_name,
           '--region', self.region]
-      vm_util.IssueCommand(delete_db_subnet_group_cmd)
+      vm_util.IssueCommand(delete_db_subnet_group_cmd, raise_on_failure=False)
 
     for subnet_for_db in self.subnets_owned_by_db:
       subnet_for_db.Delete()
@@ -646,7 +646,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
         '--db-instance-identifier=%s' % instance_id,
         '--region=%s' % self.region
     ]
-    stdout, _, retcode = vm_util.IssueCommand(cmd, suppress_warning=True)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, suppress_warning=True,
+                                              raise_on_failure=False)
     if retcode != 0:
       return None
     json_output = json.loads(stdout)

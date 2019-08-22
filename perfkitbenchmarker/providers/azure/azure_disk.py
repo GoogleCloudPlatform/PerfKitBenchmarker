@@ -178,7 +178,7 @@ class AzureDisk(disk.BaseDisk):
           str(self.lun), '--sku', self.disk_type, '--vm-name', self.vm_name,
           '--size-gb',
           str(self.disk_size)
-      ] + self.resource_group.args)
+      ] + self.resource_group.args, raise_on_failure=False)
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
@@ -187,7 +187,7 @@ class AzureDisk(disk.BaseDisk):
       _, _, retcode = vm_util.IssueCommand([
           azure.AZURE_PATH, 'disk', 'update', '--name', self.name, '--set',
           util.GetTagsJson(self.resource_group.timeout_minutes)
-      ] + self.resource_group.args)
+      ] + self.resource_group.args, raise_on_failure=False)
 
       if retcode:
         raise errors.Resource.RetryableCreationError(

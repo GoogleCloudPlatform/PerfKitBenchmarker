@@ -138,7 +138,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
 
     cmd += ['--tags']
     cmd += util.MakeFormattedDefaultTags()
-    _, stderr, _ = vm_util.IssueCommand(cmd)
+    _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
 
     if 'InsufficientCacheClusterCapacity' in stderr:
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
@@ -175,7 +175,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd = ['aws', 'elasticache', 'describe-replication-groups',
            '--region', self.redis_region,
            '--replication-group-id', self.name]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find cluster %s, %s', self.name, stderr)
       return {}

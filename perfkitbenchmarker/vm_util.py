@@ -298,7 +298,8 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
 
 
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
-                 env=None, timeout=DEFAULT_TIMEOUT, cwd=None):
+                 env=None, timeout=DEFAULT_TIMEOUT, cwd=None,
+                 raise_on_failure=True):
   """Tries running the provided command once.
 
   Args:
@@ -320,9 +321,14 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
         contain what had already been written to them before the process was
         killed.
     cwd: Directory in which to execute the command.
+    raise_on_failure: A boolean indicating if non-zero return codes should raise
+        IssueCommandError.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
+
+  Raises:
+    IssueCommandError: When raise_on_failure=True and retcode is non-zero.
   """
   if env:
     logging.debug('Environment variables: %s', env)
@@ -380,6 +386,9 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     logging.info(debug_text)
   else:
     logging.debug(debug_text)
+
+  if process.returncode and raise_on_failure:
+    raise errors.VmUtil.IssueCommandError(debug_text)
 
   return stdout, stderr, process.returncode
 

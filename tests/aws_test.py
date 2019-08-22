@@ -363,7 +363,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--instance-market-options={"MarketType": "spot", '
         '"SpotOptions": {"SpotInstanceType": "one-time", '
         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
-    ])
+    ], raise_on_failure=False)
     self.vm.use_spot_instance = False
 
   def testCreateSpotFailure(self):

@@ -129,7 +129,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     cmd = ['aws', 'elasticache', 'describe-cache-clusters',
            '--region', self.region,
            '--cache-cluster-id', self.name]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find cluster %s, %s', self.name, stderr)
       return {}

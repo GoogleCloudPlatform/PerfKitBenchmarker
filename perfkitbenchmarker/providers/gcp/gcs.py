@@ -84,9 +84,10 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
          'gs://%s' % bucket])
 
   def EmptyBucket(self, bucket):
+    # Ignore failures here and retry in DeleteBucket.  See more comments there.
     vm_util.IssueCommand(
         ['gsutil', '-m', 'rm', '-r',
-         'gs://%s/*' % bucket])
+         'gs://%s/*' % bucket], raise_on_failure=False)
 
   def ChmodBucket(self, account, access, bucket):
     """Updates access control lists.

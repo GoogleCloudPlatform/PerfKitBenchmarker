@@ -298,7 +298,8 @@ class AzureVirtualMachine(
     # Uses a custom default because create for larger sizes sometimes times out.
     azure_vm_create_timeout = 600
     _, stderr, retcode = vm_util.IssueCommand(create_cmd,
-                                              timeout=azure_vm_create_timeout)
+                                              timeout=azure_vm_create_timeout,
+                                              raise_on_failure=False)
     if retcode and 'Error Code: QuotaExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
