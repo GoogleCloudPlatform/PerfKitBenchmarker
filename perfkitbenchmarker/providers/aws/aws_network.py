@@ -264,7 +264,7 @@ class AwsSubnet(resource.BaseResource):
         'delete-subnet',
         '--region=%s' % self.region,
         '--subnet-id=%s' % self.id]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the subnet exists."""
