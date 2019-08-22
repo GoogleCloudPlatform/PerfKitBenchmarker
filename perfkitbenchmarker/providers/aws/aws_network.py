@@ -465,7 +465,8 @@ class AwsPlacementGroup(resource.BaseResource):
         'delete-placement-group',
         '--region=%s' % self.region,
         '--group-name=%s' % self.name]
-    vm_util.IssueCommand(delete_cmd)
+    # Failed deletes are ignorable (probably already deleted).
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the Placement Group exists."""
