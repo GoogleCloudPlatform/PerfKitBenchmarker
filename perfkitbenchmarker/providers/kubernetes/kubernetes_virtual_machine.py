@@ -126,7 +126,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
     logging.info('Waiting for POD %s' % self.name)
-    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
+                                          raise_on_failure=False)
     if pod_info:
       pod_info = json.loads(pod_info)
       containers = pod_info['spec']['containers']
@@ -143,7 +144,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Deletes a POD."""
     delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'delete', 'pod', self.name]
-    output = vm_util.IssueCommand(delete_pod)
+    output = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
     logging.info(output[STDOUT].rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=20)

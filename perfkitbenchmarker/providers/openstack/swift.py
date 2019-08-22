@@ -59,13 +59,15 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
   def MakeBucket(self, bucket):
     vm_util.IssueCommand(
-        ['swift'] + self.swift_command_parts + ['post', bucket])
+        ['swift'] + self.swift_command_parts + ['post', bucket],
+        raise_on_failure=False)
 
   def DeleteBucket(self, bucket):
     self.EmptyBucket(bucket)
 
     vm_util.IssueCommand(
-        ['swift'] + self.swift_command_parts + ['delete', bucket])
+        ['swift'] + self.swift_command_parts + ['delete', bucket],
+        raise_on_failure=False)
 
   def Copy(self, src_url, dst_url):
     """See base class."""
@@ -77,7 +79,8 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
   def EmptyBucket(self, bucket):
     vm_util.IssueCommand(
-        ['swift'] + self.swift_command_parts + ['delete', bucket])
+        ['swift'] + self.swift_command_parts + ['delete', bucket],
+        raise_on_failure=False)
 
   def PrepareVM(self, vm):
     vm.Install('swift_client')

@@ -81,7 +81,8 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
         self._BuildImageLocally()
 
     create_command = self._FormatCreateCommand()
-    container_info, _, _ = vm_util.IssueCommand(create_command)
+    container_info, _, _ = vm_util.IssueCommand(create_command,
+                                                raise_on_failure=False)
     self.container_id = container_info.encode('ascii')
 
   def _FormatCreateCommand(self):
@@ -129,23 +130,23 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     # Copy ssh key to container to enable ssh login
     copy_ssh_command = ['docker', 'cp', self.ssh_public_key,
                         '%s:/root/.ssh/authorized_keys' % self.name]
-    vm_util.IssueCommand(copy_ssh_command)
+    vm_util.IssueCommand(copy_ssh_command, raise_on_failure=False)
 
     # change ownership of authorized_key file to root in container
     chown_command = ['docker', 'exec', self.name, 'chown',
                      'root:root', '/root/.ssh/authorized_keys']
-    vm_util.IssueCommand(chown_command)
+    vm_util.IssueCommand(chown_command, raise_on_failure=False)
     self._ConfigureProxy()
 
   def _Delete(self):
     """Kill and Remove Docker Container."""
 
     delete_command = ['docker', 'kill', self.name]
-    output = vm_util.IssueCommand(delete_command)
+    output = vm_util.IssueCommand(delete_command, raise_on_failure=False)
     logging.info(output[vm_util.OUTPUT_STDOUT].rstrip())
 
     remove_command = ['docker', 'rm', self.name]
-    output = vm_util.IssueCommand(remove_command)
+    output = vm_util.IssueCommand(remove_command, raise_on_failure=False)
     logging.info(output[vm_util.OUTPUT_STDOUT].rstrip())
 
     return
@@ -210,7 +211,8 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     logging.info('Checking Container Information')
     inspect_cmd = ['docker', 'inspect', self.name]
     info, _, return_code = vm_util.IssueCommand(inspect_cmd,
-                                                suppress_warning=True)
+                                                suppress_warning=True,
+                                                raise_on_failure=False)
     info = json.loads(info)
     return info, return_code
 
@@ -248,7 +250,8 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     """Returns whether a Docker image exists locally."""
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
     info, _, return_code = vm_util.IssueCommand(inspect_cmd,
-                                                suppress_warning=True)
+                                                suppress_warning=True,
+                                                raise_on_failure=False)
     info = json.loads(info)
     logging.info('Checking if Docker Image Exists')
     if info and return_code == 0:
@@ -271,7 +274,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
         'docker', 'build', '--no-cache',
         '-t', self.container_image, directory]
 
-    vm_util.IssueCommand(build_cmd)
+    vm_util.IssueCommand(build_cmd, raise_on_failure=False)
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.

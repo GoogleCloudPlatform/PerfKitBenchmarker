@@ -53,7 +53,7 @@ class AliVpc(resource.BaseResource):
         '--RegionId %s' % self.region,
         '--CidrBlock 10.0.0.0/16']
     create_cmd = util.GetEncodedCmd(create_cmd)
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
     response = json.loads(stdout)
     self.id = response['VpcId']
 
@@ -97,7 +97,7 @@ class AliVpc(resource.BaseResource):
         '--RegionId %s' % self.region,
         '--VpcId %s' % self.id]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class AliVSwitch(resource.BaseResource):
@@ -123,7 +123,7 @@ class AliVSwitch(resource.BaseResource):
         '--VpcId %s' % self.vpc_id,
     ]
     create_cmd = util.GetEncodedCmd(create_cmd)
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
     response = json.loads(stdout)
     self.id = response['VSwitchId']
 
@@ -135,7 +135,7 @@ class AliVSwitch(resource.BaseResource):
         '--RegionId %s' % self.region,
         '--VSwitchId %s' % self.id]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the VSwitch exists."""
