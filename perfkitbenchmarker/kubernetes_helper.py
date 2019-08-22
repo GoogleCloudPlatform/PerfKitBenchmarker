@@ -84,7 +84,7 @@ def GetWithWaitForContents(resource, resourceInstanceName, filter, jsonFilter):
 
 
 def CreateResource(resource_body):
-  with vm_util.NamedTemporaryFile() as tf:
+  with vm_util.NamedTemporaryFile(mode='w') as tf:
     tf.write(resource_body)
     tf.close()
     CreateFromFile(tf.name)

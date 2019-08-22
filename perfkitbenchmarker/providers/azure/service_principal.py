@@ -37,15 +37,13 @@ class ServicePrincipal(resource.BaseResource):
     super(ServicePrincipal, self).__init__()
     self.app_id = None
     self.name = str(uuid.uuid4())
-    self.password = str(uuid.uuid4())
+    self.password = ''
 
   def _Create(self):
     """Creates the service principal."""
     create_cmd = [
-        azure.AZURE_PATH, 'ad', 'sp', 'create-for-rbac',
-        '--name', self.name,
-        '--password', self.password,
-        '--skip-assignment',
+        azure.AZURE_PATH, 'ad', 'sp', 'create-for-rbac', '--name', self.name,
+        '--skip-assignment', '--create-cert'
     ]
     vm_util.IssueCommand(create_cmd)
 
@@ -59,6 +57,7 @@ class ServicePrincipal(resource.BaseResource):
     response = json.loads(stdout)
     if response:
       self.app_id = response[0]['appId']
+      self.password = response[0]['password']
       return True
     return False
 
