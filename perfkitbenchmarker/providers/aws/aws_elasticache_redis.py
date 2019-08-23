@@ -109,7 +109,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd = ['aws', 'elasticache', 'delete-cache-subnet-group',
            '--region=%s' % self.redis_region,
            '--cache-subnet-group-name=%s' % self.subnet_group_name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
     if self.failover_subnet:
       self.failover_subnet.Delete()
@@ -148,7 +148,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd = ['aws', 'elasticache', 'delete-replication-group',
            '--region', self.redis_region,
            '--replication-group-id', self.name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _IsDeleting(self):
     """Returns True if cluster is being deleted and false otherwise."""

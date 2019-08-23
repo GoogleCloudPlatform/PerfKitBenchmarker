@@ -202,7 +202,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
         '--region', self.region,
         '--table-name', self.table_name]
     logging.info('Attempting deletion: ')
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _IsReady(self):
     """Check if dynamodb table is ready."""

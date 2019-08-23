@@ -52,4 +52,4 @@ class RedshiftClusterSubnetGroup(resource.BaseResource):
         'redshift', 'delete-cluster-subnet-group',
         '--cluster-subnet-group-name', self.name
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)

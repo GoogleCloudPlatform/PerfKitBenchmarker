@@ -71,7 +71,7 @@ class GcpBigtableInstance(resource.BaseResource):
                              self.name)
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the instance exists."""

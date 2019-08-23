@@ -131,7 +131,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     # If we don't put this here, zone is automatically added, which
     # breaks the dataproc clusters delete
     cmd.flags['zone'] = []
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
@@ -140,7 +140,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     # If we don't put this here, zone is automatically added to
     # the command, which breaks dataproc clusters describe
     cmd.flags['zone'] = []
-    _, _, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
   def SubmitJob(self, jarfile, classname, job_script=None,

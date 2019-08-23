@@ -65,7 +65,7 @@ class TargetGroup(resource.BaseResource):
         'elbv2', 'delete-target-group',
         '--target-group-arn', self.arn
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class LoadBalancer(resource.BaseResource):
@@ -111,7 +111,7 @@ class LoadBalancer(resource.BaseResource):
         'elbv2', 'delete-load-balancer',
         '--load-balancer-arn', self.arn
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class Listener(resource.BaseResource):

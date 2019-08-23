@@ -224,7 +224,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--name', self.instance_id,
         '--yes'
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the underlying resource exists.

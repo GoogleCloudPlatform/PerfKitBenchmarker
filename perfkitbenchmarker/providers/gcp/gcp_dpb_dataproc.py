@@ -178,7 +178,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Check to see whether the cluster exists."""

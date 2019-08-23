@@ -67,7 +67,7 @@ class RedshiftClusterParameterGroupTestCase(
           'aws', '--output', 'json', 'redshift',
           'delete-cluster-parameter-group', '--parameter-group-name',
           'pkb-%s' % TEST_RUN_URI
-      ])
+      ], raise_on_failure=False)
 
 
 if __name__ == '__main__':

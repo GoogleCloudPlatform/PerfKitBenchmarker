@@ -218,7 +218,7 @@ class AwsDisk(disk.BaseDisk):
         '--volume-id=%s' % self.id]
     logging.info('Deleting AWS volume %s. This may fail if the disk is not '
                  'yet detached, but will be retried.', self.id)
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the disk exists."""

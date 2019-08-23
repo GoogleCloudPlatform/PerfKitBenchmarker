@@ -95,7 +95,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete',
                              self.name)
     cmd.flags['region'] = self.redis_region
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the instance exists."""

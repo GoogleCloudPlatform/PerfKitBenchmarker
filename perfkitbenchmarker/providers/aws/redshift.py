@@ -290,7 +290,7 @@ class Redshift(edw_service.EdwService):
     cmd = self.cmd_prefix + ['redshift', 'delete-cluster',
                              '--cluster-identifier', self.cluster_identifier,
                              '--skip-final-cluster-snapshot']
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _IsDeleting(self):
     """Method to check if the cluster is being deleting."""

@@ -84,7 +84,7 @@ class GceDisk(disk.BaseDisk):
   def _Delete(self):
     """Deletes the disk."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'delete', self.name)
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the disk exists."""

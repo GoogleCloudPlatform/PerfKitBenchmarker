@@ -67,7 +67,7 @@ class GcpTpu(cloud_tpu.BaseTpu):
     if self.spec.tpu_preemptible:
       cmd.flags['preemptible'] = self.spec.tpu_preemptible
     cmd.flags['project'] = self.project
-    _, _, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Create GCP cloud TPU failed.')
 

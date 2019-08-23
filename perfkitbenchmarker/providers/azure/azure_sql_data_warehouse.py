@@ -131,7 +131,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
            self.resource_group,
            '--server',
            self.server_name]
-    stdout, stderr, _ = vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
     """Delete dependencies of the cluster."""
@@ -147,7 +147,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
              self.resource_group,
              '--server',
              self.server_name]
-      vm_util.IssueCommand(cmd)
+      vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
