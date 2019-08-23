@@ -528,3 +528,4 @@
 - Fixed use of numpy.piecewise to be numpy > 1.13 compliant
 - Fixed the cluster boot benchmark config to use SSD boot disk types for GCP and
   Azure, adding support for specifying a boot_disk_type in Azure.
+- Fixed the default path of the spark example jar on an EMR cluster.
