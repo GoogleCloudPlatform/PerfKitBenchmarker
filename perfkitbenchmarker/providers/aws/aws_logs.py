@@ -46,7 +46,7 @@ class LogGroup(resource.BaseResource):
         'logs', 'delete-log-group',
         '--log-group-name', self.name
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def Exists(self):
     """Returns True if the log group exists."""

@@ -156,7 +156,7 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
         '--capacity-reservation-id=%s' % self.capacity_reservation_id,
         '--region=%s' % self.region,
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the underlying reservation exists and is active."""

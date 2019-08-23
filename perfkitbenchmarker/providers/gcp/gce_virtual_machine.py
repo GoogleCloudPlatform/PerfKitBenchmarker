@@ -244,7 +244,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'delete', self.name)
     cmd.flags['region'] = self.region
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
 
 class GceSoleTenantNodeGroup(resource.BaseResource):
@@ -302,7 +302,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     """Deletes the host."""
     cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'delete', self.name)
-    cmd.Issue()
+    cmd.Issue(raise_on_failure=False)
 
 
 def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
@@ -590,7 +590,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Delete a GCE VM instance."""
     delete_cmd = util.GcloudCommand(self, 'compute', 'instances', 'delete',
                                     self.name)
-    delete_cmd.Issue()
+    delete_cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the VM exists."""

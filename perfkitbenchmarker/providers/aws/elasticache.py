@@ -83,7 +83,7 @@ class ElastiCacheMemcacheService(MemcacheService):
     cmd = ['aws', 'elasticache', 'delete-cache-cluster',
            '--cache-cluster-id=%s' % self.cluster_id,
            '--region=%s' % self.region]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
     # Don't have to delete the subnet group. It will be deleted with the subnet.
 
   def Flush(self):

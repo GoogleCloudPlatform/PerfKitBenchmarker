@@ -203,7 +203,7 @@ class AwsVpc(resource.BaseResource):
         'delete-vpc',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.id]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def NextSubnetCidrBlock(self):
     """Returns the next available /24 CIDR block in this VPC.
@@ -325,7 +325,7 @@ class AwsInternetGateway(resource.BaseResource):
         'delete-internet-gateway',
         '--region=%s' % self.region,
         '--internet-gateway-id=%s' % self.id]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the internet gateway exists."""

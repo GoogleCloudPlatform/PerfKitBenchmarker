@@ -268,7 +268,7 @@ class AwsDedicatedHost(resource.BaseResource):
           'release-hosts',
           '--region=%s' % self.region,
           '--host-ids=%s' % self.id]
-      vm_util.IssueCommand(delete_cmd)
+      vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   @vm_util.Retry()
   def _Exists(self):
@@ -695,14 +695,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'terminate-instances',
           '--region=%s' % self.region,
           '--instance-ids=%s' % self.id]
-      vm_util.IssueCommand(delete_cmd)
+      vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
     if hasattr(self, 'spot_instance_request_id'):
       cancel_cmd = util.AWS_PREFIX + [
           '--region=%s' % self.region,
           'ec2',
           'cancel-spot-instance-requests',
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
-      vm_util.IssueCommand(cancel_cmd)
+      vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
   @vm_util.Retry(max_retries=5)
   def UpdateInterruptibleVmStatus(self):

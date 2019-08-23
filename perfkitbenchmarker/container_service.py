@@ -619,7 +619,7 @@ class KubernetesContainerService(BaseContainerService):
         'delete', 'deployment',
         self.name
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class KubernetesCluster(BaseContainerCluster):
