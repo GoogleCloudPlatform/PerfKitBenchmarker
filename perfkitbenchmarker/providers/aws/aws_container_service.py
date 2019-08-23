@@ -75,7 +75,7 @@ class EcrRepository(resource.BaseResource):
         '--repository-name', self.name,
         '--force'
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class ElasticContainerRegistry(container_service.BaseContainerRegistry):
@@ -378,7 +378,7 @@ class EcsService(container_service.BaseContainerService):
         '--cluster', self.cluster_name,
         '--service', self.name
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _GetNetworkConfig(self):
     network_config = {
@@ -460,7 +460,7 @@ class FargateCluster(container_service.BaseContainerCluster):
         'ecs', 'delete-cluster',
         '--cluster', self.name
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def DeployContainer(self, name, container_spec):
     """Deploys the container according to the spec."""
@@ -562,7 +562,7 @@ class AwsKopsCluster(container_service.KubernetesCluster):
         '--state=s3://%s' % self.config_bucket,
         '--yes'
     ]
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _IsReady(self):
     """Returns True if the cluster is ready, else False."""

@@ -79,7 +79,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     cmd = ['aws', 'elasticache', 'delete-cache-subnet-group',
            '--region', self.region,
            '--cache-subnet-group-name', self.subnet_group_name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Create(self):
     """Creates the cache cluster."""
@@ -102,7 +102,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     cmd = ['aws', 'elasticache', 'delete-cache-cluster',
            '--region', self.region,
            '--cache-cluster-id', self.name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _IsDeleting(self):
     """Returns True if cluster is being deleted and false otherwise."""

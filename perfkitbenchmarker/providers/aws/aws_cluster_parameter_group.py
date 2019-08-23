@@ -62,4 +62,4 @@ class RedshiftClusterParameterGroup(resource.BaseResource):
         'redshift', 'delete-cluster-parameter-group', '--parameter-group-name',
         self.name
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)

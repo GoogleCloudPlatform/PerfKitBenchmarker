@@ -433,7 +433,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
           '--skip-final-snapshot',
           '--region', self.region,
       ]
-      vm_util.IssueCommand(cmd)
+      vm_util.IssueCommand(cmd, raise_on_failure=False)
 
     if self.cluster_id is not None:
       cmd = util.AWS_PREFIX + [
@@ -443,7 +443,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
           '--skip-final-snapshot',
           '--region', self.region,
       ]
-      vm_util.IssueCommand(cmd)
+      vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the underlying resource exists.

@@ -69,7 +69,7 @@ class AciContainer(container_service.BaseContainer):
         azure.AZURE_PATH, 'container', 'delete',
         '--name', self.name, '--yes',
     ] + self.resource_group.args
-    vm_util.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   @property
   def ip_address(self):

@@ -86,7 +86,7 @@ class GcpSpannerInstance(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
                              self._database)
     cmd.flags['instance'] = self._name
-    _, _, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Create GCP Spanner database failed.')
       return
@@ -95,7 +95,7 @@ class GcpSpannerInstance(resource.BaseResource):
                              self._database)
     cmd.flags['instance'] = self._name
     cmd.flags['ddl'] = self._ddl
-    _, _, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Update GCP Spanner database schema failed.')
     else:
@@ -105,7 +105,7 @@ class GcpSpannerInstance(resource.BaseResource):
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'delete',
                              self._name)
-    _, _, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Delete GCP Spanner instance failed.')
     else:
@@ -144,7 +144,7 @@ class GcpSpannerInstance(resource.BaseResource):
 
     cmd = util.GcloudCommand(self, 'config', 'get-value',
                              'api_endpoint_overrides/spanner')
-    stdout, _, retcode = cmd.Issue()
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.warning('Fail to retrieve cloud spanner end point.')
       return None

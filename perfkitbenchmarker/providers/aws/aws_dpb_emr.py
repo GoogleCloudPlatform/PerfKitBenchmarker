@@ -78,7 +78,7 @@ class AwsSecurityGroup(resource.BaseResource):
   def _Delete(self):
     cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
                              '--group-id=' + self.group_id]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
     cmd = self.cmd_prefix + ['ec2', 'describe-security-groups',
@@ -127,8 +127,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def _CreateLogBucket(self):
     bucket_name = 's3://pkb-{0}-emr'.format(FLAGS.run_uri)
     cmd = self.cmd_prefix + ['s3', 'mb', bucket_name]
-    _, _, rc = vm_util.IssueCommand(cmd)
-    if rc != 0:
+    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
       raise Exception('Error creating logs bucket')
     self.bucket_to_delete = bucket_name
     return bucket_name
@@ -242,7 +242,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                                       'terminate-clusters',
                                       '--cluster-ids',
                                       self.cluster_id]
-      vm_util.IssueCommand(delete_cmd)
+      vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
     if self.network:

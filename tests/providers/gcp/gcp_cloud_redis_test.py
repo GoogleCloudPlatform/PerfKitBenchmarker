@@ -43,7 +43,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=('{}', '', 0)) as gcloud:
       self.redis._Delete()
-      gcloud.assert_called_once_with()
+      gcloud.assert_called_once_with(raise_on_failure=False)
 
   def testExistTrue(self):
     with mock.patch.object(util.GcloudCommand, 'Issue',
