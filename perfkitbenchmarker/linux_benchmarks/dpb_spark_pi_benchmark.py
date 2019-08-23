@@ -13,6 +13,10 @@
 # limitations under the License.
 r"""Runs a spark application on a cluster that computes an approximation to pi.
 
+The spark application accepts one argument, which is the number of partitions
+used for the task of computing Pi. In fact the level of parallelization is
+100000 * partitions.
+
 The benchmark reports
   - wall time: The total time to complete from submission.
   - running_time: Actual execution time (without the pending time).
@@ -48,9 +52,8 @@ dpb_spark_pi_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_integer('dpb_sparkpi_worksize', 100, 'Determines the size of the'
-                                                  ' random sample used and also'
-                                                  ' the degree of parallelism.')
+flags.DEFINE_integer('dpb_spark_pi_partitions', 100, 'Number of task'
+                                                     ' partitions.')
 
 FLAGS = flags.FLAGS
 
@@ -76,19 +79,18 @@ def Run(benchmark_spec):
 
   metadata = {}
   metadata.update(benchmark_spec.dpb_service.GetMetadata())
-  pi_scale = str(FLAGS.dpb_sparkpi_worksize)
-  metadata.update({'sparkpi_worksize': pi_scale})
+  num_partitions = str(FLAGS.dpb_spark_pi_partitions)
+  metadata.update({'spark_pi_partitions': num_partitions})
 
   results = []
 
-  # TODO(saksena): Check what happens with a project flag
   dpb_service_instance = benchmark_spec.dpb_service
 
   wall_time, phase_stats = dpb_service_instance.SubmitSparkJob(
       spark_application_jar=inspect.getmodule(
           benchmark_spec.dpb_service).SPARK_SAMPLE_LOCATION,
       spark_application_classname='org.apache.spark.examples.SparkPi',
-      spark_application_args=[pi_scale]
+      spark_application_args=[num_partitions]
   )
   logging.info(phase_stats)
   results.append(sample.Sample('wall_time', wall_time, 'seconds', metadata))
