@@ -530,3 +530,5 @@
   Azure, adding support for specifying a boot_disk_type in Azure.
 - Fixed the default path of the spark example jar on an EMR cluster.
 - Check if an AWS default route exists before creation.
+- Fixed the broken reference to ycsb.YCSB_TAR_URL in the
+  cloud_spanner_ycsb_benchmark. Without this, the benchmark is not runnable.
