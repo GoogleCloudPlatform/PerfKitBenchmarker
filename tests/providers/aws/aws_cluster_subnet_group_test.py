@@ -63,10 +63,10 @@ class RedshiftClusterSubnetGroupTestCase(
         return_value=('out_', 'err_', 0)) as mock_issue:
       csg._Delete()
       mock_issue.assert_called_once()
-      mock_issue.assert_called_with([
-          'aws', '--output', 'json', 'redshift', 'delete-cluster-subnet-group',
-          '--cluster-subnet-group-name', 'pkb-%s' % TEST_RUN_URI],
-                                    raise_on_failure=False)
+      mock_issue.assert_called_with(
+          ['aws', '--output', 'json', 'redshift', 'delete-cluster-subnet-group',
+           '--cluster-subnet-group-name', 'pkb-%s' % TEST_RUN_URI],
+          raise_on_failure=False)
 
 
 if __name__ == '__main__':
