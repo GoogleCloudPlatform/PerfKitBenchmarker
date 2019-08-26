@@ -60,14 +60,7 @@ CREATE TABLE %s (
   field9 STRING(MAX),
 ) PRIMARY KEY(id)
 """ % BENCHMARK_TABLE
-# As of May 2017, cloud Spanner is not included in the latest YCSB release
-# 0.12.0. The URL below points to a custom YCSB build for Cloud Spanner.
-# You can override it by flag --cloud_spanner_custom_ycsb_release.
-#
-# TODO: Remove this once cloud spanner is included in YCSB release.
-YCSB_BINDING_TAR_URL = ('https://storage.googleapis.com/'
-                        'cloud-spanner-ycsb-custom-release/'
-                        'ycsb-cloudspanner-binding-0.13.0.tar.gz')
+
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.admin',
     'https://www.googleapis.com/auth/spanner.data')
@@ -81,9 +74,6 @@ flags.DEFINE_integer('cloud_spanner_ycsb_boundedstaleness',
                      0,
                      'The Cloud Spanner bounded staleness used in the YCSB '
                      'benchmark.')
-flags.DEFINE_string('cloud_spanner_ycsb_custom_release',
-                    None,
-                    'If provided, the URL of a custom YCSB release')
 flags.DEFINE_enum('cloud_spanner_ycsb_readmode',
                   'query', ['query', 'read'],
                   'The Cloud Spanner read mode used in the YCSB benchmark.')
@@ -128,24 +118,11 @@ def Prepare(benchmark_spec):
     logging.warning('Failed to create Cloud Spanner instance and database.')
     benchmark_spec.spanner_instance.Delete()
 
-  default_ycsb_tar_url = ycsb.YCSB_TAR_URL
-
-  # TODO: figure out a less hacky way to override.
-  # Override so that we only need to download the required binding.
-  if FLAGS.cloud_spanner_ycsb_custom_release:
-    ycsb.YCSB_TAR_URL = FLAGS.cloud_spanner_ycsb_custom_release
-  else:
-    ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
-
-  logging.info('YCSB tar url: ' + ycsb.YCSB_TAR_URL)
-
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
   vm_util.RunThreaded(_Install, vms)
 
-  # Restore YCSB_TAR_URL
-  ycsb.YCSB_TAR_URL = default_ycsb_tar_url
   benchmark_spec.executor = ycsb.YCSBExecutor('cloudspanner')
 
 
@@ -169,7 +146,6 @@ def Run(benchmark_spec):
       'cloudspanner.boundedstaleness':
           FLAGS.cloud_spanner_ycsb_boundedstaleness,
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
-      'cloudspanner.host': benchmark_spec.spanner_instance.GetEndPoint(),
   }
 
   load_kwargs = run_kwargs.copy()
