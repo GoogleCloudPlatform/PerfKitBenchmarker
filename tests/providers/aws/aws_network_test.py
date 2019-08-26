@@ -22,28 +22,44 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
-FLAGS = flags.FLAGS
-_COMPONENT = 'test_component'
+ROUTE_ID = 'rtb-1234'
+
+
+def RouteTable(cidr_block):
+  return {
+      'RouteTables': [{
+          'RouteTableId': ROUTE_ID,
+          'Routes': [{
+              'DestinationCidrBlock': cidr_block
+          }]
+      }]
+  }
+
 
 REGION = 'us-west-1'
 VPC_ID = 'vpc-1234'
 SG_DEFAULT = 'sg-1234'
-
-
-def AwsResponse(json_obj):
-  return (json.dumps(json_obj), '', 0)
-
-
+QUERY_ROUTE_NONE = ('describe-route-tables', {'RouteTables': []})
+QUERY_ROUTE_NO_DEFAULT = ('describe-route-tables', RouteTable('192.168.0.0/16'))
+QUERY_ROUTE_HAS_DEFAULT = ('describe-route-tables', RouteTable('0.0.0.0/0'))
+CREATE_ROUTE = ('create-route', {})
+GATEWAY_ID = 'igw-1234'
 DESCRIBE_SECURITY_GROUPS_ONLY_DEFAULT = ('describe-security-groups', {
     'SecurityGroups': [{
         'GroupId': SG_DEFAULT
     }]
 })
-
 VPC_QUERY_NONE = ('describe-vpcs', {'Vpcs': []})
 VPC_QUERY_ONE = ('describe-vpcs', {'Vpcs': [{'VpcId': VPC_ID}]})
 VPC_CREATE = ('create-vpc', {'Vpc': {'VpcId': VPC_ID}})
 MODIFY_VPC = ('modify-vpc-attribute', {})
+
+FLAGS = flags.FLAGS
+_COMPONENT = 'test_component'
+
+
+def AwsResponse(json_obj):
+  return (json.dumps(json_obj), '', 0)
 
 
 def FindAwsCommand(cmd):
@@ -88,20 +104,20 @@ class BaseAwsTest(pkb_common_test_case.PkbCommonTestCase):
 
 class AwsVpcTableTest(BaseAwsTest):
 
-  def XtestInitWithVpc(self):
+  def testInitWithVpc(self):
     self.SetExpectedCommands(DESCRIBE_SECURITY_GROUPS_ONLY_DEFAULT)
     vpc = aws_network.AwsVpc(REGION, VPC_ID)
     self.assertEqual(VPC_ID, vpc.id)
     self.assertEqual(SG_DEFAULT, vpc.default_security_group_id)
     self.assertCommandsCalled()
 
-  def XtestExistsVpcsNone(self):
+  def testExistsVpcsNone(self):
     self.SetExpectedCommands(VPC_QUERY_NONE)
     vpc = aws_network.AwsVpc(REGION)
     self.assertFalse(vpc._Exists())
     self.assertCommandsCalled()
 
-  def XtestExistsVpcsOne(self):
+  def testExistsVpcsOne(self):
     self.SetExpectedCommands(VPC_QUERY_ONE)
     vpc = aws_network.AwsVpc(REGION)
     self.assertTrue(vpc._Exists())
@@ -114,6 +130,48 @@ class AwsVpcTableTest(BaseAwsTest):
     vpc.Create()
     self.assertEqual(VPC_ID, vpc.id)
     self.assertEqual(SG_DEFAULT, vpc.default_security_group_id)
+    self.assertCommandsCalled()
+
+
+class AwsRouteTableTest(BaseAwsTest):
+
+  def setUp(self):
+    super(AwsRouteTableTest, self).setUp()
+    self.route = aws_network.AwsRouteTable(REGION, VPC_ID)
+
+  def testExistsNoRoutes(self):
+    self.SetExpectedCommands(QUERY_ROUTE_NONE)
+    self.assertFalse(self.route.RouteExists())
+    self.assertCommandsCalled()
+
+  def testExistsNoDefaultRoute(self):
+    self.SetExpectedCommands(QUERY_ROUTE_NO_DEFAULT)
+    self.assertFalse(self.route.RouteExists())
+    self.assertCommandsCalled()
+
+  def testExistsHasDefaultRoute(self):
+    self.SetExpectedCommands(QUERY_ROUTE_HAS_DEFAULT)
+    self.assertTrue(self.route.RouteExists())
+    self.assertCommandsCalled()
+
+  def testCreate(self):
+    self.SetExpectedCommands(QUERY_ROUTE_NO_DEFAULT)
+    self.route.Create()
+    self.assertEqual(ROUTE_ID, self.route.id)
+
+  def testCreateRouteNoDefault(self):
+    # 'create-route' is executed
+    self.SetExpectedCommands(QUERY_ROUTE_NO_DEFAULT, QUERY_ROUTE_NO_DEFAULT,
+                             CREATE_ROUTE)
+    self.route.Create()
+    self.route.CreateRoute(GATEWAY_ID)
+    self.assertCommandsCalled()
+
+  def testCreateRouteHasDefaultRoute(self):
+    # 'create-route' is not executed
+    self.SetExpectedCommands(QUERY_ROUTE_HAS_DEFAULT, QUERY_ROUTE_HAS_DEFAULT)
+    self.route.Create()
+    self.route.CreateRoute(GATEWAY_ID)
     self.assertCommandsCalled()
 
 

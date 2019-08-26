@@ -411,17 +411,33 @@ class AwsRouteTable(resource.BaseResource):
   @vm_util.Retry()
   def _PostCreate(self):
     """Gets data about the route table."""
+    self.id = self.GetDict()[0]['RouteTableId']
+
+  def GetDict(self):
+    """Returns an array of the currently existing routes for this VPC."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-route-tables',
         '--region=%s' % self.region,
         '--filters=Name=vpc-id,Values=%s' % self.vpc_id]
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
-    self.id = response['RouteTables'][0]['RouteTableId']
+    return json.loads(stdout)['RouteTables']
+
+  def RouteExists(self):
+    """Returns true if the 0.0.0.0/0 route already exists."""
+    route_tables = self.GetDict()
+    if not route_tables:
+      return False
+    for route in route_tables[0].get('Routes', []):
+      if route.get('DestinationCidrBlock') == '0.0.0.0/0':
+        return True
+    return False
 
   def CreateRoute(self, internet_gateway_id):
     """Adds a route to the internet gateway."""
+    if self.RouteExists():
+      logging.info('Internet route already exists.')
+      return
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-route',
