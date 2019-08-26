@@ -44,7 +44,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   def PrepareService(self, location):
     self.location = location or DEFAULT_GCP_REGION
 
-  def MakeBucket(self, bucket):
+  def MakeBucket(self, bucket, raise_on_failure=True):
     command = ['gsutil', 'mb']
     if self.location:
       command.extend(['-l', self.location])
@@ -57,7 +57,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       command.extend(['-p', FLAGS.project])
     command.extend(['gs://%s' % bucket])
 
-    vm_util.IssueCommand(command)
+    _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
+    if ret_code and raise_on_failure:
+      raise errors.Benchmarks.BucketCreationError(stderr)
 
   def Copy(self, src_url, dst_url):
     """See base class."""

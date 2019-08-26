@@ -1419,15 +1419,22 @@ def Prepare(benchmark_spec):
       # clouds cannot contain non-alphanumeric characters.
       bucket_name = '%s%s' % (bucket_name,
                               re.sub(r'[\W_]', '', FLAGS.object_storage_region))
+    # Fail if we cannot create the bucket as long as the bucket name was not
+    # set via a flag. If it was set by a flag, then we will still try to create
+    # the bucket, but won't fail if it was created. This supports running the
+    # benchmark on the same bucket multiple times.
+    raise_on_bucket_creation_failure = not FLAGS.object_storage_bucket_name
     if FLAGS.storage == 'GCP' and FLAGS.object_storage_gcs_multiregion:
       # Use a GCS multiregional bucket
       multiregional_service = gcs.GoogleCloudStorageService()
       multiregional_service.PrepareService(FLAGS.object_storage_gcs_multiregion
                                            or DEFAULT_GCS_MULTIREGION)
-      multiregional_service.MakeBucket(bucket_name)
+      multiregional_service.MakeBucket(
+          bucket_name, raise_on_failure=raise_on_bucket_creation_failure)
     else:
       # Use a regular bucket
-      service.MakeBucket(bucket_name)
+      service.MakeBucket(
+          bucket_name, raise_on_failure=raise_on_bucket_creation_failure)
 
   # Save the service and the bucket name for later
   benchmark_spec.service = service

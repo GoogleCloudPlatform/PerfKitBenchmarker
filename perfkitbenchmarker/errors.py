@@ -155,6 +155,9 @@ class VmUtil(object):
 class Benchmarks(object):
   """Errors raised by individual benchmark."""
 
+  class BucketCreationError(Error):
+    pass
+
   class PrepareException(Error):
     pass
 
