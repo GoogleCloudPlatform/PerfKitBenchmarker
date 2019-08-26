@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to Azure Blob Storage."""
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
@@ -79,10 +80,13 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     self.storage_account.Delete()
     self.resource_group.Delete()
 
-  def MakeBucket(self, bucket):
-    vm_util.IssueRetryableCommand([
-        azure.AZURE_PATH, 'storage', 'container', 'create',
-        '--name', bucket] + self.storage_account.connection_args)
+  def MakeBucket(self, bucket, raise_on_failure=True):
+    _, stderr, ret_code = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'storage', 'container', 'create', '--name', bucket] +
+        self.storage_account.connection_args,
+        raise_on_failure=False)
+    if ret_code and raise_on_failure:
+      raise errors.Benchmarks.BucketCreationError(stderr)
 
   def DeleteBucket(self, bucket):
     vm_util.IssueCommand([

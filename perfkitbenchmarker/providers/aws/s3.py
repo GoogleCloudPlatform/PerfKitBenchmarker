@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to S3."""
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
@@ -40,11 +41,15 @@ class S3Service(object_storage_service.ObjectStorageService):
   def PrepareService(self, location):
     self.region = location or DEFAULT_AWS_REGION
 
-  def MakeBucket(self, bucket_name):
-    vm_util.IssueCommand(
-        ['aws', 's3', 'mb',
-         's3://%s' % bucket_name,
-         '--region=%s' % self.region])
+  def MakeBucket(self, bucket_name, raise_on_failure=True):
+    command = [
+        'aws', 's3', 'mb',
+        's3://%s' % bucket_name,
+        '--region=%s' % self.region
+    ]
+    _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
+    if ret_code and raise_on_failure:
+      raise errors.Benchmarks.BucketCreationError(stderr)
 
     # Tag the bucket with the persistent timeout flag so that buckets can
     # optionally stick around after PKB runs.
