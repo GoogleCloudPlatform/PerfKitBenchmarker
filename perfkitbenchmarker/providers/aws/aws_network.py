@@ -148,22 +148,25 @@ class AwsVpc(resource.BaseResource):
 
   def _SetSecurityGroupId(self):
     """Looks up the VPC default security group."""
+    groups = self.GetSecurityGroups('default')
+    if len(groups) != 1:
+      raise ValueError('Expected one security group, got {} in {}'.format(
+          len(groups), groups))
+    self.default_security_group_id = groups[0]['GroupId']
+    logging.info('Default security group ID: %s',
+                 self.default_security_group_id)
+
+  def GetSecurityGroups(self, group_name=None):
     cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-security-groups',
         '--region', self.region,
         '--filters',
-        'Name=group-name,Values=default',
         'Name=vpc-id,Values=' + self.id]
+    if group_name:
+      cmd.append('Name=group-name,Values={}'.format(group_name))
     stdout, _, _ = vm_util.IssueCommand(cmd)
-    response = json.loads(stdout)
-    groups = response['SecurityGroups']
-    if len(groups) != 1:
-      raise ValueError('Expected one security group, got {} in {}'.format(
-          len(groups), response))
-    self.default_security_group_id = groups[0]['GroupId']
-    logging.info('Default security group ID: %s',
-                 self.default_security_group_id)
+    return json.loads(stdout)['SecurityGroups']
 
   def _Exists(self):
     """Returns true if the VPC exists."""
