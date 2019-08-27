@@ -169,7 +169,7 @@ class GceNetworkResource(resource.BaseResource):
   def _Exists(self):
     """Returns True if the Network resource exists."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'describe', self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return not retcode
 
   def _GetAllFirewallRules(self):
@@ -206,7 +206,7 @@ class GceSubnetResource(resource.BaseResource):
                              self.name)
     if self.region:
       cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
