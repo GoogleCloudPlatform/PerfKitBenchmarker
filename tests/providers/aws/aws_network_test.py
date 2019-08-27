@@ -16,6 +16,7 @@
 import json
 import unittest
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
@@ -53,6 +54,19 @@ VPC_QUERY_NONE = ('describe-vpcs', {'Vpcs': []})
 VPC_QUERY_ONE = ('describe-vpcs', {'Vpcs': [{'VpcId': VPC_ID}]})
 VPC_CREATE = ('create-vpc', {'Vpc': {'VpcId': VPC_ID}})
 MODIFY_VPC = ('modify-vpc-attribute', {})
+CREATE_GATEWAY = ('create-internet-gateway', {
+    'InternetGateway': {
+        'InternetGatewayId': GATEWAY_ID
+    }
+})
+GATEWAY_QUERY_NONE = ('describe-internet-gateways', {'InternetGateways': []})
+GATEWAY_QUERY_ONE = ('describe-internet-gateways', {
+    'InternetGateways': [{
+        'InternetGatewayId': GATEWAY_ID
+    }]
+})
+ATTACH_GATEWAY = ('attach-internet-gateway', {})
+DETACH_GATEWAY = ('detach-internet-gateway', {})
 
 FLAGS = flags.FLAGS
 _COMPONENT = 'test_component'
@@ -173,6 +187,79 @@ class AwsRouteTableTest(BaseAwsTest):
     self.route.Create()
     self.route.CreateRoute(GATEWAY_ID)
     self.assertCommandsCalled()
+
+
+class AwsInternetGatewayTest(BaseAwsTest):
+
+  def assertQueryCommand(self, has_gw_id):
+    self.assertCommandsCalled()
+    gw_id_filter = AwsFilter('internet-gateway-id', GATEWAY_ID)
+    gw_vpc_filter = AwsFilter('attachment.vpc-id', VPC_ID)
+    if has_gw_id:
+      self.assertLastCommandContains(gw_id_filter)
+      self.assertLastCommandDoesNotContain(gw_vpc_filter)
+    else:
+      self.assertLastCommandDoesNotContain(gw_id_filter)
+      self.assertLastCommandContains(gw_vpc_filter)
+
+  def testCreateNoVpc(self):
+    self.SetExpectedCommands(CREATE_GATEWAY, GATEWAY_QUERY_ONE)
+    gw = aws_network.AwsInternetGateway(REGION)
+    gw.Create()
+    self.assertFalse(gw.attached)
+    self.assertEqual(GATEWAY_ID, gw.id)
+    self.assertCommandsCalled()
+
+  def testCreateWithVpc(self):
+    # the query does find an attached gateway
+    self.SetExpectedCommands(GATEWAY_QUERY_ONE)
+    gw = aws_network.AwsInternetGateway(REGION, VPC_ID)
+    self.assertCommandsCalled()
+    self.assertTrue(gw.attached)
+    self.assertEqual(GATEWAY_ID, gw.id)
+    self.assertQueryCommand(False)  # should do a query with attached.vpc-id
+    self.mock_aws.reset_mock()
+    gw.Create()
+    self.mock_aws.assert_not_called()
+
+  def testCreateWithVpcButNotFound(self):
+    # the query does not find an attached gateway
+    self.SetExpectedCommands(GATEWAY_QUERY_NONE)
+    gw = aws_network.AwsInternetGateway(REGION, VPC_ID)
+    self.assertCommandsCalled()
+    self.assertFalse(gw.attached)
+    self.assertIsNone(gw.id)
+
+  def testAttachNoVpc(self):
+    self.SetExpectedCommands(CREATE_GATEWAY, GATEWAY_QUERY_ONE)
+    gw = aws_network.AwsInternetGateway(REGION)
+    gw.Create()
+    self.SetExpectedCommands(ATTACH_GATEWAY)
+    gw.Attach(VPC_ID)
+    self.assertCommandsCalled()
+    self.assertTrue(gw.attached)
+    self.assertEqual(VPC_ID, gw.vpc_id)
+    self.SetExpectedCommands(GATEWAY_QUERY_ONE)
+    self.assertTrue(gw._Exists())
+    self.assertQueryCommand(True)
+
+  def testDetach(self):
+    self.SetExpectedCommands(CREATE_GATEWAY, GATEWAY_QUERY_ONE)
+    gw = aws_network.AwsInternetGateway(REGION)
+    gw.Create()
+    self.SetExpectedCommands(ATTACH_GATEWAY)
+    gw.Attach(VPC_ID)
+    self.SetExpectedCommands(DETACH_GATEWAY)
+    gw.Detach()
+    self.assertCommandsCalled()
+    self.SetExpectedCommands(GATEWAY_QUERY_ONE)
+    self.assertTrue(gw._Exists())
+    self.assertQueryCommand(True)
+
+  def testNoVpcNoIdThrowsExeception(self):
+    gw = aws_network.AwsInternetGateway(REGION)
+    with self.assertRaises(errors.Error):
+      gw.GetDict()
 
 
 if __name__ == '__main__':

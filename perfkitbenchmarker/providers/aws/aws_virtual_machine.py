@@ -47,6 +47,9 @@ from perfkitbenchmarker.providers.aws import util
 from six.moves import range
 
 FLAGS = flags.FLAGS
+flags.DEFINE_enum('aws_credit_specification', None,
+                  ['CpuCredits=unlimited', 'CpuCredits=standard'],
+                  'Credit specification for burstable vms.')
 
 HVM = 'hvm'
 PV = 'paravirtual'
@@ -635,6 +638,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:
       create_cmd.append('--placement=%s' % placement)
+    if FLAGS.aws_credit_specification:
+      create_cmd.append('--credit-specification=%s' %
+                        FLAGS.aws_credit_specification)
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
     if self.capacity_reservation_id:
