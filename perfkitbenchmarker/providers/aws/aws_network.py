@@ -307,8 +307,9 @@ class AwsInternetGateway(resource.BaseResource):
     self.attached = False
     if vpc_id:
       self.vpc_id = vpc_id
-      self.id = self.GetDict()['InternetGatewayId']
-      self.attached = True
+      self.id = self.GetDict().get('InternetGatewayId')
+      # if a gateway was found then it is attached to this VPC
+      self.attached = bool(self.id)
 
   def _Create(self):
     """Creates the internet gateway."""
@@ -351,9 +352,16 @@ class AwsInternetGateway(resource.BaseResource):
     if self.id:
       describe_cmd.append('--filter=Name=internet-gateway-id,Values=%s' %
                           self.id)
-    if self.vpc_id:
+    elif self.vpc_id:
+      # Only query with self.vpc_id if the self.id is NOT set -- after calling
+      # Detact() this object will set still have a vpc_id but will be filtered
+      # out in a query if using attachment.vpc-id.
+      # Using self.vpc_id instead of self.attached as the init phase always
+      # sets it to False.
       describe_cmd.append('--filter=Name=attachment.vpc-id,Values=%s' %
                           self.vpc_id)
+    else:
+      raise errors.Error('Must have a VPC id or a gateway id')
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     internet_gateways = response['InternetGateways']
