@@ -117,7 +117,7 @@ class GcpSpannerInstance(resource.BaseResource):
                              self._name)
 
     # Do not log error or warning when checking existence.
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not found GCP Spanner instances %s.' % self._name)
       return False
@@ -130,7 +130,7 @@ class GcpSpannerInstance(resource.BaseResource):
     cmd.flags['instance'] = self._name
 
     # Do not log error or warning when checking existence.
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not found GCP Spanner database %s.' % self._database)
       return False
