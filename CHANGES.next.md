@@ -328,6 +328,7 @@
 - Added sysbench benchmarking for MySQL in a VM.
 - Added check that cuda_toolkit is installed when installing cudnn.
 - Added ability to set provider-specific MySQL flags for relational databases.
+- Add support for running t3 burstable VMs on AWS without unlimited mode.
 - Added support for reporting bigtable cluster cpu utilization, gated by flag
   --get_bigtable_cluster_cpu_utilization.
 
