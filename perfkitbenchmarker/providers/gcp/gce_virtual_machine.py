@@ -236,7 +236,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'describe', self.name)
     cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
@@ -295,7 +295,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     """Returns True if the host exists."""
     cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'describe', self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
