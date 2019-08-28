@@ -172,7 +172,7 @@ class GcpDataproc(spark_service.BaseSparkService):
         FLAGS.spark_service_log_level)
     if job_arguments:
       cmd.additional_flags += ['--'] + job_arguments
-    stdout, stderr, retcode = cmd.Issue(timeout=None)
+    stdout, stderr, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
     if retcode != 0:
       return {spark_service.SUCCESS: False}
 

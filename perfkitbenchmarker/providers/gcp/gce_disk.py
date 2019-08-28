@@ -78,7 +78,7 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['image'] = self.image
     if self.image_project:
       cmd.flags['image-project'] = self.image_project
-    _, stderr, retcode = cmd.Issue()
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _Delete(self):

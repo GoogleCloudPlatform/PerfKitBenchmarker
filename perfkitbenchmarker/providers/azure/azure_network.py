@@ -278,10 +278,12 @@ class AzureVirtualNetwork(resource.BaseResource):
   def _Exists(self):
     """Returns true if the virtual network exists."""
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args,
-        suppress_warning=True)
+        [
+            azure.AZURE_PATH, 'network', 'vnet', 'show', '--output', 'json',
+            '--name', self.name
+        ] + self.resource_group.args,
+        suppress_warning=True,
+        raise_on_failure=False)
 
     return bool(json.loads(stdout))
 
@@ -306,10 +308,12 @@ class AzureSubnet(resource.BaseResource):
   @vm_util.Retry()
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'show',
-         '--vnet-name', self.vnet.name,
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+        [
+            azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'show',
+            '--vnet-name', self.vnet.name, '--output', 'json', '--name',
+            self.name
+        ] + self.resource_group.args,
+        raise_on_failure=False)
 
     return bool(json.loads(stdout))
 
@@ -347,9 +351,11 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
   @vm_util.Retry()
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nsg', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+        [
+            azure.AZURE_PATH, 'network', 'nsg', 'show', '--output', 'json',
+            '--name', self.name
+        ] + self.resource_group.args,
+        raise_on_failure=False)
 
     return bool(json.loads(stdout))
 

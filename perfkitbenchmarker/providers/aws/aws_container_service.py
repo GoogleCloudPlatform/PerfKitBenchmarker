@@ -62,7 +62,8 @@ class EcrRepository(resource.BaseResource):
         '--region', self.region,
         '--repository-names', self.name
     ]
-    stdout, _, _ = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
+    stdout, _, _ = vm_util.IssueCommand(
+        describe_cmd, suppress_warning=True, raise_on_failure=False)
     if not stdout or not json.loads(stdout)['repositories']:
       return False
     return True

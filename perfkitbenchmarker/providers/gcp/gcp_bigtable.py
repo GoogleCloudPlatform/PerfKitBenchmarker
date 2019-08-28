@@ -80,7 +80,8 @@ class GcpBigtableInstance(resource.BaseResource):
     cmd.flags['project'] = self.project
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
-    stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
+    stdout, stderr, retcode = cmd.Issue(
+        suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
       # This is not ideal, as we're returning false not because we know
       # the table isn't there, but because we can't figure out whether
