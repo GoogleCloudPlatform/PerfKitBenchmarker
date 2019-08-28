@@ -48,7 +48,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
       return False
     stdout, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH, 'acr', 'show', '--name', self.name,
-    ], suppress_warning=True)
+    ], suppress_warning=True, raise_on_failure=False)
     try:
       registry = json.loads(stdout)
       self.login_server = registry['loginServer']
@@ -142,7 +142,7 @@ class AksCluster(container_service.KubernetesCluster):
       return False
     stdout, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH, 'aks', 'show', '--name', self.name,
-    ] + self.resource_group.args)
+    ] + self.resource_group.args, raise_on_failure=False)
     try:
       json.loads(stdout)
       return True
