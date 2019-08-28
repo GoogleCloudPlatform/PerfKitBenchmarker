@@ -78,7 +78,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
            self.resource_group,
            '--server',
            self.server_name]
-    return vm_util.IssueCommand(cmd)
+    return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Method to validate the existence of cluster.

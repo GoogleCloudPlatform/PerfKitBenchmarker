@@ -207,7 +207,7 @@ class AzureDisk(disk.BaseDisk):
     stdout, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH, 'disk', 'show', '--output', 'json', '--name',
         self.name
-    ] + self.resource_group.args)
+    ] + self.resource_group.args, raise_on_failure=False)
     try:
       json.loads(stdout)
       return True

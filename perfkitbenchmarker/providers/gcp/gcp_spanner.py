@@ -78,7 +78,7 @@ class GcpSpannerInstance(resource.BaseResource):
     cmd.flags['description'] = self._description
     cmd.flags['nodes'] = self._nodes
     cmd.flags['config'] = self._config
-    _, _, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Create GCP Spanner instance failed.')
       return
