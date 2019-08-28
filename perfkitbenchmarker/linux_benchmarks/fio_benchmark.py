@@ -180,6 +180,8 @@ flags.DEFINE_boolean(  # TODO(user): Add support for simultaneous read.
     'fio_write_against_multiple_clients', False,
     'Whether to run fio against multiple nfs. Only applicable '
     'when running fio against network mounts and rw=write.')
+flags.DEFINE_integer('fio_command_timeout_sec', None,
+                     'Timeout for fio commands in seconds.')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -607,7 +609,8 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   logging.info('FIO Results:')
 
   start_time = time.time()
-  stdout, _ = vm.RobustRemoteCommand(fio_command, should_log=True)
+  stdout, _ = vm.RobustRemoteCommand(
+      fio_command, should_log=True, timeout=FLAGS.fio_command_timeout_sec)
   end_time = time.time()
   bin_vals = []
   if collect_logs:

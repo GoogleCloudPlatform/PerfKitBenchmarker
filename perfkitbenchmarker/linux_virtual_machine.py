@@ -209,7 +209,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       command: The command to run.
       should_log: Whether to log the command's output at the info level. The
           output is always logged at the debug level.
-      timeout: The timeout for the command.
+      timeout: The timeout for the command in seconds.
       ignore_failure: Ignore any failure if set to true.
 
     Returns:
