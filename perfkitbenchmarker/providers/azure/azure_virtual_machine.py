@@ -153,9 +153,11 @@ class AzurePublicIPAddress(resource.BaseResource):
       return False
 
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'public-ip', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+        [
+            azure.AZURE_PATH, 'network', 'public-ip', 'show', '--output',
+            'json', '--name', self.name
+        ] + self.resource_group.args,
+        raise_on_failure=False)
     try:
       json.loads(stdout)
       return True
@@ -206,9 +208,11 @@ class AzureNIC(resource.BaseResource):
     # Same deal as AzurePublicIPAddress. 'show' doesn't error out if
     # the resource doesn't exist, but no-op 'set' does.
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nic', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+        [
+            azure.AZURE_PATH, 'network', 'nic', 'show', '--output', 'json',
+            '--name', self.name
+        ] + self.resource_group.args,
+        raise_on_failure=False)
     try:
       json.loads(stdout)
       return True
@@ -329,7 +333,7 @@ class AzureVirtualMachine(
         azure.AZURE_PATH, 'vm', 'show', '--output', 'json',
         '--name', self.name
     ] + self.resource_group.args
-    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     try:
       json.loads(stdout)
       return True

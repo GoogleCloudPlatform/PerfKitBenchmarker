@@ -244,7 +244,7 @@ class Redshift(edw_service.EdwService):
     """Describe a redshift cluster."""
     cmd = self.cmd_prefix + ['redshift', 'describe-clusters',
                              '--cluster-identifier', self.cluster_identifier]
-    return vm_util.IssueCommand(cmd)
+    return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Method to validate the existence of a redshift cluster.
