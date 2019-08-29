@@ -129,6 +129,7 @@
 - Added support for T4 GPUs on GCE.
 - Added mpstat utility to measure cpu processor stats.
 - Added a benchmark to run spark application on a cluster that computes an approximation to pi.
+- Added a benchmark to run spark io workload on a cluster that provisions a database and queries it.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
