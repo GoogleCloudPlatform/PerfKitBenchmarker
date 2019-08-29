@@ -58,7 +58,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
-    self.region = self.spec.vm_spec.zone
+    self.region = self.spec.db_spec.zone
     self.resource_group = azure_network.GetResourceGroup(self.region)
 
     self.unmanaged_db_exists = None if self.is_managed_db else False
@@ -75,12 +75,12 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """
     metadata = super(AzureRelationalDb, self).GetResourceMetadata()
     metadata.update({
-        'zone': self.spec.vm_spec.zone,
+        'zone': self.spec.db_spec.zone,
     })
 
-    if hasattr(self.spec.disk_spec, 'iops'):
+    if hasattr(self.spec.db_disk_spec, 'iops'):
       metadata.update({
-          'disk_iops': self.spec.disk_spec.iops,
+          'disk_iops': self.spec.db_disk_spec.iops,
       })
 
     return metadata
@@ -144,16 +144,25 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           self.GetAzCommandForEngine(),
           'server',
           'create',
-          '--resource-group', self.resource_group.name,
-          '--name', self.instance_id,
-          '--location', self.region,
-          '--admin-user', self.spec.database_username,
-          '--admin-password', self.spec.database_password,
-          '--performance-tier', self.spec.vm_spec.tier,
-          '--compute-units', str(self.spec.vm_spec.compute_units),
+          '--resource-group',
+          self.resource_group.name,
+          '--name',
+          self.instance_id,
+          '--location',
+          self.region,
+          '--admin-user',
+          self.spec.database_username,
+          '--admin-password',
+          self.spec.database_password,
+          '--performance-tier',
+          self.spec.db_spec.tier,
+          '--compute-units',
+          str(self.spec.db_spec.compute_units),
           # AZ command line expects 128000MB-1024000MB in increments of 128000MB
-          '--storage-size', str(self.spec.disk_spec.disk_size * 1000),
-          '--version', self.spec.engine_version,
+          '--storage-size',
+          str(self.spec.db_disk_spec.disk_size * 1000),
+          '--version',
+          self.spec.engine_version,
       ]
       vm_util.IssueCommand(cmd)
 
