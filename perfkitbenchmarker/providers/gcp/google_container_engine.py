@@ -15,10 +15,12 @@
 """Contains classes/functions related to GKE (Google Container Engine)."""
 
 import json
+import logging
 import os
 
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
@@ -159,7 +161,16 @@ class GkeCluster(container_service.KubernetesCluster):
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
-    cmd.Issue(timeout=900, env=self._GetRequiredGkeEnv())
+    _, stderr, retcode = cmd.Issue(
+        timeout=900, env=self._GetRequiredGkeEnv(), raise_on_failure=False)
+    if retcode != 0:
+      # Log specific type of failure, if known.
+      if 'ZONE_RESOURCE_POOL_EXHAUSTED' in stderr:
+        logging.exception('Container resources exhausted: %s', stderr)
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            'Container resources exhausted in zone %s: %s' %
+            (self.zone, stderr))
+      raise errors.Resource.CreationError(stderr)
 
   def _PostCreate(self):
     """Acquire cluster authentication."""
