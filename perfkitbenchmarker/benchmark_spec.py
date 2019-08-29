@@ -147,6 +147,9 @@ class BenchmarkSpec(object):
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
+    self.vms_to_boot = (
+        self.config.vm_groups if self.config.relational_db is None else
+        relational_db.VmsToBoot(self.config.relational_db.vm_groups))
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -260,7 +263,7 @@ class BenchmarkSpec(object):
     if self.nfs_service:
       logging.info('NFS service already created: %s', self.nfs_service)
       return
-    for group_spec in self.config.vm_groups.values():
+    for group_spec in self.vms_to_boot.values():
       if not group_spec.disk_spec or not group_spec.vm_count:
         continue
       disk_spec = group_spec.disk_spec
@@ -284,7 +287,7 @@ class BenchmarkSpec(object):
     if self.smb_service:
       logging.info('SMB service already created: %s', self.smb_service)
       return
-    for group_spec in self.config.vm_groups.values():
+    for group_spec in self.vms_to_boot.values():
       if not group_spec.disk_spec or not group_spec.vm_count:
         continue
       disk_spec = group_spec.disk_spec
@@ -401,7 +404,7 @@ class BenchmarkSpec(object):
 
   def ConstructVirtualMachines(self):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
-    vm_group_specs = self.config.vm_groups
+    vm_group_specs = self.vms_to_boot
 
     clouds = {}
     for group_name, group_spec in sorted(six.iteritems(vm_group_specs)):
@@ -453,10 +456,10 @@ class BenchmarkSpec(object):
     if service_type == spark_service.PKB_MANAGED:
       for name, spec in [('master_group', spark_spec.master_group),
                          ('worker_group', spark_spec.worker_group)]:
-        if name in self.config.vm_groups:
+        if name in self.vms_to_boot:
           raise Exception('Cannot have a vm group {0} with a {1} spark '
                           'service'.format(name, spark_service.PKB_MANAGED))
-        self.config.vm_groups[name] = spec
+        self.vms_to_boot[name] = spec
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
@@ -530,12 +533,7 @@ class BenchmarkSpec(object):
     if self.dpb_service:
       self.dpb_service.Create()
     if hasattr(self, 'relational_db') and self.relational_db:
-      if 'clients' in self.vm_groups:
-        self.relational_db.client_vm = self.vm_groups['clients'][0]
-      else:
-        self.relational_db.client_vm = self.vm_groups['default'][0]
-      if 'servers' in self.vm_groups:
-        self.relational_db.server_vm = self.vm_groups['servers'][0]
+      self.relational_db.SetVms(self.vm_groups)
       self.relational_db.Create()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)

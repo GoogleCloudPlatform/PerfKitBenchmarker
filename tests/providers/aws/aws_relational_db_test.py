@@ -81,15 +81,14 @@ class AwsRelationalDbTestCase(unittest.TestCase):
       yield issue_command
 
   def CreateMockSpec(self, additional_spec_items={}):
-    default_server_disk_spec = aws_disk.AwsDiskSpec(
-        _COMPONENT,
-        disk_size=5,
-        disk_type=aws_disk.IO1,
-        iops=1000)
+    default_server_db_disk_spec = aws_disk.AwsDiskSpec(
+        _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000)
 
-    default_server_vm_spec = virtual_machine.BaseVmSpec(
-        'NAME', **{'machine_type': 'db.t1.micro',
-                   'zone': 'us-west-2b'})
+    default_server_db_spec = virtual_machine.BaseVmSpec(
+        'NAME', **{
+            'machine_type': 'db.t1.micro',
+            'zone': 'us-west-2b'
+        })
     spec_dict = {
         'engine': MYSQL,
         'engine_version': '5.7.11',
@@ -98,8 +97,8 @@ class AwsRelationalDbTestCase(unittest.TestCase):
         'database_password': 'fakepassword',
         'database_username': 'fakeusername',
         'high_availability': False,
-        'vm_spec': default_server_vm_spec,
-        'disk_spec': default_server_disk_spec,
+        'db_spec': default_server_db_spec,
+        'db_disk_spec': default_server_db_disk_spec,
     }
     spec_dict.update(additional_spec_items)
 
@@ -145,9 +144,11 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     self.assertIn('--master-user-password=fakepassword', command_string)
 
   def CreateAuroraMockSpec(self, additional_spec_items={}):
-    default_server_vm_spec = virtual_machine.BaseVmSpec(
-        'NAME', **{'machine_type': 'db.t1.micro',
-                   'zone': 'us-west-2b'})
+    default_server_db_spec = virtual_machine.BaseVmSpec(
+        'NAME', **{
+            'machine_type': 'db.t1.micro',
+            'zone': 'us-west-2b'
+        })
 
     spec_dict = {
         'engine': AURORA_POSTGRES,
@@ -155,7 +156,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
         'database_username': 'fakeusername',
-        'vm_spec': default_server_vm_spec,
+        'db_spec': default_server_db_spec,
         'zones': ['us-east-1a', 'us-east-1d'],
         'engine_version': '9.6.2',
         'high_availability': True
@@ -217,8 +218,9 @@ class AwsRelationalDbTestCase(unittest.TestCase):
 
   def testDiskWithoutIops(self):
     spec_dict = {
-        'disk_spec': aws_disk.AwsDiskSpec(
-            _COMPONENT, disk_size=5, disk_type=aws_disk.GP2)
+        'db_disk_spec':
+            aws_disk.AwsDiskSpec(
+                _COMPONENT, disk_size=5, disk_type=aws_disk.GP2)
     }
     command_string = self.Create(spec_dict)
 
