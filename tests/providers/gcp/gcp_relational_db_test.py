@@ -73,22 +73,22 @@ def PatchCriticalObjects(stdout='', stderr='', return_code=0):
 class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def createMySQLSpecDict(self):
-    vm_spec = virtual_machine.BaseVmSpec('NAME',
-                                         **{
-                                             'machine_type': 'db-n1-standard-1',
-                                             'zone': 'us-west1-b',
-                                         })
-    vm_spec.cpus = None
-    vm_spec.memory = None
-    disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
+    db_spec = virtual_machine.BaseVmSpec(
+        'NAME', **{
+            'machine_type': 'db-n1-standard-1',
+            'zone': 'us-west1-b',
+        })
+    db_spec.cpus = None
+    db_spec.memory = None
+    db_disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
         'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
-        'vm_spec': vm_spec,
-        'disk_spec': disk_spec,
+        'db_spec': db_spec,
+        'db_disk_spec': db_disk_spec,
         'high_availability': False,
         'backup_enabled': True,
         'backup_start_time': '07:00',
@@ -223,16 +223,16 @@ class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'machine_type': {'cpus': 1, 'memory': '3840MiB'},
         'zone': 'us-west1-b',
     }
-    vm_spec = gce_virtual_machine.GceVmSpec('NAME', **machine_type)
-    disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
+    db_spec = gce_virtual_machine.GceVmSpec('NAME', **machine_type)
+    db_disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': POSTGRES,
         'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
-        'vm_spec': vm_spec,
-        'disk_spec': disk_spec,
+        'db_spec': db_spec,
+        'db_disk_spec': db_disk_spec,
         'high_availability': False,
         'backup_enabled': True,
         'backup_start_time': '07:00'
@@ -251,8 +251,7 @@ class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertRaises(ValueError, db._ValidateMachineType, 255, 1)
       self.assertRaises(ValueError, db._ValidateMachineType, 256000000000, 1)
       self.assertRaises(ValueError, db._ValidateMachineType, 2560, 1)
-      db._ValidateMachineType(db.spec.vm_spec.memory,
-                              db.spec.vm_spec.cpus)
+      db._ValidateMachineType(db.spec.db_spec.memory, db.spec.db_spec.cpus)
 
   def testCreateNonHighAvailability(self):
     with PatchCriticalObjects() as issue_command:

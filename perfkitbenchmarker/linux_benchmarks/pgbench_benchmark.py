@@ -62,7 +62,7 @@ pgbench:
   description: pgbench benchmark for managed PostgreSQL databases
   relational_db:
     engine: postgres
-    vm_spec:
+    db_spec:
       GCP:
         machine_type:
           cpus: 16
@@ -76,7 +76,7 @@ pgbench:
           tier: Standard
           compute_units: 800
         zone: eastus
-    disk_spec:
+    db_disk_spec:
       GCP:
         disk_size: 1000
         disk_type: pd-ssd
@@ -86,19 +86,33 @@ pgbench:
       Azure:
         #Valid storage sizes range from minimum of 128000 MB and additional increments of 128000 MB up to maximum of 1024000 MB.
         disk_size: 128
-  vm_groups:
-    default:
-      os_type: ubuntu1604
-      vm_spec:
-        AWS:
-          machine_type: m4.4xlarge
-          zone: us-west-1c
-        Azure:
-          machine_type: Standard_A8m_v2
-          zone: eastus
-        GCP:
-          machine_type: n1-standard-16
-          zone: us-central1-c
+    vm_groups:
+      clients:
+        os_type: ubuntu1604
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-16
+            zone: us-central1-c
+          AWS:
+            machine_type: m4.4xlarge
+            zone: us-west-1c
+          Azure:
+            machine_type: Standard_A4m_v2
+            zone: eastus
+        disk_spec: *default_500_gb
+      servers:
+        os_type: ubuntu1604
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-16
+            zone: us-central1-c
+          AWS:
+            machine_type: m4.4xlarge
+            zone: us-west-1c
+          Azure:
+            machine_type: Standard_A4m_v2
+            zone: eastus
+        disk_spec: *default_500_gb
 """
 
 

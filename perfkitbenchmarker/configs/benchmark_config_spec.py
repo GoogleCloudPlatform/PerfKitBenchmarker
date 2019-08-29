@@ -439,28 +439,28 @@ class _RelationalDbSpec(spec.BaseSpec):
                                    if flag_values else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
 
-    if self.disk_spec:
-      disk_config = getattr(self.disk_spec, self.cloud, None)
+    if self.db_disk_spec:
+      disk_config = getattr(self.db_disk_spec, self.cloud, None)
       if disk_config is None:
         raise errors.Config.MissingOption(
-            '{0}.cloud is "{1}", but {0}.disk_spec does not contain a '
+            '{0}.cloud is "{1}", but {0}.db_disk_spec does not contain a '
             'configuration for "{1}".'.format(component_full_name, self.cloud))
       disk_spec_class = disk.GetDiskSpecClass(self.cloud)
-      self.disk_spec = disk_spec_class(
-          '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
+      self.db_disk_spec = disk_spec_class(
+          '{0}.db_disk_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
           **disk_config)
 
-    vm_config = getattr(self.vm_spec, self.cloud, None)
-    if vm_config is None:
+    db_vm_config = getattr(self.db_spec, self.cloud, None)
+    if db_vm_config is None:
       raise errors.Config.MissingOption(
-          '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
+          '{0}.cloud is "{1}", but {0}.db_spec does not contain a '
           'configuration for "{1}".'.format(component_full_name, self.cloud))
-    vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
-    self.vm_spec = vm_spec_class(
-        '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+    db_vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+    self.db_spec = db_vm_spec_class(
+        '{0}.db_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
-        **vm_config)
+        **db_vm_config)
 
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
@@ -522,8 +522,11 @@ class _RelationalDbSpec(spec.BaseSpec):
         'backup_start_time': (option_decoders.StringDecoder, {
             'default': '07:00'
         }),
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
-        'disk_spec': (option_decoders.PerCloudConfigDecoder, {})
+        'db_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'vm_groups': (_VmGroupsDecoder, {
+            'default': {}
+        })
     })
     return result
 
@@ -539,8 +542,8 @@ class _RelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    # TODO(ferneyhough): Add flags for disk_spec.
-    # Currently the only way to modify the disk_spec of the
+    # TODO(ferneyhough): Add flags for db_disk_spec.
+    # Currently the only way to modify the disk spec of the
     # db is to change the benchmark spec in the benchmark source code
     # itself.
     super(_RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
@@ -587,23 +590,23 @@ class _RelationalDbSpec(spec.BaseSpec):
 
     cloud = config_values['cloud']
     if flag_values['managed_db_zone'].present:
-      config_values['vm_spec'][cloud]['zone'] = (flag_values.managed_db_zone[0])
+      config_values['db_spec'][cloud]['zone'] = (flag_values.managed_db_zone[0])
       config_values['zones'] = flag_values.managed_db_zone
     if has_db_machine_type:
-      config_values['vm_spec'][cloud]['machine_type'] = (
+      config_values['db_spec'][cloud]['machine_type'] = (
           flag_values.managed_db_machine_type)
     if has_custom_machine_type:
-      config_values['vm_spec'][cloud]['machine_type'] = {
+      config_values['db_spec'][cloud]['machine_type'] = {
           'cpus': flag_values.managed_db_cpus,
           'memory': flag_values.managed_db_memory
       }
     if flag_values['mysql_flags'].present:
-      config_values['vm_spec'][cloud]['mysql_flags'] = (flag_values.mysql_flags)
+      config_values['db_spec'][cloud]['mysql_flags'] = flag_values.mysql_flags
     if flag_values['managed_db_disk_size'].present:
-      config_values['disk_spec'][cloud]['disk_size'] = (
+      config_values['db_disk_spec'][cloud]['disk_size'] = (
           flag_values.managed_db_disk_size)
     if flag_values['managed_db_disk_type'].present:
-      config_values['disk_spec'][cloud]['disk_type'] = (
+      config_values['db_disk_spec'][cloud]['disk_type'] = (
           flag_values.managed_db_disk_type)
 
 

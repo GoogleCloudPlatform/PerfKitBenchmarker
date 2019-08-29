@@ -121,14 +121,12 @@ _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
 
 
 BENCHMARK_NAME = 'sysbench'
-# TODO(jerlawson): Move or copy the server definitions into the relational_db
-# object since that's what they're ultimately a part of.
 BENCHMARK_CONFIG = """
 sysbench:
   description: Sysbench OLTP benchmarks.
   relational_db:
     engine: mysql
-    vm_spec:
+    db_spec:
       GCP:
         machine_type: db-n1-standard-16
         zone: us-central1-c
@@ -140,7 +138,7 @@ sysbench:
           tier: Standard
           compute_units: 800
         zone: westus
-    disk_spec:
+    db_disk_spec:
       GCP:
         disk_size: 100
         disk_type: pd-ssd
@@ -152,45 +150,45 @@ sysbench:
         #Valid storage sizes range from minimum of 128000 MB and additional
         #increments of 128000 MB up to maximum of 1024000 MB.
         disk_size: 128
-  vm_groups:
-    clients:
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-16
-          zone: us-central1-c
-        AWS:
-          machine_type: m4.4xlarge
-          zone: us-west-1a
-        Azure:
-          machine_type: Standard_A4m_v2
-          zone: westus
-      disk_spec: *default_500_gb
-    servers:
-      os_type: ubuntu1604
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-16
-          zone: us-central1-c
-        AWS:
-          machine_type: m4.4xlarge
-          zone: us-west-1a
-        Azure:
-          machine_type: Standard_A4m_v2
-          zone: westus
-      disk_spec: *default_500_gb
-    replications:
-      os_type: ubuntu1604
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-16
-          zone: us-central1-b
-        AWS:
-          machine_type: m4.4xlarge
-          zone: us-east-1a
-        Azure:
-          machine_type: Standard_A4m_v2
-          zone: eastus
-      disk_spec: *default_500_gb
+    vm_groups:
+      clients:
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-16
+            zone: us-central1-c
+          AWS:
+            machine_type: m4.4xlarge
+            zone: us-west-1a
+          Azure:
+            machine_type: Standard_A4m_v2
+            zone: westus
+        disk_spec: *default_500_gb
+      servers:
+        os_type: ubuntu1604
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-16
+            zone: us-central1-c
+          AWS:
+            machine_type: m4.4xlarge
+            zone: us-west-1a
+          Azure:
+            machine_type: Standard_A4m_v2
+            zone: westus
+        disk_spec: *default_500_gb
+      replications:
+        os_type: ubuntu1604
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-16
+            zone: us-central1-b
+          AWS:
+            machine_type: m4.4xlarge
+            zone: us-east-1a
+          Azure:
+            machine_type: Standard_A4m_v2
+            zone: eastus
+        disk_spec: *default_500_gb
 """
 
 # Constants defined for Sysbench tests.

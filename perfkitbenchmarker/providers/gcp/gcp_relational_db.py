@@ -88,8 +88,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     return ','.join('{0}/32'.format(vm.ip_address) for vm in vms)
 
   def _CreateGcloudSqlInstance(self):
-    storage_size = self.spec.disk_spec.disk_size
-    instance_zone = self.spec.vm_spec.zone
+    storage_size = self.spec.db_disk_spec.disk_size
+    instance_zone = self.spec.db_spec.zone
 
     authorized_network = self._GetAuthorizedNetworks([self.client_vm])
 
@@ -116,16 +116,15 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if self.spec.engine == relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
 
-    if (self.spec.vm_spec.cpus and
-        self.spec.vm_spec.memory):
+    if (self.spec.db_spec.cpus and self.spec.db_spec.memory):
       self._ValidateSpec()
-      memory = self.spec.vm_spec.memory
-      cpus = self.spec.vm_spec.cpus
+      memory = self.spec.db_spec.memory
+      cpus = self.spec.db_spec.cpus
       self._ValidateMachineType(memory, cpus)
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
-    elif hasattr(self.spec.vm_spec, 'machine_type'):
-      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+    elif hasattr(self.spec.db_spec, 'machine_type'):
+      machine_type_flag = '--tier=%s' % self.spec.db_spec.machine_type
       cmd_string.append(machine_type_flag)
     else:
       raise Exception('Unspecified machine type')
@@ -207,12 +206,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
         config.
     """
-    if not hasattr(self.spec.vm_spec, 'cpus') or not self.spec.vm_spec.cpus:
+    if not hasattr(self.spec.db_spec, 'cpus') or not self.spec.db_spec.cpus:
       raise data.ResourceNotFound(
           'Must specify cpu count in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
-    if not hasattr(self.spec.vm_spec, 'memory') or not self.spec.vm_spec.memory:
+    if not hasattr(self.spec.db_spec, 'memory') or not self.spec.db_spec.memory:
       raise data.ResourceNotFound(
           'Must specify a memory amount in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '

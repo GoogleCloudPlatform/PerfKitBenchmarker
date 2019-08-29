@@ -20,6 +20,7 @@ import uuid
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+import six
 
 # TODO(ferneyhough): change to enum
 flags.DEFINE_string('managed_db_engine', None,
@@ -113,6 +114,16 @@ def GetRelationalDbClass(cloud):
   return resource.GetResourceClass(BaseRelationalDb, CLOUD=cloud)
 
 
+def VmsToBoot(vm_groups):
+  # TODO(jerlawson): Enable replications.
+  return {
+      name: spec  # pylint: disable=g-complex-comprehension
+      for name, spec in six.iteritems(vm_groups)
+      if name == 'clients' or name == 'default' or
+      (not FLAGS.use_managed_db and name == 'servers')
+  }
+
+
 class BaseRelationalDb(resource.BaseResource):
   """Object representing a relational database Service."""
 
@@ -161,6 +172,31 @@ class BaseRelationalDb(resource.BaseResource):
   @client_vm.setter
   def client_vm(self, client_vm):
     self._client_vm = client_vm
+
+  @property
+  def server_vm(self):
+    """Server VM for hosting a managed database.
+
+    Raises:
+      RelationalDbPropertyNotSet: if the server_vm is missing.
+
+    Returns:
+      The server_vm.
+    """
+    if not hasattr(self, '_server_vm'):
+      raise RelationalDbPropertyNotSet('server_vm is not set')
+    return self._server_vm
+
+  @server_vm.setter
+  def server_vm(self, server_vm):
+    self._server_vm = server_vm
+
+  def SetVms(self, vm_groups):
+    self.client_vm = vm_groups['clients' if 'clients' in
+                               vm_groups else 'default'][0]
+    if not self.is_managed_db and 'servers' in vm_groups:
+      self.server_vm = vm_groups['servers'][0]
+    # TODO(jerlawson): Enable replications.
 
   def MakePsqlConnectionString(self, database_name):
     return '\'host={0} user={1} password={2} dbname={3}\''.format(
@@ -213,36 +249,35 @@ class BaseRelationalDb(resource.BaseResource):
        RelationalDbPropertyNotSet: if any expected metadata is missing.
     """
     metadata = {
-        'zone': self.spec.vm_spec.zone,
-        'disk_type': self.spec.disk_spec.disk_type,
-        'disk_size': self.spec.disk_spec.disk_size,
+        'zone': self.spec.db_spec.zone,
+        'disk_type': self.spec.db_disk_spec.disk_type,
+        'disk_size': self.spec.db_disk_spec.disk_size,
         'engine': self.spec.engine,
         'high_availability': self.spec.high_availability,
         'backup_enabled': self.spec.backup_enabled,
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
     }
-    if (hasattr(self.spec.vm_spec, 'machine_type') and
-        self.spec.vm_spec.machine_type):
+    if (hasattr(self.spec.db_spec, 'machine_type') and
+        self.spec.db_spec.machine_type):
       metadata.update({
-          'machine_type': self.spec.vm_spec.machine_type,
+          'machine_type': self.spec.db_spec.machine_type,
       })
-    elif hasattr(self.spec.vm_spec, 'cpus') and (
-        hasattr(self.spec.vm_spec, 'memory')):
+    elif hasattr(self.spec.db_spec, 'cpus') and (hasattr(
+        self.spec.db_spec, 'memory')):
       metadata.update({
-          'cpus': self.spec.vm_spec.cpus,
-      })
-      metadata.update({
-          'memory': self.spec.vm_spec.memory,
-
-      })
-    elif hasattr(self.spec.vm_spec, 'tier') and (
-        hasattr(self.spec.vm_spec, 'compute_units')):
-      metadata.update({
-          'tier': self.spec.vm_spec.tier,
+          'cpus': self.spec.db_spec.cpus,
       })
       metadata.update({
-          'compute_units': self.spec.vm_spec.compute_units,
+          'memory': self.spec.db_spec.memory,
+      })
+    elif hasattr(self.spec.db_spec, 'tier') and (hasattr(
+        self.spec.db_spec, 'compute_units')):
+      metadata.update({
+          'tier': self.spec.db_spec.tier,
+      })
+      metadata.update({
+          'compute_units': self.spec.db_spec.compute_units,
       })
     else:
       raise RelationalDbPropertyNotSet(
