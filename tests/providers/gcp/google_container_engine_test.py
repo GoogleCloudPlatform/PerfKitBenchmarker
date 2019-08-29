@@ -22,6 +22,7 @@ import contextlib2
 import mock
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -155,6 +156,21 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--zone us-central1-a', command_string)
+
+  def testCreateResourcesExhausted(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects(
+        stderr="""
+        [ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS]:
+        Instance 'test' creation failed: The zone
+        'projects/artemis-prod/zones/us-central1-a' does not have enough
+        resources available to fulfill the request.""",
+        return_code=1) as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      with self.assertRaises(
+          errors.Benchmarks.InsufficientCapacityCloudFailure):
+        cluster._Create()
+      self.assertEqual(issue_command.call_count, 1)
 
   @mock.patch.object(
       google_container_engine.GkeCluster, '_AddTags', return_value=None)

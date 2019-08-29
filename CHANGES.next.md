@@ -535,3 +535,4 @@
 - Fixed the broken reference to ycsb.YCSB_TAR_URL in the
   cloud_spanner_ycsb_benchmark. Without this, the benchmark is not runnable.
 - Fixed bug of query failing to find AWS internet gateway after Delete called.
+- Abort and log when container resources are exhausted.
