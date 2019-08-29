@@ -983,7 +983,7 @@ def ListConsistencyBenchmark(service):
     my_prefix = '%s_%d' % (object_prefix, i)
     thread = Thread(target=WriteObjects,
                     args=(service, FLAGS.bucket, my_prefix,
-                          LIST_CONSISTENCY_OBJECT_COUNT /
+                          LIST_CONSISTENCY_OBJECT_COUNT //
                           LIST_CONSISTENCY_THREAD_COUNT,
                           1,
                           per_thread_objects_written[i], None, None))
