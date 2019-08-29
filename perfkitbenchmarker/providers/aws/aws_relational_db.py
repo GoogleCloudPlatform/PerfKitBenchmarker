@@ -86,7 +86,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
   At the moment there is no way to specify the primary zone when creating a
   high availability instance, which means that the client and server may
   be launched in different zones, which hurts network performance.
-  In other words, the 'zone' attribute on the relational_db vm_spec
+  In other words, the 'zone' attribute on the relational_db db_spec
   has no effect, and is only used to specify the region.
 
   To filter out runs that cross zones, be sure to check the sample metadata for
@@ -110,7 +110,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     if hasattr(self.spec, 'zones') and self.spec.zones is not None:
       self.zones = self.spec.zones
     else:
-      self.zones = [self.spec.vm_spec.zone]
+      self.zones = [self.spec.db_spec.zone]
 
     self.region = util.GetRegionFromZones(self.zones)
     self.subnets_owned_by_db = []
@@ -137,9 +137,9 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
           'secondary_zone': self.secondary_zone,
       })
 
-    if hasattr(self.spec.disk_spec, 'iops'):
+    if hasattr(self.spec.db_disk_spec, 'iops'):
       metadata.update({
-          'disk_iops': self.spec.disk_spec.iops,
+          'disk_iops': self.spec.db_disk_spec.iops,
       })
 
     return metadata
@@ -289,25 +289,24 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       instance_identifier = self.instance_id
       self.all_instance_ids.append(instance_identifier)
       cmd = util.AWS_PREFIX + [
-          'rds',
-          'create-db-instance',
+          'rds', 'create-db-instance',
           '--db-instance-identifier=%s' % instance_identifier,
           '--engine=%s' % self.spec.engine,
           '--master-username=%s' % self.spec.database_username,
           '--master-user-password=%s' % self.spec.database_password,
-          '--allocated-storage=%s' % self.spec.disk_spec.disk_size,
-          '--storage-type=%s' % self.spec.disk_spec.disk_type,
-          '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
+          '--allocated-storage=%s' % self.spec.db_disk_spec.disk_size,
+          '--storage-type=%s' % self.spec.db_disk_spec.disk_type,
+          '--db-instance-class=%s' % self.spec.db_spec.machine_type,
           '--no-auto-minor-version-upgrade',
           '--region=%s' % self.region,
           '--engine-version=%s' % self.spec.engine_version,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
-          '--availability-zone=%s' % self.spec.vm_spec.zone,
-          '--tags'] + util.MakeFormattedDefaultTags()
+          '--availability-zone=%s' % self.spec.db_spec.zone, '--tags'
+      ] + util.MakeFormattedDefaultTags()
 
-      if self.spec.disk_spec.disk_type == aws_disk.IO1:
-        cmd.append('--iops=%s' % self.spec.disk_spec.iops)
+      if self.spec.db_disk_spec.disk_type == aws_disk.IO1:
+        cmd.append('--iops=%s' % self.spec.db_disk_spec.iops)
       # TODO(ferneyhough): add backup_enabled and backup_window
 
       vm_util.IssueCommand(cmd)
@@ -354,17 +353,16 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
         self.all_instance_ids.append(instance_identifier)
 
         cmd = util.AWS_PREFIX + [
-            'rds',
-            'create-db-instance',
+            'rds', 'create-db-instance',
             '--db-instance-identifier=%s' % instance_identifier,
             '--db-cluster-identifier=%s' % cluster_identifier,
             '--engine=%s' % self.spec.engine,
             '--engine-version=%s' % self.spec.engine_version,
             '--no-auto-minor-version-upgrade',
-            '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
+            '--db-instance-class=%s' % self.spec.db_spec.machine_type,
             '--region=%s' % self.region,
-            '--availability-zone=%s' % zone,
-            '--tags'] + util.MakeFormattedDefaultTags()
+            '--availability-zone=%s' % zone, '--tags'
+        ] + util.MakeFormattedDefaultTags()
         vm_util.IssueCommand(cmd)
 
     else:
