@@ -66,12 +66,12 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.minimal_spec = {
         'cloud': 'GCP',
         'engine': 'mysql',
-        'vm_spec': {
+        'db_spec': {
             'GCP': {
                 'machine_type': 'n1-standard-1'
             }
         },
-        'disk_spec': {
+        'db_disk_spec': {
             'GCP': {
                 'disk_size': 500
             }
@@ -91,7 +91,7 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.engine, 'mysql')
     self.assertEqual(result.cloud, 'GCP')
-    self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
+    self.assertIsInstance(result.db_spec, gce_virtual_machine.GceVmSpec)
 
   def testDefaultDatabaseName(self):
     result = benchmark_config_spec._RelationalDbSpec(
@@ -165,12 +165,12 @@ class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.spec = {
         'cloud': 'GCP',
         'engine': 'mysql',
-        'vm_spec': {
+        'db_spec': {
             'GCP': {
                 'machine_type': 'n1-standard-1'
             }
         },
-        'disk_spec': {
+        'db_disk_spec': {
             'GCP': {
                 'disk_size': 500
             }
@@ -178,14 +178,14 @@ class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
 
   def testDiskSpecRequired(self):
-    del self.spec['disk_spec']
-    with self.assertRaisesRegexp(errors.Config.MissingOption, 'disk_spec'):
+    del self.spec['db_disk_spec']
+    with self.assertRaisesRegexp(errors.Config.MissingOption, 'db_disk_spec'):
       benchmark_config_spec._RelationalDbSpec(
           _COMPONENT, flag_values=FLAGS, **self.spec)
 
   def testVmSpecRequired(self):
-    del self.spec['vm_spec']
-    with self.assertRaisesRegexp(errors.Config.MissingOption, 'vm_spec'):
+    del self.spec['db_spec']
+    with self.assertRaisesRegexp(errors.Config.MissingOption, 'db_spec'):
       benchmark_config_spec._RelationalDbSpec(
           _COMPONENT, flag_values=FLAGS, **self.spec)
 
@@ -203,13 +203,13 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
         'database_password': 'fake_password',
         'backup_enabled': True,
         'backup_start_time': '07:00',
-        'vm_spec': {
+        'db_spec': {
             'GCP': {
                 'machine_type': 'n1-standard-1',
                 'zone': 'us-west1-a',
             }
         },
-        'disk_spec': {
+        'db_disk_spec': {
             'GCP': {
                 'disk_size': 500,
             }
@@ -277,7 +277,8 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['managed_db_zone'].parse('us-east1-b')
     result = benchmark_config_spec._RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
-    self.assertEqual(result.vm_spec.zone, 'us-east1-b')
+    self.assertEqual(result.db_spec.zone, 'us-east1-b')
+
 
 if __name__ == '__main__':
   unittest.main()
