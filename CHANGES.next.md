@@ -29,7 +29,9 @@
 - Raise IssueCommandError by default when vm_util.IssueCommand return code is
   non-zero.  Previous behavior can be emulated by setting
   `raise_on_failure=False`.
-
+- Changed support for reusing buckets for Azure blob service benchmarking. The
+  storage account and resource group are now named based on the bucket name so
+  that subsequent runs can use the same bucket.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
