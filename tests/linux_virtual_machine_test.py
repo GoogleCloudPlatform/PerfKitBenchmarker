@@ -20,6 +20,9 @@ import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import pkb
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 import six
@@ -46,7 +49,7 @@ class LinuxVMResource(virtual_machine.BaseVirtualMachine,
   BASE_OS_TYPE = 'debian'
 
   def __init__(self, _):
-    pass
+    super(LinuxVMResource, self).__init__(virtual_machine.BaseVmSpec('test'))
 
   def Install(self):
     pass
@@ -189,6 +192,62 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
       self.vm._PreDelete()
     remote_command.assert_called_once_with('hostname && dmesg', should_log=True)
+
+
+class TestLsCpu(unittest.TestCase):
+
+  LSCPU_DATA = {
+      'NUMA node(s)': '1',
+      'Core(s) per socket': '2',
+      'Socket(s)': '3',
+      'a': 'b',
+  }
+
+  def LsCpuText(self, data):
+    return '\n'.join(['%s:%s' % entry for entry in data.items()])
+
+  def CreateVm(self, os_type, remote_command_text):
+    vm = LinuxVMResource(None)
+    vm.OS_TYPE = os_type  # pylint: disable=invalid-name
+    vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
+    vm.RemoteCommand.return_value = remote_command_text, ''
+    vm.name = 'pkb-test'
+    return vm
+
+  def testRecordLscpuOutputLinux(self):
+    vm = self.CreateVm(os_types.UBUNTU1604, self.LsCpuText(self.LSCPU_DATA))
+    samples = pkb._CreateLscpuSamples([vm])
+    vm.RemoteCommand.assert_called_with('lscpu')
+    self.assertEqual(1, len(samples))
+    metadata = {'node_name': vm.name}
+    metadata.update(self.LSCPU_DATA)
+    expected = sample.Sample('lscpu', 0, '', metadata, samples[0].timestamp)
+    self.assertEqual(expected, samples[0])
+
+  def testRecordLscpuOutputNonLinux(self):
+    vm = self.CreateVm(os_types.WINDOWS, '')
+    samples = pkb._CreateLscpuSamples([vm])
+    self.assertEqual(0, len(samples))
+    vm.RemoteCommand.assert_not_called()
+
+  def testMissingRequiredLsCpuEntries(self):
+    with self.assertRaises(ValueError):
+      linux_virtual_machine.LsCpuResults('')
+
+  def testLsCpuParsing(self):
+    vm = self.CreateVm(os_types.UBUNTU1604,
+                       self.LsCpuText(self.LSCPU_DATA) + '\nThis Line=Invalid')
+    results = vm.CheckLsCpu()
+    self.assertEqual(1, results.numa_node_count)
+    self.assertEqual(2, results.cores_per_socket)
+    self.assertEqual(3, results.socket_count)
+    self.assertEqual(
+        {
+            'NUMA node(s)': '1',
+            'Core(s) per socket': '2',
+            'Socket(s)': '3',
+            'a': 'b'
+        }, results.data)
 
 
 if __name__ == '__main__':
