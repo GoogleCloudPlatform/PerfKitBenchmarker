@@ -57,11 +57,13 @@ def GetResourceGroup(zone=None):
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name, zone=None, use_existing=False, timeout_minutes=None):
+  def __init__(self, name, zone=None, use_existing=False, timeout_minutes=None,
+               raise_on_create_failure=True):
     super(AzureResourceGroup, self).__init__()
     self.name = name
     self.use_existing = use_existing
     self.timeout_minutes = timeout_minutes
+    self.raise_on_create_failure = raise_on_create_failure
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
@@ -83,7 +85,7 @@ class AzureResourceGroup(resource.BaseResource):
           ] + util.GetTags(self.timeout_minutes),
           raise_on_failure=False)
 
-      if retcode:
+      if retcode and self.raise_on_create_failure:
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure resource group')
 
@@ -169,7 +171,7 @@ class AzureStorageAccount(resource.BaseResource):
                kind=None,
                access_tier=None,
                resource_group=None,
-               use_existing=False):
+               use_existing=False, raise_on_create_failure=True):
     super(AzureStorageAccount, self).__init__()
     self.storage_type = storage_type
     self.name = name
@@ -177,6 +179,7 @@ class AzureStorageAccount(resource.BaseResource):
     self.location = location
     self.kind = kind or 'Storage'
     self.use_existing = use_existing
+    self.raise_on_create_failure = raise_on_create_failure
 
     AzureStorageAccount.total_storage_accounts += 1
 
@@ -199,7 +202,8 @@ class AzureStorageAccount(resource.BaseResource):
         create_cmd.extend(['--location', self.location])
       if self.kind == 'BlobStorage':
         create_cmd.extend(['--access-tier', self.access_tier])
-      vm_util.IssueCommand(create_cmd)
+      vm_util.IssueCommand(create_cmd,
+                           raise_on_failure=self.raise_on_create_failure)
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
