@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Class to represent an Azure Virtual Machine object.
 
 Zones:
@@ -56,8 +55,10 @@ import yaml
 
 FLAGS = flags.FLAGS
 NUM_LOCAL_VOLUMES = {
-    'Standard_L8s_v2': 1, 'Standard_L16s_v2': 2,
-    'Standard_L32s_v2': 4, 'Standard_L64s_v2': 8,
+    'Standard_L8s_v2': 1,
+    'Standard_L16s_v2': 2,
+    'Standard_L32s_v2': 4,
+    'Standard_L64s_v2': 8,
     'Standard_L80s_v2': 10
 }
 
@@ -93,10 +94,10 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
@@ -143,10 +144,10 @@ class AzurePublicIPAddress(resource.BaseResource):
     self.resource_group = azure_network.GetResourceGroup()
 
   def _Create(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'public-ip', 'create',
-         '--location', self.location,
-         '--name', self.name] + self.resource_group.args)
+    vm_util.IssueCommand([
+        azure.AZURE_PATH, 'network', 'public-ip', 'create', '--location',
+        self.location, '--name', self.name
+    ] + self.resource_group.args)
 
   def _Exists(self):
     if self._deleted:
@@ -165,10 +166,10 @@ class AzurePublicIPAddress(resource.BaseResource):
       return False
 
   def GetIPAddress(self):
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'network', 'public-ip', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+    stdout, _ = vm_util.IssueRetryableCommand([
+        azure.AZURE_PATH, 'network', 'public-ip', 'show', '--output', 'json',
+        '--name', self.name
+    ] + self.resource_group.args)
 
     response = json.loads(stdout)
     return response['ipAddress']
@@ -192,12 +193,12 @@ class AzureNIC(resource.BaseResource):
     self.accelerated_networking = accelerated_networking
 
   def _Create(self):
-    cmd = [azure.AZURE_PATH, 'network', 'nic', 'create',
-           '--location', self.location,
-           '--vnet-name', self.subnet.vnet.name,
-           '--subnet', self.subnet.name,
-           '--public-ip-address', self.public_ip,
-           '--name', self.name] + self.resource_group.args
+    cmd = [
+        azure.AZURE_PATH, 'network', 'nic', 'create', '--location',
+        self.location, '--vnet-name', self.subnet.vnet.name, '--subnet',
+        self.subnet.name, '--public-ip-address', self.public_ip, '--name',
+        self.name
+    ] + self.resource_group.args
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
     vm_util.IssueCommand(cmd)
@@ -222,10 +223,10 @@ class AzureNIC(resource.BaseResource):
   def GetInternalIP(self):
     """Grab some data."""
 
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'network', 'nic', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+    stdout, _ = vm_util.IssueRetryableCommand([
+        azure.AZURE_PATH, 'network', 'nic', 'show', '--output', 'json',
+        '--name', self.name
+    ] + self.resource_group.args)
 
     response = json.loads(stdout)
     return response['ipConfigurations'][0]['privateIpAddress']
@@ -244,8 +245,8 @@ class AzureVirtualMachineMetaClass(resource.AutoRegisterResourceMeta):
     super(AzureVirtualMachineMetaClass, self).__init__(name, bases, dct)
     if hasattr(self, 'OS_TYPE'):
       assert self.OS_TYPE, '{0} did not override OS_TYPE'.format(self.__name__)
-      assert self.IMAGE_URN, (
-          '{0} did not override IMAGE_URN'.format(self.__name__))
+      assert self.IMAGE_URN, ('{0} did not override IMAGE_URN'.format(
+          self.__name__))
 
 
 class AzureVirtualMachine(
@@ -271,9 +272,8 @@ class AzureVirtualMachine(
 
     self.resource_group = azure_network.GetResourceGroup()
     self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
-    self.nic = AzureNIC(self.network.subnet,
-                        self.name + '-nic', self.public_ip.name,
-                        vm_spec.accelerated_networking)
+    self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
+                        self.public_ip.name, vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
     self.image = vm_spec.image or self.IMAGE_URN
 
@@ -282,12 +282,13 @@ class AzureVirtualMachine(
         vm_spec.boot_disk_type or self.storage_account.storage_type)
     if vm_spec.boot_disk_size:
       disk_spec.disk_size = vm_spec.boot_disk_size
-    self.os_disk = azure_disk.AzureDisk(disk_spec,
-                                        self.name,
-                                        self.machine_type,
-                                        self.storage_account,
-                                        None,
-                                        is_image=True)
+    self.os_disk = azure_disk.AzureDisk(
+        disk_spec,
+        self.name,
+        self.machine_type,
+        self.storage_account,
+        None,
+        is_image=True)
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -313,9 +314,8 @@ class AzureVirtualMachine(
 
     # Uses a custom default because create for larger sizes sometimes times out.
     azure_vm_create_timeout = 600
-    _, stderr, retcode = vm_util.IssueCommand(create_cmd,
-                                              timeout=azure_vm_create_timeout,
-                                              raise_on_failure=False)
+    _, stderr, retcode = vm_util.IssueCommand(
+        create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
     if retcode and 'Error Code: QuotaExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
@@ -330,8 +330,7 @@ class AzureVirtualMachine(
     if self._deleted:
       return False
     show_cmd = [
-        azure.AZURE_PATH, 'vm', 'show', '--output', 'json',
-        '--name', self.name
+        azure.AZURE_PATH, 'vm', 'show', '--output', 'json', '--name', self.name
     ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     try:
@@ -347,16 +346,16 @@ class AzureVirtualMachine(
   @vm_util.Retry()
   def _PostCreate(self):
     """Get VM data."""
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args)
+    stdout, _ = vm_util.IssueRetryableCommand([
+        azure.AZURE_PATH, 'vm', 'show', '--output', 'json', '--name', self.name
+    ] + self.resource_group.args)
     response = json.loads(stdout)
     self.os_disk.name = response['storageProfile']['osDisk']['name']
     self.os_disk.created = True
     vm_util.IssueCommand([
         azure.AZURE_PATH, 'disk', 'update', '--name', self.os_disk.name,
-        '--set', util.GetTagsJson(self.resource_group.timeout_minutes)
+        '--set',
+        util.GetTagsJson(self.resource_group.timeout_minutes)
     ] + self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
     self.ip_address = self.public_ip.GetIPAddress()
@@ -364,9 +363,8 @@ class AzureVirtualMachine(
   def AddMetadata(self, **tags):
     tag_list = ['tags.%s=%s' % (k, v) for k, v in six.iteritems(tags)]
     vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'update',
-         '--name', self.name] + self.resource_group.args +
-        ['--set'] + tag_list)
+        [azure.AZURE_PATH, 'vm', 'update', '--name', self.name] +
+        self.resource_group.args + ['--set'] + tag_list)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -506,13 +504,12 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
     super(WindowsAzureVirtualMachine, self)._PostCreate()
     config_dict = {'commandToExecute': windows_virtual_machine.STARTUP_SCRIPT}
     config = json.dumps(config_dict)
-    vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'extension', 'set',
-         '--vm-name', self.name,
-         '--name', 'CustomScriptExtension',
-         '--publisher', 'Microsoft.Compute',
-         '--version', '1.4',
-         '--protected-settings=%s' % config] + self.resource_group.args)
+    vm_util.IssueRetryableCommand([
+        azure.AZURE_PATH, 'vm', 'extension', 'set', '--vm-name', self.name,
+        '--name', 'CustomScriptExtension', '--publisher', 'Microsoft.Compute',
+        '--version', '1.4',
+        '--protected-settings=%s' % config
+    ] + self.resource_group.args)
 
 
 class Windows2012AzureVirtualMachine(WindowsAzureVirtualMachine,
@@ -533,33 +530,27 @@ class Windows2019AzureVirtualMachine(WindowsAzureVirtualMachine,
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""
-  module_name_with_underscores_removed = module_name.replace(
-      '_', '-')
+  module_name_with_underscores_removed = module_name.replace('_', '-')
   destpath = posixpath.join(install_path, filename)
   # TODO(ferneyhough): Refactor this so that this mkdir command
   # is run on all clouds, and is os-agnostic (this is linux specific).
   mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
-  download_command = ('az storage blob download '
-                      '--no-progress '
-                      '--account-name %s '
-                      '--container-name %s '
-                      '--name %s '
-                      '--file %s' % (
-                          FLAGS.azure_preprovisioned_data_bucket,
-                          module_name_with_underscores_removed,
-                          filename,
-                          destpath))
+  download_command = (
+      'az storage blob download '
+      '--no-progress '
+      '--account-name %s '
+      '--container-name %s '
+      '--name %s '
+      '--file %s' % (FLAGS.azure_preprovisioned_data_bucket,
+                     module_name_with_underscores_removed, filename, destpath))
   return '{0} && {1}'.format(mkdir_command, download_command)
 
 
 def GenerateStatPreprovisionedDataCommand(module_name, filename):
   """Returns a string used to download preprovisioned data."""
-  module_name_with_underscores_removed = module_name.replace(
-      '_', '-')
+  module_name_with_underscores_removed = module_name.replace('_', '-')
   return ('az storage blob show '
           '--account-name %s '
           '--container-name %s '
-          '--name %s' % (
-              FLAGS.azure_preprovisioned_data_bucket,
-              module_name_with_underscores_removed,
-              filename))
+          '--name %s' % (FLAGS.azure_preprovisioned_data_bucket,
+                         module_name_with_underscores_removed, filename))
