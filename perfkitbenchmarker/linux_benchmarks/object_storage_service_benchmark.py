@@ -1399,6 +1399,15 @@ def Prepare(benchmark_spec):
         # are reading existing objects
         (benchmark_spec.read_objects['azure_storage_account'],
          benchmark_spec.read_objects['azure_resource_group']))
+  elif FLAGS.storage == 'Azure' and FLAGS.object_storage_bucket_name:
+    # We are using a bucket that may exist from a previous run. We should use
+    # a storage account and resource group for this bucket based on the same
+    # name (for consistency).
+    service.PrepareService(
+        FLAGS.object_storage_region,
+        (FLAGS.object_storage_bucket_name + 'storage',
+         FLAGS.object_storage_bucket_name + '-resource-group'),
+        try_to_create_storage_account_and_resource_group=True)
   else:
     service.PrepareService(FLAGS.object_storage_region)
 
