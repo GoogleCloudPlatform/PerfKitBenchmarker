@@ -357,7 +357,8 @@ flags.DEFINE_bool('disable_interrupt_moderation', False,
                   'Turn off the interrupt moderation networking feature')
 flags.DEFINE_bool('disable_rss', False,
                   'Whether or not to disable the Receive Side Scaling feature.')
-
+flags.DEFINE_boolean('record_lscpu', True,
+                     'Whether to record the lscpu output in a sample')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -702,6 +703,9 @@ def DoRunPhase(spec, collector, timer):
     if run_number == 0 and (FLAGS.boot_samples or
                             spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
       samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
+
+    if FLAGS.record_lscpu:
+      samples.extend(_CreateLscpuSamples(spec.vms))
 
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
@@ -1177,6 +1181,17 @@ def _GenerateBenchmarkDocumentation():
                            vm_str or total_vm_count,
                            scratch_disk_str))
   return '\n\t'.join(benchmark_docs)
+
+
+def _CreateLscpuSamples(vms):
+  """Creates samples from linux VMs of lscpu output."""
+  samples = []
+  for vm in vms:
+    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      metadata = {'node_name': vm.name}
+      metadata.update(vm.CheckLsCpu().data)
+      samples.append(sample.Sample('lscpu', 0, '', metadata))
+  return samples
 
 
 def Main():
