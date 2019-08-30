@@ -200,6 +200,10 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
       cmd.Issue()
 
+      cmd = util.GcloudCommand(self, 'compute', 'disks', 'add-labels', vm_name)
+      cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+      cmd.Issue()
+
   def _GetInstanceGroups(self):
     cmd = util.GcloudCommand(self, 'container', 'node-pools', 'list')
     cmd.flags['cluster'] = self.name
