@@ -162,6 +162,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
     self._needs_reboot = False
+    self._lscpu_cache = None
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -453,8 +454,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def CheckLsCpu(self):
     """Returns a LsCpuResults from the host VM."""
-    lscpu, _ = self.RemoteCommand('lscpu')
-    return LsCpuResults(lscpu)
+    if not self._lscpu_cache:
+      lscpu, _ = self.RemoteCommand('lscpu')
+      self._lscpu_cache = LsCpuResults(lscpu)
+    return self._lscpu_cache
 
   @property
   def os_info(self):
@@ -1627,9 +1630,14 @@ class KernelRelease(object):
 
 class LsCpuResults(object):
   """Holds the contents of the command lscpu."""
+  # all rows in the lscpu output should look like "key:value"
+  _KEY_VALUE_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
 
   def __init__(self, lscpu):
     """LsCpuResults Constructor.
+
+    The lscpu command on Ubuntu 16.04 does *not* have the "--json" option for
+    json output, so keep on using the text format.
 
     Args:
       lscpu: A string in the format of "lscpu" command
@@ -1660,26 +1668,23 @@ class LsCpuResults(object):
     L3 cache:              15360K
     NUMA node0 CPU(s):     0-11
     """
-    match = re.search(r'NUMA\ node\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
-    if match:
-      self.numa_node_count = int(match.group(1))
-    else:
-      raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
-                       lscpu)
+    self.data = {}
+    for line in lscpu.splitlines():
+      m = self._KEY_VALUE_RE.match(line)
+      if m:
+        self.data[m.group('key')] = m.group('value')
+      else:
+        logging.debug('Ignoring bad lscpu line "%s"', line)
 
-    match = re.search(r'Core\(s\)\ per\ socket:\s*(\d+)$', lscpu, re.MULTILINE)
-    if match:
-      self.cores_per_socket = int(match.group(1))
-    else:
-      raise ValueError('Core(s) per socket could not be found in lscpu '
-                       'value:\n%s' % lscpu)
+    def GetInt(key):
+      if key in self.data and self.data[key].isdigit():
+        return int(self.data[key])
+      raise ValueError('Could not find integer "{}" in {}'.format(
+          key, sorted(self.data)))
 
-    match = re.search(r'Socket\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
-    if match:
-      self.socket_count = int(match.group(1))
-    else:
-      raise ValueError('Socket(s) count could not be found in lscpu '
-                       'value:\n%s' % lscpu)
+    self.numa_node_count = GetInt('NUMA node(s)')
+    self.cores_per_socket = GetInt('Core(s) per socket')
+    self.socket_count = GetInt('Socket(s)')
 
 
 class JujuMixin(DebianMixin):
