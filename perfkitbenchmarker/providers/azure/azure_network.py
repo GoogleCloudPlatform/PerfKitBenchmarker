@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Module containing classes related to Azure VM networking.
 
 The Firewall class provides a way of opening VM ports. The Network class allows
@@ -78,10 +77,10 @@ class AzureResourceGroup(resource.BaseResource):
       # group itself needs to have a location. Therefore,
       # FLAGS.zones[0].
       _, _, retcode = vm_util.IssueCommand(
-          [azure.AZURE_PATH, 'group', 'create',
-           '--name', self.name,
-           '--location', self.location,
-           '--tags'] + util.GetTags(self.timeout_minutes),
+          [
+              azure.AZURE_PATH, 'group', 'create', '--name', self.name,
+              '--location', self.location, '--tags'
+          ] + util.GetTags(self.timeout_minutes),
           raise_on_failure=False)
 
       if retcode:
@@ -91,7 +90,8 @@ class AzureResourceGroup(resource.BaseResource):
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'show', '--name', self.name],
-        suppress_warning=True, raise_on_failure=False)
+        suppress_warning=True,
+        raise_on_failure=False)
     try:
       json.loads(stdout)
       return True
@@ -102,7 +102,8 @@ class AzureResourceGroup(resource.BaseResource):
     # Ignore delete failures (potentially already deleted)
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
-        timeout=600, raise_on_failure=False)
+        timeout=600,
+        raise_on_failure=False)
 
   def AddTag(self, key, value):
     """Add a single tag to an existing Resource Group.
@@ -114,9 +115,11 @@ class AzureResourceGroup(resource.BaseResource):
     Raises:
       errors.resource.CreationError on failure.
     """
-    _, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'group', 'update', '--name', self.name,
-         '--set', 'tags.' + util.FormatTag(key, value)], raise_on_failure=False)
+    _, _, retcode = vm_util.IssueCommand([
+        azure.AZURE_PATH, 'group', 'update', '--name', self.name, '--set',
+        'tags.' + util.FormatTag(key, value)
+    ],
+                                         raise_on_failure=False)
     if retcode:
       raise errors.resource.CreationError('Error tagging Azure resource group.')
 
@@ -132,12 +135,10 @@ class AzureAvailSet(resource.BaseResource):
 
   def _Create(self):
     """Create the availability set."""
-    create_cmd = [azure.AZURE_PATH,
-                  'vm',
-                  'availability-set',
-                  'create',
-                  '--resource-group', self.resource_group.name,
-                  '--name', self.name]
+    create_cmd = [
+        azure.AZURE_PATH, 'vm', 'availability-set', 'create',
+        '--resource-group', self.resource_group.name, '--name', self.name
+    ]
     if self.location:
       create_cmd.extend(['--location', self.location])
     vm_util.IssueCommand(create_cmd)
@@ -148,13 +149,10 @@ class AzureAvailSet(resource.BaseResource):
   @vm_util.Retry()
   def _Exists(self):
     """Returns True if the availability set exists."""
-    show_cmd = [azure.AZURE_PATH,
-                'vm',
-                'availability-set',
-                'show',
-                '--output', 'json',
-                '--resource-group', self.resource_group.name,
-                '--name', self.name]
+    show_cmd = [
+        azure.AZURE_PATH, 'vm', 'availability-set', 'show', '--output', 'json',
+        '--resource-group', self.resource_group.name, '--name', self.name
+    ]
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     return bool(json.loads(stdout))
 
@@ -164,8 +162,13 @@ class AzureStorageAccount(resource.BaseResource):
 
   total_storage_accounts = 0
 
-  def __init__(self, storage_type, location, name,
-               kind=None, access_tier=None, resource_group=None,
+  def __init__(self,
+               storage_type,
+               location,
+               name,
+               kind=None,
+               access_tier=None,
+               resource_group=None,
                use_existing=False):
     super(AzureStorageAccount, self).__init__()
     self.storage_type = storage_type
@@ -187,22 +190,15 @@ class AzureStorageAccount(resource.BaseResource):
   def _Create(self):
     """Creates the storage account."""
     if not self.use_existing:
-      create_cmd = ([azure.AZURE_PATH,
-                     'storage',
-                     'account',
-                     'create',
-                     '--kind', self.kind,
-                     '--sku', self.storage_type,
-                     '--name', self.name,
-                     '--tags'] + util.GetTags(
-                         self.resource_group.timeout_minutes)
-                    + self.resource_group.args)
+      create_cmd = ([
+          azure.AZURE_PATH, 'storage', 'account', 'create', '--kind', self.kind,
+          '--sku', self.storage_type, '--name', self.name, '--tags'
+      ] + util.GetTags(self.resource_group.timeout_minutes) +
+                    self.resource_group.args)
       if self.location:
-        create_cmd.extend(
-            ['--location', self.location])
+        create_cmd.extend(['--location', self.location])
       if self.kind == 'BlobStorage':
-        create_cmd.extend(
-            ['--access-tier', self.access_tier])
+        create_cmd.extend(['--access-tier', self.access_tier])
       vm_util.IssueCommand(create_cmd)
 
   def _PostCreate(self):
@@ -210,25 +206,24 @@ class AzureStorageAccount(resource.BaseResource):
     self.connection_string = util.GetAzureStorageConnectionString(
         self.name, self.resource_group.args)
     self.connection_args = ['--connection-string', self.connection_string]
-    self.key = util.GetAzureStorageAccountKey(
-        self.name, self.resource_group.args)
+    self.key = util.GetAzureStorageAccountKey(self.name,
+                                              self.resource_group.args)
 
   def _Delete(self):
     """Deletes the storage account."""
-    delete_cmd = [azure.AZURE_PATH,
-                  'storage',
-                  'account',
-                  'delete',
-                  '--name', self.name,
-                  '--yes'] + self.resource_group.args
+    delete_cmd = [
+        azure.AZURE_PATH, 'storage', 'account', 'delete', '--name', self.name,
+        '--yes'
+    ] + self.resource_group.args
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the storage account exists."""
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'show',
-         '--output', 'json',
-         '--name', self.name] + self.resource_group.args,
+        [
+            azure.AZURE_PATH, 'storage', 'account', 'show', '--output', 'json',
+            '--name', self.name
+        ] + self.resource_group.args,
         suppress_warning=True,
         raise_on_failure=False)
 
@@ -264,11 +259,10 @@ class AzureVirtualNetwork(resource.BaseResource):
 
   def _Create(self):
     """Creates the virtual network."""
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'create',
-         '--location', self.location,
-         '--address-prefixes', self.address_space,
-         '--name', self.name] + self.resource_group.args)
+    vm_util.IssueCommand([
+        azure.AZURE_PATH, 'network', 'vnet', 'create', '--location', self
+        .location, '--address-prefixes', self.address_space, '--name', self.name
+    ] + self.resource_group.args)
 
   def _Delete(self):
     """Deletes the virtual network."""
@@ -299,11 +293,11 @@ class AzureSubnet(resource.BaseResource):
     self.args = ['--subnet', self.name]
 
   def _Create(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'create',
-         '--vnet-name', self.vnet.name,
-         '--address-prefix', self.vnet.address_space,
-         '--name', self.name] + self.resource_group.args)
+    vm_util.IssueCommand([
+        azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'create', '--vnet-name',
+        self.vnet.name, '--address-prefix', self.vnet.address_space, '--name',
+        self.name
+    ] + self.resource_group.args)
 
   @vm_util.Retry()
   def _Exists(self):
@@ -343,10 +337,10 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     self.have_deny_all_rule = False
 
   def _Create(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nsg', 'create',
-         '--location', self.location,
-         '--name', self.name] + self.resource_group.args)
+    vm_util.IssueCommand([
+        azure.AZURE_PATH, 'network', 'nsg', 'create', '--location',
+        self.location, '--name', self.name
+    ] + self.resource_group.args)
 
   @vm_util.Retry()
   def _Exists(self):
@@ -363,12 +357,10 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     pass
 
   def AttachToSubnet(self):
-    vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'update',
-         '--name', self.subnet.name,
-         '--network-security-group', self.name] +
-        self.resource_group.args +
-        self.subnet.vnet.args)
+    vm_util.IssueRetryableCommand([
+        azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'update', '--name',
+        self.subnet.name, '--network-security-group', self.name
+    ] + self.resource_group.args + self.subnet.vnet.args)
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Open a port or port range.
@@ -394,8 +386,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       if rule in self.rules:
         return
       port_range = '%s-%s' % (start_port, end_port)
-      rule_name = 'allow-%s-%s' % (
-          port_range, source_range_str)
+      rule_name = 'allow-%s-%s' % (port_range, source_range_str)
       # Azure priorities are between 100 and 4096, but we reserve 4095
       # for the special DenyAll rule created by DisallowAllPorts.
       rule_priority = 100 + len(self.rules)
@@ -403,15 +394,13 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         raise ValueError('Too many firewall rules!')
       self.rules[rule] = rule_name
 
-    vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
-         '--name', rule_name,
-         '--destination-port-range', port_range,
-         '--access', 'Allow',
-         '--priority', str(rule_priority)]
-        + ['--source-address-prefixes'] + source_range
-        + self.resource_group.args
-        + self.args)
+    vm_util.IssueRetryableCommand([
+        azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
+        rule_name, '--destination-port-range', port_range, '--access', 'Allow',
+        '--priority',
+        str(rule_priority)
+    ] + ['--source-address-prefixes'] + source_range +
+                                  self.resource_group.args + self.args)
 
 
 class AzureFirewall(network.BaseFirewall):
@@ -433,8 +422,8 @@ class AzureFirewall(network.BaseFirewall):
       source_range: unsupported at present.
     """
 
-    vm.network.nsg.AllowPort(vm, start_port, end_port=end_port,
-                             source_range=source_range)
+    vm.network.nsg.AllowPort(
+        vm, start_port, end_port=end_port, source_range=source_range)
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
