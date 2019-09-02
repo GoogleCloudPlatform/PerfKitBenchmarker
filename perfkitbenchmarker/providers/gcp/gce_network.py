@@ -31,7 +31,9 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import resource
+
 from perfkitbenchmarker.providers.gcp import util
 import six
 
@@ -119,9 +121,15 @@ class GceFirewall(network.BaseFirewall):
     with self._lock:
       if end_port is None:
         end_port = start_port
-      firewall_name = ('perfkit-firewall-%s-%d-%d' %
-                       (FLAGS.run_uri, start_port, end_port))
-      key = (vm.project, start_port, end_port, source_range)
+      if vm.cidr:  # Allow multiple networks per zone.
+        cidr_string = network.BaseNetwork.FormatCidrString(vm.cidr)
+        firewall_name = ('perfkit-firewall-%s-%s-%d-%d' %
+                         (cidr_string, FLAGS.run_uri, start_port, end_port))
+        key = (vm.project, vm.cidr, start_port, end_port, source_range)
+      else:
+        firewall_name = ('perfkit-firewall-%s-%d-%d' %
+                         (FLAGS.run_uri, start_port, end_port))
+        key = (vm.project, start_port, end_port, source_range)
       if key in self.firewall_rules:
         return
       allow = ','.join('{0}:{1}-{2}'.format(protocol, start_port, end_port)
@@ -235,27 +243,72 @@ class GceNetwork(network.BaseNetwork):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
     name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
-    mode = 'auto' if FLAGS.gce_subnet_region is None else 'custom'
+
+    self.net_type = 'default'  # Default network 'auto' mode. Single VPC with subnets in all regions
+    self.subnet_addr = NETWORK_RANGE
+    self.net_name = network.BaseNetwork.FormatCidrString(NETWORK_RANGE)
+
+    if FLAGS.gce_subnet_region:  # Overrides auto network when set. Creates one VPC network in single region.
+      self.net_type = 'single'
+      self.subnet_addr = FLAGS.gce_subnet_addr
+      self.net_name = network.BaseNetwork.FormatCidrString(FLAGS.gce_subnet_addr)
+      name = FLAGS.gce_network_name or 'pkb-network-%s-%s-%s' % (self.net_type, self.net_name, FLAGS.run_uri)
+    if network_spec.cidr:  # Creates multiple VPC networks when set.
+      self.net_type = 'multi'
+      self.subnet_addr = network_spec.cidr
+      self.net_name = network.BaseNetwork.FormatCidrString(network_spec.cidr)
+      name = FLAGS.gce_network_name or 'pkb-network-%s-%s-%s' % (self.net_type, self.net_name, FLAGS.run_uri)
+
+    self.subnet_region = FLAGS.gce_subnet_region if network_spec.cidr is None else util.GetRegionFromZone(network_spec.zone)
+    mode = 'auto' if self.subnet_region is None else 'custom'
     self.network_resource = GceNetworkResource(name, mode, self.project)
-    if FLAGS.gce_subnet_region is None:
+    if self.subnet_region is None:
       self.subnet_resource = None
     else:
       self.subnet_resource = GceSubnetResource(name, name,
-                                               FLAGS.gce_subnet_region,
-                                               FLAGS.gce_subnet_addr,
+                                               self.subnet_region,
+                                               self.subnet_addr,
                                                self.project)
-    firewall_name = 'default-internal-%s' % FLAGS.run_uri
+
+    self.all_nets = []  # Holds the different networks we learn about.
+    self.external_nets_rules = {}  # Holds FW rules for any external subnets.
+    self.default_subnet = None  # Holds the default subnet for this run if used.
+
+    firewall_name = '%s-%s-%s-%s' % (self.net_type, 'internal', self.net_name, FLAGS.run_uri)
     self.default_firewall_rule = GceFirewallRule(
-        firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE)
+        firewall_name, self.project, ALLOW_ALL, name, self.subnet_addr)
+    self.all_nets.append(self.net_name)
+    if self.net_type != 'multi':  # We're using the default network.
+      self.default_subnet = self.subnet_addr
+
+    # Add firewall rules for other networks if they exist.
+    if network_spec.custom_subnets:
+      for net_group, cidr in network_spec.custom_subnets.items():
+        this_net_string = None
+        this_net = None
+        if cidr is None and self.default_subnet is None:  # only add default rule once
+          self.default_subnet = FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region else NETWORK_RANGE
+          this_net_string = network.BaseNetwork.FormatCidrString(self.default_subnet)
+          this_net = self.default_subnet
+        elif cidr:
+          this_net_string = network.BaseNetwork.FormatCidrString(cidr)
+          this_net = cidr
+        if this_net and this_net_string not in self.all_nets:
+          rule_name = '%s-%s-%s-%s' % (self.net_type, self.net_name, this_net_string, FLAGS.run_uri)
+          self.external_nets_rules[rule_name] = GceFirewallRule(rule_name, self.project, ALLOW_ALL, name, this_net)
+          self.all_nets.append(this_net_string)
+
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns a BaseNetworkSpec created from VM attributes."""
-    return GceNetworkSpec(project=vm.project, zone=vm.zone)
+    return GceNetworkSpec(project=vm.project, zone=vm.zone, cidr=vm.cidr)
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
     """Returns a key used to register Network instances."""
+    if spec.cidr:
+      return (cls.CLOUD, spec.project, spec.cidr)
     return (cls.CLOUD, spec.project)
 
   def Create(self):
@@ -264,12 +317,20 @@ class GceNetwork(network.BaseNetwork):
       self.network_resource.Create()
       if self.subnet_resource:
         self.subnet_resource.Create()
-      self.default_firewall_rule.Create()
+      if self.default_firewall_rule:
+        self.default_firewall_rule.Create()
+      if self.external_nets_rules:
+        for rule in self.external_nets_rules:
+          self.external_nets_rules[rule].Create()
 
   def Delete(self):
     """Deletes the actual network."""
     if not FLAGS.gce_network_name:
-      self.default_firewall_rule.Delete()
+      if self.default_firewall_rule.created:
+        self.default_firewall_rule.Delete()
+      if self.external_nets_rules:
+        for rule in self.external_nets_rules:
+          self.external_nets_rules[rule].Delete()
       if self.subnet_resource:
         self.subnet_resource.Delete()
       self.network_resource.Delete()
