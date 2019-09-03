@@ -325,8 +325,8 @@ def _GetCpuUtilizationSample(samples, instance_id):
 
     metadata = {
         'cluster_number': cluster_number,
-        'cpu_utilization_per_minute': utilization
-        }
+        'cpu_utilization_per_minute': utilization,
+    }
 
     cpu_utilization_sample = sample.Sample(
         'cpu_load_array', -1, 'cpu load', metadata)
@@ -439,7 +439,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
- # Delete table
+  # Delete table
   if FLAGS.google_bigtable_instance_name is None:
     benchmark_spec.bigtable_instance.Delete()
   else:
