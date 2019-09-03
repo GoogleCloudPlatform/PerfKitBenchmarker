@@ -102,8 +102,8 @@ def ManageLifecycleResources(base_folder, dpb_service_instance,
     storage_service.Copy(static_artifact_url, lifecycle_folder_uri)
 
     if 'prefix' in artifact_details.keys():
-      lifecycle_artifact_uri = lifecycle_folder_uri[0:len(lifecycle_folder_uri
-                                                         ) - 1]
+      lifecycle_artifact_uri = lifecycle_folder_uri[0:len(
+          lifecycle_folder_uri) - 1]
     else:
       lifecycle_artifact_uri = '{}/{}'.format(lifecycle_folder_uri,
                                               artifact_details['artifact'])

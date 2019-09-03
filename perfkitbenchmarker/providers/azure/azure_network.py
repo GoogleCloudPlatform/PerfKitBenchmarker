@@ -117,11 +117,11 @@ class AzureResourceGroup(resource.BaseResource):
     Raises:
       errors.resource.CreationError on failure.
     """
-    _, _, retcode = vm_util.IssueCommand([
+    tag_cmd = [
         azure.AZURE_PATH, 'group', 'update', '--name', self.name, '--set',
         'tags.' + util.FormatTag(key, value)
-    ],
-                                         raise_on_failure=False)
+    ]
+    _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
       raise errors.resource.CreationError('Error tagging Azure resource group.')
 
@@ -193,11 +193,11 @@ class AzureStorageAccount(resource.BaseResource):
   def _Create(self):
     """Creates the storage account."""
     if not self.use_existing:
-      create_cmd = ([
+      create_cmd = [
           azure.AZURE_PATH, 'storage', 'account', 'create', '--kind', self.kind,
           '--sku', self.storage_type, '--name', self.name, '--tags'
-      ] + util.GetTags(self.resource_group.timeout_minutes) +
-                    self.resource_group.args)
+      ] + util.GetTags(
+          self.resource_group.timeout_minutes) + self.resource_group.args
       if self.location:
         create_cmd.extend(['--location', self.location])
       if self.kind == 'BlobStorage':
@@ -398,13 +398,14 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         raise ValueError('Too many firewall rules!')
       self.rules[rule] = rule_name
 
-    vm_util.IssueRetryableCommand([
+    network_cmd = [
         azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
         rule_name, '--destination-port-range', port_range, '--access', 'Allow',
         '--priority',
         str(rule_priority)
-    ] + ['--source-address-prefixes'] + source_range +
-                                  self.resource_group.args + self.args)
+    ] + ['--source-address-prefixes'] + source_range
+    network_cmd.extend(self.resource_group.args + self.args)
+    vm_util.IssueRetryableCommand(network_cmd)
 
 
 class AzureFirewall(network.BaseFirewall):
