@@ -265,7 +265,7 @@ class EksCluster(container_service.KubernetesCluster):
 
   def _AuthorizeNodes(self):
     """Allow the nodes to be added to the cluster."""
-    with vm_util.NamedTemporaryFile() as tf:
+    with vm_util.NamedTemporaryFile(mode='w') as tf:
       tf.write(_CONFIG_MAP.format(
           node_instance_role=self.eks_workers.node_instance_role))
       tf.close()
