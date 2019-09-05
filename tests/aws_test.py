@@ -520,5 +520,19 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(
     self.assertEqual(actual, expected)
 
 
+class AwsKeyFileManagerTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @mock.patch.object(vm_util, 'IssueRetryableCommand')
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testKeyPairLimitExceeded(self, import_cmd, cat_cmd):
+    cat_cmd.side_effect = [('key_content', None)]
+    import_cmd.side_effect = [
+        ('', 'An error occurred (KeyPairLimitExceeded) when calling the '
+         'ImportKeyPair operation: Maximum of 5000 keypairs reached.', 255)
+    ]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+      aws_virtual_machine.AwsKeyFileManager.ImportKeyfile('region')
+
+
 if __name__ == '__main__':
   unittest.main()

@@ -378,7 +378,15 @@ class AwsKeyFileManager(object):
           'import-key-pair',
           '--key-name=%s' % cls.GetKeyNameForRun(),
           '--public-key-material=%s' % keyfile]
-      util.IssueRetryableCommand(import_cmd)
+      _, stderr, retcode = vm_util.IssueCommand(
+          import_cmd, raise_on_failure=False)
+      if retcode:
+        if 'KeyPairLimitExceeded' in stderr:
+          raise errors.Benchmarks.QuotaFailure(
+              'KeyPairLimitExceeded in %s: %s' % (region, stderr))
+        else:
+          raise errors.Benchmarks.PrepareException(stderr)
+
       cls.imported_keyfile_set.add(_GetKeyfileSetKey(region))
       if _GetKeyfileSetKey(region) in cls.deleted_keyfile_set:
         cls.deleted_keyfile_set.remove(_GetKeyfileSetKey(region))
@@ -787,7 +795,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       if len(boot_drive) > 0:
         # get the boot drive index by dropping the nvme prefix
         boot_idx = int(boot_drive[4:])
-        logging.info("found boot drive at nvme index %d" % boot_idx)
+        logging.info('found boot drive at nvme index %d', boot_idx)
         return boot_idx
       else:
         # boot drive is not nvme
