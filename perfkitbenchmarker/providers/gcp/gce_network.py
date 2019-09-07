@@ -25,8 +25,10 @@ from __future__ import division
 from __future__ import print_function
 
 import json
+import logging
 import threading
 
+from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
@@ -39,6 +41,405 @@ import six
 FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
+
+
+class GceVPNGW(network.BaseVPNGW):
+  CLOUD = providers.GCP
+
+  def __init__(self, name, network_name, region, cidr, project):
+    super(GceVPNGW, self).__init__()
+
+    self.forwarding_rules = {}
+    self.tunnels = {}
+    self.routes = {}
+    self.ip_resource = None
+    self.vpngw_resource = GceVPNGWResource(name, network_name, region, cidr, project)
+
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.cidr = cidr
+    self.project = project
+
+    self.ip_address = None
+    self.created = False
+    self.require_target_to_init = False
+    self.routing = None
+    self.psk = None
+
+  def ConfigureTunnel(self, tunnel_config):
+    network.BaseVPNGW.ConfigureTunnel(self, tunnel_config)
+    logging.info('Configuring Tunnel with params:')
+    logging.info(tunnel_config)
+
+    # update tunnel_config if needed
+    if self.name not in tunnel_config.endpoints:
+      logging.info('tunnel_config: This endpoint isnt registered yet... %s' % self.name)
+      tunnel_config.endpoints[self.name] = {}
+      tunnel_config.endpoints[self.name]['is_configured'] = False
+      tunnel_config.endpoints[self.name]['cidr'] = self.cidr
+      tunnel_config.endpoints[self.name]['project'] = self.project
+      tunnel_config.endpoints[self.name]['network_name'] = self.network_name
+      tunnel_config.endpoints[self.name]['region'] = self.region
+      tunnel_config.endpoints[self.name]['require_target_to_init'] = self.require_target_to_init
+
+    # attach public IP to this GW if doesnt exist
+    # and update tunnel_config if needed
+    # requires project, region, name
+    if not self.ip_address:
+      if not self.ip_resource:
+        self.ip_resource = GceIPAddress(self.project, self.region, self.name)
+        self.ip_resource.Create()
+      self.ip_address = self.ip_resource.ip_address
+    if 'ip_address' not in tunnel_config.endpoints[self.name]:
+      logging.info('tunnel_config: Configuring IP for %s' % self.name)
+      tunnel_config.endpoints[self.name]['ip_address'] = self.ip_address
+
+    # configure forwarding
+    # requires: -
+    if len(self.forwarding_rules) == 3:
+      logging.info('tunnel_config: Forwarding already configured, skipping')
+    else:
+      logging.info('tunnel_config: Setting up forwarding')
+      self._SetupForwarding(tunnel_config)
+
+    # Abort if we don't have a target info configured yet
+    if len(tunnel_config.endpoints) < 2:
+      logging.info('tunnel_config: Only found %d endpoints... waiting for target to configure' % len(tunnel_config.endpoints))
+      return
+
+    # Get target endpoint config key
+    target_endpoint = [k for k in tunnel_config.endpoints.keys() if k not in self.name][0]
+
+    # configure tunnel resources
+    # requires: target_ip_address, IKE version (default 1),
+    if 'ip_address' not in tunnel_config.endpoints[target_endpoint]:
+      logging.info('tunnel_config: Target IP needed... waiting for target to configure')
+      return
+    if not hasattr(tunnel_config, 'psk'):
+      logging.info('tunnel_config: PSK not provided... setting to runid')
+      tunnel_config.psk = 'key' + FLAGS.run_uri
+    self._SetupTunnel(tunnel_config)
+
+    # configure routing
+    # requires: next_hop_tunnel_id, target_cidr,
+    dest_cidr = tunnel_config.endpoints[target_endpoint].get('cidr')
+    if not dest_cidr or not dest_cidr.strip():
+      logging.info('tunnel_config: destination CIDR needed... waiting for target to configure')
+      return
+    self._SetupRouting(
+        tunnel_config.suffix,
+        tunnel_config.endpoints[self.name]['tunnel_id'],
+        tunnel_config.endpoints[target_endpoint]['cidr'])
+
+    tunnel_config.endpoints[self.name]['is_configured'] = True
+
+  def IsTunnelReady(self, tunnel_id):
+    return self.tunnels[tunnel_id].IsReady()
+
+  def _SetupTunnel(self, tunnel_config):
+    target_endpoint = [k for k in tunnel_config.endpoints.keys() if k not in self.name][0]
+    project = tunnel_config.endpoints[self.name]['project']
+    region = tunnel_config.endpoints[self.name]['region']
+    vpngw_id = self.name
+    target_ip = tunnel_config.endpoints[target_endpoint]['ip_address']
+    psk = tunnel_config.psk
+    ike_version = tunnel_config.ike_version
+    suffix = tunnel_config.suffix
+    name = 'tun-' + self.name + '-' + suffix
+    if name not in self.tunnels:
+      self.tunnels[name] = GceStaticTunnel(project, region, name, vpngw_id, target_ip, ike_version, psk)
+      self.tunnels[name].Create()
+      tunnel_config.endpoints[self.name]['tunnel_id'] = name
+
+  def _SetupForwarding(self, tunnel_config):
+    """Create IPSec forwarding rules
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Args:
+      source_gw: The BaseVPN object to add forwarding rules to.
+    """
+    if len(self.forwarding_rules) == 3:
+      return  # backout if already set
+    suffix = tunnel_config.suffix
+    # GCP doesnt like uppercase names?!?
+    fr_UDP500_name = ('fr-udp500-%s-%s' %
+                      (suffix, FLAGS.run_uri))
+    fr_UDP4500_name = ('fr-udp4500-%s-%s' %
+                       (suffix, FLAGS.run_uri))
+    fr_ESP_name = ('fr-esp-%s-%s' %
+                   (suffix, FLAGS.run_uri))
+
+    if fr_UDP500_name not in self.forwarding_rules:
+      fr_UDP500 = GceForwardingRule(
+          fr_UDP500_name, 'UDP', self, 500)
+      self.forwarding_rules[fr_UDP500_name] = fr_UDP500
+      fr_UDP500.Create()
+    if fr_UDP4500_name not in self.forwarding_rules:
+      fr_UDP4500 = GceForwardingRule(
+          fr_UDP4500_name, 'UDP', self, 4500)
+      self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
+      fr_UDP4500.Create()
+    if fr_ESP_name not in self.forwarding_rules:
+      fr_ESP = GceForwardingRule(
+          fr_ESP_name, 'ESP', self)
+      self.forwarding_rules[fr_ESP_name] = fr_ESP
+      fr_ESP.Create()
+
+  def _SetupRouting(self, suffix, next_hop_tun, dest_cidr):
+    """Create IPSec routing rules between the source gw and the target gw.
+
+    Args:
+      target_gw: The VPNGW object to point routing rules at.
+    """
+
+    route_name = 'route-' + self.name + '-' + suffix
+    if route_name not in self.routes:
+      self.routes[route_name] = GceRoute(route_name, dest_cidr, self.network_name, next_hop_tun, self.region, self.project, self.region)
+      self.routes[route_name].Create()
+
+  def Create(self):
+    """Creates the actual VPNGW."""
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
+    if self.created:
+      return
+    if self.vpngw_resource:
+      self.vpngw_resource.Create()
+    key = self.name
+    if key not in benchmark_spec.vpngws:
+      benchmark_spec.vpngws[key] = self
+
+    self.created = True
+    return benchmark_spec.vpngws[key]
+
+  def Delete(self):
+    """Deletes the actual VPNGW."""
+    if self.ip_resource:
+      self.ip_resource.Delete()
+
+    if self.tunnels:
+      for tun in self.tunnels:
+        self.tunnels[tun].Delete()
+
+    if self.forwarding_rules:
+      for fr in self.forwarding_rules:
+        self.forwarding_rules[fr].Delete()
+
+    if self.routes:
+      for route in self.routes:
+        self.routes[route].Delete()
+
+    if self.vpngw_resource:
+      self.vpngw_resource.Delete()
+
+    self.created = False
+
+
+class GceVPNGWResource(resource.BaseResource):
+
+  def __init__(self, name, network_name, region, cidr, project):
+    super(GceVPNGWResource, self).__init__()
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.cidr = cidr
+    self.project = project
+
+  def _Create(self):
+    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'create',
+                             self.name)
+    cmd.flags['network'] = self.network_name
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+  def _Exists(self):
+    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    return not retcode
+
+  def _Delete(self):
+    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'delete',
+                             self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue(raise_on_failure=False)
+
+
+class GceIPAddress(resource.BaseResource):
+
+  def __init__(self, project, region, name):
+    super(GceIPAddress, self).__init__()
+    self.project = project
+    self.region = region
+    self.name = name
+    self.ip_address = None
+
+  def _Create(self):
+    """ Allocates a public IP for the VPN GW """
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'create', self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+  def _PostCreate(self):
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe', self.name)
+    cmd.flags['region'] = self.region
+    cmd.flags['format'] = 'value(address)'
+    stdout, _, _ = cmd.Issue()
+    self.ip_address = stdout.encode('ascii', 'ignore').rstrip()
+
+  def _Delete(self):
+    """ Deletes a public IP for the VPN GW """
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'delete', self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue(raise_on_failure=False)
+
+  def _Exists(self):
+    """Returns True if the IP address exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    return not retcode
+
+
+class GceStaticTunnel(resource.BaseResource):
+  """An object representing a GCE Tunnel."""
+
+  def __init__(self, project, region, name, vpngw_id, target_ip, ike_version, psk):
+    super(GceStaticTunnel, self).__init__()
+    self.project = project
+    self.region = region
+    self.name = name
+    self.vpngw_id = vpngw_id
+    self.target_ip = target_ip
+    self.ike_version = ike_version
+    self.psk = psk
+
+  def _Create(self):
+    """Creates the Tunnel."""
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create', self.name)
+    cmd.flags['peer-address'] = self.target_ip
+    cmd.flags['target-vpn-gateway'] = self.vpngw_id
+    cmd.flags['ike-version'] = self.ike_version
+    cmd.flags['local-traffic-selector'] = '0.0.0.0/0'
+    cmd.flags['remote-traffic-selector'] = '0.0.0.0/0'
+    cmd.flags['shared-secret'] = self.psk
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+  def _Delete(self):
+    """Delete IPSec tunnel
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'delete', self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue(raise_on_failure=False)
+
+  def _Exists(self):
+    """Returns True if the tunnel exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe', self.name)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    return not retcode
+
+  def IsReady(self):
+    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe', self.name)
+    cmd.flags['region'] = self.region
+    response = cmd.Issue(suppress_warning=True)
+    return 'established' in str(response).lower()
+
+
+class GceRoute(resource.BaseResource):
+  """An object representing a GCE Route."""
+
+  def __init__(self, route_name, dest_cidr, network_name, next_hop_tun, next_hop_region, project, region):
+    super(GceRoute, self).__init__()
+    self.name = route_name
+    self.dest_cidr = dest_cidr
+    self.next_hop_region = next_hop_region
+    self.next_hop_tun = next_hop_tun
+    self.network_name = network_name
+    self.project = project
+    self.region = region
+
+  def _Create(self):
+    """Creates the Route."""
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'create', self.name)
+    cmd.flags['destination-range'] = self.dest_cidr
+    cmd.flags['network'] = self.network_name
+    cmd.flags['next-hop-vpn-tunnel'] = self.next_hop_tun
+    cmd.flags['next-hop-vpn-tunnel-region'] = self.next_hop_region
+    cmd.Issue()
+#     return self.id
+
+  def _Delete(self):
+    """Delete route
+
+    Args:
+      route: The route name to delete
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'delete', self.name)
+    cmd.Issue(raise_on_failure=False)
+
+  def _Exists(self):
+    """Returns True if the Route exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'describe',
+                             self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    return not retcode
+
+
+class GceForwardingRule(resource.BaseResource):
+  """An object representing a GCE Forwarding Rule."""
+
+  def __init__(self, name, protocol, src_vpngw, port=None):
+    super(GceForwardingRule, self).__init__()
+    self.name = name
+    self.protocol = protocol
+    self.port = port
+    self.target_name = src_vpngw.name
+    self.target_ip = src_vpngw.ip_address
+    self.src_region = src_vpngw.region
+    self.project = src_vpngw.project
+
+  def __eq__(self, other):
+    """Defines equality to make comparison easy."""
+    return (self.name == other.name and
+            self.protocol == other.protocol and
+            self.port == other.port and
+            self.target_name == other.target_name and
+            self.target_ip == other.target_ip and
+            self.src_region == other.src_region)
+
+  def _Create(self):
+    """Creates the Forwarding Rule."""
+    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'create',
+                             self.name)
+    cmd.flags['ip-protocol'] = self.protocol
+    if self.port:
+      cmd.flags['ports'] = self.port
+    cmd.flags['address'] = self.target_ip
+    cmd.flags['target-vpn-gateway'] = self.target_name
+    cmd.flags['region'] = self.src_region
+    cmd.Issue()
+
+  def _Delete(self):
+    """Deletes the Forwarding Rule."""
+    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'delete',
+                             self.name)
+    cmd.flags['region'] = self.src_region
+    cmd.Issue(raise_on_failure=False)
+
+  def _Exists(self):
+    """Returns True if the Forwarding Rule exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.src_region
+    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    return not retcode
 
 
 class GceFirewallRule(resource.BaseResource):
@@ -241,6 +642,7 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
+    self.vpngw = {}
 
     #  Figuring out the type of network here.
     #  Precedence: User Managed > MULTI > SINGLE > DEFAULT
@@ -284,6 +686,15 @@ class GceNetwork(network.BaseNetwork):
                                                             self.project,
                                                             ALLOW_ALL, name,
                                                             ext_net)
+
+    # Add VPNGWs to the network.
+    if FLAGS.use_vpn:
+      for gwnum in range(0, FLAGS.vpn_service_gateway_count):
+        vpngw_name = 'vpngw-%s-%s-%s' % (
+            util.GetRegionFromZone(network_spec.zone), gwnum, FLAGS.run_uri)
+        self.vpngw[vpngw_name] = GceVPNGW(
+            vpngw_name, name, util.GetRegionFromZone(network_spec.zone),
+            network_spec.cidr, self.project)
 
   def _GetNetworksFromSpec(self, network_spec):
     """Returns a list of distinct CIDR networks for this benchmark.
@@ -400,10 +811,16 @@ class GceNetwork(network.BaseNetwork):
       if self.external_nets_rules:
         for rule in self.external_nets_rules:
           self.external_nets_rules[rule].Create()
+      if getattr(self, 'vpngw', False):
+        for gw in self.vpngw:
+          self.vpngw[gw].Create()
 
   def Delete(self):
     """Deletes the actual network."""
     if not FLAGS.gce_network_name:
+      if getattr(self, 'vpngw', False):
+        for gw in self.vpngw:
+          self.vpngw[gw].Delete()
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:
