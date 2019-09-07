@@ -102,6 +102,56 @@ class BaseNetworkSpec(object):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
 
+class BaseVPNGW(object):
+  """An object representing the Base VPN GW."""
+  CLOUD = None
+
+  def __init__(self, zone=None, cidr=None):
+    """Initializes the BaseVPNGW.
+
+    Args:
+      zone: The zone in which to create the VPNGW.
+    """
+    self.zone = zone
+    self.cidr = cidr
+    self.require_target_to_init = False  # True if we need taget GW up front (AWS)
+
+  @classmethod
+  def GetVPNGW(cls):
+    """Returns a BaseVPNGW.
+    This method is used instead of directly calling the class's constructor.
+    It creates BaseVPNGW instances and registers them.
+    If a BaseVPNGW object has already been registered, that object
+    will be returned rather than creating a new one. This enables multiple
+    VMs to call this method and all share the same BaseVPN object.
+    """
+    if cls.CLOUD is None:
+      raise errors.Error('VPNGWs should have CLOUD attributes.')
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetVPN called in a thread without a '
+                         'BenchmarkSpec.')
+    with benchmark_spec.vpngws_lock:
+      key = cls.CLOUD
+      if key not in benchmark_spec.vpngws:
+        benchmark_spec.vpngws[key] = cls()
+      return benchmark_spec.vpngws[key]
+
+  def IsTunnelConfigured(self):
+    pass
+
+  def ConfigureTunnel(self, tunnel_config):
+    pass
+
+  def Create(self):
+    """Creates the actual VPNGW."""
+    pass
+
+  def Delete(self):
+      """Deletes the actual VPNGW."""
+      pass
+
+
 class BaseNetwork(object):
   """Object representing a Base Network."""
 

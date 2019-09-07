@@ -330,6 +330,9 @@ flags.DEFINE_boolean(
 flags.DEFINE_string(
     'skip_pending_runs_file', None,
     'If file exists, any pending runs will be not be executed.')
+flags.DEFINE_boolean(
+    'use_vpn', False,
+    'Creates VPN tunnels between vm_groups')
 flags.DEFINE_integer(
     'after_prepare_sleep_time', 0,
     'The time in seconds to sleep after the prepare phase. This can be useful '
@@ -624,6 +627,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
+  spec.ConstructVPNService()
   spec.ConstructNfsService()
   spec.ConstructSmbService()
   # Pickle the spec before we try to create anything so we can clean
