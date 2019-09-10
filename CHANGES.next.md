@@ -543,3 +543,4 @@
   cloud_spanner_ycsb_benchmark. Without this, the benchmark is not runnable.
 - Fixed bug of query failing to find AWS internet gateway after Delete called.
 - Abort and log when container resources are exhausted.
+- Check if an AWS firewall rule exists before creating one by querying AWS.

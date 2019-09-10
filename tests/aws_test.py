@@ -399,6 +399,8 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm.use_spot_instance = False
 
   def testFirewallAllowPortNonStatic(self):
+    check_firewall = {'SecurityGroups': []}
+    util.IssueRetryableCommand.return_value = json.dumps(check_firewall), ''
     self.vm.firewall.AllowPort(self.vm, 22)
     # only checking that the 2nd of the tcp/udp calls are done
     cmd = _AwsCommand('us-east-1', 'authorize-security-group-ingress',

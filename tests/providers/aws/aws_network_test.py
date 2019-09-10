@@ -68,6 +68,10 @@ GATEWAY_QUERY_ONE = ('describe-internet-gateways', {
 ATTACH_GATEWAY = ('attach-internet-gateway', {})
 DETACH_GATEWAY = ('detach-internet-gateway', {})
 
+DESCRIBE_FW_NONE = ('describe-security-groups', {'SecurityGroups': []})
+DESCRIBE_FW_ONE = ('describe-security-groups', {'SecurityGroups': [1]})
+CREATE_FW = ('authorize-security-group-ingress', {})
+
 FLAGS = flags.FLAGS
 _COMPONENT = 'test_component'
 
@@ -260,6 +264,33 @@ class AwsInternetGatewayTest(BaseAwsTest):
     gw = aws_network.AwsInternetGateway(REGION)
     with self.assertRaises(errors.Error):
       gw.GetDict()
+
+
+class AwsFirewallTest(BaseAwsTest):
+
+  def testHappyPath(self):
+    self.SetExpectedCommands(DESCRIBE_FW_NONE, CREATE_FW, CREATE_FW)
+    fw = aws_network.AwsFirewall()
+    fw.AllowPortInSecurityGroup(REGION, SG_DEFAULT, 22)
+    self.assertCommandsCalled()
+
+  def testSerialLocking(self):
+    self.SetExpectedCommands(DESCRIBE_FW_NONE, CREATE_FW, CREATE_FW)
+    fw = aws_network.AwsFirewall()
+    fw.AllowPortInSecurityGroup(REGION, SG_DEFAULT, 22)
+    self.assertCommandsCalled()
+    # show that the describe and create commands are not called
+    self.SetExpectedCommands()
+    fw.AllowPortInSecurityGroup(REGION, SG_DEFAULT, 22)
+    self.assertCommandsCalled()
+
+  def testAddMultipleSources(self):
+    self.SetExpectedCommands(DESCRIBE_FW_NONE, CREATE_FW, CREATE_FW)
+    fw = aws_network.AwsFirewall()
+    fw.AllowPortInSecurityGroup(REGION, SG_DEFAULT, 22, source_range=['a'])
+    self.SetExpectedCommands(DESCRIBE_FW_NONE, CREATE_FW, CREATE_FW)
+    fw.AllowPortInSecurityGroup(REGION, SG_DEFAULT, 22, source_range=['a', 'b'])
+    self.assertCommandsCalled()
 
 
 if __name__ == '__main__':
