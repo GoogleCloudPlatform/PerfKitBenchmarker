@@ -93,10 +93,13 @@ class AwsFirewall(network.BaseFirewall):
     for source in source_range:
       entry = (start_port, end_port, region, security_group, source)
       if entry in self.firewall_set:
-        return
+        continue
+      if self._RuleExists(region, security_group, start_port, end_port, source):
+        self.firewall_set.add(entry)
+        continue
       with self._lock:
         if entry in self.firewall_set:
-          return
+          continue
         authorize_cmd = util.AWS_PREFIX + [
             'ec2',
             'authorize-security-group-ingress',
@@ -108,6 +111,23 @@ class AwsFirewall(network.BaseFirewall):
         util.IssueRetryableCommand(authorize_cmd + ['--protocol=tcp'])
         util.IssueRetryableCommand(authorize_cmd + ['--protocol=udp'])
         self.firewall_set.add(entry)
+
+  def _RuleExists(self, region, security_group, start_port, end_port, source):
+    """Whether the firewall rule exists in the VPC."""
+    query_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-security-groups',
+        '--region=%s' % region,
+        '--group-ids=%s' % security_group,
+        '--filters',
+        'Name=ip-permission.cidr,Values={}'.format(source),
+        'Name=ip-permission.from-port,Values={}'.format(start_port),
+        'Name=ip-permission.to-port,Values={}'.format(end_port),
+    ]
+    stdout, _ = util.IssueRetryableCommand(query_cmd)
+    # "groups" will be an array of all the matching firewall rules
+    groups = json.loads(stdout)['SecurityGroups']
+    return bool(groups)
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
