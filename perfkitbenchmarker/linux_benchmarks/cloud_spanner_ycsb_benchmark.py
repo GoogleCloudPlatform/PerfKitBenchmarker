@@ -25,6 +25,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
+from perfkitbenchmarker.providers.gcp import util
 
 BENCHMARK_NAME = 'cloud_spanner_ycsb'
 BENCHMARK_CONFIG = """
@@ -65,7 +66,14 @@ REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.admin',
     'https://www.googleapis.com/auth/spanner.data')
 
+CLIENT_TAR_URL = {
+    'go': 'https://storage.googleapis.com/cloud-spanner-client-packages/'
+          'ycsb-go-20180531_f0afaf5fad3c46ae392ebab6b7553d37d65d07ac.tar.gz',
+}
+
 FLAGS = flags.FLAGS
+flags.DEFINE_enum('cloud_spanner_ycsb_client_type', 'java', ['java', 'go'],
+                  'The type of the client.')
 flags.DEFINE_integer('cloud_spanner_ycsb_batchinserts',
                      1,
                      'The Cloud Spanner batch inserts used in the YCSB '
@@ -118,6 +126,9 @@ def Prepare(benchmark_spec):
     logging.warning('Failed to create Cloud Spanner instance and database.')
     benchmark_spec.spanner_instance.Delete()
 
+  if FLAGS.cloud_spanner_ycsb_client_type != 'java':
+    ycsb.SetYcsbTarUrl(CLIENT_TAR_URL[FLAGS.cloud_spanner_ycsb_client_type])
+
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
@@ -148,11 +159,17 @@ def Run(benchmark_spec):
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
   }
 
+  if FLAGS.cloud_spanner_ycsb_client_type == 'go':
+    run_kwargs['cloudspanner.project'] = util.GetDefaultProject()
+
   load_kwargs = run_kwargs.copy()
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
-  # TODO: Figure out a common set of properties and update the benchmark
-  # meta data here.
+
+  metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
+  for sample in samples:
+    sample.metadata.update(metadata)
+
   return samples
 
 
@@ -167,6 +184,10 @@ def Cleanup(benchmark_spec):
 
 
 def _Install(vm):
+  if FLAGS.cloud_spanner_ycsb_client_type == 'go':
+    logging.info('Installing go packages.')
+    vm.Install('go_lang')
+    vm.Install('google_cloud_go')
   vm.Install('ycsb')
 
   # Run custom VM installation commands.
