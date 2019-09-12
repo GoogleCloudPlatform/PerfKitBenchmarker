@@ -13,5 +13,4 @@
 # limitations under the License.
 
 # Requirements for running PerfKit Benchmarker on CloudStack.
--r../../../requirements.txt
 csapi>=0.0.7
