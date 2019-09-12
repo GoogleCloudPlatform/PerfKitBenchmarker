@@ -339,6 +339,8 @@
 - Move vm_groups to inside the relational_db spec when there is one, to allow it
   to control what vms are used. Rename the old vm_spec and disk_spec under the
   relational_db to db_spec and db_disk_spec respectively, for added clarity.
+- Updated cloud_spanner_ycsb_benchmark to add the support for GCP Go client
+  library.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

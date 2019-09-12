@@ -118,7 +118,7 @@ def PrepActConfig(vm, load, index=None):
   if FLAGS.act_threads_per_queue:
     content += 'threads-per-queue: %d\n' % FLAGS.act_threads_per_queue
   logging.info('ACT config: %s', content)
-  with tempfile.NamedTemporaryFile(delete=False) as tf:
+  with tempfile.NamedTemporaryFile(delete=False, mode='w+') as tf:
     tf.write(content)
     tf.close()
     vm.PushDataFile(tf.name, config_file)
