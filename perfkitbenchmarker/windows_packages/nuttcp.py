@@ -71,6 +71,7 @@ class NuttcpNotRunningError(Exception):
   """Raised when nuttcp is not running at a time that it is expected to be."""
 
 
+@vm_util.Retry()
 def Install(vm):
   """Installs the nuttcp package on the VM."""
   zip_path = ntpath.join(vm.temp_dir, NUTTCP_ZIP)
