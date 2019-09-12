@@ -31,7 +31,8 @@ def _GetVersion():
   try:
     version = subprocess.check_output(['git', '--git-dir', git_dir,
                                        'describe', '--always'],
-                                      stderr=subprocess.STDOUT)
+                                      stderr=subprocess.STDOUT,
+                                      universal_newlines=True)
   except (OSError, subprocess.CalledProcessError):
     # Could not get the version from git. Resort to contents of the static
     # version file.
