@@ -67,6 +67,8 @@ from six.moves import zip
 
 FLAGS = flags.FLAGS
 
+YCSB_URL_TEMPLATE = ('https://github.com/brianfrankcooper/YCSB/releases/'
+                     'download/{0}/ycsb-{0}.tar.gz')
 YCSB_DIR = posixpath.join(INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 HDRHISTOGRAM_DIR = posixpath.join(INSTALL_DIR, 'hdrhistogram')
@@ -171,6 +173,14 @@ flags.DEFINE_float('ycsb_scanproportion',
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
 
+# Customer YCSB tar url. If not set, the official YCSB release will be used.
+_ycsb_tar_url = None
+
+
+def SetYcsbTarUrl(url):
+  global _ycsb_tar_url
+  _ycsb_tar_url = url
+
 
 def _GetVersionIndex(version_str):
   """Returns the version index from ycsb version string.
@@ -215,8 +225,7 @@ def _Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
   vm.Install('curl')
-  ycsb_url = ('https://github.com/brianfrankcooper/YCSB/releases/'
-              'download/{0}/ycsb-{0}.tar.gz').format(FLAGS.ycsb_version)
+  ycsb_url = _ycsb_tar_url or YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version)
   install_cmd = ('mkdir -p {0} && curl -L {1} | '
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
@@ -724,9 +733,12 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
     List of sample.Sample objects.
   """
   stage = 'load' if ycsb_result['command_line'].endswith('-load') else 'run'
-  base_metadata = {'command_line': ycsb_result['command_line'],
-                   'stage': stage,
-                   'ycsb_version': FLAGS.ycsb_version}
+  base_metadata = {
+      'command_line': ycsb_result['command_line'],
+      'stage': stage,
+      'ycsb_tar_url': _ycsb_tar_url,
+      'ycsb_version': FLAGS.ycsb_version
+  }
   base_metadata.update(kwargs)
 
   for group_name, group in six.iteritems(ycsb_result['groups']):
