@@ -14,16 +14,20 @@
 
 """Tests for perfkitbenchmarker.requirements."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from collections import deque
 import contextlib
-import StringIO
 import unittest
 
 import mock
-import pkg_resources
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import requirements
+import pkg_resources
+import six
+from six.moves import map
 
 
 _PATH = 'dir/file'
@@ -32,7 +36,7 @@ _PATH = 'dir/file'
 class _MockOpenRequirementsFile(object):
 
   def __init__(self, *args):
-    self._io = deque(StringIO.StringIO(a) for a in args)
+    self._io = deque(six.StringIO(a) for a in args)
 
   def __enter__(self):
     return self._io.popleft()
@@ -57,7 +61,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     """
     with self._MockOpen(requirements_content) as mocked_open:
       requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'rb')
+    mocked_open.assert_called_once_with('dir/file', 'r')
 
   def testMissingPackage(self):
     requirements_content = """
@@ -67,7 +71,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'rb')
+    mocked_open.assert_called_once_with('dir/file', 'r')
 
   def testInstalledVersionLowerThanRequirement(self):
     requirements_content = """
@@ -77,7 +81,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'rb')
+    mocked_open.assert_called_once_with('dir/file', 'r')
 
   def testInstalledVersionGreaterThanRequirement(self):
     requirements_content = """
@@ -87,7 +91,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'rb')
+    mocked_open.assert_called_once_with('dir/file', 'r')
 
   def testIncludedFiles(self):
     top_file = """
@@ -111,12 +115,13 @@ class CheckRequirementsTestCase(unittest.TestCase):
       with mock.patch.object(pkg_resources, 'require') as mocked_require:
         requirements._CheckRequirements(_PATH)
     mocked_open.assert_has_calls((
-        mock.call('dir/file', 'rb'), mock.call('dir/subfile0', 'rb'),
-        mock.call('dir/subdir/subfile2', 'rb'),
-        mock.call('dir/../subfile3', 'rb'), mock.call('dir/subfile1', 'rb')))
-    mocked_require.assert_has_calls(map(mock.call, (
-        'package-0', 'package-3', 'package-4', 'package-5',
-        'package-1>=2.0', 'package-6', 'package-2')))
+        mock.call('dir/file', 'r'), mock.call('dir/subfile0', 'r'),
+        mock.call('dir/subdir/subfile2', 'r'),
+        mock.call('dir/../subfile3', 'r'), mock.call('dir/subfile1', 'r')))
+    mocked_require.assert_has_calls(
+        list(
+            map(mock.call, ('package-0', 'package-3', 'package-4', 'package-5',
+                            'package-1>=2.0', 'package-6', 'package-2'))))
 
 
 class CheckBasicRequirementsTestCase(unittest.TestCase):
