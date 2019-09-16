@@ -307,7 +307,7 @@ def _GetCpuUtilizationSample(samples, instance_id):
   end_timestamp = last_run_sample.timestamp
   cpu_query = query.Query(
       client, project=(FLAGS.project or _GetDefaultProject()),
-      metric_type='bigtable.googleapis.com/cluster/cpu_load',
+      metric_type='bigtable.googleapis.com/cluster/cpu_load_hottest_node',
       end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
       minutes=int((end_timestamp - start_timestamp) / 60))
   cpu_query = cpu_query.select_resources(instance=instance_id)
@@ -329,7 +329,7 @@ def _GetCpuUtilizationSample(samples, instance_id):
     }
 
     cpu_utilization_sample = sample.Sample(
-        'cpu_load_array', -1, 'cpu load', metadata)
+        'cpu_load_hottest_node_array', -1, 'cpu load hottest node', metadata)
 
     samples.append(cpu_utilization_sample)
   return samples
