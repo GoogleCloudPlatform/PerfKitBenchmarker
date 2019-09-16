@@ -17,6 +17,11 @@
 cp and dd between two attached disks on same vm.
 scp copy across different vms using external networks.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import functools
 import logging
 import posixpath
 
@@ -29,6 +34,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import option_decoders
+import six
 
 
 class CopyThroughputBenchmarkSpec(
@@ -208,7 +214,8 @@ def AvailableCiphers(vm):
 
 def ChooseSshCipher(vms):
   """Returns the most-preferred cipher that's available to all vms."""
-  available = reduce(lambda a, b: a & b, [AvailableCiphers(vm) for vm in vms])
+  available = functools.reduce(lambda a, b: a & b,
+                               [AvailableCiphers(vm) for vm in vms])
   for cipher in CIPHERS:
     if cipher in available:
       return cipher
@@ -263,7 +270,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm, cipher,
   results = []
   metadata = base_metadata.copy()
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
-    for k, v in vm.GetResourceMetadata().iteritems():
+    for k, v in six.iteritems(vm.GetResourceMetadata()):
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
   cmd_template = ('sudo sync; sudo sysctl vm.drop_caches=3; '
