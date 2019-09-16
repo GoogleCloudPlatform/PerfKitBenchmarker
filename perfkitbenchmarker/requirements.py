@@ -73,7 +73,8 @@ def CheckBasicRequirements():
     requirements_file_name = 'requirements.txt'
   else:
     requirements_file_name = 'requirements-py3.txt'
-  requirements_file_path = os.path.join(_BRANCH_ROOT_DIR, requirements_file_name)
+  requirements_file_path = os.path.join(_BRANCH_ROOT_DIR,
+                                        requirements_file_name)
   if os.path.isfile(requirements_file_path):
     _CheckRequirements(requirements_file_path)
 
