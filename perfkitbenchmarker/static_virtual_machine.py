@@ -202,6 +202,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         os_types.WINDOWS: required_keys | frozenset(['password']),
         os_types.DEBIAN: linux_required_keys,
         os_types.RHEL: linux_required_keys,
+        os_types.CLEAR: linux_required_keys,
         os_types.UBUNTU_CONTAINER: linux_required_keys,
     }
 
@@ -304,6 +305,11 @@ class ContainerizedStaticVirtualMachine(
 
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
                                       linux_virtual_machine.DebianMixin):
+  pass
+
+
+class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
+                                     linux_virtual_machine.ClearMixin):
   pass
 
 

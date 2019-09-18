@@ -57,6 +57,7 @@ FLAGS = flags.FLAGS
 
 
 LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
+CLEAR_BUILD_REGEXP = r'Installed version:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '~/.ssh/id_rsa'
@@ -314,7 +315,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-      self.InstallPackages('python')
+      if (self.OS_TYPE != 'clear'):
+        self.InstallPackages('python')
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -465,9 +467,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if self.os_metadata.get('os_info'):
       return self.os_metadata['os_info']
     else:
-      self.Install('lsb_release')
-      stdout, _ = self.RemoteCommand('lsb_release -d')
-      return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+      if (self.OS_TYPE == 'clear'):
+        stdout, _ = self.RemoteCommand('swupd info | grep Installed')
+        return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
+      else:
+        self.Install('lsb_release')
+        stdout, _ = self.RemoteCommand('lsb_release -d')
+        return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
 
   @property
   def kernel_release(self):
@@ -1089,6 +1095,97 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.AppendKernelCommandLine(
           FLAGS.append_kernel_command_line, reboot=False)
       self._needs_reboot = True
+
+
+class ClearMixin(BaseLinuxMixin):
+  """Class holding Clear Linux specific VM methods and attributes."""
+
+  OS_TYPE = os_types.CLEAR
+  BASE_OS_TYPE = os_types.CLEAR
+
+  def OnStartup(self):
+    """Eliminates the need to have a tty to run sudo commands."""
+    super(ClearMixin, self).OnStartup()
+    self.RemoteHostCommand('sudo swupd autoupdate --disable')
+    self.RemoteHostCommand('sudo mkdir -p /etc/sudoers.d')
+    self.RemoteHostCommand('echo \'Defaults:{0} !requiretty\' | '
+                           'sudo tee /etc/sudoers.d/pkb'.format(self.user_name),
+                           login_shell=True)
+
+  def PackageCleanup(self):
+    """Cleans up all installed packages.
+
+    Performs the normal package cleanup, then deletes the file
+    added to the /etc/sudoers.d directory during startup.
+    """
+    super(ClearMixin, self).PackageCleanup()
+    self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
+
+  def SnapshotPackages(self):
+    """Grabs a snapshot of the currently installed packages."""
+    self.RemoteCommand('sudo swupd bundle-list > {0}/bundle_list'.format(linux_packages.INSTALL_DIR))
+
+  def RestorePackages(self):
+    """Restores the currently installed bundles to those snapshotted."""
+    self.RemoteCommand(
+        'sudo swupd bundle-list | grep --fixed-strings --line-regexp --invert-match --file '
+        '{0}/bundle_list | xargs --no-run-if-empty sudo swupd bundle-remove'.format(linux_packages.INSTALL_DIR),
+        ignore_failure=True)
+
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('sudo swupd bundle-list --all | grep {0}'.format(package),
+                                 suppress_warning=True)
+
+  def InstallPackages(self, packages):
+    """Installs packages using the swupd bundle manager."""
+    self.RemoteCommand('sudo swupd bundle-add {0}'.format(packages))
+
+  def InstallPackageGroup(self, package_group):
+    """Installs a 'package group' using the yum package manager."""
+    self.RemoteCommand('sudo swupd bundle-add "{0}"'.format(package_group))
+
+  def Install(self, package_name):
+    """Installs a PerfKit package on the VM."""
+    if not self.install_packages:
+      return
+    if package_name not in self._installed_packages:
+      package = linux_packages.PACKAGES[package_name]
+      if hasattr(package, 'SwupdInstall'):
+        package.SwupdInstall(self)
+      elif hasattr(package, 'Install'):
+        package.Install(self)
+      else:
+        raise KeyError('Package {0} has no install method for Clear Linux.'.format(package_name))
+      self._installed_packages.add(package_name)
+
+  def Uninstall(self, package_name):
+    """Uninstalls a PerfKit package on the VM."""
+    package = linux_packages.PACKAGES[package_name]
+    if hasattr(package, 'SwupdUninstall'):
+      package.SwupdUninstall(self)
+    elif hasattr(package, 'Uninstall'):
+      package.Uninstall(self)
+
+  def GetPathToConfig(self, package_name):
+    """Returns the path to the config file for PerfKit packages.
+
+    This function is mostly useful when config files locations
+    don't match across distributions (such as mysql). Packages don't
+    need to implement it if this is not the case.
+    """
+    package = linux_packages.PACKAGES[package_name]
+    return package.YumGetPathToConfig(self)
+
+  def GetServiceName(self, package_name):
+    """Returns the service name of a PerfKit package.
+
+    This function is mostly useful when service names don't
+    match across distributions (such as mongodb). Packages don't
+    need to implement it if this is not the case.
+    """
+    package = linux_packages.PACKAGES[package_name]
+    return package.YumGetServiceName(self)
 
 
 class RhelMixin(BaseLinuxMixin):
