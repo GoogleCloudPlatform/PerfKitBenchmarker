@@ -19,6 +19,10 @@ others in the
 same project. See https://developers.google.com/compute/docs/networking for
 more information about AliCloud VM networking.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import threading
@@ -30,6 +34,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128

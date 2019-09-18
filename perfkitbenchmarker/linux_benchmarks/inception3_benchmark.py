@@ -22,6 +22,9 @@ except that this can target TPU.
 # TODO(tohaowu): We only measure image processing speed for now, and we will
 # measure the other metrics in the future.
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -29,6 +32,7 @@ from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.linux_benchmarks import resnet_benchmark
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import tensorflow
+from six.moves import range
 
 FLAGS = flags.FLAGS
 

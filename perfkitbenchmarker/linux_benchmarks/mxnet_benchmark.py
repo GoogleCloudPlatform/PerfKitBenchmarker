@@ -19,6 +19,9 @@
 image-classification).
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -26,6 +29,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import mxnet
 from perfkitbenchmarker.linux_packages import mxnet_cnn
+from six.moves import range
 
 
 FLAGS = flags.FLAGS

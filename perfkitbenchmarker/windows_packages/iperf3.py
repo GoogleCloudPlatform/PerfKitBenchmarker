@@ -14,6 +14,10 @@
 
 """Module containing Iperf3 windows installation and cleanup functions."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import multiprocessing
 import ntpath
 
@@ -21,6 +25,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -189,9 +194,9 @@ def RunIperf3UDPStream(sending_vm, receiving_vm, use_internal_ip=True):
 
   samples = []
 
-  for bandwidth in xrange(FLAGS.min_bandwidth_mb,
-                          FLAGS.max_bandwidth_mb,
-                          FLAGS.bandwidth_step_mb):
+  for bandwidth in range(FLAGS.min_bandwidth_mb,
+                         FLAGS.max_bandwidth_mb,
+                         FLAGS.bandwidth_step_mb):
     sender_args = ('--client {server_ip} --udp -t {duration} -P {num_threads} '
                    '-b {bandwidth}M -l {buffer_len} > {out_file}'.format(
                        server_ip=receiver_ip,

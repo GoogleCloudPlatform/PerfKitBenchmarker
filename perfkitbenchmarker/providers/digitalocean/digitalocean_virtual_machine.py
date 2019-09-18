@@ -14,6 +14,9 @@
 """Class to represent a DigitalOcean Virtual Machine object (Droplet).
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
@@ -22,6 +25,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
 from perfkitbenchmarker.providers.digitalocean import util
 from perfkitbenchmarker import providers
+from six.moves import range
 
 UBUNTU_IMAGE = 'ubuntu-14-04-x64'
 

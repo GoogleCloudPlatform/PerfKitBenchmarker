@@ -17,6 +17,10 @@ library which calls the cloudstack API. For more information refer to
 the Cloudstack documentation at https://github.com/syed/PerfKitBenchmarker.git
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 
 from perfkitbenchmarker import flags
@@ -27,6 +31,7 @@ from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
 from perfkitbenchmarker.providers.cloudstack import cloudstack_network
 from perfkitbenchmarker.providers.cloudstack import util
 from perfkitbenchmarker import providers
+from six.moves import range
 
 UBUNTU_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
 RHEL_IMAGE = 'CentOS 7 HVM base (64bit)'
@@ -189,7 +194,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self.disks = []
 
-    for i in xrange(disk_spec.num_striped_disks):
+    for i in range(disk_spec.num_striped_disks):
 
         name = 'disk-%s-%d-%d' % (self.name, i + 1, self.disk_counter)
         scratch_disk = cloudstack_disk.CloudStackDisk(disk_spec,

@@ -22,6 +22,10 @@ remote/persistent ssd, and local ssd. The Aerospike configuration is controlled
 by the "aerospike_storage_type" and "data_disk_type" flags.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import re
 
 from perfkitbenchmarker import configs
@@ -29,8 +33,10 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import aerospike_server
 from perfkitbenchmarker.linux_packages import aerospike_client
+from perfkitbenchmarker.linux_packages import aerospike_server
+from six.moves import map
+from six.moves import range
 
 
 FLAGS = flags.FLAGS
@@ -143,7 +149,7 @@ def Run(benchmark_spec):
     average_latency = (
         (FLAGS.aerospike_read_percent / 100.0) * float(read_latency) +
         ((100 - FLAGS.aerospike_read_percent) / 100.0) * float(write_latency))
-    tps = map(int, re.findall(r'total\(tps=([0-9]+) ', output))
+    tps = list(map(int, re.findall(r'total\(tps=([0-9]+) ', output)))
     return float(sum(tps)) / len(tps), average_latency
 
   load_command = ('./%s/benchmarks/target/benchmarks -z 32 -n test -w I '

@@ -14,17 +14,17 @@
 
 import json
 import logging
-from requests.auth import HTTPBasicAuth
-import requests
-import urlparse
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.mesos.mesos_disk import LocalDisk
-from perfkitbenchmarker import providers
+import requests
+from requests.auth import HTTPBasicAuth
+import six.moves.urllib.parse
 
 FLAGS = flags.FLAGS
 
@@ -78,8 +78,9 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     self.cpus = vm_spec.docker_cpus
     self.memory_mb = vm_spec.docker_memory_mb
     self.privileged = vm_spec.mesos_privileged_docker
-    self.api_url = urlparse.urljoin(FLAGS.marathon_address, MARATHON_API_PREFIX)
-    self.app_url = urlparse.urljoin(self.api_url, self.name)
+    self.api_url = six.moves.urllib.parse.urljoin(FLAGS.marathon_address,
+                                                  MARATHON_API_PREFIX)
+    self.app_url = six.moves.urllib.parse.urljoin(self.api_url, self.name)
     auth = FLAGS.marathon_auth.split(":")
     if len(auth) == 2:
       self.auth = HTTPBasicAuth(auth[0], auth[1])

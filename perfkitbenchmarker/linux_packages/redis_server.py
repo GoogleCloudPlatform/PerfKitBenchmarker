@@ -15,8 +15,12 @@
 
 """Module containing redis installation and cleanup functions."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from six.moves import range
 
 
 flags.DEFINE_integer('redis_total_num_processes', 1,
