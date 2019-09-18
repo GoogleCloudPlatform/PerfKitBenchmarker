@@ -14,6 +14,10 @@
 
 """Module containing nuttcp installation and cleanup functions."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import multiprocessing
 import ntpath
 
@@ -22,6 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -230,7 +235,7 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
 
   bandwidths = [
       '{b}m'.format(b=b)
-      for b in xrange(
+      for b in range(
           FLAGS.nuttcp_min_bandwidth_mb,
           FLAGS.nuttcp_max_bandwidth_mb,
           FLAGS.nuttcp_bandwidth_step_mb)

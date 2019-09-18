@@ -19,6 +19,10 @@ cassandra-stress tool page:
 http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import functools
 import logging
@@ -35,6 +39,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cassandra
+from six.moves import range
 
 
 NUM_KEYS_PER_CORE = 2000000
@@ -430,7 +435,7 @@ def RunCassandraStressTest(cassandra_vms, loader_vms, num_operations,
   args = [((loader_vms[i], i, operations_per_vm, data_node_ips,
             command, profile_operations, population_per_vm,
             population_dist, population_params), {})
-          for i in xrange(0, num_loaders)]
+          for i in range(0, num_loaders)]
   vm_util.RunThreaded(RunTestOnLoader, args)
 
 

@@ -21,6 +21,10 @@ More information about NTttcp may be found here:
 https://gallery.technet.microsoft.com/NTttcp-Version-528-Now-f8b12769
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import ntpath
 import time
@@ -30,6 +34,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+import six
 
 FLAGS = flags.FLAGS
 
@@ -251,7 +256,7 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type, udp,
 
   metadata = {'ip_type': ip_type}
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
-    for k, v in vm.GetResourceMetadata().iteritems():
+    for k, v in six.iteritems(vm.GetResourceMetadata()):
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
   return ParseNtttcpResults(sender_xml, receiver_xml, metadata)

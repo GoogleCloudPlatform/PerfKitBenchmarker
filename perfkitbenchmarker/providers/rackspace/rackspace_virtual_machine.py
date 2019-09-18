@@ -28,6 +28,10 @@ run 'rack servers image list'
 All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from collections import OrderedDict
 import json
 import logging
@@ -44,6 +48,9 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
 from perfkitbenchmarker.providers.rackspace import rackspace_network
 from perfkitbenchmarker.providers.rackspace import util
+import six
+from six.moves import range
+from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -274,7 +281,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
           FLAGS.rackspace_network_id])
     create_cmd.flags['user-data'] = tf.name
     metadata = ['owner=%s' % FLAGS.owner]
-    for key, value in self.boot_metadata.iteritems():
+    for key, value in six.iteritems(self.boot_metadata):
       metadata.append('%s=%s' % (key, value))
     create_cmd.flags['metadata'] = ','.join(metadata)
     return create_cmd
@@ -337,7 +344,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd = util.RackCLICommand(self, 'servers', 'instance', 'update-metadata')
     cmd.flags['id'] = self.id
     cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
-                                     for key, value in kwargs.iteritems())
+                                     for key, value in six.iteritems(kwargs))
     cmd.Issue()
 
   def OnStartup(self):
@@ -470,7 +477,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     groups = [LSBLK_PATTERN.match(line) for line in lines]
     tuples = [g.groups() for g in groups if g]
     colnames = ('name', 'model', 'size_bytes', 'type', 'mountpoint', 'label',)
-    blk_devices = [dict(zip(colnames, t)) for t in tuples]
+    blk_devices = [dict(list(zip(colnames, t))) for t in tuples]
     for d in blk_devices:
       d['model'] = d['model'].rstrip()
       d['label'] = d['label'].rstrip()

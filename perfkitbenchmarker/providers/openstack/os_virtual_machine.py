@@ -22,6 +22,10 @@ Images:
   run 'openstack image list'
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import json
 import logging
 import threading
@@ -34,6 +38,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
+from six.moves import range
 
 RHEL_IMAGE = 'rhel-7.2'
 CENTOS_IMAGE = 'centos7'

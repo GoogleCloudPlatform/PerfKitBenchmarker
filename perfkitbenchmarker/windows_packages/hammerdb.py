@@ -21,6 +21,10 @@ More information about HammerDB may be found here:
 https://www.hammerdb.com/index.html
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import ntpath
 import os
 import re
@@ -31,6 +35,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import data
+import six
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -272,7 +278,7 @@ def RunHammerDB(vm):
   hammer_result = _CatFile(vm, 'C://hammerdb.log')
 
   metadata = {}
-  for k, v in vm.GetResourceMetadata().iteritems():
+  for k, v in six.iteritems(vm.GetResourceMetadata()):
     metadata[k] = v
 
   metadata['hammerdb_tpcc_warehouse'] = FLAGS.hammerdb_tpcc_warehouse
