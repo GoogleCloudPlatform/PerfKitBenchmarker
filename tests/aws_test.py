@@ -280,8 +280,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     network_mock.subnet = mock.MagicMock(id='subnet-id')
     placement_group = mock.MagicMock()
     placement_group.name = 'placement_group_name'
+    placement_group.strategy = 'cluster'
     network_mock.placement_group = placement_group
     self.vm.network = network_mock
+    self.vm.placement_group = placement_group
 
     self.response = self.open_json_data('aws-describe-instance.json')
     self.sir_response = self.open_json_data(

@@ -455,6 +455,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
     self.network = aws_network.AwsNetwork.GetNetwork(self)
+    self.placement_group = getattr(vm_spec, 'placement_group',
+                                   self.network.placement_group)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.use_spot_instance = vm_spec.use_spot_instance
@@ -466,6 +468,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.metadata.update({
         'spot_instance': self.use_spot_instance,
         'spot_price': self.spot_price,
+        'placement_group_strategy': self.placement_group.strategy
     })
     self.early_termination = False
     self.spot_status_code = None
@@ -626,7 +629,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       placement.append('Tenancy=host,HostId=%s' % self.host.id)
       num_hosts = len(self.host_list)
     elif IsPlacementGroupCompatible(self.machine_type):
-      placement.append('GroupName=%s' % self.network.placement_group.name)
+      placement.append('GroupName=%s' % self.placement_group.name)
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type,
                                          self.boot_disk_size,
