@@ -24,7 +24,6 @@ for more information about AWS Virtual Private Clouds.
 import json
 import logging
 import threading
-import uuid
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -33,6 +32,7 @@ from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import util
 
 flags.DEFINE_string('aws_vpc', None,
@@ -476,59 +476,6 @@ class AwsRouteTable(resource.BaseResource):
     util.IssueRetryableCommand(create_cmd)
 
 
-class AwsPlacementGroup(resource.BaseResource):
-  """Object representing an AWS Placement Group.
-
-  Attributes:
-    region: The AWS region the Placement Group is in.
-    name: The name of the Placement Group.
-  """
-
-  def __init__(self, region):
-    """Init method for AwsPlacementGroup.
-
-    Args:
-      region: A string containing the AWS region of the Placement Group.
-    """
-    super(AwsPlacementGroup, self).__init__()
-    self.name = (
-        'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
-    self.region = region
-
-  def _Create(self):
-    """Creates the Placement Group."""
-    create_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'create-placement-group',
-        '--region=%s' % self.region,
-        '--group-name=%s' % self.name,
-        '--strategy=cluster']
-    vm_util.IssueCommand(create_cmd)
-
-  def _Delete(self):
-    """Deletes the Placement Group."""
-    delete_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'delete-placement-group',
-        '--region=%s' % self.region,
-        '--group-name=%s' % self.name]
-    # Failed deletes are ignorable (probably already deleted).
-    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
-
-  def _Exists(self):
-    """Returns true if the Placement Group exists."""
-    describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-placement-groups',
-        '--region=%s' % self.region,
-        '--filter=Name=group-name,Values=%s' % self.name]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
-    placement_groups = response['PlacementGroups']
-    assert len(placement_groups) < 2, 'Too many placement groups.'
-    return len(placement_groups) > 0
-
-
 class _AwsRegionalNetwork(network.BaseNetwork):
   """Object representing regional components of an AWS network.
 
@@ -674,7 +621,10 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id)
     self.subnet = None
-    self.placement_group = AwsPlacementGroup(self.region)
+    placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(
+        'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone)
+    self.placement_group = aws_placement_group.AwsPlacementGroup(
+        placement_group_spec)
     self.is_static = False
     if spec.vpc_id:
       self.is_static = True
