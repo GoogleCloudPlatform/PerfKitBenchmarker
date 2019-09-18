@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Cloudstack utils"""
-
-import urllib
 from csapi import API
 from perfkitbenchmarker import flags
+from six.moves import urllib
 
 try:
     from requests.packages import urllib3
@@ -380,7 +379,7 @@ class CsClient(object):
         cs_args = {
             'command': 'registerSSHKeyPair',
             'name': name,
-            'publickey': urllib.quote(public_key),
+            'publickey': urllib.parse.quote(public_key),
         }
 
         if project_id:

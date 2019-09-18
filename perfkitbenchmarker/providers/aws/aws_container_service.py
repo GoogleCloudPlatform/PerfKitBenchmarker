@@ -14,6 +14,9 @@
 
 """Contains classes/functions related to AWS container clusters."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import json
 import os
 import uuid
@@ -29,6 +32,7 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 import requests
+import six
 import yaml
 
 FLAGS = flags.FLAGS
@@ -307,7 +311,7 @@ class EcsTask(container_service.BaseContainer):
     """Returns the logs from the container."""
     task_id = self.arn.split('/')[-1]
     log_stream = 'pkb/{name}/{task_id}'.format(name=self.name, task_id=task_id)
-    return unicode(
+    return six.text_type(
         aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb'))
 
 

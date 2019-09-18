@@ -14,11 +14,16 @@
 
 """Run nutttcp between two VMs."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.windows_packages import nuttcp
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -69,7 +74,7 @@ def RunNuttcp(vms, exec_path):
                            receiving_vm.internal_ip, 'internal', iteration))
 
   # run in both directions just for completeness
-  for iteration in xrange(FLAGS.nuttcp_udp_iterations):
+  for iteration in range(FLAGS.nuttcp_udp_iterations):
     _RunNuttcpTest(vms[0], vms[1], iteration)
     if FLAGS.nuttcp_udp_run_both_directions:
       _RunNuttcpTest(vms[1], vms[0], iteration)

@@ -21,6 +21,10 @@ More information about DiskSpd may be found here:
 https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import ntpath
 import xml.etree.ElementTree
@@ -29,6 +33,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+import six
 
 FLAGS = flags.FLAGS
 
@@ -323,7 +328,7 @@ def RunDiskSpd(running_vm):
   """Run Diskspd and return the samples collected from the run."""
 
   metadata = {}
-  for k, v in running_vm.GetResourceMetadata().iteritems():
+  for k, v in six.iteritems(running_vm.GetResourceMetadata()):
     metadata['{0}'.format(k)] = v
 
   # add the flag information to the metadata

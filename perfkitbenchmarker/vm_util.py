@@ -14,6 +14,10 @@
 
 """Set of utility functions for working with virtual machines."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import contextlib
 import logging
 import os
@@ -33,6 +37,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
+from six.moves import range
 
 FLAGS = flags.FLAGS
 

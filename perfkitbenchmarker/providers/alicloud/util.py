@@ -15,6 +15,9 @@
 """Utilities for working with AliCloud Web Services resources."""
 
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import shlex
 import string
 import random
@@ -26,6 +29,7 @@ except ImportError:
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+import six
 
 ALI_PREFIX = ['aliyuncli']
 ROOT = 'root'
@@ -71,7 +75,7 @@ def AddTags(resource_id, resource_type, region, **kwargs):
       '--RegionId %s' % region,
       '--ResourceId %s' % resource_id,
       '--ResourceType %s' % resource_type]
-  for index, (key, value) in enumerate(kwargs.iteritems()):
+  for index, (key, value) in enumerate(six.iteritems(kwargs)):
     tag_cmd.append('--Tag{0}Key {1} --Tag{0}Value {2}'
                    .format(index + 1, key, value))
   tag_cmd = GetEncodedCmd(tag_cmd)

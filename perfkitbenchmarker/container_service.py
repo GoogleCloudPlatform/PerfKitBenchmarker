@@ -418,7 +418,7 @@ class BaseContainerCluster(resource.BaseResource):
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
-    for container in itertools.chain(*self.containers.values()):
+    for container in itertools.chain(*list(self.containers.values())):
       container.Delete()
 
   def DeleteServices(self):
@@ -463,7 +463,7 @@ class BaseContainerCluster(resource.BaseResource):
         'Cluster Creation Time',
         self.resource_ready_time - self.create_start_time,
         'seconds'))
-    for container in itertools.chain(*self.containers.values()):
+    for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
         samples.append(sample.Sample(

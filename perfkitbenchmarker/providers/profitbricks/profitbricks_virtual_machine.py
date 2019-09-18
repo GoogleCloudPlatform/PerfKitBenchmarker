@@ -14,9 +14,14 @@
 """Class to represent a ProfitBricks Virtual Machine object.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import logging
 import base64
+import six
 import yaml
 
 from perfkitbenchmarker import disk
@@ -64,7 +69,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a ProfitBricks VM config."""
 
   def __init__(self, **kwargs):
-    super(MachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
+    super(MachineTypeDecoder, self).__init__((six.string_types, dict), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a ProfitBricks VM config.
@@ -86,7 +91,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     """
     super(MachineTypeDecoder, self).Decode(value, component_full_name,
                                            flag_values)
-    if isinstance(value, basestring):
+    if isinstance(value, six.string_types):
       return value
     return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
                                  flag_values=flag_values, **value)

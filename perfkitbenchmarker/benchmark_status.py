@@ -13,7 +13,11 @@
 # limitations under the License.
 """Constants and helpers for reporting the success status of each benchmark."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import os
+from six.moves import zip
 
 SUCCEEDED = 'SUCCEEDED'
 FAILED = 'FAILED'
@@ -59,7 +63,8 @@ def _CreateSummaryTable(benchmark_specs):
                              'element.')
   col_headers = 'Name', 'UID', 'Status', 'Failed Substatus'
   col_lengths = []
-  for col_header, col_entries in zip(col_headers, zip(*run_status_tuples)):
+  for col_header, col_entries in zip(col_headers,
+                                     list(zip(*run_status_tuples))):
     max_col_content_length = max(len(entry) for entry in col_entries)
     col_lengths.append(max(len(col_header), max_col_content_length))
   line_length = (len(col_headers) - 1) * len(_COL_SEPARATOR) + sum(col_lengths)

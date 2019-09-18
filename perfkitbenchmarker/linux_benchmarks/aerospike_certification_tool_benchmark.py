@@ -17,11 +17,15 @@
 See https://github.com/aerospike/act for more info.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import act
+from six.moves import range
 
 BENCHMARK_NAME = 'aerospike_certification_tool'
 BENCHMARK_CONFIG = """

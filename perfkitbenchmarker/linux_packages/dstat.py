@@ -15,9 +15,13 @@
 
 """Module containing dstat installation and cleanup functions."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import csv
 import itertools
 import numpy as np
+from six.moves import zip
 
 
 def ParseCsvFile(fp):
