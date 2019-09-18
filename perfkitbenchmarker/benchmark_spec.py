@@ -39,6 +39,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
@@ -147,6 +148,8 @@ class BenchmarkSpec(object):
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
+    self.placement_group_specs = benchmark_config.placement_group_specs or {}
+    self.placement_groups = {}
     self.vms_to_boot = (
         self.config.vm_groups if self.config.relational_db is None else
         relational_db.VmsToBoot(self.config.relational_db.vm_groups))
@@ -340,6 +343,10 @@ class BenchmarkSpec(object):
     else:
       disk_spec = None
 
+    if group_spec.placement_group_name:
+      group_spec.vm_spec.placement_group = self.placement_groups[
+          group_spec.placement_group_name]
+
     for _ in range(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
       if FLAGS.zones or FLAGS.extra_zones or FLAGS.zone:
@@ -404,6 +411,9 @@ class BenchmarkSpec(object):
 
   def ConstructVirtualMachines(self):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
+
+    self.ConstructPlacementGroups()
+
     vm_group_specs = self.vms_to_boot
 
     clouds = {}
@@ -436,6 +446,12 @@ class BenchmarkSpec(object):
         self.config.spark_service.service_type == spark_service.PKB_MANAGED):
       for group_name in 'master_group', 'worker_group':
         self.spark_service.vms[group_name] = self.vm_groups[group_name]
+
+  def ConstructPlacementGroups(self):
+    for placement_group_name, placement_group_spec in six.iteritems(
+        self.placement_group_specs):
+      self.placement_groups[placement_group_name] = self._CreatePlacementGroup(
+          placement_group_spec, placement_group_spec.CLOUD)
 
   def ConstructSparkService(self):
     """Create the spark_service object and create groups for its vms."""
@@ -506,6 +522,9 @@ class BenchmarkSpec(object):
       self.nfs_service.Create()
     if self.smb_service:
       self.smb_service.Create()
+
+    for placement_group_object in self.placement_groups.values():
+      placement_group_object.Create()
 
     if self.vms:
 
@@ -584,6 +603,9 @@ class BenchmarkSpec(object):
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
 
+    for placement_group_object in self.placement_groups.values():
+      placement_group_object.Delete()
+
     for firewall in six.itervalues(self.firewalls):
       try:
         firewall.DisallowAllPorts()
@@ -646,6 +668,23 @@ class BenchmarkSpec(object):
   def GetResourceTags(self, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
     return self._GetResourceDict(METADATA_TIME_FORMAT, timeout_minutes)
+
+  def _CreatePlacementGroup(self, placement_group_spec, cloud):
+    """Create a placement group in zone.
+
+    Args:
+      placement_group_spec: A placement_group.BasePlacementGroupSpec object.
+      cloud: The cloud for the placement group.
+          See the flag of the same name for more information.
+    Returns:
+      A placement_group.BasePlacementGroup object.
+    """
+
+    placement_group_class = placement_group.GetPlacementGroupClass(cloud)
+    if placement_group_class:
+      return placement_group_class(placement_group_spec)
+    else:
+      return None
 
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.

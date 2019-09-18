@@ -33,6 +33,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import spark_service
@@ -696,6 +697,8 @@ class _VmGroupSpec(spec.BaseSpec):
     vm_count: int. Number of VMs in this group, including static VMs and
         provisioned VMs.
     vm_spec: BaseVmSpec. Configuration for provisioned VMs in this group.
+    placement_group_name: string. Name of placement group
+        that VM group belongs to.
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -758,7 +761,11 @@ class _VmGroupSpec(spec.BaseSpec):
             'default': _DEFAULT_VM_COUNT,
             'min': 0
         }),
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'placement_group_name': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
     })
     return result
 
@@ -846,6 +853,50 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **vm_group_config)
+
+
+class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
+  """Validates the placement_group_specs dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_PlacementGroupSpecsDecoder, self).__init__(
+        valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies placement_group_specs dictionary of a benchmark config object.
+
+    Args:
+      value: dict mapping Placement Group Spec name string to the
+          corresponding placement group spec config dict.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      dict mapping Placement Group Spec name string
+          to placement_group.BasePlacementGroupSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    placement_group_spec_configs = (super(_PlacementGroupSpecsDecoder, self)
+                                    .Decode(
+                                        value,
+                                        component_full_name,
+                                        flag_values))
+    result = {}
+    for placement_group_name, placement_group_spec_config in six.iteritems(
+        placement_group_spec_configs):
+      placement_group_spec_class = placement_group.GetPlacementGroupSpecClass(
+          self.cloud)
+      result[placement_group_name] = placement_group_spec_class(
+          '{0}.{1}'.format(
+              self._GetOptionFullName(component_full_name)
+              , placement_group_name),
+          flag_values=flag_values,
+          **placement_group_spec_config)
+    return result
 
 
 class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
@@ -1348,6 +1399,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'valid_types': (dict,)
         }),
         'vm_groups': (_VmGroupsDecoder, {
+            'default': {}
+        }),
+        'placement_group_specs': (_PlacementGroupSpecsDecoder, {
             'default': {}
         }),
         'spark_service': (_SparkServiceDecoder, {

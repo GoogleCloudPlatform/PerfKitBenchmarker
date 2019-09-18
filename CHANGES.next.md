@@ -133,6 +133,7 @@
 - Added a benchmark to run spark application on a cluster that computes an approximation to pi.
 - Added a benchmark to run spark io workload on a cluster that provisions a database and queries it.
 - Added flag --record_lscpu=True to record lscpu data as its own metric "lscpu"
+- Added flag --aws_placement_group_style to allow different AWS placement groups options for ec2 VM benchmarks.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
