@@ -57,6 +57,11 @@ flags.DEFINE_boolean('stress_ng_calc_geomean', True,
 flags.DEFINE_list('stress_ng_custom_stressors', [],
                   'List of stressors to run against. Default combines cpu,'
                   'cpu-cache, and memory suites')
+flags.DEFINE_list('stress_ng_cpu_methods', [],
+                  'List of cpu methods to run with. By default none are ran.'
+                  'If some are defined here and nothing is defined for'
+                  'stress_ng_custom_stressors then stress-ng will be ran'
+                  'only against the cpu methods.')
 
 ALL_WORKLOADS = ['small', 'medium', 'large']
 flags.DEFINE_list('stress_ng_thread_workloads', ['large'],
@@ -129,7 +134,7 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand('cd {0} && make && sudo make install'.format(STRESS_NG_DIR))
 
 
-def _ParseStressngResult(metadata, output):
+def _ParseStressngResult(metadata, output, cpu_method=None):
   """Returns stress-ng data as a sample.
 
   Sample output eg:
@@ -144,6 +149,7 @@ def _ParseStressngResult(metadata, output):
   Args:
     metadata: metadata of the sample.
     output: the output of the stress-ng benchmark.
+    cpu_method: an optional flag for the cpu method for the cpu stressor.
   """
   output_list = output.splitlines()
   output_matrix = [i.split() for i in output_list]
@@ -155,6 +161,13 @@ def _ParseStressngResult(metadata, output):
   line = output_matrix[4]
   name = line[3]
   value = float(line[-2])  # parse bogo ops/s (real time)
+  if name == 'cpu' and cpu_method:
+    return sample.Sample(
+        metric=cpu_method,
+        value=value,
+        unit='bogus_ops_sec',  # bogus operations per second
+        metadata=metadata)
+
   return sample.Sample(
       metric=name,
       value=value,
@@ -205,7 +218,7 @@ def _RunWorkload(vm, num_threads):
 
   stressors = sorted(set(cpu_suites + cpu_cache_suites + memory_suites))
 
-  if FLAGS.stress_ng_custom_stressors:
+  if FLAGS.stress_ng_custom_stressors or FLAGS.stress_ng_cpu_methods:
     stressors = FLAGS.stress_ng_custom_stressors
 
   samples = []
@@ -222,12 +235,25 @@ def _RunWorkload(vm, num_threads):
       samples.append(stressng_sample)
       values_to_geomean_list.append(stressng_sample.value)
 
+  for cpu_method in FLAGS.stress_ng_cpu_methods:
+    cmd = ('stress-ng --cpu {numthreads} --metrics-brief '
+           '-t {duration} --cpu-method {cpu_method}'.format(
+               numthreads=num_threads,
+               duration=FLAGS.stress_ng_duration,
+               cpu_method=cpu_method))
+    stdout, _ = vm.RemoteCommand(cmd)
+    stressng_sample = _ParseStressngResult(metadata, stdout, cpu_method)
+    if stressng_sample:
+      samples.append(stressng_sample)
+      values_to_geomean_list.append(stressng_sample.value)
+
   if FLAGS.stress_ng_calc_geomean:
     geomean_metadata = metadata.copy()
     geomean_metadata['stressors'] = stressors
     # True only if each stressor provided a value
     geomean_metadata['valid_run'] = (
-        len(values_to_geomean_list) == len(stressors))
+        len(values_to_geomean_list) == len(stressors) +
+        len(FLAGS.stress_ng_cpu_methods))
     geomean_sample = sample.Sample(
         metric='STRESS_NG_GEOMEAN',
         value=_GeoMeanOverflow(values_to_geomean_list),
