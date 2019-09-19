@@ -903,6 +903,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return result
 
 
+class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
+                                  linux_virtual_machine.ClearMixin):
+  IMAGE_NAME_FILTER = 'clear/images/*/clear-*'
+  IMAGE_OWNER = '679593333241'  # For marketplace images.
+
+  def __init__(self, vm_spec):
+    super(ClearBasedAwsVirtualMachine, self).__init__(vm_spec)
+    user_name_set = FLAGS['aws_user_name'].present
+    self.user_name = FLAGS.aws_user_name if user_name_set else 'clear'
+
+
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   """Class with configuration for AWS Debian virtual machines."""
