@@ -892,8 +892,8 @@ class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
           self.cloud)
       result[placement_group_name] = placement_group_spec_class(
           '{0}.{1}'.format(
-              self._GetOptionFullName(component_full_name)
-              , placement_group_name),
+              self._GetOptionFullName(component_full_name),
+              placement_group_name),
           flag_values=flag_values,
           **placement_group_spec_config)
     return result
