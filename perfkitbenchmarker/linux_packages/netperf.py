@@ -30,16 +30,23 @@ flags.DEFINE_integer(
     'range. The default value that netperf uses is 100. Using more will '
     'increase the precision of the histogram samples that the netperf '
     'benchmark produces.')
+flags.DEFINE_boolean(
+    'netperf_use_newest_git', False,
+    'If true. It will pull the latest version from the master branch of ' 
+    'the git repo')
 FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.7.0.tar.gz'
 NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
               NETPERF_TAR)
+
+NETPERF_GIT = 'https://github.com/HewlettPackard/netperf.git'
 NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
 
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
 NETPERF_PATH = NETPERF_SRC_DIR + '/netperf'
 NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
+NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 
 def _Install(vm):
@@ -47,17 +54,34 @@ def _Install(vm):
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install absl-py')
   vm.Install('build_tools')
-  _CopyTar(vm)
-  vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
+
+  if(FLAGS.netperf_use_newest_git):
+    _LoadNetperf(vm)
+
+    vm.RemoteCommand('cd %s && '
+                     './autogen.sh &&'
+                     './configure --enable-burst --enable-demo --enable-histogram '
+                     '&& make && sudo make install' % (NETPERF_DIR))
+
+    vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh find_max_burst.sh' 
+                     % (NETPERF_EXAMPLE_DIR))
+  else:
+    _CopyTar(vm)
+    vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
+    vm.PushDataFile('netperf.patch', NETLIB_PATCH)
+    vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
+                     NETPERF_SRC_DIR)
   # Modify netperf to print out all buckets in its histogram rather than
   # aggregating.
-  vm.PushDataFile('netperf.patch', NETLIB_PATCH)
-  vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
-                   NETPERF_SRC_DIR)
-  vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-                   './configure --enable-histogram=yes '
-                   '&& make' % (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+    vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
+                     './autogen.sh &&'
+                     './configure --enable-histogram '
+                     '&& make && sudo make install' % (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
 
+def _LoadNetperf(vm):
+  vm.Install('curl')
+  vm.RemoteCommand('cd %s && git clone %s %s' % (
+        INSTALL_DIR, NETPERF_GIT, NETPERF_DIR))
 
 def _CopyTar(vm):
   """Copy the tar file for installation.
