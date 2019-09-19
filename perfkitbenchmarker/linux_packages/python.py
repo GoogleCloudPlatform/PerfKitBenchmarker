@@ -24,4 +24,9 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the package on the VM."""
-  vm.InstallPackages('python2.7')
+  vm.InstallPackages('python python2.7')
+
+
+def SwupdInstall(vm):
+  """Installs the package on the VM"""
+  vm.InstallPackages('python-basic')

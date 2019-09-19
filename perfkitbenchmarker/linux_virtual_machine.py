@@ -315,8 +315,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-      if (self.OS_TYPE != 'clear'):
-        self.InstallPackages('python')
+      self.Install('python')
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -461,19 +460,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._lscpu_cache = LsCpuResults(lscpu)
     return self._lscpu_cache
 
+  def GetOsInfo(self):
+    """Returns information regarding OS type and version"""
+    self.Install('lsb_release')
+    stdout, _ = self.RemoteCommand('lsb_release -d')
+    return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+
   @property
   def os_info(self):
     """Get distribution-specific information."""
     if self.os_metadata.get('os_info'):
       return self.os_metadata['os_info']
     else:
-      if (self.OS_TYPE == 'clear'):
-        stdout, _ = self.RemoteCommand('swupd info | grep Installed')
-        return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
-      else:
-        self.Install('lsb_release')
-        stdout, _ = self.RemoteCommand('lsb_release -d')
-        return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+      return self.GetOsInfo()
 
   @property
   def kernel_release(self):
@@ -1175,7 +1174,7 @@ class ClearMixin(BaseLinuxMixin):
     need to implement it if this is not the case.
     """
     package = linux_packages.PACKAGES[package_name]
-    return package.YumGetPathToConfig(self)
+    return package.SwupdGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
     """Returns the service name of a PerfKit package.
@@ -1185,7 +1184,11 @@ class ClearMixin(BaseLinuxMixin):
     need to implement it if this is not the case.
     """
     package = linux_packages.PACKAGES[package_name]
-    return package.YumGetServiceName(self)
+    return package.SwupdGetServiceName(self)
+
+  def GetOsInfo(self):
+    stdout, _ = self.RemoteCommand('swupd info | grep Installed')
+    return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
 
 
 class RhelMixin(BaseLinuxMixin):
