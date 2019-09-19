@@ -1121,11 +1121,11 @@ class ClearMixin(BaseLinuxMixin):
     self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
 
   def SnapshotPackages(self):
-    """Grabs a snapshot of the currently installed packages."""
+    """See base class."""
     self.RemoteCommand('sudo swupd bundle-list > {0}/bundle_list'.format(linux_packages.INSTALL_DIR))
 
   def RestorePackages(self):
-    """Restores the currently installed bundles to those snapshotted."""
+    """See base class."""
     self.RemoteCommand(
         'sudo swupd bundle-list | grep --fixed-strings --line-regexp --invert-match --file '
         '{0}/bundle_list | xargs --no-run-if-empty sudo swupd bundle-remove'.format(linux_packages.INSTALL_DIR),
@@ -1139,10 +1139,6 @@ class ClearMixin(BaseLinuxMixin):
   def InstallPackages(self, packages):
     """Installs packages using the swupd bundle manager."""
     self.RemoteCommand('sudo swupd bundle-add {0}'.format(packages))
-
-  def InstallPackageGroup(self, package_group):
-    """Installs a 'package group' using the yum package manager."""
-    self.RemoteCommand('sudo swupd bundle-add "{0}"'.format(package_group))
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
@@ -1167,26 +1163,17 @@ class ClearMixin(BaseLinuxMixin):
       package.Uninstall(self)
 
   def GetPathToConfig(self, package_name):
-    """Returns the path to the config file for PerfKit packages.
-
-    This function is mostly useful when config files locations
-    don't match across distributions (such as mysql). Packages don't
-    need to implement it if this is not the case.
-    """
+    """See base class"""
     package = linux_packages.PACKAGES[package_name]
     return package.SwupdGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
-    """Returns the service name of a PerfKit package.
-
-    This function is mostly useful when service names don't
-    match across distributions (such as mongodb). Packages don't
-    need to implement it if this is not the case.
-    """
+    """See base class"""
     package = linux_packages.PACKAGES[package_name]
     return package.SwupdGetServiceName(self)
 
   def GetOsInfo(self):
+    """See base class"""
     stdout, _ = self.RemoteCommand('swupd info | grep Installed')
     return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
 
