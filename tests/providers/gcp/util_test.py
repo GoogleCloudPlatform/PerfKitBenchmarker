@@ -79,7 +79,7 @@ class GcloudCommandTestCase(unittest.TestCase):
   def testIssue(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    mock_issue_return_value = 'issue-return-value'
+    mock_issue_return_value = ('issue-return-value', 'stderr', 0)
     p = mock.patch(util.__name__ + '.vm_util.IssueCommand',
                    return_value=mock_issue_return_value)
     with p as mock_issue:
@@ -91,7 +91,7 @@ class GcloudCommandTestCase(unittest.TestCase):
   def testIssueWarningSuppressed(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    mock_issue_return_value = 'issue-return-value'
+    mock_issue_return_value = ('issue-return-value', 'stderr', 0)
     p = mock.patch(util.__name__ + '.vm_util.IssueCommand',
                    return_value=mock_issue_return_value)
     with p as mock_issue:
@@ -105,7 +105,7 @@ class GcloudCommandTestCase(unittest.TestCase):
   def testIssueRetryable(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
-    mock_issue_return_value = 'issue-return-value'
+    mock_issue_return_value = ('issue-return-value', 'stderr', 0)
     p = mock.patch(util.__name__ + '.vm_util.IssueRetryableCommand',
                    return_value=mock_issue_return_value)
     with p as mock_issue:
