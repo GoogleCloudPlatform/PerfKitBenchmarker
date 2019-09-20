@@ -151,6 +151,9 @@ class VmUtil(object):
   class IssueCommandError(Error):
     pass
 
+  class IssueCommandTimeoutError(Error):
+    pass
+
 
 class Benchmarks(object):
   """Errors raised by individual benchmark."""
