@@ -548,3 +548,4 @@
 - Fixed bug of query failing to find AWS internet gateway after Delete called.
 - Abort and log when container resources are exhausted.
 - Check if an AWS firewall rule exists before creating one by querying AWS.
+- Update requirements.txt for Python 3.
