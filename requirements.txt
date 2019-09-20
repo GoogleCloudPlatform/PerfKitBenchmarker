@@ -20,7 +20,7 @@ futures>=3.0.3
 PyYAML==3.12
 pint>=0.7
 numpy==1.16.4
-functools32
+functools32 ; python_version <= '2.7'
 contextlib2>=0.5.1
 pywinrm
 timeout-decorator

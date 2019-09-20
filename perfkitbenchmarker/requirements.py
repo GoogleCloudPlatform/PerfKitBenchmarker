@@ -16,7 +16,6 @@
 from collections import deque
 import os
 import pkg_resources
-import six
 
 from perfkitbenchmarker import errors
 
@@ -69,12 +68,8 @@ def CheckBasicRequirements():
   directory. If such a file does not exist, then the requirements check is
   skipped.
   """
-  if six.PY2:
-    requirements_file_name = 'requirements.txt'
-  else:
-    requirements_file_name = 'requirements-py3.txt'
   requirements_file_path = os.path.join(_BRANCH_ROOT_DIR,
-                                        requirements_file_name)
+                                        'requirements.txt')
   if os.path.isfile(requirements_file_path):
     _CheckRequirements(requirements_file_path)
 
