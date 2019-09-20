@@ -302,9 +302,21 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   return Wrap
 
 
+class _BoxedObject(object):
+  """Box a value in a reference so it is modifiable inside an inner function.
+
+  In python3 the nonlocal keyword could be used instead - but for python2
+  there is no support for modifying an external scoped variable value.
+  """
+
+  def __init__(self, initial_value):
+    self.value = initial_value
+
+
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
                  env=None, timeout=DEFAULT_TIMEOUT, cwd=None,
-                 raise_on_failure=True):
+                 raise_on_failure=True,
+                 raise_on_timeout=True):
   """Tries running the provided command once.
 
   Args:
@@ -328,12 +340,16 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     cwd: Directory in which to execute the command.
     raise_on_failure: A boolean indicating if non-zero return codes should raise
         IssueCommandError.
+    raise_on_timeout: A boolean indicating if killing the process due to the
+        timeout being hit should raise a IssueCommandTimeoutError
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
 
   Raises:
     IssueCommandError: When raise_on_failure=True and retcode is non-zero.
+    IssueCommandTimeoutError:  When raise_on_timeout=True and
+                               command duration exceeds timeout
   """
   if env:
     logging.debug('Environment variables: %s', env)
@@ -363,10 +379,16 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
                                stdin=subprocess.PIPE, stdout=tf_out,
                                stderr=tf_err, cwd=cwd)
 
+    did_timeout = _BoxedObject(False)
+    was_killed = _BoxedObject(False)
+
     def _KillProcess():
-      logging.error('IssueCommand timed out after %d seconds. '
-                    'Killing command "%s".', timeout, full_cmd)
+      did_timeout.value = True
+      if not raise_on_timeout:
+        logging.warning('IssueCommand timed out after %d seconds. '
+                        'Killing command "%s".', timeout, full_cmd)
       process.kill()
+      was_killed.value = True
 
     timer = threading.Timer(timeout, _KillProcess)
     timer.start()
@@ -385,14 +407,25 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     if should_time:
       timing_output = tf_timing.read().rstrip('\n')
 
-  debug_text = ('Ran: {%s}  ReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
+  debug_text = ('Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, timing_output, stdout, stderr))
   if force_info_log or (process.returncode and not suppress_warning):
     logging.info(debug_text)
   else:
     logging.debug(debug_text)
 
-  if process.returncode and raise_on_failure:
+  # Raise timeout error regardless of raise_on_failure - as the intended
+  # semantics is to ignore expected errors caused by invoking the command
+  # not errors from PKB infrastructure.
+  if did_timeout.value and raise_on_timeout:
+    debug_text = (
+        '{0}\nIssueCommand timed out after {1} seconds.  '
+        '{2} by perfkitbenchmarker.'.format(
+            debug_text, timeout,
+            'Process was killed' if was_killed.value else
+            'Process may have been killed'))
+    raise errors.VmUtil.IssueCommandTimeoutError(debug_text)
+  elif process.returncode and raise_on_failure:
     raise errors.VmUtil.IssueCommandError(debug_text)
 
   return stdout, stderr, process.returncode
