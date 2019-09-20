@@ -23,6 +23,7 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
@@ -131,9 +132,17 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(retcode, 0)
 
   @mock.patch('threading.Timer', new=WaitUntilSleepTimer)
+  def testTimeoutReachedThrows(self):
+    with self.assertRaises(errors.VmUtil.IssueCommandTimeoutError):
+      _, _, _ = vm_util.IssueCommand(['sleep', '2s'], timeout=1,
+                                     raise_on_failure=False)
+    self.assertFalse(HaveSleepSubprocess())
+
+  @mock.patch('threading.Timer', new=WaitUntilSleepTimer)
   def testTimeoutReached(self):
     _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=1,
-                                         raise_on_failure=False)
+                                         raise_on_failure=False,
+                                         raise_on_timeout=False)
     self.assertEqual(retcode, -9)
     self.assertFalse(HaveSleepSubprocess())
 
