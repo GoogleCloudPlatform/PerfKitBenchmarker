@@ -135,3 +135,5 @@ flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
                      'rules are added manually, PKB will not know about all of '
                      'them. However, they must be deleted in order to '
                      'successfully delete the PKB-created network.')
+flags.DEFINE_boolean('gcp_retry_on_rate_limited', True,
+                     'Whether to retry commands when rate limited.')

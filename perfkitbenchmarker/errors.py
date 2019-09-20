@@ -176,6 +176,9 @@ class Benchmarks(object):
   class QuotaFailure(Error):
     pass
 
+  class RateLimitExceededError(Error):
+    pass
+
 
 class Resource(object):
   """Errors related to resource creation and deletion."""
