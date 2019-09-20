@@ -548,4 +548,5 @@
   cloud_spanner_ycsb_benchmark. Without this, the benchmark is not runnable.
 - Fixed bug of query failing to find AWS internet gateway after Delete called.
 - Abort and log when container resources are exhausted.
+- Add a retry on gcloud commands when rate limited.
 - Check if an AWS firewall rule exists before creating one by querying AWS.
