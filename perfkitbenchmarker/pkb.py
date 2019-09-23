@@ -735,7 +735,7 @@ def DoCleanupPhase(spec, timer):
       benchmark module's Cleanup function.
   """
   if FLAGS.before_cleanup_pause:
-    raw_input('Hit enter to begin cleanup.')
+    six.moves.input('Hit enter to begin cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
