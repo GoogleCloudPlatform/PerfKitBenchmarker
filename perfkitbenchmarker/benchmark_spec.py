@@ -602,9 +602,9 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
-
-    for placement_group_object in self.placement_groups.values():
-      placement_group_object.Delete()
+    if hasattr(self, 'placement_groups'):
+      for placement_group_object in self.placement_groups.values():
+        placement_group_object.Delete()
 
     for firewall in six.itervalues(self.firewalls):
       try:
