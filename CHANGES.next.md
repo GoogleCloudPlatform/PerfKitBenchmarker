@@ -329,7 +329,8 @@
 - Add gluster_fio benchmark.
 - Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
 - Added support to append a region name to a bucket name for object storage
-  benchmarking.
+  benchmarking. For Azure, the region is appended to storage accounts and
+  resource groups as well.
 - Added sysbench benchmarking for MySQL in a VM.
 - Added check that cuda_toolkit is installed when installing cudnn.
 - Added ability to set provider-specific MySQL flags for relational databases.
