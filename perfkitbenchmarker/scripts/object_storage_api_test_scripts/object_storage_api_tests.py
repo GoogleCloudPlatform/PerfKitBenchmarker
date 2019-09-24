@@ -361,7 +361,7 @@ def GenerateWritePayload(size):
   # don't use a for...range(100M), range(100M) will create a list of 100mm items
   # with each item being the default object size of 30 bytes or so, it will lead
   # to out of memory error.
-  for i in xrange(size):
+  for i in range(size):
     payload_bytes[i] = ord(random.choice(string.letters))
 
   return payload_bytes
