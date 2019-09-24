@@ -42,6 +42,8 @@ Launcher has a few defaults, listed below:
   - GCE VM Machine Type: n1-standard-16
 """
 
+from __future__ import print_function
+
 import datetime
 import logging
 import re
@@ -49,8 +51,8 @@ import shlex
 import subprocess
 import sys
 import time
-from absl import flags
 
+from absl import flags
 import plot_sysbench_results
 
 # GLOBAL STRINGS
@@ -180,7 +182,6 @@ def driver(argv):
     logging.info('Provision and prepare completed. Run uri assigned: %s',
                  run_uri)
     if run_stage == 'provision,prepare':
-      print run_uri
       return run_uri
   if not run_stage or run_stage == RUN:
     _run(run_uri)
