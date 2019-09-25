@@ -626,21 +626,23 @@ class _RelationalDbSpec(spec.BaseSpec):
           'cpus': flag_values.managed_db_cpus,
           'memory': flag_values.managed_db_memory
       }
-      config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'machine_type'] = {
-              'cpus': flag_values.managed_db_cpus,
-              'memory': flag_values.managed_db_memory
-          }
+      # tox and pylint have contradictory closing brace rules, so avoid having
+      # opening and closing brackets on different lines.
+      config_values_vm_groups = config_values['vm_groups']
+      config_values_vm_groups['servers']['vm_spec'][cloud]['machine_type'] = {
+          'cpus': flag_values.managed_db_cpus,
+          'memory': flag_values.managed_db_memory
+      }
     if has_client_machine_type:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'machine_type'] = (
               flag_values.client_vm_machine_type)
     if has_client_custom_machine_type:
-      config_values['vm_groups']['clients']['vm_spec'][cloud][
-          'machine_type'] = {
-              'cpus': flag_values.client_vm_cpus,
-              'memory': flag_values.client_vm_memory
-          }
+      config_values_vm_groups = config_values['vm_groups']
+      config_values_vm_groups['clients']['vm_spec'][cloud]['machine_type'] = {
+          'cpus': flag_values.client_vm_cpus,
+          'memory': flag_values.client_vm_memory
+      }
     if flag_values['mysql_flags'].present:
       config_values['db_spec'][cloud]['mysql_flags'] = flag_values.mysql_flags
     if flag_values['managed_db_disk_size'].present:
