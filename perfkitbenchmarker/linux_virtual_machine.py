@@ -491,7 +491,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
-    """Waits until VM is has booted."""
+    """Waits until the VM has booted."""
     resp, _ = self.RemoteHostCommand('hostname', retries=1,
                                      suppress_warning=True)
     if self.bootable_time is None:
@@ -784,6 +784,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def _Reboot(self):
     """OS-specific implementation of reboot command."""
+    if not self.IS_REBOOTABLE:
+      raise errors.VirtualMachine.VirtualMachineError(
+          "Trying to reboot a VM that isn't rebootable.")
     self.RemoteCommand('sudo reboot', ignore_failure=True)
 
   def _AfterReboot(self):
