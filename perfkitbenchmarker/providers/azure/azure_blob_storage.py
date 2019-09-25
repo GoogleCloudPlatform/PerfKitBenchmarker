@@ -122,9 +122,10 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
       raise errors.Benchmarks.BucketCreationError(stderr)
 
   def DeleteBucket(self, bucket):
-    vm_util.IssueCommand([
-        azure.AZURE_PATH, 'storage', 'container', 'delete',
-        '--name', bucket] + self.storage_account.connection_args)
+    vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'storage', 'container', 'delete', '--name', bucket] +
+        self.storage_account.connection_args,
+        raise_on_failure=False)
 
   def Copy(self, src_url, dst_url):
     """See base class."""
