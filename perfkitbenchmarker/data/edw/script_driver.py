@@ -4,15 +4,20 @@ Driver compiles the provider specific script execution command and returns the
 time taken to execute the script in seconds or -1 if the script fails.
 """
 
-__author__ = 'p3rf@google.com'
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import json
 import logging
 from subprocess import call
 import time
+
 from absl import app
 from absl import flags
 import provider_specific_script_driver
+
+__author__ = 'p3rf@google.com'
 
 flags.DEFINE_string('script', None, 'SQL script which contains the query.')
 flags.DEFINE_string('logfile_suffix', 'log', 'Suffix to use for the output and '
@@ -77,7 +82,7 @@ def execute_script(script, logfile_suffix):
 
 def main(argv):
   del argv
-  print (execute_script(FLAGS.script, FLAGS.logfile_suffix))  # pylint: disable=superfluous-parens
+  print(execute_script(FLAGS.script, FLAGS.logfile_suffix))
 
 
 if __name__ == '__main__':
