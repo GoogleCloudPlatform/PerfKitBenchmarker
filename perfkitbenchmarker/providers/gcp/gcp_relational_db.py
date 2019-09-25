@@ -53,6 +53,7 @@ CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 IS_READY_TIMEOUT = 600  # 10 minutes
+CREATION_TIMEOUT = 600  # 10 minutes
 
 
 class UnsupportedDatabaseEngineException(Exception):
@@ -141,7 +142,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 
-    _, _, _ = cmd.Issue()
+    _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
 
     if FLAGS.mysql_flags:
       cmd_string = [
