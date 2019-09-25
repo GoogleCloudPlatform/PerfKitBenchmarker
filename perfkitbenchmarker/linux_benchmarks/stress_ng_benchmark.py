@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs stress-ng.
 
 From the stress-ng ubuntu documentation:
@@ -32,9 +31,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
-
 FLAGS = flags.FLAGS
-
 
 BENCHMARK_NAME = 'stress_ng'
 BENCHMARK_CONFIG = """
@@ -49,25 +46,81 @@ STRESS_NG_DIR = '~/stress_ng'
 GIT_REPO = 'https://github.com/ColinIanKing/stress-ng'
 GIT_TAG = '54722768329c9f8184c1c98db63435f201377df1'  # version 0.05.23
 
+VALID_CPU_METHODS = {
+    'all', 'ackermann', 'bitops', 'callfunc', 'cdouble', 'cfloat',
+    'clongdouble', 'correlate', 'crc16', 'decimal32', 'decimal64', 'decimal128',
+    'dither', 'djb2a', 'double', 'euler', 'explog', 'fft', 'factorial',
+    'fibonacci', 'float', 'float32', 'float80', 'float128', 'fnv1a', 'gamma',
+    'gcd', 'gray', 'hamming', 'hanoi', 'hyperbolic', 'idct', 'int128', 'int64',
+    'int32', 'int16', 'int8', 'int128float', 'int128double', 'int128longdouble',
+    'int128decimal32', 'int128decimal64', 'int128decimal128', 'int64float',
+    'int64double', 'int64longdouble', 'int32float', 'int32double',
+    'int32longdouble', 'jenkin', 'jmp', 'ln2', 'longdouble', 'loop',
+    'matrixprod', 'nsqrt', 'omega', 'parity', 'phi', 'pi', 'pjw', 'prime',
+    'psi', 'queens', 'rand', 'rand48', 'rgb', 'sdbm', 'sieve', 'stats', 'sqrt',
+    'trig', 'union', 'zeta'
+}
+
+VALID_STRESSORS = {
+    'affinity', 'af-alg', 'aio', 'aio-linux', 'apparmor', 'bigheap', 'brk',
+    'bsearch', 'cache', 'chdir', 'chmod', 'clock', 'clone', 'context', 'cpu',
+    'cpu-online', 'crypt', 'daemon', 'dentry', 'dir', 'dup', 'epoll', 'eventfd',
+    'exec', 'fallocate', 'fault', 'fcntl', 'fiemap', 'fifo', 'filename',
+    'flock', 'fork', 'fp-error', 'fstat', 'futex', 'get', 'getrandom',
+    'getdent', 'handle', 'hdd', 'heapsort', 'hsearch', 'icache', 'iosync',
+    'inotify', 'itimer', 'kcmp', 'key', 'kill', 'klog', 'lease', 'link',
+    'lockbus', 'lockf', 'longjmp', 'lsearch', 'malloc', 'matrix', 'membarrier',
+    'memcpy', 'memfd', 'mergesort', 'mincore', 'mknod', 'mlock', 'mmap',
+    'mmapfork', 'mmapmany', 'mremap', 'msg', 'mq', 'nice', 'null', 'numa',
+    'oom-pipe', 'open', 'personality', 'pipe', 'poll', 'procfs', 'pthread',
+    'ptrace', 'qsort', 'quota', 'rdrand', 'readahead', 'remap-file-pages',
+    'rename', 'rlimit', 'seccomp', 'seek', 'sem-posix', 'sem-sysv', 'shm-posix',
+    'shm-sysv', 'sendfile', 'sigfd', 'sigfpe', 'sigpending', 'sigq', 'sigsegv',
+    'sigsuspend', 'sleep', 'socket', 'socket-fd', 'socket-pair', 'spawn',
+    'splice', 'stack', 'str', 'stream', 'switch', 'symlink', 'sync-file',
+    'sysinfo', 'sysfs', 'tee', 'timer', 'timerfd', 'tsc', 'tsearch', 'udp',
+    'udp-flood', 'unshare', 'urandom', 'userfaultfd', 'utime', 'vecmath',
+    'vfork', 'vm', 'vm-rw', 'vm-splice', 'wait', 'wcs', 'xattr', 'yield',
+    'zero', 'zlib', 'zombie'
+}
+CPU_SUITE = {
+    'af-alg', 'bsearch', 'context', 'cpu', 'cpu-online', 'crypt', 'fp-error',
+    'getrandom', 'heapsort', 'hsearch', 'longjmp', 'lsearch', 'matrix',
+    'mergesort', 'numa', 'qsort', 'rdrand', 'str', 'stream', 'tsc', 'tsearch',
+    'vecmath', 'wcs', 'zlib'
+}
+CPU_CACHE_SUITE = {
+    'bsearch', 'cache', 'heapsort', 'hsearch', 'icache', 'lockbus', 'lsearch',
+    'malloc', 'matrix', 'membarrier', 'memcpy', 'mergesort', 'qsort', 'str',
+    'stream', 'tsearch', 'vecmath', 'wcs', 'zlib'
+}
+MEMORY_SUITE = {
+    'bsearch', 'context', 'heapsort', 'hsearch', 'lockbus', 'lsearch', 'malloc',
+    'matrix', 'membarrier', 'memcpy', 'memfd', 'mergesort', 'mincore', 'null',
+    'numa', 'oom-pipe', 'pipe', 'qsort', 'stack', 'str', 'stream', 'tsearch',
+    'vm', 'vm-rw', 'wcs', 'zero', 'zlib'
+}
+# Run the stressors that are each part of all of the compute related stress-ng
+# classes: cpu, cpu-cache, and memory.
+DEFAULT_STRESSORS = sorted(
+    CPU_SUITE.intersection(CPU_CACHE_SUITE).intersection(MEMORY_SUITE))
 
 flags.DEFINE_integer('stress_ng_duration', 10,
                      'Number of seconds to run the test.')
 flags.DEFINE_boolean('stress_ng_calc_geomean', True,
                      'Whether to calculate geomean or not.')
-flags.DEFINE_list('stress_ng_custom_stressors', [],
+flags.DEFINE_list('stress_ng_custom_stressors', DEFAULT_STRESSORS,
                   'List of stressors to run against. Default combines cpu,'
                   'cpu-cache, and memory suites')
 flags.DEFINE_list('stress_ng_cpu_methods', [],
-                  'List of cpu methods to run with. By default none are ran.'
-                  'If some are defined here and nothing is defined for'
-                  'stress_ng_custom_stressors then stress-ng will be ran'
-                  'only against the cpu methods.')
+                  'List of cpu methods to run with. By default none are ran.')
 
 ALL_WORKLOADS = ['small', 'medium', 'large']
-flags.DEFINE_list('stress_ng_thread_workloads', ['large'],
-                  'List of threads sizes to run against. Options are'
-                  'small (1 thread total), medium (1 thread per 2 cpus), and '
-                  'large (1 thread per cpu).')
+flags.DEFINE_list(
+    'stress_ng_thread_workloads', ['large'],
+    'List of threads sizes to run against. Options are'
+    'small (1 thread total), medium (1 thread per 2 cpus), and '
+    'large (1 thread per cpu).')
 flags.register_validator(
     'stress_ng_thread_workloads',
     lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS))
@@ -80,7 +133,6 @@ def _GeoMeanOverflow(iterable):
 
   Args:
     iterable: a list of positive floats to take the geometric mean of.
-
   Returns: The geometric mean of the list.
   """
   a = numpy.log(iterable)
@@ -89,29 +141,19 @@ def _GeoMeanOverflow(iterable):
 
 def StressngCustomStressorsValidator(stressors):
   """Returns whether or not the list of custom stressors is valid."""
-  valid_stressors = {
-      'affinity', 'af-alg', 'aio', 'aio-linux', 'apparmor', 'bigheap', 'brk',
-      'bsearch', 'cache', 'chdir', 'chmod', 'clock', 'clone', 'context', 'cpu',
-      'cpu-online', 'crypt', 'daemon', 'dentry', 'dir', 'dup', 'epoll',
-      'eventfd', 'exec', 'fallocate', 'fault', 'fcntl', 'fiemap', 'fifo',
-      'filename', 'flock', 'fork', 'fp-error', 'fstat', 'futex', 'get',
-      'getrandom', 'getdent', 'handle', 'hdd', 'heapsort', 'hsearch', 'icache',
-      'iosync', 'inotify', 'itimer', 'kcmp', 'key', 'kill', 'klog', 'lease',
-      'link', 'lockbus', 'lockf', 'longjmp', 'lsearch', 'malloc', 'matrix',
-      'membarrier', 'memcpy', 'memfd', 'mergesort', 'mincore', 'mknod', 'mlock',
-      'mmap', 'mmapfork', 'mmapmany', 'mremap', 'msg', 'mq', 'nice', 'null',
-      'numa', 'oom-pipe', 'open', 'personality', 'pipe', 'poll', 'procfs',
-      'pthread', 'ptrace', 'qsort', 'quota', 'rdrand', 'readahead',
-      'remap-file-pages', 'rename', 'rlimit', 'seccomp', 'seek', 'sem-posix',
-      'sem-sysv', 'shm-posix', 'shm-sysv', 'sendfile', 'sigfd', 'sigfpe',
-      'sigpending', 'sigq', 'sigsegv', 'sigsuspend', 'sleep', 'socket',
-      'socket-fd', 'socket-pair', 'spawn', 'splice', 'stack', 'str', 'stream',
-      'switch', 'symlink', 'sync-file', 'sysinfo', 'sysfs', 'tee', 'timer',
-      'timerfd', 'tsc', 'tsearch', 'udp', 'udp-flood', 'unshare', 'urandom',
-      'userfaultfd', 'utime', 'vecmath', 'vfork', 'vm', 'vm-rw', 'vm-splice',
-      'wait', 'wcs', 'xattr', 'yield', 'zero', 'zlib', 'zombie'
-  }
-  return valid_stressors.issuperset(set(stressors))
+  return VALID_STRESSORS.issuperset(set(stressors))
+
+
+def StressngCpuMethodsValidator(cpu_methods):
+  """Returns whether or not the list of cpu methods is valid."""
+  return ('all_cpu_methods' in cpu_methods or
+          VALID_CPU_METHODS.issuperset(set(cpu_methods)))
+
+
+flags.register_validator('stress_ng_custom_stressors',
+                         StressngCustomStressorsValidator)
+flags.register_validator('stress_ng_cpu_methods',
+                         StressngCpuMethodsValidator)
 
 
 def GetConfig(user_config):
@@ -123,7 +165,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
   vm.InstallPackages(
@@ -186,56 +228,28 @@ def _RunWorkload(vm, num_threads):
     A list of sample.Sample objects.
   """
 
-  metadata = {
-      'duration_sec': FLAGS.stress_ng_duration,
-      'threads': num_threads
-  }
-
-  # Rather than running stress-ng with --class cpu,cpu-cache,memory all in one
-  # RobustRemoteCommand we run each stressor indivually. The reason is that
-  # RobustRemoteCommand periodically SSHs into the VM, but one of the memory
-  # stressors stresses the VM so much that SSH instantly returns 255, causing
-  # the benchmark to fail completely.
-
-  cpu_suites = [
-      'af-alg', 'bsearch', 'context', 'cpu', 'cpu-online', 'crypt', 'fp-error',
-      'getrandom', 'heapsort', 'hsearch', 'longjmp', 'lsearch', 'matrix',
-      'mergesort', 'numa', 'qsort', 'rdrand', 'str', 'stream', 'tsc', 'tsearch',
-      'vecmath', 'wcs', 'zlib'
-  ]
-  cpu_cache_suites = [
-      'bsearch', 'cache', 'heapsort', 'hsearch', 'icache', 'lockbus', 'lsearch',
-      'malloc', 'matrix', 'membarrier', 'memcpy', 'mergesort', 'qsort', 'str',
-      'stream', 'tsearch', 'vecmath', 'wcs', 'zlib'
-  ]
-  memory_suites = [
-      'bsearch', 'context', 'heapsort', 'hsearch', 'lockbus', 'lsearch',
-      'malloc', 'matrix', 'membarrier', 'memcpy', 'memfd', 'mergesort',
-      'mincore', 'null', 'numa', 'oom-pipe', 'pipe', 'qsort',
-      'stack', 'str', 'stream', 'tsearch', 'vm', 'vm-rw',
-      'wcs', 'zero', 'zlib'
-  ]
-
-  stressors = sorted(set(cpu_suites + cpu_cache_suites + memory_suites))
-
-  if FLAGS.stress_ng_custom_stressors or FLAGS.stress_ng_cpu_methods:
-    stressors = FLAGS.stress_ng_custom_stressors
+  metadata = {'duration_sec': FLAGS.stress_ng_duration, 'threads': num_threads}
 
   samples = []
   values_to_geomean_list = []
 
+  stressors = FLAGS.stress_ng_custom_stressors
   for stressor in stressors:
     cmd = ('stress-ng --{stressor} {numthreads} --metrics-brief '
-           '-t {duration}'.format(stressor=stressor,
-                                  numthreads=num_threads,
-                                  duration=FLAGS.stress_ng_duration))
+           '-t {duration}'.format(
+               stressor=stressor,
+               numthreads=num_threads,
+               duration=FLAGS.stress_ng_duration))
     stdout, _ = vm.RemoteCommand(cmd)
     stressng_sample = _ParseStressngResult(metadata, stdout)
     if stressng_sample:
       samples.append(stressng_sample)
       values_to_geomean_list.append(stressng_sample.value)
 
-  for cpu_method in FLAGS.stress_ng_cpu_methods:
+  cpu_methods = (VALID_CPU_METHODS
+                 if 'all_cpu_methods' in FLAGS.stress_ng_cpu_methods
+                 else FLAGS.stress_ng_cpu_methods)
+  for cpu_method in cpu_methods:
     cmd = ('stress-ng --cpu {numthreads} --metrics-brief '
            '-t {duration} --cpu-method {cpu_method}'.format(
                numthreads=num_threads,
@@ -252,8 +266,7 @@ def _RunWorkload(vm, num_threads):
     geomean_metadata['stressors'] = stressors
     # True only if each stressor provided a value
     geomean_metadata['valid_run'] = (
-        len(values_to_geomean_list) == len(stressors) +
-        len(FLAGS.stress_ng_cpu_methods))
+        len(values_to_geomean_list) == len(stressors) + len(cpu_methods))
     geomean_sample = sample.Sample(
         metric='STRESS_NG_GEOMEAN',
         value=_GeoMeanOverflow(values_to_geomean_list),
@@ -269,7 +282,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -294,7 +307,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
   vm.RemoteCommand('cd {0} && sudo make uninstall'.format(STRESS_NG_DIR))

@@ -330,7 +330,8 @@
 - Add gluster_fio benchmark.
 - Added support for static AWS VPCs with --aws_vpc and --aws_subnet flags.
 - Added support to append a region name to a bucket name for object storage
-  benchmarking.
+  benchmarking. For Azure, the region is appended to storage accounts and
+  resource groups as well.
 - Added sysbench benchmarking for MySQL in a VM.
 - Added check that cuda_toolkit is installed when installing cudnn.
 - Added ability to set provider-specific MySQL flags for relational databases.
@@ -344,6 +345,8 @@
 - Added ability in stress_ng benchmark to test --cpu-method's.
 - Updated cloud_spanner_ycsb_benchmark to add the support for GCP Go client
   library.
+- Make Kubernetes virtual machines not rebootable by default, to avoid changing
+  things that require rebooting, since doing so is not ideal for containers.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -548,4 +551,6 @@
   cloud_spanner_ycsb_benchmark. Without this, the benchmark is not runnable.
 - Fixed bug of query failing to find AWS internet gateway after Delete called.
 - Abort and log when container resources are exhausted.
+- Add a retry on gcloud commands when rate limited.
 - Check if an AWS firewall rule exists before creating one by querying AWS.
+- Add flag overrides for server and client vm groups inside relational_db.

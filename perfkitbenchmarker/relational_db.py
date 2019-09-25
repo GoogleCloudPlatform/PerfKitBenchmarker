@@ -47,6 +47,8 @@ flags.DEFINE_string('managed_db_backup_start_time', '07:00',
 flags.DEFINE_list('managed_db_zone', None,
                   'zone or region to launch the database in. '
                   'Defaults to the client vm\'s zone.')
+flags.DEFINE_string('client_vm_zone', None,
+                    'zone or region to launch the client in. ')
 flags.DEFINE_string('managed_db_machine_type', None,
                     'Machine type of the database.')
 flags.DEFINE_integer('managed_db_cpus', None,
@@ -56,8 +58,17 @@ flags.DEFINE_string('managed_db_memory', None,
                     'string as custom machine memory type.')
 flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
-flags.DEFINE_string('managed_db_disk_type', None,
-                    'Machine type of the database.')
+flags.DEFINE_string('managed_db_disk_type', None, 'Disk type of the database.')
+flags.DEFINE_string('client_vm_machine_type', None,
+                    'Machine type of the client vm.')
+flags.DEFINE_integer('client_vm_cpus', None, 'Number of Cpus in the client vm.')
+flags.DEFINE_string(
+    'client_vm_memory', None,
+    'Amount of Memory in the vm.  Uses the same format '
+    'string as custom machine memory type.')
+flags.DEFINE_integer('client_vm_disk_size', None,
+                     'Size of the client vm disk in GB.')
+flags.DEFINE_string('client_vm_disk_type', None, 'Disk type of the client vm.')
 flags.DEFINE_boolean(
     'use_managed_db', True, 'If true, uses the managed MySql '
     'service for the requested cloud provider. If false, uses '
@@ -257,6 +268,11 @@ class BaseRelationalDb(resource.BaseResource):
         'backup_enabled': self.spec.backup_enabled,
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
+        'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
+        'client_vm_disk_type':
+            self.spec.vm_groups['clients'].disk_spec.disk_type,
+        'client_vm_disk_size':
+            self.spec.vm_groups['clients'].disk_spec.disk_size,
     }
     if (hasattr(self.spec.db_spec, 'machine_type') and
         self.spec.db_spec.machine_type):
@@ -282,6 +298,23 @@ class BaseRelationalDb(resource.BaseResource):
     else:
       raise RelationalDbPropertyNotSet(
           'Machine type of the database must be set.')
+
+    if (hasattr(self.spec.vm_groups['clients'].vm_spec, 'machine_type') and
+        self.spec.vm_groups['clients'].vm_spec.machine_type):
+      metadata.update({
+          'machine_type': self.spec.vm_groups['clients'].vm_spec.machine_type,
+      })
+    elif hasattr(self.spec.vm_groups['clients'].vm_spec, 'cpus') and (hasattr(
+        self.spec.vm_groups['clients'].vm_spec, 'memory')):
+      metadata.update({
+          'cpus': self.spec.vm_groups['clients'].vm_spec.cpus,
+      })
+      metadata.update({
+          'memory': self.spec.vm_groups['clients'].vm_spec.memory,
+      })
+    else:
+      raise RelationalDbPropertyNotSet(
+          'Machine type of the client VM must be set.')
 
     if FLAGS.mysql_flags:
       metadata.update({

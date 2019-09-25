@@ -22,6 +22,7 @@ import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -47,6 +48,13 @@ def CreateMockClientVM(db_class):
   db_class.client_vm = m
 
 
+def CreateMockServerVM(db_class):
+  m = mock.MagicMock()
+  m.HasIpAddress = True
+  m.ip_address = '192.168.2.1'
+  db_class.server_vm = m
+
+
 def CreateDbFromSpec(spec_dict):
   mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
@@ -68,6 +76,39 @@ def PatchCriticalObjects(stdout='', stderr='', return_code=0):
                                    util.__name__ + '.GetDefaultProject',
                                    return_value='fakeproject'):
     yield issue_command
+
+
+def VmGroupSpec():
+  return {
+      'clients': {
+          'vm_spec': {
+              'GCP': {
+                  'zone': 'us-central1-c',
+                  'machine_type': 'n1-standard-1'
+              }
+          },
+          'disk_spec': {
+              'GCP': {
+                  'disk_size': 500,
+                  'disk_type': 'pd-ssd'
+              }
+          }
+      },
+      'servers': {
+          'vm_spec': {
+              'GCP': {
+                  'zone': 'us-central1-c',
+                  'machine_type': 'n1-standard-1'
+              }
+          },
+          'disk_spec': {
+              'GCP': {
+                  'disk_size': 500,
+                  'disk_type': 'pd-ssd'
+              }
+          }
+      }
+  }
 
 
 class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -92,6 +133,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'high_availability': False,
         'backup_enabled': True,
         'backup_start_time': '07:00',
+        'vm_groups': VmGroupSpec(),
     }
 
   def setUp(self):
@@ -132,6 +174,14 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--backup', command_string)
       self.assertIn('--backup-start-time=07:00', command_string)
       self.assertIn('--zone=us-west1-b', command_string)
+
+  def testCorrectVmGroupsPresent(self):
+    with PatchCriticalObjects():
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
+      CreateMockServerVM(db)
+      db._Create()
+      vms = relational_db.VmsToBoot(db.spec.vm_groups)
+      self.assertNotIn('servers', vms)
 
   def testCreateWithBackupDisabled(self):
     with PatchCriticalObjects() as issue_command:
@@ -208,6 +258,20 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual('', db._ParseEndpoint(None))
       self.assertIn('10.10.0.35',
                     db._ParseEndpoint(json.loads(test_output)))
+
+  def testCreateUnmanagedDb(self):
+    FLAGS['use_managed_db'].parse(False)
+    FLAGS['project'].parse('test')
+    with PatchCriticalObjects() as issue_command:
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
+      CreateMockServerVM(db)
+      db._Create()
+      self.assertTrue(db._Exists())
+      self.assertTrue(hasattr(db, 'firewall'))
+      self.assertEqual(db.endpoint, db.server_vm.ip_address)
+      self.assertEqual(db.spec.database_username, 'root')
+      self.assertEqual(db.spec.database_password, 'perfkitbenchmarker')
+      self.assertIsNone(issue_command.call_args)
 
 
 class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
