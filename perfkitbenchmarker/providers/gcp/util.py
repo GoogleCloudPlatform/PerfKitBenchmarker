@@ -34,6 +34,15 @@ else:
 
 FLAGS = flags.FLAGS
 
+RATE_LIMITED_MESSAGE = 'Rate Limit Exceeded'
+RATE_LIMITED_MAX_RETRIES = 10
+# 200s is chosen because 1) quota is measured in 100s intervals and 2) fuzzing
+# causes a random number between 100 and this to be chosen.
+RATE_LIMITED_MAX_POLLING_INTERVAL = 200
+# This must be set. Otherwise, calling Issue() will fail in util_test.py.
+RATE_LIMITED_FUZZ = 0.5
+RATE_LIMITED_TIMEOUT = 1200
+
 
 @functools.lru_cache()
 def GetDefaultProject():
@@ -191,8 +200,14 @@ class GcloudCommand(object):
   def __repr__(self):
     return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
+  @vm_util.Retry(
+      poll_interval=RATE_LIMITED_MAX_POLLING_INTERVAL,
+      max_retries=RATE_LIMITED_MAX_RETRIES,
+      fuzz=RATE_LIMITED_FUZZ,
+      timeout=RATE_LIMITED_TIMEOUT,
+      retryable_exceptions=(errors.Benchmarks.RateLimitExceededError,))
   def Issue(self, **kwargs):
-    """Tries to run the gcloud command once.
+    """Tries to run the gcloud command once, retrying if Rate Limited.
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
@@ -200,8 +215,17 @@ class GcloudCommand(object):
 
     Returns:
       A tuple of stdout, stderr, and retcode from running the gcloud command.
+    Raises:
+      RateLimitExceededError: if command fails with Rate Limit Exceeded.
+
     """
-    return _issue_command_function(self, **kwargs)
+    stdout, stderr, retcode = _issue_command_function(self, **kwargs)
+    if (retcode and
+        RATE_LIMITED_MESSAGE in stderr and
+        FLAGS.gcp_retry_on_rate_limited):
+      raise errors.Benchmarks.RateLimitExceededError(RATE_LIMITED_MESSAGE)
+
+    return stdout, stderr, retcode
 
   def IssueRetryable(self, **kwargs):
     """Tries running the gcloud command until it succeeds or times out.

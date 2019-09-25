@@ -225,11 +225,18 @@ class GkeCluster(container_service.KubernetesCluster):
       instances.append(instance['instance'].split('/')[-1])
     return instances
 
+  def _IsDeleting(self):
+    cmd = util.GcloudCommand(
+        self, 'container', 'clusters', 'describe', self.name)
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
+    return True if stdout else False
+
   def _Delete(self):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'delete', self.name)
-    cmd.Issue(timeout=450, raise_on_failure=False)
+    cmd.args.append('--async')
+    cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns True if the cluster exits."""

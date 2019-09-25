@@ -213,6 +213,36 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
             'GCP': {
                 'disk_size': 500,
             }
+        },
+        'vm_groups': {
+            'clients': {
+                'vm_spec': {
+                    'GCP': {
+                        'zone': 'us-central1-c',
+                        'machine_type': 'n1-standard-1'
+                    }
+                },
+                'disk_spec': {
+                    'GCP': {
+                        'disk_size': 500,
+                        'disk_type': 'pd-ssd'
+                    }
+                }
+            },
+            'servers': {
+                'vm_spec': {
+                    'GCP': {
+                        'zone': 'us-central1-c',
+                        'machine_type': 'n1-standard-1'
+                    }
+                },
+                'disk_spec': {
+                    'GCP': {
+                        'disk_size': 500,
+                        'disk_type': 'pd-ssd'
+                    }
+                }
+            }
         }
     }
 
@@ -278,6 +308,26 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = benchmark_config_spec._RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.db_spec.zone, 'us-east1-b')
+    self.assertEqual(result.vm_groups['servers'].vm_spec.zone, 'us-east1-b')
+
+  def testClientVmZoneFlag(self):
+    FLAGS['client_vm_zone'].parse('us-east1-b')
+    result = benchmark_config_spec._RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
+    self.assertEqual(result.vm_groups['clients'].vm_spec.zone, 'us-east1-b')
+
+  def testDiskSizeFlag(self):
+    FLAGS['managed_db_disk_size'].parse(2000)
+    result = benchmark_config_spec._RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
+    self.assertEqual(result.db_disk_spec.disk_size, 2000)
+    self.assertEqual(result.vm_groups['servers'].disk_spec.disk_size, 2000)
+
+  def testClientVmDiskSizeFlag(self):
+    FLAGS['client_vm_disk_size'].parse(2000)
+    result = benchmark_config_spec._RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.full_spec)
+    self.assertEqual(result.vm_groups['clients'].disk_spec.disk_size, 2000)
 
 
 if __name__ == '__main__':
