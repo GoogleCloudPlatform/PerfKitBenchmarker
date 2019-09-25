@@ -19,9 +19,17 @@
 def YumInstall(vm):
   """Installs the package on the VM."""
   package_name = getattr(vm, 'python_package_config', 'python-2.7.5')
+  # try to install "python" by default
+  if package_name != 'python':
+    package_name = 'python ' + package_name
   vm.InstallPackages(package_name)
 
 
 def AptInstall(vm):
   """Installs the package on the VM."""
-  vm.InstallPackages('python2.7')
+  vm.InstallPackages('python python2.7')
+
+
+def SwupdInstall(vm):
+  """Installs the package on the VM"""
+  vm.InstallPackages('python-basic')
