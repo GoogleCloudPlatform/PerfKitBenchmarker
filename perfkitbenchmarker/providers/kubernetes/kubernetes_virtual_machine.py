@@ -49,6 +49,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
   HOME_DIR = '/root'
+  IS_REBOOTABLE = False
 
   def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
@@ -125,7 +126,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
-    logging.info('Waiting for POD %s' % self.name)
+    logging.info('Waiting for POD %s', self.name)
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
                                           raise_on_failure=False)
     if pod_info:
@@ -414,6 +415,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
+    self.Install('python')
 
     # Needed for the MKL math library.
     self.InstallPackages('cpio')

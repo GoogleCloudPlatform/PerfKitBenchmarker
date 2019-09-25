@@ -22,10 +22,12 @@ import mock
 from mock import patch, Mock
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.providers.aws.aws_relational_db import (AwsRelationalDb)
 from perfkitbenchmarker.relational_db import AURORA_POSTGRES
@@ -80,6 +82,38 @@ class AwsRelationalDbTestCase(unittest.TestCase):
                                                 '.NamedTemporaryFile'):
       yield issue_command
 
+  def VmGroupSpec(self):
+    return {
+        'clients': {
+            'vm_spec': {
+                'GCP': {
+                    'zone': 'us-central1-c',
+                    'machine_type': 'n1-standard-1'
+                }
+            },
+            'disk_spec': {
+                'GCP': {
+                    'disk_size': 500,
+                    'disk_type': 'pd-ssd'
+                }
+            }
+        },
+        'servers': {
+            'vm_spec': {
+                'GCP': {
+                    'zone': 'us-central1-c',
+                    'machine_type': 'n1-standard-1'
+                }
+            },
+            'disk_spec': {
+                'GCP': {
+                    'disk_size': 500,
+                    'disk_type': 'pd-ssd'
+                }
+            }
+        }
+    }
+
   def CreateMockSpec(self, additional_spec_items={}):
     default_server_db_disk_spec = aws_disk.AwsDiskSpec(
         _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000)
@@ -99,6 +133,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
         'high_availability': False,
         'db_spec': default_server_db_spec,
         'db_disk_spec': default_server_db_disk_spec,
+        'vm_groups': self.VmGroupSpec(),
     }
     spec_dict.update(additional_spec_items)
 
@@ -111,6 +146,12 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     m.HasIpAddress = True
     m.ip_address = '192.168.0.1'
     db_class.client_vm = m
+
+  def CreateMockServerVM(self, db_class):
+    m = mock.MagicMock()
+    m.HasIpAddress = True
+    m.ip_address = '192.168.2.1'
+    db_class.server_vm = m
 
   def CreateDbFromMockSpec(self, mock_spec):
     aws_db = AwsRelationalDb(mock_spec)
@@ -142,6 +183,14 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     self.assertIn('--db-instance-class=db.t1.micro', command_string)
     self.assertIn('--engine=mysql', command_string)
     self.assertIn('--master-user-password=fakepassword', command_string)
+
+  def testCorrectVmGroupsPresent(self):
+    with self._PatchCriticalObjects():
+      db = self.CreateDbFromSpec()
+      self.CreateMockServerVM(db)
+      db._Create()
+      vms = relational_db.VmsToBoot(db.spec.vm_groups)
+      self.assertNotIn('servers', vms)
 
   def CreateAuroraMockSpec(self, additional_spec_items={}):
     default_server_db_spec = virtual_machine.BaseVmSpec(
@@ -284,6 +333,22 @@ class AwsRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--db-instance-identifier=pkb-db-instance-123',
                     command_string)
       self.assertIn('--skip-final-snapshot', command_string)
+
+  @mock.patch.object(aws_network.AwsFirewall, '_RuleExists', return_value=True,
+                     autospec=True)
+  def testCreateUnmanagedDb(self, rule_check_mock):  # pylint: disable=unused-argument
+    FLAGS['use_managed_db'].parse(False)
+    FLAGS['default_timeout'].parse(300)
+    with self._PatchCriticalObjects() as issue_command:
+      db = self.CreateDbFromSpec()
+      self.CreateMockServerVM(db)
+      db._Create()
+      self.assertTrue(db._Exists())
+      self.assertTrue(hasattr(db, 'firewall'))
+      self.assertEqual(db.endpoint, db.server_vm.ip_address)
+      self.assertEqual(db.spec.database_username, 'root')
+      self.assertEqual(db.spec.database_password, 'perfkitbenchmarker')
+      self.assertIsNone(issue_command.call_args)
 
 
 if __name__ == '__main__':

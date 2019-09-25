@@ -1386,6 +1386,22 @@ def Prepare(benchmark_spec):
   # Load the provider and its object storage service
   providers.LoadProvider(FLAGS.storage)
 
+  # Determine the bucket name.
+  if benchmark_spec.read_objects is not None:
+    # Using an existing bucket
+    bucket_name = benchmark_spec.read_objects['bucket_name']
+    if FLAGS.object_storage_bucket_name is not None:
+      logging.warning('--object_storage_bucket_name ignored because '
+                      '--object_storage_read_objects was specified')
+  else:
+    # Use a new bucket (or the name of a specified bucket).
+    bucket_name = FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
+    if FLAGS.object_storage_apply_region_suffix_to_bucket_name:
+      # Avoid non-alphanumeric characters in the region as bucket names on some
+      # clouds cannot contain non-alphanumeric characters.
+      bucket_name = '%s%s' % (bucket_name,
+                              re.sub(r'[\W_]', '', FLAGS.object_storage_region))
+
   service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
   if (FLAGS.storage == 'Azure' and
       FLAGS.object_storage_read_objects_prefix is not None):
@@ -1405,8 +1421,8 @@ def Prepare(benchmark_spec):
     # name (for consistency).
     service.PrepareService(
         FLAGS.object_storage_region,
-        (FLAGS.object_storage_bucket_name + 'storage',
-         FLAGS.object_storage_bucket_name + '-resource-group'),
+        # The storage account must not exceed 24 characters.
+        (bucket_name[:24], bucket_name + '-resource-group'),
         try_to_create_storage_account_and_resource_group=True)
   else:
     service.PrepareService(FLAGS.object_storage_region)
@@ -1414,20 +1430,8 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
-  if benchmark_spec.read_objects is not None:
-    # Using an existing bucket
-    bucket_name = benchmark_spec.read_objects['bucket_name']
-    if FLAGS.object_storage_bucket_name is not None:
-      logging.warning('--object_storage_bucket_name ignored because '
-                      '--object_storage_read_objects was specified')
-  else:
-    # Make the bucket(s)
-    bucket_name = FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
-    if FLAGS.object_storage_apply_region_suffix_to_bucket_name:
-      # Avoid non-alphanumeric characters in the region as bucket names on some
-      # clouds cannot contain non-alphanumeric characters.
-      bucket_name = '%s%s' % (bucket_name,
-                              re.sub(r'[\W_]', '', FLAGS.object_storage_region))
+  # Make the bucket.
+  if benchmark_spec.read_objects is None:
     # Fail if we cannot create the bucket as long as the bucket name was not
     # set via a flag. If it was set by a flag, then we will still try to create
     # the bucket, but won't fail if it was created. This supports running the
