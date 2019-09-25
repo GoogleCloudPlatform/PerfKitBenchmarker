@@ -644,6 +644,11 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   """
   OS_TYPE = None
   BASE_OS_TYPE = None
+  # Represents whether the VM type can be (cleanly) rebooted. Should be false
+  # for a class if rebooting causes issues, e.g. for KubernetesVirtualMachine
+  # needing to reboot often indicates a design problem since restarting a
+  # container can have side effects in certain situations.
+  IS_REBOOTABLE = True
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()
@@ -719,7 +724,15 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     Returns:
       The duration in seconds from the time the reboot command was issued to
       the time we could SSH into the VM and verify that the timestamp changed.
+
+    Raises:
+      Exception: If trying to reboot a VM that isn't rebootable
+        (e.g. Kubernetes).
     """
+    if not self.IS_REBOOTABLE:
+      raise errors.VirtualMachine.VirtualMachineError(
+          "Trying to reboot a VM that isn't rebootable.")
+
     vm_bootable_time = None
 
     # Use self.bootable_time to determine if this is the first boot.

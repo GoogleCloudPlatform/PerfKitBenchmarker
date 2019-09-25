@@ -344,6 +344,8 @@
 - Added ability in stress_ng benchmark to test --cpu-method's.
 - Updated cloud_spanner_ycsb_benchmark to add the support for GCP Go client
   library.
+- Make Kubernetes virtual machines not rebootable by default, to avoid changing
+  things that require rebooting, since doing so is not ideal for containers.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
