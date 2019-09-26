@@ -202,7 +202,7 @@ def ParseRunAct(out):
     matrix = ''
     if vals[0] in ('avg', 'max'):
       matrix = '_' + vals[0]
-    num_buckets = (len(vals) - 1) / 2
+    num_buckets = (len(vals) - 1) // 2
     for i in range(num_buckets - 1):
       assert buckets[i] == buckets[i + num_buckets]
       ret.append(
