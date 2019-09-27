@@ -51,6 +51,13 @@ def YumInstall(vm):
   Install(vm, package_name)
 
 
+def SwupdInstall(vm):
+  """Installs the pip package on the VM,"""
+  vm.InstallPackages("which")
+  package_name = "python-basic"
+  Install(vm, package_name)
+
+
 def Uninstall(vm):
   """Uninstalls the pip package on the VM."""
   vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '

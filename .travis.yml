@@ -1,9 +1,11 @@
 language: python
-python: 2.7
-env:
-  - TOX_ENV=py27
-  - TOX_ENV=flake8
+matrix:
+  include:
+  - python: 3.6
+    env: TOX_ENV=py36,flake8,scripts
+  - python: 2.7
+    env: TOX_ENV=py27,flake8,scripts
 install:
   - pip install tox
 script:
-  - tox -e $TOX_ENV
+  - tox -r -e $TOX_ENV
