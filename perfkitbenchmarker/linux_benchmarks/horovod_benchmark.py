@@ -184,6 +184,10 @@ def _PrepareHorovod(vm):
     return
   vm.Install('tensorflow')
   vm.Install('openmpi')
+  vm.RemoteCommand(
+      'sudo apt-get install -y g++-4.9 && '
+      'sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 20 && '
+      'sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 10')
   vm.RemoteCommand('sudo HOROVOD_GPU_ALLREDUCE=NCCL pip install '
                    '--no-cache-dir horovod')
 
