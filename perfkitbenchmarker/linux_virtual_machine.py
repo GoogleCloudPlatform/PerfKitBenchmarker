@@ -57,6 +57,7 @@ FLAGS = flags.FLAGS
 
 
 LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
+CLEAR_BUILD_REGEXP = r'Installed version:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '~/.ssh/id_rsa'
@@ -314,7 +315,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-      self.InstallPackages('python')
+      self.Install('python')
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -459,15 +460,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._lscpu_cache = LsCpuResults(lscpu)
     return self._lscpu_cache
 
+  def GetOsInfo(self):
+    """Returns information regarding OS type and version"""
+    self.Install('lsb_release')
+    stdout, _ = self.RemoteCommand('lsb_release -d')
+    return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+
   @property
   def os_info(self):
     """Get distribution-specific information."""
     if self.os_metadata.get('os_info'):
       return self.os_metadata['os_info']
     else:
-      self.Install('lsb_release')
-      stdout, _ = self.RemoteCommand('lsb_release -d')
-      return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+      return self.GetOsInfo()
 
   @property
   def kernel_release(self):
@@ -1092,6 +1097,88 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.AppendKernelCommandLine(
           FLAGS.append_kernel_command_line, reboot=False)
       self._needs_reboot = True
+
+
+class ClearMixin(BaseLinuxMixin):
+  """Class holding Clear Linux specific VM methods and attributes."""
+
+  OS_TYPE = os_types.CLEAR
+  BASE_OS_TYPE = os_types.CLEAR
+
+  def OnStartup(self):
+    """Eliminates the need to have a tty to run sudo commands."""
+    super(ClearMixin, self).OnStartup()
+    self.RemoteHostCommand('sudo swupd autoupdate --disable')
+    self.RemoteHostCommand('sudo mkdir -p /etc/sudoers.d')
+    self.RemoteHostCommand('echo \'Defaults:{0} !requiretty\' | '
+                           'sudo tee /etc/sudoers.d/pkb'.format(self.user_name),
+                           login_shell=True)
+
+  def PackageCleanup(self):
+    """Cleans up all installed packages.
+
+    Performs the normal package cleanup, then deletes the file
+    added to the /etc/sudoers.d directory during startup.
+    """
+    super(ClearMixin, self).PackageCleanup()
+    self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
+
+  def SnapshotPackages(self):
+    """See base class."""
+    self.RemoteCommand('sudo swupd bundle-list > {0}/bundle_list'.format(linux_packages.INSTALL_DIR))
+
+  def RestorePackages(self):
+    """See base class."""
+    self.RemoteCommand(
+        'sudo swupd bundle-list | grep --fixed-strings --line-regexp --invert-match --file '
+        '{0}/bundle_list | xargs --no-run-if-empty sudo swupd bundle-remove'.format(linux_packages.INSTALL_DIR),
+        ignore_failure=True)
+
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('sudo swupd bundle-list --all | grep {0}'.format(package),
+                                 suppress_warning=True)
+
+  def InstallPackages(self, packages):
+    """Installs packages using the swupd bundle manager."""
+    self.RemoteCommand('sudo swupd bundle-add {0}'.format(packages))
+
+  def Install(self, package_name):
+    """Installs a PerfKit package on the VM."""
+    if not self.install_packages:
+      return
+    if package_name not in self._installed_packages:
+      package = linux_packages.PACKAGES[package_name]
+      if hasattr(package, 'SwupdInstall'):
+        package.SwupdInstall(self)
+      elif hasattr(package, 'Install'):
+        package.Install(self)
+      else:
+        raise KeyError('Package {0} has no install method for Clear Linux.'.format(package_name))
+      self._installed_packages.add(package_name)
+
+  def Uninstall(self, package_name):
+    """Uninstalls a PerfKit package on the VM."""
+    package = linux_packages.PACKAGES[package_name]
+    if hasattr(package, 'SwupdUninstall'):
+      package.SwupdUninstall(self)
+    elif hasattr(package, 'Uninstall'):
+      package.Uninstall(self)
+
+  def GetPathToConfig(self, package_name):
+    """See base class"""
+    package = linux_packages.PACKAGES[package_name]
+    return package.SwupdGetPathToConfig(self)
+
+  def GetServiceName(self, package_name):
+    """See base class"""
+    package = linux_packages.PACKAGES[package_name]
+    return package.SwupdGetServiceName(self)
+
+  def GetOsInfo(self):
+    """See base class"""
+    stdout, _ = self.RemoteCommand('swupd info | grep Installed')
+    return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
 
 
 class RhelMixin(BaseLinuxMixin):

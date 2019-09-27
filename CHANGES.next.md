@@ -133,6 +133,7 @@
 - Added a benchmark to run spark application on a cluster that computes an approximation to pi.
 - Added a benchmark to run spark io workload on a cluster that provisions a database and queries it.
 - Added flag --record_lscpu=True to record lscpu data as its own metric "lscpu"
+- Added support for the Clear Linux OS type for AWS and static VMs (e.g. --os-type=clear)
 - Added flag --aws_placement_group_style to allow different AWS placement groups options for ec2 VM benchmarks.
 
 ### Enhancements:
@@ -553,4 +554,5 @@
 - Add a retry on gcloud commands when rate limited.
 - Check if an AWS firewall rule exists before creating one by querying AWS.
 - Add flag overrides for server and client vm groups inside relational_db.
+- Update requirements.txt for Python 3
 - Upgrade hadoop to version 3.2.1.
