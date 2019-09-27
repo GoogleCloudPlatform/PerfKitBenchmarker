@@ -63,7 +63,7 @@ def Prepare(benchmark_spec):
   vm.Install('act')
   for load in FLAGS.act_load:
     if FLAGS.act_parallel:
-      for i in range(len(vm.scratch_disks))[FLAGS.act_reserved_partitions:]:
+      for i in range(FLAGS.act_reserved_partitions, len(vm.scratch_disks)):
         act.PrepActConfig(vm, float(load), i)
     else:
       act.PrepActConfig(vm, float(load))
@@ -84,7 +84,7 @@ def Run(benchmark_spec):
     if FLAGS.act_parallel:
       args = [((float(load), idx), {})
               for idx in range(
-                  len(vm.scratch_disks))[FLAGS.act_reserved_partitions:]]
+                  FLAGS.act_reserved_partitions, len(vm.scratch_disks))]
       vm_util.RunThreaded(_Run, args)
     else:
       run_samples.extend(act.RunAct(vm, float(load)))
