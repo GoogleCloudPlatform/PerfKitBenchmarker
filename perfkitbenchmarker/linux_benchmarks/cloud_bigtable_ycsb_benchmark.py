@@ -46,6 +46,15 @@ FLAGS = flags.FLAGS
 HBASE_CLIENT_VERSION = '1.x'
 BIGTABLE_CLIENT_VERSION = '1.4.0'
 
+# TODO(user): remove the custom ycsb build once the head version of YCSB
+# is updated to share Bigtable table object, and PKB is updated to work with the
+# new YCSB version (as of now, YCSB 0.17.0 does not work for PKB due to package
+# move from com.yahoo.ycsb to site.ycsb). The source code of the patched YCSB
+# 0.14.0 can be found at 'https://storage.googleapis.com/cbt_ycsb_client_jar/'
+# 'YCSB-0.14.0-Bigtable-table-object-sharing.zip'.
+YCSB_BIGTABLE_TABLE_SHARING_TAR_URL = (
+    'https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz')
+
 flags.DEFINE_string('google_bigtable_endpoint', 'bigtable.googleapis.com',
                     'Google API endpoint for Cloud Bigtable.')
 flags.DEFINE_string('google_bigtable_admin_endpoint',
@@ -55,6 +64,12 @@ flags.DEFINE_string('google_bigtable_admin_endpoint',
 flags.DEFINE_string('google_bigtable_instance_name', None,
                     'Bigtable instance name. If not specified, new instance '
                     'will be created and deleted on the fly.')
+flags.DEFINE_string('google_bigtable_static_table_name', None,
+                    'Bigtable table name. If not specified, a temporary table '
+                    'will be created and deleted on the fly.')
+flags.DEFINE_boolean('google_bigtable_enable_table_object_sharing', False,
+                     'If true, will use a YCSB binary that shares the same '
+                     'Bigtable table object across all the threads on a VM.')
 flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
@@ -192,7 +207,8 @@ def _GetInstanceDescription(project, instance_name):
 
 
 def _GetTableName():
-  return 'ycsb{0}'.format(FLAGS.run_uri)
+  return (FLAGS.google_bigtable_static_table_name or
+          'ycsb{0}'.format(FLAGS.run_uri))
 
 
 def _GetDefaultProject():
@@ -344,6 +360,8 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
+  if FLAGS.google_bigtable_enable_table_object_sharing:
+    ycsb.SetYcsbTarUrl(YCSB_BIGTABLE_TABLE_SHARING_TAR_URL)
 
   # TODO: in the future, it might be nice to change this so that
   # a gcp_bigtable.GcpBigtableInstance can be created with an
@@ -362,11 +380,10 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(_Install, vms)
 
-  # Create table
-  hbase_ycsb.CreateYCSBTable(vms[0], table_name=_GetTableName(),
-                             use_snappy=False, limit_filesize=False)
-
   table_name = _GetTableName()
+  # If the table already exists, it will be an no-op.
+  hbase_ycsb.CreateYCSBTable(vms[0], table_name=table_name, use_snappy=False,
+                             limit_filesize=False)
 
   # Add hbase conf dir to the classpath.
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
@@ -442,8 +459,8 @@ def Cleanup(benchmark_spec):
   # Delete table
   if FLAGS.google_bigtable_instance_name is None:
     benchmark_spec.bigtable_instance.Delete()
-  else:
-    # Only need to drop the tables if we're not deleting the instance.
+  elif FLAGS.google_bigtable_static_table_name is None:
+    # Only need to drop the temporary tables if we're not deleting the instance.
     vm = benchmark_spec.vms[0]
     command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
                """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
