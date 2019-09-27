@@ -347,6 +347,9 @@
   library.
 - Make Kubernetes virtual machines not rebootable by default, to avoid changing
   things that require rebooting, since doing so is not ideal for containers.
+- Improved the usability of cloud bigtable ycsb benchmark by introducing flags
+  --google_bigtable_static_table_name,
+  --google_bigtable_enable_table_object_sharing, and --ycsb_skip_load_stage.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
