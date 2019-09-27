@@ -555,3 +555,4 @@
 - Check if an AWS firewall rule exists before creating one by querying AWS.
 - Add flag overrides for server and client vm groups inside relational_db.
 - Update requirements.txt for Python 3
+- Upgrade hadoop to version 3.2.1.
