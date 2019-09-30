@@ -101,11 +101,13 @@ class AzureResourceGroup(resource.BaseResource):
       return False
 
   def _Delete(self):
-    # Ignore delete failures (potentially already deleted)
+    # Ignore delete failures (potentially already deleted) and timeouts as
+    # delete should complete even if we stop waiting for the response.
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'delete', '--yes', '--name', self.name],
         timeout=600,
-        raise_on_failure=False)
+        raise_on_failure=False,
+        raise_on_timeout=False)
 
   def AddTag(self, key, value):
     """Add a single tag to an existing Resource Group.
