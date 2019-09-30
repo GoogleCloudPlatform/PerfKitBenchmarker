@@ -116,6 +116,9 @@ flags.DEFINE_boolean('ycsb_histogram', False, 'Include individual '
                      'count).')
 flags.DEFINE_boolean('ycsb_load_samples', True, 'Include samples '
                      'from pre-populating database.')
+flags.DEFINE_boolean('ycsb_skip_load_stage', False, 'If True, skip the data '
+                     'loading staging. It can be used when the database target '
+                     'already exists with pre-populated data.')
 flags.DEFINE_boolean('ycsb_include_individual_results', False,
                      'Include results from each client VM, rather than just '
                      'combined results.')
@@ -1192,6 +1195,9 @@ class YCSBExecutor(object):
     Returns:
       List of sample.Sample objects.
     """
-    load_samples = self.Load(vms, workloads=workloads, load_kwargs=load_kwargs)
+    load_samples = []
+    if not FLAGS.ycsb_skip_load_stage:
+      load_samples = self.Load(vms, workloads=workloads,
+                               load_kwargs=load_kwargs)
     run_samples = self.Run(vms, workloads=workloads, run_kwargs=run_kwargs)
     return load_samples + run_samples
