@@ -217,15 +217,23 @@ class GcloudCommand(object):
       A tuple of stdout, stderr, and retcode from running the gcloud command.
     Raises:
       RateLimitExceededError: if command fails with Rate Limit Exceeded.
+      IssueCommandError: if command fails without Rate Limit Exceeded.
 
     """
-    stdout, stderr, retcode = _issue_command_function(self, **kwargs)
-    if (retcode and
-        RATE_LIMITED_MESSAGE in stderr and
-        FLAGS.gcp_retry_on_rate_limited):
-      raise errors.Benchmarks.RateLimitExceededError(RATE_LIMITED_MESSAGE)
+    if FLAGS.gcp_retry_on_rate_limited:
+      try:
+        stdout, stderr, retcode = _issue_command_function(self, **kwargs)
+      except errors.VmUtil.IssueCommandError as error:
+        if RATE_LIMITED_MESSAGE in error.message:
+          raise errors.Benchmarks.RateLimitExceededError(error.message)
+        else:
+          raise error
+      if retcode and RATE_LIMITED_MESSAGE in stderr:
+        raise errors.Benchmarks.RateLimitExceededError(stderr)
 
-    return stdout, stderr, retcode
+      return stdout, stderr, retcode
+    else:
+      return _issue_command_function(self, **kwargs)
 
   def IssueRetryable(self, **kwargs):
     """Tries running the gcloud command until it succeeds or times out.
