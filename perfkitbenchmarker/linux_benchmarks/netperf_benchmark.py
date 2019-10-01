@@ -276,14 +276,15 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     results = next(r)
     logging.info('Netperf Results: %s', results)
     assert 'Throughput' in results
-  except StopIteration:
+  except (StopIteration, AssertionError):
     # The output returned by netperf was unparseable - usually due to a broken
     # connection or other error.  Raise KnownIntermittentError to signal the
     # benchmark can be retried.  Do not automatically retry as an immediate
     # retry on these VMs may be adveresly affected (e.g. burstable credits
     # partially used)
-    raise errors.Benchmarks.KnownIntermittentError(
-        'Netperf ERROR: Failed to parse stdout. STDOUT: %s' % stdout)
+    message = 'Netperf ERROR: Failed to parse stdout. STDOUT: %s' % stdout
+    logging.error(message)
+    raise errors.Benchmarks.KnownIntermittentError(message)
 
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
