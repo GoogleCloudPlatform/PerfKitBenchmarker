@@ -386,7 +386,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                         thinktime_run_length=FLAGS.netperf_thinktime_run_length)
 
   # Run all of the netperf processes and collect their stdout
-  # TODO: Record process start delta of netperf processes on the remote machine
+  # TODO(dlott): Analyze process start delta of netperf processes on the remote
+  #              machine
 
   # Give the remote script the max possible test length plus 5 minutes to
   # complete
