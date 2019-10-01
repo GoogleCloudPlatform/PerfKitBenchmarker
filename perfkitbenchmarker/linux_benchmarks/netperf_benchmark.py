@@ -27,18 +27,19 @@ from __future__ import division
 from __future__ import print_function
 import collections
 import csv
-import io
 import json
 import logging
 import os
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
+import six
 from six.moves import zip
 
 flags.DEFINE_integer('netperf_max_iter', None,
@@ -244,6 +245,9 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
   Args:
     stdout: the stdout of the netperf process
     metadata: metadata for any sample.Sample objects we create
+    benchmark_name: the name of the netperf benchmark
+    enable_latency_histograms: bool indicating if latency histograms are
+        included in stdout
 
   Returns:
     A tuple containing (throughput_sample, latency_samples, latency_histogram)
@@ -264,7 +268,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
   # Maximum Latency Microseconds\n
   # 1405.50,Trans/s,2.522,4,783.80,683,735,841,600,900\n
   try:
-    fp = io.StringIO(stdout)
+    fp = six.StringIO(stdout)
     # "-o" flag above specifies CSV output, but there is one extra header line:
     banner = next(fp)
     assert banner.startswith('MIGRATED'), stdout
@@ -272,9 +276,14 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     results = next(r)
     logging.info('Netperf Results: %s', results)
     assert 'Throughput' in results
-  except:
-    raise Exception('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
-                    stdout)
+  except StopIteration:
+    # The output returned by netperf was unparseable - usually due to a broken
+    # connection or other error.  Raise KnownIntermittentError to signal the
+    # benchmark can be retried.  Do not automatically retry as an immediate
+    # retry on these VMs may be adveresly affected (e.g. burstable credits
+    # partially used)
+    raise errors.Benchmarks.KnownIntermittentError(
+        'Netperf ERROR: Failed to parse stdout. STDOUT: %s' % stdout)
 
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
