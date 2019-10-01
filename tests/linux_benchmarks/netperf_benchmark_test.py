@@ -20,6 +20,7 @@ import unittest
 import mock
 
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
@@ -37,6 +38,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
+    super(NetperfBenchmarkTestCase, self).setUp()
     # Load data
     path = os.path.join(os.path.dirname(__file__),
                         '..', 'data',
@@ -140,6 +142,16 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
       self.assertDictContainsSubset(meta, result[i][3])
+
+  def testParseNetperfOutputError(self):
+    with self.assertRaises(
+        errors.Benchmarks.KnownIntermittentError) as e:
+      netperf_benchmark.ParseNetperfOutput(
+          'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
+          '10.0.0.137 () port 20157 AF_INET : '
+          'histogram\nrecv_response_timed_n: no response received. errno 110 '
+          'counter 0\n', {}, 'fake_benchmark_name', False)
+    self.assertIn('Failed to parse stdout', str(e.exception))
 
 
 if __name__ == '__main__':

@@ -809,7 +809,7 @@ def RunBenchmark(spec, collector):
   """
 
   # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
-  # further dicussion in _BackgroundProcessTaskManager) this mechanism is
+  # further discussion in _BackgroundProcessTaskManager) this mechanism is
   # provided for defense in depth to force skip pending runs after SIGINT.
   for f in _SKIP_PENDING_RUNS_CHECKS:
     if f():
@@ -871,6 +871,10 @@ def RunBenchmark(spec, collector):
         elif (isinstance(e, errors.Benchmarks.QuotaFailure)
               or 'QuotaFailure' in str(e)):
           spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
+          spec.status_detail = str(e)
+        elif isinstance(e, errors.Benchmarks.KnownIntermittentError):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.KNOWN_EXECUTION)
           spec.status_detail = str(e)
 
         # Resource cleanup (below) can take a long time. Log the error to give

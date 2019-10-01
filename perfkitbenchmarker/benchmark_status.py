@@ -38,6 +38,11 @@ class FailedSubstatus(object):
   # non-preventable.
   INSUFFICIENT_CAPACITY = 'INSUFFICIENT_CAPACITY'
 
+  # Failure during the execution of the benchmark. These are non-retryable,
+  # known failure modes of the benchmark.  It is recommended that the benchmark
+  # be completely re-run.
+  KNOWN_INTERMITTENT = 'KNOWN_INTERMITTENT'
+
 
 def _CreateSummaryTable(benchmark_specs):
   """Converts statuses of benchmark runs into a formatted string table.

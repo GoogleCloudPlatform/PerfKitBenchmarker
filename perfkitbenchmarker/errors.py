@@ -179,6 +179,13 @@ class Benchmarks(object):
   class RateLimitExceededError(Error):
     pass
 
+  class KnownIntermittentError(Error):
+    """Known intermittent failures of the benchmark.
+
+    These are non-retryable, known failure modes of the benchmark.  It is
+    recommended that the benchmark be completely re-run.
+    """
+
 
 class Resource(object):
   """Errors related to resource creation and deletion."""
