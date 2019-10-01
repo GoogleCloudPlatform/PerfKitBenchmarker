@@ -16,8 +16,8 @@
 import json
 import os
 import unittest
-
 import mock
+import parameterized
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
@@ -143,14 +143,20 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
       self.assertIsInstance(result[i][3], dict)
       self.assertDictContainsSubset(meta, result[i][3])
 
-  def testParseNetperfOutputError(self):
+  @parameterized.parameterized.expand([
+      'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
+      '10.0.0.137 () port 20157 AF_INET : histogram\nrecv_response_timed_n: no'
+      ' response received. errno 110 counter 0\n',
+      'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
+      '10.0.0.172 () port 20169 AF_INET : histogram\ncatcher: timer popped '
+      'with times_up != 0\nrecv_response_timed_n: no response received. errno '
+      '4 counter -1\n'
+  ])
+  def testParseNetperfOutputError(self, output):
     with self.assertRaises(
         errors.Benchmarks.KnownIntermittentError) as e:
-      netperf_benchmark.ParseNetperfOutput(
-          'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
-          '10.0.0.137 () port 20157 AF_INET : '
-          'histogram\nrecv_response_timed_n: no response received. errno 110 '
-          'counter 0\n', {}, 'fake_benchmark_name', False)
+      netperf_benchmark.ParseNetperfOutput(output, {}, 'fake_benchmark_name',
+                                           False)
     self.assertIn('Failed to parse stdout', str(e.exception))
 
 
