@@ -874,7 +874,7 @@ def RunBenchmark(spec, collector):
           spec.status_detail = str(e)
         elif isinstance(e, errors.Benchmarks.KnownIntermittentError):
           spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.KNOWN_EXECUTION)
+              benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT)
           spec.status_detail = str(e)
 
         # Resource cleanup (below) can take a long time. Log the error to give
