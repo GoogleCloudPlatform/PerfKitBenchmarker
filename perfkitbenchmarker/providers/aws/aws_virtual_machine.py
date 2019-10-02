@@ -466,9 +466,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.host = None
     self.id = None
     self.metadata.update({
-        'spot_instance': self.use_spot_instance,
-        'spot_price': self.spot_price,
-        'placement_group_strategy': self.placement_group.strategy
+        'spot_instance':
+            self.use_spot_instance,
+        'spot_price':
+            self.spot_price,
+        'placement_group_strategy':
+            self.placement_group.strategy if self.placement_group else 'none'
     })
     self.early_termination = False
     self.spot_status_code = None
@@ -628,8 +631,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host:
       placement.append('Tenancy=host,HostId=%s' % self.host.id)
       num_hosts = len(self.host_list)
-    elif IsPlacementGroupCompatible(self.machine_type):
-      placement.append('GroupName=%s' % self.placement_group.name)
+    elif self.placement_group:
+      if IsPlacementGroupCompatible(self.machine_type):
+        placement.append('GroupName=%s' % self.placement_group.name)
+      else:
+        logging.warn(
+            'VM not placed in Placement Group. VM Type %s not supported',
+            self.machine_type)
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type,
                                          self.boot_disk_size,
