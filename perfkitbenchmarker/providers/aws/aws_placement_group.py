@@ -28,8 +28,9 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import util
 
 
-_PLACEMENT_GROUP_OPTIONS = frozenset(['cluster', 'spread'])
+_PLACEMENT_GROUP_OPTIONS = frozenset(['cluster', 'spread', 'none'])
 _PLACEMENT_GROUP_DEFAULT = 'cluster'
+PLACEMENT_GROUP_NONE = 'none'
 
 flags.DEFINE_enum(
     'aws_placement_group_style', _PLACEMENT_GROUP_DEFAULT,
