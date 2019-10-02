@@ -621,10 +621,14 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id)
     self.subnet = None
-    placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(
-        'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone)
-    self.placement_group = aws_placement_group.AwsPlacementGroup(
-        placement_group_spec)
+    if (FLAGS.aws_placement_group_style ==
+        aws_placement_group.PLACEMENT_GROUP_NONE):
+      self.placement_group = None
+    else:
+      placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(
+          'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone)
+      self.placement_group = aws_placement_group.AwsPlacementGroup(
+          placement_group_spec)
     self.is_static = False
     if spec.vpc_id:
       self.is_static = True
@@ -648,13 +652,15 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
                               cidr_block=cidr)
       self.subnet.Create()
-    self.placement_group.Create()
+    if self.placement_group:
+      self.placement_group.Create()
 
   def Delete(self):
     """Deletes the network."""
     if self.subnet:
       self.subnet.Delete()
-    self.placement_group.Delete()
+    if self.placement_group:
+      self.placement_group.Delete()
     self.regional_network.Delete()
 
   @classmethod
