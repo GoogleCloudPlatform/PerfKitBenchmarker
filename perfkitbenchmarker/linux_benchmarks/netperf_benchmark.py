@@ -15,7 +15,7 @@
 """Runs plain netperf in a few modes.
 
 docs:
-http://www.netperf.org/svn/netperf2/tags/netperf-2.4.5/doc/netperf.html#TCP_005fRR
+https://hewlettpackard.github.io/netperf/doc/netperf.html
 manpage: http://manpages.ubuntu.com/manpages/maverick/man1/netperf.1.html
 
 Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
