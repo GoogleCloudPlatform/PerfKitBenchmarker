@@ -302,15 +302,16 @@ class BaseRelationalDb(resource.BaseResource):
     if (hasattr(self.spec.vm_groups['clients'].vm_spec, 'machine_type') and
         self.spec.vm_groups['clients'].vm_spec.machine_type):
       metadata.update({
-          'machine_type': self.spec.vm_groups['clients'].vm_spec.machine_type,
+          'client_vm_machine_type':
+              self.spec.vm_groups['clients'].vm_spec.machine_type,
       })
     elif hasattr(self.spec.vm_groups['clients'].vm_spec, 'cpus') and (hasattr(
         self.spec.vm_groups['clients'].vm_spec, 'memory')):
       metadata.update({
-          'cpus': self.spec.vm_groups['clients'].vm_spec.cpus,
+          'client_vm_cpus': self.spec.vm_groups['clients'].vm_spec.cpus,
       })
       metadata.update({
-          'memory': self.spec.vm_groups['clients'].vm_spec.memory,
+          'client_vm_memory': self.spec.vm_groups['clients'].vm_spec.memory,
       })
     else:
       raise RelationalDbPropertyNotSet(
