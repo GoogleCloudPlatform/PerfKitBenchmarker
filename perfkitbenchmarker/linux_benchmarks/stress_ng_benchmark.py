@@ -49,16 +49,15 @@ GIT_TAG = '54722768329c9f8184c1c98db63435f201377df1'  # version 0.05.23
 VALID_CPU_METHODS = {
     'all', 'ackermann', 'bitops', 'callfunc', 'cdouble', 'cfloat',
     'clongdouble', 'correlate', 'crc16', 'decimal32', 'decimal64', 'decimal128',
-    'dither', 'djb2a', 'double', 'euler', 'explog', 'fft', 'factorial',
-    'fibonacci', 'float', 'float32', 'float80', 'float128', 'fnv1a', 'gamma',
-    'gcd', 'gray', 'hamming', 'hanoi', 'hyperbolic', 'idct', 'int128', 'int64',
-    'int32', 'int16', 'int8', 'int128float', 'int128double', 'int128longdouble',
-    'int128decimal32', 'int128decimal64', 'int128decimal128', 'int64float',
-    'int64double', 'int64longdouble', 'int32float', 'int32double',
-    'int32longdouble', 'jenkin', 'jmp', 'ln2', 'longdouble', 'loop',
-    'matrixprod', 'nsqrt', 'omega', 'parity', 'phi', 'pi', 'pjw', 'prime',
-    'psi', 'queens', 'rand', 'rand48', 'rgb', 'sdbm', 'sieve', 'stats', 'sqrt',
-    'trig', 'union', 'zeta'
+    'dither', 'djb2a', 'double', 'euler', 'explog', 'fft', 'fibonacci', 'float',
+    'fnv1a', 'gamma', 'gcd', 'gray', 'hamming', 'hanoi', 'hyperbolic', 'idct',
+    'int128', 'int64', 'int32', 'int16', 'int8', 'int128float', 'int128double',
+    'int128longdouble', 'int128decimal32', 'int128decimal64',
+    'int128decimal128', 'int64float', 'int64double', 'int64longdouble',
+    'int32float', 'int32double', 'int32longdouble', 'jenkin', 'jmp', 'ln2',
+    'longdouble', 'loop', 'matrixprod', 'nsqrt', 'omega', 'parity', 'phi', 'pi',
+    'pjw', 'prime', 'psi', 'queens', 'rand', 'rand48', 'rgb', 'sdbm', 'sieve',
+    'sqrt', 'trig', 'union', 'zeta'
 }
 
 VALID_STRESSORS = {
