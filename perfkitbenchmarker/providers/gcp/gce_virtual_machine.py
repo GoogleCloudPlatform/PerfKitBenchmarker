@@ -519,6 +519,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     if retcode:
+      if (create_cmd.rate_limited and 'already exists' in stderr and
+          FLAGS.gcp_retry_on_rate_limited):
+        # Gcloud create commands may still create VMs despite being rate
+        # limited.
+        return
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
 

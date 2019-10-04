@@ -532,6 +532,52 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
+  @mock.patch('time.sleep', side_effect=lambda _: None)
+  def testCreateRateLimitedMachineCreated(self, mock_cmd):
+    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'The resource already exists', 1)]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm._Create()  # No error should be thrown.
+      self.assertEqual(issue_command.call_count, 5)
+
+  @mock.patch('time.sleep', side_effect=lambda _: None)
+  def testCreateRateLimitedMachineCreatedFailure(self, mock_cmd):
+    fake_rets = []
+    for _ in range(0, 100):
+      fake_rets.append(('stdout', 'Rate Limit Exceeded', 1))
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      with self.assertRaises(errors.Benchmarks.RateLimitExceededError):
+        vm._Create()
+      self.assertEqual(issue_command.call_count,
+                       util.RATE_LIMITED_MAX_RETRIES + 1)
+
+  def testCreateVMAlreadyExists(self):
+    fake_rets = [('stdout', 'The resource already exists', 1)]
+    with PatchCriticalObjects(fake_rets):
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      with self.assertRaises(errors.Resource.CreationError):
+        vm._Create()
+
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(

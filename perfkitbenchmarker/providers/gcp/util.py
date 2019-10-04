@@ -161,6 +161,7 @@ class GcloudCommand(object):
         value in the list.
     additional_flags: list of strings. Additional flags to append unmodified to
         the end of the gcloud command (e.g. ['--metadata', 'color=red']).
+    rate_limited: boolean. True if rate limited, False otherwise.
   """
 
   def __init__(self, resource, *args):
@@ -176,6 +177,7 @@ class GcloudCommand(object):
     self.flags = collections.OrderedDict()
     self.additional_flags = []
     self._AddCommonFlags(resource)
+    self.rate_limited = False
 
   def GetCommand(self):
     """Generates the gcloud command.
@@ -225,10 +227,12 @@ class GcloudCommand(object):
         stdout, stderr, retcode = _issue_command_function(self, **kwargs)
       except errors.VmUtil.IssueCommandError as error:
         if RATE_LIMITED_MESSAGE in error.message:
+          self.rate_limited = True
           raise errors.Benchmarks.RateLimitExceededError(error.message)
         else:
           raise error
       if retcode and RATE_LIMITED_MESSAGE in stderr:
+        self.rate_limited = True
         raise errors.Benchmarks.RateLimitExceededError(stderr)
 
       return stdout, stderr, retcode
