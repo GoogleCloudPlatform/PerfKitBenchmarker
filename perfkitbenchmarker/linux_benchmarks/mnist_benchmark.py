@@ -68,9 +68,10 @@ flags.DEFINE_integer('mnist_num_eval_images', 5000,
                      'Size of MNIST validation data set.')
 flags.DEFINE_integer('mnist_train_epochs', 37,
                      'Total number of training echos', lower_bound=1)
-flags.DEFINE_integer('mnist_eval_epochs', 1,
-                     'Total number of evaluation epochs. If `0`, evaluation '
-                     'after training is skipped.')
+flags.DEFINE_integer(
+    'mnist_eval_epochs', 0,
+    'Total number of evaluation epochs. If `0`, evaluation '
+    'after training is skipped.')
 flags.DEFINE_integer('tpu_iterations', 500,
                      'Number of iterations per TPU training loop.')
 flags.DEFINE_integer('mnist_batch_size', 1024,
@@ -287,46 +288,85 @@ def Run(benchmark_spec):
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  mnist_benchmark_script = 'mnist_tpu.py'
-  mnist_benchmark_cmd = (
-      'cd models/official/mnist && '
-      'python {script} '
-      '--data_dir={data_dir} '
-      '--iterations={iterations} '
-      '--model_dir={model_dir} '
-      '--batch_size={batch_size}'.format(
-          script=mnist_benchmark_script,
-          data_dir=benchmark_spec.data_dir,
-          iterations=benchmark_spec.iterations,
-          model_dir=benchmark_spec.model_dir,
-          batch_size=benchmark_spec.batch_size))
+
+  if benchmark_spec.tpus:
+    mnist_benchmark_script = 'mnist_tpu.py'
+    mnist_benchmark_cmd = ('cd tpu/models && '
+                           'export PYTHONPATH=$(pwd) && '
+                           'cd official/mnist && '
+                           'python {script} '
+                           '--data_dir={data_dir} '
+                           '--iterations={iterations} '
+                           '--model_dir={model_dir} '
+                           '--batch_size={batch_size}'.format(
+                               script=mnist_benchmark_script,
+                               data_dir=benchmark_spec.data_dir,
+                               iterations=benchmark_spec.iterations,
+                               model_dir=benchmark_spec.model_dir,
+                               batch_size=benchmark_spec.batch_size))
+  else:
+    mnist_benchmark_script = 'mnist.py'
+    mnist_benchmark_cmd = ('cd models && '
+                           'export PYTHONPATH=$(pwd) && '
+                           'cd official/mnist && '
+                           'python {script} '
+                           '--data_dir={data_dir} '
+                           '--model_dir={model_dir} '
+                           '--batch_size={batch_size} '.format(
+                               script=mnist_benchmark_script,
+                               data_dir=benchmark_spec.data_dir,
+                               model_dir=benchmark_spec.model_dir,
+                               batch_size=benchmark_spec.batch_size))
+
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)
   samples = []
   metadata = CreateMetadataDict(benchmark_spec)
-  if benchmark_spec.train_steps:
+
+  if benchmark_spec.train_steps > 0:
     if benchmark_spec.tpus:
       tpu = benchmark_spec.tpu_groups['train'].GetName()
       num_shards = '--num_shards={}'.format(
           benchmark_spec.tpu_groups['train'].GetNumShards())
     else:
       tpu = num_shards = ''
-    mnist_benchmark_train_cmd = (
-        '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
-        '{num_shards} --noenable_predict'.format(
-            cmd=mnist_benchmark_cmd, tpu=tpu, use_tpu=bool(benchmark_spec.tpus),
-            train_steps=benchmark_spec.train_steps, num_shards=num_shards))
+
+    if benchmark_spec.tpus:
+      mnist_benchmark_train_cmd = (
+          '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
+          '{num_shards} --noenable_predict'.format(
+              cmd=mnist_benchmark_cmd,
+              tpu=tpu,
+              use_tpu=bool(benchmark_spec.tpus),
+              train_steps=benchmark_spec.train_steps,
+              num_shards=num_shards))
+    else:
+      mnist_benchmark_train_cmd = (
+          '{cmd} --train_epochs={train_epochs} '.format(
+              cmd=mnist_benchmark_cmd,
+              train_epochs=benchmark_spec.train_epochs))
+
     start = time.time()
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd,
                                             should_log=True)
     elapsed_seconds = (time.time() - start)
     samples.extend(MakeSamplesFromTrainOutput(
         metadata, stdout + stderr, elapsed_seconds, benchmark_spec.train_steps))
-  if benchmark_spec.eval_steps:
-    mnist_benchmark_eval_cmd = (
-        '{cmd} --tpu="" --use_tpu=False --eval_steps={eval_steps}'.format(
-            cmd=mnist_benchmark_cmd, eval_steps=benchmark_spec.eval_steps))
+
+  if benchmark_spec.eval_steps > 0:
+    if benchmark_spec.tpus:
+      mnist_benchmark_eval_cmd = (
+          '{cmd} --tpu={tpu} --use_tpu={use_tpu} --eval_steps={eval_steps}'
+          .format(
+              cmd=mnist_benchmark_cmd,
+              use_tpu=bool(benchmark_spec.tpus),
+              tpu=benchmark_spec.tpu_groups['eval'].GetName(),
+              eval_steps=benchmark_spec.eval_steps))
+    else:
+      mnist_benchmark_eval_cmd = ('{cmd} --eval_steps={eval_steps}'.format(
+          cmd=mnist_benchmark_cmd, eval_steps=benchmark_spec.eval_steps))
+
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_eval_cmd,
                                             should_log=True)
     samples.extend(MakeSamplesFromEvalOutput(metadata, stdout + stderr,

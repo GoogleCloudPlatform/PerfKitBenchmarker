@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 TF_MODELS_GIT = 'https://github.com/tensorflow/models.git'
 
 flags.DEFINE_string('tensorflow_models_commit_hash',
-                    '57e075203f8fba8d85e6b74f17f63d0a07da233a',
+                    '4fa82ae1cb08c374a44e2713e731f57d44bf7e61',
                     'git commit hash of desired TensorFlow models commit.')
 
 

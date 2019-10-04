@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 CLOUD_TPU_GIT = 'https://github.com/tensorflow/tpu.git'
 
 flags.DEFINE_string('cloud_tpu_commit_hash',
-                    '0aecc4c539db2b753bec722a6e3dfc6f685959eb',
+                    '45f33771f9d9aef6d37386d07b086d7e20be0254',
                     'git commit hash of desired cloud TPU models commit.')
 
 
