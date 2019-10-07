@@ -26,6 +26,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 
@@ -121,7 +122,8 @@ class AciCluster(container_service.BaseContainerCluster):
 
   def __init__(self, cluster_spec):
     super(AciCluster, self).__init__(cluster_spec)
-    self.resource_group = azure_network.GetResourceGroup(self.zone)
+    self.location = util.GetLocationFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.location)
 
   def _Create(self):
     """ACI has no cluster."""

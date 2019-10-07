@@ -17,6 +17,7 @@
 import json
 
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -35,7 +36,8 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def __init__(self, registry_spec):
     super(AzureContainerRegistry, self).__init__(registry_spec)
-    self.resource_group = azure_network.GetResourceGroup(self.zone)
+    self.location = util.GetLocationFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.location)
     self.login_server = None
     self.sku = 'Basic'
     self._deleted = False
@@ -114,7 +116,11 @@ class AksCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     """Initializes the cluster."""
     super(AksCluster, self).__init__(spec)
-    self.resource_group = azure_network.GetResourceGroup(self.zone)
+    if util.IsZone(self.spec.db_spec.zone):
+      raise errors.Config.InvalidValue(
+          'Availability zones are currently not supported by Aks Cluster')
+    self.location = util.GetLocationFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.location)
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self._deleted = False
@@ -129,7 +135,7 @@ class AksCluster(container_service.KubernetesCluster):
         '--enable-rbac',
         '--node-vm-size', self.machine_type,
         '--node-count', str(self.num_nodes),
-        '--location', self.zone,
+        '--location', self.location,
         '--dns-name-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
         '--service-principal', self.service_principal.app_id,

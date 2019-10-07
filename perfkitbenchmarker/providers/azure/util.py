@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import json
+import re
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
@@ -112,3 +113,41 @@ def GetTagsJson(timeout_minutes):
     A string contains json formatted tags.
   """
   return 'tags={}'.format(json.dumps(GetResourceTags(timeout_minutes)))
+
+
+def _IsLocation(zone_or_location):
+  """Returns whether "zone_or_location" is a location."""
+  return re.match(r'[a-z]+[0-9]?$', zone_or_location)
+
+
+def IsZone(zone_or_location):
+  """Returns whether "zone_or_location" is a zone.
+
+  Args:
+    zone_or_location: string, Azure zone or location. Format for Azure
+      availability
+      zone support is "location-availability_zone". Example: eastus2-1 specifies
+        Azure location eastus2 with availability zone 1.
+  """
+
+  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_location)
+
+
+def GetLocationFromZone(zone_or_location):
+  """Returns the location a zone is in (or "zone_or_location" if it's a location)."""
+  if _IsLocation(zone_or_location):
+    return zone_or_location
+  if IsZone(zone_or_location):
+    return zone_or_location[:-2]
+
+  raise ValueError('%s is not a valid Azure zone or location name' %
+                   zone_or_location)
+
+
+def GetAvailabilityZoneFromZone(zone_or_location):
+  """Returns the Availability Zone from a zone."""
+  if IsZone(zone_or_location):
+    return zone_or_location[-1]
+  if _IsLocation(zone_or_location):
+    return None
+  raise ValueError('%s is not a valid Azure zone' % zone_or_location)
