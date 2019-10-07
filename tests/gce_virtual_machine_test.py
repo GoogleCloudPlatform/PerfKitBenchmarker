@@ -561,7 +561,8 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'memory': '1.0GiB',
           })
       vm = gce_virtual_machine.GceVirtualMachine(spec)
-      with self.assertRaises(errors.Benchmarks.RateLimitExceededError):
+      with self.assertRaises(
+          errors.Benchmarks.QuotaFailure.RateLimitExceededError):
         vm._Create()
       self.assertEqual(issue_command.call_count,
                        util.RATE_LIMITED_MAX_RETRIES + 1)
