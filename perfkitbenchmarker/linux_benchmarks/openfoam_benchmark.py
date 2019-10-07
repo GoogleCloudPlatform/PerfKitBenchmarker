@@ -23,7 +23,7 @@ scalability of OpenFOAM across multiple cores. Since this is a complex
 computation, make sure to use a compute-focused machine-type that has multiple
 cores before attempting to run.
 
-# TODO(user): Add support for multiple vms.
+# TODO(liubrandon): Add support for multiple vms.
 """
 
 from __future__ import absolute_import
