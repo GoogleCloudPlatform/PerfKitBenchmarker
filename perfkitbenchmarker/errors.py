@@ -174,10 +174,10 @@ class Benchmarks(object):
     pass
 
   class QuotaFailure(Error):
-    pass
+    """Errors that are related to insufficient quota on cloud provider."""
 
-  class RateLimitExceededError(Error):
-    pass
+    class RateLimitExceededError(Error):
+      pass
 
   class KnownIntermittentError(Error):
     """Known intermittent failures of the benchmark.

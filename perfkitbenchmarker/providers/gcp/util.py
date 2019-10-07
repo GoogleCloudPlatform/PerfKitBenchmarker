@@ -207,7 +207,8 @@ class GcloudCommand(object):
       max_retries=RATE_LIMITED_MAX_RETRIES,
       fuzz=RATE_LIMITED_FUZZ,
       timeout=RATE_LIMITED_TIMEOUT,
-      retryable_exceptions=(errors.Benchmarks.RateLimitExceededError,))
+      retryable_exceptions=(
+          errors.Benchmarks.QuotaFailure.RateLimitExceededError,))
   def Issue(self, **kwargs):
     """Tries to run the gcloud command once, retrying if Rate Limited.
 
@@ -228,12 +229,13 @@ class GcloudCommand(object):
       except errors.VmUtil.IssueCommandError as error:
         if RATE_LIMITED_MESSAGE in error.message:
           self.rate_limited = True
-          raise errors.Benchmarks.RateLimitExceededError(error.message)
+          raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(
+              error.message)
         else:
           raise error
       if retcode and RATE_LIMITED_MESSAGE in stderr:
         self.rate_limited = True
-        raise errors.Benchmarks.RateLimitExceededError(stderr)
+        raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
 
       return stdout, stderr, retcode
     else:
