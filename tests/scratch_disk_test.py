@@ -155,7 +155,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = azure_virtual_machine.AzureVmSpec(
-        'test_vm_spec.Azure', machine_type='test_machine_type')
+        'test_vm_spec.Azure', zone='eastus2', machine_type='test_machine_type')
     return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):

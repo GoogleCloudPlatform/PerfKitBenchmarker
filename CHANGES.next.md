@@ -135,6 +135,9 @@
 - Added flag --record_lscpu=True to record lscpu data as its own metric "lscpu"
 - Added support for the Clear Linux OS type for AWS and static VMs (e.g. --os-type=clear)
 - Added flag --aws_placement_group_style to allow or disable different AWS placement groups options for ec2 VM benchmarks.
+- Added support for availability zones for Azure. Format for availability zone support is "location-availability_zone".
+  Example: eastus2-1 specifies Azure location eastus2 with availability zone 1.
+  A PKB zone can be either a Azure location or an Azure location with an availability zone.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

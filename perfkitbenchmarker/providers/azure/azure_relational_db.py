@@ -17,12 +17,14 @@ import datetime
 import json
 import logging
 import time
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 
@@ -42,14 +44,14 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   called, which is the current behavior of PKB. This is necessary to setup the
   networking correctly. The following steps are performed to provision the
   database:
-    1. create the RDS instance in the requested region.
+    1. create the RDS instance in the requested location.
 
   Instructions from:
   https://docs.microsoft.com/en-us/azure/postgresql/quickstart-create-server-database-azure-cli
 
   On teardown, all resources are deleted.
 
-  Note that the client VM's region and the region requested for the database
+  Note that the client VM's location and the location requested for the database
   must be the same.
 
   """
@@ -58,8 +60,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
-    self.region = self.spec.db_spec.zone
-    self.resource_group = azure_network.GetResourceGroup(self.region)
+    if util.IsZone(self.spec.db_spec.zone):
+      raise errors.Config.InvalidValue(
+          'Availability zones are currently not supported by Azure DBs')
+    self.location = util.GetLocationFromZone(self.spec.db_spec.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.location)
 
     self.unmanaged_db_exists = None if self.is_managed_db else False
 
@@ -149,7 +154,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           '--name',
           self.instance_id,
           '--location',
-          self.region,
+          self.location,
           '--admin-user',
           self.spec.database_username,
           '--admin-password',
