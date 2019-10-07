@@ -136,18 +136,24 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
 class AzurePublicIPAddress(resource.BaseResource):
   """Class to represent an Azure Public IP Address."""
 
-  def __init__(self, location, name):
+  def __init__(self, location, availability_zone, name):
     super(AzurePublicIPAddress, self).__init__()
     self.location = location
+    self.availability_zone = availability_zone
     self.name = name
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
 
   def _Create(self):
-    vm_util.IssueCommand([
+    cmd = [
         azure.AZURE_PATH, 'network', 'public-ip', 'create', '--location',
         self.location, '--name', self.name
-    ] + self.resource_group.args)
+    ] + self.resource_group.args
+
+    if self.availability_zone:
+      cmd += ['--zone', self.availability_zone]
+
+    vm_util.IssueCommand(cmd)
 
   def _Exists(self):
     if self._deleted:
@@ -264,6 +270,13 @@ class AzureVirtualMachine(
       vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(AzureVirtualMachine, self).__init__(vm_spec)
+
+    # PKB zone can be either a location or a location with an availability zone.
+    # Format for Azure availability zone support is "location-availability_zone"
+    # Example: eastus2-1 is Azure location eastus2 with availability zone 1.
+
+    self.location = util.GetLocationFromZone(self.zone)
+    self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
@@ -271,7 +284,8 @@ class AzureVirtualMachine(
     self._deleted = False
 
     self.resource_group = azure_network.GetResourceGroup()
-    self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
+    self.public_ip = AzurePublicIPAddress(self.location, self.availability_zone,
+                                          self.name + '-public-ip')
     self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
                         self.public_ip.name, vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
@@ -301,11 +315,16 @@ class AzureVirtualMachine(
     else:
       disk_size_args = []
     create_cmd = ([
-        azure.AZURE_PATH, 'vm', 'create', '--location', self.zone, '--image',
-        self.image, '--size', self.machine_type, '--admin-username',
-        self.user_name, '--availability-set', self.network.avail_set.name,
-        '--storage-sku', self.os_disk.disk_type, '--name', self.name
+        azure.AZURE_PATH, 'vm', 'create', '--location', self.location,
+        '--image', self.image, '--size', self.machine_type, '--admin-username',
+        self.user_name, '--storage-sku', self.os_disk.disk_type, '--name',
+        self.name
     ] + disk_size_args + self.resource_group.args + self.nic.args)
+
+    if self.availability_zone:
+      create_cmd.extend(['--zone', self.availability_zone])
+    else:
+      create_cmd.extend(['--availability-set', self.network.avail_set.name])
 
     if self.password:
       create_cmd.extend(['--admin-password', self.password])

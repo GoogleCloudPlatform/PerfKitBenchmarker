@@ -113,7 +113,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                                   num_striped_disks=goal_stripes)
 
     vm_spec = azure_virtual_machine.AzureVmSpec(
-        'test_vm_spec.AZURE', zone='East US 2', machine_type=machine_type)
+        'test_vm_spec.AZURE', zone='eastus2', machine_type=machine_type)
     vm = azure_virtual_machine.DebianBasedAzureVirtualMachine(
         vm_spec)
 

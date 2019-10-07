@@ -727,7 +727,7 @@ Cloud name | Default zone | Notes
 -------|---------|-------
 GCP | us-central1-a | |
 AWS | us-east-1a | |
-Azure | East US | |
+Azure | eastus2 | | A PKB zone can be either a Azure location or an Azure location with an availability zone. Format for Azure availability zone support is "location-availability_zone". Example: eastus2-1 specifies Azure location eastus2 with availability zone 1.
 AliCloud | West US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |

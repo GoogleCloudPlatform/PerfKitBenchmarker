@@ -65,9 +65,9 @@ class AzureResourceGroup(resource.BaseResource):
     self.timeout_minutes = timeout_minutes
     self.raise_on_create_failure = raise_on_create_failure
     # A resource group's location doesn't affect the location of
-    # actual resources, but we need to choose *some* region for every
+    # actual resources, but we need to choose *some* location for every
     # benchmark, even if the user doesn't specify one.
-    self.location = (
+    self.location = util.GetLocationFromZone(
         FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_LOCATION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
@@ -257,9 +257,9 @@ class AzureVirtualNetwork(resource.BaseResource):
       self.vnet_num = self.num_vnets
       self.__class__.num_vnets += 1
 
-    # Allocate a different /16 in each region. This allows for 255
-    # regions (should be enough for anyone), and 65536 VMs in each
-    # region. Using different address spaces prevents us from
+    # Allocate a different /16 in each location. This allows for 255
+    # locations (should be enough for anyone), and 65536 VMs in each
+    # location. Using different address spaces prevents us from
     # accidentally contacting the wrong VM.
     self.address_space = '10.%s.0.0/16' % self.vnet_num
 
@@ -438,10 +438,10 @@ class AzureFirewall(network.BaseFirewall):
 
 
 class AzureNetwork(network.BaseNetwork):
-  """Regional network components.
+  """Locational network components.
 
   A container object holding all of the network-related objects that
-  we need for an Azure zone (aka region).
+  we need for an Azure zone (aka location).
   """
 
   CLOUD = providers.AZURE
@@ -449,8 +449,9 @@ class AzureNetwork(network.BaseNetwork):
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
+    self.location = util.GetLocationFromZone(self.zone)
     avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
-    self.avail_set = AzureAvailSet(avail_set_name, self.zone)
+    self.avail_set = AzureAvailSet(avail_set_name, self.location)
 
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri
@@ -460,12 +461,12 @@ class AzureNetwork(network.BaseNetwork):
     # awful naming scheme.
     suffix = 'storage%d' % AzureStorageAccount.total_storage_accounts
     self.storage_account = AzureStorageAccount(
-        FLAGS.azure_storage_type, self.zone,
+        FLAGS.azure_storage_type, self.location,
         storage_account_prefix[:24 - len(suffix)] + suffix)
-    prefix = '%s-%s' % (self.resource_group.name, self.zone)
-    self.vnet = AzureVirtualNetwork(self.zone, prefix + '-vnet')
+    prefix = '%s-%s' % (self.resource_group.name, self.location)
+    self.vnet = AzureVirtualNetwork(self.location, prefix + '-vnet')
     self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
-    self.nsg = AzureNetworkSecurityGroup(self.zone, self.subnet,
+    self.nsg = AzureNetworkSecurityGroup(self.location, self.subnet,
                                          self.subnet.name + '-nsg')
 
   @vm_util.Retry()
