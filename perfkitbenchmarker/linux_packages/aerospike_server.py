@@ -65,6 +65,7 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the memtier package on the VM."""
+  vm.InstallPackages('netcat-openbsd zlib1g-dev')
   _Install(vm)
 
 
