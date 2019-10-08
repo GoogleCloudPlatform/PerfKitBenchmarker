@@ -524,8 +524,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         # Gcloud create commands may still create VMs despite being rate
         # limited.
         return
+      if util.RATE_LIMITED_MESSAGE in stderr:
+        raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
       raise errors.Resource.CreationError(
-          'Failed to create VM: %s return code: %s' % (retcode, stderr))
+          'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
