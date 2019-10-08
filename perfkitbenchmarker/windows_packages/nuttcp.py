@@ -76,11 +76,18 @@ class NuttcpNotRunningError(Exception):
   """Raised when nuttcp is not running at a time that it is expected to be."""
 
 
-@vm_util.Retry()
 def Install(vm):
   """Installs the nuttcp package on the VM."""
   zip_path = ntpath.join(vm.temp_dir, NUTTCP_ZIP)
-  vm.DownloadFile(NUTTCP_URL, zip_path)
+  @vm_util.Retry()
+  def DownloadWithRetry():
+    vm.DownloadFile(NUTTCP_URL, zip_path)
+  try:
+    DownloadWithRetry()
+  except errors.VirtualMachine.RemoteCommandError as e:
+    # The mirror to download nuttcp from is temporarily unavailable.
+    raise errors.Benchmarks.KnownIntermittentError(
+        'Failed to download nuttcp package: %s' % e)
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
