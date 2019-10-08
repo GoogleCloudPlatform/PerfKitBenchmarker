@@ -227,10 +227,10 @@ class GcloudCommand(object):
       try:
         stdout, stderr, retcode = _issue_command_function(self, **kwargs)
       except errors.VmUtil.IssueCommandError as error:
-        if RATE_LIMITED_MESSAGE in error.message:
+        if RATE_LIMITED_MESSAGE in str(error):
           self.rate_limited = True
           raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(
-              error.message)
+              str(error))
         else:
           raise error
       if retcode and RATE_LIMITED_MESSAGE in stderr:
