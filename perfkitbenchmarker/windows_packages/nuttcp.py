@@ -79,6 +79,7 @@ class NuttcpNotRunningError(Exception):
 def Install(vm):
   """Installs the nuttcp package on the VM."""
   zip_path = ntpath.join(vm.temp_dir, NUTTCP_ZIP)
+
   @vm_util.Retry()
   def DownloadWithRetry():
     vm.DownloadFile(NUTTCP_URL, zip_path)
