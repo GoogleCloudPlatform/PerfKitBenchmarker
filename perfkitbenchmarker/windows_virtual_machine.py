@@ -28,6 +28,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
 
+import six
 import timeout_decorator
 import winrm
 
@@ -66,7 +67,8 @@ netsh advfirewall firewall add rule name='Allow RDP' dir=in action=allow `
     protocol=TCP localport={rdp_port}
 """.format(winrm_port=WINRM_PORT, rdp_port=RDP_PORT)
 STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
-    encoded_command=base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le')))
+    encoded_command=six.ensure_str(
+        base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le'))))
 
 # Cygwin constants for installing and running commands through Cygwin.
 # _CYGWIN_FORMAT provides a format string to transform a bash command into one
@@ -210,7 +212,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     s = winrm.Session('https://%s:%s' % (self.ip_address, self.winrm_port),
                       auth=(self.user_name, self.password),
                       server_cert_validation='ignore')
-    encoded_command = base64.b64encode(command.encode('utf_16_le'))
+    encoded_command = six.ensure_str(
+        base64.b64encode(command.encode('utf_16_le')))
 
     @timeout_decorator.timeout(timeout, use_signals=False,
                                timeout_exception=errors.VirtualMachine.
@@ -219,7 +222,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       return s.run_cmd('powershell -encodedcommand %s' % encoded_command)
 
     r = run_command()
-    retcode, stdout, stderr = r.status_code, r.std_out, r.std_err
+    retcode, stdout, stderr = r.status_code, six.ensure_str(
+        r.std_out), six.ensure_str(r.std_err)
 
     debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                   (command, self, retcode, stdout, stderr))
