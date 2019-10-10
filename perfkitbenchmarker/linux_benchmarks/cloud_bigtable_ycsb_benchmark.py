@@ -321,33 +321,34 @@ def _GetCpuUtilizationSample(samples, instance_id):
   client = monitoring_v3.MetricServiceClient()
   start_timestamp = load_sample.timestamp
   end_timestamp = last_run_sample.timestamp
-  cpu_query = query.Query(
-      client, project=(FLAGS.project or _GetDefaultProject()),
-      metric_type='bigtable.googleapis.com/cluster/cpu_load_hottest_node',
-      end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
-      minutes=int((end_timestamp - start_timestamp) / 60))
-  cpu_query = cpu_query.select_resources(instance=instance_id)
-  time_series = list(cpu_query)
-  if not time_series:
-    raise Exception('Time series could not be found '
-                    'for computing cpu utilization.')
-
-  # Build the dict to be added to samples.
   samples = []
-  for cluster_number, cluster_time_series in enumerate(time_series):
-    utilization = [
-        round(point.value.double_value, 3)
-        for point in cluster_time_series.points]
+  for metric in ['cpu_load', 'cpu_load_hottest_node']:
+    cpu_query = query.Query(
+        client, project=(FLAGS.project or _GetDefaultProject()),
+        metric_type='bigtable.googleapis.com/cluster/{}'.format(metric),
+        end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+        minutes=int((end_timestamp - start_timestamp) / 60))
+    cpu_query = cpu_query.select_resources(instance=instance_id)
+    time_series = list(cpu_query)
+    if not time_series:
+      raise Exception(
+          'Time series for computing {} could not be found.'.format(metric))
 
-    metadata = {
-        'cluster_number': cluster_number,
-        'cpu_utilization_per_minute': utilization,
-    }
+    # Build the dict to be added to samples.
+    for cluster_number, cluster_time_series in enumerate(time_series):
+      utilization = [
+          round(point.value.double_value, 3)
+          for point in cluster_time_series.points]
 
-    cpu_utilization_sample = sample.Sample(
-        'cpu_load_hottest_node_array', -1, 'cpu load hottest node', metadata)
+      metadata = {
+          'cluster_number': cluster_number,
+          'cpu_utilization_per_minute': utilization,
+      }
 
-    samples.append(cpu_utilization_sample)
+      cpu_utilization_sample = sample.Sample(
+          '{}_array'.format(metric), -1, metric, metadata)
+
+      samples.append(cpu_utilization_sample)
   return samples
 
 
