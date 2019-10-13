@@ -642,8 +642,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     # An scp is not retried, so increase the connection timeout.
-    scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key,
-                                         connect_timeout=30))
+    ssh_private_key = (self.ssh_private_key if self.is_static else
+                       vm_util.GetPrivateKeyPath())
+    scp_cmd.extend(vm_util.GetSshOptions(ssh_private_key, connect_timeout=30))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:
@@ -734,7 +735,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         self.internal_ip if FLAGS.ssh_via_internal_ip else self.ip_address)
     user_host = '%s@%s' % (self.user_name, ip_address)
     ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
-    ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
+    ssh_private_key = (self.ssh_private_key if self.is_static else
+                       vm_util.GetPrivateKeyPath())
+    ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
