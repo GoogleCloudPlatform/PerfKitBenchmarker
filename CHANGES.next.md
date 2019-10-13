@@ -564,3 +564,6 @@
 - Update requirements.txt for Python 3
 - Upgrade hadoop to version 3.2.1.
 - Install the netcat-openbsd and zlib.h debian package for aerospike_ycsb.
+- Updated linux_virtual_machine.py to use the single source of truth of
+  perfkitbenchmark_keyfile path for non-static VM, expanding the use case of
+  stage-wise test, e.g., do prepare on machine A, do run stage on machine B.
