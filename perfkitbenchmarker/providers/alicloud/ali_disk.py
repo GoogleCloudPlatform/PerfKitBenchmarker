@@ -31,7 +31,8 @@ DISK_TYPE = {
     disk.STANDARD: 'cloud',
     disk.REMOTE_SSD: 'cloud_ssd',
     disk.PIOPS: 'cloud_efficiency',
-    disk.LOCAL: 'ephemeral_ssd'
+    disk.LOCAL: 'ephemeral_ssd',
+    disk.REMOTE_ESSD: 'cloud_essd',
 }
 
 
@@ -67,12 +68,11 @@ class AliDisk(disk.BaseDisk):
     delete_cmd = util.ALI_PREFIX + [
         'ecs',
         'DeleteDisk',
-        '--RegionId %s' % self.region,
         '--DiskId %s' % self.id]
     logging.info('Deleting AliCloud disk %s. This may fail if the disk is not '
                  'yet detached, but will be retried.', self.id)
     delete_cmd = util.GetEncodedCmd(delete_cmd)
-    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -91,7 +91,6 @@ class AliDisk(disk.BaseDisk):
     attach_cmd = util.ALI_PREFIX + [
         'ecs',
         'AttachDisk',
-        '--RegionId %s' % self.region,
         '--InstanceId %s' % self.attached_vm_id,
         '--DiskId %s' % self.id,
         '--Device %s' % self.GetVirtualDevicePath()]
@@ -103,7 +102,6 @@ class AliDisk(disk.BaseDisk):
     detach_cmd = util.ALI_PREFIX + [
         'ecs',
         'DetachDisk',
-        '--RegionId %s' % self.region,
         '--InstanceId %s' % self.attached_vm_id,
         '--DiskId %s' % self.id]
     detach_cmd = util.GetEncodedCmd(detach_cmd)
@@ -133,8 +131,7 @@ class AliDisk(disk.BaseDisk):
         'DescribeDisks',
         '--RegionId %s' % self.region,
         '--ZoneId %s' % self.zone,
-        '--DiskIds \'["%s"]\'' % self.id,
-        '--Device %s' % self.GetVirtualDevicePath()]
+        '--DiskIds \'["%s"]\'' % self.id]
     attach_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(attach_cmd)
     response = json.loads(stdout)

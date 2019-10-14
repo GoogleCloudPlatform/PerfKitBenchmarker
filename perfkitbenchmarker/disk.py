@@ -57,6 +57,7 @@ FLAGS = flags.FLAGS
 STANDARD = 'standard'
 REMOTE_SSD = 'remote_ssd'
 PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS and Alicloud
+REMOTE_ESSD = 'remote_essd'  # Enhanced Cloud SSD in Alicloud
 
 # 'local' refers to disks that come attached to VMs. It is the only
 # "universal" disk type that is not associated with a provider. It
