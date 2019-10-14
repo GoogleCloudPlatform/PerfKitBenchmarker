@@ -409,82 +409,24 @@ $ azure provider register Microsoft.Network
 ```
 
 ### Install AliCloud CLI and setup authentication
-Make sure you have installed pip (see the section above).
 
-Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
+1. Download Linux installer from [Aliyun Github](https://github.com/aliyun/aliyun-cli).
+Follow instructions from Readme to install for your OS.
 
-1. Install python development tools:
-
-   In Debian or Ubuntu:
+2. Verify that aliyun CLI is working as expected:
 
    ```bash
-   $ sudo apt-get install -y python-dev
+   $ aliyun ecs help
    ```
 
-   In CentOS:
-
-   ```bash
-   $ sudo yum install python-devel
-   ```
-
-2. Install aliyuncli tool and python SDK for ECS:
-
-   ```bash
-   $ sudo pip install -r perfkitbenchmarker/providers/alicloud/requirements.txt
-   ```
-   In some CentOS version, you may need:
-
-   ```bash
-   $ sudo yum install libffi-devel.x86_64
-   $ sudo yum install openssl-devel.x86_64
-   $ sudo pip install 'colorama<=0.3.3'
-   ```
-
-   To check if AliCloud is installed:
-
-   ```bash
-   $ aliyuncli --help
-   ```
-
-   Check if `aliyuncli ecs` command is ready:
-
-   ```bash
-   $ aliyuncli ecs help
-   ```
-
-   If you see the "usage" message, you should follow step 3.
-   Otherwise, jump to step 4.
-
-3. Dealing with an exception when it runs on some specific version of Ubuntu.
-   Get the python lib path: `/usr/lib/python2.7/dist-packages`
-
-   ```bash
-   $ python
-   > from distutils.sysconfig import get_python_lib
-   > get_python_lib()
-   '/usr/lib/python2.7/dist-packages'
-   ```
-
-   Copy to the right directory (for Python 2.7.X):
-
-   ```bash
-   $ sudo cp -r /usr/local/lib/python2.7/dist-packages/aliyun* /usr/lib/python2.7/dist-packages/
-   ```
-
-   Check again:
-
-   ```bash
-   $ aliyuncli ecs help
-   ```
-
-4. Navigate to the [AliCloud console](https://home.console.alicloud.com/#/) to create access credentials:
+3. Navigate to the [AliCloud console](https://home.console.alicloud.com/#/) to create access credentials:
    * Login first
    * Click on "AccessKeys" (top right)
    * Click on "Create Access Key", copy and store the "Access Key ID" and "Access Key Secret" to a safe place.
    * Configure the CLI using the Access Key ID and Access Key Secret from the previous step
 
    ```bash
-   $ aliyuncli configure
+   $ aliyun configure
    ```
 
 ### DigitalOcean configuration and credentials

@@ -31,7 +31,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 import six
 
-ALI_PREFIX = ['aliyuncli']
+ALI_PREFIX = ['aliyun']
 ROOT = 'root'
 FLAGS = flags.FLAGS
 PASSWD_LEN = 20
@@ -72,13 +72,12 @@ def AddTags(resource_id, resource_type, region, **kwargs):
   tag_cmd = ALI_PREFIX + [
       'ecs',
       'AddTags',
-      '--RegionId %s' % region,
-      '--ResourceId %s' % resource_id,
-      '--ResourceType %s' % resource_type]
-  for index, (key, value) in enumerate(six.iteritems(kwargs)):
-    tag_cmd.append('--Tag{0}Key {1} --Tag{0}Value {2}'
-                   .format(index + 1, key, value))
-  tag_cmd = GetEncodedCmd(tag_cmd)
+      '--RegionId', region,
+      '--ResourceId', resource_id,
+      '--ResourceType', resource_type]
+  for index, (key, value) in enumerate(kwargs.iteritems()):
+    tag_cmd.extend(['--Tag.{0}.Key'.format(index + 1), str(key),
+                    '--Tag.{0}.Value'.format(index + 1), str(value)])
   vm_util.IssueRetryableCommand(tag_cmd)
 
 
@@ -109,11 +108,24 @@ def AddPubKeyToHost(host_ip, password, keyfile, username):
       public_key = f.read()
   ssh = paramiko.SSHClient()
   ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+  # this section is needed in case a corporate proxy is in play
+  proxy = None
+  ssh_config_file = os.path.expanduser("~/.ssh/config")
+  if os.path.exists(ssh_config_file):
+    conf = paramiko.SSHConfig()
+    with open(ssh_config_file) as f:
+      conf.parse(f)
+    host_config = conf.lookup(host_ip)
+    if 'proxycommand' in host_config:
+      proxy = paramiko.ProxyCommand(host_config['proxycommand'])
+
   try:
     ssh.connect(
         host_ip,
         username=ROOT,  # We should use root to add pubkey to host
         password=password,
+        sock=proxy,
     )
     if username == ROOT:
       command_list = [
@@ -137,7 +149,7 @@ def AddPubKeyToHost(host_ip, password, keyfile, username):
 
 
 def GeneratePassword(length=PASSWD_LEN):
-  digit_len = length / 2
+  digit_len = int(length / 2)
   letter_len = length - digit_len
   return ''.join(random.sample(string.letters, digit_len)) + \
          ''.join(random.sample(string.digits, letter_len))
