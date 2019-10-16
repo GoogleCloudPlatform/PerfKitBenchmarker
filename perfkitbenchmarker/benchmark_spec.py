@@ -557,7 +557,8 @@ class BenchmarkSpec(object):
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.edw_service:
-      if not self.edw_service.user_managed:
+      if (not self.edw_service.user_managed and
+          self.edw_service.SERVICE_TYPE == 'redshift'):
         # The benchmark creates the Redshift cluster's subnet group in the
         # already provisioned virtual private cloud (vpc).
         for network in networks:

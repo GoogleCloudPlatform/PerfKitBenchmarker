@@ -46,11 +46,14 @@ flags.DEFINE_string('edw_service_cluster_password', None,
 FLAGS = flags.FLAGS
 
 
-TYPE_2_PROVIDER = dict([('redshift', 'aws'),
+TYPE_2_PROVIDER = dict([('athena', 'aws'),
+                        ('redshift', 'aws'),
                         ('spectrum', 'aws'),
                         ('bigquery', 'gcp'),
                         ('azuresqldatawarehouse', 'azure')])
-TYPE_2_MODULE = dict([('redshift',
+TYPE_2_MODULE = dict([('athena',
+                       'perfkitbenchmarker.providers.aws.athena'),
+                      ('redshift',
                        'perfkitbenchmarker.providers.aws.redshift'),
                       ('spectrum',
                        'perfkitbenchmarker.providers.aws.spectrum'),
