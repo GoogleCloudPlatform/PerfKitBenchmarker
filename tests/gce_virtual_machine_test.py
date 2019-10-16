@@ -608,6 +608,52 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
 
+class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @mock.patch('time.sleep', side_effect=lambda _: None)
+  def testGceFirewallRuleSuccessfulAfterRateLimited(self, mock_cmd):
+    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'some warning perhaps', 0)]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      fr = gce_network.GceFirewallRule('name', 'project', 'allow',
+                                       'network_name')
+      fr._Create()
+      self.assertEqual(issue_command.call_count, 2)
+
+  @mock.patch('time.sleep', side_effect=lambda _: None)
+  def testGceFirewallRuleGenericErrorAfterRateLimited(self, mock_cmd):
+    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'some random firewall error', 1)]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
+        fr = gce_network.GceFirewallRule('name', 'project', 'allow',
+                                         'network_name')
+        fr._Create()
+      self.assertEqual(issue_command.call_count, 3)
+
+  @mock.patch('time.sleep', side_effect=lambda _: None)
+  def testGceFirewallRuleAlreadyExistsAfterRateLimited(self, mock_cmd):
+    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'Rate Limit Exceeded', 1),
+                 ('stdout', 'firewall already exists', 1)]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      fr = gce_network.GceFirewallRule('name', 'project', 'allow',
+                                       'network_name')
+      fr._Create()
+      self.assertEqual(issue_command.call_count, 3)
+
+  @mock.patch('time.sleep', side_effect=lambda _: None)
+  def testGceFirewallRuleGenericError(self, mock_cmd):
+    fake_rets = [('stdout', 'some random firewall error', 1)]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
+        fr = gce_network.GceFirewallRule('name', 'project', 'allow',
+                                         'network_name')
+        fr._Create()
+      self.assertEqual(issue_command.call_count, 1)
+
+
 class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
