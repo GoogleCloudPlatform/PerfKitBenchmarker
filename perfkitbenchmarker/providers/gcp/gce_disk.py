@@ -20,7 +20,9 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 import json
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import GCP
 from perfkitbenchmarker.providers.gcp import util
 
@@ -96,6 +98,7 @@ class GceDisk(disk.BaseDisk):
       return False
     return True
 
+  @vm_util.Retry()
   def Attach(self, vm):
     """Attaches the disk to a VM.
 
@@ -107,7 +110,17 @@ class GceDisk(disk.BaseDisk):
                              self.attached_vm_name)
     cmd.flags['device-name'] = self.name
     cmd.flags['disk'] = self.name
-    cmd.IssueRetryable()
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    # Gcloud attach-disk commands may still attach disks despite being rate
+    # limited.
+    if retcode:
+      if (cmd.rate_limited and 'is already being used' in stderr and
+          FLAGS.gcp_retry_on_rate_limited):
+        return
+      debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
+                    (' '.join(cmd.GetCommand()), retcode, stdout, stderr))
+      raise errors.VmUtil.CalledProcessException(
+          'Command returned a non-zero exit code:\n{}'.format(debug_text))
 
   def Detach(self):
     """Detaches the disk from a VM."""

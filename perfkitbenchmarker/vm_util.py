@@ -466,8 +466,10 @@ def IssueRetryableCommand(cmd, env=None):
   """
   stdout, stderr, retcode = IssueCommand(cmd, env=env, raise_on_failure=False)
   if retcode:
+    debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
+                  (' '.join(cmd), retcode, stdout, stderr))
     raise errors.VmUtil.CalledProcessException(
-        'Command returned a non-zero exit code:\n{}'.format(stderr))
+        'Command returned a non-zero exit code:\n{}'.format(debug_text))
   return stdout, stderr
 
 
