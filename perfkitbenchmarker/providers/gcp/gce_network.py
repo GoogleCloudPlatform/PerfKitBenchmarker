@@ -27,6 +27,7 @@ from __future__ import print_function
 import json
 import threading
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
@@ -66,7 +67,15 @@ class GceFirewallRule(resource.BaseResource):
     cmd.flags['network'] = self.network_name
     if self.source_range:
       cmd.flags['source-ranges'] = self.source_range
-    cmd.Issue()
+    # Gcloud create commands may still create firewalls despite being rate
+    # limited.
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode:
+      if cmd.rate_limited and 'already exists' in stderr:
+        return
+      debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
+                    (' '.join(cmd.GetCommand()), retcode, stdout, stderr))
+      raise errors.VmUtil.IssueCommandError(debug_text)
 
   def _Delete(self):
     """Deletes the Firewall Rule."""
