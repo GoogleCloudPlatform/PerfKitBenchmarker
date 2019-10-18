@@ -28,10 +28,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import itertools
 import json
 import posixpath
 import re
+import threading
 
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -255,6 +257,184 @@ class AzureVirtualMachineMetaClass(resource.AutoRegisterResourceMeta):
           self.__name__))
 
 
+class AzureDedicatedHostGroup(resource.BaseResource):
+  """Object representing an Azure host group (a collection of dedicated hosts).
+
+  A host group is required for dedicated host creation.
+  Attributes:
+    name: The name of the vm - to be part of the host group name.
+    location: The region the host group will exist in.
+    resource_group: The group of resources for the host group.
+  """
+
+  def __init__(self, name, location, resource_group, availability_zone):
+    super(AzureDedicatedHostGroup, self).__init__()
+    self.name = name + 'Group'
+    self.location = location
+    self.resource_group = resource_group
+    self.availability_zone = availability_zone
+
+  def _Create(self):
+    """See base class."""
+    create_cmd = ([
+        azure.AZURE_PATH,
+        'vm',
+        'host',
+        'group',
+        'create',
+        '--name',
+        self.name,
+        '--location',
+        self.location,
+        # number of fault domains (physical racks) to span across
+        # TODO(user): add support for multiple fault domains
+        # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts#high-availability-considerations
+        '--platform-fault-domain-count',
+        '1',
+    ] + self.resource_group.args)
+
+    if self.availability_zone:
+      create_cmd.extend(['--zone', self.availability_zone])
+
+    vm_util.IssueCommand(create_cmd)
+
+  def _Delete(self):
+    """See base class."""
+    delete_cmd = ([
+        azure.AZURE_PATH,
+        'vm',
+        'host',
+        'group',
+        'delete',
+        '--host-group',
+        self.name,
+    ] + self.resource_group.args)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """See base class."""
+    show_cmd = [
+        azure.AZURE_PATH, 'vm', 'host', 'group', 'show', '--output', 'json',
+        '--name', self.name
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+      json.loads(stdout)
+      return True
+    except ValueError:
+      return False
+
+
+def _GetSkuType(machine_type):
+  """Returns the host SKU type derived from the VM machine type."""
+  # TODO(user): add support for FSv2 machine types when no longer in preview
+  # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts
+  sku = ''
+  if re.match('Standard_D[0-9]*s_v3', machine_type):
+    sku = 'DSv3-Type1'
+  elif re.match('Standard_E[0-9]*s_v3', machine_type):
+    sku = 'ESv3-Type1'
+  else:
+    raise ValueError('Dedicated hosting does not support machine type %s.' %
+                     machine_type)
+  return sku
+
+
+class AzureDedicatedHost(resource.BaseResource):
+  """Object representing an Azure host.
+
+  Attributes:
+    host_group: The required host group to which the host will belong.
+    name: The name of the vm - to be part of the host name.
+    location: The region the host will exist in.
+    resource_group: The group of resources for the host.
+  """
+  _lock = threading.Lock()
+  # globals guarded by _lock
+  host_group_map = {}
+
+  def __init__(self, name, location, resource_group, sku_type,
+               availability_zone):
+    super(AzureDedicatedHost, self).__init__()
+    self.name = name + '-Host'
+    self.location = location
+    self.resource_group = resource_group
+    self.sku_type = sku_type
+    self.availability_zone = availability_zone
+    self.host_group = None
+
+  def _CreateDependencies(self):
+    """See base class."""
+    with self._lock:
+      if self.location not in self.host_group_map:
+        new_host_group = AzureDedicatedHostGroup(self.name, self.location,
+                                                 self.resource_group,
+                                                 self.availability_zone)
+        new_host_group.Create()
+        self.host_group_map[self.location] = new_host_group.name
+      self.host_group = self.host_group_map[self.location]
+
+  def _Create(self):
+    """See base class."""
+    create_cmd = ([
+        azure.AZURE_PATH,
+        'vm',
+        'host',
+        'create',
+        '--host-group',
+        self.host_group,
+        '--name',
+        self.name,
+        '--sku',
+        self.sku_type,
+        '--location',
+        self.location,
+        # the specific fault domain (physical rack) for the host dependent on
+        # the number (count) of fault domains of the host group
+        # TODO(user): add support for specifying multiple fault domains if
+        # benchmarks require
+        '--platform-fault-domain',
+        '0',
+    ] + self.resource_group.args)
+    vm_util.IssueCommand(create_cmd)
+
+  def _Delete(self):
+    """See base class."""
+    delete_cmd = ([
+        azure.AZURE_PATH,
+        'vm',
+        'host',
+        'delete',
+        '--host-group',
+        self.host_group,
+        '--name',
+        self.name,
+        '--yes',
+    ] + self.resource_group.args)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """See base class."""
+    show_cmd = [
+        azure.AZURE_PATH,
+        'vm',
+        'host',
+        'show',
+        '--output',
+        'json',
+        '--name',
+        self.name,
+        '--host-group',
+        self.host_group,
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+      json.loads(stdout)
+      return True
+    except ValueError:
+      return False
+
+
 class AzureVirtualMachine(
     six.with_metaclass(AzureVirtualMachineMetaClass,
                        virtual_machine.BaseVirtualMachine)):
@@ -262,6 +442,11 @@ class AzureVirtualMachine(
   CLOUD = providers.AZURE
   # Subclasses should override IMAGE_URN.
   IMAGE_URN = None
+
+  _lock = threading.Lock()
+  # TODO(user): remove host groups & hosts as globals -> create new spec
+  # globals guarded by _lock
+  host_map = collections.defaultdict(list)
 
   def __init__(self, vm_spec):
     """Initialize an Azure virtual machine.
@@ -277,6 +462,7 @@ class AzureVirtualMachine(
 
     self.location = util.GetLocationFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
+    self.use_dedicated_host = vm_spec.use_dedicated_host
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
@@ -290,6 +476,10 @@ class AzureVirtualMachine(
                         self.public_ip.name, vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
     self.image = vm_spec.image or self.IMAGE_URN
+    self.host = None
+    if self.use_dedicated_host:
+      self.host_series_sku = _GetSkuType(self.machine_type)
+      self.host_list = None
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     disk_spec.disk_type = (
@@ -309,11 +499,25 @@ class AzureVirtualMachine(
     self.public_ip.Create()
     self.nic.Create()
 
+    if self.use_dedicated_host:
+      with self._lock:
+        self.host_list = self.host_map[(self.host_series_sku, self.location)]
+        if not self.host_list:
+          new_host = AzureDedicatedHost(self.name, self.location,
+                                        self.resource_group,
+                                        self.host_series_sku,
+                                        self.availability_zone)
+          self.host_list.append(new_host)
+          new_host.Create()
+        self.host = self.host_list[-1]
+
   def _Create(self):
+    """See base class."""
     if self.os_disk.disk_size:
       disk_size_args = ['--os-disk-size-gb', str(self.os_disk.disk_size)]
     else:
       disk_size_args = []
+
     create_cmd = ([
         azure.AZURE_PATH, 'vm', 'create', '--location', self.location,
         '--image', self.image, '--size', self.machine_type, '--admin-username',
@@ -323,7 +527,14 @@ class AzureVirtualMachine(
 
     if self.availability_zone:
       create_cmd.extend(['--zone', self.availability_zone])
-    else:
+
+    # Resources in Availability Set are not allowed to be
+    # deployed to particular hosts.
+    if self.use_dedicated_host:
+      create_cmd.extend(
+          ['--host-group', self.host.host_group, '--host', self.host.name])
+
+    if self.network.avail_set:
       create_cmd.extend(['--availability-set', self.network.avail_set.name])
 
     if self.password:
@@ -338,6 +549,8 @@ class AzureVirtualMachine(
     if retcode and 'Error Code: QuotaExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
+    # TODO(user): raise host insufficient capacity error
+    # if capacity is reached with user set num_vms value, fail benchmark
     if retcode and 'AllocationFailed' in stderr:
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if retcode:
