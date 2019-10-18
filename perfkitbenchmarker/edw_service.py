@@ -205,3 +205,18 @@ class EdwService(resource.BaseResource):
     all_script_performance = json.loads(stdout)
     script_performance = all_script_performance[script_name]
     return script_performance['execution_time'], script_performance['job_id']
+
+  @classmethod
+  def RunScriptOnClientVm(cls, vm, database, script):
+    """A function to execute the script on the client vm.
+
+    Args:
+      vm: Client vm on which the script will be run.
+      database: The database within which the query executes.
+      script: Named query to execute (expected to be on the client vm).
+
+    Returns:
+      A dictionary with the execution performance results that includes
+      execution status and the latency of executing the script.
+    """
+    raise NotImplementedError
