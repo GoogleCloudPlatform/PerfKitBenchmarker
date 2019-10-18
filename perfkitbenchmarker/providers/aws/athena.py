@@ -72,3 +72,10 @@ class Athena(edw_service.EdwService):
     """
     super(Athena, self).PrepareClientVm(vm)
     self.InstallAndAuthenticateRunner(vm)
+
+  @classmethod
+  def RunScriptOnClientVm(cls, vm, database, script):
+    """A function to execute a script against AWS Athena Database."""
+    stdout, _ = vm.RemoteCommand('python runner.py --database=%s --script=%s' %
+                                 (database, script))
+    return stdout
