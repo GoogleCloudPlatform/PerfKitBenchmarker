@@ -57,7 +57,11 @@ def GetResourceGroup(zone=None):
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name, zone=None, use_existing=False, timeout_minutes=None,
+  def __init__(self,
+               name,
+               zone=None,
+               use_existing=False,
+               timeout_minutes=None,
                raise_on_create_failure=True):
     super(AzureResourceGroup, self).__init__()
     self.name = name
@@ -173,7 +177,8 @@ class AzureStorageAccount(resource.BaseResource):
                kind=None,
                access_tier=None,
                resource_group=None,
-               use_existing=False, raise_on_create_failure=True):
+               use_existing=False,
+               raise_on_create_failure=True):
     super(AzureStorageAccount, self).__init__()
     self.storage_type = storage_type
     self.name = name
@@ -204,8 +209,8 @@ class AzureStorageAccount(resource.BaseResource):
         create_cmd.extend(['--location', self.location])
       if self.kind == 'BlobStorage':
         create_cmd.extend(['--access-tier', self.access_tier])
-      vm_util.IssueCommand(create_cmd,
-                           raise_on_failure=self.raise_on_create_failure)
+      vm_util.IssueCommand(
+          create_cmd, raise_on_failure=self.raise_on_create_failure)
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
@@ -450,9 +455,13 @@ class AzureNetwork(network.BaseNetwork):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
     self.location = util.GetLocationFromZone(self.zone)
-    avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
-    self.avail_set = AzureAvailSet(avail_set_name, self.location)
-
+    # With dedicated hosting and/or an availability zone, an availability set
+    # cannot be created
+    if FLAGS.dedicated_hosts or FLAGS.availability_zone:
+      self.avail_set = None
+    else:
+      avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
+      self.avail_set = AzureAvailSet(avail_set_name, self.location)
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri
 
@@ -478,7 +487,8 @@ class AzureNetwork(network.BaseNetwork):
     # commands more than once, so that is fine.
     self.resource_group.Create()
 
-    self.avail_set.Create()
+    if self.avail_set:
+      self.avail_set.Create()
 
     self.storage_account.Create()
 
