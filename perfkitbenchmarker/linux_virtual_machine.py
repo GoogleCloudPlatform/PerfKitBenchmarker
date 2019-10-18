@@ -164,6 +164,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._has_remote_command_script = False
     self._needs_reboot = False
     self._lscpu_cache = None
+    self._partition_table = None
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -489,6 +490,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     return (self.os_metadata.get('kernel_command_line') or
             self.RemoteCommand('cat /proc/cmdline')[0].strip())
 
+  @property
+  def partition_table(self):
+    """Return partition table information."""
+    if not self._partition_table:
+      partition_tables = self.RemoteCommand('sudo fdisk -l')[0]
+      self._partition_table = {
+          dev: int(size) for (dev, size) in regex_util.ExtractAllMatches(
+              r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes,', partition_tables)}
+    return self._partition_table
+
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
     """Waits until the VM has booted."""
@@ -506,6 +517,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.numa_node_count = lscpu_results.numa_node_count
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = self.kernel_release
+    self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
 
