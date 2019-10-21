@@ -260,6 +260,11 @@ class TestPartitionTable(unittest.TestCase):
     vm._partition_table = {}
     return vm
 
+  def testFdiskNoPartitonTable(self):
+    vm = self.CreateVm('')
+    results = vm.partition_table
+    self.assertEqual({}, results)
+
   def testFdiskParsingBootDiskOnly(self):
     vm = self.CreateVm("""
 Disk /dev/sda: 10.7 GB, 10737418240 bytes
