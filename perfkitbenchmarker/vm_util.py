@@ -97,7 +97,7 @@ flags.DEFINE_string('ssh_control_path', None,
                     'connections if --ssh_reuse_connections is set. This can '
                     'be helpful on systems whose default temporary directory '
                     'path is too long (sockets have a max path length) or a '
-                    'version of ssh that doesn\'t support the %C token. See '
+                    'version of ssh that doesn\'t support the %h token. See '
                     'ssh documentation on the ControlPath setting for more '
                     'detailed information.')
 flags.DEFINE_string('ssh_control_persist', '30m',
@@ -224,7 +224,7 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
     options.append('-6')
   if FLAGS.ssh_reuse_connections:
     control_path = (FLAGS.ssh_control_path or
-                    os.path.join(temp_dir.GetSshConnectionsDir(), '%C'))
+                    os.path.join(temp_dir.GetSshConnectionsDir(), '%h'))
     options.extend([
         '-o', 'ControlPath="%s"' % control_path,
         '-o', 'ControlMaster=auto',
