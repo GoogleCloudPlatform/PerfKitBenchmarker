@@ -355,6 +355,21 @@ def FormatTags(tags_dict):
   return ','.join('{0}={1}'.format(k, v) for k, v in six.iteritems(tags_dict))
 
 
+def GetDefaultTags(timeout_minutes=None):
+  """Get the default tags in a dictionary.
+
+  Args:
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
+
+  Returns:
+    A dict of tags, contributed from the benchmark spec.
+  """
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if not benchmark_spec:
+    return {}
+  return benchmark_spec.GetResourceTags(timeout_minutes)
+
+
 def MakeFormattedDefaultTags(timeout_minutes=None):
   """Get the default tags formatted.
 
@@ -364,7 +379,4 @@ def MakeFormattedDefaultTags(timeout_minutes=None):
   Returns:
     A string contains tags, contributed from the benchmark spec.
   """
-  benchmark_spec = context.GetThreadBenchmarkSpec()
-  if not benchmark_spec:
-    return {}
-  return FormatTags(benchmark_spec.GetResourceTags(timeout_minutes))
+  return FormatTags(GetDefaultTags(timeout_minutes))
