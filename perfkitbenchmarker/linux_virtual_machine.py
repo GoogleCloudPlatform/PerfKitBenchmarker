@@ -164,7 +164,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._has_remote_command_script = False
     self._needs_reboot = False
     self._lscpu_cache = None
-    self._partition_table = None
+    self._partition_table = {}
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -494,10 +494,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def partition_table(self):
     """Return partition table information."""
     if not self._partition_table:
-      partition_tables = self.RemoteCommand('sudo fdisk -l')[0]
-      self._partition_table = {
-          dev: int(size) for (dev, size) in regex_util.ExtractAllMatches(
-              r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes', partition_tables)}
+      cmd = 'sudo fdisk -l'
+      partition_tables = self.RemoteCommand(cmd)[0]
+      try:
+        self._partition_table = {
+            dev: int(size) for (dev, size) in regex_util.ExtractAllMatches(
+                r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes', partition_tables)}
+      except regex_util.NoMatchError:
+        # TODO(user): Use alternative methods to retrieve partition table.
+        logging.warn('Partition table not found with "%s".', cmd)
     return self._partition_table
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
