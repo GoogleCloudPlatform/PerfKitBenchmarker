@@ -497,7 +497,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       partition_tables = self.RemoteCommand('sudo fdisk -l')[0]
       self._partition_table = {
           dev: int(size) for (dev, size) in regex_util.ExtractAllMatches(
-              r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes,', partition_tables)}
+              r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes', partition_tables)}
     return self._partition_table
 
   @vm_util.Retry(log_errors=False, poll_interval=1)

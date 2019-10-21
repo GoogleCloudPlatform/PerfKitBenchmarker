@@ -250,5 +250,69 @@ class TestLsCpu(unittest.TestCase):
         }, results.data)
 
 
+class TestPartitionTable(unittest.TestCase):
+
+  def CreateVm(self, remote_command_text):
+    vm = LinuxVMResource(None)
+    vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
+    vm.RemoteCommand.return_value = remote_command_text, ''
+    vm.name = 'pkb-test'
+    vm._partition_table = {}
+    return vm
+
+  def testFdiskParsingBootDiskOnly(self):
+    vm = self.CreateVm("""
+Disk /dev/sda: 10.7 GB, 10737418240 bytes
+4 heads, 32 sectors/track, 163840 cylinders, total 20971520 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 4096 bytes
+Disk identifier: 0x00067934
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sda1   *        2048    20971519    10484736   83  Linux
+    """)
+    results = vm.partition_table
+    self.assertEqual(
+        {'/dev/sda': 10737418240}, results)
+
+  def testFdiskParsingWithRaidDisk(self):
+    vm = self.CreateVm("""
+Disk /dev/sda: 10 GiB, 10737418240 bytes, 20971520 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 4096 bytes
+Disklabel type: dos
+Disk identifier: 0x8c87e63b
+
+Device     Boot Start      End  Sectors Size Id Type
+/dev/sda1  *     2048 20971486 20969439  10G 83 Linux
+
+
+Disk /dev/sdb: 375 GiB, 402653184000 bytes, 98304000 sectors
+Units: sectors of 1 * 4096 = 4096 bytes
+Sector size (logical/physical): 4096 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 4096 bytes
+
+
+Disk /dev/sdc: 375 GiB, 402653184000 bytes, 98304000 sectors
+Units: sectors of 1 * 4096 = 4096 bytes
+Sector size (logical/physical): 4096 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 4096 bytes
+
+
+Disk /dev/md0: 749.8 GiB, 805037932544 bytes, 196542464 sectors
+Units: sectors of 1 * 4096 = 4096 bytes
+Sector size (logical/physical): 4096 bytes / 4096 bytes
+I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
+    """)
+    results = vm.partition_table
+    self.assertEqual(
+        {'/dev/sda': 10737418240,
+         '/dev/sdb': 402653184000,
+         '/dev/sdc': 402653184000,
+         '/dev/md0': 805037932544}, results)
+
+
 if __name__ == '__main__':
   unittest.main()
