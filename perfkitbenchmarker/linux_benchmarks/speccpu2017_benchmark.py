@@ -164,7 +164,7 @@ def Run(benchmark_spec):
   # not including os overhead
   # Refer to: https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
   copies = min(vm.NumCpusForBenchmark(),
-               vm.total_free_memory_kb / (2 * KB_TO_GB_MULTIPLIER))
+               vm.total_free_memory_kb // (2 * KB_TO_GB_MULTIPLIER))
   version_specific_parameters.append(' --copies=%s ' %
                                      (FLAGS.spec17_copies or copies))
   version_specific_parameters.append(' --threads=%s ' %
