@@ -661,7 +661,8 @@ class BenchmarkSpec(object):
         'create_time_utc': now_utc.strftime(time_format),
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
-        'owner': FLAGS.owner
+        'owner': FLAGS.owner,
+        'benchmark_uid': self.uid,
     }
 
     return tags
@@ -734,21 +735,8 @@ class BenchmarkSpec(object):
     Raises:
         Exception: If --vm_metadata is malformed.
     """
-    vm_metadata = {
-        'benchmark':
-            self.name,
-        'perfkit_uuid':
-            self.uuid,
-        'benchmark_uid':
-            self.uid,
-        'create_time_utc':
-            datetime.datetime.utcfromtimestamp(vm.create_start_time),
-        'owner':
-            FLAGS.owner
-    }
+    vm_metadata = self._GetResourceDict(METADATA_TIME_FORMAT)
     for item in FLAGS.vm_metadata:
-      if ':' not in item:
-        raise Exception('"%s" not in expected key:value format' % item)
       key, value = item.split(':', 1)
       vm_metadata[key] = value
     vm.AddMetadata(**vm_metadata)

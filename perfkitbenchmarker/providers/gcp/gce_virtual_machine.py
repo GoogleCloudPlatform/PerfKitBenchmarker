@@ -456,17 +456,25 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         '%s=%s' % (k, v) for k, v in six.iteritems(metadata_from_file)
     ])
 
-    metadata = {'owner': FLAGS.owner} if FLAGS.owner else {}
+    metadata = {}
     metadata.update(self.boot_metadata)
-    parsed_metadata = flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata)
-    for key, value in six.iteritems(parsed_metadata):
+    metadata.update(util.GetDefaultTags())
+
+    additional_metadata = {}
+    for item in FLAGS.vm_metadata:
+      key, value = item.split(':', 1)
+      additional_metadata[key] = value
+    additional_metadata.update(
+        flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
+
+    for key, value in six.iteritems(additional_metadata):
       if key in metadata:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
                         'from command line.', key)
         continue
       metadata[key] = value
-    cmd.flags['metadata'] = ','.join(
-        ['%s=%s' % (k, v) for k, v in six.iteritems(metadata)])
+
+    cmd.flags['metadata'] = util.FormatTags(metadata)
 
     # TODO(gareth-ferneyhough): If GCE one day supports live migration on GPUs
     #                           this can be revised.
@@ -662,18 +670,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def AddMetadata(self, **kwargs):
-    """Adds metadata to the VM and disk."""
-    if not kwargs:
-      return
-    cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
-                             self.name)
-    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
-    if kwargs:
-      cmd.flags['metadata'] = '{metadata},{kwargs}'.format(
-          metadata=cmd.flags['metadata'],
-          kwargs=util.FormatTags(kwargs))
-    cmd.Issue()
-
+    """Adds metadata to disk."""
+    # vm metadata added to vm on creation.
     cmd = util.GcloudCommand(
         self, 'compute', 'disks', 'add-labels', self.name)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()

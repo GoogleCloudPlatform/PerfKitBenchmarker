@@ -52,6 +52,32 @@ _VM_SPEC_REGISTRY = {}
 _VM_REGISTRY = {}
 
 
+def ValidateVmMetadataFlag(options_list):
+  """Verifies correct usage of the vm metadata flag.
+
+  All provided options must be in the form of key:value.
+
+  Args:
+    options_list: A list of strings parsed from the provided value for the
+      flag.
+
+  Returns:
+    True if the list of options provided as the value for the flag meets
+    requirements.
+
+  Raises:
+    flags.ValidationError: If the list of options provided as the value for
+      the flag does not meet requirements.
+  """
+  for option in options_list:
+    if ':' not in option[1:-1]:
+      raise flags.ValidationError(
+          '"%s" not in expected key:value format' % option)
+  return True
+
+# vm_metadata flag name
+VM_METADATA = 'vm_metadata'
+
 flags.DEFINE_boolean(
     'dedicated_hosts', False,
     'If True, use hosts that only have VMs from the same '
@@ -63,9 +89,9 @@ flags.DEFINE_integer(
     'scale their configurations; this can be used as a method to control '
     'benchmark scaling. It will also change the num_cpus metadata '
     'published along with the benchmark data.')
-flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
-                  'via the provider\'s AddMetadata function. It expects'
-                  'key:value pairs')
+flags.DEFINE_list(VM_METADATA, [], 'Metadata to add to the vm. It expects'
+                  'key:value pairs.')
+flags.register_validator(VM_METADATA, ValidateVmMetadataFlag)
 flags.DEFINE_bool(
     'skip_firewall_rules', False,
     'If set, this run will not create firewall rules. This is useful if the '
@@ -353,8 +379,9 @@ class BaseVirtualMachine(resource.BaseResource):
   def AddMetadata(self, **kwargs):
     """Add key/value metadata to the instance.
 
-    Adds metadata in the form of key value pairs to the instance. Useful for
-    debugging / introspection.
+    Setting the metadata on create is preferred. If that is not possible, this
+    method adds metadata in the form of key value pairs to the instance. Useful
+    for debugging / introspection.
 
     The default implementation is a noop. Cloud providers supporting instance
     metadata should override.
