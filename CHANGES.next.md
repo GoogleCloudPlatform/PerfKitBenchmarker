@@ -569,3 +569,5 @@
 - Updated linux_virtual_machine.py to use the single source of truth of
   perfkitbenchmark_keyfile path for non-static VM, expanding the use case of
   stage-wise test, e.g., do prepare on machine A, do run stage on machine B.
+- Added --scp_connect_timeout and --ssh_connect_timeout flag to replace the
+  hard-coded values at the call sites of vm_util.GetSshOptions.

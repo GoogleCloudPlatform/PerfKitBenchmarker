@@ -92,6 +92,11 @@ flags.DEFINE_integer('simulate_maintenance_delay', 0,
 flags.DEFINE_boolean('ssh_reuse_connections', True,
                      'Whether to reuse SSH connections rather than '
                      'reestablishing a connection for each remote command.')
+# We set this to the short value of 5 seconds so that the cluster boot benchmark
+# can measure a fast connection when bringing up a VM. This avoids retries that
+# may not be as quick as every 5 seconds when specifying a larger value.
+flags.DEFINE_integer('ssh_connect_timeout', 5, 'timeout for SSH connection.',
+                     lower_bound=0)
 flags.DEFINE_string('ssh_control_path', None,
                     'Overrides the default ControlPath setting for ssh '
                     'connections if --ssh_reuse_connections is set. This can '
@@ -205,7 +210,7 @@ def GetCertPath():
   return PrependTempDir(CERT_FILE)
 
 
-def GetSshOptions(ssh_key_filename, connect_timeout=5):
+def GetSshOptions(ssh_key_filename, connect_timeout=None):
   """Return common set of SSH and SCP options."""
   options = [
       '-2',
@@ -214,7 +219,8 @@ def GetSshOptions(ssh_key_filename, connect_timeout=5):
       '-o', 'IdentitiesOnly=yes',
       '-o', 'PreferredAuthentications=publickey',
       '-o', 'PasswordAuthentication=no',
-      '-o', 'ConnectTimeout=%d' % connect_timeout,
+      '-o', 'ConnectTimeout=%d' % (
+          connect_timeout or FLAGS.ssh_connect_timeout),
       '-o', 'GSSAPIAuthentication=no',
       '-o', 'ServerAliveInterval=%d' % FLAGS.ssh_server_alive_interval,
       '-o', 'ServerAliveCountMax=%d' % FLAGS.ssh_server_alive_count_max,
