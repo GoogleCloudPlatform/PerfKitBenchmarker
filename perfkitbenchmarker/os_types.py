@@ -18,6 +18,7 @@ from perfkitbenchmarker import flags
 AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
 CLEAR = 'clear'
+COS = 'cos'
 DEBIAN = 'debian'
 DEBIAN9 = 'debian9'
 JUJU = 'juju'
@@ -37,6 +38,7 @@ LINUX_OS_TYPES = [
     AMAZONLINUX2,
     CENTOS7,
     CLEAR,
+    COS,
     DEBIAN,
     DEBIAN9,
     JUJU,
@@ -55,7 +57,7 @@ WINDOWS_OS_TYPES = [
     WINDOWS2019,
 ]
 ALL = LINUX_OS_TYPES + WINDOWS_OS_TYPES
-BASE_OS_TYPES = [CLEAR, DEBIAN, RHEL, WINDOWS]
+BASE_OS_TYPES = [CLEAR, COS, DEBIAN, RHEL, WINDOWS]
 
 flags.DEFINE_enum(
     'os_type', UBUNTU1604, ALL,

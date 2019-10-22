@@ -1205,6 +1205,20 @@ class ClearMixin(BaseLinuxMixin):
     return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
 
 
+class BaseContainerLinuxMixin(BaseLinuxMixin):
+  """Class holding VM methods for minimal container-based OSes like Core OS."""
+
+  def PrepareVMEnvironment(self):
+    # Add more when benchmarks besides clusterboot are supported
+    pass
+
+  def Install(self, package_name):
+    raise NotImplementedError('Only use for cluster boot for now')
+
+  def Uninstall(self, package_name):
+    raise NotImplementedError('Only use for cluster boot for now')
+
+
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
@@ -1328,6 +1342,20 @@ class AmazonLinux2Mixin(RhelMixin):
 class Centos7Mixin(RhelMixin):
   """Class holding Centos 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
+
+
+class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
+  """Class holding COS specific VM methods and attributes."""
+  OS_TYPE = os_types.COS
+  BASE_OS_TYPE = os_types.COS
+
+  def PrepareVMEnvironment(self):
+    super(ContainerOptimizedOsMixin, self).PrepareVMEnvironment()
+    # COS mounts /home and /tmp with -o noexec, which blocks running benchmark
+    # binaries.
+    # TODO(user): Support reboots
+    self.RemoteCommand('sudo mount -o remount,exec /mount')
+    self.RemoteCommand('sudo mount -o remount,exec /tmp')
 
 
 class DebianMixin(BaseLinuxMixin):
