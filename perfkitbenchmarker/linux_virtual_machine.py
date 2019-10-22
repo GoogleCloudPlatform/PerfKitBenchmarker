@@ -132,6 +132,9 @@ flags.DEFINE_bool(
 flags.DEFINE_integer(
     'ssh_retries', 10, 'Default number of times to retry SSH.', lower_bound=0)
 
+flags.DEFINE_integer(
+    'scp_connect_timeout', 30, 'timeout for SCP connection.', lower_bound=0)
+
 flags.DEFINE_boolean(
     'ssh_via_internal_ip', False,
     'Whether to use internal IP addresses for running commands on and pushing '
@@ -661,7 +664,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # An scp is not retried, so increase the connection timeout.
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
-    scp_cmd.extend(vm_util.GetSshOptions(ssh_private_key, connect_timeout=30))
+    scp_cmd.extend(vm_util.GetSshOptions(
+        ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:
