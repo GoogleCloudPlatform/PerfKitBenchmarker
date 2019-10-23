@@ -922,6 +922,18 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
     self.user_name = FLAGS.aws_user_name if user_name_set else 'clear'
 
 
+class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
+                                   linux_virtual_machine.CoreOsMixin):
+  IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
+  # Note AMIs can also be found distributed by CoreOS in 595879546273
+  IMAGE_OWNER = '679593333241'  # For marketplace images.
+
+  def __init__(self, vm_spec):
+    super(CoreOsBasedAwsVirtualMachine, self).__init__(vm_spec)
+    user_name_set = FLAGS['aws_user_name'].present
+    self.user_name = FLAGS.aws_user_name if user_name_set else 'core'
+
+
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   """Class with configuration for AWS Debian virtual machines."""

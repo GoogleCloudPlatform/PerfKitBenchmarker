@@ -838,6 +838,11 @@ class ContainerOptimizedOsBasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
 
+class CoreOsBasedGceVirtualMachine(GceVirtualMachine, linux_vm.CoreOsMixin):
+  DEFAULT_IMAGE_FAMILY = 'coreos-stable'
+  DEFAULT_IMAGE_PROJECT = 'coreos-cloud'
+
+
 class Ubuntu1404BasedGceVirtualMachine(GceVirtualMachine,
                                        linux_vm.Ubuntu1404Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1404-lts'

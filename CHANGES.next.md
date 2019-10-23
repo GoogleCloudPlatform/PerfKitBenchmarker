@@ -571,3 +571,7 @@
   stage-wise test, e.g., do prepare on machine A, do run stage on machine B.
 - Added --scp_connect_timeout and --ssh_connect_timeout flag to replace the
   hard-coded values at the call sites of vm_util.GetSshOptions.
+- Added support for Container Optimized OS in the GCP Provider. Support is
+  currently limited to the cluster_boot benchmark.
+- Added support for CoreOS Container Linux in GCP, AWS, and Azure Providers.
+  Support is currently limited to the cluster_boot benchmark.
