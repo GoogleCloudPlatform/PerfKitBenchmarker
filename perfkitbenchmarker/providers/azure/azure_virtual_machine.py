@@ -717,6 +717,11 @@ class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
     self.python_pip_package_config = 'python2-pip'
 
 
+class CoreOsBasedAzureVirtualMachine(AzureVirtualMachine,
+                                     linux_virtual_machine.CoreOsMixin):
+  IMAGE_URN = 'CoreOS:CoreOS:Stable:latest'
+
+
 class WindowsAzureVirtualMachine(AzureVirtualMachine,
                                  windows_virtual_machine.WindowsMixin):
   """Class supporting Windows Azure virtual machines."""
