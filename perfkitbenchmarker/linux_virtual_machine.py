@@ -1354,7 +1354,7 @@ class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
     # COS mounts /home and /tmp with -o noexec, which blocks running benchmark
     # binaries.
     # TODO(user): Support reboots
-    self.RemoteCommand('sudo mount -o remount,exec /mount')
+    self.RemoteCommand('sudo mount -o remount,exec /home')
     self.RemoteCommand('sudo mount -o remount,exec /tmp')
 
 
