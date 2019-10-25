@@ -13,8 +13,8 @@
 # limitations under the License.
 """Common base class for PKB unittests."""
 
-import unittest
 
+from absl.testing import absltest
 from absl.testing import flagsaver
 
 from perfkitbenchmarker import flags
@@ -24,9 +24,9 @@ FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
 
 
-class PkbCommonTestCase(unittest.TestCase):
+class PkbCommonTestCase(absltest.TestCase):
 
   def setUp(self):
+    super(PkbCommonTestCase, self).setUp()
     saved_flag_values = flagsaver.save_flag_values()
-    self.addCleanup(
-        flagsaver.restore_flag_values, saved_flag_values)
+    self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
