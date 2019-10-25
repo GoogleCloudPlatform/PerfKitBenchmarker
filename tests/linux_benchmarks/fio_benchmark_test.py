@@ -48,6 +48,7 @@ do_verify=0
 verify_fatal=0
 group_reporting=1
 randrepeat=0
+offset_increment=1k
 
 [sequential_read-io-depth-1-num-jobs-1]
 stonewall
@@ -70,7 +71,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read'],
             [1, 2], [1],
-            None, None, 600, ['randrepeat=0']),
+            None, None, 600, ['randrepeat=0', 'offset_increment=1k']),
         expected_jobfile)
 
   def testMultipleScenarios(self):
