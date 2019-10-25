@@ -162,7 +162,7 @@ class GkeCluster(container_service.KubernetesCluster):
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
     _, stderr, retcode = cmd.Issue(
-        timeout=900, env=self._GetRequiredGkeEnv(), raise_on_failure=False)
+        timeout=1200, env=self._GetRequiredGkeEnv(), raise_on_failure=False)
     if retcode != 0:
       # Log specific type of failure, if known.
       if 'ZONE_RESOURCE_POOL_EXHAUSTED' in stderr:
