@@ -26,6 +26,7 @@ A full TeraSort benchmark run consists of the following three steps:
 
 The benchmark reports the detailed latency of executing each phase.
 """
+from __future__ import division
 
 import logging
 
@@ -138,7 +139,7 @@ def Run(benchmark_spec):
   metadata.update({
       'dpb_terasort_storage_type': FLAGS.dpb_terasort_storage_type})
   metadata.update({'terasort_num_record': FLAGS.dpb_terasort_num_records})
-  storage_in_gb = (FLAGS.dpb_terasort_num_records * 100) / (1000 * 1000 * 1000)
+  storage_in_gb = (FLAGS.dpb_terasort_num_records * 100) // (1000 * 1000 * 1000)
   metadata.update({'terasort_dataset_size_in_GB': storage_in_gb})
   logging.info('metadata %s ', str(metadata))
 
