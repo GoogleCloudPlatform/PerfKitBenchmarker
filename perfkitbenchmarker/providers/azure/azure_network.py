@@ -457,7 +457,7 @@ class AzureNetwork(network.BaseNetwork):
     self.location = util.GetLocationFromZone(self.zone)
     # With dedicated hosting and/or an availability zone, an availability set
     # cannot be created
-    if FLAGS.dedicated_hosts or FLAGS.availability_zone:
+    if FLAGS.dedicated_hosts or util.GetAvailabilityZoneFromZone(self.zone):
       self.avail_set = None
     else:
       avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
