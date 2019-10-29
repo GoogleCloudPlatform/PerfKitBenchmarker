@@ -921,7 +921,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       copy_cmd = (' '.join(['cp', home_file_path, remote_path]))
       self.RemoteCommand(copy_cmd)
     else:
-      self.RemoteCommand('sudo rm -f ' + remote_path)
       self.PushFile(file_path, remote_path)
 
   def RenderTemplate(self, template_path, remote_path, context):

@@ -927,7 +927,6 @@ class YCSBExecutor(object):
     ]
 
     def PushWorkload(vm):
-      vm.RemoteCommand('sudo rm -f ' + remote_path)
       vm.PushFile(workload_file, remote_path)
     vm_util.RunThreaded(PushWorkload, list(set(vms)))
 

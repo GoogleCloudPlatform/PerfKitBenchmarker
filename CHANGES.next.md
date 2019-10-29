@@ -577,6 +577,3 @@
 - Added support for CoreOS Container Linux in GCP, AWS, and Azure Providers.
   Support is currently limited to the cluster_boot benchmark.
 - PkbCommonTestCase extends absltest.TestCase for py3 test backports.
-- Remove the remote file before pushing a local file to the remote place. This
-  can avoid permission issue as the pushed file only allows user "perfkit" to do
-  read or execute.
