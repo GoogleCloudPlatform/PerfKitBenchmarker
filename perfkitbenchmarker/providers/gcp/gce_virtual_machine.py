@@ -461,9 +461,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     metadata.update(util.GetDefaultTags())
 
     additional_metadata = {}
-    for item in FLAGS.vm_metadata:
-      key, value = item.split(':', 1)
-      additional_metadata[key] = value
+    additional_metadata.update(self.vm_metadata)
     additional_metadata.update(
         flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
 
