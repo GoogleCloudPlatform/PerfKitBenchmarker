@@ -518,12 +518,17 @@ class AzureVirtualMachine(
     else:
       disk_size_args = []
 
+    tags = {}
+    tags.update(self.vm_metadata)
+    tags.update(util.GetResourceTags(self.resource_group.timeout_minutes))
+    tag_args = ['--tags'] + util.FormatTags(tags)
+
     create_cmd = ([
         azure.AZURE_PATH, 'vm', 'create', '--location', self.location,
         '--image', self.image, '--size', self.machine_type, '--admin-username',
         self.user_name, '--storage-sku', self.os_disk.disk_type, '--name',
         self.name
-    ] + disk_size_args + self.resource_group.args + self.nic.args)
+    ] + disk_size_args + self.resource_group.args + self.nic.args + tag_args)
 
     if self.availability_zone:
       create_cmd.extend(['--zone', self.availability_zone])
@@ -591,12 +596,6 @@ class AzureVirtualMachine(
     ] + self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
     self.ip_address = self.public_ip.GetIPAddress()
-
-  def AddMetadata(self, **tags):
-    tag_list = ['tags.%s=%s' % (k, v) for k, v in six.iteritems(tags)]
-    vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'update', '--name', self.name] +
-        self.resource_group.args + ['--set'] + tag_list)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.

@@ -338,7 +338,9 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
     self.assertFalse(self.vm._Exists())
 
-  def testCreateSpot(self):
+  @mock.patch.object(util, 'FormatTagSpecifications')
+  def testCreateSpot(self, mock_cmd):
+    mock_cmd.return_value = 'foobar'
     vm_util.IssueCommand.side_effect = [(None, '', None)]
 
     self.vm.use_spot_instance = True
@@ -357,6 +359,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--image-id=ami-12345',
         '--instance-type=c3.large',
         '--key-name=perfkit-key-aaaaaa',
+        '--tag-specifications=foobar',
         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
         '"DeviceName": "/dev/xvdc"}]',
