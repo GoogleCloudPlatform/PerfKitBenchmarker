@@ -766,6 +766,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                           'operations', 'list')
       gcloud_command.flags['filter'] = 'zone:%s targetLink.scope():%s' % (
           self.zone, self.name)
+      gcloud_command.additional_flags.append('--log-http')
       stdout, _, _ = gcloud_command.Issue()
       self.early_termination = any(
           operation['operationType'] == 'compute.instances.preempted'
