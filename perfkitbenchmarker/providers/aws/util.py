@@ -117,6 +117,21 @@ def FormatTags(tags_dict):
   return ['Key=%s,Value=%s' % (k, v) for k, v in six.iteritems(tags_dict)]
 
 
+def FormatTagSpecifications(resource_type, tags_dict):
+  """Format a dict of tags into arguments for 'tag-specifications' parameter.
+
+  Args:
+    resource_type: resource type to be tagged.
+    tags_dict: Tags to be formatted.
+
+  Returns:
+    A list of tags formatted as arguments for 'tag-specifications' parameter.
+  """
+  tags = ','.join('{Key=%s,Value=%s}' %
+                  (k, v) for k, v in six.iteritems(tags_dict))
+  return 'ResourceType=%s,Tags=[%s]' % (resource_type, tags)
+
+
 def AddTags(resource_id, region, **kwargs):
   """Adds tags to an AWS resource created by PerfKitBenchmarker.
 

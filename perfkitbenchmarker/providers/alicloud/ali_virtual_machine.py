@@ -235,6 +235,9 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
                          self.password,
                          key_file,
                          self.user_name)
+    tags = {}
+    tags.update(self.vm_metadata)
+    util.AddTags(tags)
     util.AddDefaultTags(self.id, RESOURCE_TYPE[INSTANCE], self.region)
 
   def _CreateDependencies(self):

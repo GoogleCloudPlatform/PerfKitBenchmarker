@@ -179,6 +179,8 @@ class BaseVmSpec(spec.BaseSpec):
           flag_values.disable_interrupt_moderation)
     if flag_values['disable_rss'].present:
       config_values['disable_rss'] = flag_values.disable_rss
+    if flag_values['vm_metadata'].present:
+      config_values['vm_metadata'] = flag_values.vm_metadata
 
     if 'gpu_count' in config_values and 'gpu_type' not in config_values:
       raise errors.Config.MissingOption(
@@ -224,7 +226,10 @@ class BaseVmSpec(spec.BaseSpec):
             'valid_values': [vm_util.IpAddressSubset.EXTERNAL,
                              vm_util.IpAddressSubset.INTERNAL]}),
         'background_cpu_threads': (option_decoders.IntDecoder, {
-            'none_ok': True, 'default': None})})
+            'none_ok': True, 'default': None}),
+        'vm_metadata': (option_decoders.ListDecoder, {
+            'item_decoder': option_decoders.StringDecoder(),
+            'default': []})})
     return result
 
 
@@ -315,6 +320,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.numa_node_count = None
     self.num_disable_cpus = None
     self.capacity_reservation_id = None
+    self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(

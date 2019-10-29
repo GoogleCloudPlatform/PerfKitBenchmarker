@@ -198,6 +198,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     resp = json.loads(stdout)
     self.internal_ip = resp['PrivateIPv4']
     self.ip_address = resp['PublicIPv4']
+    self.AddMetadata(**self.vm_metadata)
 
   def _Exists(self):
     """Returns true if the VM exists otherwise returns false."""

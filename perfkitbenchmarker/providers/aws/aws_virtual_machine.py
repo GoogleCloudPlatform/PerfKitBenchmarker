@@ -591,7 +591,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = instance['PrivateIpAddress']
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
-    util.AddDefaultTags(self.id, self.region)
 
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
@@ -643,6 +642,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                          self.boot_disk_size,
                                          self.image,
                                          self.region)
+    tags = {}
+    tags.update(self.vm_metadata)
+    tags.update(util.MakeDefaultTags())
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
@@ -652,7 +654,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--client-token=%s' % self.client_token,
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
-        '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun()]
+        '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
+        '--tag-specifications=%s' %
+        util.FormatTagSpecifications('instance', tags)]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:

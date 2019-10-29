@@ -735,11 +735,7 @@ class BenchmarkSpec(object):
     Raises:
         Exception: If --vm_metadata is malformed.
     """
-    vm_metadata = self._GetResourceDict(METADATA_TIME_FORMAT)
-    for item in FLAGS.vm_metadata:
-      key, value = item.split(':', 1)
-      vm_metadata[key] = value
-    vm.AddMetadata(**vm_metadata)
+    vm.AddMetadata()
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
