@@ -30,6 +30,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import logging
 import os
 import pipes
@@ -78,6 +79,9 @@ WAIT_FOR_COMMAND = 'wait_for_command.py'
 _DEFAULT_DISK_FS_TYPE = 'ext4'
 _DEFAULT_DISK_MOUNT_OPTIONS = 'discard'
 _DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
+
+# regex for parsing lscpu and /proc/cpuinfo
+_COLON_SEPARATED_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
 
 flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
@@ -168,6 +172,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._needs_reboot = False
     self._lscpu_cache = None
     self._partition_table = {}
+    self._proccpu_cache = None
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -463,6 +468,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       lscpu, _ = self.RemoteCommand('lscpu')
       self._lscpu_cache = LsCpuResults(lscpu)
     return self._lscpu_cache
+
+  def CheckProcCpu(self):
+    """Returns a ProcCpuResults from the host VM."""
+    if not self._proccpu_cache:
+      proccpu, _ = self.RemoteCommand('cat /proc/cpuinfo')
+      self._proccpu_cache = ProcCpuResults(proccpu)
+    return self._proccpu_cache
 
   def GetOsInfo(self):
     """Returns information regarding OS type and version"""
@@ -1776,10 +1788,36 @@ class KernelRelease(object):
     return self.minor >= minor
 
 
+def _ParseTextProperties(text):
+  """Parses raw text that has lines in "key:value" form.
+
+  When comes across an empty line will return a dict of the current values.
+
+  Args:
+    text: Text of lines in "key:value" form.
+
+  Yields:
+    Dict of [key,value] values for a section.
+  """
+  current_data = {}
+  for line in (line.strip() for line in text.splitlines()):
+    if line:
+      m = _COLON_SEPARATED_RE.match(line)
+      if m:
+        current_data[m.group('key')] = m.group('value')
+      else:
+        logging.debug('Ignoring bad line "%s"', line)
+    else:
+      # Hit a section break
+      if current_data:
+        yield current_data
+        current_data = {}
+  if current_data:
+    yield current_data
+
+
 class LsCpuResults(object):
   """Holds the contents of the command lscpu."""
-  # all rows in the lscpu output should look like "key:value"
-  _KEY_VALUE_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
 
   def __init__(self, lscpu):
     """LsCpuResults Constructor.
@@ -1817,12 +1855,8 @@ class LsCpuResults(object):
     NUMA node0 CPU(s):     0-11
     """
     self.data = {}
-    for line in lscpu.splitlines():
-      m = self._KEY_VALUE_RE.match(line)
-      if m:
-        self.data[m.group('key')] = m.group('value')
-      else:
-        logging.debug('Ignoring bad lscpu line "%s"', line)
+    for stanza in _ParseTextProperties(lscpu):
+      self.data.update(stanza)
 
     def GetInt(key):
       if key in self.data and self.data[key].isdigit():
@@ -1833,6 +1867,85 @@ class LsCpuResults(object):
     self.numa_node_count = GetInt('NUMA node(s)')
     self.cores_per_socket = GetInt('Core(s) per socket')
     self.socket_count = GetInt('Socket(s)')
+
+
+class ProcCpuResults(object):
+  """Parses /proc/cpuinfo text into grouped values.
+
+  Most of the cpuinfo is repeated per processor.  Known ones that change per
+  processor are listed in _PER_CPU_KEYS and are processed separately to make
+  reporting easier.
+
+  Example metadata for metric='proccpu':
+    |bugs:spec_store_bypass spectre_v1 spectre_v2 swapgs|,
+    |cache size:25344 KB|
+
+  Example metadata for metric='proccpu_mapping':
+    |proc_0:apicid=0;core id=0;initial apicid=0;physical id=0|,
+    |proc_1:apicid=2;core id=1;initial apicid=2;physical id=0|
+
+  Attributes:
+    text: The /proc/cpuinfo text.
+    mappings: Dict of [processor id: dict of values that change with cpu]
+    attributes: Dict of /proc/cpuinfo entries that are not in mappings.
+  """
+
+  # known attributes that vary with the processor id
+  _PER_CPU_KEYS = ['core id', 'initial apicid', 'apicid', 'physical id']
+  # attributes that should be sorted, for example turning the 'flags' value
+  # of "popcnt avx512bw" to "avx512bw popcnt"
+  _SORT_VALUES = ['flags', 'bugs']
+
+  def __init__(self, text):
+    self.mappings = {}
+    self.attributes = collections.defaultdict(set)
+    for stanza in _ParseTextProperties(text):
+      processor_id, single_values, multiple_values = self._ParseStanza(stanza)
+      if processor_id is None:  # can be 0
+        continue
+      if processor_id in self.mappings:
+        logging.warn('Processor id %s seen twice in %s', processor_id, text)
+        continue
+      self.mappings[processor_id] = single_values
+      for key, value in multiple_values.items():
+        self.attributes[key].add(value)
+
+  def GetValues(self):
+    """Dict of cpuinfo keys to its values.
+
+    Multiple values are joined by semicolons.
+
+    Returns:
+      Dict of [cpuinfo key:value string]
+    """
+    cpuinfo = {
+        key: ';'.join(sorted(values))
+        for key, values in self.attributes.items()
+    }
+    cpuinfo['proccpu'] = ','.join(sorted(self.attributes.keys()))
+    return cpuinfo
+
+  def _ParseStanza(self, stanza):
+    """Parses the cpuinfo section for an individual CPU.
+
+    Args:
+      stanza: Dict of the /proc/cpuinfo results for an individual CPU.
+
+    Returns:
+      Tuple of (processor_id, dict of values that are known to change with
+      each CPU, dict of other cpuinfo results).
+    """
+    singles = {}
+    if 'processor' not in stanza:
+      return None, None, None
+    processor_id = int(stanza.pop('processor'))
+    for key in self._PER_CPU_KEYS:
+      if key in stanza:
+        singles[key] = stanza.pop(key)
+    for key in self._SORT_VALUES:
+      if key in stanza:
+        stanza[key] = ' '.join(sorted(stanza[key].split()))
+    return processor_id, singles, stanza
 
 
 class JujuMixin(DebianMixin):

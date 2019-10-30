@@ -140,6 +140,7 @@
   A PKB zone can be either a Azure location or an Azure location with an availability zone.
 - Added resource class and mapping for AWS Athena Service.
 - Added support for Azure Dedicated Hosting. Simply add flag `--dedicated_hosts=True` to use.
+- Records two new samples for /proc/cpuinfo data.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
