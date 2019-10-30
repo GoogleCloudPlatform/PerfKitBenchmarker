@@ -83,6 +83,11 @@ flags.DEFINE_boolean(
     'If True, use hosts that only have VMs from the same '
     'benchmark running on them.')
 flags.DEFINE_integer(
+    'num_vms_per_host', None,
+    'The number of VMs per dedicated host. If None, VMs will be packed on a '
+    'single host until no more can be packed at which point a new host will '
+    'be created.')
+flags.DEFINE_integer(
     'num_cpus_override', None,
     'Rather than detecting the number of CPUs present on the machine, use this '
     'value if set. Some benchmarks will use this number to automatically '
@@ -170,6 +175,8 @@ class BaseVmSpec(spec.BaseSpec):
           flag_values.background_network_ip_type)
     if flag_values['dedicated_hosts'].present:
       config_values['use_dedicated_host'] = flag_values.dedicated_hosts
+    if flag_values['num_vms_per_host'].present:
+      config_values['num_vms_per_host'] = flag_values.num_vms_per_host
     if flag_values['gpu_type'].present:
       config_values['gpu_type'] = flag_values.gpu_type
     if flag_values['gpu_count'].present:
@@ -219,6 +226,8 @@ class BaseVmSpec(spec.BaseSpec):
                                                  'default': None}),
         'use_dedicated_host': (option_decoders.BooleanDecoder,
                                {'default': False}),
+        'num_vms_per_host': (option_decoders.IntDecoder,
+                             {'default': None}),
         'background_network_mbits_per_sec': (option_decoders.IntDecoder, {
             'none_ok': True, 'default': None}),
         'background_network_ip_type': (option_decoders.EnumDecoder, {
@@ -313,6 +322,7 @@ class BaseVirtualMachine(resource.BaseResource):
         vm_spec.background_network_mbits_per_sec)
     self.background_network_ip_type = vm_spec.background_network_ip_type
     self.use_dedicated_host = None
+    self.num_vms_per_host = None
 
     self.network = None
     self.firewall = None
@@ -416,6 +426,8 @@ class BaseVirtualMachine(resource.BaseResource):
       result['machine_type'] = self.machine_type
     if self.use_dedicated_host is not None:
       result['dedicated_host'] = self.use_dedicated_host
+    if self.num_vms_per_host is not None:
+      result['num_vms_per_host'] = self.num_vms_per_host
     if self.tcp_congestion_control is not None:
       result['tcp_congestion_control'] = self.tcp_congestion_control
     if self.numa_node_count is not None:
@@ -921,7 +933,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       copy_cmd = (' '.join(['cp', home_file_path, remote_path]))
       self.RemoteCommand(copy_cmd)
     else:
-      self.RemoteCommand('sudo rm -f ' + remote_path)
       self.PushFile(file_path, remote_path)
 
   def RenderTemplate(self, template_path, remote_path, context):

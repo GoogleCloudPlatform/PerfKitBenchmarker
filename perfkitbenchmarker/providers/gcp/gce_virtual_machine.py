@@ -142,8 +142,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['image_project'] = flag_values.image_project
     if flag_values['gcp_node_type'].present:
       config_values['node_type'] = flag_values.gcp_node_type
-    if flag_values['gcp_num_vms_per_host'].present:
-      config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
       if (flag_values.gcp_min_cpu_platform !=
           gcp_flags.GCP_MIN_CPU_PLATFORM_NONE):
@@ -192,9 +190,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         }),
         'node_type': (option_decoders.StringDecoder, {
             'default': 'n1-node-96-624'
-        }),
-        'num_vms_per_host': (option_decoders.IntDecoder, {
-            'default': None
         }),
         'min_cpu_platform': (option_decoders.StringDecoder, {
             'default': None

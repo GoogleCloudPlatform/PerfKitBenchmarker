@@ -15,7 +15,6 @@
 """Tests for linux_virtual_machine.py."""
 
 import unittest
-
 import mock
 
 from perfkitbenchmarker import flags
@@ -23,6 +22,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
@@ -192,7 +192,7 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
     remote_command.assert_called_once_with('hostname && dmesg', should_log=True)
 
 
-class TestLsCpu(unittest.TestCase):
+class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   LSCPU_DATA = {
       'NUMA node(s)': '1',
@@ -200,6 +200,25 @@ class TestLsCpu(unittest.TestCase):
       'Socket(s)': '3',
       'a': 'b',
   }
+
+  PROC_CPU_TEXT = """
+  processor: 29
+  cpu family: 6
+  core id: 13
+  oddkey: v29
+  apicid: 27
+
+  processor: 30
+  cpu family: 6
+  core id: 14
+  oddkey: v30
+  apicid:29
+
+  processor: 31
+  cpu family: 6
+  core id: 15
+  apicid: 31
+  """
 
   def LsCpuText(self, data):
     return '\n'.join(['%s:%s' % entry for entry in data.items()])
@@ -246,6 +265,42 @@ class TestLsCpu(unittest.TestCase):
             'Socket(s)': '3',
             'a': 'b'
         }, results.data)
+
+  def testProcCpuParsing(self):
+    vm = self.CreateVm(os_types.UBUNTU1604, self.PROC_CPU_TEXT)
+    results = vm.CheckProcCpu()
+    expected_mappings = {}
+    expected_mappings[29] = {'apicid': '27', 'core id': '13'}
+    expected_mappings[30] = {'apicid': '29', 'core id': '14'}
+    expected_mappings[31] = {'apicid': '31', 'core id': '15'}
+    expected_common = {
+        'cpu family': '6',
+        'oddkey': 'v29;v30',
+        'proccpu': 'cpu family,oddkey'
+    }
+    self.assertEqual(expected_mappings, results.mappings)
+    self.assertEqual(expected_common, results.GetValues())
+
+  def testProcCpuSamples(self):
+    vm = self.CreateVm(os_types.UBUNTU1604, self.PROC_CPU_TEXT)
+    samples = pkb._CreateProcCpuSamples([vm])
+    proccpu_metadata = {
+        'cpu family': '6',
+        'node_name': 'pkb-test',
+        'oddkey': 'v29;v30',
+        'proccpu': 'cpu family,oddkey',
+    }
+    proccpu_mapping_metadata = {
+        'node_name': 'pkb-test',
+        'proc_29': 'apicid=27;core id=13',
+        'proc_30': 'apicid=29;core id=14',
+        'proc_31': 'apicid=31;core id=15'
+    }
+    expected_samples = [
+        sample.Sample('proccpu', 0, '', proccpu_metadata),
+        sample.Sample('proccpu_mapping', 0, '', proccpu_mapping_metadata)
+    ]
+    self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
 
 
 class TestPartitionTable(unittest.TestCase):

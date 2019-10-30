@@ -463,6 +463,10 @@ class AzureVirtualMachine(
     self.location = util.GetLocationFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
+    # TODO(user): implement num_vms_per_host functionality
+    self.num_vms_per_host = vm_spec.num_vms_per_host
+    if self.num_vms_per_host:
+      raise NotImplementedError('Num vms per host for Azure is not supported.')
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
