@@ -359,6 +359,8 @@ flags.DEFINE_bool('disable_rss', False,
                   'Whether or not to disable the Receive Side Scaling feature.')
 flags.DEFINE_boolean('record_lscpu', True,
                      'Whether to record the lscpu output in a sample')
+flags.DEFINE_boolean('record_proccpu', True,
+                     'Whether to record the /proc/cpuinfo output in a sample')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -706,6 +708,9 @@ def DoRunPhase(spec, collector, timer):
 
     if FLAGS.record_lscpu:
       samples.extend(_CreateLscpuSamples(spec.vms))
+
+    if FLAGS.record_proccpu:
+      samples.extend(_CreateProcCpuSamples(spec.vms))
 
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
@@ -1195,6 +1200,24 @@ def _CreateLscpuSamples(vms):
       metadata = {'node_name': vm.name}
       metadata.update(vm.CheckLsCpu().data)
       samples.append(sample.Sample('lscpu', 0, '', metadata))
+  return samples
+
+
+def _CreateProcCpuSamples(vms):
+  """Creates samples from linux VMs of lscpu output."""
+  samples = []
+  for vm in vms:
+    if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
+      continue
+    data = vm.CheckProcCpu()
+    metadata = {'node_name': vm.name}
+    metadata.update(data.GetValues())
+    samples.append(sample.Sample('proccpu', 0, '', metadata))
+    metadata = {'node_name': vm.name}
+    for processor_id, raw_values in data.mappings.items():
+      values = ['%s=%s' % item for item in raw_values.items()]
+      metadata['proc_{}'.format(processor_id)] = ';'.join(sorted(values))
+    samples.append(sample.Sample('proccpu_mapping', 0, '', metadata))
   return samples
 
 
