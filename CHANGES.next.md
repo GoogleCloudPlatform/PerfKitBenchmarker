@@ -579,3 +579,7 @@
   Support is currently limited to the cluster_boot benchmark.
 - PkbCommonTestCase extends absltest.TestCase for py3 test backports.
 - Update tox python version.
+- Added --cluster_boot_test_port_listening for cluster_boot benchmark. When
+  set to True (the default) it will report the time until the remote command
+  port (SSH port for Linux and WinRM port for Windows) in addition to the time
+  until a remote command is successfully run.
