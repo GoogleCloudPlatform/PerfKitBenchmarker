@@ -96,7 +96,6 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.winrm_port = WINRM_PORT
     self.smb_port = SMB_PORT
     self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
-    self.primary_remote_access_port = self.winrm_port
     self.temp_dir = None
     self.home_dir = None
     self.system_drive = None
@@ -410,15 +409,6 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
-    # Test for listening on the port first, because this will happen strictly
-    # first.
-    if (FLAGS.cluster_boot_test_port_listening and
-        self.port_listening_time is None):
-      self.TestConnectRemoteAccessPort()
-      self.port_listening_time = time.time()
-
-    # Always wait for remote host command to succeed, because it is necessary to
-    # run benchmarks.
     stdout, _ = self.RemoteCommand('hostname', suppress_warning=True)
     if self.bootable_time is None:
       self.bootable_time = time.time()
