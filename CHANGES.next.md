@@ -29,6 +29,8 @@
 - Raise IssueCommandError by default when vm_util.IssueCommand return code is
   non-zero.  Previous behavior can be emulated by setting
   `raise_on_failure=False`.
+- Fix AliCloud support by using the newer aliyun (instead of aliyuncli) cmd
+  line utility
 - Changed support for reusing buckets for Azure blob service benchmarking. The
   storage account and resource group are now named based on the bucket name so
   that subsequent runs can use the same bucket.
@@ -577,8 +579,6 @@
 - Unifying metadata creation on cluster boot.
 - Added support for CoreOS Container Linux in GCP, AWS, and Azure Providers.
   Support is currently limited to the cluster_boot benchmark.
-- Fix AliCloud support by using the newer aliyun (instead of aliyuncli) cmd
-  line utility
 - PkbCommonTestCase extends absltest.TestCase for py3 test backports.
 - Update tox python version.
 - Remove the remote file before pushing a local file to the remote place. This
