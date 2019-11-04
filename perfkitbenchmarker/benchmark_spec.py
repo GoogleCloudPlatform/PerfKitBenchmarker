@@ -272,13 +272,17 @@ class BenchmarkSpec(object):
       disk_spec = group_spec.disk_spec
       if disk_spec.disk_type != disk.NFS:
         continue
+      # Choose which nfs_service to create.
       if disk_spec.nfs_ip_address:
         self.nfs_service = nfs_service.StaticNfsService(disk_spec)
-      else:
+      elif disk_spec.nfs_managed:
         cloud = group_spec.cloud
         providers.LoadProvider(cloud)
         nfs_class = nfs_service.GetNfsServiceClass(cloud)
         self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
+      else:
+        self.nfs_service = nfs_service.UnmanagedNfsService(disk_spec,
+                                                           self.vms[0])
       logging.debug('NFS service %s', self.nfs_service)
       break
 
@@ -518,7 +522,7 @@ class BenchmarkSpec(object):
       self.container_cluster.Create()
 
     # do after network setup but before VM created
-    if self.nfs_service:
+    if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
       self.nfs_service.Create()
     if self.smb_service:
       self.smb_service.Create()
@@ -535,6 +539,8 @@ class BenchmarkSpec(object):
           self.CreateAndBootVm,
           self.vms,
           post_task_delay=FLAGS.create_and_boot_post_task_delay)
+      if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
+        self.nfs_service.Create()
       vm_util.RunThreaded(self.PrepareVmAfterBoot, self.vms)
 
       sshable_vms = [
@@ -737,6 +743,7 @@ class BenchmarkSpec(object):
     """
     vm.AddMetadata()
     vm.OnStartup()
+    # Prepare vm scratch disks:
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
