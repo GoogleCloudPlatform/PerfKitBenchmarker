@@ -198,8 +198,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     with self._remote_command_script_upload_lock:
       if not self._has_remote_command_script:
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
-          self.PushDataFile(f, os.path.join(vm_util.VM_TMP_DIR,
-                                            os.path.basename(f)))
+          remote_path = os.path.join(vm_util.VM_TMP_DIR, os.path.basename(f))
+          if os.path.basename(remote_path):
+            self.RemoteCommand('sudo rm -f ' + remote_path)
+          self.PushDataFile(f, remote_path)
         self._has_remote_command_script = True
 
   def RobustRemoteCommand(self, command, should_log=False, timeout=None,

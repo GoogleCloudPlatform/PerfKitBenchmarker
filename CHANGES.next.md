@@ -579,3 +579,6 @@
   Support is currently limited to the cluster_boot benchmark.
 - PkbCommonTestCase extends absltest.TestCase for py3 test backports.
 - Update tox python version.
+- Remove the remote file before pushing a local file to the remote place. This
+  can avoid permission issue as the pushed file only allows user to read or
+  execute.
