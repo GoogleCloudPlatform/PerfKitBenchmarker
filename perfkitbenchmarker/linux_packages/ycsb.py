@@ -926,6 +926,7 @@ class YCSBExecutor(object):
 
     remote_path = posixpath.join(INSTALL_DIR,
                                  os.path.basename(workload_file))
+
     def PushWorkload(vm):
       if os.path.basename(remote_path):
         vm.RemoteCommand('sudo rm -f ' + remote_path)
