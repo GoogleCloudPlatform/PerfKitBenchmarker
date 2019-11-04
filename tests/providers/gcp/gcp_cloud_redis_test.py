@@ -36,14 +36,14 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=('{}', '', 0)) as gcloud:
       self.redis._Create()
-      gcloud.assert_called_once_with()
+      gcloud.assert_called_once_with(timeout=600)
       self.assertTrue(self.redis._Exists())
 
   def testDelete(self):
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=('{}', '', 0)) as gcloud:
       self.redis._Delete()
-      gcloud.assert_called_once_with(raise_on_failure=False)
+      gcloud.assert_called_once_with(raise_on_failure=False, timeout=600)
 
   def testExistTrue(self):
     with mock.patch.object(util.GcloudCommand, 'Issue',
