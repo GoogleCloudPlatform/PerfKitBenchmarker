@@ -901,8 +901,6 @@ class YCSBExecutor(object):
     """
     results = []
 
-    remote_path = posixpath.join(INSTALL_DIR,
-                                 os.path.basename(workload_file))
     kwargs.setdefault('threads', self._default_preload_threads)
     if FLAGS.ycsb_record_count:
       kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
@@ -926,7 +924,11 @@ class YCSBExecutor(object):
         for i in range(len(vms))
     ]
 
+    remote_path = posixpath.join(INSTALL_DIR,
+                                 os.path.basename(workload_file))
     def PushWorkload(vm):
+      if os.path.basename(remote_path):
+        vm.RemoteCommand('sudo rm -f ' + remote_path)
       vm.PushFile(workload_file, remote_path)
     vm_util.RunThreaded(PushWorkload, list(set(vms)))
 
