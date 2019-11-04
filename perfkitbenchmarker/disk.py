@@ -36,6 +36,9 @@ flags.DEFINE_integer('nfs_rsize', 1048576, 'NFS read size.')
 flags.DEFINE_integer('nfs_wsize', 1048576, 'NFS write size.')
 flags.DEFINE_integer('nfs_timeout', 60, 'NFS timeout.')
 flags.DEFINE_integer('nfs_retries', 2, 'NFS Retries.')
+flags.DEFINE_boolean('nfs_managed', True,
+                     'Use a managed NFS service if using NFS disks. Otherwise '
+                     'start an NFS server on the first VM.')
 flags.DEFINE_string('nfs_ip_address', None,
                     'If specified, PKB will target this ip address when '
                     'mounting NFS "disks" rather than provisioning an NFS '
@@ -68,7 +71,7 @@ LOCAL = 'local'
 
 RAM = 'ram'
 
-# refers to disks that come from a cloud NFS or SMB service
+# refers to disks that come from a cloud/unmanaged NFS or SMB service
 NFS = 'nfs'
 SMB = 'smb'
 
@@ -237,6 +240,8 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['nfs_retries'] = flag_values.nfs_retries
     if flag_values['nfs_ip_address'].present:
       config_values['nfs_ip_address'] = flag_values.nfs_ip_address
+    if flag_values['nfs_managed'].present:
+      config_values['nfs_managed'] = flag_values.nfs_managed
     if flag_values['nfs_directory'].present:
       config_values['nfs_directory'] = flag_values.nfs_directory
     if flag_values['smb_version'].present:
@@ -270,6 +275,7 @@ class BaseDiskSpec(spec.BaseSpec):
                                                            'min': 1}),
         'nfs_version': (option_decoders.StringDecoder, {'default': None}),
         'nfs_ip_address': (option_decoders.StringDecoder, {'default': None}),
+        'nfs_managed': (option_decoders.BooleanDecoder, {'default': True}),
         'nfs_directory': (option_decoders.StringDecoder, {'default': None}),
         'nfs_rsize': (option_decoders.IntDecoder, {'default': 1048576}),
         'nfs_wsize': (option_decoders.IntDecoder, {'default': 1048576}),
