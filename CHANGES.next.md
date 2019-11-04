@@ -582,3 +582,4 @@
 - Remove the remote file before pushing a local file to the remote place. This
   can avoid permission issue as the pushed file only allows user to read or
   execute.
+- Add support for unmanaged NFS.
