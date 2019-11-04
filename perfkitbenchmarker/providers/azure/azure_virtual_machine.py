@@ -613,11 +613,15 @@ class AzureVirtualMachine(
     disks = []
 
     for _ in range(disk_spec.num_striped_disks):
-      if disk_spec.disk_type == disk.SMB:
+      if disk_spec.disk_type == disk.NFS:
+        data_disk = self._GetNfsService().CreateNfsDisk()
+        disks.append(data_disk)
+        continue
+      elif disk_spec.disk_type == disk.SMB:
         data_disk = self._GetSmbService().CreateSmbDisk()
         disks.append(data_disk)
         continue
-      if disk_spec.disk_type == disk.LOCAL:
+      elif disk_spec.disk_type == disk.LOCAL:
         # Local disk numbers start at 1 (0 is the system disk).
         disk_number = self.local_disk_counter + 1
         self.local_disk_counter += 1
