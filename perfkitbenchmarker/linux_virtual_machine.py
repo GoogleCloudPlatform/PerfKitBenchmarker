@@ -163,8 +163,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def __init__(self):
     super(BaseLinuxMixin, self).__init__()
+    # N.B. If you override ssh_port you must override remote_access_ports and
+    # primary_remote_access_port.
     self.ssh_port = DEFAULT_SSH_PORT
     self.remote_access_ports = [self.ssh_port]
+    self.primary_remote_access_port = self.ssh_port
     self.has_private_key = False
 
     self._remote_command_script_upload_lock = threading.Lock()
@@ -525,6 +528,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
     """Waits until the VM has booted."""
+    # Test for listening on the port first, because this will happen strictly
+    # first.
+    if (FLAGS.cluster_boot_test_port_listening and
+        self.port_listening_time is None):
+      self.TestConnectRemoteAccessPort()
+      self.port_listening_time = time.time()
+
+    # Always wait for remote host command to succeed, because it is necessary to
+    # run benchmarks
     resp, _ = self.RemoteHostCommand('hostname', retries=1,
                                      suppress_warning=True)
     if self.bootable_time is None:
