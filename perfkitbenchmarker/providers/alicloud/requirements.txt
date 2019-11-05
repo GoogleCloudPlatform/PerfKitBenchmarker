@@ -13,4 +13,3 @@
 # limitations under the License.
 
 # Requirements for running PerfKit Benchmarker on AliCloud.
-paramiko>=1.15

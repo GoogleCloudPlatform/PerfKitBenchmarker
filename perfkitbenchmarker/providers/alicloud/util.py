@@ -40,6 +40,17 @@ PASSWD_LEN = 20
 REGION_HZ = 'cn-hangzhou'
 
 
+ADD_USER_TEMPLATE = '''#!/bin/bash
+echo "{0} ALL = NOPASSWD: ALL" >> /etc/sudoers
+useradd {0} --home /home/{0} --shell /bin/bash -m
+mkdir /home/{0}/.ssh
+echo "{1}" >> /home/{0}/.ssh/authorized_keys
+chown -R {0}:{0} /home/{0}/.ssh
+chmod 700 /home/{0}/.ssh
+chmod 600 /home/{0}/.ssh/authorized_keys
+'''
+
+
 def GetEncodedCmd(cmd):
   cmd_line = ' '.join(cmd)
   cmd_args = shlex.split(cmd_line)
@@ -95,64 +106,6 @@ def AddDefaultTags(resource_id, resource_type, region):
   """
   tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
   AddTags(resource_id, resource_type, region, **tags)
-
-
-@vm_util.Retry(max_retries=10)
-def AddPubKeyToHost(host_ip, password, keyfile, username):
-  public_key = str()
-  if keyfile:
-    keyfile = os.path.expanduser(keyfile)
-    if not paramiko:
-      raise Exception('`paramiko` is required for pushing keyfile to ecs.')
-    with open(keyfile, 'r') as f:
-      public_key = f.read()
-  ssh = paramiko.SSHClient()
-  ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-  # this section is needed in case a corporate proxy is in play
-  proxy = None
-  ssh_config_file = os.path.expanduser("~/.ssh/config")
-  if os.path.exists(ssh_config_file):
-    conf = paramiko.SSHConfig()
-    with open(ssh_config_file) as f:
-      conf.parse(f)
-    host_config = conf.lookup(host_ip)
-    if 'proxycommand' in host_config:
-      proxy = paramiko.ProxyCommand(host_config['proxycommand'])
-
-  try:
-    ssh.connect(
-        host_ip,
-        username=ROOT,  # We should use root to add pubkey to host
-        password=password,
-        sock=proxy,
-    )
-    if username == ROOT:
-      command_list = [
-          'mkdir .ssh; echo "%s" >> ~/.ssh/authorized_keys' % public_key
-      ]
-    else:
-      command_list = [
-          'echo "{0} ALL = NOPASSWD: ALL" >> /etc/sudoers'.format(username),
-          'useradd {0} --home /home/{0} --shell /bin/bash -m'.format(username),
-          'mkdir /home/{0}/.ssh'.format(username),
-          'echo "{0}" >> /home/{1}/.ssh/authorized_keys'
-          .format(public_key, username),
-          'chown -R {0}:{0} /home/{0}/.ssh'.format(username)]
-    command = ';'.join(command_list)
-    ssh.exec_command(command)
-
-    ssh.close()
-    return True
-  except IOError:
-    raise IOError
-
-
-def GeneratePassword(length=PASSWD_LEN):
-  digit_len = length // 2
-  letter_len = length - digit_len
-  return ''.join(random.sample(string.letters, digit_len)) + \
-         ''.join(random.sample(string.digits, letter_len))
 
 
 def GetDrivePathPrefix():
