@@ -48,6 +48,10 @@ flags.DEFINE_boolean(
     'cluster_boot_time_reboot', False,
     'Whether to reboot the VMs during the cluster boot benchmark to measure '
     'reboot performance.')
+flags.DEFINE_boolean(
+    'cluster_boot_test_port_listening', False,
+    'Test the time it takes to successfully connect to the port that is used to run the remote command.'
+)
 FLAGS = flags.FLAGS
 
 
@@ -78,6 +82,7 @@ def GetTimeToBoot(vms):
 
   max_create_delay_sec = 0
   max_boot_time_sec = 0
+  max_port_listening_time_sec = 0
   samples = []
   os_types = set()
   for i, vm in enumerate(vms):
@@ -97,6 +102,15 @@ def GetTimeToBoot(vms):
     max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
     samples.append(
         sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
+    if FLAGS.cluster_boot_test_port_listening:
+      assert vm.port_listening_time
+      assert vm.port_listening_time >= vm.create_start_time
+      port_listening_time_sec = vm.port_listening_time - min_create_start_time
+      max_port_listening_time_sec = max(max_port_listening_time_sec,
+                                        port_listening_time_sec)
+      samples.append(
+          sample.Sample('Port Listening Time', port_listening_time_sec,
+                        'seconds', metadata))
 
   # Add a total cluster boot sample as the maximum boot time.
   metadata = {
@@ -107,6 +121,10 @@ def GetTimeToBoot(vms):
   samples.append(
       sample.Sample('Cluster Boot Time', max_boot_time_sec, 'seconds',
                     metadata))
+  if FLAGS.cluster_boot_test_port_listening:
+    samples.append(
+        sample.Sample('Cluster Port Listening Time',
+                      max_port_listening_time_sec, 'seconds', metadata))
   if max_create_delay_sec > 1:
     logging.warning(
         'The maximum delay between starting VM creations is %0.1fs.',

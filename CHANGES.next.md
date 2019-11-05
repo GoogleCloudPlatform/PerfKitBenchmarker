@@ -583,3 +583,7 @@
   can avoid permission issue as the pushed file only allows user to read or
   execute.
 - Add support for unmanaged NFS.
+- Added --cluster_boot_test_port_listening for cluster_boot benchmark. When
+  set to True it will report the time until the remote command port (SSH
+  port for Linux and WinRM port for Windows) in addition to the time until
+  a remote command is successfully run.
