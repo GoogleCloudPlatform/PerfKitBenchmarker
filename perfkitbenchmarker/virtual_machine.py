@@ -23,7 +23,9 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+import contextlib
 import os.path
+import socket
 import threading
 import time
 
@@ -701,10 +703,13 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self.startup_script_output = None
     self.postrun_script_output = None
     self.bootable_time = None
+    self.port_listening_time = None
     self.hostname = None
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []
+    # Port to be used to see if VM is ready to receive a remote command.
+    self.primary_remote_access_port = None
 
     # Cached values
     self._reachable = {}
@@ -1140,3 +1145,18 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       raise errors.Setup.BadPreprovisionedDataError(
           'Invalid sha256sum for %s/%s: %s (actual) != %s (expected)' % (
               module_name, filename, actual_sha256, expected_sha256))
+
+  def TestConnectRemoteAccessPort(self):
+    """Tries to connect to remote access port and throw if it fails."""
+    if not self.ip_address:
+      raise errors.VirtualMachine.VirtualMachineError(
+          'Trying to connect to a VM without an external IP address')
+    port = self.primary_remote_access_port
+    # TODO(user): refactor to reuse sockets?
+    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) \
+        as sock:
+      # Before the IP is reachable the socket times out (and throws). After that
+      # it throws immediately until the port is listened to.
+      # 250 ms fits well within the 500 ms cluster_boot polling fuzz.
+      sock.settimeout(0.25)  # seconds
+      sock.connect((self.ip_address, port))
