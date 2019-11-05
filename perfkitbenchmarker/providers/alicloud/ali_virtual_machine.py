@@ -21,6 +21,7 @@ operate on the VM: boot, shutdown, etc.
 import json
 import threading
 import logging
+import base64
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
@@ -90,6 +91,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AliVirtualMachine, self).__init__(vm_spec)
     self.image = FLAGS.image
     self.user_name = FLAGS.ali_user_name
+    self.key_pair_name = None
     self.region = util.GetRegionByZone(self.zone)
     self.bandwidth_in = FLAGS.ali_bandwidth_in
     self.bandwidth_out = FLAGS.ali_bandwidth_out
@@ -228,24 +230,19 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._WaitForInstanceStatus(['Running'])
 
     self.firewall.AllowPort(self, SSH_PORT)
-    key_file = vm_util.GetPublicKeyPath()
-    logging.info("Using Paramiko SSH to connect and add public key to host.")
-    util.AddPubKeyToHost(self.ip_address,
-                         self.password,
-                         key_file,
-                         self.user_name)
     tags = {}
     tags.update(self.vm_metadata)
-    util.AddTags(tags)
+    util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **tags)
     util.AddDefaultTags(self.id, RESOURCE_TYPE[INSTANCE], self.region)
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    pass
+    self.key_pair_name = AliCloudKeyFileManager.ImportKeyfile(self.region)
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
-    pass
+    if self.key_pair_name:
+      AliCloudKeyFileManager.DeleteKeyfile(self.region, self.key_pair_name)
 
   def _Create(self):
     """Create a VM instance."""
@@ -254,8 +251,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       # This is here and not in the __init__ method bceauese _GetDefaultImage
       # does a nontrivial amount of work (it calls the aliyuncli).
       self.image = self._GetDefaultImage(self.region)
-
-    self.password = util.GeneratePassword()
 
     create_cmd = util.ALI_PREFIX + [
         'ecs',
@@ -266,7 +261,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--ImageId %s' % self.image,
         '--InstanceType %s' % self.machine_type,
         '--SecurityGroupId %s' % self.network.security_group.group_id,
-        '--Password %s' % self.password,
+        '--KeyPairName %s' % self.key_pair_name,
         '--SystemDisk.Category %s' % self.system_disk_type,
         '--SystemDisk.Size %s' % self.system_disk_size]
 
@@ -288,6 +283,12 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--InternetChargeType PayByTraffic',
           '--InternetMaxBandwidthIn %s' % self.bandwidth_in,
           '--InternetMaxBandwidthOut %s' % self.bandwidth_out])
+
+    # Create user and add SSH key
+    public_key = AliCloudKeyFileManager.GetPublicKey()
+    user_data = util.ADD_USER_TEMPLATE.format(self.user_name, public_key)
+    logging.debug('encoding startup script: %s' % user_data)
+    create_cmd.extend(['--UserData', base64.b64encode(user_data)])
 
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
@@ -374,6 +375,57 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **kwargs)
+
+
+class AliCloudKeyFileManager(object):
+  """Object for managing AliCloud Keyfiles."""
+  _lock = threading.Lock()
+  imported_keyfile_set = set()
+  deleted_keyfile_set = set()
+  run_uri_key_names = {}
+
+  @classmethod
+  def ImportKeyfile(cls, region):
+    """Imports the public keyfile to AliCloud."""
+    with cls._lock:
+      if FLAGS.run_uri in cls.run_uri_key_names:
+        return cls.run_uri_key_names[FLAGS.run_uri]
+      public_key = cls.GetPublicKey()
+      key_name = cls.GetKeyNameForRun()
+      import_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'ImportKeyPair',
+          '--RegionId', region,
+          '--KeyPairName', key_name,
+          '--PublicKeyBody', json.dumps(public_key)]
+      stdout, _ = vm_util.IssueRetryableCommand(import_cmd)
+      cls.run_uri_key_names[FLAGS.run_uri] = key_name
+      return key_name
+
+  @classmethod
+  def DeleteKeyfile(cls, region, key_name):
+    """Deletes the imported KeyPair for a run_uri."""
+    with cls._lock:
+      if FLAGS.run_uri not in cls.run_uri_key_names:
+        return
+      delete_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'DeleteKeyPairs',
+          '--RegionId', region,
+          '--KeyPairNames', json.dumps([key_name])]
+      stdout, _ = vm_util.IssueRetryableCommand(delete_cmd)
+      del cls.run_uri_key_names[FLAGS.run_uri]
+
+  @classmethod
+  def GetKeyNameForRun(cls):
+    return 'perfkit_key_{0}'.format(FLAGS.run_uri)
+
+  @classmethod
+  def GetPublicKey(cls):
+    cat_cmd = ['cat',
+               vm_util.GetPublicKeyPath()]
+    keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+    return keyfile.strip()
 
 
 class DebianBasedAliVirtualMachine(AliVirtualMachine,
