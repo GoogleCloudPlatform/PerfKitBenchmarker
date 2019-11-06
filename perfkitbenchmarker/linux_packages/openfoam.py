@@ -25,8 +25,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import logging
-
 
 PACKAGE_NAME = 'openfoam'
 
@@ -46,7 +44,6 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Install OpenFOAM https://openfoam.org/download/7-ubuntu/."""
-  logging.info('Installing OpenFOAM via apt')
   remote_key_file = '/tmp/openfoam.key'
   vm.PushDataFile(_OPENFOAM_REPOSITORY_KEY, remote_key_file)
   vm.RemoteCommand('sudo apt-key add {0}; rm {0}'.format(remote_key_file))

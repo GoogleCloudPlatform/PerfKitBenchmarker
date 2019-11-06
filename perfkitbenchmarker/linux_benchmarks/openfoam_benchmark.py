@@ -41,6 +41,9 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import openfoam
 
 
+BENCHMARK_NAME = 'openfoam'
+
+
 _DEFAULT_CASE = 'motorbike'
 _CASE_PATHS = {
     'motorbike': 'tutorials/incompressible/simpleFoam/motorBike'
@@ -51,13 +54,13 @@ assert _DEFAULT_CASE in _CASE_PATHS
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
     'openfoam_case', _DEFAULT_CASE,
-    sorted(list(_CASE_PATHS.keys())), 'Name of the Openfoam case to run.')
+    sorted(list(_CASE_PATHS.keys())), 'Name of the OpenFOAM case to run.')
 
 
-BENCHMARK_NAME = 'openfoam'
+_BENCHMARK_RUN_PATH = '$HOME/Openfoam/${USER}-7/run'
 BENCHMARK_CONFIG = """
 openfoam:
-  description: Runs a Openfoam benchmarks.
+  description: Runs an OpenFOAM benchmark.
   vm_groups:
     default:
       vm_spec:
@@ -73,9 +76,21 @@ openfoam:
           zone: us-east-1f
           boot_disk_size: 100
       os_type: ubuntu1604
-      vm_count: null
-"""
-_BENCHMARK_RUN_PATH = '$HOME/Openfoam/${USER}-7/run'
+      vm_count: 2
+      disk_spec:
+        GCP:
+          disk_type: nfs
+          nfs_managed: False
+          mount_point: {path}
+        Azure:
+          disk_type: nfs
+          nfs_managed: False
+          mount_point: {path}
+        AWS:
+          disk_type: nfs
+          nfs_managed: False
+          mount_point: {path}
+""".format(path=_BENCHMARK_RUN_PATH)
 
 
 def GetConfig(user_config):

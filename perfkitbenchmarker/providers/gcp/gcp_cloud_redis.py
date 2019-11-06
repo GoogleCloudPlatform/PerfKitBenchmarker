@@ -28,6 +28,7 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 STANDARD_TIER = 'STANDARD'
 BASIC_TIER = 'BASIC'
+COMMAND_TIMEOUT = 600  # 10 minutes
 
 
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
@@ -83,7 +84,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
     cmd.flags['redis-version'] = self.redis_version
-    cmd.Issue()
+    cmd.Issue(timeout=COMMAND_TIMEOUT)
 
   def _IsReady(self):
     """Returns whether cluster is ready."""
@@ -95,7 +96,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete',
                              self.name)
     cmd.flags['region'] = self.redis_region
-    cmd.Issue(raise_on_failure=False)
+    cmd.Issue(timeout=COMMAND_TIMEOUT, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the instance exists."""
