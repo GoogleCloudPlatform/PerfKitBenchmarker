@@ -24,6 +24,7 @@ from __future__ import print_function
 
 import abc
 import contextlib
+import logging
 import os.path
 import socket
 import threading
@@ -1146,12 +1147,13 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           'Invalid sha256sum for %s/%s: %s (actual) != %s (expected)' % (
               module_name, filename, actual_sha256, expected_sha256))
 
-  def TestConnectRemoteAccessPort(self):
+  def TestConnectRemoteAccessPort(self, port=None):
     """Tries to connect to remote access port and throw if it fails."""
     if not self.ip_address:
       raise errors.VirtualMachine.VirtualMachineError(
           'Trying to connect to a VM without an external IP address')
-    port = self.primary_remote_access_port
+    if not port:
+      port = self.primary_remote_access_port
     # TODO(user): refactor to reuse sockets?
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) \
         as sock:
@@ -1160,3 +1162,4 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       # 250 ms fits well within the 500 ms cluster_boot polling fuzz.
       sock.settimeout(0.25)  # seconds
       sock.connect((self.ip_address, port))
+    logging.info('Connected to port %s on %s', port, self)
