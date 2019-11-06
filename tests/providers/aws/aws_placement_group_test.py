@@ -56,7 +56,8 @@ EXISTS_CALL = AwsCommand(
     'describe-placement-groups',
     '--filter=Name=group-name,Values={}'.format(GROUP_NAME),
     env=None,
-    raise_on_failure=False)
+    raise_on_failure=False,
+    suppress_failure=None)
 CREATE_CALL = AwsCommand('create-placement-group',
                          '--group-name={}'.format(GROUP_NAME),
                          '--strategy={}'.format(STRATEGY))

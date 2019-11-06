@@ -74,11 +74,21 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
+    """See base class."""
+
+    def _suppress_failure(stdout, stderr, retcode):
+      """Suppresses failure when bucket does not exist."""
+      del stdout  # unused
+      if retcode and 'NoSuchBucket' in stderr:
+        return True
+      return False
+
     vm_util.IssueCommand(
         ['aws', 's3', 'rb',
          's3://%s' % bucket,
          '--region', self.region,
-         '--force'])  # --force deletes even if bucket contains objects.
+         '--force'],  # --force deletes even if bucket contains objects.
+        suppress_failure=_suppress_failure)
 
   def EmptyBucket(self, bucket):
     vm_util.IssueCommand(
