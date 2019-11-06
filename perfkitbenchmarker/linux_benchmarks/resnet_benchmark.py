@@ -24,13 +24,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import datetime
+import posixpath
 import time
+
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import tensorflow
 from six.moves import range
 
@@ -98,7 +102,9 @@ def GetConfig(user_config):
   Returns:
     loaded benchmark configuration
   """
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+  return config
 
 
 def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
@@ -132,9 +138,32 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification
+
+  Raises:
+    errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
   """
+  vm = benchmark_spec.vms[0]
+
+  if (bool(benchmark_spec.tpus) and cuda_toolkit.CheckNvidiaGpuExists(vm)):
+    raise errors.Config.InvalidValue(
+        'Invalid configuration. GPUs and TPUs can not both present in the config.'
+    )
+
   mnist_benchmark.Prepare(benchmark_spec)
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
+
+  vm.Install('pyyaml')
+  # To correctly install the requests lib, otherwise the experiment won't run
+  vm.RemoteCommand('sudo pip uninstall -y requests')
+  vm.RemoteCommand('sudo pip install requests')
+
+  if not benchmark_spec.tpus:
+    local_data_path = posixpath.join('/data', 'imagenet')
+    vm.RemoteCommand('sudo mkdir -p {data_path} && '
+                     'sudo chmod a+w {data_path} && '
+                     'gsutil -m cp -r {data_dir}/* {data_path}'.format(
+                         data_dir=benchmark_spec.data_dir,
+                         data_path=local_data_path))
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -159,6 +188,7 @@ def _CreateMetadataDict(benchmark_spec):
       'train_batch_size': benchmark_spec.train_batch_size,
       'eval_batch_size': benchmark_spec.eval_batch_size
   })
+
   return metadata
 
 
@@ -186,13 +216,14 @@ def _ParseDateTime(wall_time):
         '%Y%m%d %H:%M:%S.%f')
 
 
-def MakeSamplesFromEvalOutput(metadata, output, elapsed_seconds):
+def MakeSamplesFromEvalOutput(metadata, output, elapsed_seconds, use_tpu=True):
   """Create a sample containing evaluation metrics.
 
   Args:
     metadata: dict contains all the metadata that reports.
     output: string, command output
     elapsed_seconds: float, elapsed seconds from saved checkpoint.
+    use_tpu: bool, whether tpu is used
 
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/resnet_benchmark_test.py
@@ -200,11 +231,21 @@ def MakeSamplesFromEvalOutput(metadata, output, elapsed_seconds):
   Returns:
     a Sample containing evaluation metrics
   """
-  pattern = (r'Saving dict for global step \d+: global_step = (\d+), '
-             r'loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
-             r'top_5_accuracy = (\d+\.\d+)')
-  step, loss, top_1_accuracy, top_5_accuracy = (
-      regex_util.ExtractExactlyOneMatch(pattern, output))
+
+  if use_tpu:
+    pattern = (r'Saving dict for global step \d+: global_step = (\d+), '
+               r'loss = (\d+\.\d+), top_1_accuracy = (\d+\.\d+), '
+               r'top_5_accuracy = (\d+\.\d+)')
+    step, loss, top_1_accuracy, top_5_accuracy = (
+        regex_util.ExtractExactlyOneMatch(pattern, output))
+  else:
+    pattern = (
+        r'tensorflow:Saving dict for global step \d+: accuracy = (\d+\.\d+), '
+        r'accuracy_top_5 = (\d+\.\d+), global_step = (\d+),'
+        r' loss = (\d+\.\d+)')
+    top_1_accuracy, top_5_accuracy, step, loss = (
+        regex_util.ExtractExactlyOneMatch(pattern, output))
+
   metadata_copy = metadata.copy()
   step = int(step)
   metadata_copy['step'] = step
@@ -235,40 +276,72 @@ def Run(benchmark_spec):
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  resnet_benchmark_script = 'resnet_main.py'
-  resnet_benchmark_cmd = (
-      '{env_cmd} && cd tpu/models/official/resnet && '
-      'python {script} '
-      '--use_tpu={use_tpu} '
-      '--data_dir={data_dir} '
-      '--model_dir={model_dir} '
-      '--resnet_depth={depth} '
-      '--train_batch_size={train_batch_size} '
-      '--eval_batch_size={eval_batch_size} '
-      '--iterations_per_loop={iterations} '
-      '--data_format={data_format} '
-      '--precision={precision} '
-      '--skip_host_call={skip_host_call} '
-      '--num_train_images={num_train_images} '
-      '--num_eval_images={num_eval_images}'.format(
-          env_cmd=benchmark_spec.env_cmd,
-          script=resnet_benchmark_script,
-          use_tpu=bool(benchmark_spec.tpus),
-          data_dir=benchmark_spec.data_dir,
-          model_dir=benchmark_spec.model_dir,
-          depth=benchmark_spec.depth,
-          train_batch_size=benchmark_spec.train_batch_size,
-          eval_batch_size=benchmark_spec.eval_batch_size,
-          iterations=benchmark_spec.iterations,
-          data_format=benchmark_spec.data_format,
-          precision=benchmark_spec.precision,
-          skip_host_call=benchmark_spec.skip_host_call,
-          num_train_images=benchmark_spec.num_train_images,
-          num_eval_images=benchmark_spec.num_eval_images
-      ))
-  if FLAGS.tf_device == 'gpu':
-    resnet_benchmark_cmd = '{env} {cmd}'.format(
-        env=tensorflow.GetEnvironmentVars(vm), cmd=resnet_benchmark_cmd)
+  if benchmark_spec.tpus:
+    resnet_benchmark_script = 'resnet_main.py'
+    resnet_benchmark_cmd = (
+        '{env_cmd} && '
+        'cd tpu/models && '
+        'export PYTHONPATH=$(pwd) &&'
+        'cd official/resnet && '
+        'python {script} '
+        '--use_tpu={use_tpu} '
+        '--data_dir={data_dir} '
+        '--model_dir={model_dir} '
+        '--resnet_depth={depth} '
+        '--train_batch_size={train_batch_size} '
+        '--eval_batch_size={eval_batch_size} '
+        '--iterations_per_loop={iterations} '
+        '--data_format={data_format} '
+        '--precision={precision} '
+        '--skip_host_call={skip_host_call} '
+        '--num_train_images={num_train_images} '
+        '--num_eval_images={num_eval_images}'.format(
+            env_cmd=benchmark_spec.env_cmd,
+            script=resnet_benchmark_script,
+            use_tpu=bool(benchmark_spec.tpus),
+            data_dir=benchmark_spec.data_dir,
+            model_dir=benchmark_spec.model_dir,
+            depth=benchmark_spec.depth,
+            train_batch_size=benchmark_spec.train_batch_size,
+            eval_batch_size=benchmark_spec.eval_batch_size,
+            iterations=benchmark_spec.iterations,
+            data_format=benchmark_spec.data_format,
+            precision=benchmark_spec.precision,
+            skip_host_call=benchmark_spec.skip_host_call,
+            num_train_images=benchmark_spec.num_train_images,
+            num_eval_images=benchmark_spec.num_eval_images))
+  else:
+    resnet_benchmark_script = 'imagenet_main.py'
+    resnet_benchmark_cmd = ('{env_cmd} && '
+                            'cd models && '
+                            'export PYTHONPATH=$(pwd) && '
+                            'cd official/r1/resnet && '
+                            'python {script} '
+                            '--data_dir=/data/imagenet '
+                            '--model_dir={model_dir} '
+                            '--resnet_size={resnet_size} '
+                            '--batch_size={batch_size} '
+                            '--data_format={data_format} '.format(
+                                env_cmd=benchmark_spec.env_cmd,
+                                script=resnet_benchmark_script,
+                                model_dir=benchmark_spec.model_dir,
+                                resnet_size=benchmark_spec.depth,
+                                batch_size=benchmark_spec.train_batch_size,
+                                data_format=benchmark_spec.data_format))
+    precision = '{precision}'.format(precision=benchmark_spec.precision)
+    if precision == 'bfloat16':
+      resnet_benchmark_cmd = '{cmd} --dtype=fp16'.format(
+          cmd=resnet_benchmark_cmd)
+    else:
+      resnet_benchmark_cmd = '{cmd} --dtype=fp32'.format(
+          cmd=resnet_benchmark_cmd)
+
+    if cuda_toolkit.CheckNvidiaGpuExists(vm):
+      resnet_benchmark_cmd = '{env} {cmd} --num_gpus={num_gpus}'.format(
+          env=tensorflow.GetEnvironmentVars(vm),
+          cmd=resnet_benchmark_cmd,
+          num_gpus=cuda_toolkit.QueryNumberOfGpus(vm))
+
   samples = []
   metadata = _CreateMetadataDict(benchmark_spec)
   elapsed_seconds = 0
@@ -279,38 +352,50 @@ def Run(benchmark_spec):
     step = min(step, train_steps)
     resnet_benchmark_cmd_step = '{cmd} --train_steps={step}'.format(
         cmd=resnet_benchmark_cmd, step=step)
+
     if benchmark_spec.mode in ('train', 'train_and_eval'):
       if benchmark_spec.tpus:
         tpu = benchmark_spec.tpu_groups['train'].GetName()
         num_cores = '--num_cores={}'.format(
             benchmark_spec.tpu_groups['train'].GetNumShards())
+        resnet_benchmark_train_cmd = (
+            '{cmd} --tpu={tpu} --mode=train {num_cores}'.format(
+                cmd=resnet_benchmark_cmd_step, tpu=tpu, num_cores=num_cores))
       else:
-        tpu = num_cores = ''
-      resnet_benchmark_train_cmd = (
-          '{cmd} --tpu={tpu} --mode=train {num_cores}'.format(
-              cmd=resnet_benchmark_cmd_step,
-              tpu=tpu, num_cores=num_cores))
+        resnet_benchmark_train_cmd = (
+            '{cmd} --max_train_steps={max_train_steps} '
+            '--train_epochs={train_epochs} --noeval_only'.format(
+                cmd=resnet_benchmark_cmd,
+                train_epochs=benchmark_spec.epochs_per_eval,
+                max_train_steps=step))
+
       start = time.time()
       stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_train_cmd,
                                               should_log=True)
       elapsed_seconds += (time.time() - start)
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
           metadata, stdout + stderr, elapsed_seconds, step))
+
     if benchmark_spec.mode in ('train_and_eval', 'eval'):
       if benchmark_spec.tpus:
         tpu = benchmark_spec.tpu_groups['eval'].GetName()
         num_cores = '--num_cores={}'.format(
             benchmark_spec.tpu_groups['eval'].GetNumShards())
+        resnet_benchmark_eval_cmd = (
+            '{cmd} --tpu={tpu} --mode=eval {num_cores}'.format(
+                cmd=resnet_benchmark_cmd_step, tpu=tpu, num_cores=num_cores))
       else:
-        tpu = num_cores = ''
-      resnet_benchmark_eval_cmd = (
-          '{cmd} --tpu={tpu} --mode=eval {num_cores}'.format(
-              cmd=resnet_benchmark_cmd_step,
-              tpu=tpu, num_cores=num_cores))
+        resnet_benchmark_eval_cmd = ('{cmd} --eval_only'.format(
+            cmd=resnet_benchmark_cmd))
+
       stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_eval_cmd,
                                               should_log=True)
-      samples.extend(MakeSamplesFromEvalOutput(
-          metadata, stdout + stderr, elapsed_seconds))
+      samples.extend(
+          MakeSamplesFromEvalOutput(
+              metadata,
+              stdout + stderr,
+              elapsed_seconds,
+              use_tpu=bool(benchmark_spec.tpus)))
   return samples
 
 
