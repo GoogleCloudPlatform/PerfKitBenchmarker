@@ -37,13 +37,13 @@ REGION_HZ = 'cn-hangzhou'
 
 
 ADD_USER_TEMPLATE = '''#!/bin/bash
-echo "{0} ALL = NOPASSWD: ALL" >> /etc/sudoers
-useradd {0} --home /home/{0} --shell /bin/bash -m
-mkdir /home/{0}/.ssh
-echo "{1}" >> /home/{0}/.ssh/authorized_keys
-chown -R {0}:{0} /home/{0}/.ssh
-chmod 700 /home/{0}/.ssh
-chmod 600 /home/{0}/.ssh/authorized_keys
+echo "{user_name} ALL = NOPASSWD: ALL" >> /etc/sudoers
+useradd {user_name} --home /home/{user_name} --shell /bin/bash -m
+mkdir /home/{user_name}/.ssh
+echo "{public_key}" >> /home/{user_name}/.ssh/authorized_keys
+chown -R {user_name}:{user_name} /home/{user_name}/.ssh
+chmod 700 /home/{user_name}/.ssh
+chmod 600 /home/{user_name}/.ssh/authorized_keys
 '''
 
 
