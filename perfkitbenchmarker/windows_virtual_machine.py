@@ -97,6 +97,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.smb_port = SMB_PORT
     self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
     self.primary_remote_access_port = self.winrm_port
+    self.rdp_port_listening_time = None
     self.temp_dir = None
     self.home_dir = None
     self.system_drive = None
@@ -407,9 +408,22 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
                     (retcode, cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
+    to_wait_for = [self._WaitForWinRmCommand]
+    if FLAGS.cluster_boot_test_rdp_port_listening:
+      to_wait_for.append(self._WaitForRdpPort)
+    vm_util.RunParallelThreads([(method, [], {}) for method in to_wait_for], 2)
+
+  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
+  def _WaitForRdpPort(self):
+    self.TestConnectRemoteAccessPort(RDP_PORT)
+    if self.rdp_port_listening_time is None:
+      self.rdp_port_listening_time = time.time()
+
+  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
+  def _WaitForWinRmCommand(self):
+    """Waits for WinRM command and optionally for the WinRM port to listen."""
     # Test for listening on the port first, because this will happen strictly
     # first.
     if (FLAGS.cluster_boot_test_port_listening and
