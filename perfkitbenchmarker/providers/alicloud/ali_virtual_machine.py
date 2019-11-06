@@ -287,7 +287,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # Create user and add SSH key
     public_key = AliCloudKeyFileManager.GetPublicKey()
-    user_data = util.ADD_USER_TEMPLATE.format(self.user_name, public_key)
+    user_data = util.ADD_USER_TEMPLATE.format(user_name=self.user_name,
+                                              public_key=public_key)
     logging.debug('encoding startup script: %s' % user_data)
     create_cmd.extend(['--UserData', six.ensure_str(
         base64.b64encode(user_data.encode('utf-8')))])
