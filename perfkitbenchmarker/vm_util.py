@@ -321,7 +321,7 @@ class _BoxedObject(object):
 
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
                  env=None, timeout=DEFAULT_TIMEOUT, cwd=None,
-                 raise_on_failure=True,
+                 raise_on_failure=True, suppress_failure=None,
                  raise_on_timeout=True):
   """Tries running the provided command once.
 
@@ -346,6 +346,10 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     cwd: Directory in which to execute the command.
     raise_on_failure: A boolean indicating if non-zero return codes should raise
         IssueCommandError.
+    suppress_failure: A function passed (stdout, stderr, ret_code) for non-zero
+        return codes to determine if the failure should be suppressed e.g. a
+        delete command which fails because the item to be deleted does not
+        exist.
     raise_on_timeout: A boolean indicating if killing the process due to the
         timeout being hit should raise a IssueCommandTimeoutError
 
@@ -431,7 +435,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
             'Process was killed' if was_killed.value else
             'Process may have been killed'))
     raise errors.VmUtil.IssueCommandTimeoutError(debug_text)
-  elif process.returncode and raise_on_failure:
+  elif process.returncode and (raise_on_failure or suppress_failure):
+    if suppress_failure(stdout, stderr, process.returncode):
+      # failure is suppressible, rewrite the stderr and return code as passing
+      # since some callers assume either is a failure e.g.
+      # perfkitbenchmarker.providers.aws.util.IssueRetryableCommand()
+      return stdout, '', 0
     raise errors.VmUtil.IssueCommandError(debug_text)
 
   return stdout, stderr, process.returncode

@@ -203,7 +203,7 @@ def GetAccount():
 
 
 @vm_util.Retry()
-def IssueRetryableCommand(cmd, env=None):
+def IssueRetryableCommand(cmd, env=None, suppress_failure=None):
   """Tries running the provided command until it succeeds or times out.
 
   On Windows, the AWS CLI doesn't correctly set the return code when it
@@ -214,12 +214,13 @@ def IssueRetryableCommand(cmd, env=None):
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
     env: An alternate environment to pass to the Popen command.
+    suppress_failure: A function to pass to vm_util.IssueCommand()
 
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
-  stdout, stderr, retcode = vm_util.IssueCommand(cmd, env=env,
-                                                 raise_on_failure=False)
+  stdout, stderr, retcode = vm_util.IssueCommand(
+      cmd, env=env, raise_on_failure=False, suppress_failure=suppress_failure)
   if retcode:
     raise errors.VmUtil.CalledProcessException(
         'Command returned a non-zero exit code.\n')

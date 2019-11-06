@@ -374,7 +374,7 @@ class AwsInternetGateway(resource.BaseResource):
                           self.id)
     elif self.vpc_id:
       # Only query with self.vpc_id if the self.id is NOT set -- after calling
-      # Detact() this object will set still have a vpc_id but will be filtered
+      # Detach() this object will set still have a vpc_id but will be filtered
       # out in a query if using attachment.vpc-id.
       # Using self.vpc_id instead of self.attached as the init phase always
       # sets it to False.
@@ -389,7 +389,7 @@ class AwsInternetGateway(resource.BaseResource):
     return internet_gateways[0] if internet_gateways else {}
 
   def Attach(self, vpc_id):
-    """Attaches the internetgateway to the VPC."""
+    """Attaches the internet gateway to the VPC."""
     if not self.attached:
       self.vpc_id = vpc_id
       attach_cmd = util.AWS_PREFIX + [
@@ -402,7 +402,16 @@ class AwsInternetGateway(resource.BaseResource):
       self.attached = True
 
   def Detach(self):
-    """Detaches the internetgateway from the VPC."""
+    """Detaches the internet gateway from the VPC."""
+
+    def _suppress_failure(stdout, stderr, retcode):
+      """Suppresses Detach failure when internet gateway is in a bad state."""
+      del stdout  # unused
+      if retcode and ('InvalidInternetGatewayID.NotFound' in stderr or
+                      'Gateway.NotAttached' in stderr):
+        return True
+      return False
+
     if self.attached and not self.user_managed:
       detach_cmd = util.AWS_PREFIX + [
           'ec2',
@@ -410,7 +419,7 @@ class AwsInternetGateway(resource.BaseResource):
           '--region=%s' % self.region,
           '--internet-gateway-id=%s' % self.id,
           '--vpc-id=%s' % self.vpc_id]
-      util.IssueRetryableCommand(detach_cmd)
+      util.IssueRetryableCommand(detach_cmd, suppress_failure=_suppress_failure)
       self.attached = False
 
 
