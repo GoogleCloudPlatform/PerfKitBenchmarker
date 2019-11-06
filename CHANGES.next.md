@@ -592,3 +592,4 @@
 - Added flag --cluster_boot_test_rdp_port_listening to measure time until RDP
   port accepts a connection in Windows. It is True by default.
 - Fixed Cassandra branch name (GH-2025 from @marcomicera)
+- Add OpenFOAM benchmark.

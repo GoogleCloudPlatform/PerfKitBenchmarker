@@ -19,11 +19,15 @@ problems, most prominently including computational fluid dynamics.
 OpenFOAM foundation: https://openfoam.org/.
 
 Instructions for installing OpenFOAM: https://openfoam.org/download/7-ubuntu/.
+
+NOTE: .bashrc will be overwritten by AptInstall()
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import posixpath
 
 
 PACKAGE_NAME = 'openfoam'
@@ -51,3 +55,5 @@ def AptInstall(vm):
                    .format(_OPENFOAM_REPOSITORY_URL))
   vm.RemoteCommand('sudo apt-get -y update')
   vm.RemoteCommand('sudo apt-get -y install openfoam7')
+  openfoam_bash_path = posixpath.join(OPENFOAM_ROOT, 'etc/bashrc')
+  vm.RemoteCommand('cat {} > $HOME/.bashrc'.format(openfoam_bash_path))
