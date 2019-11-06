@@ -681,3 +681,14 @@ def CopyFileBetweenVms(filename, src_vm, src_path, dest_vm, dest_path):
         temp_path, os.path.join(src_path, filename), copy_to=False)
     dest_vm.RemoteCopy(
         temp_path, os.path.join(dest_path, filename), copy_to=True)
+
+
+def ReplaceText(vm, current_value, new_value, file_name, regex_char='/'):
+  """Replaces text <current_value> with <new_value> in remote <file_name>."""
+  vm.RemoteCommand('sed -i "s{regex_char}{current_value}{regex_char}'
+                   '{new_value}{regex_char}" {file}'.format(
+                       regex_char=regex_char,
+                       current_value=current_value,
+                       new_value=new_value,
+                       file=file_name))
+

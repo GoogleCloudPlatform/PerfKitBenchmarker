@@ -23,25 +23,22 @@ scalability of OpenFOAM across multiple cores. Since this is a complex
 computation, make sure to use a compute-focused machine-type that has multiple
 cores before attempting to run.
 
-# TODO(liubrandon): Add support for multiple vms.
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import datetime
 import logging
 import posixpath
-import time
+import re
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import openfoam
-
-
-BENCHMARK_NAME = 'openfoam'
 
 
 _DEFAULT_CASE = 'motorbike'
@@ -50,14 +47,29 @@ _CASE_PATHS = {
 }
 assert _DEFAULT_CASE in _CASE_PATHS
 
+# Motorbike is the most common case, so we provide different sizes here.
+_DEFAULT_MOTORBIKE_DIMENSIONS = 'small'
+_MOTORBIKE_DIMENSIONS = {
+    'small': '20 8 8',
+    'medium': '40 16 16',
+    'large': '80 32 32',
+    'x-large': '100 40 40',
+}
+assert _DEFAULT_MOTORBIKE_DIMENSIONS in _MOTORBIKE_DIMENSIONS
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
     'openfoam_case', _DEFAULT_CASE,
-    sorted(list(_CASE_PATHS.keys())), 'Name of the OpenFOAM case to run.')
+    sorted(list(_CASE_PATHS.keys())),
+    'Name of the OpenFOAM case to run.')
+flags.DEFINE_enum(
+    'openfoam_motorbike_dimensions', _DEFAULT_MOTORBIKE_DIMENSIONS,
+    sorted(list(_MOTORBIKE_DIMENSIONS.keys())),
+    'If running motorbike, sets the dimensions of the motorbike case.')
 
 
-_BENCHMARK_RUN_PATH = '$HOME/Openfoam/${USER}-7/run'
+BENCHMARK_NAME = 'openfoam'
+_BENCHMARK_ROOT = '$HOME/OpenFOAM/run'
 BENCHMARK_CONFIG = """
 openfoam:
   description: Runs an OpenFOAM benchmark.
@@ -71,6 +83,7 @@ openfoam:
         Azure:
           machine_type: Standard_F8s_v2
           zone: eastus2
+          boot_disk_size: 100
         AWS:
           machine_type: c5.2xlarge
           zone: us-east-1f
@@ -90,7 +103,14 @@ openfoam:
           disk_type: nfs
           nfs_managed: False
           mount_point: {path}
-""".format(path=_BENCHMARK_RUN_PATH)
+""".format(path=_BENCHMARK_ROOT)
+_MACHINEFILE = 'MACHINEFILE'
+_RUNSCRIPT = 'Allrun'
+_DECOMPOSEDICT = 'system/decomposeParDict'
+_BLOCKMESHDICT = 'system/blockMeshDict'
+
+_TIME_RE = re.compile(r"""(\d+)m       # The minutes part
+                          (\d+)\.\d+s  # The seconds part """, re.VERBOSE)
 
 
 def GetConfig(user_config):
@@ -107,29 +127,43 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark spec for this sample benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  vm.Install('openfoam')
-  vm.RemoteCommand('mkdir -p %s' % _BENCHMARK_RUN_PATH)
-  vm.RemoteCommand('cp -r {case_path} {run_path}'.format(
+  vms = benchmark_spec.vms
+  vm_util.RunThreaded(lambda vm: vm.Install('openfoam'), vms)
+
+  master_vm = vms[0]
+  master_vm.RemoteCommand('mkdir -p %s' % _BENCHMARK_ROOT)
+  master_vm.RemoteCommand('cp -r {case_path} {run_path}'.format(
       case_path=posixpath.join(openfoam.OPENFOAM_ROOT,
                                _CASE_PATHS[FLAGS.openfoam_case]),
-      run_path=_BENCHMARK_RUN_PATH))
+      run_path=_BENCHMARK_ROOT))
+
+  if len(vms) > 1:
+    # Allow ssh access to other vms
+    master_vm.AuthenticateVm()
+    # Avoid printing ssh warnings when running mpirun
+    master_vm.RemoteCommand('echo "LogLevel ERROR" | '
+                            'tee -a $HOME/.ssh/config')
+    # Tells mpirun about other nodes
+    hpc_util.CreateMachineFile(vms, remote_path=_GetPath(_MACHINEFILE))
 
 
 def _AsSeconds(input_time):
   """Convert time from formatted string to seconds.
 
-  Input format: 4m1.419s
+  Input format: 200m1.419s
+  Should return 1201
 
   Args:
     input_time: The time to parse to a float.
 
   Returns:
-    A float representing the time in seconds.
+    An integer representing the time in seconds.
   """
-  parsed = time.strptime(input_time, '%Mm%S.%fs')
-  return datetime.timedelta(minutes=parsed.tm_min,
-                            seconds=parsed.tm_sec).total_seconds()
+  match = _TIME_RE.match(input_time)
+  assert match, 'Time "{}" does not match format "{}"'.format(input_time,
+                                                              _TIME_RE.pattern)
+  minutes, seconds = match.group(1, 2)
+  return int(minutes) * 60 + int(seconds)
 
 
 def _GetSample(line):
@@ -170,14 +204,59 @@ def _GetSamples(output):
 
 
 def _GetOpenfoamVersion(vm):
-  """Get the installed OpenFOAm version from the vm."""
-  return vm.RemoteCommand('source {}/etc/bashrc && echo $WM_PROJECT_VERSION'
-                          .format(openfoam.OPENFOAM_ROOT))[0]
+  """Get the installed OpenFOAM version from the vm."""
+  return vm.RemoteCommand('echo $WM_PROJECT_VERSION')[0]
 
 
 def _GetOpenmpiVersion(vm):
   """Get the installed OpenMPI version from the vm."""
   return vm.RemoteCommand('mpirun -version')[0].split()[3]
+
+
+def _GetWorkingDirPath():
+  """Get the base directory name of the case being run."""
+  case_dir_name = posixpath.basename(_CASE_PATHS[FLAGS.openfoam_case])
+  return posixpath.join(_BENCHMARK_ROOT, case_dir_name)
+
+
+def _GetPath(openfoam_file):
+  """Get the absolute path to the file in the working directory."""
+  return posixpath.join(_GetWorkingDirPath(), openfoam_file)
+
+
+def _SetParallelDecompositionMethod(vm, decompose_method):
+  """Set the parallel decomposition method if using multiple cores."""
+  vm_util.ReplaceText(vm, 'method.*', 'method %s;' % decompose_method,
+                      _GetPath(_DECOMPOSEDICT))
+
+
+def _SetNumProcesses(vm, num_processes):
+  """Configure OpenFOAM to use the correct number of processes."""
+  vm_util.ReplaceText(vm, 'numberOfSubdomains.*',
+                      'numberOfSubdomains %s;' % str(num_processes),
+                      _GetPath(_DECOMPOSEDICT))
+
+
+def _SetMeshDimensions(vm, dimensions):
+  """Set the dimensions to test scalability of the motorBike tutorial."""
+  pattern = 'hex (0 1 2 3 4 5 6 7) ({}) simpleGrading (1 1 1)'
+  original_string = pattern.format(_MOTORBIKE_DIMENSIONS['medium'])
+  new_string = pattern.format(dimensions)
+  vm_util.ReplaceText(vm, original_string, new_string, _GetPath(_BLOCKMESHDICT))
+
+
+def _UseMpi(vm, num_processes):
+  """Configure OpenFOAM to use MPI if running with more than 1 VM."""
+  runscript = _GetPath(_RUNSCRIPT)
+  vm_util.ReplaceText(
+      vm, 'runParallel', 'mpirun '
+      '-hostfile {machinefile} '
+      '-mca btl ^openib '
+      '--map-by node '
+      '-np {num_processes}'.format(
+          machinefile=_GetPath(_MACHINEFILE), num_processes=num_processes),
+      runscript, '|')
+  vm_util.ReplaceText(vm, '^mpirun.*', '& -parallel', runscript)
 
 
 def Run(benchmark_spec):
@@ -192,18 +271,43 @@ def Run(benchmark_spec):
   Returns:
     A list of performance samples.
   """
-  vm = benchmark_spec.vms[0]
+  vms = benchmark_spec.vms
+  master_vm = vms[0]
+  num_vms = len(vms)
+  num_cpus_available = num_vms * master_vm.NumCpusForBenchmark()
+  num_cpus_to_use = num_cpus_available // 2
+  logging.info('Running %s benchmark on %s/%s cores on %s vms',
+               FLAGS.openfoam_case,
+               num_cpus_to_use,
+               num_cpus_available,
+               num_vms)
+
+  # Configure the run
+  master_vm.RemoteCommand('cp -r {case_path} {destination}'.format(
+      case_path=posixpath.join(openfoam.OPENFOAM_ROOT,
+                               _CASE_PATHS[FLAGS.openfoam_case]),
+      destination=_BENCHMARK_ROOT))
+  dimensions = _MOTORBIKE_DIMENSIONS[FLAGS.openfoam_motorbike_dimensions]
+  _SetMeshDimensions(master_vm, dimensions)
+  _SetParallelDecompositionMethod(master_vm, 'scotch')
+  _SetNumProcesses(master_vm, num_cpus_to_use)
+  if num_vms > 1:
+    _UseMpi(master_vm, num_cpus_to_use)
+
+  # Run and collect samples
   run_cmd = [
-      'source %s/etc/bashrc' % openfoam.OPENFOAM_ROOT,
-      'cd %s/motorBike' % _BENCHMARK_RUN_PATH,
+      'cd %s' % _GetWorkingDirPath(),
       './Allclean',
       'time ./Allrun'
   ]
-  _, run_output = vm.RemoteCommand(' && '.join(run_cmd))
+  _, run_output = master_vm.RemoteCommand(' && '.join(run_cmd))
   common_metadata = {
       'case': FLAGS.openfoam_case,
-      'openfoam_version': _GetOpenfoamVersion(vm),
-      'openmpi_version': _GetOpenmpiVersion(vm)
+      'dimensions': dimensions,
+      'num_cpus_available': num_cpus_available,
+      'num_cpus_used': num_cpus_to_use,
+      'openfoam_version': _GetOpenfoamVersion(master_vm),
+      'openmpi_version': _GetOpenmpiVersion(master_vm)
   }
   samples = _GetSamples(run_output)
   for result in samples:
