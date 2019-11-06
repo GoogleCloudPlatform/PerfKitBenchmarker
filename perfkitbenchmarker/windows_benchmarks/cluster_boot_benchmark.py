@@ -19,7 +19,13 @@ figure out a way for benchmarks which work on both Windows and Linux to share
 code.
 """
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
+
+flags.DEFINE_boolean(
+    'cluster_boot_test_rdp_port_listening', False,
+    'Test the time it takes to successfully connect to the RDP port.')
+FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = cluster_boot_benchmark.BENCHMARK_NAME
 BENCHMARK_CONFIG = cluster_boot_benchmark.BENCHMARK_CONFIG

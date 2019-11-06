@@ -587,3 +587,5 @@
   set to True it will report the time until the remote command port (SSH
   port for Linux and WinRM port for Windows) in addition to the time until
   a remote command is successfully run.
+- Added flag --cluster_boot_test_rdp_port_listening to measure time until RDP
+  port accepts a connection in Windows. It is True by default.
