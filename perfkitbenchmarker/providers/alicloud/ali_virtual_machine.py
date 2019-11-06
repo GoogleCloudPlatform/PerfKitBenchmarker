@@ -22,6 +22,7 @@ import json
 import threading
 import logging
 import base64
+import six
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
@@ -288,7 +289,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     public_key = AliCloudKeyFileManager.GetPublicKey()
     user_data = util.ADD_USER_TEMPLATE.format(self.user_name, public_key)
     logging.debug('encoding startup script: %s' % user_data)
-    create_cmd.extend(['--UserData', base64.b64encode(user_data)])
+    create_cmd.extend(['--UserData', six.ensure_str(
+        base64.b64encode(user_data.encode('utf-8')))])
 
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
