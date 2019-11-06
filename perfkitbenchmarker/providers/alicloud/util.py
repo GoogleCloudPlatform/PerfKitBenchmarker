@@ -22,10 +22,6 @@ import shlex
 import string
 import random
 import os
-try:
-    import paramiko
-except ImportError:
-    paramiko = None
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
