@@ -43,6 +43,10 @@ class FailedSubstatus(object):
   # be completely re-run.
   KNOWN_INTERMITTENT = 'KNOWN_INTERMITTENT'
 
+  # Failure due to an interruptible vm being interrupted before the benchmark
+  # completes. User non-preventable.
+  INTERRUPTED = 'INTERRUPTED'
+
 
 def _CreateSummaryTable(benchmark_specs):
   """Converts statuses of benchmark runs into a formatted string table.
