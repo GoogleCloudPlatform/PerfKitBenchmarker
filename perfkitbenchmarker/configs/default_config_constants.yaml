@@ -15,8 +15,8 @@ default_single_core: &default_single_core
     zone: us-east-1
     image: null
   AliCloud:
-    machine_type: ecs.s2.large
-    zone: us-west-1a
+    machine_type: ecs.g5.large
+    zone: cn-beijing-g
     image: null
   DigitalOcean:
     machine_type: 2gb
@@ -67,6 +67,10 @@ default_dual_core: &default_dual_core
     machine_type:
       cpus: 2
       memory: 4.0GiB
+  AliCloud:
+    machine_type: ecs.g5.xlarge
+    zone: cn-beijing-g
+    image: null
 
 # TODO(nlavine): update the disk types below as more providers are
 # updated for the disk types refactor.

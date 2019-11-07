@@ -21,6 +21,8 @@ operate on the VM: boot, shutdown, etc.
 import json
 import threading
 import logging
+import base64
+import six
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
@@ -69,8 +71,6 @@ INSTANCE_EXISTS_STATUSES = frozenset(
 INSTANCE_DELETED_STATUSES = frozenset([])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
-DEFAULT_IMAGE = "ubuntu_14_0405_64_40G_alibase_20170711.vhd",
-
 
 class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AliCloud Virtual Machine."""
@@ -78,7 +78,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.ALICLOUD
   DEFAULT_ZONE = 'cn-hangzhou-d'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
-  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64_40G_alibase*'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -91,13 +90,15 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
     """
     super(AliVirtualMachine, self).__init__(vm_spec)
-    self.image = self.image or DEFAULT_IMAGE
+    self.image = FLAGS.image
     self.user_name = FLAGS.ali_user_name
+    self.key_pair_name = None
     self.region = util.GetRegionByZone(self.zone)
     self.bandwidth_in = FLAGS.ali_bandwidth_in
     self.bandwidth_out = FLAGS.ali_bandwidth_out
     self.scratch_disk_size = FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE
     self.system_disk_type = FLAGS.ali_system_disk_type
+    self.system_disk_size = FLAGS.ali_system_disk_size
     self.eip_address_bandwidth = FLAGS.ali_eip_address_bandwidth
     self.network = ali_network.AliNetwork.GetNetwork(self)
     self.firewall = ali_network.AliFirewall.GetFirewall()
@@ -188,7 +189,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
-        'DescribeImage',
+        'DescribeImages',
         '--RegionId %s' % region,
         '--ImageName \'%s\'' % cls.IMAGE_NAME_FILTER]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
@@ -230,23 +231,19 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._WaitForInstanceStatus(['Running'])
 
     self.firewall.AllowPort(self, SSH_PORT)
-    key_file = vm_util.GetPublicKeyPath()
-    util.AddPubKeyToHost(self.ip_address,
-                         self.password,
-                         key_file,
-                         self.user_name)
     tags = {}
     tags.update(self.vm_metadata)
-    util.AddTags(tags)
+    util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **tags)
     util.AddDefaultTags(self.id, RESOURCE_TYPE[INSTANCE], self.region)
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    pass
+    self.key_pair_name = AliCloudKeyFileManager.ImportKeyfile(self.region)
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
-    pass
+    if self.key_pair_name:
+      AliCloudKeyFileManager.DeleteKeyfile(self.region, self.key_pair_name)
 
   def _Create(self):
     """Create a VM instance."""
@@ -255,8 +252,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       # This is here and not in the __init__ method bceauese _GetDefaultImage
       # does a nontrivial amount of work (it calls the aliyuncli).
       self.image = self._GetDefaultImage(self.region)
-
-    self.password = util.GeneratePassword()
 
     create_cmd = util.ALI_PREFIX + [
         'ecs',
@@ -267,11 +262,12 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--ImageId %s' % self.image,
         '--InstanceType %s' % self.machine_type,
         '--SecurityGroupId %s' % self.network.security_group.group_id,
-        '--Password %s' % self.password]
+        '--KeyPairName %s' % self.key_pair_name,
+        '--SystemDisk.Category %s' % self.system_disk_type,
+        '--SystemDisk.Size %s' % self.system_disk_size]
 
     if FLAGS.scratch_disk_type == disk.LOCAL:
       disk_cmd = [
-          '--SystemDiskCategory ephemeral_ssd',
           '--DataDisk1Category ephemeral_ssd',
           '--DataDisk1Size %s' % self.scratch_disk_size,
           '--DataDisk1Device %s%s' % (util.GetDrivePathPrefix(),
@@ -279,17 +275,23 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend(disk_cmd)
 
     if FLAGS.ali_io_optimized is not None:
-      create_cmd.extend(['--IoOptimized optimized',
-                         '--SystemDiskCategory %s' % self.system_disk_type])
+      create_cmd.extend(['--IoOptimized optimized'])
 
     if FLAGS.ali_use_vpc:
-      create_cmd.extend(['--VpcId %s' % self.network.vpc.id,
-                        '--VSwitchId %s' % self.network.vswitch.id])
+      create_cmd.extend(['--VSwitchId %s' % self.network.vswitch.id])
     else:
       create_cmd.extend([
           '--InternetChargeType PayByTraffic',
           '--InternetMaxBandwidthIn %s' % self.bandwidth_in,
           '--InternetMaxBandwidthOut %s' % self.bandwidth_out])
+
+    # Create user and add SSH key
+    public_key = AliCloudKeyFileManager.GetPublicKey()
+    user_data = util.ADD_USER_TEMPLATE.format(user_name=self.user_name,
+                                              public_key=public_key)
+    logging.debug('encoding startup script: %s' % user_data)
+    create_cmd.extend(['--UserData', six.ensure_str(
+        base64.b64encode(user_data.encode('utf-8')))])
 
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
@@ -301,7 +303,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     start_cmd = util.ALI_PREFIX + [
         'ecs',
         'StartInstance',
-        '--RegionId %s' % self.region,
         '--InstanceId %s' % self.id]
     start_cmd = util.GetEncodedCmd(start_cmd)
     vm_util.IssueRetryableCommand(start_cmd)
@@ -311,7 +312,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     stop_cmd = util.ALI_PREFIX + [
         'ecs',
         'StopInstance',
-        '--RegionId %s' % self.region,
         '--InstanceId %s' % self.id]
     stop_cmd = util.GetEncodedCmd(stop_cmd)
     vm_util.IssueRetryableCommand(stop_cmd)
@@ -321,7 +321,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_cmd = util.ALI_PREFIX + [
         'ecs',
         'DeleteInstance',
-        '--RegionId %s' % self.region,
         '--InstanceId %s' % self.id]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
@@ -367,10 +366,9 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     if disk_spec.disk_type != disk.LOCAL:
       data_disk.Create()
       data_disk.Attach(self)
+      data_disk.WaitForDiskStatus(['In_use'])
     else:
       data_disk.device_letter = DRIVE_START_LETTER
-
-    data_disk.WaitForDiskStatus(['In_use'])
 
     self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
     self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
@@ -382,9 +380,89 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **kwargs)
 
 
+class AliCloudKeyFileManager(object):
+  """Object for managing AliCloud Keyfiles."""
+  _lock = threading.Lock()
+  imported_keyfile_set = set()
+  deleted_keyfile_set = set()
+  run_uri_key_names = {}
+
+  @classmethod
+  def ImportKeyfile(cls, region):
+    """Imports the public keyfile to AliCloud."""
+    with cls._lock:
+      if FLAGS.run_uri in cls.run_uri_key_names:
+        return cls.run_uri_key_names[FLAGS.run_uri]
+      public_key = cls.GetPublicKey()
+      key_name = cls.GetKeyNameForRun()
+      import_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'ImportKeyPair',
+          '--RegionId', region,
+          '--KeyPairName', key_name,
+          '--PublicKeyBody', json.dumps(public_key)]
+      stdout, _ = vm_util.IssueRetryableCommand(import_cmd)
+      cls.run_uri_key_names[FLAGS.run_uri] = key_name
+      return key_name
+
+  @classmethod
+  def DeleteKeyfile(cls, region, key_name):
+    """Deletes the imported KeyPair for a run_uri."""
+    with cls._lock:
+      if FLAGS.run_uri not in cls.run_uri_key_names:
+        return
+      delete_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'DeleteKeyPairs',
+          '--RegionId', region,
+          '--KeyPairNames', json.dumps([key_name])]
+      stdout, _ = vm_util.IssueRetryableCommand(delete_cmd)
+      del cls.run_uri_key_names[FLAGS.run_uri]
+
+  @classmethod
+  def GetKeyNameForRun(cls):
+    return 'perfkit_key_{0}'.format(FLAGS.run_uri)
+
+  @classmethod
+  def GetPublicKey(cls):
+    cat_cmd = ['cat',
+               vm_util.GetPublicKeyPath()]
+    keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+    return keyfile.strip()
+
+
 class DebianBasedAliVirtualMachine(AliVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
+  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+
+
+class Ubuntu1404BasedAliVirtualMachine(AliVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1604Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
+  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+
+
+class Ubuntu1604BasedAliVirtualMachine(AliVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1604Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu_16_04_64*alibase*.vhd'
+  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+
+
+class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1804Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu_18_04_64*alibase*.vhd'
+
+
+class Centos7BasedAliVirtualMachine(AliVirtualMachine,
+                                    linux_virtual_machine.Centos7Mixin):
+  IMAGE_NAME_FILTER = 'centos_7_05_64*alibase*.vhd'
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedAliVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python2-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class RhelBasedAliVirtualMachine(AliVirtualMachine,
