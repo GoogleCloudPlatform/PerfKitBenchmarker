@@ -700,16 +700,31 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       self.os_metadata['high_cpu_priority'] = [executable_name]
 
 
-class Windows2012Mixin(WindowsMixin):
-  """Class holding Windows2012 specific VM methods and attributes."""
-  OS_TYPE = os_types.WINDOWS2012
+class Windows2012CoreMixin(WindowsMixin):
+  """Class holding Windows Server 2012 Server Core VM specifics."""
+  OS_TYPE = os_types.WINDOWS2012_CORE
 
 
-class Windows2016Mixin(WindowsMixin):
-  """Class holding Windows2016 specific VM methods and attributes."""
-  OS_TYPE = os_types.WINDOWS2016
+class Windows2016CoreMixin(WindowsMixin):
+  """Class holding Windows Server 2016 Server Core VM specifics."""
+  OS_TYPE = os_types.WINDOWS2016_CORE
 
 
-class Windows2019Mixin(WindowsMixin):
-  """Class holding Windows2019 specific VM methods and attributes."""
-  OS_TYPE = os_types.WINDOWS2019
+class Windows2019CoreMixin(WindowsMixin):
+  """Class holding Windows Server 2019 Server Core VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_CORE
+
+
+class Windows2012BaseMixin(WindowsMixin):
+  """Class holding Windows Server 2012 Server Base VM specifics."""
+  OS_TYPE = os_types.WINDOWS2012_BASE
+
+
+class Windows2016BaseMixin(WindowsMixin):
+  """Class holding Windows Server 2016 Server Base VM specifics."""
+  OS_TYPE = os_types.WINDOWS2016_BASE
+
+
+class Windows2019BaseMixin(WindowsMixin):
+  """Class holding Windows Server 2019 Server Base VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_BASE
