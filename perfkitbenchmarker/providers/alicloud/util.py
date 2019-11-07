@@ -19,9 +19,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import shlex
-import string
-import random
-import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -36,7 +33,7 @@ PASSWD_LEN = 20
 REGION_HZ = 'cn-hangzhou'
 
 
-ADD_USER_TEMPLATE = '''#!/bin/bash
+ADD_USER_TEMPLATE = """#!/bin/bash
 echo "{user_name} ALL = NOPASSWD: ALL" >> /etc/sudoers
 useradd {user_name} --home /home/{user_name} --shell /bin/bash -m
 mkdir /home/{user_name}/.ssh
@@ -44,7 +41,7 @@ echo "{public_key}" >> /home/{user_name}/.ssh/authorized_keys
 chown -R {user_name}:{user_name} /home/{user_name}/.ssh
 chmod 700 /home/{user_name}/.ssh
 chmod 600 /home/{user_name}/.ssh/authorized_keys
-'''
+"""
 
 
 def GetEncodedCmd(cmd):
@@ -55,7 +52,7 @@ def GetEncodedCmd(cmd):
 
 def GetRegionByZone(zone):
   if zone.find(REGION_HZ) != -1:
-      return REGION_HZ
+    return REGION_HZ
   s = zone.split('-')
   if s[0] == 'cn':
     s.pop()
@@ -77,14 +74,15 @@ def AddTags(resource_id, resource_type, region, **kwargs):
     return
 
   tag_cmd = ALI_PREFIX + [
-      'ecs',
-      'AddTags',
-      '--RegionId', region,
-      '--ResourceId', resource_id,
-      '--ResourceType', resource_type]
+      'ecs', 'AddTags', '--RegionId', region, '--ResourceId', resource_id,
+      '--ResourceType', resource_type
+  ]
   for index, (key, value) in enumerate(six.iteritems(kwargs)):
-    tag_cmd.extend(['--Tag.{0}.Key'.format(index + 1), str(key),
-                    '--Tag.{0}.Value'.format(index + 1), str(value)])
+    tag_cmd.extend([
+        '--Tag.{0}.Key'.format(index + 1),
+        str(key), '--Tag.{0}.Value'.format(index + 1),
+        str(value)
+    ])
   vm_util.IssueRetryableCommand(tag_cmd)
 
 
