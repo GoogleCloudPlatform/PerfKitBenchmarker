@@ -289,7 +289,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     public_key = AliCloudKeyFileManager.GetPublicKey()
     user_data = util.ADD_USER_TEMPLATE.format(user_name=self.user_name,
                                               public_key=public_key)
-    logging.debug('encoding startup script: %s' % user_data)
+    logging.debug('encoding startup script: %s', user_data)
     create_cmd.extend(['--UserData', six.ensure_str(
         base64.b64encode(user_data.encode('utf-8')))])
 
@@ -401,7 +401,7 @@ class AliCloudKeyFileManager(object):
           '--RegionId', region,
           '--KeyPairName', key_name,
           '--PublicKeyBody', json.dumps(public_key)]
-      stdout, _ = vm_util.IssueRetryableCommand(import_cmd)
+      vm_util.IssueRetryableCommand(import_cmd)
       cls.run_uri_key_names[FLAGS.run_uri] = key_name
       return key_name
 
@@ -416,7 +416,7 @@ class AliCloudKeyFileManager(object):
           'DeleteKeyPairs',
           '--RegionId', region,
           '--KeyPairNames', json.dumps([key_name])]
-      stdout, _ = vm_util.IssueRetryableCommand(delete_cmd)
+      vm_util.IssueRetryableCommand(delete_cmd)
       del cls.run_uri_key_names[FLAGS.run_uri]
 
   @classmethod
