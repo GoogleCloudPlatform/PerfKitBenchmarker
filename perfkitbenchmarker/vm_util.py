@@ -700,4 +700,3 @@ def ReplaceText(vm, current_value, new_value, file_name, regex_char='/'):
                        current_value=current_value,
                        new_value=new_value,
                        file=file_name))
-
