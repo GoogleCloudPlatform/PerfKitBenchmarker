@@ -74,14 +74,15 @@ def AddTags(resource_id, resource_type, region, **kwargs):
     return
 
   tag_cmd = ALI_PREFIX + [
-      'ecs', 'AddTags', '--RegionId', region, '--ResourceId', resource_id,
+      'ecs', 'AddTags',
+      '--RegionId', region,
+      '--ResourceId', resource_id,
       '--ResourceType', resource_type
   ]
   for index, (key, value) in enumerate(six.iteritems(kwargs)):
     tag_cmd.extend([
-        '--Tag.{0}.Key'.format(index + 1),
-        str(key), '--Tag.{0}.Value'.format(index + 1),
-        str(value)
+        '--Tag.{0}.Key'.format(index + 1), str(key),
+        '--Tag.{0}.Value'.format(index + 1), str(value)
     ])
   vm_util.IssueRetryableCommand(tag_cmd)
 
