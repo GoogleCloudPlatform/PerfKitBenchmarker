@@ -756,18 +756,33 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
     ] + self.resource_group.args)
 
 
-class Windows2012AzureVirtualMachine(WindowsAzureVirtualMachine,
-                                     windows_virtual_machine.Windows2012Mixin):
+class Windows2012CoreAzureVirtualMachine(
+    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter-Core:latest'
+
+
+class Windows2016CoreAzureVirtualMachine(
+    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter-Core:latest'
+
+
+class Windows2019CoreAzureVirtualMachine(
+    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
+
+
+class Windows2012BaseAzureVirtualMachine(
+    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
-class Windows2016AzureVirtualMachine(WindowsAzureVirtualMachine,
-                                     windows_virtual_machine.Windows2016Mixin):
+class Windows2016BaseAzureVirtualMachine(
+    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
 
 
-class Windows2019AzureVirtualMachine(WindowsAzureVirtualMachine,
-                                     windows_virtual_machine.Windows2019Mixin):
+class Windows2019BaseAzureVirtualMachine(
+    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
 
 

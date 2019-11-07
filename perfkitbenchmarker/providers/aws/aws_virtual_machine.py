@@ -1144,19 +1144,34 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
           'InterruptModeration failed to disable')
 
 
-class Windows2012AwsVirtualMachine(WindowsAwsVirtualMachine,
-                                   windows_virtual_machine.Windows2012Mixin):
+class Windows2012CoreAwsVirtualMachine(
+    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
 
 
-class Windows2016AwsVirtualMachine(WindowsAwsVirtualMachine,
-                                   windows_virtual_machine.Windows2016Mixin):
+class Windows2016CoreAwsVirtualMachine(
+    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Core-Base-*'
 
 
-class Windows2019AwsVirtualMachine(WindowsAwsVirtualMachine,
-                                   windows_virtual_machine.Windows2019Mixin):
+class Windows2019CoreAwsVirtualMachine(
+    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
+
+
+class Windows2012BaseAwsVirtualMachine(
+    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Base-*'
+
+
+class Windows2016BaseAwsVirtualMachine(
+    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Full-Base-*'
+
+
+class Windows2019BaseAwsVirtualMachine(
+    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
