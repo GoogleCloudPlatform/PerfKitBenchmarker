@@ -936,9 +936,6 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
-  if spec.failed_substatus:
-    metadata['failed_substatus'] = spec.failed_substatus
-
   def UpdateVmStatus(vm):
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)
@@ -951,9 +948,14 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       interruptible_vm_count += 1
       if vm.WasInterrupted():
         interrupted_vm_count += 1
+        spec.failed_substatus = (
+            benchmark_status.FailedSubstatus.INTERRUPTED)
         status_code = vm.GetVmStatusCode()
         if status_code:
           vm_status_codes.append(status_code)
+
+  if spec.failed_substatus:
+    metadata['failed_substatus'] = spec.failed_substatus
 
   if interruptible_vm_count:
     metadata.update({'interruptible_vms': interruptible_vm_count,
