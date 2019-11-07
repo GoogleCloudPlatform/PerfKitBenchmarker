@@ -938,20 +938,38 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
 
 
-class Windows2012GceVirtualMachine(WindowsGceVirtualMachine,
-                                   windows_virtual_machine.Windows2012Mixin):
+class Windows2012CoreGceVirtualMachine(
+    WindowsGceVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2016CoreGceVirtualMachine(
+    WindowsGceVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2016-core'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2019CoreGceVirtualMachine(
+    WindowsGceVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2019-core'
+  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2012BaseGceVirtualMachine(
+    WindowsGceVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
-class Windows2016GceVirtualMachine(WindowsGceVirtualMachine,
-                                   windows_virtual_machine.Windows2016Mixin):
+class Windows2016BaseGceVirtualMachine(
+    WindowsGceVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2016'
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
-class Windows2019GceVirtualMachine(WindowsGceVirtualMachine,
-                                   windows_virtual_machine.Windows2019Mixin):
+class Windows2019BaseGceVirtualMachine(
+    WindowsGceVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 

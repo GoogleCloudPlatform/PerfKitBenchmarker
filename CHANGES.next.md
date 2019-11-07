@@ -34,6 +34,11 @@
 - Changed support for reusing buckets for Azure blob service benchmarking. The
   storage account and resource group are now named based on the bucket name so
   that subsequent runs can use the same bucket.
+- Changed Windows Server versions for GCP and Azure. Before this AWS used
+  Windows Server Core (non-graphical), while GCP and Azure used Windows Server
+  Base (graphical). All existing windows os_types now refer to the Core
+  version and there is a new 'windows*_base' os_types for users who want to RDP
+  in and use a full GUI.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
