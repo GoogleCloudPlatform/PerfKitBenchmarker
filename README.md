@@ -381,31 +381,27 @@ $ aws configure
 
 ### Windows Azure CLI and credentials
 
-You first need to install node.js and NPM.  This version of Perfkit Benchmarker
-is known to be compatible with Azure CLI version 0.10.4, and will likely work
-with any version newer than that.
+This version of Perfkit Benchmarker is known to be compatible with Azure CLI 
+version 2.0.75, and will likely work with any version newer than that.
 
-Go [here](https://nodejs.org/download/), and follow the setup instructions.
-
-Next, run the following (omit the `sudo` on Windows):
+Follow the instructions at https://docs.microsoft.com/en-us/cli/azure/install-azure-cli or 
+on Linux, run the following commands:
 
 ```bash
-$ sudo npm install azure-cli -g
-$ azure login
+$ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+$ az login
 ```
 Test that `azure` is installed correctly:
 
 ```bash
-$ azure vm list
+$ az vm list
 ```
 
-Finally, make sure Azure is in Resource Management mode and that your account is
-authorized to allocate VMs and networks from Azure:
+Finally, make sure that your account is authorized to allocate VMs and networks from Azure:
 
 ```bash
-$ azure config mode arm
-$ azure provider register Microsoft.Compute
-$ azure provider register Microsoft.Network
+$ az provider register -n Microsoft.Compute
+$ az provider register -n Microsoft.Network
 ```
 
 ### Install AliCloud CLI and setup authentication
