@@ -388,7 +388,7 @@ Follow the instructions at https://docs.microsoft.com/en-us/cli/azure/install-az
 on Linux, run the following commands:
 
 ```bash
-$ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+$ curl -L https://aka.ms/InstallAzureCli | bash
 $ az login
 ```
 Test that `azure` is installed correctly:
