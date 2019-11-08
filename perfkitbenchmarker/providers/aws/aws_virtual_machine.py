@@ -459,7 +459,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                    self.network.placement_group)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
-    # TODO(user): implement num_vms_per_host functionality
+    # TODO(buggay): implement num_vms_per_host functionality
     self.num_vms_per_host = vm_spec.num_vms_per_host
     if self.num_vms_per_host:
       raise NotImplementedError('Num vms per host for AWS is not supported.')

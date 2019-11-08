@@ -287,7 +287,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
         '--location',
         self.location,
         # number of fault domains (physical racks) to span across
-        # TODO(user): add support for multiple fault domains
+        # TODO(buggay): add support for multiple fault domains
         # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts#high-availability-considerations
         '--platform-fault-domain-count',
         '1',
@@ -327,7 +327,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
 
 def _GetSkuType(machine_type):
   """Returns the host SKU type derived from the VM machine type."""
-  # TODO(user): add support for FSv2 machine types when no longer in preview
+  # TODO(buggay): add support for FSv2 machine types when no longer in preview
   # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts
   sku = ''
   if re.match('Standard_D[0-9]*s_v3', machine_type):
@@ -391,7 +391,7 @@ class AzureDedicatedHost(resource.BaseResource):
         self.location,
         # the specific fault domain (physical rack) for the host dependent on
         # the number (count) of fault domains of the host group
-        # TODO(user): add support for specifying multiple fault domains if
+        # TODO(buggay): add support for specifying multiple fault domains if
         # benchmarks require
         '--platform-fault-domain',
         '0',
@@ -444,7 +444,7 @@ class AzureVirtualMachine(
   IMAGE_URN = None
 
   _lock = threading.Lock()
-  # TODO(user): remove host groups & hosts as globals -> create new spec
+  # TODO(buggay): remove host groups & hosts as globals -> create new spec
   # globals guarded by _lock
   host_map = collections.defaultdict(list)
 
@@ -463,7 +463,7 @@ class AzureVirtualMachine(
     self.location = util.GetLocationFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
-    # TODO(user): implement num_vms_per_host functionality
+    # TODO(buggay): implement num_vms_per_host functionality
     self.num_vms_per_host = vm_spec.num_vms_per_host
     if self.num_vms_per_host:
       raise NotImplementedError('Num vms per host for Azure is not supported.')
@@ -558,7 +558,7 @@ class AzureVirtualMachine(
     if retcode and 'Error Code: QuotaExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
-    # TODO(user): raise host insufficient capacity error
+    # TODO(buggay): raise host insufficient capacity error
     # if capacity is reached with user set num_vms value, fail benchmark
     if retcode and 'AllocationFailed' in stderr:
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
