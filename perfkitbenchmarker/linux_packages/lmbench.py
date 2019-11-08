@@ -17,30 +17,17 @@
 import posixpath
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-LMBENCH_DIR = posixpath.join(INSTALL_DIR, 'lmbench-master')
-PACKAGE_NAME = 'lmbench'
-LMBENCH_ZIP = 'master.zip'
-PREPROVISIONED_DATA = {
-    LMBENCH_ZIP:
-        '85ea189c2a7adf1e2c9c136eb9775ff8fc3c6cd873d1354b10deb33148a19913'
-}
-PACKAGE_DATA_URL = {
-    LMBENCH_ZIP: 'https://github.com/intel/lmbench/archive/master.zip'
-}
+LMBENCH_DIR = posixpath.join(INSTALL_DIR, 'lmbench')
+GIT = 'https://github.com/intel/lmbench.git'
+COMMIT = '4e4efa113b244b70a1faafd13744578b4edeaeb3'
 
 
 def _Install(vm):
   """Installs the Lmbench package on the VM."""
 
   vm.Install('build_tools')
-  vm.Install('unzip')
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [LMBENCH_ZIP], INSTALL_DIR)
-  vm.RemoteCommand('cd %s && unzip %s' % (INSTALL_DIR, LMBENCH_ZIP))
-  # Fix the bug in the source code
-  # See more in:
-  # https://github.com/zhanglongqi/linux-tips/blob/master/tools/benchmark.md
-  vm.RemoteCommand(
-      'cd {0} && mkdir ./SCCS && touch ./SCCS/s.ChangeSet'.format(LMBENCH_DIR))
+  vm.RemoteCommand('cd %s && git clone %s && cd %s && git checkout %s' % (
+      INSTALL_DIR, GIT, 'lmbench', COMMIT))
 
 
 def YumInstall(vm):
