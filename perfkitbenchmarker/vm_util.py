@@ -436,7 +436,8 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
             'Process may have been killed'))
     raise errors.VmUtil.IssueCommandTimeoutError(debug_text)
   elif process.returncode and (raise_on_failure or suppress_failure):
-    if suppress_failure(stdout, stderr, process.returncode):
+    if (suppress_failure and
+        suppress_failure(stdout, stderr, process.returncode)):
       # failure is suppressible, rewrite the stderr and return code as passing
       # since some callers assume either is a failure e.g.
       # perfkitbenchmarker.providers.aws.util.IssueRetryableCommand()
