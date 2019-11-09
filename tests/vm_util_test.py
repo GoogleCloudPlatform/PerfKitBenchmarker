@@ -15,7 +15,6 @@
 """Tests for perfkitbenchmarker.vm_util."""
 
 import os
-import psutil
 import subprocess
 import threading
 import time
@@ -27,6 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
+import psutil
 
 FLAGS = flags.FLAGS
 
@@ -94,6 +94,7 @@ class WaitUntilSleepTimer(threading.Thread):
   TODO(klausw): If that's an issue, could add a unique fractional part
   to the sleep command args to distinguish them.
   """
+
   def __init__(self, interval, function):
     threading.Thread.__init__(self)
     self.end_time = time.time() + interval
@@ -156,6 +157,56 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(KeyboardInterrupt):
         vm_util.IssueCommand(['sleep', '2s'], timeout=None)
     self.assertFalse(HaveSleepSubprocess())
+
+  def testRaiseOnFailureSuppressed_NoException(self):
+    def _SuppressFailure(stdout, stderr, retcode):
+      del stdout  # unused
+      del stderr  # unused
+      self.assertNotEqual(
+          retcode, 0,
+          '_SuppressFailure should not have been called for retcode=0.')
+      return True
+
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        ['cat', 'non_existent_file'],
+        suppress_failure=_SuppressFailure)
+
+    # Ideally our command would produce stdout that we could verify is preserved
+    # but that's hard with the way IssueCommand creates local files for getting
+    # results subprocess.Popen().
+    self.assertEqual(stdout, '')
+
+    # suppressed from
+    # cat: non_existent_file: No such file or directory
+    self.assertEqual(stderr, '')
+
+    # suppressed from 1
+    self.assertEqual(retcode, 0)
+
+  def testRaiseOnFailureUnsuppressed_ExceptionRaised(self):
+
+    def _DoNotSuppressFailure(stdout, stderr, retcode):
+      del stdout  # unused
+      del stderr  # unused
+      self.assertNotEqual(
+          retcode, 0,
+          '_DoNotSuppressFailure should not have been called for retcode=0.')
+      return False
+
+    with self.assertRaises(errors.VmUtil.IssueCommandError) as cm:
+      vm_util.IssueCommand(['cat', 'non_existent_file'],
+                           raise_on_failure=True,
+                           suppress_failure=_DoNotSuppressFailure)
+    self.assertIn('cat: non_existent_file: No such file or directory',
+                  str(cm.exception))
+
+  def testRaiseOnFailureWithNoSuppression_ExceptionRaised(self):
+    with self.assertRaises(errors.VmUtil.IssueCommandError) as cm:
+      vm_util.IssueCommand(['cat', 'non_existent_file'],
+                           raise_on_failure=True,
+                           suppress_failure=None)
+    self.assertIn('cat: non_existent_file: No such file or directory',
+                  str(cm.exception))
 
 
 if __name__ == '__main__':
