@@ -555,7 +555,8 @@ class AzureVirtualMachine(
     azure_vm_create_timeout = 600
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
-    if retcode and 'Error Code: QuotaExceeded' in stderr:
+    if retcode and ('Error Code: QuotaExceeded' in stderr or
+                    'exceeding quota limit' in stderr):
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
     # TODO(buggay): raise host insufficient capacity error
