@@ -81,3 +81,9 @@ flags.DEFINE_enum('efs_throughput_mode', 'provisioned',
 flags.DEFINE_float('efs_provisioned_throughput', 1024.0,
                    'The throughput limit of EFS (in MiB/s) when run in '
                    'provisioned mode.')
+flags.DEFINE_boolean('provision_athena', False,
+                     'Whether to provision the Athena database.')
+flags.DEFINE_boolean('teardown_athena', True,
+                     'Whether to teardown the Athena database.')
+flags.DEFINE_string('athena_output_location', None,
+                    'Athena Query Output Location.')
