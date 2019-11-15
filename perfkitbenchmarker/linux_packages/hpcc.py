@@ -25,6 +25,7 @@ import re
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import amdblis
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import openblas
 
@@ -45,15 +46,19 @@ HPCC_VERSION = '1.5.0'
 MAKE_FLAVOR_CBLAS = 'Linux_PII_CBLAS'
 MAKE_FLAVOR_MKL = 'intel64'
 MAKE_FLAVOR_OPEN_BLAS = 'OPEN_BLAS'
+MAKE_FLAVOR_AMD_BLIS = 'AMD_BLIS'
 
 HPCC_MAKEFILE_CBLAS = 'Make.%s' % MAKE_FLAVOR_CBLAS
 HPCC_MAKEFILE_MKL = 'Make.%s' % MAKE_FLAVOR_MKL
 HPCC_MAKEFILE_OPEN_BLAS = 'Make.%s' % MAKE_FLAVOR_OPEN_BLAS
+HPCC_MAKEFILE_AMD_BLIS = 'Make.%s' % MAKE_FLAVOR_AMD_BLIS
 
 HPCC_MAKEFILE_PATH_MKL = '%s/hpl/%s' % (HPCC_DIR, HPCC_MAKEFILE_MKL)
 HPCC_MAKEFILE_PATH_OPEN_BLAS = '%s/hpl/%s' % (HPCC_DIR, HPCC_MAKEFILE_OPEN_BLAS)
+HPCC_MAKEFILE_PATH_AMD_BLIS = '%s/hpl/%s' % (HPCC_DIR, HPCC_MAKEFILE_AMD_BLIS)
 
 HPCC_MATH_LIBRARY_OPEN_BLAS = 'openblas'
+HPCC_MATH_LIBRARY_AMD_BLIS = 'amdblis'
 HPCC_MATH_LIBRARY_MKL = 'mkl'
 
 # A dict mapping HPCC benchmarks to dicts mapping summary result names to units.
@@ -203,10 +208,11 @@ HPCC_BENCHMARKS = sorted(HPCC_METRIC_MAP)
 
 
 flags.DEFINE_enum(
-    'hpcc_math_library', HPCC_MATH_LIBRARY_OPEN_BLAS,
-    [HPCC_MATH_LIBRARY_OPEN_BLAS, HPCC_MATH_LIBRARY_MKL],
-    'The math library to use when compiling hpcc: openblas or mkl. '
-    'The default is openblas.')
+    'hpcc_math_library', HPCC_MATH_LIBRARY_OPEN_BLAS, [
+        HPCC_MATH_LIBRARY_OPEN_BLAS, HPCC_MATH_LIBRARY_MKL,
+        HPCC_MATH_LIBRARY_AMD_BLIS
+    ], 'The math library to use when compiling hpcc: openblas, mkl, or '
+    'amdblis. The default is openblas.')
 flags.DEFINE_list(
     'hpcc_benchmarks', [], 'A list of benchmarks in HPCC to run. If none are '
     'specified (the default), then all of the benchmarks are run. In 1.5.0, '
@@ -269,6 +275,8 @@ def _Install(vm):
     _CompileHpccOpenblas(vm)
   elif FLAGS.hpcc_math_library == HPCC_MATH_LIBRARY_MKL:
     _CompileHpccMKL(vm)
+  elif FLAGS.hpcc_math_library == HPCC_MATH_LIBRARY_AMD_BLIS:
+    _CompileHpccAmdBlis(vm)
   else:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Unexpected hpcc_math_library option encountered.')
@@ -277,16 +285,32 @@ def _Install(vm):
 def _CompileHpccOpenblas(vm):
   """Compile HPCC with OpenBlas."""
   vm.Install('openblas')
-  vm.RemoteCommand('cp %s/hpl/setup/%s %s' % (HPCC_DIR, HPCC_MAKEFILE_CBLAS,
-                                              HPCC_MAKEFILE_PATH_OPEN_BLAS))
+  vm.RemoteCommand(
+      'cp %s/hpl/setup/%s %s' %
+      (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_OPEN_BLAS))
   sed_cmd = ('sed -i -e "/^MP/d" -e "s/gcc/mpicc/" -e "s/g77/mpicc/" '
              '-e "s/\\$(HOME)\\/netlib\\/ARCHIVES\\/Linux_PII/%s/" '
              '-e "s/libcblas.*/libopenblas.a/" '
              '-e "s/-funroll-loops/-funroll-loops -std=c99/" '
-             '-e "s/\\-lm/\\-lgfortran \\-lm/" %s' % (re.escape(
-                 openblas.OPENBLAS_DIR), HPCC_MAKEFILE_PATH_OPEN_BLAS))
+             '-e "s/\\-lm/\\-lgfortran \\-lm/" %s' %
+             (re.escape(openblas.OPENBLAS_DIR), HPCC_MAKEFILE_PATH_OPEN_BLAS))
   vm.RemoteCommand(sed_cmd)
   vm.RemoteCommand('cd %s; make arch=OPEN_BLAS' % HPCC_DIR)
+
+
+def _CompileHpccAmdBlis(vm):
+  """Compile HPCC with AMD BLIS."""
+  vm.Install('amdblis')
+  vm.RemoteCommand('cp %s/hpl/setup/%s %s' %
+                   (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_AMD_BLIS))
+  sed_cmd = ('sed -i -e "/^MP/d" -e "s/gcc/mpicc/" -e "s/g77/mpicc/" '
+             '-e "s/\\$(HOME)\\/netlib\\/ARCHIVES\\/Linux_PII/%s/" '
+             '-e "s/libcblas.*/lib\\/zen\\/libblis.a/" '
+             '-e "s/-funroll-loops/-funroll-loops -std=c99/" '
+             '-e "s/\\-lm/\\-lgfortran \\-lm/" %s' %
+             (re.escape(amdblis.AMDBLIS_DIR), HPCC_MAKEFILE_PATH_AMD_BLIS))
+  vm.RemoteCommand(sed_cmd)
+  vm.RemoteCommand('cd %s; make arch=AMD_BLIS' % HPCC_DIR)
 
 
 def _CompileHpccMKL(vm):
