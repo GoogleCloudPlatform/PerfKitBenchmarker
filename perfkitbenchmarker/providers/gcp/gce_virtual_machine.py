@@ -502,18 +502,24 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                             raise_on_failure=False)
 
     if (self.use_dedicated_host and retcode and
-        _INSUFFICIENT_HOST_CAPACITY in stderr and not self.num_vms_per_host):
-      logging.warning(
-          'Creation failed due to insufficient host capacity. A new host will '
-          'be created and instance creation will be retried.')
-      with self._host_lock:
-        if num_hosts == len(self.host_list):
-          host = GceSoleTenantNodeGroup(self.node_template,
-                                        self.zone, self.project)
-          self.host_list.append(host)
-          host.Create()
-        self.node_group = self.host_list[-1]
-      raise errors.Resource.RetryableCreationError()
+        _INSUFFICIENT_HOST_CAPACITY in stderr):
+      if self.num_vms_per_host:
+        raise errors.Resource.CreationError(
+            'Failed to create host: %d vms of type %s per host exceeds '
+            'memory capacity limits of the host' %
+            (self.num_vms_per_host, self.machine_type))
+      else:
+        logging.warning(
+            'Creation failed due to insufficient host capacity. A new host will '
+            'be created and instance creation will be retried.')
+        with self._host_lock:
+          if num_hosts == len(self.host_list):
+            host = GceSoleTenantNodeGroup(self.node_template,
+                                          self.zone, self.project)
+            self.host_list.append(host)
+            host.Create()
+          self.node_group = self.host_list[-1]
+        raise errors.Resource.RetryableCreationError()
     if (not self.use_dedicated_host and retcode and
         _INSUFFICIENT_HOST_CAPACITY in stderr):
       logging.error(STOCKOUT_MESSAGE)
