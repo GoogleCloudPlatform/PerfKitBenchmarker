@@ -31,6 +31,7 @@ from __future__ import print_function
 import collections
 import itertools
 import json
+import logging
 import posixpath
 import re
 import threading
@@ -362,6 +363,7 @@ class AzureDedicatedHost(resource.BaseResource):
     self.sku_type = sku_type
     self.availability_zone = availability_zone
     self.host_group = None
+    self.fill_fraction = 0.0
 
   def _CreateDependencies(self):
     """See base class."""
@@ -463,10 +465,7 @@ class AzureVirtualMachine(
     self.location = util.GetLocationFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
-    # TODO(buggay): implement num_vms_per_host functionality
     self.num_vms_per_host = vm_spec.num_vms_per_host
-    if self.num_vms_per_host:
-      raise NotImplementedError('Num vms per host for Azure is not supported.')
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
@@ -506,7 +505,9 @@ class AzureVirtualMachine(
     if self.use_dedicated_host:
       with self._lock:
         self.host_list = self.host_map[(self.host_series_sku, self.location)]
-        if not self.host_list:
+        if (not self.host_list or (self.num_vms_per_host and
+                                   self.host_list[-1].fill_fraction +
+                                   1.0 / self.num_vms_per_host > 1.0)):
           new_host = AzureDedicatedHost(self.name, self.location,
                                         self.resource_group,
                                         self.host_series_sku,
@@ -514,6 +515,8 @@ class AzureVirtualMachine(
           self.host_list.append(new_host)
           new_host.Create()
         self.host = self.host_list[-1]
+        if self.num_vms_per_host:
+          self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
   def _Create(self):
     """See base class."""
@@ -542,6 +545,7 @@ class AzureVirtualMachine(
     if self.use_dedicated_host:
       create_cmd.extend(
           ['--host-group', self.host.host_group, '--host', self.host.name])
+      num_hosts = len(self.host_list)
 
     if self.network.avail_set:
       create_cmd.extend(['--availability-set', self.network.avail_set.name])
@@ -559,9 +563,30 @@ class AzureVirtualMachine(
                     'exceeding quota limit' in stderr):
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
-    # TODO(buggay): raise host insufficient capacity error
-    # if capacity is reached with user set num_vms value, fail benchmark
-    if retcode and 'AllocationFailed' in stderr:
+    # TODO(buggay) refactor to share code with gcp_virtual_machine.py
+    if (self.use_dedicated_host and retcode and
+        'AllocationFailed' in stderr):
+      if self.num_vms_per_host:
+        raise errors.Resource.CreationError(
+            'Failed to create host: %d vms of type %s per host exceeds '
+            'memory capacity limits of the host' %
+            (self.num_vms_per_host, self.machine_type))
+      else:
+        logging.warning(
+            'Creation failed due to insufficient host capacity. A new host will '
+            'be created and instance creation will be retried.')
+        with self._lock:
+          if num_hosts == len(self.host_list):
+            new_host = AzureDedicatedHost(self.name, self.location,
+                                          self.resource_group,
+                                          self.host_series_sku,
+                                          self.availability_zone)
+            self.host_list.append(new_host)
+            new_host.Create()
+          self.host = self.host_list[-1]
+        raise errors.Resource.RetryableCreationError()
+    if (not self.use_dedicated_host and retcode and
+        'AllocationFailed' in stderr):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
@@ -675,6 +700,8 @@ class AzureVirtualMachine(
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.os_disk.disk_type
     result['boot_disk_size'] = self.os_disk.disk_size or 'default'
+    if self.use_dedicated_host:
+      result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
 
