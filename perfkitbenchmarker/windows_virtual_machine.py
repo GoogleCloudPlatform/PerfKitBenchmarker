@@ -50,7 +50,6 @@ RDP_PORT = 3389
 # This startup script enables remote mangement of the instance. It does so
 # by creating a WinRM listener (using a self-signed cert) and opening
 # the WinRM port in the Windows firewall.
-# It also sets up RDP for manual debugging.
 _STARTUP_SCRIPT = """
 Enable-PSRemoting -Force
 $cert = New-SelfSignedCertificate -DnsName hostname -CertStoreLocation `
@@ -60,12 +59,7 @@ New-Item WSMan:\\localhost\\Listener -Transport HTTPS -Address * `
 Set-Item -Path 'WSMan:\\localhost\\Service\\Auth\\Basic' -Value $true
 netsh advfirewall firewall add rule name='Allow WinRM' dir=in action=allow `
     protocol=TCP localport={winrm_port}
-Set-ItemProperty -Path `
-    "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server" `
-    -Name "fDenyTSConnections" -Value 0
-netsh advfirewall firewall add rule name='Allow RDP' dir=in action=allow `
-    protocol=TCP localport={rdp_port}
-""".format(winrm_port=WINRM_PORT, rdp_port=RDP_PORT)
+""".format(winrm_port=WINRM_PORT)
 STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
     encoded_command=six.ensure_str(
         base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le'))))

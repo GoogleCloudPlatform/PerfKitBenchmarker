@@ -13,12 +13,79 @@
 # limitations under the License.
 """Module containing class for AWS's Athena EDW service."""
 
+import datetime
+import logging
+
+from perfkitbenchmarker import data
+
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import util
 
+AWS_ATHENA_CMD_PREFIX = ['aws', 'athena']
+AWS_ATHENA_CMD_POSTFIX = ['--output', 'json']
 
 FLAGS = flags.FLAGS
+
+
+class AthenaQueryError(RuntimeError):
+  pass
+
+
+def ReadScript(script_uri):
+  """Method to read a sql script based on its local path.
+
+  Arguments:
+    script_uri: Local URI of file containing SQL query.
+
+  Returns:
+    Query String contents of the URI location.
+
+  Raises:
+    IOError: If the script cannot be read.
+  """
+  with open(script_uri) as fp:
+    return fp.read()
+
+
+def PrepareQueryString(query_string_template, substitutions):
+  """Method to read a template Athena script and substitute placeholders.
+
+  Args:
+    query_string_template: Template version of the Athena query.
+    substitutions: A dictionary of string placeholder keys and corresponding
+      string values.
+
+  Returns:
+     Materialized Athena query as a string.
+  """
+  for key, value in substitutions.items():
+    query_string = query_string_template.replace(key, value)
+  return query_string
+
+
+def RunScriptCommand(script_command):
+  """Method to execute an AWS Athena cli command.
+
+  Args:
+    script_command: Fully compiled AWS Athena cli command.
+
+  Returns:
+    String stdout result of executing the query.
+    Script Command execution duration in seconds (rounded).
+
+  Raises:
+    AthenaQueryError: If the return code does not indicate success.
+  """
+  start_time = datetime.datetime.now()
+  stdout, _, retcode = vm_util.IssueCommand(
+      script_command, raise_on_failure=False)
+  if retcode:
+    raise AthenaQueryError
+  end_time = datetime.datetime.now()
+  return stdout, int((end_time - start_time).total_seconds())
 
 
 class Athena(edw_service.EdwService):
@@ -27,9 +94,74 @@ class Athena(edw_service.EdwService):
   CLOUD = providers.AWS
   SERVICE_TYPE = 'athena'
 
+  def __init__(self, edw_service_spec):
+    super(Athena, self).__init__(edw_service_spec)
+    self.output_location = FLAGS.athena_output_location
+    self.region = util.GetRegionFromZone(FLAGS.zones[0])
+    if FLAGS.provision_athena:
+      self.db = '_'.join(
+          [FLAGS.edw_tpc_dsb_type,
+           str(FLAGS.edw_tpc_dataset_size_in_GB)])
+      self.data_bucket = self.db.replace('_', '')
+      self.athena_db_create_time = 0
+      self.athena_table_create_time = 0
+
+  def BuildAthenaCommand(self, query_string, database=None):
+    """Method to compile a AWS Athena cli command.
+
+    Arguments:
+      query_string: A string with the query that needs to be executed on Athena.
+      database: The Athena database against which the query should be executed.
+
+    Returns:
+      Fully compiled AWS Athena cli command.
+    """
+    cmd = []
+    cmd.extend(AWS_ATHENA_CMD_PREFIX)
+    cmd.extend([
+        '--region', self.region,
+        'start-query-execution',
+        '--query-string', query_string
+    ])
+    if database:
+      cmd.extend(['--query-execution-context', ('Database=%s' % database)])
+    cmd.extend([
+        '--result-configuration', ('OutputLocation=%s' % self.output_location)
+    ])
+    cmd.extend(AWS_ATHENA_CMD_POSTFIX)
+    return cmd
+
   def _Create(self):
     """Create a Athena data warehouse."""
-    raise NotImplementedError
+
+    def _CreateDatabase():
+      create_database_query_string = PrepareQueryString(
+          'create database database_name', {'database_name': self.db})
+      script_command = self.BuildAthenaCommand(create_database_query_string)
+      return RunScriptCommand(script_command)
+
+    def _CreateTable(table_create_sql_template):
+      template_script_path = data.ResourcePath(table_create_sql_template)
+      template_script_contents = ReadScript(template_script_path)
+      script_contents = PrepareQueryString(template_script_contents,
+                                           {'{bucket}': self.data_bucket})
+      script_command = self.BuildAthenaCommand(
+          script_contents, database=self.db)
+      return RunScriptCommand(script_command)
+
+    def _CreateAllTables():
+      cumulative_table_create_time = 0
+      # TODO(user): Derive the paths and full table set from the TPC suite.
+      for script in [
+          'edw/athena/tpc_h/ddl/s3_customer.sql',
+          'edw/athena/tpc_h/ddl/s3_nation.sql'
+      ]:
+        _, table_create_time = _CreateTable(script)
+        cumulative_table_create_time += table_create_time
+      return cumulative_table_create_time
+
+    _, self.athena_db_create_time = _CreateDatabase()
+    self.athena_table_create_time = _CreateAllTables()
 
   def _Exists(self):
     """Method to validate the existence of a Athena data warehouse.
@@ -41,6 +173,9 @@ class Athena(edw_service.EdwService):
 
   def _Delete(self):
     """Delete a Athena data warehouse."""
+    if not FLAGS.teardown_athena:
+      logging.info('The current resource is requested to be long living.')
+      return
     raise NotImplementedError
 
   def GetMetadata(self):

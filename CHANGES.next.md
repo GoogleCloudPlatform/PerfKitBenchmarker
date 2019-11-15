@@ -598,3 +598,5 @@
   port accepts a connection in Windows. It is True by default.
 - Fixed Cassandra branch name (GH-2025 from @marcomicera)
 - Add OpenFOAM benchmark.
+- Removed RDP setup from Windows Startup script, because it was not needed by
+  any tested provider.
