@@ -151,7 +151,7 @@ class Athena(edw_service.EdwService):
 
     def _CreateAllTables():
       cumulative_table_create_time = 0
-      # TODO(saksena): Derive the paths and full table set from the TPC suite.
+      # TODO(user): Derive the paths and full table set from the TPC suite.
       for script in [
           'edw/athena/tpc_h/ddl/s3_customer.sql',
           'edw/athena/tpc_h/ddl/s3_nation.sql'
