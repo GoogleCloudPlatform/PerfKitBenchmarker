@@ -1146,9 +1146,18 @@ class YCSBExecutor(object):
     hdrhistograms = {}
     for grouptype in HDRHISTOGRAM_GROUPS:
       worker_vm = vms[0]
+      hdr, _ = worker_vm.RemoteCommand(
+          'touch {0}{1}.hdr && tail -1 {0}{1}.hdr'.format(
+              hdr_files_dir, grouptype))
+      # It's possible that there is no result for certain group, e.g., read
+      # only, update only.
+      if not hdr:
+        continue
+
       for vm in vms[1:]:
         hdr, _ = vm.RemoteCommand(
-            'tail -1 {0}{1}.hdr'.format(hdr_files_dir, grouptype))
+            'touch {0}{1}.hdr && tail -1 {0}{1}.hdr'.format(
+                hdr_files_dir, grouptype))
         worker_vm.RemoteCommand(
             'sudo chmod 777 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
                 hdr[:-1], hdr_files_dir, grouptype))
