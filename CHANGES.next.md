@@ -603,3 +603,5 @@
 - Add OpenFOAM benchmark.
 - Removed RDP setup from Windows Startup script, because it was not needed by
   any tested provider.
+- Updated ycsb.py to handle the cases of read only and update only, where there
+  is no result for certain hdr histogram group.
