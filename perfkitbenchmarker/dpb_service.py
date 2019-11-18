@@ -129,13 +129,15 @@ class BaseDpbService(resource.BaseResource):
 
   @abc.abstractmethod
   def SubmitJob(self,
-                jarfile,
-                classname,
+                jarfile=None,
+                classname=None,
                 pyspark_file=None,
                 query_file=None,
                 job_poll_interval=None,
                 job_stdout_file=None,
                 job_arguments=None,
+                job_files=None,
+                job_jars=None,
                 job_type=None):
     """Submit a data processing job to the backend.
 
@@ -150,8 +152,11 @@ class BaseDpbService(resource.BaseResource):
         Not used by providers for which submit job is a synchronous operation.
       job_stdout_file: String giving the location of the file in which to put
         the standard out of the job.
-      job_arguments: List of string arguments to pass to classname. These are
-       not the arguments passed to the wrapper that submits the job.
+      job_arguments: List of string arguments to pass to driver application.
+        These are not the arguments passed to the wrapper that submits the job.
+      job_files: Files passed to a Spark Application to be distributed to
+        executors.
+      job_jars: Jars to pass to the application
       job_type: Spark or Hadoop job
 
     Returns:
@@ -252,11 +257,9 @@ class BaseDpbService(resource.BaseResource):
     ]
     start_time = datetime.datetime.now()
     stats = self.SubmitJob(
-        generate_jar,
-        None,
+        jarfile=generate_jar,
         job_poll_interval=5,
         job_arguments=generate_args,
-        job_stdout_file=None,
         job_type=generate_job_category)
     end_time = datetime.datetime.now()
     return self._ProcessWallTime(start_time, end_time), stats
@@ -283,11 +286,9 @@ class BaseDpbService(resource.BaseResource):
     sort_args = [TERASORT, base_dir + TERAGEN, base_dir + TERASORT]
     start_time = datetime.datetime.now()
     stats = self.SubmitJob(
-        sort_jar,
-        None,
+        jarfile=sort_jar,
         job_poll_interval=5,
         job_arguments=sort_args,
-        job_stdout_file=None,
         job_type=sort_job_category)
     end_time = datetime.datetime.now()
     return self._ProcessWallTime(start_time, end_time), stats
@@ -311,11 +312,9 @@ class BaseDpbService(resource.BaseResource):
     validate_args = [TERAVALIDATE, base_dir + TERASORT, base_dir + TERAVALIDATE]
     start_time = datetime.datetime.now()
     stats = self.SubmitJob(
-        validate_jar,
-        None,
+        jarfile=validate_jar,
         job_poll_interval=5,
         job_arguments=validate_args,
-        job_stdout_file=None,
         job_type=validate_job_category)
     end_time = datetime.datetime.now()
     return self._ProcessWallTime(start_time, end_time), stats
