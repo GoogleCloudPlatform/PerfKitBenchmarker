@@ -58,6 +58,26 @@ def _GetLocalPath():
   return os.path.expanduser(FLAGS.aws_credentials_local_path)
 
 
+def GetCredentials(credentials_file_name='credentials'):
+  """Gets the credentials from the local credential file.
+
+  AWS credentials file is expected to be called 'credentials'.
+  AWS credentials file looks like this, and ends with a newline:
+  [default]
+  aws_access_key_id = {access_key}
+  aws_secret_access_key = {secret_access_key}
+
+  Args:
+    credentials_file_name: String name of the file containing the credentials.
+
+  Returns:
+    A string, string tuple of access_key and secret_access_key
+  """
+  with open(os.path.join(_GetLocalPath(), credentials_file_name)) as fp:
+    text = fp.read().split('\n')
+  return (text[1].split(' = ')[1]), (text[2].split(' = ')[1])
+
+
 def CheckPrerequisites():
   """Verifies that the required resources are present.
 
