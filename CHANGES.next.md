@@ -600,6 +600,7 @@
 - Added flag --cluster_boot_test_rdp_port_listening to measure time until RDP
   port accepts a connection in Windows. It is True by default.
 - Fixed Cassandra branch name (GH-2025 from @marcomicera)
+- Add AWS T3 cpu credits argument to sample metadata.
 - Add OpenFOAM benchmark.
 - Removed RDP setup from Windows Startup script, because it was not needed by
   any tested provider.
