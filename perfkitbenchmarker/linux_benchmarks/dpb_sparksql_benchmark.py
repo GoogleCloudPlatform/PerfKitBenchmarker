@@ -138,8 +138,6 @@ def Prepare(benchmark_spec):
       continue
     table = re.split(' |/', table_dir.rstrip('/')).pop()
     stats = dpb_service_instance.SubmitJob(
-        None,
-        None,
         pyspark_file=os.path.join(dst_url, SPARK_TABLE_SCRIPT),
         job_type=BaseDpbService.PYSPARK_JOB_TYPE,
         job_arguments=[FLAGS.dpb_sparksql_data, table])

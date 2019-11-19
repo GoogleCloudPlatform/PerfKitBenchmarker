@@ -300,8 +300,16 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     else:
       return None
 
-  def SubmitJob(self, jarfile, classname, pyspark_file=None, query_file=None,
-                job_poll_interval=5, job_arguments=None, job_stdout_file=None,
+  def SubmitJob(self,
+                jarfile=None,
+                classname=None,
+                pyspark_file=None,
+                query_file=None,
+                job_poll_interval=5,
+                job_arguments=None,
+                job_files=None,
+                job_jars=None,
+                job_stdout_file=None,
                 job_type=None):
     """See base class."""
     @vm_util.Retry(timeout=EMR_TIMEOUT,
@@ -323,14 +331,26 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         arg_spec = '[' + ','.join(job_arguments) + ']'
         step_list.append('Args=' + arg_spec)
     elif job_type == self.SPARK_JOB_TYPE:
-      arg_list = ['--class', classname, jarfile]
+      arg_list = []
+      if job_files:
+        arg_list += ['--files', ','.join(job_files)]
+      if job_jars:
+        arg_list += ['--jars', ','.join(job_jars)]
+      # jarfile must be last before args
+      arg_list += ['--class', classname, jarfile]
       if job_arguments:
         arg_list += job_arguments
       arg_spec = '[' + ','.join(arg_list) + ']'
       step_type_spec = 'Type=Spark'
       step_list = [step_type_spec, 'Args=' + arg_spec]
     elif job_type == self.PYSPARK_JOB_TYPE:
-      arg_list = [pyspark_file]
+      arg_list = []
+      if job_files:
+        arg_list += ['--files', ','.join(job_files)]
+      if job_jars:
+        arg_list += ['--jars', ','.join(job_jars)]
+      # pyspark_file must be last before args
+      arg_list += [pyspark_file]
       if job_arguments:
         arg_list += job_arguments
       arg_spec = 'Args=[{}]'.format(','.join(arg_list))

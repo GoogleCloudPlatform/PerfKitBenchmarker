@@ -475,7 +475,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'spot_price':
             self.spot_price,
         'placement_group_strategy':
-            self.placement_group.strategy if self.placement_group else 'none'
+            self.placement_group.strategy if self.placement_group else 'none',
+        'aws_credit_specification':
+            FLAGS.aws_credit_specification
+            if FLAGS.aws_credit_specification else 'none'
     })
     self.early_termination = False
     self.spot_status_code = None

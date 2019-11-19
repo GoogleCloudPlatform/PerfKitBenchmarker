@@ -126,8 +126,6 @@ def Prepare(benchmark_spec):
   dml_script_uri = uri_map['dml_script']
   data_folder_uri = uri_map['data']
   stats = dpb_service_instance.SubmitJob(
-      None,
-      None,
       pyspark_file=dml_script_uri,
       job_type=BaseDpbService.PYSPARK_JOB_TYPE,
       job_arguments=[data_folder_uri])
@@ -157,8 +155,6 @@ def Run(benchmark_spec):
                                     SPARK_SAMPLE_SCRIPT)
 
   stats = dpb_service_instance.SubmitJob(
-      None,
-      None,
       query_file=query_script_uri,
       job_type=BaseDpbService.SPARKSQL_JOB_TYPE)
   logging.info(stats)

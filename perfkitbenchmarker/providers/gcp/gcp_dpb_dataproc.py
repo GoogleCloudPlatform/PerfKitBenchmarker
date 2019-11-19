@@ -187,9 +187,17 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname, pyspark_file=None, query_file=None,
-                job_poll_interval=None, job_arguments=None,
-                job_stdout_file=None, job_type=None):
+  def SubmitJob(self,
+                jarfile=None,
+                classname=None,
+                pyspark_file=None,
+                query_file=None,
+                job_poll_interval=None,
+                job_stdout_file=None,
+                job_arguments=None,
+                job_files=None,
+                job_jars=None,
+                job_type=None):
     """See base class."""
     args = ['jobs', 'submit', job_type]
 
@@ -209,6 +217,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     if query_file:
       cmd.flags['file'] = query_file
+
+    if job_files:
+      cmd.flags['files'] = ','.join(job_files)
+    if job_jars:
+      cmd.flags['jars'] = ','.join(job_jars)
 
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
