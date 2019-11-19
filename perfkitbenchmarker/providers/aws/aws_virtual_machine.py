@@ -434,6 +434,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   IMAGE_OWNER = None
   IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
+  DEFAULT_USER_NAME = 'ec2-user'
 
   _lock = threading.Lock()
   deleted_hosts = set()
@@ -450,7 +451,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
-    self.user_name = FLAGS.aws_user_name
+    self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
@@ -926,11 +927,7 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.ClearMixin):
   IMAGE_NAME_FILTER = 'clear/images/*/clear-*'
   IMAGE_OWNER = '679593333241'  # For marketplace images.
-
-  def __init__(self, vm_spec):
-    super(ClearBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'clear'
+  DEFAULT_USER_NAME = 'clear'
 
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -938,11 +935,7 @@ class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
   # Note AMIs can also be found distributed by CoreOS in 595879546273
   IMAGE_OWNER = '679593333241'  # For marketplace images.
-
-  def __init__(self, vm_spec):
-    super(CoreOsBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'core'
+  DEFAULT_USER_NAME = 'core'
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -951,6 +944,7 @@ class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -959,24 +953,28 @@ class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -985,6 +983,7 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class AmazonLinux2BasedAwsVirtualMachine(
@@ -994,9 +993,6 @@ class AmazonLinux2BasedAwsVirtualMachine(
 
   def __init__(self, vm_spec):
     super(AmazonLinux2BasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
-
     # package_config
     self.python_package_config = 'python27'
     self.python_dev_package_config = 'python27-devel'
@@ -1015,9 +1011,6 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
-
     # package_config
     self.python_package_config = 'python27'
     self.python_dev_package_config = 'python27-devel'
@@ -1032,12 +1025,10 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   IMAGE_OWNER = 'aws-marketplace'
+  DEFAULT_USER_NAME = 'centos'
 
   def __init__(self, vm_spec):
     super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'centos'
-
     # package_config
     self.python_package_config = 'python'
     self.python_dev_package_config = 'python-devel'
@@ -1048,10 +1039,10 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
   """Support for Windows machines on AWS."""
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+  DEFAULT_USER_NAME = 'Administrator'
 
   def __init__(self, vm_spec):
     super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
-    self.user_name = 'Administrator'
     self.user_data = ('<powershell>%s</powershell>' %
                       windows_virtual_machine.STARTUP_SCRIPT)
 
