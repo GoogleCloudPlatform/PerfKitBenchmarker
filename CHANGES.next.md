@@ -39,6 +39,8 @@
   Base (graphical). All existing windows os_types now refer to the Core
   version and there is a new 'windows*_base' os_types for users who want to RDP
   in and use a full GUI.
+- Changed `--aws_user_name` default from `ubuntu` to `ec2-user`. Individual
+  OS types including Ubuntu should still override it appropriately.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers.
