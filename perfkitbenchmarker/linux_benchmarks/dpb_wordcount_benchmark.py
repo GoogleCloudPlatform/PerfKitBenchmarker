@@ -158,10 +158,12 @@ def Run(benchmark_spec):
   metadata.update({'input_location': input_location})
 
   start = datetime.datetime.now()
-  dpb_service_instance.SubmitJob(jarfile, classname,
-                                 job_arguments=job_arguments,
-                                 job_stdout_file=stdout_file,
-                                 job_type=job_type)
+  dpb_service_instance.SubmitJob(
+      jarfile=jarfile,
+      classname=classname,
+      job_arguments=job_arguments,
+      job_stdout_file=stdout_file,
+      job_type=job_type)
   end_time = datetime.datetime.now()
   run_time = (end_time - start).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
