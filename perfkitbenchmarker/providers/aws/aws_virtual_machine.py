@@ -251,6 +251,7 @@ class AwsDedicatedHost(resource.BaseResource):
     self.region = util.GetRegionFromZone(self.zone)
     self.client_token = str(uuid.uuid4())
     self.id = None
+    self.fill_fraction = 0.0
 
   def _Create(self):
     create_cmd = util.AWS_PREFIX + [
@@ -434,6 +435,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   IMAGE_OWNER = None
   IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
+  DEFAULT_USER_NAME = 'ec2-user'
 
   _lock = threading.Lock()
   deleted_hosts = set()
@@ -450,7 +452,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
-    self.user_name = FLAGS.aws_user_name
+    self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
@@ -459,10 +461,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                    self.network.placement_group)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
-    # TODO(buggay): implement num_vms_per_host functionality
     self.num_vms_per_host = vm_spec.num_vms_per_host
-    if self.num_vms_per_host:
-      raise NotImplementedError('Num vms per host for AWS is not supported.')
     self.use_spot_instance = vm_spec.use_spot_instance
     self.spot_price = vm_spec.spot_price
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -612,11 +611,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.use_dedicated_host:
       with self._lock:
-        if not self.host_list:
+        if (not self.host_list or (self.num_vms_per_host and
+                                   self.host_list[-1].fill_fraction +
+                                   1.0 / self.num_vms_per_host > 1.0)):
           host = AwsDedicatedHost(self.machine_type, self.zone)
           self.host_list.append(host)
           host.Create()
         self.host = self.host_list[-1]
+        if self.num_vms_per_host:
+          self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
@@ -697,17 +700,23 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.host_arch = host_arch
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
-      logging.warning(
-          'Creation failed due to insufficient host capacity. A new host will '
-          'be created and instance creation will be retried.')
-      with self._lock:
-        if num_hosts == len(self.host_list):
-          host = AwsDedicatedHost(self.machine_type, self.zone)
-          self.host_list.append(host)
-          host.Create()
-        self.host = self.host_list[-1]
-      self.client_token = str(uuid.uuid4())
-      raise errors.Resource.RetryableCreationError()
+      if self.num_vms_per_host:
+        raise errors.Resource.CreationError(
+            'Failed to create host: %d vms of type %s per host exceeds '
+            'memory capacity limits of the host' %
+            (self.num_vms_per_host, self.machine_type))
+      else:
+        logging.warning(
+            'Creation failed due to insufficient host capacity. A new host will '
+            'be created and instance creation will be retried.')
+        with self._lock:
+          if num_hosts == len(self.host_list):
+            host = AwsDedicatedHost(self.machine_type, self.zone)
+            self.host_list.append(host)
+            host.Create()
+          self.host = self.host_list[-1]
+        self.client_token = str(uuid.uuid4())
+        raise errors.Resource.RetryableCreationError()
     if 'InsufficientInstanceCapacity' in stderr:
       if self.use_spot_instance:
         self.spot_status_code = 'InsufficientSpotInstanceCapacity'
@@ -919,6 +928,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result = super(AwsVirtualMachine, self).GetResourceMetadata()
     result['boot_disk_type'] = self.DEFAULT_ROOT_DISK_TYPE
     result['boot_disk_size'] = self.boot_disk_size or 'default'
+    if self.use_dedicated_host:
+      result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
 
@@ -926,11 +937,7 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.ClearMixin):
   IMAGE_NAME_FILTER = 'clear/images/*/clear-*'
   IMAGE_OWNER = '679593333241'  # For marketplace images.
-
-  def __init__(self, vm_spec):
-    super(ClearBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'clear'
+  DEFAULT_USER_NAME = 'clear'
 
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -938,11 +945,7 @@ class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
   # Note AMIs can also be found distributed by CoreOS in 595879546273
   IMAGE_OWNER = '679593333241'  # For marketplace images.
-
-  def __init__(self, vm_spec):
-    super(CoreOsBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'core'
+  DEFAULT_USER_NAME = 'core'
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -951,6 +954,7 @@ class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -959,24 +963,28 @@ class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -985,6 +993,7 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
+  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class AmazonLinux2BasedAwsVirtualMachine(
@@ -994,9 +1003,6 @@ class AmazonLinux2BasedAwsVirtualMachine(
 
   def __init__(self, vm_spec):
     super(AmazonLinux2BasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
-
     # package_config
     self.python_package_config = 'python27'
     self.python_dev_package_config = 'python27-devel'
@@ -1015,9 +1021,6 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
-
     # package_config
     self.python_package_config = 'python27'
     self.python_dev_package_config = 'python27-devel'
@@ -1032,12 +1035,10 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   IMAGE_OWNER = 'aws-marketplace'
+  DEFAULT_USER_NAME = 'centos'
 
   def __init__(self, vm_spec):
     super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'centos'
-
     # package_config
     self.python_package_config = 'python'
     self.python_dev_package_config = 'python-devel'
@@ -1048,10 +1049,10 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
   """Support for Windows machines on AWS."""
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+  DEFAULT_USER_NAME = 'Administrator'
 
   def __init__(self, vm_spec):
     super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
-    self.user_name = 'Administrator'
     self.user_data = ('<powershell>%s</powershell>' %
                       windows_virtual_machine.STARTUP_SCRIPT)
 
