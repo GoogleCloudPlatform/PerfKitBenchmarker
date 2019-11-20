@@ -26,6 +26,7 @@ SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2017
 
@@ -128,7 +129,11 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
+  vms = benchmark_spec.vms
+  vm_util.RunThreaded(_Prepare, vms)
+
+
+def _Prepare(vm):
   CheckVmPrerequisites(vm)
   vm.Install('speccpu2017')
   # Set attribute outside of the install function, so benchmark will work
@@ -145,10 +150,27 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
+    A list of lists of sample.Sample objects.
+  """
+  vms = benchmark_spec.vms
+  samples = []
+  grouped_samples = vm_util.RunThreaded(_Run, vms)
+
+  for samples_list in grouped_samples:
+    samples.extend(samples_list)
+
+  return samples
+
+
+def _Run(vm):
+  """See base method.
+
+  Args:
+    vm: The vm to run the benchmark on.
+
+  Returns:
     A list of sample.Sample objects.
   """
-  vm = benchmark_spec.vms[0]
-
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
   # Also consider setting enable_transparent_hugepages flag to true
@@ -161,15 +183,14 @@ def Run(benchmark_spec):
 
   version_specific_parameters = []
   # rate runs require 2 GB minimum system main memory per copy,
-  # not including os overhead
-  # Refer to: https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
+  # not including os overhead. Refer to:
+  # https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
   copies = min(vm.NumCpusForBenchmark(),
                vm.total_free_memory_kb // (2 * KB_TO_GB_MULTIPLIER))
   version_specific_parameters.append(' --copies=%s ' %
                                      (FLAGS.spec17_copies or copies))
-  version_specific_parameters.append(' --threads=%s ' %
-                                     (FLAGS.spec17_threads or
-                                      vm.NumCpusForBenchmark()))
+  version_specific_parameters.append(
+      ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark()))
 
   if FLAGS.spec17_fdo:
     version_specific_parameters.append('--feedback ')
@@ -198,7 +219,11 @@ def Run(benchmark_spec):
       elif test in FPRATE_SUITE:
         log_files.add(LOG_FILENAME['fprate'])
 
-  return speccpu.ParseOutput(vm, log_files, partial_results, None)
+  samples = speccpu.ParseOutput(vm, log_files, partial_results, None)
+  for item in samples:
+    item.metadata['vm_name'] = vm.name
+
+  return samples
 
 
 def Cleanup(benchmark_spec):
@@ -208,5 +233,5 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  speccpu.Uninstall(vm)
+  vms = benchmark_spec.vms
+  vm_util.RunThreaded(speccpu.Uninstall, vms)
