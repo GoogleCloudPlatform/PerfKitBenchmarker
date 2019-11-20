@@ -186,6 +186,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise Exception('Internal POD IP address not found. Retrying.')
 
     self.internal_ip = pod_ip
+    self.ip_address = pod_ip
 
   def _ConfigureProxy(self):
     """
