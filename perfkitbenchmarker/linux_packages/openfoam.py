@@ -54,6 +54,7 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo add-apt-repository {}'
                    .format(_OPENFOAM_REPOSITORY_URL))
   vm.RemoteCommand('sudo apt-get -y update')
-  vm.RemoteCommand('sudo apt-get -y install openfoam7')
+  vm.Install('build_tools')
+  vm.InstallPackages('openfoam7')
   openfoam_bash_path = posixpath.join(OPENFOAM_ROOT, 'etc/bashrc')
   vm.RemoteCommand('cat {} > $HOME/.bashrc'.format(openfoam_bash_path))
