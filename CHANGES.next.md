@@ -150,7 +150,7 @@
 - Added resource class and mapping for AWS Athena Service.
 - Added support for Azure Dedicated Hosting. Simply add flag `--dedicated_hosts=True` to use.
 - Records two new samples for /proc/cpuinfo data.
-- Added support for specifying a number of vms per host for Azure Dedicated Hosting.
+- Added support for specifying a number of vms per host for Azure & AWS Dedicated Hosting.
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
 
 ### Enhancements:

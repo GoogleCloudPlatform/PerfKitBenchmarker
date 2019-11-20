@@ -251,6 +251,7 @@ class AwsDedicatedHost(resource.BaseResource):
     self.region = util.GetRegionFromZone(self.zone)
     self.client_token = str(uuid.uuid4())
     self.id = None
+    self.fill_fraction = 0.0
 
   def _Create(self):
     create_cmd = util.AWS_PREFIX + [
@@ -460,10 +461,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                    self.network.placement_group)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
-    # TODO(buggay): implement num_vms_per_host functionality
     self.num_vms_per_host = vm_spec.num_vms_per_host
-    if self.num_vms_per_host:
-      raise NotImplementedError('Num vms per host for AWS is not supported.')
     self.use_spot_instance = vm_spec.use_spot_instance
     self.spot_price = vm_spec.spot_price
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -613,11 +611,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.use_dedicated_host:
       with self._lock:
-        if not self.host_list:
+        if (not self.host_list or (self.num_vms_per_host and
+                                   self.host_list[-1].fill_fraction +
+                                   1.0 / self.num_vms_per_host > 1.0)):
           host = AwsDedicatedHost(self.machine_type, self.zone)
           self.host_list.append(host)
           host.Create()
         self.host = self.host_list[-1]
+        if self.num_vms_per_host:
+          self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
@@ -698,17 +700,23 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.host_arch = host_arch
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
-      logging.warning(
-          'Creation failed due to insufficient host capacity. A new host will '
-          'be created and instance creation will be retried.')
-      with self._lock:
-        if num_hosts == len(self.host_list):
-          host = AwsDedicatedHost(self.machine_type, self.zone)
-          self.host_list.append(host)
-          host.Create()
-        self.host = self.host_list[-1]
-      self.client_token = str(uuid.uuid4())
-      raise errors.Resource.RetryableCreationError()
+      if self.num_vms_per_host:
+        raise errors.Resource.CreationError(
+            'Failed to create host: %d vms of type %s per host exceeds '
+            'memory capacity limits of the host' %
+            (self.num_vms_per_host, self.machine_type))
+      else:
+        logging.warning(
+            'Creation failed due to insufficient host capacity. A new host will '
+            'be created and instance creation will be retried.')
+        with self._lock:
+          if num_hosts == len(self.host_list):
+            host = AwsDedicatedHost(self.machine_type, self.zone)
+            self.host_list.append(host)
+            host.Create()
+          self.host = self.host_list[-1]
+        self.client_token = str(uuid.uuid4())
+        raise errors.Resource.RetryableCreationError()
     if 'InsufficientInstanceCapacity' in stderr:
       if self.use_spot_instance:
         self.spot_status_code = 'InsufficientSpotInstanceCapacity'
@@ -920,6 +928,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result = super(AwsVirtualMachine, self).GetResourceMetadata()
     result['boot_disk_type'] = self.DEFAULT_ROOT_DISK_TYPE
     result['boot_disk_size'] = self.boot_disk_size or 'default'
+    if self.use_dedicated_host:
+      result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
 
