@@ -318,7 +318,8 @@ def Run(benchmark_spec):
   _SetDimensions(master_vm, dimensions)
   _SetDecomposeMethod(master_vm, 'scotch')
   _SetNumProcesses(master_vm, num_cpus_to_use)
-  if num_vms > 1: _UseMpi(master_vm, num_cpus_to_use)
+  if num_vms > 1:
+    _UseMpi(master_vm, num_cpus_to_use)
 
   # Run and collect samples
   run_command = ' && '.join([
