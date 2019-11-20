@@ -43,30 +43,39 @@ from perfkitbenchmarker.linux_packages import openfoam
 
 _DEFAULT_CASE = 'motorbike'
 _CASE_PATHS = {
-    'motorbike': 'tutorials/incompressible/simpleFoam/motorBike'
+    'motorbike': 'tutorials/incompressible/simpleFoam/motorBike',
+    'pipe_cyclic': 'tutorials/incompressible/simpleFoam/pipeCyclic',
 }
 assert _DEFAULT_CASE in _CASE_PATHS
-
-# Motorbike is the most common case, so we provide different sizes here.
-_DEFAULT_MOTORBIKE_DIMENSIONS = 'small'
-_MOTORBIKE_DIMENSIONS = {
-    'small': '20 8 8',
-    'medium': '40 16 16',
-    'large': '80 32 32',
-    'x-large': '100 40 40',
-}
-assert _DEFAULT_MOTORBIKE_DIMENSIONS in _MOTORBIKE_DIMENSIONS
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
     'openfoam_case', _DEFAULT_CASE,
     sorted(list(_CASE_PATHS.keys())),
     'Name of the OpenFOAM case to run.')
+
+# Convenience flag when running motorbike. Motorbike is the most common case,
+# so we provide different sizes here.
+_DEFAULT_MOTORBIKE_DIMENSIONS = 'small'
+_MOTORBIKE_DIMENSIONS = {
+    'small': '20 8 8',
+    'medium': '40 16 16',
+    'large': '80 32 32',
+    'x-large': '160 64 64',
+}
+assert _DEFAULT_MOTORBIKE_DIMENSIONS in _MOTORBIKE_DIMENSIONS
 flags.DEFINE_enum(
     'openfoam_motorbike_dimensions', _DEFAULT_MOTORBIKE_DIMENSIONS,
     sorted(list(_MOTORBIKE_DIMENSIONS.keys())),
     'If running motorbike, sets the dimensions of the motorbike case.')
 
+# Problem size and scaling
+flags.DEFINE_string(
+    'openfoam_dimensions', _MOTORBIKE_DIMENSIONS[_DEFAULT_MOTORBIKE_DIMENSIONS],
+    'Dimensions of the case.')
+flags.DEFINE_integer(
+    'openfoam_num_threads', None,
+    'The number of threads to run OpenFOAM with.')
 
 BENCHMARK_NAME = 'openfoam'
 _BENCHMARK_ROOT = '$HOME/OpenFOAM/run'
@@ -173,7 +182,7 @@ def _GetSample(line):
     real    4m1.419s
 
   Args:
-    line: A single line from the Openfoam timing output.
+    line: A single line from the OpenFOAM timing output.
 
   Returns:
     A single performance sample, with times in ms.
@@ -195,7 +204,7 @@ def _GetSamples(output):
     sys     0m25.274s
 
   Args:
-    output: The output from running the Openfoam benchmark.
+    output: The output from running the OpenFOAM benchmark.
 
   Returns:
     A list of performance samples.
@@ -224,25 +233,40 @@ def _GetPath(openfoam_file):
   return posixpath.join(_GetWorkingDirPath(), openfoam_file)
 
 
-def _SetParallelDecompositionMethod(vm, decompose_method):
+def _SetDecomposeMethod(vm, decompose_method):
   """Set the parallel decomposition method if using multiple cores."""
+  logging.info('Using %s decomposition', decompose_method)
   vm_util.ReplaceText(vm, 'method.*', 'method %s;' % decompose_method,
                       _GetPath(_DECOMPOSEDICT))
 
 
 def _SetNumProcesses(vm, num_processes):
   """Configure OpenFOAM to use the correct number of processes."""
+  logging.info('Decomposing into %s subdomains', num_processes)
   vm_util.ReplaceText(vm, 'numberOfSubdomains.*',
                       'numberOfSubdomains %s;' % str(num_processes),
                       _GetPath(_DECOMPOSEDICT))
 
 
-def _SetMeshDimensions(vm, dimensions):
-  """Set the dimensions to test scalability of the motorBike tutorial."""
-  pattern = 'hex (0 1 2 3 4 5 6 7) ({}) simpleGrading (1 1 1)'
-  original_string = pattern.format(_MOTORBIKE_DIMENSIONS['medium'])
-  new_string = pattern.format(dimensions)
-  vm_util.ReplaceText(vm, original_string, new_string, _GetPath(_BLOCKMESHDICT))
+def _SetDimensions(vm, dimensions):
+  """Sets the mesh dimensions in blockMeshDict.
+
+  Replaces lines of the format:
+  hex (0 1 2 3 4 5 6 7) (20 8 8) simpleGrading (1 1 1)
+
+  with:
+  hex (0 1 2 3 4 5 6 7) (dimensions) simpleGrading (1 1 1)
+
+  Args:
+    vm: The vm to make the replacement on.
+    dimensions: String, new mesh dimensions to run with.
+
+  """
+  logging.info('Using dimensions (%s) in blockMeshDict', dimensions)
+  vm_util.ReplaceText(vm, r'(hex \(.*\) \().*(\) .* \(.*\))',
+                      r'\1{}\2'.format(dimensions),
+                      _GetPath(_BLOCKMESHDICT),
+                      regex_char='|')
 
 
 def _UseMpi(vm, num_processes):
@@ -275,32 +299,35 @@ def Run(benchmark_spec):
   master_vm = vms[0]
   num_vms = len(vms)
   num_cpus_available = num_vms * master_vm.NumCpusForBenchmark()
-  num_cpus_to_use = num_cpus_available // 2
-  logging.info('Running %s benchmark on %s/%s cores on %s vms',
+  num_cpus_to_use = FLAGS.openfoam_num_threads or num_cpus_available // 2
+  logging.info('Running %s case on %s/%s cores on %s vms',
                FLAGS.openfoam_case,
                num_cpus_to_use,
                num_cpus_available,
                num_vms)
 
   # Configure the run
+  case = FLAGS.openfoam_case
   master_vm.RemoteCommand('cp -r {case_path} {destination}'.format(
-      case_path=posixpath.join(openfoam.OPENFOAM_ROOT,
-                               _CASE_PATHS[FLAGS.openfoam_case]),
+      case_path=posixpath.join(openfoam.OPENFOAM_ROOT, _CASE_PATHS[case]),
       destination=_BENCHMARK_ROOT))
-  dimensions = _MOTORBIKE_DIMENSIONS[FLAGS.openfoam_motorbike_dimensions]
-  _SetMeshDimensions(master_vm, dimensions)
-  _SetParallelDecompositionMethod(master_vm, 'scotch')
+  if case == 'motorbike':
+    dimensions = _MOTORBIKE_DIMENSIONS[FLAGS.openfoam_motorbike_dimensions]
+  else:
+    dimensions = FLAGS.openfoam_dimensions
+  _SetDimensions(master_vm, dimensions)
+  _SetDecomposeMethod(master_vm, 'scotch')
   _SetNumProcesses(master_vm, num_cpus_to_use)
-  if num_vms > 1:
-    _UseMpi(master_vm, num_cpus_to_use)
+  if num_vms > 1: _UseMpi(master_vm, num_cpus_to_use)
 
   # Run and collect samples
-  run_cmd = [
+  run_command = ' && '.join([
       'cd %s' % _GetWorkingDirPath(),
       './Allclean',
       'time ./Allrun'
-  ]
-  _, run_output = master_vm.RemoteCommand(' && '.join(run_cmd))
+  ])
+  _, run_output = master_vm.RemoteCommand(run_command)
+  samples = _GetSamples(run_output)
   common_metadata = {
       'case': FLAGS.openfoam_case,
       'dimensions': dimensions,
@@ -309,7 +336,6 @@ def Run(benchmark_spec):
       'openfoam_version': _GetOpenfoamVersion(master_vm),
       'openmpi_version': _GetOpenmpiVersion(master_vm)
   }
-  samples = _GetSamples(run_output)
   for result in samples:
     result.metadata.update(common_metadata)
   return samples
