@@ -152,6 +152,7 @@
 - Records two new samples for /proc/cpuinfo data.
 - Added support for specifying a number of vms per host for Azure & AWS Dedicated Hosting.
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
+- Added support for AWS EFA networking with --aws_efa=True flag.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
