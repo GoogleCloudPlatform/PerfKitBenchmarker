@@ -121,6 +121,21 @@ _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
     'a1': 'cortex-a72',
 }
 
+# Parameters for use with Elastic Fiber Adapter
+_EFA_PARAMS = {
+    'InterfaceType': 'efa',
+    'DeviceIndex': 0,
+    'AssociatePublicIpAddress': True
+}
+# Location of EFA installer
+_EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
+            'aws-efa-installer-{version}.tar.gz')
+# Command to install Libfabric and OpenMPI
+_EFA_INSTALL_CMD = ';'.join([
+    'curl -O {url}', 'tar -xvzf {tarfile}', 'cd aws-efa-installer',
+    'sudo ./efa_installer.sh -y', 'rm -rf {tarfile} aws-efa-installer'
+])
+
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -600,6 +615,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
+    if FLAGS.aws_efa:
+      self.InstallPackages('curl')
+      url = _EFA_URL.format(version=FLAGS.aws_efa_version)
+      self.RemoteCommand(
+          _EFA_INSTALL_CMD.format(url=url, tarfile=posixpath.basename(url)))
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -660,13 +680,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'run-instances',
         '--region=%s' % self.region,
         '--subnet-id=%s' % self.network.subnet.id,
-        '--associate-public-ip-address',
         '--client-token=%s' % self.client_token,
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s' %
         util.FormatTagSpecifications('instance', tags)]
+    if FLAGS.aws_efa:
+      create_cmd.extend([
+          '--network-interfaces',
+          ','.join(['%s=%s' % item for item in sorted(_EFA_PARAMS.items())])
+      ])
+    else:
+      create_cmd.append('--associate-public-ip-address')
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:
@@ -930,6 +956,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['boot_disk_size'] = self.boot_disk_size or 'default'
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
+    result['efa'] = FLAGS.aws_efa
+    if FLAGS.aws_efa:
+      result['efa_version'] = FLAGS.aws_efa_version
     return result
 
 
