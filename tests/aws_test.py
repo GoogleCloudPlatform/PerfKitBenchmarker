@@ -20,6 +20,8 @@ import unittest
 
 import mock
 
+from parameterized import parameterized
+
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -354,12 +356,12 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'run-instances',
         '--region=us-east-1',
         '--subnet-id=subnet-id',
-        '--associate-public-ip-address',
         '--client-token=00000000-1111-2222-3333-444444444444',
         '--image-id=ami-12345',
         '--instance-type=c3.large',
         '--key-name=perfkit-key-aaaaaa',
         '--tag-specifications=foobar',
+        '--associate-public-ip-address',
         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
         '"DeviceName": "/dev/xvdc"}]',
@@ -424,6 +426,33 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm.firewall.AllowPort(self.vm, 22)
     util.IssueRetryableCommand.assert_not_called()
     self.vm.network.is_static = False
+
+  @parameterized.expand([
+      (True, 'network-interfaces', 'associate-public-ip-address'),
+      (False, 'associate-public-ip-address', 'network-interfaces'),
+  ])
+  def testElasticNetwork(self, use_efa, should_find, should_not_find):
+    # with EFA the "--associate-public-ip-address" flag is not used, instead
+    # putting that attribute into --network-interfaces
+    FLAGS.aws_efa = use_efa
+    aws_cmd = CreateVm()
+    self.assertRegex(aws_cmd, 'run-instances .*--' + should_find)
+    self.assertNotRegex(aws_cmd, 'run-instances .*--' + should_not_find)
+
+
+def CreateVm():
+  """Returns the AWS run-instances command line."""
+  vm_util.IssueCommand.side_effect = [('', '', 0)]
+  util.IssueRetryableCommand.side_effect = [('', '', 0)]
+  vm_spec = aws_virtual_machine.AwsVmSpec(
+      'test_vm_spec.AWS', zone='us-west-1a', machine_type='c5n.18xlarge')
+  vm = aws_virtual_machine.AwsVirtualMachine(vm_spec)
+  vm.network.regional_network = mock.Mock()
+  vm.network.subnet = mock.Mock(id='subnet-1234')
+  vm.network.placement_group = mock.Mock()
+  vm.network.Create()
+  vm._Create()
+  return ' '.join(vm_util.IssueCommand.call_args[0][0])
 
 
 class AwsIsRegionTestCase(pkb_common_test_case.PkbCommonTestCase):

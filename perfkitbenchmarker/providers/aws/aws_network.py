@@ -40,6 +40,10 @@ flags.DEFINE_string('aws_vpc', None,
 flags.DEFINE_string(
     'aws_subnet', None,
     'The static AWS subnet id to use.  Default creates a new one')
+flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
+flags.DEFINE_string('aws_efa_version', '1.7.0',
+                    'Version of AWS EFA to use (must also pass in --aws_efa).')
+
 FLAGS = flags.FLAGS
 
 
@@ -175,6 +179,8 @@ class AwsVpc(resource.BaseResource):
     self.default_security_group_id = groups[0]['GroupId']
     logging.info('Default security group ID: %s',
                  self.default_security_group_id)
+    if FLAGS.aws_efa:
+      self._AllowSelfOutBound()
 
   def GetSecurityGroups(self, group_name=None):
     cmd = util.AWS_PREFIX + [
@@ -247,6 +253,24 @@ class AwsVpc(resource.BaseResource):
       cidr = '10.0.{0}.0/24'.format(self._subnet_index)
       self._subnet_index += 1
     return cidr
+
+  @vm_util.Retry()
+  def _AllowSelfOutBound(self):
+    """Allow outbound connections on all ports in the default security group.
+
+    Details: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-start.html
+    """
+    cmd = util.AWS_PREFIX + [
+        'ec2', 'authorize-security-group-egress',
+        '--region', self.region, '--group-id', self.default_security_group_id,
+        '--protocol', 'all', '--source-group', self.default_security_group_id
+    ]
+    try:
+      vm_util.IssueCommand(cmd)
+    except errors.VmUtil.IssueCommandError as ex:
+      # do not retry if this rule already exists
+      if ex.message.find('InvalidPermission.Duplicate') == -1:
+        raise ex
 
 
 class AwsSubnet(resource.BaseResource):
