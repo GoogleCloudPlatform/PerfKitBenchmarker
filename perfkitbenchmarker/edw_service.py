@@ -220,3 +220,25 @@ class EdwService(resource.BaseResource):
       execution status and the latency of executing the script.
     """
     raise NotImplementedError
+
+  def GetDatasetLastUpdatedTime(self, dataset=None):
+    """Get the formatted last modified timestamp of the dataset."""
+    raise NotImplementedError
+
+  def ExtractDataset(self,
+                     dest_bucket,
+                     dataset=None,
+                     tables=None,
+                     dest_format='CSV'):
+    """Extract all tables in a dataset to object storage.
+
+    Args:
+      dest_bucket: Name of the bucket to extract the data to. Should already
+        exist.
+      dataset: Optional name of the dataset. If none, will be extracted from the
+        cluster_identifier.
+      tables: Optional list of table names to extract. If none, all tables in
+        the dataset will be extracted.
+      dest_format: Format to extract data in.
+    """
+    raise NotImplementedError
