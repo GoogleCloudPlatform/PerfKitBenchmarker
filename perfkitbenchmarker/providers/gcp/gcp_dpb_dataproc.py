@@ -26,6 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -324,3 +325,31 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if udpate_default_fs:
       vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
     return {dpb_service.SUCCESS: True}
+
+  def MigrateCrossCloud(self, source_location, destination_location):
+    """Method to copy data cross cloud using a distributed job on the cluster.
+
+    Currently the only supported destination cloud is AWS.
+    TODO(user): Add support for other destination clouds.
+
+    Args:
+      source_location: The source GCS path to migrate.
+      destination_location: The destination S3 location.
+
+    Returns:
+      A dictionary with key 'success' and boolean value set to the status of
+      data migration command.
+    """
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    if self.project is not None:
+      cmd.flags['project'] = self.project
+    cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['class'] = 'org.apache.hadoop.tools.DistCp'
+    s3_access_key, s3_secret_key = aws_credentials.GetCredentials()
+    cmd.flags['properties'] = 'fs.s3a.access.key=%s,fs.s3a.secret.key=%s' % (
+        s3_access_key, s3_secret_key)
+    cmd.additional_flags = ['--'] + [
+        'gs://' + source_location, 's3a://' + destination_location
+    ]
+    _, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
+    return {dpb_service.SUCCESS: retcode == 0}
