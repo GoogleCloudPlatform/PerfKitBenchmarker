@@ -163,7 +163,7 @@ def _AsSeconds(input_time):
   Should return 1201
 
   Args:
-    input_time: The time to parse to a float.
+    input_time: The time to parse to an integer.
 
   Returns:
     An integer representing the time in seconds.
@@ -330,10 +330,10 @@ def Run(benchmark_spec):
   _, run_output = master_vm.RemoteCommand(run_command)
   samples = _GetSamples(run_output)
   common_metadata = {
-      'case': FLAGS.openfoam_case,
+      'case_name': FLAGS.openfoam_case,
       'dimensions': dimensions,
-      'num_cpus_available': num_cpus_available,
-      'num_cpus_used': num_cpus_to_use,
+      'total_cpus_available': num_cpus_available,
+      'total_cpus_used': num_cpus_to_use,
       'openfoam_version': _GetOpenfoamVersion(master_vm),
       'openmpi_version': _GetOpenmpiVersion(master_vm)
   }
