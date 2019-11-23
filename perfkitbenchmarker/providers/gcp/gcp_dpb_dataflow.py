@@ -77,9 +77,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """See base class."""
     pass
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None,
-                job_type=None):
+  def SubmitJob(
+      self,
+      jarfile='',
+      classname=None,
+      job_poll_interval=None,
+      job_arguments=None,
+      job_stdout_file=None,
+      job_type=None):
     """See base class."""
 
     if job_type == self.BEAM_JOB_TYPE:
