@@ -102,7 +102,7 @@ class Athena(edw_service.EdwService):
       self.db = '_'.join(
           [FLAGS.edw_tpc_dsb_type,
            str(FLAGS.edw_tpc_dataset_size_in_GB)])
-      self.data_bucket = self.db.replace('_', '')
+      self.data_bucket = 'pkb' + self.db.replace('_', '')
       self.athena_db_create_time = 0
       self.athena_table_create_time = 0
 
