@@ -77,7 +77,8 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         'total_cpus_available': 8,
         'total_cpus_used': 4,
         'openfoam_version': '7',
-        'openmpi_version': '1.10.2'
+        'openmpi_version': '1.10.2',
+        'mpi_mapping': 'core:SPAN',
     }
     unit = 'seconds'
     self.assertSamplesEqualUpToTimestamp(
