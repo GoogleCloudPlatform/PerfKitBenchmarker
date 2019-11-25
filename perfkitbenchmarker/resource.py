@@ -215,7 +215,8 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
     self.created = True
     self.create_end_time = time.time()
 
-  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+                 timeout=3600)
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
 
