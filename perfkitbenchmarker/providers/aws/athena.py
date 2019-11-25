@@ -160,10 +160,10 @@ class Athena(edw_service.EdwService):
           'edw/athena/tpc_h/ddl/s3_partsupp.sql',
           'edw/athena/tpc_h/ddl/s3_region.sql',
           'edw/athena/tpc_h/ddl/s3_supplier.sql',
-          'edw/athena/tpc_h/ddl/s3_lineitem_bucketed.sql',
           'edw/athena/tpc_h/ddl/s3_lineitem_temp.sql',
-          'edw/athena/tpc_h/ddl/s3_orders_bucketed.sql',
-          'edw/athena/tpc_h/ddl/s3_orders_temp.sql'
+          'edw/athena/tpc_h/ddl/s3_lineitem_bucketed.sql',
+          'edw/athena/tpc_h/ddl/s3_orders_temp.sql',
+          'edw/athena/tpc_h/ddl/s3_orders_bucketed.sql'
       ]:
         _, table_create_time = _CreateTable(script)
         cumulative_table_create_time += table_create_time
