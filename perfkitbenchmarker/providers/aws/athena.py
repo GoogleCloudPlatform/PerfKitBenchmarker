@@ -26,6 +26,19 @@ from perfkitbenchmarker.providers.aws import util
 
 AWS_ATHENA_CMD_PREFIX = ['aws', 'athena']
 AWS_ATHENA_CMD_POSTFIX = ['--output', 'json']
+# TODO(user): Derive the full table set from the TPC suite.
+TPC_H_TABLES = [
+    'customer', 'lineitem', 'nation', 'orders', 'part', 'partsupp', 'region',
+    'supplier'
+]
+TPC_DS_TABLES = [
+    'call_center', 'catalog_page', 'catalog_returns', 'catalog_sales',
+    'customer', 'customer_address', 'customer_demographics', 'date_dim',
+    'dbgen_version', 'household_demographics', 'income_band', 'inventory',
+    'item', 'promotion', 'reason', 'result_table', 'result_table1', 'ship_mode',
+    'store', 'store_returns', 'store_sales', 'time_dim', 'warehouse',
+    'web_page', 'web_returns', 'web_sales', 'web_site'
+]
 
 FLAGS = flags.FLAGS
 
@@ -103,6 +116,7 @@ class Athena(edw_service.EdwService):
           [FLAGS.edw_tpc_dsb_type,
            str(FLAGS.edw_tpc_dataset_size_in_GB)])
       self.data_bucket = 'pkb' + self.db.replace('_', '')
+      self.tables = TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES
       self.athena_db_create_time = 0
       self.athena_table_create_time = 0
 
@@ -134,6 +148,36 @@ class Athena(edw_service.EdwService):
   def _Create(self):
     """Create a Athena data warehouse."""
 
+    def _EmptyDatabase():
+      """Remove tables, if they exist, so they can be refreshed.
+
+      If the database and/or tables don't already exist, the drop commands
+      will simply fail, which won't raise errors.
+      """
+      drop_script_path = data.ResourcePath('edw/athena/%s/ddl/s3_drop.sql' %
+                                           FLAGS.edw_tpc_dsb_type)
+      drop_script_contents = ReadScript(drop_script_path)
+      # Drop all tables so the database can be dropped.
+      for table in self.tables:
+        # Remove the folder backing each parquet table so they can be refreshed.
+        vm_util.IssueCommand([
+            'aws', 's3', 'rm',
+            's3://%s/%s_parquet' % (self.data_bucket, table), '--recursive'
+        ], raise_on_failure=False)
+        # The parquet tables don't have the type suffix so that the queries can
+        # run as written without having to change the table names.
+        for suffix in ['_csv', '']:
+          script_contents = PrepareQueryString(drop_script_contents,
+                                               {'{table}': table + suffix})
+          script_command = self.BuildAthenaCommand(
+              script_contents, database=self.db)
+          RunScriptCommand(script_command)
+
+      drop_database_query_string = PrepareQueryString(
+          'drop database database_name', {'database_name': self.db})
+      script_command = self.BuildAthenaCommand(drop_database_query_string)
+      RunScriptCommand(script_command)
+
     def _CreateDatabase():
       create_database_query_string = PrepareQueryString(
           'create database database_name', {'database_name': self.db})
@@ -152,23 +196,15 @@ class Athena(edw_service.EdwService):
     def _CreateAllTables():
       """Create all TPC benchmarking tables."""
       cumulative_table_create_time = 0
-      # TODO(user): Derive the paths and full table set from the TPC suite.
-      for script in [
-          'edw/athena/tpc_h/ddl/s3_customer.sql',
-          'edw/athena/tpc_h/ddl/s3_nation.sql',
-          'edw/athena/tpc_h/ddl/s3_part.sql',
-          'edw/athena/tpc_h/ddl/s3_partsupp.sql',
-          'edw/athena/tpc_h/ddl/s3_region.sql',
-          'edw/athena/tpc_h/ddl/s3_supplier.sql',
-          'edw/athena/tpc_h/ddl/s3_lineitem_temp.sql',
-          'edw/athena/tpc_h/ddl/s3_lineitem_bucketed.sql',
-          'edw/athena/tpc_h/ddl/s3_orders_temp.sql',
-          'edw/athena/tpc_h/ddl/s3_orders_bucketed.sql'
-      ]:
-        _, table_create_time = _CreateTable(script)
-        cumulative_table_create_time += table_create_time
+      for table in self.tables:
+        for suffix in ['_csv', '_parquet']:
+          script = 'edw/athena/%s/ddl/s3_%s.sql' % (FLAGS.edw_tpc_dsb_type,
+                                                    table + suffix)
+          _, table_create_time = _CreateTable(script)
+          cumulative_table_create_time += table_create_time
       return cumulative_table_create_time
 
+    _EmptyDatabase()
     _, self.athena_db_create_time = _CreateDatabase()
     self.athena_table_create_time = _CreateAllTables()
 
