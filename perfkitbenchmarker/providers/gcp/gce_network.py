@@ -24,6 +24,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import copy
 import json
 import threading
 
@@ -242,62 +243,120 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
-    name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
 
+    #  Figuring out the type of network here.
+    #  Precedence: User Managed > CIDR (multi) > gce_subnet flag (single) > Auto (default)
     self.net_type = 'default'  # Default network 'auto' mode. Single VPC with subnets in all regions
-    self.subnet_addr = NETWORK_RANGE
-    self.net_name = network.BaseNetwork.FormatCidrString(NETWORK_RANGE)
-
+    self.cidr = NETWORK_RANGE
     if FLAGS.gce_subnet_region:  # Overrides auto network when set. Creates one VPC network in single region.
       self.net_type = 'single'
-      self.subnet_addr = FLAGS.gce_subnet_addr
-      self.net_name = network.BaseNetwork.FormatCidrString(FLAGS.gce_subnet_addr)
-      name = FLAGS.gce_network_name or 'pkb-network-%s-%s-%s' % (self.net_type, self.net_name, FLAGS.run_uri)
+      self.cidr = FLAGS.gce_subnet_addr
     if network_spec.cidr:  # Creates multiple VPC networks when set.
       self.net_type = 'multi'
-      self.subnet_addr = network_spec.cidr
-      self.net_name = network.BaseNetwork.FormatCidrString(network_spec.cidr)
-      name = FLAGS.gce_network_name or 'pkb-network-%s-%s-%s' % (self.net_type, self.net_name, FLAGS.run_uri)
+      self.cidr = network_spec.cidr
 
-    self.subnet_region = FLAGS.gce_subnet_region if network_spec.cidr is None else util.GetRegionFromZone(network_spec.zone)
-    mode = 'auto' if self.subnet_region is None else 'custom'
+    name = self._MakeGceNetworkName()
+
+    subnet_region = FLAGS.gce_subnet_region if not network_spec.cidr else util.GetRegionFromZone(network_spec.zone)
+    mode = 'auto' if subnet_region is None else 'custom'
     self.network_resource = GceNetworkResource(name, mode, self.project)
-    if self.subnet_region is None:
+    if subnet_region is None:
       self.subnet_resource = None
     else:
-      self.subnet_resource = GceSubnetResource(name, name,
-                                               self.subnet_region,
-                                               self.subnet_addr,
-                                               self.project)
+      self.subnet_resource = GceSubnetResource(name, name, subnet_region, self.cidr, self.project)
 
-    self.all_nets = []  # Holds the different networks we learn about.
+    # Stage FW rules.
+    self.all_nets = self._GetNetworksFromSpec(network_spec)  # Holds the different networks in this run.
     self.external_nets_rules = {}  # Holds FW rules for any external subnets.
-    self.default_subnet = None  # Holds the default subnet for this run if used.
 
-    firewall_name = '%s-%s-%s-%s' % (self.net_type, 'internal', self.net_name, FLAGS.run_uri)
+    #  Set the default rule to allow all traffic within this network's subnet.
+    firewall_name = self._MakeGceFWRuleName()
     self.default_firewall_rule = GceFirewallRule(
-        firewall_name, self.project, ALLOW_ALL, name, self.subnet_addr)
-    self.all_nets.append(self.net_name)
-    if self.net_type != 'multi':  # We're using the default network.
-      self.default_subnet = self.subnet_addr
+        firewall_name, self.project, ALLOW_ALL, name, self.cidr)
 
-    # Add firewall rules for other networks if they exist.
+    # Set external rules to allow traffic from other VPCs/subnets in this benchmark.
+    for ext_net in self.all_nets:
+      if ext_net == self.cidr:
+        continue  # We've already added our own network to the default rule.
+      rule_name = self._MakeGceFWRuleName(dst_cidr=ext_net)
+      self.external_nets_rules[rule_name] = GceFirewallRule(rule_name, self.project, ALLOW_ALL, name, ext_net)
+
+
+  def _GetNetworksFromSpec(self, network_spec):
+    """
+    Returns a list of distinct CIDR networks defined in this benchmark's vm_groups.
+
+    All GCP networks that aren't set explicitly with a vm_group cidr property are assigned to the default network.
+    The default network is either specified as a single region with the gce_subnet_region and gce_subnet_addr flags,
+        or assigned to an auto created /20 in each region if no flags are passed.
+
+    :param network_spec:
+    :return: list[String]
+    """
+    nets = set()
+    gce_default_subnet = FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region else NETWORK_RANGE
+
     if network_spec.custom_subnets:
-      for net_group, cidr in network_spec.custom_subnets.items():
-        this_net_string = None
-        this_net = None
-        if cidr is None and self.default_subnet is None:  # only add default rule once
-          self.default_subnet = FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region else NETWORK_RANGE
-          this_net_string = network.BaseNetwork.FormatCidrString(self.default_subnet)
-          this_net = self.default_subnet
-        elif cidr:
-          this_net_string = network.BaseNetwork.FormatCidrString(cidr)
-          this_net = cidr
-        if this_net and this_net_string not in self.all_nets:
-          rule_name = '%s-%s-%s-%s' % (self.net_type, self.net_name, this_net_string, FLAGS.run_uri)
-          self.external_nets_rules[rule_name] = GceFirewallRule(rule_name, self.project, ALLOW_ALL, name, this_net)
-          self.all_nets.append(this_net_string)
+      for (k, v) in network_spec.custom_subnets.items():
+        if not v['cidr'] and not v['cloud'] == 'GCP':
+          pass  # @TODO handle other providers defaults in net_util
+        elif not v['cidr']:
+          nets.add(gce_default_subnet)
+        else:
+          nets.add(v['cidr'])
+    # return list(nets)
+    return nets
 
+  def _MakeGceNetworkName(self, net_type=None, cidr=None, uri=None):
+    """
+    Build the current network's name string.
+    Uses current instance properties if none provided.
+    Must match regex: r'(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
+    :param net_type:
+    :param cidr:
+    :param uri:
+    :return: String gce_network_name
+    """
+    if FLAGS.gce_network_name:  # Return user managed network name if defined.
+      return FLAGS.gce_network_name
+
+    _net_type = self.net_type if not net_type else net_type
+    _cidr = self.cidr if not cidr else cidr
+    _uri = FLAGS.run_uri if not uri else uri
+
+    name = 'pkb-network-%s' % _uri  # Assume the default network naming
+
+    if _net_type in ('single', 'multi'):  # GCE network names must be unique
+      name = 'pkb-network-%s-%s-%s' % (_net_type, self.FormatCidrString(_cidr), _uri)
+
+    return name
+
+  def _MakeGceFWRuleName(self, net_type=None, src_cidr=None, dst_cidr=None, port_range_lo=None, port_range_hi=None, uri=None):
+    """
+    Build a firewall name string.
+    Firewall rule names must be unique within a project so we include source and destination nets to disambiguate.
+    :param net_type: default|single|multi
+    :param src_cidr: source network
+    :param dst_cidr: target network
+    :param port_range_lo: low port to open
+    :param port_range_hi: high port to open in range.
+    :param uri: run_uri
+    :return:
+    """
+
+    _net_type = self.net_type if not net_type else net_type
+    _uri = FLAGS.run_uri if not uri else uri
+    _src_cidr = self.cidr if not src_cidr else src_cidr
+    _dst_cidr = self.cidr if not dst_cidr else dst_cidr
+    _prefix = None if _src_cidr == _dst_cidr else 'perfkit-firewall'
+    _src_cidr = 'internal' if _src_cidr == _dst_cidr else self.FormatCidrString(_src_cidr)
+    _dst_cidr = self.FormatCidrString(_dst_cidr)
+    _port_lo = port_range_lo
+    _port_hi = None if port_range_lo == port_range_hi else port_range_hi
+
+    firewall_name = '-'.join(str(i) for i in (_prefix, _net_type, _src_cidr, _dst_cidr, _port_lo, _port_hi, _uri) if i)
+
+    return firewall_name
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
