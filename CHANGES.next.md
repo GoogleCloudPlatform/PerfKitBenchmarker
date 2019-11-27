@@ -152,6 +152,7 @@
 - Records two new samples for /proc/cpuinfo data.
 - Added support for specifying a number of vms per host for Azure & AWS Dedicated Hosting.
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
+- Added support for skipping the creation of Azure availability sets with the --azure_availability_set=False flag (fixes #1863)
 - Added support for AWS EFA networking with --aws_efa=True flag.
 - Added NCCL benchmark for GPU networking.
 
