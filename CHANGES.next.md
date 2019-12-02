@@ -609,3 +609,8 @@
   any tested provider.
 - Updated ycsb.py to handle the cases of read only and update only, where there
   is no result for certain hdr histogram group.
+- Add support from reading from BigQuery Storage API in the
+  dpb_sparksql_benchmark. It uses
+  https://github.com/GoogleCloudPlatform/spark-bigquery-connector. Support is
+  currently limited to GCP Dataproc provider, but it could run anywhere
+  provided some auth is plumbed through.
