@@ -13,9 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.cuda_toolkit."""
 
-import mock
 import os
 import unittest
+import mock
 
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
@@ -28,6 +28,7 @@ AUTOBOOST_DISABLED_DICT = {'autoboost': False, 'autoboost_default': False}
 class CudaToolkitTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
+    super(CudaToolkitTestCase, self).setUp()
     path = os.path.join(os.path.dirname(__file__), '../data',
                         'nvidia_smi_output.txt')
     with open(path) as fp:
@@ -35,20 +36,20 @@ class CudaToolkitTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testQueryNumberOfGpus(self):
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(return_value=("count\n8", None))
+    vm.RemoteCommand = mock.MagicMock(return_value=('count\n8', None))
     self.assertEqual(8, cuda_toolkit.QueryNumberOfGpus(vm))
 
   def testQueryGpuClockSpeed(self):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
-        return_value=("clocks.applications.graphics [MHz], "
-                      "clocks.applications.memory [Mhz]\n"
-                      "324 MHz, 527 MHz", None))
+        return_value=('clocks.applications.graphics [MHz], '
+                      'clocks.applications.memory [Mhz]\n'
+                      '324 MHz, 527 MHz', None))
     self.assertEqual((324, 527), cuda_toolkit.QueryGpuClockSpeed(vm, 3))
     vm.RemoteCommand.assert_called_with(
-        "sudo nvidia-smi "
-        "--query-gpu=clocks.applications.memory,"
-        "clocks.applications.graphics --format=csv --id=3", should_log=True)
+        'sudo nvidia-smi '
+        '--query-gpu=clocks.applications.memory,'
+        'clocks.applications.graphics --format=csv --id=3', should_log=True)
 
   def testGetDriverVersion(self):
     vm = mock.MagicMock()
@@ -71,7 +72,6 @@ class CudaToolkitTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     self.assertEqual(expected, actual)
     vm.RemoteCommand.assert_called_with('nvidia-smi topo -p2p r',
                                         should_log=True)
-
 
   def testQueryAutoboostNull(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -125,7 +125,7 @@ class CudaToolkitTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
         return_value=(nvidia_smi_output, ''))
-    self.assertRaisesRegexp(cuda_toolkit.HeterogeneousGpuTypesException,
+    self.assertRaisesRegexp(cuda_toolkit.HeterogeneousGpuTypesError,
                             'PKB only supports one type of gpu per VM',
                             cuda_toolkit.GetGpuType, vm)
 
