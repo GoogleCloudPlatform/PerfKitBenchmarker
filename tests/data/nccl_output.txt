@@ -1,0 +1,58 @@
+# nThread 1 nGpus 1 minBytes 8 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 100 validation: 1
+#
+# Using devices
+#   Rank  0 Pid  40529 on ip-172-31-20-44 device  0 [0x00] Tesla V100-SXM2-32GB
+#   Rank  1 Pid  40530 on ip-172-31-20-44 device  1 [0x00] Tesla V100-SXM2-32GB
+#   Rank  2 Pid  40531 on ip-172-31-20-44 device  2 [0x00] Tesla V100-SXM2-32GB
+#   Rank  3 Pid  40532 on ip-172-31-20-44 device  3 [0x00] Tesla V100-SXM2-32GB
+#   Rank  4 Pid  40533 on ip-172-31-20-44 device  4 [0x00] Tesla V100-SXM2-32GB
+#   Rank  5 Pid  40534 on ip-172-31-20-44 device  5 [0x00] Tesla V100-SXM2-32GB
+#   Rank  6 Pid  40535 on ip-172-31-20-44 device  6 [0x00] Tesla V100-SXM2-32GB
+#   Rank  7 Pid  40536 on ip-172-31-20-44 device  7 [0x00] Tesla V100-SXM2-32GB
+#   Rank  8 Pid  25655 on ip-172-31-26-32 device  0 [0x00] Tesla V100-SXM2-32GB
+#   Rank  9 Pid  25656 on ip-172-31-26-32 device  1 [0x00] Tesla V100-SXM2-32GB
+#   Rank 10 Pid  25657 on ip-172-31-26-32 device  2 [0x00] Tesla V100-SXM2-32GB
+#   Rank 11 Pid  25658 on ip-172-31-26-32 device  3 [0x00] Tesla V100-SXM2-32GB
+#   Rank 12 Pid  25659 on ip-172-31-26-32 device  4 [0x00] Tesla V100-SXM2-32GB
+#   Rank 13 Pid  25660 on ip-172-31-26-32 device  5 [0x00] Tesla V100-SXM2-32GB
+#   Rank 14 Pid  25661 on ip-172-31-26-32 device  6 [0x00] Tesla V100-SXM2-32GB
+#   Rank 15 Pid  25664 on ip-172-31-26-32 device  7 [0x00] Tesla V100-SXM2-32GB
+NCCL version 2.4.6+cuda10.0
+#
+#                                                     out-of-place                       in-place
+#       size         count    type   redop     time   algbw   busbw  error     time   algbw   busbw  error
+#        (B)    (elements)                     (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)
+           8             2   float     sum    58.10    0.00    0.00  4e-07    57.87    0.00    0.00  4e-07
+          16             4   float     sum    57.75    0.00    0.00  2e-07    57.43    0.00    0.00  2e-07
+          32             8   float     sum    58.07    0.00    0.00  1e-07    57.95    0.00    0.00  1e-07
+          64            16   float     sum    58.59    0.00    0.00  1e-07    58.33    0.00    0.00  1e-07
+         128            32   float     sum    58.79    0.00    0.00  1e-07    59.41    0.00    0.00  1e-07
+         256            64   float     sum    60.04    0.00    0.01  1e-07    60.38    0.00    0.01  1e-07
+         512           128   float     sum    61.71    0.01    0.02  1e-07    61.41    0.01    0.02  1e-07
+        1024           256   float     sum    63.63    0.02    0.03  4e-07    63.80    0.02    0.03  4e-07
+        2048           512   float     sum    67.82    0.03    0.06  4e-07    68.13    0.03    0.06  4e-07
+        4096          1024   float     sum    83.44    0.05    0.09  4e-07    83.28    0.05    0.09  4e-07
+        8192          2048   float     sum    180.0    0.05    0.09  4e-07    172.3    0.05    0.09  4e-07
+       16384          4096   float     sum    232.1    0.07    0.13  4e-07    209.7    0.08    0.15  4e-07
+       32768          8192   float     sum    230.7    0.14    0.27  4e-07    216.9    0.15    0.28  4e-07
+       65536         16384   float     sum    255.2    0.26    0.48  5e-07    234.8    0.28    0.52  5e-07
+      131072         32768   float     sum    278.3    0.47    0.88  5e-07    243.4    0.54    1.01  5e-07
+      262144         65536   float     sum    302.1    0.87    1.63  5e-07    299.0    0.88    1.64  5e-07
+      524288        131072   float     sum    405.7    1.29    2.42  5e-07    404.7    1.30    2.43  5e-07
+     1048576        262144   float     sum    621.8    1.69    3.16  5e-07    621.7    1.69    3.16  5e-07
+     2097152        524288   float     sum    625.7    3.35    6.28  5e-07    621.7    3.37    6.32  5e-07
+     4194304       1048576   float     sum   1054.9    3.98    7.46  5e-07   1060.8    3.95    7.41  5e-07
+     8388608       2097152   float     sum   1762.9    4.76    8.92  5e-07   1775.8    4.72    8.86  5e-07
+    16777216       4194304   float     sum   3082.6    5.44   10.20  5e-07   3096.3    5.42   10.16  5e-07
+    33554432       8388608   float     sum   5765.1    5.82   10.91  5e-07   5746.6    5.84   10.95  5e-07
+    67108864      16777216   float     sum    10775    6.23   11.68  5e-07    10760    6.24   11.69  5e-07
+   134217728      33554432   float     sum    21129    6.35   11.91  5e-07    21261    6.31   11.84  5e-07
+   268435456      67108864   float     sum    40620    6.61   12.39  5e-07    40437    6.64   12.45  5e-07
+   536870912     134217728   float     sum    69863    7.68   14.41  5e-07    69558    7.72   14.47  5e-07
+  1073741824     268435456   float     sum   132630    8.10   15.18  5e-07   132569    8.10   15.19  5e-07
+  2147483648     536870912   float     sum   258019    8.32   15.61  5e-07   259264    8.28   15.53  5e-07
+  4294967296    1073741824   float     sum   509664    8.43   15.80  5e-07   509800    8.42   15.80  5e-07
+  8589934592    2147483648   float     sum  1622242    5.30    9.93  5e-07  1623801    5.29    9.92  5e-07
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 5.16186
+#
