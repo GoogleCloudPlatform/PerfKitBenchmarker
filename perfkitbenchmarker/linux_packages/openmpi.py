@@ -23,11 +23,14 @@ FLAGS = flags.FLAGS
 flags.DEFINE_bool('openmpi_enable_shared', False,
                   'Whether openmpi should build shared libraries '
                   'in addition to static ones.')
+flags.DEFINE_bool('openmpi_with_cuda_support', False,
+                  'Compile with CUDA support')
 
 MPI_DIR = '%s/openmpi-3.1.2' % INSTALL_DIR
 MPI_TAR = 'openmpi-3.1.2.tar.gz'
 MPI_URL = 'https://download.open-mpi.org/release/open-mpi/v3.1/' + MPI_TAR
 MPI_VERSION = '3.1.2'
+REMOVE_MPI_CMD = 'autoremove -y libopenmpi-dev openmpi-bin openmpi-common'
 
 
 def _Install(vm):
@@ -37,12 +40,18 @@ def _Install(vm):
   vm.RemoteCommand('wget %s -P %s' % (MPI_URL, INSTALL_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, MPI_TAR))
   make_jobs = vm.NumCpusForBenchmark()
-  if FLAGS.openmpi_enable_shared:
-    shared_lib_command = '--enable-shared'
+  shared_lib_command = ('--enable-shared' if FLAGS.openmpi_enable_shared
+                        else '--disable-shared')
+  if FLAGS.openmpi_with_cuda_support:
+    cuda_cmd = ('--with-cuda=/usr/local/cuda-{version}/ '
+                '--with-cuda-libdir=/usr/local/cuda-{version}/lib64/'.format(
+                    version=FLAGS.cuda_toolkit_version))
   else:
-    shared_lib_command = '--disable-shared'
-  config_cmd = ('./configure --enable-static %s --prefix=/usr'
-                % shared_lib_command)
+    cuda_cmd = ''
+  config_cmd = (
+      './configure --enable-static {shared_lib_cmd} --prefix=/usr '
+      '{cuda_cmd}'.format(shared_lib_cmd=shared_lib_command,
+                          cuda_cmd=cuda_cmd))
   vm.RobustRemoteCommand(
       'cd %s && %s && make -j %s && sudo make install' %
       (MPI_DIR, config_cmd, make_jobs))
@@ -50,11 +59,13 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the OpenMPI package on the VM."""
+  vm.RobustRemoteCommand('sudo yum {}'.format(REMOVE_MPI_CMD))
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the OpenMPI package on the VM."""
+  vm.RobustRemoteCommand('sudo apt-get {}'.format(REMOVE_MPI_CMD))
   _Install(vm)
 
 
