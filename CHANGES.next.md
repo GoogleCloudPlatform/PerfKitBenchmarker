@@ -617,3 +617,4 @@
 - Updated ycsb.py to handle the cases of read only and update only, where there
   is no result for certain hdr histogram group.
 - Add `-m PEM` to `ssh-keygen` to fix AWS.
+- Updated AWS Virtual Machine to handle shutting_down case when creating an instance.

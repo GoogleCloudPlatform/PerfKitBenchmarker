@@ -333,10 +333,29 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(str(e.exception), 'Server.InsufficientInstanceCapacity:'
                      ' Insufficient capacity to satisfy instance request')
 
+  def testInternalServerErrorAfterCreate(self):
+    """This tests when run-instances succeeds and returns a pending instance.
+
+    The instance then is not fulfilled and transitions to shutting-down due to
+    an internal server error.
+    """
+    response = json.loads(self.response)
+    state = response['Reservations'][0]['Instances'][0]['State']
+    state['Name'] = 'shutting-down'
+    state_reason = {'Code': 'Server.InternalError'}
+    response['Reservations'][0]['Instances'][0]['StateReason'] = state_reason
+    util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
+    initial_client_token = self.vm.client_token
+    self.assertFalse(self.vm._Exists())
+    # Token should be refreshed
+    self.assertNotEqual(initial_client_token, self.vm.client_token)
+
   def testInstanceDeleted(self):
     response = json.loads(self.response)
     state = response['Reservations'][0]['Instances'][0]['State']
     state['Name'] = 'shutting-down'
+    state_reason = {'Code': 'shutting-down-test'}
+    response['Reservations'][0]['Instances'][0]['StateReason'] = state_reason
     util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
     self.assertFalse(self.vm._Exists())
 
