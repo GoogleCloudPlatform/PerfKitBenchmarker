@@ -39,4 +39,3 @@ def AptInstall(vm):
                      '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'.format(
                          build='./nccl/build/pkg/deb/', nccl=FLAGS.nccl_version,
                          cuda=FLAGS.cuda_toolkit_version))
-
