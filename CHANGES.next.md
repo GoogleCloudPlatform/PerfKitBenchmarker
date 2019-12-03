@@ -154,6 +154,7 @@
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
 - Added support for AWS EFA networking with --aws_efa=True flag.
 - Added NCCL benchmark for GPU networking.
+- Added AWS DAX provider.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
