@@ -88,8 +88,9 @@ NUM_LOCAL_VOLUMES = {
 }
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
+SHUTTING_DOWN = 'shutting-down'
 INSTANCE_EXISTS_STATUSES = frozenset(['running', 'stopping', 'stopped'])
-INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', TERMINATED])
+INSTANCE_DELETED_STATUSES = frozenset([SHUTTING_DOWN, TERMINATED])
 INSTANCE_TRANSITIONAL_STATUSES = frozenset(['pending'])
 INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
                            | INSTANCE_TRANSITIONAL_STATUSES)
@@ -841,6 +842,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'Server.InsufficientInstanceCapacity'):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(
           instances[0]['StateReason']['Message'])
+    # In this path run-instances succeeded, a pending instance was created, but
+    # instance is shutting down due to internal server error. This is a
+    # retryable command for run-instance.
+    # Client token needs to be refreshed for idempotency.
+    if (status == SHUTTING_DOWN and
+        instances[0]['StateReason']['Code'] == 'Server.InternalError'):
+      self.client_token = str(uuid.uuid4())
     return status in INSTANCE_EXISTS_STATUSES
 
   def _GetNvmeBootIndex(self):
