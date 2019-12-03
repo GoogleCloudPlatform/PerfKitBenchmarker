@@ -43,7 +43,6 @@ FLAGS = flags.FLAGS
 
 PRIVATE_KEYFILE = 'perfkitbenchmarker_keyfile'
 PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
-CERT_FILE = 'perfkitbenchmarker.pem'
 
 # The temporary directory on VMs. We cannot reuse GetTempDir()
 # because run_uri will not be available at time of module load and we need
@@ -165,37 +164,12 @@ def SSHKeyGen():
 
   if not os.path.isfile(GetPrivateKeyPath()):
     create_cmd = ['ssh-keygen',
-                  '-t',
-                  'rsa',
-                  '-N',
-                  '',
+                  '-t', 'rsa',
+                  '-N', '',
+                  '-m', 'PEM',
                   '-q',
-                  '-f',
-                  PrependTempDir(PRIVATE_KEYFILE)]
-    shell_value = RunningOnWindows()
-    create_process = subprocess.Popen(create_cmd,
-                                      shell=shell_value,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-    create_process.communicate()
-
-  if not os.path.isfile(GetCertPath()):
-    create_cmd = ['openssl',
-                  'req',
-                  '-x509',
-                  '-new',
-                  '-out',
-                  PrependTempDir(CERT_FILE),
-                  '-key',
-                  PrependTempDir(PRIVATE_KEYFILE)]
-    shell_value = RunningOnWindows()
-    create_process = subprocess.Popen(create_cmd,
-                                      shell=shell_value,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      stdin=subprocess.PIPE)
-    input_bytes = ('\n' * 7).encode('utf8')
-    create_process.communicate(input=input_bytes)
+                  '-f', PrependTempDir(PRIVATE_KEYFILE)]
+    IssueCommand(create_cmd)
 
 
 def GetPrivateKeyPath():
@@ -204,10 +178,6 @@ def GetPrivateKeyPath():
 
 def GetPublicKeyPath():
   return PrependTempDir(PUBLIC_KEYFILE)
-
-
-def GetCertPath():
-  return PrependTempDir(CERT_FILE)
 
 
 def GetSshOptions(ssh_key_filename, connect_timeout=None):
