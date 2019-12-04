@@ -154,11 +154,11 @@ def Prepare(benchmark_spec):
       run_path=_BENCHMARK_ROOT))
 
   if len(vms) > 1:
-    # Allow ssh access to other vms
-    master_vm.AuthenticateVm()
-    # Avoid printing ssh warnings when running mpirun
-    master_vm.RemoteCommand('echo "LogLevel ERROR" | '
-                            'tee -a $HOME/.ssh/config')
+    # Allow ssh access to other vms and avoid printing ssh warnings when running
+    # mpirun.
+    for vm in vms:
+      vm.AuthenticateVm()
+      vm.RemoteCommand('echo "LogLevel ERROR" | tee -a $HOME/.ssh/config')
     # Tells mpirun about other nodes
     hpc_util.CreateMachineFile(vms, remote_path=_GetPath(_MACHINEFILE))
 
