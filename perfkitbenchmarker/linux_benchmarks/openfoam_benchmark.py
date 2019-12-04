@@ -125,6 +125,8 @@ _BLOCKMESHDICT = 'system/blockMeshDict'
 _TIME_RE = re.compile(r"""(\d+)m       # The minutes part
                           (\d+)\.\d+s  # The seconds part """, re.VERBOSE)
 
+_SSH_CONFIG_CMD = 'echo "LogLevel ERROR" | tee -a $HOME/.ssh/config'
+
 
 def GetConfig(user_config):
   """Returns the configuration of a benchmark."""
@@ -156,9 +158,8 @@ def Prepare(benchmark_spec):
   if len(vms) > 1:
     # Allow ssh access to other vms and avoid printing ssh warnings when running
     # mpirun.
-    for vm in vms:
-      vm.AuthenticateVm()
-      vm.RemoteCommand('echo "LogLevel ERROR" | tee -a $HOME/.ssh/config')
+    vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
+    vm_util.RunThreaded(lambda vm: vm.RemoteCommand(_SSH_CONFIG_CMD), vms)
     # Tells mpirun about other nodes
     hpc_util.CreateMachineFile(vms, remote_path=_GetPath(_MACHINEFILE))
 
@@ -322,7 +323,7 @@ def Run(benchmark_spec):
       destination=_BENCHMARK_ROOT))
   if case == 'motorbike':
     dimensions = _MOTORBIKE_DIMENSIONS[FLAGS.openfoam_motorbike_dimensions]
-  else:
+  if FLAGS['openfoam_dimensions'].present:
     dimensions = FLAGS.openfoam_dimensions
   _SetDimensions(master_vm, dimensions)
   _SetDecomposeMethod(master_vm, 'scotch')
