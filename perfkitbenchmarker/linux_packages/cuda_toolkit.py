@@ -28,9 +28,9 @@ from __future__ import print_function
 import posixpath
 import re
 
-from perfkitbenchmarker import regex_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import regex_util
 from six.moves import range
 
 
@@ -96,23 +96,23 @@ CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/c
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 
-class UnsupportedClockSpeedException(Exception):
+class UnsupportedClockSpeedError(Exception):
   pass
 
 
-class NvidiaSmiParseOutputException(Exception):
+class NvidiaSmiParseOutputError(Exception):
   pass
 
 
-class HeterogeneousGpuTypesException(Exception):
+class HeterogeneousGpuTypesError(Exception):
   pass
 
 
-class UnsupportedGpuTypeException(Exception):
+class UnsupportedGpuTypeError(Exception):
   pass
 
 
-class UnsupportedCudaVersionException(Exception):
+class UnsupportedCudaVersionError(Exception):
   pass
 
 
@@ -124,13 +124,17 @@ def SmiPath():
 def GetMetadata(vm):
   """Returns gpu-specific metadata as a dict.
 
+  Args:
+    vm: virtual machine to operate on
+
   Returns:
     A dict of gpu-specific metadata.
   """
   metadata = {}
   clock_speeds = QueryGpuClockSpeed(vm, 0)
   autoboost_policy = QueryAutoboostPolicy(vm, 0)
-  metadata['cuda_toolkit_installation_dir'] = FLAGS.cuda_toolkit_installation_dir
+  metadata['cuda_toolkit_installation_dir'] = (
+      FLAGS.cuda_toolkit_installation_dir)
   metadata['cuda_toolkit_version'] = FLAGS.cuda_toolkit_version
   metadata['gpu_memory_clock'] = clock_speeds[0]
   metadata['gpu_graphics_clock'] = clock_speeds[1]
@@ -145,6 +149,9 @@ def GetMetadata(vm):
 
 def GetPeerToPeerTopology(vm):
   """Returns a string specifying which GPUs can access each other via p2p.
+
+  Args:
+    vm: virtual machine to operate on
 
   Example:
     If p2p topology from nvidia-smi topo -p2p r looks like this:
@@ -185,16 +192,17 @@ def GetGpuType(vm):
     type of gpus installed on the vm as a string
 
   Raises:
-    NvidiaSmiParseOutputException: if nvidia-smi output cannot be parsed
-    HeterogeneousGpuTypesException: if more than one gpu type is detected
+    NvidiaSmiParseOutputError: if nvidia-smi output cannot be parsed
+    HeterogeneousGpuTypesError: if more than one gpu type is detected
+    UnsupportedClockSpeedError: if gpu type is not supported
   """
   stdout, _ = vm.RemoteCommand('nvidia-smi -L', should_log=True)
   try:
     gpu_types = [line.split(' ')[3] for line in stdout.splitlines() if line]
   except:
-    raise NvidiaSmiParseOutputException('Unable to parse gpu type')
+    raise NvidiaSmiParseOutputError('Unable to parse gpu type')
   if any(gpu_type != gpu_types[0] for gpu_type in gpu_types):
-    raise HeterogeneousGpuTypesException(
+    raise HeterogeneousGpuTypesError(
         'PKB only supports one type of gpu per VM')
 
   if 'K80' in gpu_types[0]:
@@ -207,23 +215,23 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_V100
   if 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
-  raise UnsupportedClockSpeedException(
+  raise UnsupportedClockSpeedError(
       'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
 
 def GetDriverVersion(vm):
-  """Returns the NVIDIA driver version as a string"""
+  """Returns the NVIDIA driver version as a string."""
   stdout, _ = vm.RemoteCommand('nvidia-smi', should_log=True)
-  regex = 'Driver Version\:\s+(\S+)'
+  regex = r'Driver Version\:\s+(\S+)'
   match = re.search(regex, stdout)
   try:
     return str(match.group(1))
   except:
-    raise NvidiaSmiParseOutputException('Unable to parse driver version')
+    raise NvidiaSmiParseOutputError('Unable to parse driver version')
 
 
 def QueryNumberOfGpus(vm):
-  """Returns the number of Nvidia GPUs on the system"""
+  """Returns the number of Nvidia GPUs on the system."""
   stdout, _ = vm.RemoteCommand('sudo nvidia-smi --query-gpu=count --id=0 '
                                '--format=csv', should_log=True)
   return int(stdout.split()[1])
@@ -241,7 +249,7 @@ def SetAndConfirmGpuClocks(vm):
     vm: the virtual machine to operate on.
 
   Raises:
-    UnsupportedClockSpeedException if a GPU did not accept the
+    UnsupportedClockSpeedError: if a GPU did not accept the
     provided clock speeds.
   """
   gpu_type = GetGpuType(vm)
@@ -262,10 +270,9 @@ def SetAndConfirmGpuClocks(vm):
   for i in range(num_gpus):
     if QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
                                      desired_graphics_clock):
-      raise UnsupportedClockSpeedException('Unrecoverable error setting '
-                                           'GPU #{} clock speed to {},{}'
-                                           .format(i, desired_memory_clock,
-                                                   desired_graphics_clock))
+      raise UnsupportedClockSpeedError(
+          'Unrecoverable error setting GPU #{} clock speed to {},{}'.format(
+              i, desired_memory_clock, desired_graphics_clock))
 
 
 def EnablePersistenceMode(vm):
@@ -352,7 +359,7 @@ def QueryAutoboostPolicy(vm, device_id):
             autoboost_default_match.group(1)]
     }
   except:
-    raise NvidiaSmiParseOutputException('Unable to parse Auto Boost policy')
+    raise NvidiaSmiParseOutputError('Unable to parse Auto Boost policy')
 
 
 def QueryGpuClockSpeed(vm, device_id):
@@ -378,13 +385,11 @@ def QueryGpuClockSpeed(vm, device_id):
 
 
 def CheckNvidiaSmiExists(vm):
-  """Returns whether nvidia-smi is installed or not"""
+  """Returns whether nvidia-smi is installed or not."""
   resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
                                  ignore_failure=True,
                                  suppress_warning=True)
-  if resp.rstrip() == "":
-    return False
-  return True
+  return bool(resp.rstrip())
 
 
 def CheckNvidiaGpuExists(vm):
@@ -402,9 +407,9 @@ def DoPostInstallActions(vm):
 def _InstallCudaPatch(vm, patch_url):
   """Installs CUDA Toolkit patch from NVIDIA.
 
-  args:
+  Args:
     vm: VM to install patch on
-    path_url: url of the CUDA patch to install
+    patch_url: url of the CUDA patch to install
   """
   # Need to append .deb to package name because the file downloaded from
   # NVIDIA is missing the .deb extension.
@@ -468,9 +473,15 @@ def _InstallCuda10Point1(vm):
 
 
 def AptInstall(vm):
-  """Installs CUDA toolkit on the VM if not already installed"""
+  """Installs CUDA toolkit on the VM if not already installed."""
   if CheckNvidiaSmiExists(vm):
     DoPostInstallActions(vm)
+    return
+
+  resp, _ = vm.RemoteHostCommand('ls /opt/deeplearning/install-driver.sh',
+                                 ignore_failure=True, suppress_warning=True)
+  if resp.rstrip():
+    vm.RemoteCommand('sudo /opt/deeplearning/install-driver.sh')
     return
 
   vm.Install('build_tools')
@@ -482,16 +493,17 @@ def AptInstall(vm):
   elif FLAGS.cuda_toolkit_version == '10.1':
     _InstallCuda10Point1(vm)
   else:
-    raise UnsupportedCudaVersionException()
+    raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
   # This library provides advanced profiling support
   vm.RemoteCommand('sudo apt-get install -y libcupti-dev')
 
 
-def YumInstall(vm):
-  """TODO: PKB currently only supports the installation of CUDA toolkit
-     on Ubuntu.
+def YumInstall(unused_vm):
+  """Installs CUDA toolkit on the VM if not already installed.
+
+  TODO: PKB currently only supports the installation of CUDA toolkit on Ubuntu.
   """
   raise NotImplementedError()
 
@@ -507,6 +519,9 @@ def CheckPrerequisites():
 
 def Uninstall(vm):
   """Removes the CUDA toolkit.
+
+  Args:
+    vm: VM that installed CUDA
 
   Note that reinstallation does not work correctly, i.e. you cannot reinstall
   CUDA by calling _Install() again.

@@ -1,403 +1,62 @@
-STARTING TIMING RUN AT 2019-01-31 06:16:59 PM
-:::MLPv0.5.0 resnet 1548958627.029501677 (resnet/resnet_main.py:523) run_start
-:::MLPv0.5.0 resnet 1548958627.162087679 (resnet/resnet_main.py:534) run_set_random_seed: "none"
-:::MLPv0.5.0 resnet 1548958627.610722542 (resnet/resnet_main.py:551) input_batch_size: 1024
-:::MLPv0.5.0 resnet 1548958627.613099575 (resnet/resnet_main.py:592) preproc_num_train_examples: 1281167
-:::MLPv0.5.0 resnet 1548958627.613535881 (resnet/resnet_main.py:594) preproc_num_eval_examples: 50000
-:::MLPv0.5.0 resnet 1548958627.613925934 (resnet/resnet_main.py:667) train_loop
-:::MLPv0.5.0 resnet 1548958627.614327192 (resnet/resnet_main.py:668) train_epoch: 0
-:::MLPv0.5.0 resnet 1548958627.614718437 (resnet/resnet_main.py:684) eval_target: 0.749
-:::MLPv0.5.0 resnet 1548958627.648092747 (in_memory_eval.py:149) eval_offset: 0
-:::MLPv0.5.0 resnet 1548958627.871796131 (imagenet_input.py:273) input_order
-:::MLPv0.5.0 resnet 1548958627.928777933 (imagenet_input.py:297) input_order
-:::MLPv0.5.0 resnet 1548958628.026674509 (resnet_preprocessing.py:197) input_resize: [224, 224]
-:::MLPv0.5.0 resnet 1548958628.028887033 (resnet_preprocessing.py:59) input_distorted_crop_min_object_covered: 0.1
-:::MLPv0.5.0 resnet 1548958628.030133963 (resnet_preprocessing.py:61) input_distorted_crop_aspect_ratio_range: [0.75, 1.3333333333333333]
-:::MLPv0.5.0 resnet 1548958628.031324148 (resnet_preprocessing.py:63) input_distorted_crop_area_range: [0.08, 1.0]
-:::MLPv0.5.0 resnet 1548958628.032501936 (resnet_preprocessing.py:65) input_distorted_crop_max_attempts: 10
-:::MLPv0.5.0 resnet 1548958628.081197977 (resnet_preprocessing.py:140) input_random_flip
-:::MLPv0.5.0 resnet 1548958628.184454203 (resnet/resnet_main.py:297) input_mean_subtraction: [123.675, 116.28, 103.53]
-:::MLPv0.5.0 resnet 1548958628.248790741 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(224, 224, 3) -> (112, 112, 64)"
-:::MLPv0.5.0 resnet 1548958628.250193357 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.296217203 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(112, 112, 64)"}
-:::MLPv0.5.0 resnet 1548958628.297478199 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.304017544 (resnet_model.py:372) model_hp_initial_max_pool: "(112, 112, 64) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.306495667 (resnet_model.py:324) model_hp_initial_shape: [56, 56, 64]
-:::MLPv0.5.0 resnet 1548958628.307752132 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958628.308964252 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958628.310171127 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.326009274 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.327384233 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.373537302 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 256)"}
-:::MLPv0.5.0 resnet 1548958628.374883652 (resnet_model.py:263) model_hp_projection_shortcut: "(56, 56, 64) -> (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.390875101 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.392261505 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.436064482 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 64)"}
-:::MLPv0.5.0 resnet 1548958628.437443018 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.455568314 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.456957102 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.501791716 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 64)"}
-:::MLPv0.5.0 resnet 1548958628.503162146 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.520344019 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.521700382 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.567090750 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 256)"}
-:::MLPv0.5.0 resnet 1548958628.570058823 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958628.571405888 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.572732925 (resnet_model.py:297) model_hp_end_block: " Block Output: (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.573897362 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958628.575128078 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958628.576416731 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.592749357 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 256) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.594094515 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.638403177 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 64)"}
-:::MLPv0.5.0 resnet 1548958628.639764786 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.657193899 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.658549070 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.703661203 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 64)"}
-:::MLPv0.5.0 resnet 1548958628.705064535 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.722026825 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.723402977 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.767586946 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 256)"}
-:::MLPv0.5.0 resnet 1548958628.770514011 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958628.771814108 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.773135424 (resnet_model.py:297) model_hp_end_block: " Block Output: (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.774532318 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958628.775689840 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958628.776871681 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.793035984 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 256) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.794421434 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.839672565 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 64)"}
-:::MLPv0.5.0 resnet 1548958628.841063499 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.857865572 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 64)"
-:::MLPv0.5.0 resnet 1548958628.859251976 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 64, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.904538155 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 64)"}
-:::MLPv0.5.0 resnet 1548958628.905923843 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.924552441 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 64) -> (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.925924778 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958628.971420765 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 256)"}
-:::MLPv0.5.0 resnet 1548958628.974666595 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958628.975996733 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958628.977313995 (resnet_model.py:297) model_hp_end_block: " Block Output: (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958628.979610205 (resnet_model.py:324) model_hp_initial_shape: [56, 56, 256]
-:::MLPv0.5.0 resnet 1548958628.980888367 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958628.982076883 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958628.983255386 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (56, 56, 256)"
-:::MLPv0.5.0 resnet 1548958629.001230478 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 256) -> (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.002778292 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.050791025 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 512)"}
-:::MLPv0.5.0 resnet 1548958629.052202940 (resnet_model.py:263) model_hp_projection_shortcut: "(56, 56, 256) -> (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.067690849 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 256) -> (56, 56, 128)"
-:::MLPv0.5.0 resnet 1548958629.069071293 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.114986420 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(56, 56, 128)"}
-:::MLPv0.5.0 resnet 1548958629.116390467 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.134797573 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(56, 56, 128) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.136201382 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.182955027 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.184334517 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.200619221 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.201980829 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.247684479 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 512)"}
-:::MLPv0.5.0 resnet 1548958629.250710964 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958629.252012253 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.253296137 (resnet_model.py:297) model_hp_end_block: " Block Output: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.254440784 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958629.255609989 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958629.256789446 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.272497416 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 512) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.273911715 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.321396828 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.322708368 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.338991642 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.340454817 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.386590719 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.387971401 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.496281624 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.497625351 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.542766333 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 512)"}
-:::MLPv0.5.0 resnet 1548958629.546124220 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958629.547434092 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.548757315 (resnet_model.py:297) model_hp_end_block: " Block Output: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.549978256 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958629.551193476 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958629.552406549 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.568610907 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 512) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.569960594 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.616530418 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.617863417 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.634555101 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.635922432 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.681770802 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.683170080 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.700991392 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.702406168 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.749162674 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 512)"}
-:::MLPv0.5.0 resnet 1548958629.752276659 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958629.753583908 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.754848480 (resnet_model.py:297) model_hp_end_block: " Block Output: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.756034851 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958629.757237911 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958629.758438826 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.774276018 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 512) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.775696993 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.822404146 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.823731422 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.840706110 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 128)"
-:::MLPv0.5.0 resnet 1548958629.842124939 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 128, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.890241623 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 128)"}
-:::MLPv0.5.0 resnet 1548958629.891568422 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.907816172 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 128) -> (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.909277678 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958629.955712080 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 512)"}
-:::MLPv0.5.0 resnet 1548958629.959091663 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958629.960470438 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958629.961786747 (resnet_model.py:297) model_hp_end_block: " Block Output: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.963818550 (resnet_model.py:324) model_hp_initial_shape: [28, 28, 512]
-:::MLPv0.5.0 resnet 1548958629.965037823 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958629.966201305 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958629.967374086 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (28, 28, 512)"
-:::MLPv0.5.0 resnet 1548958629.986320019 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 512) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958629.987712860 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.039424896 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958630.040800810 (resnet_model.py:263) model_hp_projection_shortcut: "(28, 28, 512) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.057460070 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 512) -> (28, 28, 256)"
-:::MLPv0.5.0 resnet 1548958630.058842182 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.106523037 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(28, 28, 256)"}
-:::MLPv0.5.0 resnet 1548958630.107854605 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.126852989 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(28, 28, 256) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.128275394 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.172367096 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.173696041 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.190656424 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.192474127 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.243723154 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958630.246895552 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958630.248248816 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.249523878 (resnet_model.py:297) model_hp_end_block: " Block Output: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.250709772 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958630.251932383 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958630.253114939 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.269220829 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.270560026 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.316615343 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.318009377 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.335405111 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.336768150 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.382261992 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.383608103 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.400670767 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.402025461 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.453162670 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958630.456211567 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958630.457481384 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.458823442 (resnet_model.py:297) model_hp_end_block: " Block Output: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.460365295 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958630.461543560 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958630.462701082 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.478559256 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.480022669 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.526707888 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.528072834 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.545563698 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.547001123 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.592637300 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.593967438 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.610088348 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.611489773 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.663976192 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958630.666728973 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958630.667923450 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.669155121 (resnet_model.py:297) model_hp_end_block: " Block Output: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.670266867 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958630.671409369 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958630.672574997 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.688653946 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.690058231 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.735488892 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.736827612 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.753246546 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958630.754629612 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.911321640 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958630.912697077 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.930178404 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.931531429 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958630.981683493 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958630.984800816 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958630.986070395 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958630.987373829 (resnet_model.py:297) model_hp_end_block: " Block Output: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958630.988545418 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958630.989724398 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958630.990868568 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.007881641 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958631.009267569 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.055094719 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958631.056475163 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.073232174 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958631.074580908 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.120712280 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958631.122085571 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.139100075 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.140475035 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.191426039 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958631.194498539 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958631.195793390 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.197090864 (resnet_model.py:297) model_hp_end_block: " Block Output: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.198222160 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958631.199361086 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958631.200518370 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.216331720 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958631.217767715 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.265124321 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958631.266436338 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.282492399 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 256)"
-:::MLPv0.5.0 resnet 1548958631.283930063 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 256, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.329290152 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 256)"}
-:::MLPv0.5.0 resnet 1548958631.330605030 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.347709179 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 256) -> (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.349112511 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 1024, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.401129246 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 1024)"}
-:::MLPv0.5.0 resnet 1548958631.403911352 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958631.405100346 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.406323195 (resnet_model.py:297) model_hp_end_block: " Block Output: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.408209801 (resnet_model.py:324) model_hp_initial_shape: [14, 14, 1024]
-:::MLPv0.5.0 resnet 1548958631.409372568 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958631.410525560 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958631.411673069 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (14, 14, 1024)"
-:::MLPv0.5.0 resnet 1548958631.429978132 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.431376219 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 2048, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.483278513 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 2048)"}
-:::MLPv0.5.0 resnet 1548958631.484716654 (resnet_model.py:263) model_hp_projection_shortcut: "(14, 14, 1024) -> (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.501376867 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 1024) -> (14, 14, 512)"
-:::MLPv0.5.0 resnet 1548958631.502732038 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.548898697 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(14, 14, 512)"}
-:::MLPv0.5.0 resnet 1548958631.550278664 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.570021391 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(14, 14, 512) -> (7, 7, 512)"
-:::MLPv0.5.0 resnet 1548958631.571394920 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 2, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.618538141 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 512)"}
-:::MLPv0.5.0 resnet 1548958631.619887829 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.637645245 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 512) -> (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.639020205 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 2048, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.691944599 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 2048)"}
-:::MLPv0.5.0 resnet 1548958631.695004940 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958631.696348667 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.697662830 (resnet_model.py:297) model_hp_end_block: " Block Output: (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.698811293 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958631.700013638 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958631.701199055 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.717277765 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 2048) -> (7, 7, 512)"
-:::MLPv0.5.0 resnet 1548958631.718676805 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.765638351 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 512)"}
-:::MLPv0.5.0 resnet 1548958631.766969442 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.783448935 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 512) -> (7, 7, 512)"
-:::MLPv0.5.0 resnet 1548958631.784873009 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.834214687 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 512)"}
-:::MLPv0.5.0 resnet 1548958631.835533619 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.852394581 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 512) -> (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.853829145 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 2048, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.907182217 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 2048)"}
-:::MLPv0.5.0 resnet 1548958631.909975052 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958631.911188364 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958631.912467003 (resnet_model.py:297) model_hp_end_block: " Block Output: (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.913615942 (resnet_model.py:244) model_hp_block_type: "bottleneck_block"
-:::MLPv0.5.0 resnet 1548958631.914775133 (resnet_model.py:246) model_hp_begin_block: {"block_type": "bottleneck_block"}
-:::MLPv0.5.0 resnet 1548958631.915971994 (resnet_model.py:246) model_hp_resnet_topology: " Block Input: (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958631.934184551 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 2048) -> (7, 7, 512)"
-:::MLPv0.5.0 resnet 1548958631.935533524 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958631.982294559 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 512)"}
-:::MLPv0.5.0 resnet 1548958631.983662605 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958632.001613855 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 512) -> (7, 7, 512)"
-:::MLPv0.5.0 resnet 1548958632.002978563 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 512, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958632.050291300 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 512)"}
-:::MLPv0.5.0 resnet 1548958632.051619053 (resnet_model.py:83) model_hp_relu
-:::MLPv0.5.0 resnet 1548958632.069630861 (resnet_model.py:161) model_hp_conv2d_fixed_padding: "(7, 7, 512) -> (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958632.071004391 (resnet_model.py:161) model_hp_conv2d_fixed_padding: {"initializer": "truncated_normal", "filters": 2048, "stride": 1, "use_bias": false}
-:::MLPv0.5.0 resnet 1548958632.123980045 (resnet_model.py:79) model_hp_batch_norm: {"epsilon": 1e-05, "training": true, "scale": true, "center": true, "momentum": 0.9, "shape": "(7, 7, 2048)"}
-:::MLPv0.5.0 resnet 1548958632.127077818 (resnet_model.py:295) model_hp_shorcut_add
-:::MLPv0.5.0 resnet 1548958632.128391981 (resnet_model.py:296) model_hp_relu
-:::MLPv0.5.0 resnet 1548958632.129661083 (resnet_model.py:297) model_hp_end_block: " Block Output: (7, 7, 2048)"
-:::MLPv0.5.0 resnet 1548958632.136381388 (resnet_model.py:402) model_hp_dense: 1000
-:::MLPv0.5.0 resnet 1548958632.161034107 (resnet_model.py:410) model_hp_final_shape: [1000]
-:::MLPv0.5.0 resnet 1548958632.163281679 (resnet/resnet_main.py:335) model_hp_loss_fn: "categorical_cross_entropy"
-:::MLPv0.5.0 resnet 1548958632.482104063 (resnet/resnet_main.py:346) model_exclude_bn_from_l2: true
-:::MLPv0.5.0 resnet 1548958632.483355045 (resnet/resnet_main.py:348) model_l2_regularization: 0.0001
-:::MLPv0.5.0 resnet 1548958632.489289045 (resnet/resnet_main.py:257) opt_learning_rate: "DEFERRED: 6fd25032-9200-4f2d-a360-b239c7b75f0c"
-:::MLPv0.5.0 resnet 1548958632.504543543 (resnet/resnet_main.py:361) opt_name: "stochastic_gradient_descent_with_momentum"
-:::MLPv0.5.0 resnet 1548958632.505724430 (resnet/resnet_main.py:362) opt_momentum: 0.9
-:::MLPv0.5.0 resnet 1548958638.024123669 (imagenet_input.py:273) input_order
-:::MLPv0.5.0 resnet 1548958638.057919979 (imagenet_input.py:297) input_order
-:::MLPv0.5.0 resnet 1548958638.072879076 (resnet_preprocessing.py:201) input_resize: [224, 224]
-:::MLPv0.5.0 resnet 1548958638.174988031 (resnet/resnet_main.py:297) input_mean_subtraction: [123.675, 116.28, 103.53]
-:::MLPv0.5.0 resnet 1548958640.918206453 (resnet/resnet_main.py:335) model_hp_loss_fn: "categorical_cross_entropy"
-:::MLPv0.5.0 resnet 1548958641.073733330 (resnet/resnet_main.py:346) model_exclude_bn_from_l2: true
-:::MLPv0.5.0 resnet 1548958641.075131178 (resnet/resnet_main.py:348) model_l2_regularization: 0.0001
-:::MLPv0.5.0 resnet 1548958984.670252323 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548959010.505098820 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548959010.505903006 (in_memory_eval.py:262) eval_accuracy: {"epoch": 0, "value": 0.0596720390021801}
-:::MLPv0.5.0 resnet 1548959010.506592989 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548960158.454315662 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548960175.196053505 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548960175.196903706 (in_memory_eval.py:262) eval_accuracy: {"epoch": 4, "value": 0.3689168393611908}
-:::MLPv0.5.0 resnet 1548960175.197606087 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548961322.704822302 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548961340.307948828 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548961340.308732748 (in_memory_eval.py:262) eval_accuracy: {"epoch": 8, "value": 0.49114990234375}
-:::MLPv0.5.0 resnet 1548961340.309406281 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548962490.975445986 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548962509.491874695 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548962509.492691517 (in_memory_eval.py:262) eval_accuracy: {"epoch": 12, "value": 0.5301310420036316}
-:::MLPv0.5.0 resnet 1548962509.493383646 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548963660.801329613 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548963678.252296686 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548963678.253144741 (in_memory_eval.py:262) eval_accuracy: {"epoch": 16, "value": 0.5355224609375}
-:::MLPv0.5.0 resnet 1548963678.253855228 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548964824.644151688 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548964841.804595709 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548964841.805408001 (in_memory_eval.py:262) eval_accuracy: {"epoch": 20, "value": 0.5487263798713684}
-:::MLPv0.5.0 resnet 1548964841.806090593 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548965989.566337585 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548966007.166140556 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548966007.166918516 (in_memory_eval.py:262) eval_accuracy: {"epoch": 24, "value": 0.5470173954963684}
-:::MLPv0.5.0 resnet 1548966007.167597532 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548967154.258266687 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548967170.973573923 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548967170.974365950 (in_memory_eval.py:262) eval_accuracy: {"epoch": 28, "value": 0.5672810673713684}
-:::MLPv0.5.0 resnet 1548967170.975055695 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548968322.705148935 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548968340.004263878 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548968340.005048990 (in_memory_eval.py:262) eval_accuracy: {"epoch": 32, "value": 0.70751953125}
-:::MLPv0.5.0 resnet 1548968340.005733252 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548969486.224864006 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548969504.766570807 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548969504.767342806 (in_memory_eval.py:262) eval_accuracy: {"epoch": 36, "value": 0.71368408203125}
-:::MLPv0.5.0 resnet 1548969504.768056393 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548970651.187619448 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548970668.278244495 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548970668.279062986 (in_memory_eval.py:262) eval_accuracy: {"epoch": 40, "value": 0.7149454951286316}
-:::MLPv0.5.0 resnet 1548970668.279749155 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548971815.726225138 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548971833.514549255 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548971833.515324593 (in_memory_eval.py:262) eval_accuracy: {"epoch": 44, "value": 0.7070515751838684}
-:::MLPv0.5.0 resnet 1548971833.516043901 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548972981.801921129 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548972999.296593666 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548972999.297385454 (in_memory_eval.py:262) eval_accuracy: {"epoch": 48, "value": 0.7065632939338684}
-:::MLPv0.5.0 resnet 1548972999.298064232 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548974147.882283688 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548974164.561633348 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548974164.562449217 (in_memory_eval.py:262) eval_accuracy: {"epoch": 52, "value": 0.70562744140625}
-:::MLPv0.5.0 resnet 1548974164.563139915 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548975311.700199604 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548975329.229606867 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548975329.230376005 (in_memory_eval.py:262) eval_accuracy: {"epoch": 56, "value": 0.7088623046875}
-:::MLPv0.5.0 resnet 1548975329.231114626 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548976476.609688997 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548976493.318666935 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548976493.319438457 (in_memory_eval.py:262) eval_accuracy: {"epoch": 60, "value": 0.7467244267463684}
-:::MLPv0.5.0 resnet 1548976493.320153475 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548976780.609737873 (in_memory_eval.py:230) eval_start
-:::MLPv0.5.0 resnet 1548976799.119123697 (in_memory_eval.py:257) eval_stop
-:::MLPv0.5.0 resnet 1548976799.119972706 (in_memory_eval.py:262) eval_accuracy: {"epoch": 61, "value": 0.7500407099723816}
-:::MLPv0.5.0 resnet 1548976799.120691538 (in_memory_eval.py:266) eval_size: 50000
-:::MLPv0.5.0 resnet 1548976799.121440172 (in_memory_eval.py:270) run_stop: {"success": "true"}
-:::MLPv0.5.0 resnet 1548976801.875200272 (resnet/resnet_main.py:776) run_final
-ENDING TIMING RUN AT 2019-01-31 11:20:02 PM
-RESULT,resnet,0,18183,perfkit,2019-01-31 06:16:59 PM
+:::MLL 1569741493.629 init_start: {"value": null, "metadata": {"file": "resnet_main.py", "lineno": 602}}
+:::MLL 1569741493.629 global_batch_size: {"value": 4096, "metadata": {"file": "resnet_main.py", "lineno": 608}}
+:::MLL 1569741501.192 model_bn_span: {"value": 128, "metadata": {"file": "resnet_main.py", "lineno": 406}}
+:::MLL 1569741501.193 opt_name: {"value": "lars", "metadata": {"file": "resnet_main.py", "lineno": 411}}
+:::MLL 1569741501.194 lars_opt_weight_decay: {"value": 0.0002, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 86}}
+:::MLL 1569741501.195 lars_epsilon: {"value": 0.0, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 87}}
+:::MLL 1569741501.196 opt_base_learning_rate: {"value": 10.0, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 60}}
+:::MLL 1569741501.197 opt_learning_rate_warmup_epochs: {"value": 5, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 61}}
+:::MLL 1569741501.198 lars_opt_end_learning_rate: {"value": 0.0001, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 62}}
+:::MLL 1569741501.205 lars_opt_learning_rate_decay_steps: {"value": 20974, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 71}}
+:::MLL 1569741501.206 lars_opt_learning_rate_decay_poly_power: {"value": 2.0, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/lars_util.py", "lineno": 72}}
+:::MLL 1569741579.566 init_stop: {"value": null, "metadata": {"file": "resnet_main.py", "lineno": 680}}
+:::MLL 1569741579.567 run_start: {"value": null, "metadata": {"file": "resnet_main.py", "lineno": 681}}
+:::MLL 1569741579.567 num_train_examples: {"value": 1281167, "metadata": {"file": "resnet_main.py", "lineno": 683}}
+:::MLL 1569741579.568 num_eval_examples: {"value": 50000, "metadata": {"file": "resnet_main.py", "lineno": 684}}
+:::MLL 1569741579.571 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 4}}
+:::MLL 1569741803.878 eval_accuracy: {"value": 0.32322001457214355, "metadata": {"epoch_num": 4, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569741803.879 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 4}}
+:::MLL 1569741803.879 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 8}}
+:::MLL 1569741968.041 eval_accuracy: {"value": 0.40342000126838684, "metadata": {"epoch_num": 8, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569741968.041 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 8}}
+:::MLL 1569741968.042 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 12}}
+:::MLL 1569742132.117 eval_accuracy: {"value": 0.4821600019931793, "metadata": {"epoch_num": 12, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569742132.118 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 12}}
+:::MLL 1569742132.118 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 16}}
+:::MLL 1569742296.213 eval_accuracy: {"value": 0.5174999833106995, "metadata": {"epoch_num": 16, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569742296.214 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 16}}
+:::MLL 1569742296.215 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 20}}
+:::MLL 1569742460.306 eval_accuracy: {"value": 0.5285199880599976, "metadata": {"epoch_num": 20, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569742460.307 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 20}}
+:::MLL 1569742460.307 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 24}}
+:::MLL 1569742624.399 eval_accuracy: {"value": 0.5299599766731262, "metadata": {"epoch_num": 24, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569742624.399 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 24}}
+:::MLL 1569742624.400 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 28}}
+:::MLL 1569742788.504 eval_accuracy: {"value": 0.6044999957084656, "metadata": {"epoch_num": 28, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569742788.505 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 28}}
+:::MLL 1569742788.505 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 32}}
+:::MLL 1569742952.590 eval_accuracy: {"value": 0.6277599930763245, "metadata": {"epoch_num": 32, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569742952.591 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 32}}
+:::MLL 1569742952.591 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 36}}
+:::MLL 1569743116.683 eval_accuracy: {"value": 0.6622400283813477, "metadata": {"epoch_num": 36, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569743116.684 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 36}}
+:::MLL 1569743116.684 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 40}}
+:::MLL 1569743280.785 eval_accuracy: {"value": 0.6734600067138672, "metadata": {"epoch_num": 40, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569743280.786 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 40}}
+:::MLL 1569743280.786 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 44}}
+:::MLL 1569743444.873 eval_accuracy: {"value": 0.7077400088310242, "metadata": {"epoch_num": 44, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569743444.873 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 44}}
+:::MLL 1569743444.874 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 48}}
+:::MLL 1569743608.963 eval_accuracy: {"value": 0.7240599989891052, "metadata": {"epoch_num": 48, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569743608.963 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 48}}
+:::MLL 1569743608.964 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 52}}
+:::MLL 1569743773.063 eval_accuracy: {"value": 0.7385799884796143, "metadata": {"epoch_num": 52, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569743773.063 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 52}}
+:::MLL 1569743773.064 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 56}}
+:::MLL 1569743937.153 eval_accuracy: {"value": 0.7526000142097473, "metadata": {"epoch_num": 56, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569743937.153 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 56}}
+:::MLL 1569743937.154 block_start: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 460, "epoch_count": 4, "first_epoch_num": 60}}
+:::MLL 1569744101.245 eval_accuracy: {"value": 0.760420024394989, "metadata": {"epoch_num": 60, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 481}}
+:::MLL 1569744101.245 block_stop: {"value": null, "metadata": {"lineno": 484, "file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "first_epoch_num": 60}}
+:::MLL 1569744101.246 run_stop: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "status": "success", "lineno": 488}}
+:::MLL 1569744101.246 run_final: {"value": null, "metadata": {"file": "/home/perfkit/training_results_v0.6/Google/benchmarks/resnet/implementations/tpu-v3-32-resnet/resnet/train_and_eval_runner.py", "lineno": 498}}

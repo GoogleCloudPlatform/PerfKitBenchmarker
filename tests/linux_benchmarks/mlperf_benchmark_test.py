@@ -32,43 +32,86 @@ class MlperfBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   @mock.patch('time.time', mock.MagicMock(return_value=1550279509.59))
   def testTrainResults(self):
-    samples = mlperf_benchmark.MakeSamplesFromOutput({}, self.contents)
+    samples = mlperf_benchmark.MakeSamplesFromOutput({},
+                                                     self.contents,
+                                                     use_tpu=True,
+                                                     model='resnet')
     golden = [
-        Sample('Eval Accuracy', 5.96720390021801, '%',
-               {'epoch': 0, 'times': 0.0, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 36.89168393611908, '%',
-               {'epoch': 4, 'times': 1164.691000699997, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 49.114990234375, '%',
-               {'epoch': 8, 'times': 2329.8028297424316, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 53.01310420036316, '%',
-               {'epoch': 12, 'times': 3498.9867885112762, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 53.55224609375, '%',
-               {'epoch': 16, 'times': 4667.747241735458, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 54.87263798713684, '%',
-               {'epoch': 20, 'times': 5831.299504995346, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 54.70173954963684, '%',
-               {'epoch': 24, 'times': 6996.661015510559, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 56.72810673713684, '%',
-               {'epoch': 28, 'times': 8160.468462944031, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 70.751953125, '%',
-               {'epoch': 32, 'times': 9329.49914598465, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 71.368408203125, '%',
-               {'epoch': 36, 'times': 10494.261439800262, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 71.49454951286316, '%',
-               {'epoch': 40, 'times': 11657.773159980774, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 70.70515751838684, '%',
-               {'epoch': 44, 'times': 12823.00942158699, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 70.65632939338684, '%',
-               {'epoch': 48, 'times': 13988.791482448578, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 70.562744140625, '%',
-               {'epoch': 52, 'times': 15154.056546211243, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 70.88623046875, '%',
-               {'epoch': 56, 'times': 16318.724472999573, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 74.67244267463684, '%',
-               {'epoch': 60, 'times': 17482.81353545189, 'version': '0.5.0'}),
-        Sample('Eval Accuracy', 75.00407099723816, '%',
-               {'epoch': 61, 'times': 17788.61406970024, 'version': '0.5.0'}),
-        Sample('Times', 18183, 'seconds', {})
+        Sample('Eval Accuracy', 32.322001457214355, '%', {
+            'epoch': 4,
+            'times': 0.0,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 40.342000126838684, '%', {
+            'epoch': 8,
+            'times': 164.16299986839294,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 48.21600019931793, '%', {
+            'epoch': 12,
+            'times': 328.239000082016,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 51.749998331069946, '%', {
+            'epoch': 16,
+            'times': 492.335000038147,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 52.851998805999756, '%', {
+            'epoch': 20,
+            'times': 656.4279999732971,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 52.99599766731262, '%', {
+            'epoch': 24,
+            'times': 820.5209999084473,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 60.44999957084656, '%', {
+            'epoch': 28,
+            'times': 984.6259999275208,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 62.775999307632446, '%', {
+            'epoch': 32,
+            'times': 1148.7119998931885,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 66.22400283813477, '%', {
+            'epoch': 36,
+            'times': 1312.8050000667572,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 67.34600067138672, '%', {
+            'epoch': 40,
+            'times': 1476.9070000648499,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 70.77400088310242, '%', {
+            'epoch': 44,
+            'times': 1640.994999885559,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 72.40599989891052, '%', {
+            'epoch': 48,
+            'times': 1805.085000038147,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 73.85799884796143, '%', {
+            'epoch': 52,
+            'times': 1969.1849999427795,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 75.26000142097473, '%', {
+            'epoch': 56,
+            'times': 2133.2750000953674,
+            'version': 'v0.6.0'
+        }),
+        Sample('Eval Accuracy', 76.0420024394989, '%', {
+            'epoch': 60,
+            'times': 2297.3669998645782,
+            'version': 'v0.6.0'
+        })
     ]
     self.assertEqual(samples, golden)
 

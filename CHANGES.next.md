@@ -152,6 +152,8 @@
 - Records two new samples for /proc/cpuinfo data.
 - Added support for specifying a number of vms per host for Azure & AWS Dedicated Hosting.
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
+- Added support for AWS EFA networking with --aws_efa=True flag.
+- Added NCCL benchmark for GPU networking.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -608,3 +610,8 @@
   any tested provider.
 - Updated ycsb.py to handle the cases of read only and update only, where there
   is no result for certain hdr histogram group.
+- Add support from reading from BigQuery Storage API in the
+  dpb_sparksql_benchmark. It uses
+  https://github.com/GoogleCloudPlatform/spark-bigquery-connector. Support is
+  currently limited to GCP Dataproc provider, but it could run anywhere
+  provided some auth is plumbed through.

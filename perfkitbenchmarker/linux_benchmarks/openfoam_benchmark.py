@@ -76,6 +76,10 @@ flags.DEFINE_string(
 flags.DEFINE_integer(
     'openfoam_num_threads', None,
     'The number of threads to run OpenFOAM with.')
+flags.DEFINE_string(
+    'openfoam_mpi_mapping', 'core:SPAN',
+    'Mpirun process mapping to use as arguments to "mpirun --map-by".')
+
 
 BENCHMARK_NAME = 'openfoam'
 _BENCHMARK_ROOT = '$HOME/OpenFOAM/run'
@@ -124,7 +128,10 @@ _TIME_RE = re.compile(r"""(\d+)m       # The minutes part
 
 def GetConfig(user_config):
   """Returns the configuration of a benchmark."""
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['num_vms'].present:
+    config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
+  return config
 
 
 def Prepare(benchmark_spec):
@@ -163,7 +170,7 @@ def _AsSeconds(input_time):
   Should return 1201
 
   Args:
-    input_time: The time to parse to a float.
+    input_time: The time to parse to an integer.
 
   Returns:
     An integer representing the time in seconds.
@@ -276,9 +283,11 @@ def _UseMpi(vm, num_processes):
       vm, 'runParallel', 'mpirun '
       '-hostfile {machinefile} '
       '-mca btl ^openib '
-      '--map-by node '
+      '--map-by {mapping} '
       '-np {num_processes}'.format(
-          machinefile=_GetPath(_MACHINEFILE), num_processes=num_processes),
+          machinefile=_GetPath(_MACHINEFILE),
+          mapping=FLAGS.openfoam_mpi_mapping,
+          num_processes=num_processes),
       runscript, '|')
   vm_util.ReplaceText(vm, '^mpirun.*', '& -parallel', runscript)
 
@@ -330,12 +339,13 @@ def Run(benchmark_spec):
   _, run_output = master_vm.RemoteCommand(run_command)
   samples = _GetSamples(run_output)
   common_metadata = {
-      'case': FLAGS.openfoam_case,
+      'case_name': FLAGS.openfoam_case,
       'dimensions': dimensions,
-      'num_cpus_available': num_cpus_available,
-      'num_cpus_used': num_cpus_to_use,
+      'total_cpus_available': num_cpus_available,
+      'total_cpus_used': num_cpus_to_use,
       'openfoam_version': _GetOpenfoamVersion(master_vm),
-      'openmpi_version': _GetOpenmpiVersion(master_vm)
+      'openmpi_version': _GetOpenmpiVersion(master_vm),
+      'mpi_mapping': FLAGS.openfoam_mpi_mapping,
   }
   for result in samples:
     result.metadata.update(common_metadata)

@@ -13,9 +13,13 @@
 # limitations under the License.
 """Module containing class for GCP's Bigquery EDW service."""
 
+import datetime
+import json
+
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
@@ -64,6 +68,10 @@ class Bigquery(edw_service.EdwService):
     bq = self.cluster_identifier.split('.')
     return '--bq_project_id={} --bq_dataset_id={}'.format(bq[0], bq[1])
 
+  def FormatProjectAndDatasetForCommand(self, dataset=None):
+    return (self.cluster_identifier.split('.')[0] + ':' +
+            dataset if dataset else self.cluster_identifier.replace('.', ':'))
+
   def InstallAndAuthenticateRunner(self, vm):
     """Method to perform installation and authentication of bigquery runner.
 
@@ -75,3 +83,65 @@ class Bigquery(edw_service.EdwService):
     """
     vm.Install('google_cloud_sdk')
     gcp_util.AuthenticateServiceAccount(vm)
+
+  def GetDatasetLastUpdatedTime(self, dataset=None):
+    """Get the formatted last modified timestamp of the dataset."""
+    cmd = [
+        'bq', 'show', '--format=prettyjson',
+        self.FormatProjectAndDatasetForCommand(dataset)
+    ]
+    dataset_metadata, _, _ = vm_util.IssueCommand(cmd)
+    metadata_json = json.loads(str(dataset_metadata))
+    return datetime.datetime.fromtimestamp(
+        float(metadata_json['lastModifiedTime']) /
+        1000.0).strftime('%Y-%m-%d_%H-%M-%S')
+
+  def GetAllTablesInDataset(self, dataset=None):
+    """Returns a list of the IDs of all the tables in the dataset."""
+    cmd = [
+        'bq', 'ls', '--format=prettyjson',
+        self.FormatProjectAndDatasetForCommand(dataset)
+    ]
+    tables_list, _, _ = vm_util.IssueCommand(cmd)
+    all_tables = []
+    for table in json.loads(str(tables_list)):
+      if table['type'] == 'TABLE':
+        all_tables.append(table['tableReference']['tableId'])
+    return all_tables
+
+  def ExtractDataset(self,
+                     dest_bucket,
+                     dataset=None,
+                     tables=None,
+                     dest_format='CSV'):
+    """Extract all tables in a dataset to a GCS bucket.
+
+    Args:
+      dest_bucket: Name of the bucket to extract the data to. Should already
+        exist.
+      dataset: Optional name of the dataset. If none, will be extracted from the
+        cluster_identifier.
+      tables: Optional list of table names to extract. If none, all tables in
+        the dataset will be extracted.
+      dest_format: Format to extract data in. Can be one of: CSV, JSON, or Avro.
+    """
+    if tables is None:
+      tables = self.GetAllTablesInDataset(dataset)
+    gcs_uri = 'gs://' + dest_bucket
+
+    # Make sure the bucket is empty.
+    vm_util.IssueCommand(['gsutil', '-m', 'rm', gcs_uri + '/**'],
+                         raise_on_failure=False)
+
+    project_dataset = self.FormatProjectAndDatasetForCommand(dataset)
+    for table in tables:
+      cmd = [
+          'bq', 'extract',
+          '--destination_format=%s' % dest_format,
+          '%s.%s' % (project_dataset, table),
+          '%s/%s/*.csv' % (gcs_uri, table)
+      ]
+      _, stderr, retcode = vm_util.IssueCommand(cmd)
+      # There is a 10T daily limit on extracting from BQ. Large datasets will
+      # inherently hit this limit and benchmarks shouldn't use those.
+      gcp_util.CheckGcloudResponseKnownFailures(stderr, retcode)
