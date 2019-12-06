@@ -671,3 +671,19 @@ def ReplaceText(vm, current_value, new_value, file_name, regex_char='/'):
                        current_value=current_value,
                        new_value=new_value,
                        file=file_name))
+
+
+def DictonaryToEnvString(dictionary):
+  """Convert a dictionary to a space sperated 'key=value' string.
+
+  Args:
+    dictionary: the key-value dictionary to be convert
+
+  Returns:
+    a string representing the dictionary
+  """
+  dict_str = ''
+  for key, value in sorted(dictionary.items()):
+    dict_str += ' {key}={value}'.format(key=key, value=value)
+  return dict_str
+
