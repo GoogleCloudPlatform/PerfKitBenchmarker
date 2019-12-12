@@ -290,8 +290,10 @@ class GceNetwork(network.BaseNetwork):
     The default network is either specified as a single region with the gce_subnet_region and gce_subnet_addr flags,
         or assigned to an auto created /20 in each region if no flags are passed.
 
-    :param network_spec:
-    :return: list[String]
+    Args:
+      network_spec: The network spec for the network.
+    Returns:
+      set(String): A set of CIDRs used by this benchmark.
     """
     nets = set()
     gce_default_subnet = FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region else NETWORK_RANGE
@@ -312,10 +314,12 @@ class GceNetwork(network.BaseNetwork):
     Build the current network's name string.
     Uses current instance properties if none provided.
     Must match regex: r'(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
-    :param net_type:
-    :param cidr:
-    :param uri:
-    :return: String gce_network_name
+    Args:
+      net_type: One of ['default', 'single', 'multi']
+      cidr: The CIDR range of this network.
+      uri: A network suffix (if different than FLAGS.run_uri)
+    Returns:
+      String The name of this network.
     """
     if FLAGS.gce_network_name:  # Return user managed network name if defined.
       return FLAGS.gce_network_name
@@ -335,13 +339,14 @@ class GceNetwork(network.BaseNetwork):
     """
     Build a firewall name string.
     Firewall rule names must be unique within a project so we include source and destination nets to disambiguate.
-    :param net_type: default|single|multi
-    :param src_cidr: source network
-    :param dst_cidr: target network
-    :param port_range_lo: low port to open
-    :param port_range_hi: high port to open in range.
-    :param uri: run_uri
-    :return:
+    Args:
+      net_type: One of ['default', 'single', 'multi']
+      src_cidr: The CIDR range of this network.
+      dst_cidr: The CIDR range of the remote network.
+      port_range_lo: The low port to open
+      port_range_hi: The high port to open in range.
+      uri: A firewall suffix (if different than FLAGS.run_uri)
+    Returns: The name of this firewall rule.
     """
 
     _net_type = self.net_type if not net_type else net_type
