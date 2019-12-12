@@ -105,6 +105,8 @@ AGGREGATE_OPERATORS = {
 
 flags.DEFINE_string('ycsb_version', '0.9.0', 'YCSB version to use. Defaults to '
                     'version 0.9.0.')
+flags.DEFINE_string('ycsb_tar_url', None, 'URL to a YCSB tarball to use '
+                    'instead of the releases located on github.')
 flags.DEFINE_enum('ycsb_measurement_type', HISTOGRAM,
                   YCSB_MEASUREMENT_TYPES,
                   'Measurement type to use for ycsb. Defaults to histogram.')
@@ -228,7 +230,8 @@ def _Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
   vm.Install('curl')
-  ycsb_url = _ycsb_tar_url or YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version)
+  ycsb_url = (_ycsb_tar_url or FLAGS.ycsb_tar_url or
+              YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version))
   install_cmd = ('mkdir -p {0} && curl -L {1} | '
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
