@@ -20,6 +20,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.linux_packages import tensorflow
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -106,7 +107,8 @@ def _DownloadData(data_dir, data_path, vm):
                    '  sudo chmod a+w {data_path} && '
                    '  {gsutil_path} -m cp -r {data_dir}/* {data_path} ;'
                    'fi'.format(
-                       data_dir=data_dir, gsutil_path=FLAGS.gsutil_path,
+                       data_dir=data_dir,
+                       gsutil_path=google_cloud_sdk.GSUTIL_PATH,
                        data_path=data_path))
 
   # vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [_ILSVRC2012_TAR],
