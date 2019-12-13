@@ -145,7 +145,9 @@ class BaseGceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-      benchmark_name, flag_values=FLAGS, **config_dict)
+        benchmark_name,
+        flag_values=FLAGS,
+        **config_dict)
     benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
                              if b.BENCHMARK_NAME == benchmark_name))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, _URI)
@@ -268,7 +270,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     # need a benchmarkspec in the context to run
     FLAGS.run_uri = _URI
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-      'cluster_boot', flag_values=FLAGS)
+        'cluster_boot', flag_values=FLAGS)
     benchmark_spec.BenchmarkSpec(mock.Mock(), config_spec, 'uid')
 
   ########
@@ -287,8 +289,8 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _cidr_string = None
     _uri = _URI
     expected_netname = '-'.join(
-      i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
-      i and i not in ('default'))
+        i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
+        i and i not in ('default'))
 
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-uri45678 (default)
@@ -309,8 +311,8 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _cidr_string = '2-2-3-4-33'
     _uri = _URI
     expected_netname = '-'.join(
-      i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
-      i and i not in ('default'))
+        i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
+        i and i not in ('default'))
 
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-single-2-2-3-4-33-uri45678 (single)
@@ -328,8 +330,8 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _cidr_string = '1-2-3-4-56'
     _uri = _URI
     expected_netname = '-'.join(
-      i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
-      i and i not in ('default'))
+        i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
+        i and i not in ('default'))
 
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-multi-1-2-3-4-56-uri45678 (multi)
@@ -353,10 +355,11 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _dst_port = None
     _uri = _URI
     expected_name = '-'.join(
-      i for i in (
-        _net_type, _src_cidr_string, _dst_cidr_string, _src_port, _dst_port,
-        _uri)
-      if i)
+        i for i in (
+            _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
+            _dst_port,
+            _uri)
+        if i)
 
     self.assertEqual(expected_name, fw_name)
     self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
@@ -373,8 +376,8 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     vm = mock.Mock(zone=zone, project=project, cidr=cidr)
     net = gce_network.GceNetwork.GetNetwork(vm)
     fw_name = net._MakeGceFWRuleName(
-      net_type=None, src_cidr=None, dst_cidr=None, port_range_lo=lo_port,
-      port_range_hi=hi_port, uri=None)
+        net_type=None, src_cidr=None, dst_cidr=None, port_range_lo=lo_port,
+        port_range_hi=hi_port, uri=None)
 
     _net_type = 'single'
     _src_cidr_string = 'internal'
@@ -383,10 +386,11 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _dst_port = None
     _uri = _URI
     expected_name = '-'.join(
-      i for i in (
-        _net_type, _src_cidr_string, _dst_cidr_string, _src_port, _dst_port,
-        _uri)
-      if i)
+        i for i in (
+            _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
+            _dst_port,
+            _uri)
+        if i)
 
     self.assertEqual(expected_name,
                      fw_name)  # single-internal-2-2-3-4-33-uri45678
@@ -404,8 +408,9 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     lo_port = 49152
     hi_port = 65535
     fw_name = net._MakeGceFWRuleName(
-      net_type=None, src_cidr=None, dst_cidr=dst_cidr, port_range_lo=lo_port,
-      port_range_hi=hi_port, uri=None)
+        net_type=None, src_cidr=None, dst_cidr=dst_cidr,
+        port_range_lo=lo_port,
+        port_range_hi=hi_port, uri=None)
 
     _prefix = None
     _net_type = 'multi'
@@ -415,9 +420,9 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _dst_port = '65535'
     _uri = _URI
     expected_name = '-'.join(
-      i for i in (
-        _prefix, _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
-        _dst_port, _uri) if i)
+        i for i in (
+            _prefix, _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
+            _dst_port, _uri) if i)
 
     self.assertEqual(expected_name,
                      fw_name)  # multi-internal-1-2-3-4-56-49152-65535-uri45678
@@ -434,8 +439,9 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     lo_port = 49152
     hi_port = 65535
     fw_name = net._MakeGceFWRuleName(
-      net_type=None, src_cidr=None, dst_cidr=dst_cidr, port_range_lo=lo_port,
-      port_range_hi=hi_port, uri=None)
+        net_type=None, src_cidr=None, dst_cidr=dst_cidr,
+        port_range_lo=lo_port,
+        port_range_hi=hi_port, uri=None)
 
     _prefix = 'perfkit-firewall'
     _net_type = 'multi'
@@ -445,9 +451,9 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _dst_port = '65535'
     _uri = _URI
     expected_name = '-'.join(
-      i for i in (
-        _prefix, _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
-        _dst_port, _uri) if i)
+        i for i in (
+            _prefix, _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
+            _dst_port, _uri) if i)
 
     self.assertEqual(expected_name,
                      fw_name)  # perfkit-firewall-multi-1-2-3-4-56-123-567-901-13-49152-65535-uri45678
@@ -467,10 +473,10 @@ def PatchCriticalObjects(retvals=None):
   with mock.patch(
       vm_util.__name__ + '.IssueCommand',
       side_effect=ReturnVal) as issue_command, mock.patch(
-    builtins.__name__ + '.open'), mock.patch(
-    vm_util.__name__ +
-    '.NamedTemporaryFile'), mock.patch(util.__name__ +
-                                       '.GetDefaultProject'):
+      builtins.__name__ + '.open'), mock.patch(
+      vm_util.__name__ +
+      '.NamedTemporaryFile'), mock.patch(util.__name__ +
+                                         '.GetDefaultProject'):
     yield issue_command
 
 
@@ -480,7 +486,7 @@ class TestGceNetwork(BaseGceNetworkTest):
     super(TestGceNetwork, self).setUp()
     # need a benchmarkspec in the context to run
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-      'cluster_boot', flag_values=FLAGS)
+        'cluster_boot', flag_values=FLAGS)
     benchmark_spec.BenchmarkSpec(mock.Mock(), config_spec, 'uid')
 
   def testGetNetwork(self):
