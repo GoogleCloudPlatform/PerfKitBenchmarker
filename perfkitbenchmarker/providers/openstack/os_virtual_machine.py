@@ -214,7 +214,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CheckFloatingIPNetworkExists(self, floating_network_name_or_id):
     network = self._CheckNetworkExists(floating_network_name_or_id)
-    if network['router:external'] != 'External':
+    if network['router:external'] != 'External' and not 'True':
       raise errors.Config.InvalidValue('Network "%s" is not External'
                                        % self.floating_ip_pool_name)
     return network
