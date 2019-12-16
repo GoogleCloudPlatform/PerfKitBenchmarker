@@ -24,7 +24,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import copy
 import json
 import threading
 
@@ -32,7 +31,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import resource
 
 from perfkitbenchmarker.providers.gcp import util
@@ -246,13 +244,13 @@ class GceNetwork(network.BaseNetwork):
 
     #  Figuring out the type of network here.
     #  Precedence: User Managed > CIDR (multi) > gce_subnet flag (single) > Auto (default)
-    self.net_type = 'default'  # Default network 'auto' mode. Single VPC with subnets in all regions
+    self.net_type = network.NetType.DEFAULT.value  # Default network 'auto' mode. Single VPC with subnets in all regions
     self.cidr = NETWORK_RANGE
     if FLAGS.gce_subnet_region:  # Overrides auto network when set. Creates one VPC network in single region.
-      self.net_type = 'single'
+      self.net_type = network.NetType.SINGLE.value
       self.cidr = FLAGS.gce_subnet_addr
     if network_spec.cidr:  # Creates multiple VPC networks when set.
-      self.net_type = 'multi'
+      self.net_type = network.NetType.MULTI.value
       self.cidr = network_spec.cidr
 
     name = self._MakeGceNetworkName()
@@ -330,7 +328,7 @@ class GceNetwork(network.BaseNetwork):
 
     name = 'pkb-network-%s' % _uri  # Assume the default network naming
 
-    if _net_type in ('single', 'multi'):  # GCE network names must be unique
+    if _net_type in (network.NetType.SINGLE.value, network.NetType.MULTI.value):  # GCE network names must be unique
       name = 'pkb-network-%s-%s-%s' % (_net_type, self.FormatCidrString(_cidr), _uri)
 
     return name

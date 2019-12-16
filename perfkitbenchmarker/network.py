@@ -20,9 +20,17 @@ others in the
 same project.
 """
 
+from enum import Enum
+
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
+
+
+class NetType(Enum):
+  DEFAULT = 'default'
+  SINGLE = 'single'
+  MULTI = 'multi'
 
 
 class BaseFirewall(object):
