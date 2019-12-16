@@ -105,6 +105,8 @@ AGGREGATE_OPERATORS = {
 
 flags.DEFINE_string('ycsb_version', '0.9.0', 'YCSB version to use. Defaults to '
                     'version 0.9.0.')
+flags.DEFINE_string('ycsb_tar_url', None, 'URL to a YCSB tarball to use '
+                    'instead of the releases located on github.')
 flags.DEFINE_enum('ycsb_measurement_type', HISTOGRAM,
                   YCSB_MEASUREMENT_TYPES,
                   'Measurement type to use for ycsb. Defaults to histogram.')
@@ -228,7 +230,8 @@ def _Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
   vm.Install('curl')
-  ycsb_url = _ycsb_tar_url or YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version)
+  ycsb_url = (_ycsb_tar_url or FLAGS.ycsb_tar_url or
+              YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version))
   install_cmd = ('mkdir -p {0} && curl -L {1} | '
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
@@ -593,7 +596,9 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       result.append((k, h1.get(k, 0) + h2.get(k, 0)))
     return result
 
-  def CombineTimeseries(combined_series, individual_series, combined_weight):
+  combined_weights = {}
+
+  def CombineTimeseries(combined_series, individual_series):
     """Combines two timeseries of average latencies.
 
     Args:
@@ -601,8 +606,6 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
           individual series is being merged.
       individual_series: A list representing the timeseries being merged with
           the combined series.
-      combined_weight: The number of individual series that the combined series
-          represents. This is needed to correctly weight the average latencies.
 
     Returns:
       A list representing the new combined series.
@@ -614,16 +617,18 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
     """
     combined_series = dict(combined_series)
     individual_series = dict(individual_series)
+    timestamps = set(combined_series) | set(individual_series)
 
     result = []
-    for timestamp in sorted(combined_series):
+    for timestamp in sorted(timestamps):
       if timestamp not in individual_series:
-        # The combined timeseries will not contain a timestamp unless all
-        # individual series also contain that timestamp. This should only
-        # happen if the clients run for different amounts of time such as
-        # during loading and should be limited to timestamps at the end of the
-        # run.
         continue
+      if timestamp not in combined_weights:
+        combined_weights[timestamp] = 1.0
+      if timestamp not in combined_series:
+        result.append((timestamp, individual_series[timestamp]))
+        continue
+
       # This computes a new combined average latency by dividing the sum of
       # request latencies by the sum of request counts for the time period.
       # The sum of latencies for an individual series is assumed to be "1",
@@ -632,19 +637,18 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       # The request count for an individual series is 1 / average latency.
       # This means the request count for the combined series is
       # combined_weight * 1 / average latency.
+      combined_weight = combined_weights[timestamp]
       average_latency = (combined_weight + 1.0) / (
           (combined_weight / combined_series[timestamp]) +
           (1.0 / individual_series[timestamp]))
       result.append((timestamp, average_latency))
+      combined_weights[timestamp] += 1.0
     return result
 
   result = copy.deepcopy(result_list[0])
   DropUnaggregated(result)
 
-  # Used for aggregating timeseries. See CombineTimeseries().
-  series_weight = 0.0
   for indiv in result_list[1:]:
-    series_weight += 1.0
     for group_name, group in six.iteritems(indiv['groups']):
       if group_name not in result['groups']:
         logging.warn('Found result group "%s" in individual YCSB result, '
@@ -681,7 +685,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       elif measurement_type == TIMESERIES:
         result['groups'][group_name][TIMESERIES] = CombineTimeseries(
             result['groups'][group_name][TIMESERIES],
-            group[TIMESERIES], series_weight)
+            group[TIMESERIES])
       else:
         result['groups'][group_name].pop(HISTOGRAM, None)
     result['client'] = ' '.join((result['client'], indiv['client']))

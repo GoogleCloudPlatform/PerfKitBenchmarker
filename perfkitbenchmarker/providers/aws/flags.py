@@ -22,6 +22,10 @@ flags.DEFINE_string(
 flags.DEFINE_integer('aws_provisioned_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
 
+flags.DEFINE_string('aws_dax_node_type', 'dax.r4.large',
+                    'The node type used for creating AWS DAX cluster.')
+flags.DEFINE_integer('aws_dax_replication_factor', 3,
+                     'The replication factor of AWS DAX cluster.')
 flags.DEFINE_string('aws_emr_loguri', None,
                     'The log-uri parameter to pass to AWS when creating a '
                     'cluster.  If not set, a bucket will be created.')
