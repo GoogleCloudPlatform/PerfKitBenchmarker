@@ -45,8 +45,8 @@ stress_ng:
 STRESS_NG_DIR = '~/stress_ng'
 GIT_REPO = 'https://github.com/ColinIanKing/stress-ng'
 GIT_TAG_MAP = {
-    '0.05.23': '54722768329c9f8184c1c98db63435f201377df1',  #  ubuntu1604
-    '0.09.25': '2db2812edf99ec80c08edf98ee88806a3662031c',  #  ubuntu1804
+    '0.05.23': '54722768329c9f8184c1c98db63435f201377df1',  # ubuntu1604
+    '0.09.25': '2db2812edf99ec80c08edf98ee88806a3662031c',  # ubuntu1804
 }
 
 VALID_CPU_METHODS = {
