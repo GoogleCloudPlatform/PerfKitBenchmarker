@@ -295,6 +295,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       cmd.flags['image'] = self.image
 
+    if FLAGS.openstack_post_provisioning_script:
+      cmd.flags['user-data'] = FLAGS.openstack_post_provisioning_script
+
     return cmd
 
   def _GetSchedulerHints(self):
