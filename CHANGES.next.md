@@ -369,6 +369,8 @@
 - Make Kubernetes virtual machines not rebootable by default, to avoid changing
   things that require rebooting, since doing so is not ideal for containers.
 - Add Amd Blis support for HPCC.
+- Add Stress-ng support to run on different versions, 0.05.23 and 0.09.25, which
+  are the defaults in Ubuntu1604 and Ubuntu1804.
 - Improved the usability of cloud bigtable ycsb benchmark by introducing flags
   --google_bigtable_static_table_name,
   --google_bigtable_enable_table_object_sharing, and --ycsb_skip_load_stage.
