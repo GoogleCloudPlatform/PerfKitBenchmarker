@@ -368,10 +368,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     net_stdout, _, _ = net_cmd.Issue()
     network = json.loads(net_stdout)
 
-    if type(network['subnets']) is list:
-        self.subnet_id = network['subnets'][0]
+    if isinstance(network['subnets'], list):
+      self.subnet_id = network['subnets'][0]
     else:
-        self.subnet_id = network['subnets']
+      self.subnet_id = network['subnets']
 
     subnet_cmd = os_utils.OpenStackCLICommand(self, 'subnet', 'show',
                                               self.subnet_id)
