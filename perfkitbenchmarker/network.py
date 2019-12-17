@@ -139,8 +139,7 @@ class BaseNetwork(object):
 
   @staticmethod
   def FormatCidrString(cidr_raw):
-    """ Format CIDR for use in resource name.
-
+    """Format CIDR for use in resource name.
     eg '10.128.0.0/9' -> '10-128-0-0-9'
 
     Args:
@@ -149,12 +148,14 @@ class BaseNetwork(object):
 
     DELIM = r'-'  # Safe delimiter for most providers
     int_regex = r'[0-9]+'
-    try:
-      return DELIM.join(regex_util.ExtractAllMatches(int_regex, str(cidr_raw)))
-    except:
-      # @TODO add address validation. Just punt for now.
-      return cidr_raw
-
+    # try:
+    octets_mask = regex_util.ExtractAllMatches(int_regex, str(cidr_raw))
+    if len(octets_mask) != 5:
+      raise errors.Error('Invalid CIDR format: "{0}"'.format(octets_mask))
+    return DELIM.join(octets_mask)
+    # except:
+    #   # @TODO add address validation. Just punt for now.
+    #   return cidr_raw
 
   @classmethod
   def GetNetworkFromNetworkSpec(cls, spec):
@@ -175,7 +176,8 @@ class BaseNetwork(object):
                          'BenchmarkSpec.')
     key = cls._GetKeyFromNetworkSpec(spec)
 
-    #  Grab the list of other networks so we can setup firewalls, forwarding, etc.
+    #  Grab the list of other networks so we can setup firewalls, forwarding,
+    #  etc.
     if not hasattr(spec, 'custom_subnets'):
       spec.__setattr__('custom_subnets', benchmark_spec.custom_subnets)
 

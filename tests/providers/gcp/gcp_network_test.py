@@ -435,7 +435,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     vm = mock.Mock(zone=zone, project=project, cidr=cidr)
     net = gce_network.GceNetwork.GetNetwork(vm)
 
-    dst_cidr = '123.567.901/13'
+    dst_cidr = '123.567.9.1/13'
     lo_port = 49152
     hi_port = 65535
     fw_name = net._MakeGceFWRuleName(
@@ -446,7 +446,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     _prefix = 'perfkit-firewall'
     _net_type = 'multi'
     _src_cidr_string = '1-2-3-4-56'
-    _dst_cidr_string = '123-567-901-13'
+    _dst_cidr_string = '123-567-9-1-13'
     _src_port = '49152'
     _dst_port = '65535'
     _uri = _URI
@@ -492,7 +492,7 @@ class TestGceNetwork(BaseGceNetworkTest):
   def testGetNetwork(self):
     project = 'myproject'
     zone = 'us-east1-a'
-    vm = mock.Mock(zone=zone, project=project)
+    vm = mock.Mock(zone=zone, project=project, cidr=None)
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertEqual(project, net.project)
     self.assertEqual(zone, net.zone)
