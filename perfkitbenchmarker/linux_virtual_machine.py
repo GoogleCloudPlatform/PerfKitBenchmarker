@@ -1230,6 +1230,87 @@ class ClearMixin(BaseLinuxMixin):
     stdout, _ = self.RemoteCommand('swupd info | grep Installed')
     return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
 
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    super(ClearMixin, self).SetupProxy()
+    profile_file = '/etc/profile'
+    commands = []
+    command_template = "grep -qxF '{0}' {1} || echo '{0}' | sudo tee -a {1}"
+
+    if FLAGS.http_proxy:
+      commands.append(command_template.format(
+          'export http_proxy=' + FLAGS.http_proxy, profile_file))
+      commands.append(command_template.format(
+          'export HTTP_PROXY=' + FLAGS.http_proxy, profile_file))
+
+    if FLAGS.https_proxy:
+      commands.append(command_template.format(
+          'export https_proxy=' + FLAGS.https_proxy, profile_file))
+      commands.append(command_template.format(
+          'export HTTPS_PROXY=' + FLAGS.https_proxy, profile_file))
+
+    if FLAGS.ftp_proxy:
+      commands.append(command_template.format(
+          'export ftp_proxy=' + FLAGS.ftp_proxy, profile_file))
+      commands.append(command_template.format(
+          'export FTP_PROXY=' + FLAGS.ftp_proxy, profile_file))
+
+    if FLAGS.no_proxy:
+      commands.append(command_template.format(
+          'export no_proxy=' + FLAGS.no_proxy, profile_file))
+      commands.append(command_template.format(
+          'export NO_PROXY=' + FLAGS.no_proxy, profile_file))
+
+    if commands:
+      self.RemoteCommand(';'.join(commands))
+
+  def ProxyCleanup(self):
+    """ Restore to a state before SetupProxy() executed """
+    super(ClearMixin, self).ProxyCleanup()
+    profile_file = '/etc/profile'
+    commands = []
+    command_template = "sudo sed -i '\#^{0}$#d' {1}"
+
+    if FLAGS.http_proxy:
+      commands.append(command_template.format(
+          'export http_proxy=' + FLAGS.http_proxy, profile_file))
+      commands.append(command_template.format(
+          'export HTTP_PROXY=' + FLAGS.http_proxy, profile_file))
+    if FLAGS.https_proxy:
+      commands.append(command_template.format(
+          'export https_proxy=' + FLAGS.https_proxy, profile_file))
+      commands.append(command_template.format(
+          'export HTTPS_PROXY=' + FLAGS.https_proxy, profile_file))
+    if FLAGS.ftp_proxy:
+      commands.append(command_template.format(
+          'export ftp_proxy=' + FLAGS.ftp_proxy, profile_file))
+      commands.append(command_template.format(
+          'export FTP_PROXY=' + FLAGS.ftp_proxy, profile_file))
+    if FLAGS.no_proxy:
+      commands.append(command_template.format(
+          'export no_proxy=' + FLAGS.no_proxy, profile_file))
+      commands.append(command_template.format(
+          'export NO_PROXY=' + FLAGS.no_proxy, profile_file))
+
+    if commands:
+      self.RemoteCommand(";".join(commands))
+
+  def RemoteCommand(self, command, **kwargs):
+    """Runs a command inside the container.
+
+    Args:
+      *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
+
+    Returns:
+      A tuple of stdout and stderr from running the command.
+    """
+    # Escapes bash sequences
+    command = ". /etc/profile; %s" % (command)
+    return self.RemoteHostCommand(command, **kwargs)[:2]
+
+
 
 class BaseContainerLinuxMixin(BaseLinuxMixin):
   """Class holding VM methods for minimal container-based OSes like Core OS."""
