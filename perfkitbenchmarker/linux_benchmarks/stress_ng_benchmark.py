@@ -44,7 +44,10 @@ stress_ng:
 """
 STRESS_NG_DIR = '~/stress_ng'
 GIT_REPO = 'https://github.com/ColinIanKing/stress-ng'
-GIT_TAG = '54722768329c9f8184c1c98db63435f201377df1'  # version 0.05.23
+GIT_TAG_MAP = {
+    '0.05.23': '54722768329c9f8184c1c98db63435f201377df1',  # ubuntu1604
+    '0.09.25': '2db2812edf99ec80c08edf98ee88806a3662031c',  # ubuntu1804
+}
 
 VALID_CPU_METHODS = {
     'all', 'ackermann', 'bitops', 'callfunc', 'cdouble', 'cfloat',
@@ -124,6 +127,12 @@ flags.register_validator(
     'stress_ng_thread_workloads',
     lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS))
 
+ALL_VERSIONS = ['0.05.23', '0.09.25']
+flags.DEFINE_enum(
+    'stress_ng_version', '0.05.23', ALL_VERSIONS,
+    'Stress-ng version to use. Default is 0.05.23 which '
+    'is the default package on Ubuntu 1604.')
+
 
 def _GeoMeanOverflow(iterable):
   """Returns the geometric mean.
@@ -171,7 +180,8 @@ def Prepare(benchmark_spec):
       'build-essential libaio-dev libapparmor-dev libattr1-dev libbsd-dev libcap-dev libgcrypt11-dev libkeyutils-dev libsctp-dev zlib1g-dev'
   )
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, STRESS_NG_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(STRESS_NG_DIR, GIT_TAG))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(
+      STRESS_NG_DIR, GIT_TAG_MAP[FLAGS.stress_ng_version]))
   vm.RemoteCommand('cd {0} && make && sudo make install'.format(STRESS_NG_DIR))
 
 
@@ -227,7 +237,11 @@ def _RunWorkload(vm, num_threads):
     A list of sample.Sample objects.
   """
 
-  metadata = {'duration_sec': FLAGS.stress_ng_duration, 'threads': num_threads}
+  metadata = {
+      'duration_sec': FLAGS.stress_ng_duration,
+      'threads': num_threads,
+      'version': FLAGS.stress_ng_version,
+  }
 
   samples = []
   values_to_geomean_list = []
@@ -239,7 +253,11 @@ def _RunWorkload(vm, num_threads):
                stressor=stressor,
                numthreads=num_threads,
                duration=FLAGS.stress_ng_duration))
-    stdout, _ = vm.RemoteCommand(cmd)
+    stdout, stderr = vm.RemoteCommand(cmd)
+    # TODO(user): Find the actual stress-ng version that changes output to
+    # stderr instead of stdout
+    if FLAGS.stress_ng_version > '0.05.23':
+      stdout = stderr
     stressng_sample = _ParseStressngResult(metadata, stdout)
     if stressng_sample:
       samples.append(stressng_sample)
