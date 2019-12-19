@@ -255,8 +255,8 @@ class GceNetwork(network.BaseNetwork):
 
     name = self._MakeGceNetworkName()
 
-    subnet_region = FLAGS.gce_subnet_region if not network_spec.cidr else \
-        util.GetRegionFromZone(network_spec.zone)
+    subnet_region = (FLAGS.gce_subnet_region if not network_spec.cidr else
+                     util.GetRegionFromZone(network_spec.zone))
     mode = 'auto' if subnet_region is None else 'custom'
     self.network_resource = GceNetworkResource(name, mode, self.project)
     if subnet_region is None:
@@ -300,8 +300,8 @@ class GceNetwork(network.BaseNetwork):
       A set of CIDR strings used by this benchmark.
     """
     nets = set()
-    gce_default_subnet = FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region \
-        else NETWORK_RANGE
+    gce_default_subnet = (FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region
+                          else NETWORK_RANGE)
 
     if network_spec.custom_subnets:
       for (k, v) in network_spec.custom_subnets.items():
