@@ -58,8 +58,6 @@ flags.DEFINE_integer('num_threads', 16,
 flags.DEFINE_integer('rpc_timeout', DEFAULT_TIMEOUT,
                      'Number of seconds to set the rpc timeout to.')
 
-tf.logging.set_verbosity(tf.logging.ERROR)
-
 
 def get_files_in_directory_sorted(directory):
   """Returns a list of files in directory, sorted alphabetically."""
@@ -111,7 +109,7 @@ class TfServingClientWorkload(object):
       request.model_spec.name = MODEL_NAME
       request.model_spec.signature_name = 'serving_default'
       request.inputs['image_bytes'].CopyFrom(
-          tf.contrib.util.make_tensor_proto(data, shape=[1]))
+          tf.make_tensor_proto(data, shape=[1]))
 
       try:
         start_time = time.time()

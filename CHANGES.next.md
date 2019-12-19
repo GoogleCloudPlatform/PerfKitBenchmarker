@@ -152,8 +152,10 @@
 - Records two new samples for /proc/cpuinfo data.
 - Added support for specifying a number of vms per host for Azure & AWS Dedicated Hosting.
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
+- Added support for skipping the creation of Azure availability sets with the --azure_availability_set=False flag (fixes #1863)
 - Added support for AWS EFA networking with --aws_efa=True flag.
 - Added NCCL benchmark for GPU networking.
+- Added AWS DAX provider.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -368,9 +370,22 @@
 - Make Kubernetes virtual machines not rebootable by default, to avoid changing
   things that require rebooting, since doing so is not ideal for containers.
 - Add Amd Blis support for HPCC.
+- Add Stress-ng support to run on different versions, 0.05.23 and 0.09.25, which
+  are the defaults in Ubuntu1604 and Ubuntu1804.
 - Improved the usability of cloud bigtable ycsb benchmark by introducing flags
   --google_bigtable_static_table_name,
   --google_bigtable_enable_table_object_sharing, and --ycsb_skip_load_stage.
+- Added `--cluster_boot_test_port_listening` for cluster_boot benchmark. When
+  set to True it will report the time until the remote command port (SSH
+  port for Linux and WinRM port for Windows) in addition to the time until
+  a remote command is successfully run.
+- Added flag `--cluster_boot_test_rdp_port_listening` to measure time until RDP
+  port accepts a connection in Windows. It is True by default.
+- Add support from reading from BigQuery Storage API in the
+  dpb_sparksql_benchmark. It uses
+  https://github.com/GoogleCloudPlatform/spark-bigquery-connector. Support is
+  currently limited to GCP Dataproc provider, but it could run anywhere
+  provided some auth is plumbed through.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -597,12 +612,6 @@
   can avoid permission issue as the pushed file only allows user to read or
   execute.
 - Add support for unmanaged NFS.
-- Added --cluster_boot_test_port_listening for cluster_boot benchmark. When
-  set to True it will report the time until the remote command port (SSH
-  port for Linux and WinRM port for Windows) in addition to the time until
-  a remote command is successfully run.
-- Added flag --cluster_boot_test_rdp_port_listening to measure time until RDP
-  port accepts a connection in Windows. It is True by default.
 - Fixed Cassandra branch name (GH-2025 from @marcomicera)
 - Add AWS T3 cpu credits argument to sample metadata.
 - Add OpenFOAM benchmark.
@@ -610,8 +619,5 @@
   any tested provider.
 - Updated ycsb.py to handle the cases of read only and update only, where there
   is no result for certain hdr histogram group.
-- Add support from reading from BigQuery Storage API in the
-  dpb_sparksql_benchmark. It uses
-  https://github.com/GoogleCloudPlatform/spark-bigquery-connector. Support is
-  currently limited to GCP Dataproc provider, but it could run anywhere
-  provided some auth is plumbed through.
+- Add `-m PEM` to `ssh-keygen` to fix AWS.
+- Updated AWS Virtual Machine to handle shutting_down case when creating an instance.

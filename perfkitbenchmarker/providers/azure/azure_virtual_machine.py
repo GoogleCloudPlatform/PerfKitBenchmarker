@@ -555,8 +555,8 @@ class AzureVirtualMachine(
     else:
       create_cmd.extend(['--ssh-key-value', self.ssh_public_key])
 
-    # Uses a custom default because create for larger sizes sometimes times out.
-    azure_vm_create_timeout = 600
+    # Uses a custom default because create has a very long tail.
+    azure_vm_create_timeout = 1200
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
     if retcode and ('Error Code: QuotaExceeded' in stderr or
