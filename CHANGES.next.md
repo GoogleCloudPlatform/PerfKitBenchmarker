@@ -156,6 +156,7 @@
 - Added support for AWS EFA networking with --aws_efa=True flag.
 - Added NCCL benchmark for GPU networking.
 - Added AWS DAX provider.
+- Added Google Cloud Firestore ycsb benchmarks.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
