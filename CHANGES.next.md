@@ -152,9 +152,11 @@
 - Records two new samples for /proc/cpuinfo data.
 - Added support for specifying a number of vms per host for Azure & AWS Dedicated Hosting.
   Simply add flag `num_vms_per_host=<#>` to use. Benchmark fails if the # of vms per host specified exceeds the memory capacity of the host.
+- Added support for skipping the creation of Azure availability sets with the --azure_availability_set=False flag (fixes #1863)
 - Added support for AWS EFA networking with --aws_efa=True flag.
 - Added NCCL benchmark for GPU networking.
 - Added AWS DAX provider.
+- Added Google Cloud Firestore ycsb benchmarks.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -369,6 +371,8 @@
 - Make Kubernetes virtual machines not rebootable by default, to avoid changing
   things that require rebooting, since doing so is not ideal for containers.
 - Add Amd Blis support for HPCC.
+- Add Stress-ng support to run on different versions, 0.05.23 and 0.09.25, which
+  are the defaults in Ubuntu1604 and Ubuntu1804.
 - Improved the usability of cloud bigtable ycsb benchmark by introducing flags
   --google_bigtable_static_table_name,
   --google_bigtable_enable_table_object_sharing, and --ycsb_skip_load_stage.

@@ -116,7 +116,8 @@ class Athena(edw_service.EdwService):
           [FLAGS.edw_tpc_dsb_type,
            str(FLAGS.edw_tpc_dataset_size_in_GB)])
       self.data_bucket = 'pkb' + self.db.replace('_', '')
-      self.tables = TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES
+      self.tables = (
+          TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES)
       self.athena_db_create_time = 0
       self.athena_table_create_time = 0
 
