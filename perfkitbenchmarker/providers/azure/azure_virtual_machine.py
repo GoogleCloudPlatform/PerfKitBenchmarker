@@ -104,7 +104,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     """
     super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
-      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+      config_values['machine_type'] = yaml.safe_load(flag_values.machine_type)
     if flag_values['azure_accelerated_networking'].present:
       config_values['accelerated_networking'] = (
           flag_values.azure_accelerated_networking)
