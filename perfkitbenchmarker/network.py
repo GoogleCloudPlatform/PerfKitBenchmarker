@@ -156,7 +156,7 @@ class BaseNetwork(object):
     int_regex = r'[0-9]+'
     octets_mask = regex_util.ExtractAllMatches(int_regex, str(cidr_raw))
     if len(octets_mask) != 5:  # expecting 4 octets plus 1 prefix mask.
-      raise errors.Error('Invalid CIDR format: "{0}"'.format(cidr_raw))
+      raise errors.ValueError('Invalid CIDR format: "{0}"'.format(cidr_raw))
     return DELIM.join(octets_mask)
 
   @classmethod

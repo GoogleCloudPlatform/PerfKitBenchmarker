@@ -329,16 +329,16 @@ class GceNetwork(network.BaseNetwork):
     if FLAGS.gce_network_name:  # Return user managed network name if defined.
       return FLAGS.gce_network_name
 
-    _net_type = self.net_type if not net_type else net_type
-    _cidr = self.cidr if not cidr else cidr
-    _uri = FLAGS.run_uri if not uri else uri
+    net_type = net_type or self.net_type
+    cidr = cidr or self.cidr
+    uri = uri or FLAGS.run_uri
 
-    name = 'pkb-network-%s' % _uri  # Assume the default network naming.
+    name = 'pkb-network-%s' % uri  # Assume the default network naming.
 
-    if _net_type in (network.NetType.SINGLE.value,
+    if net_type in (network.NetType.SINGLE.value,
                      network.NetType.MULTI.value):
       name = 'pkb-network-%s-%s-%s' % (
-          _net_type, self.FormatCidrString(_cidr), _uri)
+          net_type, self.FormatCidrString(cidr), uri)
 
     return name
 
@@ -357,21 +357,21 @@ class GceNetwork(network.BaseNetwork):
       uri: A firewall suffix (if different than FLAGS.run_uri)
     Returns: The name of this firewall rule.
     """
+    net_type = net_type or self.net_type
+    uri = uri or FLAGS.run_uri
+    src_cidr = src_cidr or self.cidr
+    dst_cidr = dst_cidr or self.cidr
 
-    _net_type = self.net_type if not net_type else net_type
-    _uri = FLAGS.run_uri if not uri else uri
-    _src_cidr = self.cidr if not src_cidr else src_cidr
-    _dst_cidr = self.cidr if not dst_cidr else dst_cidr
-    _prefix = None if _src_cidr == _dst_cidr else 'perfkit-firewall'
-    _src_cidr = 'internal' if _src_cidr == _dst_cidr else self.FormatCidrString(
-        _src_cidr)
-    _dst_cidr = self.FormatCidrString(_dst_cidr)
-    _port_lo = port_range_lo
-    _port_hi = None if port_range_lo == port_range_hi else port_range_hi
+    prefix = None if src_cidr == dst_cidr else 'perfkit-firewall'
+    src_cidr = 'internal' if src_cidr == dst_cidr else self.FormatCidrString(
+        src_cidr)
+    dst_cidr = self.FormatCidrString(dst_cidr)
+    port_lo = port_range_lo
+    port_hi = None if port_range_lo == port_range_hi else port_range_hi
 
     firewall_name = '-'.join(str(i) for i in (
-        _prefix, _net_type, _src_cidr, _dst_cidr,
-        _port_lo, _port_hi, _uri) if i)
+        prefix, net_type, src_cidr, dst_cidr,
+        port_lo, port_hi, uri) if i)
 
     return firewall_name
 
