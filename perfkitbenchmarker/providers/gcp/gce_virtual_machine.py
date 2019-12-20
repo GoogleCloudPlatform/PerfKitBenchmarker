@@ -133,7 +133,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['gce_boot_disk_type'].present:
       config_values['boot_disk_type'] = flag_values.gce_boot_disk_type
     if flag_values['machine_type'].present:
-      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+      config_values['machine_type'] = yaml.safe_load(flag_values.machine_type)
     if flag_values['project'].present:
       config_values['project'] = flag_values.project
     if flag_values['image_family'].present:

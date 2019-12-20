@@ -481,7 +481,7 @@ class YAMLParser(flags.ArgumentParser):
     """Parse the input.
 
     Args:
-      inp: A string or the result of yaml.load. If a string, should be
+      inp: A string or the result of yaml.safe_load. If a string, should be
            a valid YAML document.
     """
 
@@ -489,13 +489,13 @@ class YAMLParser(flags.ArgumentParser):
       # This will work unless the user writes a config with a quoted
       # string that, if unquoted, would be parsed as a non-string
       # Python type (example: '123'). In that case, the first
-      # yaml.load() in the config system will strip away the quotation
-      # marks, and this second yaml.load() will parse it as the
+      # yaml.safe_load() in the config system will strip away the quotation
+      # marks, and this second yaml.safe_load() will parse it as the
       # non-string type. However, I think this is the best we can do
       # without significant changes to the config system, and the
       # problem is unlikely to occur in PKB.
       try:
-        return yaml.load(inp)
+        return yaml.safe_load(inp)
       except yaml.YAMLError as e:
         raise ValueError("Couldn't parse YAML string '%s': %s" %
                          (inp, str(e)))
