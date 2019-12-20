@@ -2068,7 +2068,7 @@ class JujuMixin(DebianMixin):
   @vm_util.Retry(poll_interval=30, timeout=3600)
   def JujuWait(self):
     """Wait for all deployed services to be installed, configured, and idle."""
-    status = yaml.load(self.JujuStatus())
+    status = yaml.safe_load(self.JujuStatus())
     for service in status['services']:
       ss = status['services'][service]['service-status']['current']
 

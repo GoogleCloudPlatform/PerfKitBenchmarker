@@ -526,7 +526,7 @@ class KubernetesContainer(BaseContainer):
     stdout, _, _ = vm_util.IssueCommand([
         FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'get', 'pod', self.name, '-o', 'yaml'])
-    pod = yaml.load(stdout)
+    pod = yaml.safe_load(stdout)
     if pod:
       self.ip_address = pod.get('status', {}).get('podIP', None)
     return pod
@@ -591,7 +591,7 @@ class KubernetesContainerService(BaseContainerService):
         '-o', 'jsonpath="{.status.loadBalancer.ingress[*][\'ip\']}"'
     ]
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
-    ip_address = yaml.load(stdout)
+    ip_address = yaml.safe_load(stdout)
     if ip_address:
       self.ip_address = ip_address
 
