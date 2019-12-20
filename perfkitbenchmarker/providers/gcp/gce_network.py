@@ -336,7 +336,7 @@ class GceNetwork(network.BaseNetwork):
     name = 'pkb-network-%s' % uri  # Assume the default network naming.
 
     if net_type in (network.NetType.SINGLE.value,
-                     network.NetType.MULTI.value):
+                    network.NetType.MULTI.value):
       name = 'pkb-network-%s-%s-%s' % (
           net_type, self.FormatCidrString(cidr), uri)
 
