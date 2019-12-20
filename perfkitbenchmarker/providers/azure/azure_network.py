@@ -473,7 +473,7 @@ class AzureNetwork(network.BaseNetwork):
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.location,
         storage_account_prefix[:24 - len(suffix)] + suffix)
-    prefix = '%s-%s' % (self.resource_group.name, self.location)
+    prefix = '%s-%s' % (self.resource_group.name, self.zone)
     self.vnet = AzureVirtualNetwork(self.location, prefix + '-vnet')
     self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
     self.nsg = AzureNetworkSecurityGroup(self.location, self.subnet,
