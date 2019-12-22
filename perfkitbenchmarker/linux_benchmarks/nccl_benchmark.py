@@ -98,7 +98,7 @@ _RUN_CMD = ('{mpi} '
             '--bind-to none '
             '-np {np} '
             '-N {slots} '
-            '-x {env} '
+            '{env} '
             'nccl-tests/build/all_reduce_perf '
             '--minbytes {minbytes} '
             '--maxbytes {maxbytes} '
@@ -278,7 +278,7 @@ def Run(benchmark_spec):
                         hostfile=_HOSTFILE,
                         np=FLAGS.nccl_np,
                         slots=FLAGS.nccl_slots,
-                        env=' -x '.join(env),
+                        env=' '.join(['-x {}'.format(x) for x in env]),
                         minbytes=FLAGS.nccl_minbytes,
                         maxbytes=FLAGS.nccl_maxbytes,
                         stepfactor=FLAGS.nccl_stepfactor,
