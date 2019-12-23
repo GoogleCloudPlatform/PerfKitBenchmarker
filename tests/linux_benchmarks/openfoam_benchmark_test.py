@@ -52,7 +52,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
                      return_value='1.10.2')
   @mock.patch.object(openfoam_benchmark, '_GetOpenfoamVersion',
                      return_value='7')
-  @flagsaver.flagsaver(openfoam_motorbike_dimensions='large')
+  @flagsaver.flagsaver(openfoam_dimensions=['80 32 32'])
   def testRunReturnsCorrectlyParsedSamples(self,
                                            mock_getopenfoamversion,
                                            mock_getmpiversion):
