@@ -458,7 +458,7 @@ class AzureNetwork(network.BaseNetwork):
     # With dedicated hosting and/or an availability zone, an availability set
     # cannot be created
     if (FLAGS.dedicated_hosts or util.GetAvailabilityZoneFromZone(self.zone) or
-       not FLAGS.azure_availability_set):
+        not FLAGS.azure_availability_set):
       self.avail_set = None
     else:
       avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
@@ -473,7 +473,7 @@ class AzureNetwork(network.BaseNetwork):
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.location,
         storage_account_prefix[:24 - len(suffix)] + suffix)
-    prefix = '%s-%s' % (self.resource_group.name, self.location)
+    prefix = '%s-%s' % (self.resource_group.name, self.zone)
     self.vnet = AzureVirtualNetwork(self.location, prefix + '-vnet')
     self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
     self.nsg = AzureNetworkSecurityGroup(self.location, self.subnet,
