@@ -52,7 +52,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
                      return_value='1.10.2')
   @mock.patch.object(openfoam_benchmark, '_GetOpenfoamVersion',
                      return_value='7')
-  @flagsaver.flagsaver(openfoam_dimensions=['80 32 32'])
+  @flagsaver.flagsaver(openfoam_dimensions=['80_32_32'])
   def testRunReturnsCorrectlyParsedSamples(self,
                                            mock_getopenfoamversion,
                                            mock_getmpiversion):
@@ -73,12 +73,13 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     # Verify sample equality
     expected_metadata = {
         'case_name': 'motorbike',
+        'decomp_method': 'scotch',
         'dimensions': '80 32 32',
-        'total_cpus_available': 8,
-        'total_cpus_used': 4,
+        'mpi_mapping': 'core:SPAN',
         'openfoam_version': '7',
         'openmpi_version': '1.10.2',
-        'mpi_mapping': 'core:SPAN',
+        'total_cpus_available': 8,
+        'total_cpus_used': 4,
     }
     unit = 'seconds'
     self.assertSamplesEqualUpToTimestamp(
