@@ -54,13 +54,19 @@ flags.DEFINE_enum(
     'openfoam_case', _DEFAULT_CASE,
     sorted(list(_CASE_PATHS.keys())),
     'Name of the OpenFOAM case to run.')
-flags.DEFINE_list('openfoam_dimensions', ['20 8 8'], 'Dimensions of the case.')
+flags.DEFINE_list('openfoam_dimensions', ['20_8_8'], 'Dimensions of the case.')
 flags.DEFINE_integer(
     'openfoam_num_threads', None,
     'The number of threads to run OpenFOAM with.')
 flags.DEFINE_string(
     'openfoam_mpi_mapping', 'core:SPAN',
     'Mpirun process mapping to use as arguments to "mpirun --map-by".')
+flags.DEFINE_string(
+    'openfoam_decomp_method', 'scotch',
+    'Decomposition method to use in decomposePar. See: '
+    'https://cfd.direct/openfoam/user-guide/v7-running-applications-parallel/')
+flags.mark_flags_as_required(
+    ['openfoam_dimensions', 'openfoam_mpi_mapping', 'openfoam_decomp_method'])
 
 BENCHMARK_NAME = 'openfoam'
 _BENCHMARK_ROOT = '$HOME/OpenFOAM/run'
@@ -112,13 +118,35 @@ _SSH_CONFIG_CMD = 'echo "LogLevel ERROR" | tee -a $HOME/.ssh/config'
 def GetConfig(user_config):
   """Returns the configuration of a benchmark."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  logging.info(FLAGS.openfoam_dimensions)
-  if FLAGS.openfoam_dimensions is None:
-    raise errors.Config.MissingOption(
-        'Missing argument for --openfoam_dimensions.')
+  _ParseDimensions(FLAGS.openfoam_dimensions)
   if FLAGS['num_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   return config
+
+
+def _ParseDimensions(dimensions_list):
+  """Parse, validate, and return the supplied dimensions list.
+
+  Args:
+    dimensions_list: List of strings formatted as "_" separated integers. Like:
+      ['80_20_20', '20_8_8'].
+
+  Returns:
+    A parsed list of dimensions like: ['80 20 20', '20 8 8'].
+
+  Raises:
+    errors.Config.InvalidValue: If input dimensions are incorrectly formatted.
+
+  """
+  parsed_dimensions_list = [
+      dimensions.split('_') for dimensions in dimensions_list
+  ]
+  for dimensions in parsed_dimensions_list:
+    if not all(value.isdigit() for value in dimensions):
+      raise errors.Config.InvalidValue(
+          'Expected list of ints separated by "_" in --openfoam_dimensions '
+          'but received %s.' % dimensions)
+  return [' '.join(dimensions) for dimensions in parsed_dimensions_list]
 
 
 def Prepare(benchmark_spec):
@@ -140,13 +168,12 @@ def Prepare(benchmark_spec):
                                _CASE_PATHS[FLAGS.openfoam_case]),
       run_path=_BENCHMARK_ROOT))
 
-  if len(vms) > 1:
-    # Allow ssh access to other vms and avoid printing ssh warnings when running
-    # mpirun.
-    vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
-    vm_util.RunThreaded(lambda vm: vm.RemoteCommand(_SSH_CONFIG_CMD), vms)
-    # Tells mpirun about other nodes
-    hpc_util.CreateMachineFile(vms, remote_path=_GetPath(_MACHINEFILE))
+  # Allow ssh access to other vms and avoid printing ssh warnings when running
+  # mpirun.
+  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
+  vm_util.RunThreaded(lambda vm: vm.RemoteCommand(_SSH_CONFIG_CMD), vms)
+  # Tells mpirun about other nodes
+  hpc_util.CreateMachineFile(vms, remote_path=_GetPath(_MACHINEFILE))
 
 
 def _AsSeconds(input_time):
@@ -207,12 +234,12 @@ def _GetSamples(output):
 
 def _GetOpenfoamVersion(vm):
   """Get the installed OpenFOAM version from the vm."""
-  return vm.RemoteCommand('echo $WM_PROJECT_VERSION')[0]
+  return vm.RemoteCommand('echo $WM_PROJECT_VERSION')[0].rstrip()
 
 
 def _GetOpenmpiVersion(vm):
   """Get the installed OpenMPI version from the vm."""
-  return vm.RemoteCommand('mpirun -version')[0].split()[3]
+  return vm.RemoteCommand('mpirun -version')[0].split()[3].rstrip()
 
 
 def _GetWorkingDirPath():
@@ -254,7 +281,7 @@ def _SetDimensions(vm, dimensions):
   function will just replace whatever is inside those.
 
   Args:
-    vm: The vm to make the replacement on.
+    vm: The VM to make the replacement on.
     dimensions: String, new mesh dimensions to run with.
 
   """
@@ -265,15 +292,17 @@ def _SetDimensions(vm, dimensions):
                       regex_char='|')
 
 
-def _UseMpi(vm, num_processes):
+def _UseMpi(vm, num_processes, mapping):
   """Configure OpenFOAM to use MPI if running with more than 1 VM.
 
   This function looks for the word "runParallel" in the run script and replaces
   it with an mpirun command.
 
   Args:
-    vm: The worker vm to use MPI on.
-    num_processes: The total number of processes for the MPI job.
+    vm: The worker VM to use MPI on.
+    num_processes: An integer representing the total number of processes for the
+      MPI job.
+    mapping: A string for the mpirun --map-by flag.
   """
   runscript = _GetPath(_RUNSCRIPT)
   vm_util.ReplaceText(
@@ -283,9 +312,8 @@ def _UseMpi(vm, num_processes):
       '--map-by {mapping} '
       '-np {num_processes}'.format(
           machinefile=_GetPath(_MACHINEFILE),
-          mapping=FLAGS.openfoam_mpi_mapping,
-          num_processes=num_processes),
-      runscript, '|')
+          mapping=mapping,
+          num_processes=num_processes), runscript, '|')
   vm_util.ReplaceText(vm, '^mpirun.*', '& -parallel', runscript)
 
 
@@ -322,38 +350,43 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   num_vms = len(vms)
+
+  # Run configuration metadata:
   num_cpus_available = num_vms * master_vm.NumCpusForBenchmark()
   num_cpus_to_use = FLAGS.openfoam_num_threads or num_cpus_available // 2
-  logging.info('Running %s case on %s/%s cores on %s vms',
-               FLAGS.openfoam_case,
-               num_cpus_to_use,
-               num_cpus_available,
-               num_vms)
+  case_name = FLAGS.openfoam_case
+  mpi_mapping = FLAGS.openfoam_mpi_mapping
+  decomp_method = FLAGS.openfoam_decomp_method
+  openfoam_version = _GetOpenfoamVersion(master_vm)
+  openmpi_version = _GetOpenmpiVersion(master_vm)
+  common_metadata = {
+      'case_name': case_name,
+      'decomp_method': decomp_method,
+      'mpi_mapping': mpi_mapping,
+      'openfoam_version': openfoam_version,
+      'openmpi_version': openmpi_version,
+      'total_cpus_available': num_cpus_available,
+      'total_cpus_used': num_cpus_to_use,
+  }
+  logging.info('Running %s case on %s/%s cores on %s vms', case_name,
+               num_cpus_to_use, num_cpus_available, num_vms)
+  logging.info('Common metadata: %s', common_metadata)
 
   # Configure the run
-  case = FLAGS.openfoam_case
   master_vm.RemoteCommand('cp -r {case_path} {destination}'.format(
-      case_path=posixpath.join(openfoam.OPENFOAM_ROOT, _CASE_PATHS[case]),
+      case_path=posixpath.join(openfoam.OPENFOAM_ROOT, _CASE_PATHS[case_name]),
       destination=_BENCHMARK_ROOT))
   _SetDecomposeMethod(master_vm, 'scotch')
   _SetNumProcesses(master_vm, num_cpus_to_use)
-  if num_vms > 1:
-    _UseMpi(master_vm, num_cpus_to_use)
+  _UseMpi(master_vm, num_cpus_to_use, mpi_mapping)
 
+  # Run and gather samples.
   samples = []
-  for dimensions in FLAGS.openfoam_dimensions:
+  for dimensions in _ParseDimensions(FLAGS.openfoam_dimensions):
     results = _RunCase(master_vm, dimensions)
-    common_metadata = {
-        'case_name': FLAGS.openfoam_case,
-        'dimensions': dimensions,
-        'total_cpus_available': num_cpus_available,
-        'total_cpus_used': num_cpus_to_use,
-        'openfoam_version': _GetOpenfoamVersion(master_vm),
-        'openmpi_version': _GetOpenmpiVersion(master_vm),
-        'mpi_mapping': FLAGS.openfoam_mpi_mapping,
-    }
     for result in results:
       result.metadata.update(common_metadata)
+      result.metadata['dimensions'] = dimensions
     samples.extend(results)
   return samples
 
