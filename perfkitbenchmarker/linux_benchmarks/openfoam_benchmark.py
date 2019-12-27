@@ -65,8 +65,6 @@ flags.DEFINE_string(
     'openfoam_decomp_method', 'scotch',
     'Decomposition method to use in decomposePar. See: '
     'https://cfd.direct/openfoam/user-guide/v7-running-applications-parallel/')
-flags.mark_flags_as_required(
-    ['openfoam_dimensions', 'openfoam_mpi_mapping', 'openfoam_decomp_method'])
 
 BENCHMARK_NAME = 'openfoam'
 _BENCHMARK_ROOT = '$HOME/OpenFOAM/run'
