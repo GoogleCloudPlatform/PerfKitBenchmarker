@@ -157,6 +157,7 @@
 - Added NCCL benchmark for GPU networking.
 - Added AWS DAX provider.
 - Added Google Cloud Firestore ycsb benchmarks.
+- Added support for un-managed data processing yarn cluster benchmarking.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
