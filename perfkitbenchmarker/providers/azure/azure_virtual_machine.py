@@ -586,7 +586,8 @@ class AzureVirtualMachine(
           self.host = self.host_list[-1]
         raise errors.Resource.RetryableCreationError()
     if (not self.use_dedicated_host and retcode and
-        'AllocationFailed' in stderr):
+        ('AllocationFailed' in stderr or
+         'OverconstrainedZonalAllocationRequest' in stderr)):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
