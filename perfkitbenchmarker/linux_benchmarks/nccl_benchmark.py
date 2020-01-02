@@ -237,7 +237,7 @@ def MakeSamplesFromOutput(metadata, output):
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\S+)', output)
-  bandwidth = 0
+  max_out_of_place_algbw = 0
   for row in results:
     metadata_copy = metadata.copy()
     metadata_copy.update(zip(_METADATA_COLUMNS, row))
@@ -245,14 +245,16 @@ def MakeSamplesFromOutput(metadata, output):
       samples.append(sample.Sample(metric, float(metadata_copy[metadata_key]),
                                    'GB/s', metadata_copy))
     # Gbps is gigaBIT per second and GB/s is gigaBYTE per second
-    bandwidth = max(bandwidth, float(metadata_copy['out_of_place_algbw']))
+    max_out_of_place_algbw = max(max_out_of_place_algbw,
+                                 float(metadata_copy['out_of_place_algbw']))
 
   avg_bus_bandwidth = regex_util.ExtractExactlyOneMatch(
       r'Avg bus bandwidth\s+: ([0-9\.]+)', output)
-  samples.append(sample.Sample('Avg bus bandwidth', float(avg_bus_bandwidth),
+  samples.append(sample.Sample('avg_busbw', float(avg_bus_bandwidth),
                                'GB/s', metadata))
-  samples.append(sample.Sample('bandwidth', bandwidth * 8, 'Gbps', metadata))
-  return samples, bandwidth
+  samples.append(sample.Sample('max_out_of_place_algbw',
+                               max_out_of_place_algbw * 8, 'Gbps', metadata))
+  return samples, max_out_of_place_algbw
 
 
 def Run(benchmark_spec):
@@ -288,19 +290,26 @@ def Run(benchmark_spec):
                         iters=FLAGS.nccl_iters)
   metadata = _CreateMetadataDict()
   sample_results = []
-  bandwidth_results = []
+  max_out_of_place_algbw_results = []
 
   for _ in range(FLAGS.nccl_num_runs):
     stdout, _ = master.RobustRemoteCommand(cmd)
-    samples, bandwidth = MakeSamplesFromOutput(metadata, stdout)
+    samples, max_out_of_place_algbw = MakeSamplesFromOutput(metadata, stdout)
     sample_results.extend(samples)
-    bandwidth_results.append(bandwidth)
+    max_out_of_place_algbw_results.append(max_out_of_place_algbw)
     time.sleep(FLAGS.nccl_seconds_between_runs)
-  samples.append(sample.Sample('bandwidth_average',
-                               np.mean(bandwidth_results), 'Gbps', metadata))
-  samples.append(sample.Sample('bandwidth_variance', np.var(bandwidth_results),
-                               '', metadata))
-  return samples
+  avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
+  sample_results.append(
+      sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s', metadata))
+  sample_results.append(
+      sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s', metadata))
+  sample_results.append(
+      sample.Sample('max_out_of_place_algbw_mean',
+                    np.mean(max_out_of_place_algbw_results), 'Gbps', metadata))
+  sample_results.append(
+      sample.Sample('max_out_of_place_algbw_std',
+                    np.std(max_out_of_place_algbw_results), 'Gbps', metadata))
+  return sample_results
 
 
 def Cleanup(unused_benchmark_spec):
