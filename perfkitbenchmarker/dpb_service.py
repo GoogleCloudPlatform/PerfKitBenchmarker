@@ -391,6 +391,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     """Create an un-managed yarn cluster."""
     logging.info('Should have created vms by now.')
     logging.info(str(self.vms))
+
     # need to fix this to install spark
     def InstallHadoop(vm):
       vm.Install('hadoop')
