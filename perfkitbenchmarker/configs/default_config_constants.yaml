@@ -14,6 +14,10 @@ default_single_core: &default_single_core
     machine_type: m3.medium
     zone: us-east-1
     image: null
+  SoftLayer:
+    machine_type: '{"cpus": 1, "memory": 2048, "os": "UBUNTU_LATEST_64", "nic": 1000}'
+    zone: wdc01
+    image: null
   AliCloud:
     machine_type: ecs.g5.large
     zone: cn-beijing-g
@@ -118,6 +122,10 @@ default_500_gb: &default_500_gb
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
+  SoftLayer:
+    disk_type: local
+    disk_size: 500
+    mount_point: /scratch
   Docker:
     disk_type: local
     disk_size: 500
@@ -169,6 +177,10 @@ default_50_gb: &default_50_gb
   ProfitBricks:
     disk_type: standard
     disk_size: 50
+    mount_point: /scratch
+  SoftLayer:
+    disk_type: local
+    disk_size: 500
     mount_point: /scratch
   Docker:
     disk_type: local

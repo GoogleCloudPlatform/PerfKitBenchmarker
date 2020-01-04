@@ -118,6 +118,7 @@ Before you can run the PerfKit Benchmarker, you need account(s) on the cloud pro
 * [DigitalOcean](https://www.digitalocean.com)
 * [Rackspace Cloud](https://www.rackspace.com)
 * [ProfitBricks](https://www.profitbricks.com/)
+* [SoftLayer](http://www.softlayer.com)
 
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
