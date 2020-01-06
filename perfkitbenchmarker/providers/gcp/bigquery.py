@@ -69,8 +69,16 @@ class Bigquery(edw_service.EdwService):
     return '--bq_project_id={} --bq_dataset_id={}'.format(bq[0], bq[1])
 
   def FormatProjectAndDatasetForCommand(self, dataset=None):
-    return (self.cluster_identifier.split('.')[0] + ':' +
-            dataset if dataset else self.cluster_identifier.replace('.', ':'))
+    """Returns the project and dataset in the format needed for bq commands.
+
+    E.g., project:dataset.
+
+    Args:
+      dataset: The dataset to run commands against. If None, extracts the
+        dataset from the cluster identifier whose format is "project.dataset").
+    """
+    return ((self.cluster_identifier.split('.')[0] + ':' +
+             dataset) if dataset else self.cluster_identifier.replace('.', ':'))
 
   def InstallAndAuthenticateRunner(self, vm):
     """Method to perform installation and authentication of bigquery runner.
