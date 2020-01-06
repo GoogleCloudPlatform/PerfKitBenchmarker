@@ -29,6 +29,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -654,8 +655,8 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id)
     self.subnet = None
-    if (FLAGS.aws_placement_group_style ==
-        aws_placement_group.PLACEMENT_GROUP_NONE):
+    if (FLAGS.placement_group_style ==
+        placement_group.PLACEMENT_GROUP_NONE):
       self.placement_group = None
     else:
       placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(

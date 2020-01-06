@@ -30,6 +30,15 @@ from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 
+PLACEMENT_GROUP_OPTIONS = frozenset(['cluster', 'spread', 'none'])
+PLACEMENT_GROUP_DEFAULT = 'cluster'
+PLACEMENT_GROUP_NONE = 'none'
+
+flags.DEFINE_enum(
+    'placement_group_style', PLACEMENT_GROUP_DEFAULT,
+    PLACEMENT_GROUP_OPTIONS,
+    'The vm placement group option to use. Default sets placement to cluster.')
+
 
 def GetPlacementGroupSpecClass(cloud):
   """Returns the PlacementGroupSpec class corresponding to 'cloud'."""
@@ -51,6 +60,21 @@ class BasePlacementGroupSpec(spec.BaseSpec):
 
   SPEC_TYPE = 'BasePlacementGroupSpec'
   CLOUD = None
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(BasePlacementGroupSpec, cls)._ApplyFlags(config_values, flag_values)
+    config_values['placement_group_style'] = FLAGS.placement_group_style
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
