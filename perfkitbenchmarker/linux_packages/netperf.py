@@ -30,10 +30,10 @@ flags.DEFINE_integer(
     'range. The default value that netperf uses is 100. Using more will '
     'increase the precision of the histogram samples that the netperf '
     'benchmark produces.')
-flags.DEFINE_boolean(
-    'netperf_use_newest_git', False,
-    'If true. It will pull the latest version from the master branch of ' 
-    'the git repo')
+# flags.DEFINE_boolean(
+#     'netperf_use_newest_git', False,
+#     'If true. It will pull the latest version from the master branch of ' 
+#     'the git repo')
 FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.7.0.tar.gz'
 NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
@@ -49,34 +49,27 @@ NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
 NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 
+#TODO I've changed this a lot, so im making sure it still works.
 def _Install(vm):
   """Installs the netperf package on the VM."""
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install absl-py')
   vm.Install('build_tools')
 
-  if(FLAGS.netperf_use_newest_git):
-    _LoadNetperf(vm)
+  _LoadNetperf(vm)
 
-    vm.RemoteCommand('cd %s && '
-                     './autogen.sh &&'
-                     './configure --enable-burst --enable-demo --enable-histogram '
-                     '&& make && sudo make install' % (NETPERF_DIR))
+  # vm.PushDataFile('netperf.patch', NETLIB_PATCH)
+  # vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
+  #                   NETPERF_SRC_DIR)
 
-    vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh find_max_burst.sh' 
-                     % (NETPERF_EXAMPLE_DIR))
-  else:
-    _CopyTar(vm)
-    vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
-    vm.PushDataFile('netperf.patch', NETLIB_PATCH)
-    vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
-                     NETPERF_SRC_DIR)
-  # Modify netperf to print out all buckets in its histogram rather than
-  # aggregating.
-    vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-                     './autogen.sh &&'
-                     './configure --enable-histogram '
-                     '&& make && sudo make install' % (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+  vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
+                   './autogen.sh &&'
+                   './configure --enable-burst --enable-demo --enable-histogram '
+                   '&& make && sudo make install' %  (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+
+  vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh find_max_burst.sh' 
+                   % (NETPERF_EXAMPLE_DIR))
+
 
 def _LoadNetperf(vm):
   vm.Install('curl')

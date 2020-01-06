@@ -56,7 +56,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'netperf_aggregate'
 BENCHMARK_CONFIG = """
 netperf_aggregate:
-  description: Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM
+  description: Uses a script to run UDP_RR between one source machine (vm_1) and two target machines (vm_2 and vm_3)
   vm_groups:
     vm_1:
       vm_spec: *default_single_core
@@ -322,6 +322,12 @@ def RunNetperf(vm, server1_ip, server2_ip):
   #TODO problem with post_proc now
   # logging.info("INPUT TO CONTINUE")
   # lol = raw_input()
+
+  stdout_1, stderr_1 = vm.RemoteCommand("cd %s && cat netperf_tps.log" % (netperf.NETPERF_EXAMPLE_DIR),
+                                    ignore_failure=True, should_log=True, login_shell=False, timeout=1200)
+
+  logging.info(stdout_1)
+  logging.info(stderr_1)
 
   remote_stdout, remote_stderr = vm.RemoteCommand("cd %s && ./post_proc.py --intervals netperf_tps.log" % (netperf.NETPERF_EXAMPLE_DIR),
                                       ignore_failure=True)

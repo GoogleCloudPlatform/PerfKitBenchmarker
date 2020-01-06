@@ -20,6 +20,8 @@ function kill_netperfs {
 
 function run_cmd {
 
+    echo "BURST SIZE IS $BURST"
+
     NOW=`date +%s.%N`
     echo "Starting netperfs at $NOW for $TEST" | tee $TESTLOG
     i=0;
@@ -33,6 +35,7 @@ function run_cmd {
     TARGET=${REMOTE_HOSTS[`expr $i % $NUM_REMOTE_HOSTS`]}
     echo "Starting netperfs on localhost targeting ${TARGET} for $TEST" | tee -a $TESTLOG
     id=`printf "%.5d" $i`
+    echo "ID: $id"
     $NETPERF -H $TARGET $NETPERF_CMD 2>&1 > netperf_${TEST}_${id}_to_${TARGET}.out &
 
     # give it a moment to get going
