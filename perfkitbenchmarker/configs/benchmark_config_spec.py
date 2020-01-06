@@ -130,8 +130,8 @@ class _DpbServiceSpec(spec.BaseSpec):
             'default':
                 dpb_service.DATAPROC,
             'valid_values': [
-                dpb_service.DATAPROC, dpb_service.DATAFLOW, dpb_service.EMR
-            ]
+                dpb_service.DATAPROC, dpb_service.DATAFLOW, dpb_service.EMR,
+                dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER]
         }),
         'worker_group': (_VmGroupSpecDecoder, {}),
         'worker_count': (option_decoders.IntDecoder, {

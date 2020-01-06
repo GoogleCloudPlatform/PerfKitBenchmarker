@@ -210,10 +210,31 @@ class BenchmarkSpec(object):
     """Create the dpb_service object and create groups for its vms."""
     if self.config.dpb_service is None:
       return
-    providers.LoadProvider(self.config.dpb_service.worker_group.cloud)
-    dpb_service_class = dpb_service.GetDpbServiceClass(
-        self.config.dpb_service.service_type)
-    self.dpb_service = dpb_service_class(self.config.dpb_service)
+    dpb_service_spec = self.config.dpb_service
+    dpb_service_cloud = dpb_service_spec.worker_group.cloud
+    providers.LoadProvider(dpb_service_cloud)
+
+    dpb_service_type = dpb_service_spec.service_type
+    dpb_service_class = dpb_service.GetDpbServiceClass(dpb_service_type)
+    self.dpb_service = dpb_service_class(dpb_service_spec)
+
+    # If the dpb service is un-managed, the provisioning needs to be handed
+    # over to the vm creation module.
+    if dpb_service_type == dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER:
+      # Ensure non cluster vms are not present in the spec.
+      if self.vms_to_boot:
+        raise Exception('Invalid Non cluster vm group {0} when benchmarking '
+                        'unmanaged dpb service'.format(self.vms_to_boot))
+
+      base_vm_spec = dpb_service_spec.worker_group
+      base_vm_spec.vm_spec.zone = self.dpb_service.dpb_service_zone
+      worker_group_spec = copy.copy(base_vm_spec)
+      worker_group_spec.vm_count = dpb_service_spec.worker_count
+      self.vms_to_boot['worker_group'] = worker_group_spec
+      master_group_spec = copy.copy(base_vm_spec)
+      master_group_spec.vm_count = 1
+      self.vms_to_boot['master_group'] = master_group_spec
+      logging.info(str(self.vms_to_boot))
 
   def ConstructRelationalDb(self):
     """Create the relational db and create groups for its vms."""
@@ -453,6 +474,14 @@ class BenchmarkSpec(object):
         self.config.spark_service.service_type == spark_service.PKB_MANAGED):
       for group_name in 'master_group', 'worker_group':
         self.spark_service.vms[group_name] = self.vm_groups[group_name]
+
+    # In the case of an un-managed yarn cluster, for hadoop software
+    # installation, the dpb service instance needs access to constructed
+    # master group and worker group.
+    if (self.config.dpb_service and self.config.dpb_service.service_type ==
+        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER):
+      for group_name in 'master_group', 'worker_group':
+        self.dpb_service.vms[group_name] = self.vm_groups[group_name]
 
   def ConstructPlacementGroups(self):
     for placement_group_name, placement_group_spec in six.iteritems(

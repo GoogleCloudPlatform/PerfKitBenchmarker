@@ -91,8 +91,8 @@ class ConfigsTestCase(unittest.TestCase):
       configs.LoadMinimalConfig(INVALID_YAML_CONFIG, CONFIG_NAME)
 
   def testMergeBasicConfigs(self):
-    old_config = yaml.load(CONFIG_A)
-    new_config = yaml.load(CONFIG_B)
+    old_config = yaml.safe_load(CONFIG_A)
+    new_config = yaml.safe_load(CONFIG_B)
     config = configs.MergeConfigs(old_config, new_config)
     # Key is present in both configs.
     self.assertEqual(config['a']['flags']['flag1'], 'new_value')
@@ -102,14 +102,14 @@ class ConfigsTestCase(unittest.TestCase):
     self.assertEqual(config['a']['flags']['flag3'], 'new_flag')
 
   def testLoadConfigDoesMerge(self):
-    default = yaml.load(CONFIG_A)
-    overrides = yaml.load(CONFIG_B)
+    default = yaml.safe_load(CONFIG_A)
+    overrides = yaml.safe_load(CONFIG_B)
     merged_config = configs.MergeConfigs(default, overrides)
     config = configs.LoadConfig(CONFIG_A, overrides['a'], CONFIG_NAME)
     self.assertEqual(merged_config['a'], config)
 
   def testMergeConfigWithNoOverrides(self):
-    old_config = yaml.load(CONFIG_A)
+    old_config = yaml.safe_load(CONFIG_A)
     config = configs.MergeConfigs(old_config, None)
     self.assertEqual(config, old_config)
 
