@@ -278,8 +278,8 @@ def Run(benchmark_spec):
         external_ip_result.metadata.update(metadata)
       results.extend(external_ip_results)
 
-    if (vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm1) and
-        vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm2)):
+    if (vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vms[0]) and
+        vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vms[1])):
 
       internal_ip_results = RunNetperfAggregate(client_vm,
                                                 server_vms[0].internal_ip,
