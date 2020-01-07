@@ -12,51 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs plain netperf in a few modes.
+"""Runs plain netperf aggregate script runemomniaggdemo.sh to test packets
+per second
 
 docs:
-http://www.netperf.org/svn/netperf2/tags/netperf-2.4.5/doc/netperf.html#TCP_005fRR
+https://hewlettpackard.github.io/netperf/doc/netperf.html
 manpage: http://manpages.ubuntu.com/manpages/maverick/man1/netperf.1.html
 
-Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
-machines.
+Runs UDP_RR in script between one source machine and two target machines
+to test packets per second
+
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-import collections
-import csv
-import io
-import json
 import logging
 import os
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
-from six.moves import zip
-
-
-
-# ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR', 'UDP_STREAM']
-
-# flags.DEFINE_list('netperf_aggregate_benchmarks', ALL_BENCHMARKS,
-#                   'The netperf benchmark(s) to run.')
-# flags.register_validator(
-#     'netperf_benchmarks',
-#     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
 
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'netperf_aggregate'
 BENCHMARK_CONFIG = """
 netperf_aggregate:
-  description: Uses a script to run UDP_RR between one source machine (vm_1) and two target machines (vm_2 and vm_3)
+  description: test packets per second performance
   vm_groups:
     vm_1:
       vm_spec: *default_single_core
@@ -66,16 +52,7 @@ netperf_aggregate:
       vm_spec: *default_single_core
 """
 
-MBPS = 'Mbits/sec'
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'
-# Specifies the keys and to include in the results for OMNI tests.
-# Any user of ParseNetperfOutput() (e.g. container_netperf_benchmark), must
-# specify these selectors to ensure the parsing doesn't break.
-OUTPUT_SELECTOR = (
-    'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
-    'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
-    'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
-    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
 PORT_START = 12865
@@ -83,23 +60,15 @@ PORT_START = 12865
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'runemomniaggdemo.sh'
 
-PERCENTILES = [50, 90, 99]
-
-# By default, Container-Optimized OS (COS) host firewall allows only
-# outgoing connections and incoming SSH connections. To allow incoming
-# connections from VMs running netperf, we need to add iptables rules
-# on the VM running netserver.
-_COS_RE = re.compile(r'\b(cos|gci)-')
-
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def PrepareNetperf(vm):
+def PrepareNetperfAggregate(vm):
   """Installs netperf on a single vm."""
 
-#INSTALL
+# INSTALL
 # Ensure gcc, make, automake, texinfo and python-rrdtool are installed
 # Bring a netperf source tree to the systems
 # cd to the top of the tree
@@ -110,22 +79,11 @@ def PrepareNetperf(vm):
   vm.Install('python_rrdtool')
   vm.Install('netperf')
 
-
-  # Set keepalive to a low value to ensure that the control connection
-  # is not closed by the cloud networking infrastructure.
-  # This causes keepalive packets to be sent every minute on all ipv4
-  # tcp connections.
-  #
-  # TODO(user): Keepalive is not enabled on the netperf control socket.
-  # While (for unknown reasons) this hack fixes the issue with the socket
-  # being closed anyway, a more correct approach would be to patch netperf
-  # and enable keepalive on the control socket in addition to changing the
-  # system defaults below.
-
-  vm.ApplySysctlPersistent({
-      'net.ipv4.tcp_keepalive_time': 60,
-      'net.ipv4.tcp_keepalive_intvl': 60,
-  })
+  if vm.IS_REBOOTABLE:
+    vm.ApplySysctlPersistent({
+        'net.ipv4.tcp_keepalive_time': 60,
+        'net.ipv4.tcp_keepalive_intvl': 60,
+    })
 
   # PORT_END = PORT_START * 2 - 1
   PORT_END = PORT_START
@@ -134,50 +92,25 @@ def PrepareNetperf(vm):
     vm.AllowPort(PORT_START, PORT_END)
 
   netserver_cmd = ('{netserver_path} -p {port_start}').format(
-                       port_start=PORT_START,
-                       netserver_path=netperf.NETSERVER_PATH)
+      port_start=PORT_START,
+      netserver_path=netperf.NETSERVER_PATH)
   vm.RemoteCommand(netserver_cmd)
 
-  # logging.info("INPUT TO CONTINUE")
-  # lol = raw_input()
-
+  # SETUP
+  # push runemomniaggdemo.sh to server
+  # On the system to be the one under test,
+  # cd to  doc/examples/ in the netperf source tree
+  # Ensure that runemomniaggdemo.sh and
+  # find_max_burst.sh have the execute bit set
+  # chmod +x runemomniaggdemo.sh find_max_burst.sh
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   remote_path = netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT
   logging.info('Uploading %s to %s', path, vm)
   vm.PushFile(source_path=path, remote_path=remote_path)
   vm.RemoteCommand('chmod +x %s' % (remote_path))
 
-  # vm.RemoteCommand("cd %s && rm runemomniaggdemo.sh "
-  #                  "&& sed -i 's/DO_STREAM=1;/DO_STREAM=0;/g' runemomniaggdemo.sh "
-  #                  "&& sed -i 's/DO_MAERTS=1;/DO_MAERTS=0;/g' runemomniaggdemo.sh "
-  #                  "&& sed -i 's/DO_BIDIR=1;/DO_BIDIR=0;/g' runemomniaggdemo.sh "
-  #                  "&& sed -i 's/DO_RR=1;/DO_RR=0;/g' runemomniaggdemo.sh "
-  #                  "&& sed -i 's/DO_ANCILLARY=1;/DO_ANCILLARY=0;/g' runemomniaggdemo.sh " 
-  #                  "&& sed -i 's/DURATION=120/DURATION=60/g' runemomniaggdemo.sh "
-  #                  % (netperf.NETPERF_EXAMPLE_DIR))
 
-
-  # vm.RemoteCommand("cd %s sed -i '/pkill -ALRM netperf/a\ \ \ \ \ NETPERF_PROC=$\(pgrep\ -P\ 1\ -f\ netperf\)\n\ \ \ \ \ \[\ !\ -z\ \\x22$NETPERF_PROC\\x22\ \]\ ||\ kill\ \$NETPERF_PROC' runemomniaggdemo.sh")
-  # vm.RemoteCommand("cd %s sed -i '/pkill -ALRM netperf/a\ \ \ \ \ NETPERF_PROC=$(pgrep -P 1 -f netperf)' runemomniaggdemo.sh"
-  #                  % (netperf.NETPERF_EXAMPLE_DIR))
-
-  # logging.info("INPUT TO CONTINUE 2")
-  # lol = raw_input()
-  # vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-  #                  './autogen.sh'
-  #                  './configure --enable-burst --enable-demo --enable-histogram=yes '
-  #                  '&& make' % (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
-
- 
-#SETUP
-# src/netserver # start the netserver on the load generator systems
-# On the system to be the one under test, cd to  doc/examples/ in the netperf source tree
-# Ensure that runemomniaggdemo.sh and find_max_burst.sh have the execute bit set
-# chmod +x runemomniaggdemo.sh find_max_burst.sh
-# Edit runemomniaggdemo.sh to:
-# Enable aggregate Transactions Per Second (tps) tests - DO_RRAGG set to '1'
-# Disable the other tests - DO_mumble set to '0'
-def Prepare(benchmark_spec): 
+def Prepare(benchmark_spec):
   """Install netperf on the target vm.
 
   Args:
@@ -188,12 +121,10 @@ def Prepare(benchmark_spec):
   logging.info("RUNNING NETPERF Prepare")
   vms = benchmark_spec.vms
   vms = vms[:3]
-  vm_util.RunThreaded(PrepareNetperf, vms)
+  vm_util.RunThreaded(PrepareNetperfAggregate, vms)
 
 
-
-
-#FIXME: change this
+# FIXME: change this
 def _SetupHostFirewall(benchmark_spec):
   """Set up host firewall to allow incoming traffic.
 
@@ -263,12 +194,12 @@ def ParseNetperfAggregateOutput(stdout, metadata):
       print(metric)
       print(value)
       aggregate_samples.append(sample.Sample(
-              metric, value, unit, metadata))
+          metric, value, unit, metadata))
 
   return aggregate_samples
 
 
-def RunNetperf(vm, server1_ip, server2_ip):
+def RunNetperfAggregate(vm, server1_ip, server2_ip):
   """Spawns netperf on a remote VM, parses results.
 
   Args:
@@ -281,69 +212,54 @@ def RunNetperf(vm, server1_ip, server2_ip):
     A sample.Sample object with the result.
   """
 
-#RUN
-# Set DURATION to your desired time length for each data point - eg 60 (seconds)
-# Add the location of the find_max_burst.sh script to your $PATH variable
-# export PATH=$PATH:.
-# Edit/create a "remote_hosts" file like:
-# REMOTE_HOSTS[0]=lg1
-# REMOTE_HOSTS[1]=lg2
-# REMOTE_HOSTS[2]=lg3
-# REMOTE_HOSTS[3]=lg4
-# NUM_REMOTE_HOSTS=4
-# ./runemomniaggdemo.sh   # execute the script
-# ./post_proc.py --intervals netperf_tps.log # script relies on python_rrdtool
-# Enjoy the results.  There will also be a chart in "netperf_tsp_overall.svg" for those who prefer pictures over text
-  
+  # setup remote hosts file
   vm.RemoteCommand("cd %s && echo 'REMOTE_HOSTS[0]=%s' > remote_hosts && "
                    "echo 'REMOTE_HOSTS[1]=%s' >> remote_hosts && "
                    "echo 'NUM_REMOTE_HOSTS=2' >> remote_hosts"
                    % (netperf.NETPERF_EXAMPLE_DIR, server1_ip, server2_ip))
 
-  # vm.RemoteCommand('sudo su')
+  vm.RemoteCommand('cd %s && export PATH=$PATH:.'
+                   % (netperf.NETPERF_EXAMPLE_DIR))
 
-  vm.RemoteCommand('cd %s && export PATH=$PATH:.' % (netperf.NETPERF_EXAMPLE_DIR))
-
-  stdout,_ = vm.RemoteCommand('cd %s && cat remote_hosts' % (netperf.NETPERF_EXAMPLE_DIR))
-  logging.info(stdout)
-
-  # logging.info("INPUT TO CONTINUE")
-  # lol = raw_input()
-
-  stdout, stderr = vm.RemoteCommand("cd %s && export PATH=$PATH:. && chmod +x runemomniaggdemo.sh && ./runemomniaggdemo.sh" % (netperf.NETPERF_EXAMPLE_DIR),
-                                    ignore_failure=True, should_log=True, login_shell=False, timeout=1200)
-  # vm.RobustRemoteCommand("cd %s && ./runemomniaggdemo.sh" % (netperf.NETPERF_EXAMPLE_DIR), should_log=True, timeout=1200,
-  #                         ignore_failure=False)
-
+  stdout, stderr = vm.RemoteCommand("cd %s && export PATH=$PATH:. && chmod "
+                                    "+x runemomniaggdemo.sh && "
+                                    "./runemomniaggdemo.sh"
+                                    % (netperf.NETPERF_EXAMPLE_DIR),
+                                    ignore_failure=True, should_log=True,
+                                    login_shell=False, timeout=1200)
 
   logging.info(stdout)
   logging.info(stderr)
 
-  #TODO problem with post_proc now
+  # TODO problem with post_proc now
   # logging.info("INPUT TO CONTINUE")
   # lol = raw_input()
 
-  stdout_1, stderr_1 = vm.RemoteCommand("cd %s && cat netperf_tps.log" % (netperf.NETPERF_EXAMPLE_DIR),
-                                    ignore_failure=True, should_log=True, login_shell=False, timeout=1200)
+  # print out netperf_tps.log
+  stdout_1, stderr_1 = vm.RemoteCommand("cd %s && cat netperf_tps.log" %
+                                        (netperf.NETPERF_EXAMPLE_DIR),
+                                        ignore_failure=True, should_log=True,
+                                        login_shell=False, timeout=1200)
 
   logging.info(stdout_1)
   logging.info(stderr_1)
 
-  remote_stdout, remote_stderr = vm.RemoteCommand("cd %s && ./post_proc.py --intervals netperf_tps.log" % (netperf.NETPERF_EXAMPLE_DIR),
-                                      ignore_failure=True)
+  # do post processing step
+  proc_stdout, proc_stderr = vm.RemoteCommand("cd %s && ./post_proc.py"
+                                              "--intervals netperf_tps.log"
+                                              % (netperf.NETPERF_EXAMPLE_DIR),
+                                              ignore_failure=True)
 
-
-  logging.info(remote_stdout)
-  logging.info(remote_stderr)
+  logging.info(proc_stdout)
+  logging.info(proc_stderr)
 
   # logging.info("INPUT TO CONTINUE")
   # lol = raw_input()
-  
 
-    # Metadata to attach to samples
+  # Metadata to attach to samples
   metadata = {'number_of_hosts': 3}
 
-  samples = ParseNetperfAggregateOutput(remote_stdout, metadata)           
+  samples = ParseNetperfAggregateOutput(proc_stdout, metadata)
 
   return samples
 
@@ -365,40 +281,50 @@ def Run(benchmark_spec):
   server_vm2 = vms[2]  # Server2 aka "receiving vm"
 
   # TODO: expand beyond 3 fixed VMs
-  # vm_num = len(vms)
-  # for i in vm_num:
 
-
-  logging.info('netperf running on %s', client_vm)
   results = []
-  metadata = {
-      'sending_zone': client_vm.zone,
-      'sending_machine_type': client_vm.machine_type,
-      'receiving_zone': server_vm1.zone,
-      'receiving_machine_type': server_vm1.machine_type
-  }
 
+  # run once with each VM as the client VM and others as the server
+  for i in range(0, len(vms)):
 
+    # set client and server vms
+    client_vm = vms[i]
+    server_vms = []
+    for x in range(0, len(vms)):
+      if x != i:
+        server_vms.append(vms[x])
 
-# for num_streams in FLAGS.netperf_num_streams:
-#   assert num_streams >= 1
-  if vm_util.ShouldRunOnExternalIpAddress():
+    logging.info('netperf running on %s', client_vm)
 
-    external_ip_results = RunNetperf(client_vm,
-                                     server_vm1.ip_address, server_vm2.ip_address)
-    for external_ip_result in external_ip_results:
-      external_ip_result.metadata['ip_type'] = 'external'
-      external_ip_result.metadata.update(metadata)
-    results.extend(external_ip_results)
+    metadata = {
+        'sending_zone': client_vm.zone,
+        'sending_machine_type': client_vm.machine_type,
+        'receiving_zone_1': server_vms[0].zone,
+        'receiving_machine_type_1': server_vms[0].machine_type,
+        'receiving_zone_2': server_vms[1].zone,
+        'receiving_machine_type_2': server_vms[1].machine_type
+    }
 
-  if vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm1) and vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm2):
+    if vm_util.ShouldRunOnExternalIpAddress():
+      external_ip_results = RunNetperfAggregate(client_vm,
+                                                server_vms[0].ip_address,
+                                                server_vms[1].ip_address)
+      for external_ip_result in external_ip_results:
+        external_ip_result.metadata['ip_type'] = 'external'
+        external_ip_result.metadata.update(metadata)
+      results.extend(external_ip_results)
 
-    internal_ip_results = RunNetperf(client_vm,
-                                     server_vm1.internal_ip, server_vm2.internal_ip)
-    for internal_ip_result in internal_ip_results:
-      internal_ip_result.metadata.update(metadata)
-      internal_ip_result.metadata['ip_type'] = 'internal'
-    results.extend(internal_ip_results)
+    if (vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm1) and
+        vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm2)):
+
+      internal_ip_results = RunNetperfAggregate(client_vm,
+                                                server_vms[0].internal_ip,
+                                                server_vms[1].internal_ip)
+
+      for internal_ip_result in internal_ip_results:
+        internal_ip_result.metadata.update(metadata)
+        internal_ip_result.metadata['ip_type'] = 'internal'
+      results.extend(internal_ip_results)
 
   return results
 
