@@ -159,6 +159,8 @@
 - Added AWS DAX provider.
 - Added Google Cloud Firestore ycsb benchmarks.
 - Added support for un-managed data processing yarn cluster benchmarking.
+- Added placement group flag support for Azure. "cluster" will create proximity placement group.
+  "spread" will create an availability set.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
