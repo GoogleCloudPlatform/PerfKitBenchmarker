@@ -85,7 +85,6 @@ def PrepareNetperfAggregate(vm):
         'net.ipv4.tcp_keepalive_intvl': 60,
     })
 
-  # PORT_END = PORT_START * 2 - 1
   PORT_END = PORT_START
 
   if vm_util.ShouldRunOnExternalIpAddress():
@@ -160,22 +159,6 @@ def ParseNetperfAggregateOutput(stdout, metadata):
   """
   # Don't modify the metadata dict that was passed in
 
-
-# Average of peak interval is 460995.000 Trans/s from 1566458404 to 1566458464
-# Minimum of peak interval is 395865.170 Trans/s from 1566458404 to 1566458464
-# Maximum of peak interval is 472895.650 Trans/s from 1566458404 to 1566458464
-# Average of interval 0 is 178040.310 Trans/s from 1566458216 to 1566458274
-# Minimum of interval 0 is 166044.680 Trans/s from 1566458216 to 1566458274
-# Maximum of interval 0 is 194732.110 Trans/s from 1566458216 to 1566458274
-# Average of interval 1 is 345184.870 Trans/s from 1566458277 to 1566458335
-# Minimum of interval 1 is 325173.210 Trans/s from 1566458277 to 1566458335
-# Maximum of interval 1 is 359809.360 Trans/s from 1566458277 to 1566458335
-# Average of interval 2 is 458888.190 Trans/s from 1566458339 to 1566458397
-# Minimum of interval 2 is 444407.520 Trans/s from 1566458339 to 1566458397
-# Maximum of interval 2 is 470984.490 Trans/s from 1566458339 to 1566458397
-# Average of interval 3 is 460995.000 Trans/s from 1566458404 to 1566458464
-# Minimum of interval 3 is 395865.170 Trans/s from 1566458404 to 1566458464
-# Maximum of interval 3 is 472895.650 Trans/s from 1566458404 to 1566458464
   logging.info("Parsing netperf aggregate output")
   metadata = metadata.copy()
   aggregate_samples = []
@@ -228,13 +211,6 @@ def RunNetperfAggregate(vm, server1_ip, server2_ip):
                                     ignore_failure=True, should_log=True,
                                     login_shell=False, timeout=1200)
 
-  logging.info(stdout)
-  logging.info(stderr)
-
-  # TODO problem with post_proc now
-  # logging.info("INPUT TO CONTINUE")
-  # lol = raw_input()
-
   # print out netperf_tps.log
   stdout_1, stderr_1 = vm.RemoteCommand("cd %s && cat netperf_tps.log" %
                                         (netperf.NETPERF_EXAMPLE_DIR),
@@ -249,12 +225,6 @@ def RunNetperfAggregate(vm, server1_ip, server2_ip):
                                               "--intervals netperf_tps.log"
                                               % (netperf.NETPERF_EXAMPLE_DIR),
                                               ignore_failure=True)
-
-  logging.info(proc_stdout)
-  logging.info(proc_stderr)
-
-  # logging.info("INPUT TO CONTINUE")
-  # lol = raw_input()
 
   # Metadata to attach to samples
   metadata = {'number_of_hosts': 3}
@@ -276,11 +246,6 @@ def Run(benchmark_spec):
   """
 
   vms = benchmark_spec.vms
-  client_vm = vms[0]  # Client aka "sending vm"
-  server_vm1 = vms[1]  # Server1 aka "receiving vm"
-  server_vm2 = vms[2]  # Server2 aka "receiving vm"
-
-  # TODO: expand beyond 3 fixed VMs
 
   results = []
 
