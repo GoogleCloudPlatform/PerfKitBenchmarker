@@ -19,7 +19,6 @@ import re
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
-from perfkitbenchmarker.data import ResourceNotFound
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 flags.DEFINE_integer(
@@ -30,14 +29,7 @@ flags.DEFINE_integer(
     'range. The default value that netperf uses is 100. Using more will '
     'increase the precision of the histogram samples that the netperf '
     'benchmark produces.')
-# flags.DEFINE_boolean(
-#     'netperf_use_newest_git', False,
-#     'If true. It will pull the latest version from the master branch of ' 
-#     'the git repo')
 FLAGS = flags.FLAGS
-NETPERF_TAR = 'netperf-2.7.0.tar.gz'
-NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
-              NETPERF_TAR)
 
 NETPERF_GIT = 'https://github.com/HewlettPackard/netperf.git'
 NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
@@ -49,7 +41,6 @@ NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
 NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 
-#TODO I've changed this a lot, so im making sure it still works.
 def _Install(vm):
   """Installs the netperf package on the VM."""
   vm.Install('pip')
@@ -64,30 +55,20 @@ def _Install(vm):
 
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
                    './autogen.sh &&'
-                   './configure --enable-burst --enable-demo --enable-histogram '
-                   '&& make && sudo make install' %  (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+                   './configure --enable-burst'
+                   '--enable-demo --enable-histogram '
+                   '&& make && sudo make install' %
+                   (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
 
-  vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh find_max_burst.sh' 
+  vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh'
+                   ' find_max_burst.sh'
                    % (NETPERF_EXAMPLE_DIR))
 
 
 def _LoadNetperf(vm):
   vm.Install('curl')
   vm.RemoteCommand('cd %s && git clone %s %s' % (
-        INSTALL_DIR, NETPERF_GIT, NETPERF_DIR))
-
-def _CopyTar(vm):
-  """Copy the tar file for installation.
-
-  Tries local data directory first, then NET_PERF_URL
-  """
-
-  try:
-    vm.PushDataFile(NETPERF_TAR, remote_path=(INSTALL_DIR + '/'))
-  except ResourceNotFound:
-    vm.Install('curl')
-    vm.RemoteCommand('curl %s -L -o %s/%s' % (
-        NETPERF_URL, INSTALL_DIR, NETPERF_TAR))
+      INSTALL_DIR, NETPERF_GIT, NETPERF_DIR))
 
 
 def YumInstall(vm):

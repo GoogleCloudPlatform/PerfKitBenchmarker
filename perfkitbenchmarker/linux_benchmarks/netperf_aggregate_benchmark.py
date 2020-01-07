@@ -117,7 +117,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
 
-  logging.info("RUNNING NETPERF Prepare")
   vms = benchmark_spec.vms
   vms = vms[:3]
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
