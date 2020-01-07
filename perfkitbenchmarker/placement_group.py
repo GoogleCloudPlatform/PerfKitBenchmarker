@@ -30,9 +30,12 @@ from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 
-PLACEMENT_GROUP_OPTIONS = frozenset(['cluster', 'spread', 'none'])
-PLACEMENT_GROUP_DEFAULT = 'cluster'
+PLACEMENT_GROUP_CLUSTER = 'cluster'
+PLACEMENT_GROUP_SPREAD = 'spread'
 PLACEMENT_GROUP_NONE = 'none'
+PLACEMENT_GROUP_DEFAULT = PLACEMENT_GROUP_CLUSTER
+PLACEMENT_GROUP_OPTIONS = frozenset(
+    [PLACEMENT_GROUP_CLUSTER, PLACEMENT_GROUP_SPREAD, PLACEMENT_GROUP_NONE])
 
 flags.DEFINE_enum(
     'placement_group_style', PLACEMENT_GROUP_DEFAULT,

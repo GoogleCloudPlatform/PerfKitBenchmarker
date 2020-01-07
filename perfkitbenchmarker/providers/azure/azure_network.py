@@ -27,10 +27,12 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import azure_placement_group
 from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
@@ -130,39 +132,6 @@ class AzureResourceGroup(resource.BaseResource):
     _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
       raise errors.resource.CreationError('Error tagging Azure resource group.')
-
-
-class AzureAvailSet(resource.BaseResource):
-  """Object representing an Azure Availability Set."""
-
-  def __init__(self, name, location):
-    super(AzureAvailSet, self).__init__()
-    self.name = name
-    self.location = location
-    self.resource_group = GetResourceGroup()
-
-  def _Create(self):
-    """Create the availability set."""
-    create_cmd = [
-        azure.AZURE_PATH, 'vm', 'availability-set', 'create',
-        '--resource-group', self.resource_group.name, '--name', self.name
-    ]
-    if self.location:
-      create_cmd.extend(['--location', self.location])
-    vm_util.IssueCommand(create_cmd)
-
-  def _Delete(self):
-    pass
-
-  @vm_util.Retry()
-  def _Exists(self):
-    """Returns True if the availability set exists."""
-    show_cmd = [
-        azure.AZURE_PATH, 'vm', 'availability-set', 'show', '--output', 'json',
-        '--resource-group', self.resource_group.name, '--name', self.name
-    ]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    return bool(json.loads(stdout))
 
 
 class AzureStorageAccount(resource.BaseResource):
@@ -455,14 +424,33 @@ class AzureNetwork(network.BaseNetwork):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
     self.location = util.GetLocationFromZone(self.zone)
+    placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(
+        'AzurePlacementGroupSpec',
+        flag_values=FLAGS,
+        zone=self.zone,
+        resource_group=self.resource_group.name)
+
+    is_dedicated_host = bool(FLAGS.dedicated_hosts)
+    in_availability_zone = bool(util.GetAvailabilityZoneFromZone(self.zone))
+    no_placement_group = (
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
+    cluster_placement_group = (
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER)
+    spread_placement_group = (
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD)
+
     # With dedicated hosting and/or an availability zone, an availability set
     # cannot be created
-    if (FLAGS.dedicated_hosts or util.GetAvailabilityZoneFromZone(self.zone) or
-        not FLAGS.azure_availability_set):
-      self.avail_set = None
+    if is_dedicated_host or no_placement_group or (in_availability_zone and
+                                                   spread_placement_group):
+      self.placement_group = None
+    elif cluster_placement_group:
+      self.placement_group = azure_placement_group.AzureProximityGroup(
+          placement_group_spec)
     else:
-      avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
-      self.avail_set = AzureAvailSet(avail_set_name, self.location)
+      self.placement_group = azure_placement_group.AzureAvailSet(
+          placement_group_spec)
+
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri
 
@@ -488,8 +476,8 @@ class AzureNetwork(network.BaseNetwork):
     # commands more than once, so that is fine.
     self.resource_group.Create()
 
-    if self.avail_set:
-      self.avail_set.Create()
+    if self.placement_group:
+      self.placement_group.Create()
 
     self.storage_account.Create()
 
