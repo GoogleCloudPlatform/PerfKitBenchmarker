@@ -27,6 +27,9 @@ from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer('container_netperf_tcp_stream_send_size_in_bytes', 131072,
+                     'Send size to use for TCP_STREAM tests (netperf -m flag)')
+
 BENCHMARK_NAME = 'container_netperf'
 BENCHMARK_CONFIG = """
 container_netperf:
@@ -87,6 +90,7 @@ def Run(benchmark_spec):
                   '-H', container_0.ip_address,
                   '-l', '100',
                   '--',
+                  '-m', FLAGS.container_netperf_tcp_stream_send_size_in_bytes,
                   '-o', netperf_benchmark.OUTPUT_SELECTOR]
   cluster.DeployContainer('netperf', benchmark_spec.container_specs['netperf'])
   container_1 = cluster.containers['netperf'][1]
