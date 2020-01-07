@@ -61,7 +61,7 @@ nccl:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: common-cu101
+          image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
           boot_disk_size: 100
           gpu_type: v100
@@ -69,7 +69,7 @@ nccl:
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-west-2a
-          image: ami-04121e1f9d541d468
+          image: ami-07728e9e2742b0662
           boot_disk_size: 100
         Azure:
           machine_type: Standard_NC24rs_v3
