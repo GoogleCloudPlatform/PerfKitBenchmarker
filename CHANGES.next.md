@@ -159,11 +159,15 @@
 - Added AWS DAX provider.
 - Added Google Cloud Firestore ycsb benchmarks.
 - Added support for un-managed data processing yarn cluster benchmarking.
+- Added support for UDP_STREAM tests to netperf_benchmark
+- Added flags to select stream size to netperf_benchmark
 - Added placement group flag support for Azure. "cluster" will create proximity placement group.
   "spread" will create an availability set.
 - Added a tcpdump collector with --tcpdump flag.
 - Added ability to load datasets into BigQuery from csv files on GCS.
 - Updated AzureVirtualNetwork to support location level virtual nets, which allows support for cross zone benchmark runs.
+
+>>>>>>> added UDP STREAM results to tests
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
