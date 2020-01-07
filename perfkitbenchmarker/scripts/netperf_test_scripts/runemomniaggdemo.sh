@@ -1,3 +1,5 @@
+# slightly modified version of https://github.com/HewlettPackard/netperf/blob/master/doc/examples/runemomniaggdemo.sh
+
 # this is a quick and dirty migration of runemomniagg2.sh to the 
 # --enable-demo mode of aggregate testing
 function kill_netperfs {
