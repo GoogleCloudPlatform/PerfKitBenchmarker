@@ -547,8 +547,8 @@ class AzureVirtualMachine(
           ['--host-group', self.host.host_group, '--host', self.host.name])
       num_hosts = len(self.host_list)
 
-    if self.network.avail_set:
-      create_cmd.extend(['--availability-set', self.network.avail_set.name])
+    if self.network.placement_group:
+      create_cmd.extend(self.network.placement_group.AddVmArgs())
 
     if self.password:
       create_cmd.extend(['--admin-password', self.password])
@@ -701,6 +701,7 @@ class AzureVirtualMachine(
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.os_disk.disk_type
     result['boot_disk_size'] = self.os_disk.disk_size or 'default'
+    result['placement_group_strategy'] = FLAGS.placement_group_style
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
     return result

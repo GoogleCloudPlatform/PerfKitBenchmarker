@@ -78,8 +78,3 @@ flags.DEFINE_integer(
 flags.DEFINE_enum('azure_redis_size',
                   'C3', VALID_CACHE_SIZES,
                   'Azure redis cache size to use.')
-
-flags.DEFINE_boolean('azure_availability_set', True,
-                     'If True, create an availability set and place virtual '
-                     'machines in it. If False, do not create availability '
-                     'set.')
