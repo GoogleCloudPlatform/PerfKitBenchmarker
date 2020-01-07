@@ -271,9 +271,6 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
   # 99th Percentile Latency Microseconds,Minimum Latency Microseconds,
   # Maximum Latency Microseconds\n
   # 1405.50,Trans/s,2.522,4,783.80,683,735,841,600,900\n
-  print("PARSE NETPERF OUTPUT")
-  print("STDOUT")
-  print(stdout)
   try:
     fp = six.StringIO(stdout)
     # "-o" flag above specifies CSV output, but there is one extra header line:
@@ -294,7 +291,6 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     raise errors.Benchmarks.KnownIntermittentError(message)
 
   # Update the metadata with some additional infos
-  print("BENCHMARK NAME: ", benchmark_name)
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
   if 'TCP' in benchmark_name:
