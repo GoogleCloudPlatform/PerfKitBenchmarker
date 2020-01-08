@@ -374,8 +374,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
   netperf_cmd = ""
 
-  remote_cmd_timeout = \
-      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
+  remote_cmd_timeout = (
+      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300)
 
   metadata = {'netperf_test_length': FLAGS.netperf_test_length,
               'sending_thread_count': num_streams,
@@ -395,13 +395,12 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      verbosity=verbosity)
 
   if benchmark_name.upper() == 'UDP_STREAM':
-    netperf_cmd += (' -R 1 -m {send_size} '.format(
+    netperf_cmd += (' -R 1 -m {send_size} -M {send_size} '.format(
                     send_size=FLAGS.netperf_udp_stream_send_size_in_bytes))
     metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
 
-
   elif benchmark_name.upper() == 'TCP_STREAM':
-    netperf_cmd += (' -R 1 -m {send_size} '.format(
+    netperf_cmd += (' -R 1 -m {send_size} -M {send_size} '.format(
                     send_size=FLAGS.netperf_tcp_stream_send_size_in_bytes))
     metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
 
