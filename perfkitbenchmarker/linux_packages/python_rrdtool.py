@@ -14,12 +14,12 @@
 
 
 """Module containing build tools installation and cleanup functions."""
-from perfkitbenchmarker import os_types
 
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
   pass
+
 
 def YumInstall(vm):
   """Installs build tools on the VM."""
@@ -29,5 +29,3 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs build tools on the VM."""
   vm.InstallPackages('python-rrdtool')
-
-
