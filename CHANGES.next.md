@@ -393,6 +393,7 @@
   currently limited to GCP Dataproc provider, but it could run anywhere
   provided some auth is plumbed through.
 - Add support for generating CLI download commands for object_storage_service.
+- Added flag '--azure_low_priority_vms' to create Low Priority VMs in Azure.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
