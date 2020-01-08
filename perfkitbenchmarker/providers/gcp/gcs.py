@@ -65,6 +65,20 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     """See base class."""
     vm_util.IssueCommand(['gsutil', 'cp', src_url, dst_url])
 
+  def CopyToBucket(self, src_path, bucket, object_path):
+    """See base class."""
+    dst_url = self.MakeRemoteCliDownloadUrl(bucket, object_path)
+    vm_util.IssueCommand(['gsutil', 'cp', src_path, dst_url])
+
+  def MakeRemoteCliDownloadUrl(self, bucket, object_path):
+    """See base class."""
+    path = posixpath.join(bucket, object_path)
+    return 'gs://' + path
+
+  def GenerateCliDownloadFileCommand(self, src_url, local_path):
+    """See base class."""
+    return 'gsutil cp "%s" "%s"' % (src_url, local_path)
+
   def List(self, buckets):
     """See base class."""
     stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', buckets])
