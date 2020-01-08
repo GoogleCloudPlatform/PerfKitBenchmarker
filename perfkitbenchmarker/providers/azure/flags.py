@@ -78,3 +78,6 @@ flags.DEFINE_integer(
 flags.DEFINE_enum('azure_redis_size',
                   'C3', VALID_CACHE_SIZES,
                   'Azure redis cache size to use.')
+
+flags.DEFINE_boolean('azure_low_priority_vms', False,
+                     'Whether to set the priority to low for Azure VMs')
