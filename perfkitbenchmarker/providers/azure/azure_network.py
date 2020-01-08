@@ -131,7 +131,7 @@ class AzureResourceGroup(resource.BaseResource):
     ]
     _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
-      raise errors.resource.CreationError('Error tagging Azure resource group.')
+      raise errors.Resource.CreationError('Error tagging Azure resource group.')
 
 
 class AzureStorageAccount(resource.BaseResource):
