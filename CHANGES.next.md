@@ -161,6 +161,7 @@
 - Added support for un-managed data processing yarn cluster benchmarking.
 - Added placement group flag support for Azure. "cluster" will create proximity placement group.
   "spread" will create an availability set.
+- Added a tcpdump collector with --tcpdump flag.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
