@@ -372,8 +372,6 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if enable_latency_histograms else ''
 
-  netperf_cmd = ""
-
   remote_cmd_timeout = (
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300)
 
