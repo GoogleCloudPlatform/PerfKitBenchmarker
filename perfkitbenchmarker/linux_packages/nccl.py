@@ -18,7 +18,7 @@ import posixpath
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
-flags.DEFINE_string('nccl_version', '2.5.6-1',
+flags.DEFINE_string('nccl_version', '2.5.6-2',
                     'NCCL version to install')
 
 FLAGS = flags.FLAGS
