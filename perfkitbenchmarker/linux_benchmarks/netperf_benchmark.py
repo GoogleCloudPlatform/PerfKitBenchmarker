@@ -68,9 +68,8 @@ flags.DEFINE_integer('netperf_thinktime_run_length', 0,
 flags.DEFINE_integer('netperf_udp_stream_send_size_in_bytes', 1024,
                      'Send size to use for UDP_STREAM tests (netperf -m flag)',
                      lower_bound=1, upper_bound=65507)
-# Set default as 128KB (131072 bytes)
-# the Linux default of 16K cannot achieve
-# "link rate" and that the higher default value will let us
+# We set the default to 128KB (131072 bytes) to override the Linux default
+# of 16K so that we can achieve the "link rate".
 flags.DEFINE_integer('netperf_tcp_stream_send_size_in_bytes', 131072,
                      'Send size to use for TCP_STREAM tests (netperf -m flag)')
 
