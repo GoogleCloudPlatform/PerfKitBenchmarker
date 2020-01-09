@@ -128,7 +128,7 @@ class BenchmarkSpec(object):
     self.vms = []
     self.networks = {}
     self.custom_subnets = {k: {
-        'cloud': v.cloud, 
+        'cloud': v.cloud,
         'cidr': v.cidr} for (k, v) in self.config.vm_groups.items()}
     self.firewalls = {}
     self.networks_lock = threading.Lock()
