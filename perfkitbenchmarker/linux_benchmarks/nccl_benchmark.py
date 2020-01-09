@@ -21,6 +21,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
 flags.DEFINE_integer('nccl_np', 16, 'Number of processes to run')
 flags.DEFINE_integer('nccl_slots', 8,
@@ -46,6 +47,7 @@ flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
                     'MPI home')
 flags.DEFINE_string('nccl_nccl_home', '/usr/local/nccl2', 'NCCL home')
+flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
 
 
 FLAGS = flags.FLAGS
@@ -143,6 +145,12 @@ def _PrepareVm(vm):
     vm.Install('nccl')
   if FLAGS.nccl_install_openmpi:
     vm.Install('openmpi')
+  if FLAGS.nccl_net_plugin:
+    vm.Install('google_cloud_sdk')
+    vm.RemoteCommand('sudo {gsutil_path} cp {nccl_net_plugin_path} '
+                     '/usr/lib/x86_64-linux-gnu/libnccl-net.so'.format(
+                         gsutil_path=google_cloud_sdk.GSUTIL_PATH,
+                         nccl_net_plugin_path=FLAGS.nccl_net_plugin))
   env = ''
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
@@ -225,6 +233,7 @@ def MakeSamplesFromOutput(metadata, output):
   for rank, device in results:
     metadata[rank] = device
   results = regex_util.ExtractAllMatches(
+      r'^\s*'
       r'(\d+)\s+'
       r'(\d+)\s+'
       r'(\w+)\s+'
@@ -236,7 +245,7 @@ def MakeSamplesFromOutput(metadata, output):
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
-      r'(\S+)', output)
+      r'(\S+)', output, re.MULTILINE)
   max_out_of_place_algbw = 0
   for row in results:
     metadata_copy = metadata.copy()
@@ -292,12 +301,14 @@ def Run(benchmark_spec):
   sample_results = []
   max_out_of_place_algbw_results = []
 
-  for _ in range(FLAGS.nccl_num_runs):
+  for iteration in range(FLAGS.nccl_num_runs):
+    metadata['run_iteration'] = iteration
     stdout, _ = master.RobustRemoteCommand(cmd)
     samples, max_out_of_place_algbw = MakeSamplesFromOutput(metadata, stdout)
     sample_results.extend(samples)
     max_out_of_place_algbw_results.append(max_out_of_place_algbw)
     time.sleep(FLAGS.nccl_seconds_between_runs)
+  metadata['run_iteration'] = -1
   avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
   sample_results.append(
       sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s', metadata))
