@@ -656,6 +656,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
+      elif disk_spec.disk_type == disk.NFS:
+        data_disk = self._GetNfsService().CreateNfsDisk()
       else:
         name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
