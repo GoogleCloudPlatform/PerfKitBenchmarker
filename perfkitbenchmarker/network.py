@@ -152,12 +152,12 @@ class BaseNetwork(object):
       Error: Invalid CIDR format
     """
 
-    DELIM = r'-'  # Safe delimiter for most providers
+    delim = r'-'  # Safe delimiter for most providers
     int_regex = r'[0-9]+'
     octets_mask = regex_util.ExtractAllMatches(int_regex, str(cidr_raw))
     if len(octets_mask) != 5:  # expecting 4 octets plus 1 prefix mask.
-      raise errors.ValueError('Invalid CIDR format: "{0}"'.format(cidr_raw))
-    return DELIM.join(octets_mask)
+      raise ValueError('Invalid CIDR format: "{0}"'.format(cidr_raw))
+    return delim.join(octets_mask)
 
   @classmethod
   def GetNetworkFromNetworkSpec(cls, spec):
