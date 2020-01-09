@@ -61,7 +61,7 @@ def YumGetPathToConfig(vm):
 def AptGetPathToConfig(vm):
   """Returns the path to the mysql config file."""
   del vm
-  return '/etc/mysql/my.cnf'
+  return '/etc/mysql/mysql.conf.d/mysqld.cnf'
 
 
 def YumGetServiceName(vm):
