@@ -19,6 +19,7 @@ import re
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker.data import ResourceNotFound
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 flags.DEFINE_integer(
@@ -30,6 +31,9 @@ flags.DEFINE_integer(
     'increase the precision of the histogram samples that the netperf '
     'benchmark produces.')
 FLAGS = flags.FLAGS
+NETPERF_TAR = 'netperf-2.7.0.tar.gz'
+NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
+              NETPERF_TAR)
 
 NETPERF_GIT = 'https://github.com/HewlettPackard/netperf.git'
 NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
@@ -66,9 +70,13 @@ def _Install(vm):
 
 
 def _LoadNetperf(vm):
-  vm.Install('curl')
-  vm.RemoteCommand('cd %s && git clone %s %s' % (
-      INSTALL_DIR, NETPERF_GIT, NETPERF_DIR))
+  try:
+    vm.PushDataFile(NETPERF_TAR, remote_path=(INSTALL_DIR + '/'))
+    vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
+  except ResourceNotFound:
+    vm.Install('curl')
+    vm.RemoteCommand('cd %s && git clone %s %s' % (
+        INSTALL_DIR, NETPERF_GIT, NETPERF_DIR))
 
 
 def YumInstall(vm):
