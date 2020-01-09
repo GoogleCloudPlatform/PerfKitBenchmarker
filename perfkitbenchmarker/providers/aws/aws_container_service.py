@@ -532,7 +532,7 @@ class AwsKopsCluster(container_service.KubernetesCluster):
         FLAGS.kops, 'get', 'cluster', self.name, '--output=yaml'
     ]
     stdout, _, _ = vm_util.IssueCommand(get_cmd, env=env)
-    spec = yaml.load(stdout)
+    spec = yaml.safe_load(stdout)
     spec['metadata']['creationTimestamp'] = None
     spec['spec']['api']['loadBalancer']['idleTimeoutSeconds'] = 3600
     benchmark_spec = context.GetThreadBenchmarkSpec()

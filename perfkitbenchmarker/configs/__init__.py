@@ -162,7 +162,7 @@ def _LoadUserConfig(path):
   config_files = _GetImportFiles(path)
   with contextlib2.ExitStack() as stack:
     files = [stack.enter_context(open(f)) for f in config_files]
-    return yaml.load(_ConcatenatedFiles(files))
+    return yaml.safe_load(_ConcatenatedFiles(files))
 
 
 @functools.lru_cache()
@@ -183,7 +183,7 @@ def _GetConfigFromOverrides(overrides):
                        'fully.qualified.key=value.')
     full_key, value = override.split('=')
     keys = full_key.split('.')
-    new_config = {keys.pop(): yaml.load(value)}
+    new_config = {keys.pop(): yaml.safe_load(value)}
     while keys:
       new_config = {keys.pop(): new_config}
     config = MergeConfigs(config, new_config)
@@ -289,7 +289,7 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
   yaml_config.append(benchmark_config)
 
   try:
-    config = yaml.load('\n'.join(yaml_config))
+    config = yaml.safe_load('\n'.join(yaml_config))
   except yaml.parser.ParserError as e:
     raise errors.Config.ParseError(
         'Encountered a problem loading the default benchmark config. Please '

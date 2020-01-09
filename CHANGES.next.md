@@ -143,7 +143,8 @@
 - Added a benchmark to run spark io workload on a cluster that provisions a database and queries it.
 - Added flag --record_lscpu=True to record lscpu data as its own metric "lscpu"
 - Added support for the Clear Linux OS type for AWS and static VMs (e.g. --os-type=clear)
-- Added flag --aws_placement_group_style to allow or disable different AWS placement groups options for ec2 VM benchmarks.
+- Added flag --placement_group_style to allow or disable different AWS placement groups options for ec2 VM benchmarks.
+  Flag supports cluster, spread, and none placement group options.
 - Added support for availability zones for Azure. Format for availability zone support is "location-availability_zone".
   Example: eastus2-1 specifies Azure location eastus2 with availability zone 1.
   A PKB zone can be either a Azure location or an Azure location with an availability zone.
@@ -157,6 +158,11 @@
 - Added NCCL benchmark for GPU networking.
 - Added AWS DAX provider.
 - Added Google Cloud Firestore ycsb benchmarks.
+- Added support for un-managed data processing yarn cluster benchmarking.
+- Added placement group flag support for Azure. "cluster" will create proximity placement group.
+  "spread" will create an availability set.
+- Added a tcpdump collector with --tcpdump flag.
+- Added ability to load datasets into BigQuery from csv files on GCS.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -387,6 +393,8 @@
   https://github.com/GoogleCloudPlatform/spark-bigquery-connector. Support is
   currently limited to GCP Dataproc provider, but it could run anywhere
   provided some auth is plumbed through.
+- Add support for generating CLI download commands for object_storage_service.
+- Added flag '--azure_low_priority_vms' to create Low Priority VMs in Azure.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

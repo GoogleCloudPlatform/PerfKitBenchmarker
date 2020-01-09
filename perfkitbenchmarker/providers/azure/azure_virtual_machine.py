@@ -75,6 +75,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     accelerated_networking: boolean. True if supports accelerated_networking.
     boot_disk_size: None or int. The size of the boot disk in GB.
     boot_disk_type: string or None. The type of the boot disk.
+    low_priority: boolean. True if the VM should be low-priority, else False.
   """
 
   CLOUD = providers.AZURE
@@ -104,10 +105,12 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     """
     super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
-      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+      config_values['machine_type'] = yaml.safe_load(flag_values.machine_type)
     if flag_values['azure_accelerated_networking'].present:
       config_values['accelerated_networking'] = (
           flag_values.azure_accelerated_networking)
+    if flag_values['azure_low_priority_vms'].present:
+      config_values['low_priority'] = flag_values.azure_low_priority_vms
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -130,6 +133,9 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
         }),
         'boot_disk_type': (option_decoders.StringDecoder, {
             'default': None
+        }),
+        'low_priority': (option_decoders.BooleanDecoder, {
+            'default': False
         }),
     })
     return result
@@ -483,6 +489,9 @@ class AzureVirtualMachine(
     if self.use_dedicated_host:
       self.host_series_sku = _GetSkuType(self.machine_type)
       self.host_list = None
+    self.low_priority = vm_spec.low_priority
+    self.low_priority_status_code = None
+    self.early_termination = False
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     disk_spec.disk_type = (
@@ -547,8 +556,11 @@ class AzureVirtualMachine(
           ['--host-group', self.host.host_group, '--host', self.host.name])
       num_hosts = len(self.host_list)
 
-    if self.network.avail_set:
-      create_cmd.extend(['--availability-set', self.network.avail_set.name])
+    if self.network.placement_group:
+      create_cmd.extend(self.network.placement_group.AddVmArgs())
+
+    if self.low_priority:
+      create_cmd.extend(['--priority', 'Spot'])
 
     if self.password:
       create_cmd.extend(['--admin-password', self.password])
@@ -586,7 +598,8 @@ class AzureVirtualMachine(
           self.host = self.host_list[-1]
         raise errors.Resource.RetryableCreationError()
     if (not self.use_dedicated_host and retcode and
-        'AllocationFailed' in stderr):
+        ('AllocationFailed' in stderr or
+         'OverconstrainedZonalAllocationRequest' in stderr)):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
@@ -700,9 +713,39 @@ class AzureVirtualMachine(
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.os_disk.disk_type
     result['boot_disk_size'] = self.os_disk.disk_size or 'default'
+    result['placement_group_strategy'] = FLAGS.placement_group_style
+    result['preemptible'] = self.low_priority
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
     return result
+
+  @vm_util.Retry(max_retries=5)
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    if self.low_priority:
+      self.early_termination = True
+
+  def IsInterruptible(self):
+    """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
+
+    Returns:
+      True if this vm is a interruptible vm.
+    """
+    return self.low_priority
+
+  def WasInterrupted(self):
+    """Returns whether this low-priority vm was terminated early by Azure.
+
+    Returns: True if this vm was terminated early by Azure.
+    """
+    return self.early_termination
+
+  def GetVmStatusCode(self):
+    """Returns the early termination code if any.
+
+    Returns: Early termination code.
+    """
+    return self.low_priority_status_code
 
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,

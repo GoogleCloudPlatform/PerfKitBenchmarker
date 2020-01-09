@@ -127,6 +127,9 @@ class BenchmarkSpec(object):
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.vms = []
     self.networks = {}
+    self.custom_subnets = {k: {
+        'cloud': v.cloud,
+        'cidr': v.cidr} for (k, v) in self.config.vm_groups.items()}
     self.firewalls = {}
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
@@ -209,10 +212,31 @@ class BenchmarkSpec(object):
     """Create the dpb_service object and create groups for its vms."""
     if self.config.dpb_service is None:
       return
-    providers.LoadProvider(self.config.dpb_service.worker_group.cloud)
-    dpb_service_class = dpb_service.GetDpbServiceClass(
-        self.config.dpb_service.service_type)
-    self.dpb_service = dpb_service_class(self.config.dpb_service)
+    dpb_service_spec = self.config.dpb_service
+    dpb_service_cloud = dpb_service_spec.worker_group.cloud
+    providers.LoadProvider(dpb_service_cloud)
+
+    dpb_service_type = dpb_service_spec.service_type
+    dpb_service_class = dpb_service.GetDpbServiceClass(dpb_service_type)
+    self.dpb_service = dpb_service_class(dpb_service_spec)
+
+    # If the dpb service is un-managed, the provisioning needs to be handed
+    # over to the vm creation module.
+    if dpb_service_type == dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER:
+      # Ensure non cluster vms are not present in the spec.
+      if self.vms_to_boot:
+        raise Exception('Invalid Non cluster vm group {0} when benchmarking '
+                        'unmanaged dpb service'.format(self.vms_to_boot))
+
+      base_vm_spec = dpb_service_spec.worker_group
+      base_vm_spec.vm_spec.zone = self.dpb_service.dpb_service_zone
+      worker_group_spec = copy.copy(base_vm_spec)
+      worker_group_spec.vm_count = dpb_service_spec.worker_count
+      self.vms_to_boot['worker_group'] = worker_group_spec
+      master_group_spec = copy.copy(base_vm_spec)
+      master_group_spec.vm_count = 1
+      self.vms_to_boot['master_group'] = master_group_spec
+      logging.info(str(self.vms_to_boot))
 
   def ConstructRelationalDb(self):
     """Create the relational db and create groups for its vms."""
@@ -358,6 +382,8 @@ class BenchmarkSpec(object):
         group_spec.vm_spec.zone = zone_list[self._zone_index]
         self._zone_index = (self._zone_index + 1
                             if self._zone_index < len(zone_list) - 1 else 0)
+      if group_spec.cidr:  # apply cidr range to all vms in vm_group
+        group_spec.vm_spec.cidr = group_spec.cidr
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec and not vm.is_static:
         if disk_spec.disk_type == disk.LOCAL and disk_count is None:
@@ -451,6 +477,14 @@ class BenchmarkSpec(object):
       for group_name in 'master_group', 'worker_group':
         self.spark_service.vms[group_name] = self.vm_groups[group_name]
 
+    # In the case of an un-managed yarn cluster, for hadoop software
+    # installation, the dpb service instance needs access to constructed
+    # master group and worker group.
+    if (self.config.dpb_service and self.config.dpb_service.service_type ==
+        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER):
+      for group_name in 'master_group', 'worker_group':
+        self.dpb_service.vms[group_name] = self.vm_groups[group_name]
+
   def ConstructPlacementGroups(self):
     for placement_group_name, placement_group_spec in six.iteritems(
         self.placement_group_specs):
@@ -509,6 +543,7 @@ class BenchmarkSpec(object):
     # first when sorted.
     networks = [self.networks[key]
                 for key in sorted(six.iterkeys(self.networks))]
+
     vm_util.RunThreaded(lambda net: net.Create(), networks)
     if self.container_registry:
       self.container_registry.Create()
