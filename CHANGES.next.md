@@ -630,3 +630,5 @@
   is no result for certain hdr histogram group.
 - Add `-m PEM` to `ssh-keygen` to fix AWS.
 - Updated AWS Virtual Machine to handle shutting_down case when creating an instance.
+- Fixes to MySQL server and client settings to ensure enough data and temp
+  directory space, and to prevent connection timeouts.

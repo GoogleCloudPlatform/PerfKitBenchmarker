@@ -421,6 +421,13 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       if hasattr(self, 'firewall'):
         self.firewall.DisallowAllPorts()
       self.unmanaged_db_exists = False
+      self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
+      self.server_vm.RemoteCommand(
+          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_connects\';"' %
+          self.MakeMysqlConnectionString(use_localhost=True))
+      self.server_vm.RemoteCommand(
+          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_clients\';"' %
+          self.MakeMysqlConnectionString(use_localhost=True))
       return
 
     for current_instance_id in self.all_instance_ids:

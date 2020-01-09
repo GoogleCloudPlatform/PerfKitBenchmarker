@@ -29,3 +29,15 @@ def AptInstall(vm):
       "'deb https://mirror.ubuntu.serverforge.org trusty universe'")
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get -y install mysql-client-5.6')
+
+
+def YumGetPathToConfig(vm):
+  """Returns the path to the mysql config file."""
+  del vm
+  return '/etc/my.cnf'
+
+
+def AptGetPathToConfig(vm):
+  """Returns the path to the mysql config file."""
+  del vm
+  return '/etc/mysql/conf.d/mysql.cnf'
