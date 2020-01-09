@@ -163,6 +163,7 @@
   "spread" will create an availability set.
 - Added a tcpdump collector with --tcpdump flag.
 - Added ability to load datasets into BigQuery from csv files on GCS.
+- Updated AzureVirtualNetwork to support location level virtual nets, which allows support for cross zone benchmark runs.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
