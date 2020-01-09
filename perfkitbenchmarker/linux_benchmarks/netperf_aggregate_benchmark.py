@@ -117,9 +117,6 @@ def Prepare(benchmark_spec):
   """
 
   vms = benchmark_spec.vms
-  print("VMS")
-  print(vms)
-  vms = vms[:3]
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
 
 
@@ -192,10 +189,22 @@ def RunNetperfAggregate(vm, server_ips):
 
   # setup remote hosts file
   # TODO change this to append
-  vm.RemoteCommand("cd %s && echo 'REMOTE_HOSTS[0]=%s' > remote_hosts && "
-                   "echo 'REMOTE_HOSTS[1]=%s' >> remote_hosts && "
-                   "echo 'NUM_REMOTE_HOSTS=2' >> remote_hosts"
-                   % (netperf.NETPERF_EXAMPLE_DIR, server_ips, server_ips))
+
+  vm.RemoteCommand("cd %s && rm remote_hosts"
+                     % (netperf.NETPERF_EXAMPLE_DIR))
+  ip_num = 0
+  for ip in server_ips:
+    vm.RemoteCommand("cd %s && echo 'REMOTE_HOSTS[%d]=%s' >> remote_hosts"
+                     % (netperf.NETPERF_EXAMPLE_DIR, ip_num, ip))
+    ip_num += 1
+
+  vm.RemoteCommand("cd %s && echo 'NUM_REMOTE_HOSTS=%d' >> remote_hosts"
+                   % (netperf.NETPERF_EXAMPLE_DIR, len(server_ips)))
+
+  stdout, stderr = vm.RemoteCommand("cd %s && cat remote_hosts"
+                                    % (netperf.NETPERF_EXAMPLE_DIR))
+
+  print(stdout)
 
   vm.RemoteCommand('cd %s && export PATH=$PATH:.'
                    % (netperf.NETPERF_EXAMPLE_DIR))
@@ -218,13 +227,13 @@ def RunNetperfAggregate(vm, server_ips):
   logging.info(stderr_1)
 
   # do post processing step
-  proc_stdout, proc_stderr = vm.RemoteCommand("cd %s && ./post_proc.py"
+  proc_stdout, proc_stderr = vm.RemoteCommand("cd %s && ./post_proc.py "
                                               "--intervals netperf_tps.log"
                                               % (netperf.NETPERF_EXAMPLE_DIR),
                                               ignore_failure=True)
 
   # Metadata to attach to samples
-  metadata = {'number_of_hosts': 3}
+  metadata = {'server_count': len(server_ips)}
 
   samples = ParseNetperfAggregateOutput(proc_stdout, metadata)
 
@@ -242,33 +251,23 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
 
+  # set client and server vms
   vm_dict = benchmark_spec.vm_groups
   client_vms = vm_dict['client']
   server_vms = vm_dict['servers']
-
-  print("CLIENT VM")
-  print(client_vms)
-  print("SERVER VMS")
-  print(server_vms)
+  client_vm = client_vms[0]
 
   results = []
 
-  # set client and server vms
-  client_vm = client_vms[0]
-
-  logging.info('netperf running on %s', client_vm)
-
   metadata = {
-      'sending_zone': client_vm.zone,
-      'sending_machine_type': client_vm.machine_type,
-      'receiving_zone_1': server_vms[0].zone,
-      'receiving_machine_type_1': server_vms[0].machine_type,
-      'receiving_zone_2': server_vms[1].zone,
-      'receiving_machine_type_2': server_vms[1].machine_type
+      'client_zone': client_vm.zone,
+      'client_machine_type': client_vm.machine_type,
+      'server_zone': server_vms[0].zone,
+      'server_machine_type': server_vms[0].machine_type
   }
 
   if vm_util.ShouldRunOnExternalIpAddress():
-    server_ips = (vm.ip_address for vm in server_vms)
+    server_ips = list((vm.ip_address for vm in server_vms))
     external_ip_results = RunNetperfAggregate(client_vm, server_ips)
     for external_ip_result in external_ip_results:
       external_ip_result.metadata['ip_type'] = 'external'
@@ -283,7 +282,7 @@ def Run(benchmark_spec):
       break
 
   if runInternal:
-    server_ips = (vm.internal_ip for vm in server_vms)
+    server_ips = list((vm.internal_ip for vm in server_vms))
     internal_ip_results = RunNetperfAggregate(client_vm, server_ips)
 
     for internal_ip_result in internal_ip_results:
