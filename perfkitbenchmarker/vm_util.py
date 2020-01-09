@@ -394,6 +394,8 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   else:
     logging.debug(debug_text)
 
+
+
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command
   # not errors from PKB infrastructure.
@@ -413,6 +415,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
       # perfkitbenchmarker.providers.aws.util.IssueRetryableCommand()
       return stdout, '', 0
     raise errors.VmUtil.IssueCommandError(debug_text)
+
 
   return stdout, stderr, process.returncode
 

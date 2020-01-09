@@ -26,7 +26,7 @@ JUJU = 'juju'
 RHEL = 'rhel'
 UBUNTU_CONTAINER = 'ubuntu_container'
 UBUNTU1404 = 'ubuntu1404'
-UBUNTU1604 = 'ubuntu1604'
+UBUNTU1604 = 'ubuntu1604_test123'
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
 UBUNTU1710 = 'ubuntu1710'
 UBUNTU1804 = 'ubuntu1804'
@@ -69,6 +69,7 @@ BASE_OS_TYPES = [CLEAR, CORE_OS, DEBIAN, RHEL, WINDOWS]
 
 flags.DEFINE_enum(
     'os_type', UBUNTU1604, ALL,
+#    'os_type', DEBIAN, ALL,
     'The VM\'s OS type. Ubuntu\'s os_type can also be specified as "debian" '
     'because it is largely built on Debian and uses the same package manager. '
     'Likewise, CentOS\'s os_type can be "rhel". In general if two OS\'s use '
