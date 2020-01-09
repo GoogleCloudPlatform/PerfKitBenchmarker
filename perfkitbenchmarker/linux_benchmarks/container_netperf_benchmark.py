@@ -27,6 +27,9 @@ from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
 
 FLAGS = flags.FLAGS
 
+# Set default as 128KB (131072 bytes)
+# the Linux default of 16K cannot achieve
+# "link rate" and that the higher default value will let us
 flags.DEFINE_integer('container_netperf_tcp_stream_send_size_in_bytes', 131072,
                      'Send size to use for TCP_STREAM tests (netperf -m flag)')
 
