@@ -48,7 +48,7 @@ def _Build(vm):
 def AptInstall(vm):
   """Installs the NCCL package on the VM."""
   _Build(vm)
-
+  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
   vm.InstallPackages('{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
                      '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'
                      .format(
