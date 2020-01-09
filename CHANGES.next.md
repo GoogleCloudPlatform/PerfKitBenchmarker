@@ -162,6 +162,7 @@
 - Added placement group flag support for Azure. "cluster" will create proximity placement group.
   "spread" will create an availability set.
 - Added a tcpdump collector with --tcpdump flag.
+- Added ability to load datasets into BigQuery from csv files on GCS.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

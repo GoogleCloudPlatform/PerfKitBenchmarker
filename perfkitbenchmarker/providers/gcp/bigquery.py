@@ -15,6 +15,7 @@
 
 import datetime
 import json
+import logging
 
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
@@ -24,6 +25,8 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
 FLAGS = flags.FLAGS
+
+DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 
 class Bigquery(edw_service.EdwService):
@@ -84,7 +87,7 @@ class Bigquery(edw_service.EdwService):
     """Method to perform installation and authentication of bigquery runner.
 
     Native Bigquery client that ships with the google_cloud_sdk
-    https://cloud.google.com/bigquery/docs/bq-command-line-too used as client.
+    https://cloud.google.com/bigquery/docs/bq-command-line-tool used as client.
 
     Args:
       vm: Client vm on which the script will be run.
@@ -153,3 +156,76 @@ class Bigquery(edw_service.EdwService):
       # There is a 10T daily limit on extracting from BQ. Large datasets will
       # inherently hit this limit and benchmarks shouldn't use those.
       gcp_util.CheckGcloudResponseKnownFailures(stderr, retcode)
+
+  def RemoveDataset(self, dataset=None):
+    """Removes a dataset.
+
+    See https://cloud.google.com/bigquery/docs/managing-tables#deleting_tables
+
+    Args:
+      dataset: Optional name of the dataset. If none, will be extracted from the
+        cluster_identifier.
+    """
+    project_dataset = self.FormatProjectAndDatasetForCommand(dataset)
+    vm_util.IssueCommand(['bq', 'rm', '-r', '-f', '-d', project_dataset],
+                         raise_on_failure=False)
+
+  def CreateDataset(self, dataset=None, description=None):
+    """Creates a new dataset.
+
+    See https://cloud.google.com/bigquery/docs/tables
+
+    Args:
+      dataset: Optional name of the dataset. If none, will be extracted from the
+        cluster_identifier.
+      description: Optional description of the dataset. Escape double quotes.
+    """
+    project_dataset = self.FormatProjectAndDatasetForCommand(dataset)
+    cmd = [
+        'bq', 'mk', '--dataset',
+        '--default_table_expiration=%d' % DEFAULT_TABLE_EXPIRATION
+    ]
+    if description:
+      cmd.extend(['--description', '"%s"' % description])
+    cmd.append(project_dataset)
+    vm_util.IssueCommand(cmd)
+
+  def LoadDataset(self,
+                  source_bucket,
+                  tables,
+                  schema_dir,
+                  dataset=None,
+                  append=True,
+                  skip_leading_row=True):
+    """Load all tables in a dataset to a database from CSV object storage.
+
+    See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv
+
+    Args:
+      source_bucket: Name of the bucket to load the data from. Should already
+        exist. Each table must have its own subfolder in the bucket named after
+        the table, containing one or more csv files that make up the table data.
+      tables: List of table names to load.
+      schema_dir: GCS directory containing json schemas of all tables to load.
+      dataset: Optional name of the dataset. If none, will be extracted from the
+        cluster_identifier.
+      append: If True, appends loaded data to the existing set. If False,
+        replaces the existing data (if any).
+      skip_leading_row: If True, skips the first row of data being loaded.
+    """
+    project_dataset = self.FormatProjectAndDatasetForCommand(dataset)
+    for table in tables:
+      schema_path = schema_dir + table + '.json'
+      local_schema = './%s.json' % table
+      vm_util.IssueCommand(['gsutil', 'cp', schema_path, local_schema])
+      cmd = [
+          'bq', 'load', '--noreplace' if append else '--replace',
+          '--source_format=CSV',
+          '--skip_leading_rows=%d' % 1 if skip_leading_row else 0,
+          '%s.%s' % (project_dataset, table),
+          'gs://%s/%s/*.csv' % (source_bucket, table), local_schema
+      ]
+      _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+      if retcode:
+        logging.warning('Loading table %s failed. stderr: %s, retcode: %s',
+                        table, stderr, retcode)
