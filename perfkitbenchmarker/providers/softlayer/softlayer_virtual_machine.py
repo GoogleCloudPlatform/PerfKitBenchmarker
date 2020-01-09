@@ -323,11 +323,14 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         create_cmd = create_cmd + \
             ['--vlan-private', '%s' % private_vlan_id]
 
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+### Added by Yen for #1978 
+    stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
+###
+
 #    response = json.loads(stdout)
 #    self.id = response['id']
 
-#### Added by Yen
+### Added by Yen in order to return VM id 
 
     #list of VM id
     list_id_cmd = util.SoftLayer_PREFIX + [
@@ -342,7 +345,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = json.loads(stdout)
     self.id = response[0]['id']
 
-#### 
+### 
 
 # CPOMRS
   def UnregisterDNS(self):
