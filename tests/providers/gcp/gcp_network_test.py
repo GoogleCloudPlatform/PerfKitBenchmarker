@@ -26,8 +26,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
-from tests import pkb_common_test_case
 from six.moves import builtins
+from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
@@ -135,9 +135,12 @@ _REGEX_GCE_FW_NAMES = r'(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
 
 class BaseGceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
+<<<<<<< HEAD
   def setUp(self):
     super(BaseGceNetworkTest, self).setUp()
 
+=======
+>>>>>>> 319e7061... -------------
   def _CreateBenchmarkSpecFromYaml(self, yaml_string,
                                    benchmark_name=_BENCHMARK_NAME):
     config = configs.LoadConfig(yaml_string, {}, benchmark_name)
@@ -155,9 +158,12 @@ class BaseGceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
 class TestGceNetworkConfig(BaseGceNetworkTest):
 
+<<<<<<< HEAD
   def setUp(self):
     super(TestGceNetworkConfig, self).setUp()
 
+=======
+>>>>>>> 319e7061... -------------
   def testLoadDefaultConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
     spec.ConstructVirtualMachines()
@@ -285,12 +291,21 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     net = gce_network.GceNetwork.GetNetwork(vm)
     net_name = net._MakeGceNetworkName()
 
+<<<<<<< HEAD
     _net_type = 'default'
     _cidr_string = None
     _uri = _URI
     expected_netname = '-'.join(
         i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
         i and i not in ('default'))
+=======
+    net_type = 'default'
+    cidr_string = None
+    uri = _URI
+    expected_netname = '-'.join(
+        i for i in ('pkb-network', net_type, cidr_string, uri) if
+        i and i not in 'default')
+>>>>>>> 319e7061... -------------
 
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-uri45678 (default)
@@ -307,6 +322,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     net = gce_network.GceNetwork.GetNetwork(vm)
     net_name = net._MakeGceNetworkName()
 
+<<<<<<< HEAD
     _net_type = 'single'
     _cidr_string = '2-2-3-4-33'
     _uri = _URI
@@ -316,6 +332,18 @@ class TestGceNetworkNames(BaseGceNetworkTest):
 
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-single-2-2-3-4-33-uri45678 (single)
+=======
+    net_type = 'single'
+    cidr_string = '2-2-3-4-33'
+    uri = _URI
+    expected_netname = '-'.join(
+        i for i in ('pkb-network', net_type, cidr_string, uri) if
+        i and i not in 'default')
+
+    self.assertEqual(
+        expected_netname,
+        net_name)  # pkb-network-single-2-2-3-4-33-uri45678 (single)
+>>>>>>> 319e7061... -------------
     self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
 
   def testGetMultiNetworkName(self):
@@ -326,12 +354,21 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     net = gce_network.GceNetwork.GetNetwork(vm)
     net_name = net._MakeGceNetworkName()
 
+<<<<<<< HEAD
     _net_type = 'multi'
     _cidr_string = '1-2-3-4-56'
     _uri = _URI
     expected_netname = '-'.join(
         i for i in ('pkb-network', _net_type, _cidr_string, _uri) if
         i and i not in ('default'))
+=======
+    net_type = 'multi'
+    cidr_string = '1-2-3-4-56'
+    uri = _URI
+    expected_netname = '-'.join(
+        i for i in ('pkb-network', net_type, cidr_string, uri) if
+        i and i not in 'default')
+>>>>>>> 319e7061... -------------
 
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-multi-1-2-3-4-56-uri45678 (multi)
@@ -348,6 +385,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     net = gce_network.GceNetwork.GetNetwork(vm)
     fw_name = net._MakeGceFWRuleName()
 
+<<<<<<< HEAD
     _net_type = 'default'
     _src_cidr_string = 'internal'
     _dst_cidr_string = '10-0-0-0-8'
@@ -360,6 +398,18 @@ class TestGceNetworkNames(BaseGceNetworkTest):
             _dst_port,
             _uri)
         if i)
+=======
+    net_type = 'default'
+    src_cidr_string = 'internal'
+    dst_cidr_string = '10-0-0-0-8'
+    src_port = None
+    dst_port = None
+    uri = _URI
+    expected_name = '-'.join(
+        i for i in (
+            net_type, src_cidr_string, dst_cidr_string, src_port,
+            dst_port, uri) if i)
+>>>>>>> 319e7061... -------------
 
     self.assertEqual(expected_name, fw_name)
     self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
@@ -379,6 +429,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         net_type=None, src_cidr=None, dst_cidr=None, port_range_lo=lo_port,
         port_range_hi=hi_port, uri=None)
 
+<<<<<<< HEAD
     _net_type = 'single'
     _src_cidr_string = 'internal'
     _dst_cidr_string = '2-2-3-4-33'
@@ -390,6 +441,17 @@ class TestGceNetworkNames(BaseGceNetworkTest):
             _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
             _dst_port,
             _uri)
+=======
+    net_type = 'single'
+    src_cidr_string = 'internal'
+    dst_cidr_string = '2-2-3-4-33'
+    src_port = None
+    dst_port = None
+    uri = _URI
+    expected_name = '-'.join(
+        i for i in (net_type, src_cidr_string, dst_cidr_string, src_port,
+                    dst_port, uri)
+>>>>>>> 319e7061... -------------
         if i)
 
     self.assertEqual(expected_name,
@@ -412,6 +474,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         port_range_lo=lo_port,
         port_range_hi=hi_port, uri=None)
 
+<<<<<<< HEAD
     _prefix = None
     _net_type = 'multi'
     _src_cidr_string = 'internal'
@@ -423,6 +486,18 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         i for i in (
             _prefix, _net_type, _src_cidr_string, _dst_cidr_string, _src_port,
             _dst_port, _uri) if i)
+=======
+    prefix = None
+    net_type = 'multi'
+    src_cidr_string = 'internal'
+    dst_cidr_string = '1-2-3-4-56'
+    src_port = '49152'
+    dst_port = '65535'
+    uri = _URI
+    expected_name = '-'.join(
+        i for i in (prefix, net_type, src_cidr_string, dst_cidr_string,
+                    src_port, dst_port, uri) if i)
+>>>>>>> 319e7061... -------------
 
     self.assertEqual(expected_name,
                      fw_name)  # multi-internal-1-2-3-4-56-49152-65535-uri45678
@@ -443,6 +518,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         port_range_lo=lo_port,
         port_range_hi=hi_port, uri=None)
 
+<<<<<<< HEAD
     _prefix = 'perfkit-firewall'
     _net_type = 'multi'
     _src_cidr_string = '1-2-3-4-56'
@@ -457,6 +533,21 @@ class TestGceNetworkNames(BaseGceNetworkTest):
 
     self.assertEqual(expected_name,
                      fw_name)  # perfkit-firewall-multi-1-2-3-4-56-123-567-901-13-49152-65535-uri45678
+=======
+    prefix = 'perfkit-firewall'
+    net_type = 'multi'
+    src_cidr_string = '1-2-3-4-56'
+    dst_cidr_string = '123-567-9-1-13'
+    src_port = '49152'
+    dst_port = '65535'
+    uri = _URI
+    expected_name = '-'.join(
+        i for i in (prefix, net_type, src_cidr_string, dst_cidr_string,
+                    src_port, dst_port, uri) if i)
+
+    # perfkit-firewall-multi-1-2-3-4-56-123-567-901-13-49152-65535-uri45678
+    self.assertEqual(expected_name, fw_name)
+>>>>>>> 319e7061... -------------
     self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
 
 
@@ -473,10 +564,17 @@ def PatchCriticalObjects(retvals=None):
   with mock.patch(
       vm_util.__name__ + '.IssueCommand',
       side_effect=ReturnVal) as issue_command, mock.patch(
+<<<<<<< HEAD
       builtins.__name__ + '.open'), mock.patch(
       vm_util.__name__ +
       '.NamedTemporaryFile'), mock.patch(util.__name__ +
                                          '.GetDefaultProject'):
+=======
+          builtins.__name__ + '.open'), mock.patch(
+              vm_util.__name__ +
+              '.NamedTemporaryFile'), mock.patch(util.__name__ +
+                                                 '.GetDefaultProject'):
+>>>>>>> 319e7061... -------------
     yield issue_command
 
 
