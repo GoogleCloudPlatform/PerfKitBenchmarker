@@ -633,5 +633,6 @@
   is no result for certain hdr histogram group.
 - Add `-m PEM` to `ssh-keygen` to fix AWS.
 - Updated AWS Virtual Machine to handle shutting_down case when creating an instance.
+- Default Docker image for cluster_boot on Kubernetes (GH-2061 from @marcomicera)
 - Fixes to MySQL server and client settings to ensure enough data and temp
   directory space, and to prevent connection timeouts.
