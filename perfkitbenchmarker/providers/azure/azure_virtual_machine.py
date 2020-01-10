@@ -160,7 +160,8 @@ class AzurePublicIPAddress(resource.BaseResource):
     ] + self.resource_group.args
 
     if self.availability_zone:
-      cmd += ['--zone', self.availability_zone]
+      # Availability Zones require Standard IPs.
+      cmd += ['--zone', self.availability_zone, '--sku', 'Standard']
 
     vm_util.IssueCommand(cmd)
 

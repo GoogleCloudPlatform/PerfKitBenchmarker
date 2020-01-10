@@ -18,7 +18,7 @@ import posixpath
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
-flags.DEFINE_string('nccl_version', '2.5.6-1',
+flags.DEFINE_string('nccl_version', '2.5.6-2',
                     'NCCL version to install')
 
 FLAGS = flags.FLAGS
@@ -48,7 +48,7 @@ def _Build(vm):
 def AptInstall(vm):
   """Installs the NCCL package on the VM."""
   _Build(vm)
-
+  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
   vm.InstallPackages('{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
                      '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'
                      .format(

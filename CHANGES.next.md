@@ -163,6 +163,7 @@
   "spread" will create an availability set.
 - Added a tcpdump collector with --tcpdump flag.
 - Added ability to load datasets into BigQuery from csv files on GCS.
+- Updated AzureVirtualNetwork to support location level virtual nets, which allows support for cross zone benchmark runs.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -631,3 +632,5 @@
 - Add `-m PEM` to `ssh-keygen` to fix AWS.
 - Updated AWS Virtual Machine to handle shutting_down case when creating an instance.
 - Default Docker image for cluster_boot on Kubernetes (GH-2061 from @marcomicera)
+- Fixes to MySQL server and client settings to ensure enough data and temp
+  directory space, and to prevent connection timeouts.
