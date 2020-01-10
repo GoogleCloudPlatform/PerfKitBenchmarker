@@ -129,7 +129,10 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
          ('UDP_RR_Latency_p99', 406.0, 'us'),
          ('UDP_RR_Latency_min', 200.0, 'us'),
          ('UDP_RR_Latency_max', 500.0, 'us'),
-         ('UDP_RR_Latency_stddev', 214.64, 'us')],
+         ('UDP_RR_Latency_stddev', 214.64, 'us'),
+         ('UDP_STREAM_Throughput', 1102.42, mbps),
+         ('UDP_STREAM_Throughput', 1802.72, 'Mbits/sec'),
+         ],
         [i[:3] for i in result])
 
     external_meta = {'ip_type': 'external'}
