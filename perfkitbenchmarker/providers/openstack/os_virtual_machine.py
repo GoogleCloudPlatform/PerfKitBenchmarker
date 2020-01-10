@@ -406,3 +406,8 @@ class VersionlessRhel7BasedOpenStackVirtualMachine(
 class CentOs7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                           linux_virtual_machine.CentOs7Mixin):
   DEFAULT_IMAGE = 'centos7'
+
+
+class ClearBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                        linux_virtual_machine.ClearMixin):
+  DEFAULT_IMAGE = 'upstream-clear'
