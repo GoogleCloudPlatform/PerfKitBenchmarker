@@ -188,10 +188,8 @@ def RunNetperfAggregate(vm, server_ips):
   """
 
   # setup remote hosts file
-  # TODO change this to append
-
   vm.RemoteCommand("cd %s && rm remote_hosts"
-                     % (netperf.NETPERF_EXAMPLE_DIR))
+                   % (netperf.NETPERF_EXAMPLE_DIR))
   ip_num = 0
   for ip in server_ips:
     vm.RemoteCommand("cd %s && echo 'REMOTE_HOSTS[%d]=%s' >> remote_hosts"
@@ -200,12 +198,6 @@ def RunNetperfAggregate(vm, server_ips):
 
   vm.RemoteCommand("cd %s && echo 'NUM_REMOTE_HOSTS=%d' >> remote_hosts"
                    % (netperf.NETPERF_EXAMPLE_DIR, len(server_ips)))
-
-  stdout, stderr = vm.RemoteCommand("cd %s && cat remote_hosts"
-                                    % (netperf.NETPERF_EXAMPLE_DIR))
-
-  print(stdout)
-
   vm.RemoteCommand('cd %s && export PATH=$PATH:.'
                    % (netperf.NETPERF_EXAMPLE_DIR))
 
@@ -217,7 +209,7 @@ def RunNetperfAggregate(vm, server_ips):
                                     ignore_failure=True, should_log=True,
                                     login_shell=False, timeout=1200)
 
-  # print out netperf_tps.log
+  # print out netperf_tps.log to log
   stdout_1, stderr_1 = vm.RemoteCommand("cd %s && cat netperf_tps.log" %
                                         (netperf.NETPERF_EXAMPLE_DIR),
                                         ignore_failure=True, should_log=True,
