@@ -152,6 +152,11 @@ flags.DEFINE_string(
     'non-empty string will cause a reboot to occur after VM prepare. '
     'If unspecified, the kernel command line will be unmodified.')
 
+flags.DEFINE_bool(
+    'increase_tcp_window', False,
+    'A flag to increase the TCP window for all VMs on the network. '
+    'As with other sysctrls, will cause a reboot to happen.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -334,6 +339,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
     self.DoConfigureNetworkForBBR()
+    self.DoConfigureTCPWindow()
     self.UpdateEnvironmentPath()
     self._RebootIfNecessary()
     self._DisableCpus()
@@ -451,6 +457,25 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'net.core.default_qdisc': 'fq',
         'net.ipv4.tcp_congestion_control': 'bbr'
     })
+
+  def DoConfigureTCPWindow(self):
+    """Apply --network_enable_BBR to the VM."""
+    if not FLAGS.increase_tcp_window:
+      return
+
+    # values are in bytes
+    # sets max OS receive buffer for all connections
+    self.ApplySysctlPersistent('net.core.rmem_max', '67108864')
+    # sets max OS send buffer for all connections
+    self.ApplySysctlPersistent('net.core.wmem_max', '67108864')
+    # TCP autotuning setting.
+    # overrides the /proc/sys/net/core/rmem_default value
+    # first value = <min receive buffer>
+    # second value = <default receive buffer>
+    # third value = <max receive buffer>
+    self.ApplySysctlPersistent('net.ipv4.tcp_rmem', '4096 87380 33554432')
+    # TCP autotuning setting. Same as above, but with send instead of receive
+    self.ApplySysctlPersistent('net.ipv4.tcp_wmem', '4096 87380 33554432')
 
   def _RebootIfNecessary(self):
     """Will reboot the VM if self._needs_reboot has been set."""
