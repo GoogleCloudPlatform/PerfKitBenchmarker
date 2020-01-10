@@ -1235,4 +1235,5 @@ def Main():
     return 0
   CheckVersionFlag()
   SetUpPKB()
+  logging.info('GitHub commit confirmed')
   return RunBenchmarks()
