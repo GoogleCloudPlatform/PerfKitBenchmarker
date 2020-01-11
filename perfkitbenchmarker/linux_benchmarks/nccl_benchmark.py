@@ -23,7 +23,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
-flags.DEFINE_integer('nccl_np', 16, 'Number of processes to run')
 flags.DEFINE_integer('nccl_slots', 8,
                      'Launch n processes per node on all allocated nodes')
 flags.DEFINE_string('nccl_cuda_visible_devices', None, 'GPU identifiers are '
@@ -55,10 +54,10 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'nccl'
 BENCHMARK_CONFIG = """
 nccl:
-  description: Runs NCCL Benchmark.
+  description: Runs NCCL Benchmark. Specify the number of VMs with --num_vms.
   vm_groups:
     default:
-      vm_count: 2
+      vm_count: null
       vm_spec:
         GCP:
           machine_type: n1-highmem-96
@@ -89,7 +88,7 @@ _SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
                              r'iters: (?P<iters>\d+) '
                              r'validation: (?P<validation>\d+)\s*')
 
-# Withoud '--mca btl_tcp_if_exclude docker0,lo', it stuck forever
+# Without '--mca btl_tcp_if_exclude docker0,lo', it stuck forever
 # This is caused by Docker network in DLVM, use mca btl_tcp_if_exclude to skip
 # docker network.
 
@@ -98,7 +97,6 @@ _RUN_CMD = ('{mpi} '
             '--mca btl tcp,self '
             '--mca btl_tcp_if_exclude docker0,lo '
             '--bind-to none '
-            '-np {np} '
             '-N {slots} '
             '{env} '
             'nccl-tests/build/all_reduce_perf '
@@ -197,8 +195,7 @@ def _CreateMetadataDict():
   Returns:
     metadata dict
   """
-  metadata = {'np': FLAGS.nccl_np,
-              'slots': FLAGS.nccl_slots,
+  metadata = {'slots': FLAGS.nccl_slots,
               'minbytes': FLAGS.nccl_minbytes,
               'maxbytes': FLAGS.nccl_maxbytes,
               'stepfactor': FLAGS.nccl_stepfactor,
@@ -287,7 +284,6 @@ def Run(benchmark_spec):
 
   cmd = _RUN_CMD.format(mpi=FLAGS.nccl_mpi,
                         hostfile=_HOSTFILE,
-                        np=FLAGS.nccl_np,
                         slots=FLAGS.nccl_slots,
                         env=' '.join(['-x {}'.format(x) for x in env]),
                         minbytes=FLAGS.nccl_minbytes,
