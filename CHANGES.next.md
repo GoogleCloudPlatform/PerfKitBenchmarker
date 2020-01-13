@@ -159,6 +159,8 @@
 - Added AWS DAX provider.
 - Added Google Cloud Firestore ycsb benchmarks.
 - Added support for un-managed data processing yarn cluster benchmarking.
+- Added support for UDP_STREAM tests to netperf_benchmark
+- Added flags to select stream size to netperf_benchmark
 - Added placement group flag support for Azure. "cluster" will create proximity placement group.
   "spread" will create an availability set.
 - Added a tcpdump collector with --tcpdump flag.
@@ -631,5 +633,6 @@
   is no result for certain hdr histogram group.
 - Add `-m PEM` to `ssh-keygen` to fix AWS.
 - Updated AWS Virtual Machine to handle shutting_down case when creating an instance.
+- Default Docker image for cluster_boot on Kubernetes (GH-2061 from @marcomicera)
 - Fixes to MySQL server and client settings to ensure enough data and temp
   directory space, and to prevent connection timeouts.
