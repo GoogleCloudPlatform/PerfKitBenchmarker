@@ -17,9 +17,11 @@
 import posixpath
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
 flags.DEFINE_string('nccl_version', '2.5.6-2',
                     'NCCL version to install')
+flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
 
 FLAGS = flags.FLAGS
 
@@ -41,17 +43,24 @@ def _Build(vm):
                                  .format(lib_path=posixpath.join(
                                      cuda_home, 'lib64')))
 
-  vm.RemoteCommand('cd nccl && {env} make -j 20 pkg.debian.build'
+  vm.RemoteCommand('cd nccl && {env} make -j pkg.debian.build'
                    .format(env=vm_util.DictonaryToEnvString(env_vars)))
 
 
 def AptInstall(vm):
   """Installs the NCCL package on the VM."""
   _Build(vm)
-  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
   vm.InstallPackages('{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
                      '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'
                      .format(
                          build='./nccl/build/pkg/deb/',
                          nccl=FLAGS.nccl_version,
                          cuda=FLAGS.cuda_toolkit_version))
+  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
+  vm.RemoteCommand('sudo ldconfig')  # Refresh LD cache
+  if FLAGS.nccl_net_plugin:
+    vm.Install('google_cloud_sdk')
+    vm.RemoteCommand('sudo {gsutil_path} cp {nccl_net_plugin_path} '
+                     '/usr/lib/x86_64-linux-gnu/libnccl-net.so'.format(
+                         gsutil_path=google_cloud_sdk.GSUTIL_PATH,
+                         nccl_net_plugin_path=FLAGS.nccl_net_plugin))

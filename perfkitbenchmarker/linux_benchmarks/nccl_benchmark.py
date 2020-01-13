@@ -21,7 +21,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
 flags.DEFINE_integer('nccl_slots', 8,
                      'Launch n processes per node on all allocated nodes')
@@ -46,7 +45,6 @@ flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
                     'MPI home')
 flags.DEFINE_string('nccl_nccl_home', '/usr/local/nccl2', 'NCCL home')
-flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
 
 
 FLAGS = flags.FLAGS
@@ -143,12 +141,7 @@ def _PrepareVm(vm):
     vm.Install('nccl')
   if FLAGS.nccl_install_openmpi:
     vm.Install('openmpi')
-  if FLAGS.nccl_net_plugin:
-    vm.Install('google_cloud_sdk')
-    vm.RemoteCommand('sudo {gsutil_path} cp {nccl_net_plugin_path} '
-                     '/usr/lib/x86_64-linux-gnu/libnccl-net.so'.format(
-                         gsutil_path=google_cloud_sdk.GSUTIL_PATH,
-                         nccl_net_plugin_path=FLAGS.nccl_net_plugin))
+
   env = ''
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
