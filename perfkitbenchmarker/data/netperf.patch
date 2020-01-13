@@ -56,9 +56,9 @@ diff -u -r netperf-2.6.0/src/nettest_bsd.h netperf-2.6.0-patch/src/nettest_bsd.h
 diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni.c
 --- netperf-2.6.0/src/nettest_omni.c	2012-06-19 13:33:48.000000000 -0700
 +++ netperf-2.6.0-patch/src/nettest_omni.c	2016-11-04 16:37:37.472977329 -0700
-@@ -3759,6 +3759,10 @@
-       omni_request->socket_prio            = remote_socket_prio;
-       omni_request->socket_tos             = remote_socket_tos;
+@@ -3794,6 +3794,10 @@
+ void
+ set_omni_request_flags(struct omni_request_struct *omni_request) {
  
 +      omni_request->think_time = think_time;
 +      omni_request->think_time_array_size = think_time_array_size;
@@ -67,7 +67,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
        /* we have no else clauses here because we previously set flags
  	 to zero above raj 20090803 */
        if (rem_nodelay)
-@@ -4932,6 +4936,11 @@
+@@ -5175,6 +5179,11 @@
  	  omni_request->cong_control,
  	  sizeof(local_cong_control_req));
  
@@ -79,7 +79,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
    /* based on what we have been told by the remote netperf, we want to
       setup our endpoint for the "data connection" and let the remote
       netperf know the situation. */
-@@ -5240,6 +5249,16 @@
+@@ -5509,6 +5518,16 @@
    addrlen = sizeof(peeraddr_in);
    memset(&peeraddr_in,0,sizeof(peeraddr_in));
  
@@ -96,7 +96,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
    /* Now it's time to start receiving data on the connection. We will */
    /* first grab the apropriate counters and then start grabbing. */
  
-@@ -5409,6 +5428,27 @@
+@@ -5676,6 +5695,27 @@
        recv_ring = recv_ring->next;
      }
  
@@ -124,7 +124,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
      /* if we should try to send something, then by all means, let us
         try to send something. */
      if ((omni_request->direction & NETPERF_XMIT) &&
-@@ -5522,6 +5562,10 @@
+@@ -5810,6 +5850,10 @@
      }
    }
  
@@ -135,18 +135,18 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
    /* The current iteration loop now exits due to timeout or unit count
       being  reached */
    stop_timer();
-@@ -6895,7 +6939,7 @@
+@@ -7143,7 +7187,7 @@
  
  {
  
--#define OMNI_ARGS "aBb:cCd:De:FgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:UVw:W:46"
-+#define OMNI_ARGS "aBb:cCd:De:FgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:UVw:W:X:46"
+-#define OMNI_ARGS "aBb:cCd:De:fFgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:q:r:R:s:S:t:T:u:UVw:W:46"
++#define OMNI_ARGS "aBb:cCd:De:fFgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:q:r:R:s:S:t:T:u:UVw:W:X:46"
  
    extern char	*optarg;	  /* pointer to option string	*/
  
-@@ -7218,6 +7262,13 @@
-       test_uuid[sizeof(test_uuid) - 1] = 0;
-       have_uuid = 1;
+@@ -7534,6 +7578,13 @@
+       /* we don't want to give-up on the failure of a connect() call */
+       dont_give_up = 1;
        break;
 +    case 'X':
 +      break_args(optarg, arg1, arg2);
@@ -158,3 +158,62 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
      case 'W':
        /* set the "width" of the user space data */
        /* buffer. This will be the number of */
+diff -u -r netperf-2.6.0/doc/examples/runemomniaggdemo.sh netperf-2.6.0-patch/doc/examples/runemomniaggdemo.sh
+--- netperf-2.6.0/doc/examples/runemomniaggdemo.sh 2020-01-13 13:37:25.111724897 -0600
++++ netperf-2.6.0-patch/doc/examples/runemomniaggdemo.sh 2020-01-13 13:38:21.111724897 -0600
+@@ -1,13 +1,20 @@
+ # this is a quick and dirty migration of runemomniagg2.sh to the 
+ # --enable-demo mode of aggregate testing
+ function kill_netperfs {
++    echo "Killing netperfs"
+     pkill -ALRM netperf
++    NETPERF_PROC=$(pgrep -P 1 -f netperf)
++
++    if [ -n "$NETPERF_PROC" ]; 
++    then
++        kill $NETPERF_PROC; 
++    fi
+ 
+     pgrep -P 1 -f netperf > /dev/null
+     while [ $? -eq 0 ]
+     do
+-	sleep 1
+-	pgrep -P 1 -f netperf > /dev/null
++    sleep 1
++    pgrep -P 1 -f netperf > /dev/null
+     done
+ }
+ 
+@@ -148,7 +155,7 @@
+ 
+ # we assume that netservers are already running on all the load generators
+ 
+-DURATION=120
++DURATION=60
+ # do not have a uuidgen? then use the one in netperf
+ MY_UUID=`uuidgen`
+ # with top-of-trunk we could make this 0 and run forever
+@@ -157,16 +164,16 @@
+ LENGTH="-l 7200"
+ OUTPUT="-o all"
+ 
+-DO_STREAM=1;
+-DO_MAERTS=1;
++DO_STREAM=0;
++DO_MAERTS=0;
+ # NOTE!  The Bidir test depends on being able to set a socket buffer
+ # size greater than 13 * 64KB or 832 KB or there is a risk of the test
+ # hanging.  If you are running linux, make certain that
+ # net.core.[r|w]mem_max are sufficiently large
+-DO_BIDIR=1;
++DO_BIDIR=0;
+ DO_RRAGG=1;
+-DO_RR=1;
+-DO_ANCILLARY=1;
++DO_RR=0;
++DO_ANCILLARY=0;
+ 
+ # UDP_RR for TPC/PPS using single-byte transactions. we do not use
+ # TCP_RR any longer because any packet losses or other matters
+
+

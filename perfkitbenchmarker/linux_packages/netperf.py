@@ -41,7 +41,7 @@ NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
 NETPERF_PATH = NETPERF_SRC_DIR + '/netperf'
-NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
+NETLIB_PATCH = NETPERF_DIR + '/netperf.patch'
 NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 
@@ -53,9 +53,13 @@ def _Install(vm):
 
   _LoadNetperf(vm)
 
-  # vm.PushDataFile('netperf.patch', NETLIB_PATCH)
-  # vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
-  #                   NETPERF_SRC_DIR)
+  vm.PushDataFile('netperf.patch', NETLIB_PATCH)
+
+  # print("INPUT TO CONTINUE")
+  # lol = raw_input()
+
+  vm.RemoteCommand('cd %s && patch -p1 < netperf.patch' %
+                   NETPERF_DIR)
 
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
                    './autogen.sh &&'

@@ -94,6 +94,9 @@ def PrepareNetperfAggregate(vm):
       netserver_path=netperf.NETSERVER_PATH)
   vm.RemoteCommand(netserver_cmd)
 
+  # logging.info("INPUT TO CONTINUE")
+  # lol = raw_input()
+
   # SETUP
   # push runemomniaggdemo.sh to server
   # On the system to be the one under test,
@@ -101,10 +104,7 @@ def PrepareNetperfAggregate(vm):
   # Ensure that runemomniaggdemo.sh and
   # find_max_burst.sh have the execute bit set
   # chmod +x runemomniaggdemo.sh find_max_burst.sh
-  path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   remote_path = netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT
-  logging.info('Uploading %s to %s', path, vm)
-  vm.PushFile(source_path=path, remote_path=remote_path)
   vm.RemoteCommand('chmod +x %s' % (remote_path))
 
 
