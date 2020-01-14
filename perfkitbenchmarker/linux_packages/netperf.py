@@ -52,11 +52,9 @@ def _Install(vm):
   _CopyTar(vm)
   vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
   # Modify netperf to print out all buckets in its histogram rather than
-  # aggregating.
+  # aggregating, edit runemomniaggdemo script, and apply fix to
+  # allow it to compile with --enable-demo flag correctly
   vm.PushDataFile('netperf.patch', NETLIB_PATCH)
-
-  # print("INPUT TO CONTINUE")
-  # lol = raw_input()
 
   vm.RemoteCommand('cd %s && patch -p1 < netperf.patch' %
                    NETPERF_DIR)
@@ -64,16 +62,23 @@ def _Install(vm):
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
                    './configure --enable-burst'
                    '--enable-demo --enable-histogram '
-                   '&& make' %
+                   '&& make && sudo make install' %
                    (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
 
   vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh'
                    ' find_max_burst.sh'
                    % (NETPERF_EXAMPLE_DIR))
 
+  if vm.IS_REBOOTABLE:
+    vm.ApplySysctlPersistent({
+        'net.ipv4.tcp_keepalive_time': 60,
+        'net.ipv4.tcp_keepalive_intvl': 60,
+    })
+
 
 def _CopyTar(vm):
   """Copy the tar file for installation.
+
   Tries local data directory first, then NET_PERF_URL
   """
 

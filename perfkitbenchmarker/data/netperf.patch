@@ -165,11 +165,11 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
 +      omni_request->think_time_run_length = think_time_run_length;
 +
        /* we have no else clauses here because we previously set flags
-   to zero above raj 20090803 */
+ 	 to zero above raj 20090803 */
        if (rem_nodelay)
 @@ -4932,6 +4936,11 @@
-    omni_request->cong_control,
-    sizeof(local_cong_control_req));
+	  omni_request->cong_control,
+ 	  sizeof(local_cong_control_req));
  
 +  // Extract think_time parameters
 +  think_time = omni_request->think_time;
@@ -242,7 +242,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
 -#define OMNI_ARGS "aBb:cCd:De:FgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:UVw:W:46"
 +#define OMNI_ARGS "aBb:cCd:De:FgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:UVw:W:X:46"
  
-   extern char  *optarg;    /* pointer to option string */
+   extern char	*optarg;	  /* pointer to option string	*/
  
 @@ -7218,6 +7262,13 @@
        test_uuid[sizeof(test_uuid) - 1] = 0;
