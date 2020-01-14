@@ -95,29 +95,6 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
 
 
-def _SetupHostFirewall(benchmark_spec):
-  """Set up host firewall to allow incoming traffic.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-  """
-
-  client_vm = benchmark_spec.vms[0]
-  server_vm = benchmark_spec.vms[1]
-
-  ip_addrs = [client_vm.internal_ip]
-  if vm_util.ShouldRunOnExternalIpAddress():
-    ip_addrs.append(client_vm.ip_address)
-
-  logging.info('setting up host firewall on %s running %s for client at %s',
-               server_vm.name, server_vm.image, ip_addrs)
-  cmd = 'sudo iptables -A INPUT -p %s -s %s -j ACCEPT'
-  for protocol in 'tcp', 'udp':
-    for ip_addr in ip_addrs:
-      server_vm.RemoteHostCommand(cmd % (protocol, ip_addr))
-
-
 def ParseNetperfAggregateOutput(stdout, metadata):
   """Parses the stdout of a single netperf process.
 
