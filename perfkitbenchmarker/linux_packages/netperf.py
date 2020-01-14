@@ -60,13 +60,13 @@ def _Install(vm):
                    NETPERF_DIR)
 
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-                   './configure --enable-burst'
+                   './configure --enable-burst '
                    '--enable-demo --enable-histogram '
                    '&& make && sudo make install' %
                    (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
 
   vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh'
-                   ' find_max_burst.sh'
+                   '&& chmod +x find_max_burst.sh'
                    % (NETPERF_EXAMPLE_DIR))
 
   if vm.IS_REBOOTABLE:
