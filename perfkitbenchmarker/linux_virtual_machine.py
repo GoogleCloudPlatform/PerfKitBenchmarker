@@ -463,19 +463,21 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not FLAGS.increase_tcp_window:
       return
 
-    # values are in bytes
-    # sets max OS receive buffer for all connections
-    self.ApplySysctlPersistent('net.core.rmem_max', '67108864')
-    # sets max OS send buffer for all connections
-    self.ApplySysctlPersistent('net.core.wmem_max', '67108864')
     # TCP autotuning setting.
-    # overrides the /proc/sys/net/core/rmem_default value
+    # values are in bytes
+    # net.core.rmem_max sets max OS receive buffer for all connections
+    # net.core.wmem_max sets max OS send buffer for all connections
+    # net.ipv4.tcp_rmem overrides the /proc/sys/net/core/rmem_default value
     # first value = <min receive buffer>
     # second value = <default receive buffer>
     # third value = <max receive buffer>
-    self.ApplySysctlPersistent('net.ipv4.tcp_rmem', '4096 87380 33554432')
-    # TCP autotuning setting. Same as above, but with send instead of receive
-    self.ApplySysctlPersistent('net.ipv4.tcp_wmem', '4096 87380 33554432')
+    # net.ipv4.tcp_wmem, same as above, but with send instead of receive
+    self.ApplySysctlPersistent({
+        'net.core.rmem_max': '67108864',
+        'net.core.wmem_max': '67108864',
+        'net.ipv4.tcp_rmem': '4096 87380 33554432',
+        'net.ipv4.tcp_wmem': '4096 87380 33554432'
+    })
 
   def _RebootIfNecessary(self):
     """Will reboot the VM if self._needs_reboot has been set."""
