@@ -20,12 +20,10 @@ CENTOS7 = 'centos7'
 CLEAR = 'clear'
 COS = 'cos'
 CORE_OS = 'core_os'
-DEBIAN = 'debian'
 DEBIAN9 = 'debian9'
 JUJU = 'juju'
 RHEL = 'rhel'
 UBUNTU_CONTAINER = 'ubuntu_container'
-UBUNTU1404 = 'ubuntu1404'
 UBUNTU1604 = 'ubuntu1604'
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
 UBUNTU1710 = 'ubuntu1710'
@@ -38,18 +36,19 @@ WINDOWS2012_BASE = 'windows2012_base'
 WINDOWS2016_BASE = 'windows2016_base'
 WINDOWS2019_BASE = 'windows2019_base'
 
+# Base-only OS types
+DEBIAN = 'debian'
+
 LINUX_OS_TYPES = [
     AMAZONLINUX2,
     CENTOS7,
     CLEAR,
     CORE_OS,
     COS,
-    DEBIAN,
     DEBIAN9,
     JUJU,
     RHEL,
     UBUNTU_CONTAINER,
-    UBUNTU1404,
     UBUNTU1604,
     UBUNTU1604_CUDA9,
     UBUNTU1710,
@@ -67,11 +66,7 @@ WINDOWS_OS_TYPES = [
 ALL = LINUX_OS_TYPES + WINDOWS_OS_TYPES
 BASE_OS_TYPES = [CLEAR, CORE_OS, DEBIAN, RHEL, WINDOWS]
 
-flags.DEFINE_enum(
-    'os_type', UBUNTU1604, ALL,
-    'The VM\'s OS type. Ubuntu\'s os_type can also be specified as "debian" '
-    'because it is largely built on Debian and uses the same package manager. '
-    'Likewise, CentOS\'s os_type can be "rhel". In general if two OS\'s use '
-    'the same package manager, and are otherwise very similar, the same '
-    'os_type may work on both of them.  However, more specific os_types (and '
-    'associated VirtualMachine subclasses can be developed.')
+# May change from time to time.
+DEFAULT = UBUNTU1604
+
+flags.DEFINE_enum('os_type', DEFAULT, ALL, 'The VM\'s OS type.')
