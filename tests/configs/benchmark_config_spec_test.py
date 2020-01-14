@@ -170,7 +170,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(VmGroupSpecTestCase, self).setUp()
     self._spec_class = benchmark_config_spec._VmGroupSpec
-    self._kwargs = {'cloud': providers.GCP, 'os_type': os_types.DEBIAN,
+    self._kwargs = {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
                     'vm_spec': _GCP_AWS_VM_CONFIG}
 
   def testMissingValues(self):
@@ -186,7 +186,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.cloud, 'GCP')
     self.assertEqual(result.disk_count, 1)
     self.assertIsNone(result.disk_spec)
-    self.assertEqual(result.os_type, 'debian')
+    self.assertEqual(result.os_type, 'ubuntu1804')
     self.assertEqual(result.static_vms, [])
     self.assertEqual(result.vm_count, 1)
     self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
@@ -272,19 +272,28 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testMissingCloudDiskConfig(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      self._spec_class(_COMPONENT, cloud=providers.GCP, os_type=os_types.DEBIAN,
-                       disk_spec={}, vm_spec=_GCP_AWS_VM_CONFIG)
-    self.assertEqual(str(cm.exception), (
-        'test_component.cloud is "GCP", but test_component.disk_spec does not '
-        'contain a configuration for "GCP".'))
+      self._spec_class(
+          _COMPONENT,
+          cloud=providers.GCP,
+          os_type=os_types.UBUNTU1804,
+          disk_spec={},
+          vm_spec=_GCP_AWS_VM_CONFIG)
+    self.assertEqual(
+        str(cm.exception),
+        ('test_component.cloud is "GCP", but test_component.disk_spec does not '
+         'contain a configuration for "GCP".'))
 
   def testMissingCloudVmConfig(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      self._spec_class(_COMPONENT, cloud=providers.GCP, os_type=os_types.DEBIAN,
-                       vm_spec={})
-    self.assertEqual(str(cm.exception), (
-        'test_component.cloud is "GCP", but test_component.vm_spec does not '
-        'contain a configuration for "GCP".'))
+      self._spec_class(
+          _COMPONENT,
+          cloud=providers.GCP,
+          os_type=os_types.UBUNTU1804,
+          vm_spec={})
+    self.assertEqual(
+        str(cm.exception),
+        ('test_component.cloud is "GCP", but test_component.vm_spec does not '
+         'contain a configuration for "GCP".'))
 
   def createNonPresentFlags(self):
     FLAGS.cloud = providers.AWS
@@ -319,7 +328,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, flag_values=self.createNonPresentFlags(), vm_count=2,
         **self._kwargs)
     self.assertEqual(result.cloud, 'GCP')
-    self.assertEqual(result.os_type, 'debian')
+    self.assertEqual(result.os_type, 'ubuntu1804')
     self.assertEqual(result.vm_count, 2)
 
   def testVmCountNone(self):
@@ -355,20 +364,20 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode({
-        'default': {'cloud': providers.GCP, 'os_type': os_types.DEBIAN,
+        'default': {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
                     'vm_spec': _GCP_AWS_VM_CONFIG}}, _COMPONENT, {})
     self.assertIsInstance(result, dict)
     self.assertEqual(len(result), 1)
     self.assertIsInstance(result['default'], benchmark_config_spec._VmGroupSpec)
     self.assertEqual(result['default'].cloud, 'GCP')
-    self.assertEqual(result['default'].os_type, 'debian')
+    self.assertEqual(result['default'].os_type, 'ubuntu1804')
     self.assertIsInstance(result['default'].vm_spec,
                           gce_virtual_machine.GceVmSpec)
 
   def testInvalidInput(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
       self._decoder.Decode(
-          {'default': {'cloud': providers.GCP, 'os_type': os_types.DEBIAN,
+          {'default': {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
                        'static_vms': [{}, {'fake_option': 1.2}],
                        'vm_spec': _GCP_AWS_VM_CONFIG}},
           _COMPONENT, {})
@@ -430,7 +439,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self._spec_class = benchmark_config_spec.BenchmarkConfigSpec
     self._description = 'Test description.'
     self._vm_groups = {'default': {'cloud': providers.GCP,
-                                   'os_type': os_types.DEBIAN,
+                                   'os_type': os_types.UBUNTU1804,
                                    'vm_spec': _GCP_AWS_VM_CONFIG}}
     self._kwargs = {'description': self._description,
                     'vm_groups': self._vm_groups}
@@ -445,7 +454,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(result.vm_groups['default'],
                           benchmark_config_spec._VmGroupSpec)
     self.assertEqual(result.vm_groups['default'].cloud, 'GCP')
-    self.assertEqual(result.vm_groups['default'].os_type, 'debian')
+    self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu1804')
     self.assertIsInstance(result.vm_groups['default'].vm_spec,
                           gce_virtual_machine.GceVmSpec)
 
@@ -462,7 +471,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMismatchedOsTypes(self):
     self._kwargs['vm_groups'] = {
         os_type + '_group': {'os_type': os_type, 'vm_spec': _GCP_AWS_VM_CONFIG}
-        for os_type in (os_types.DEBIAN, os_types.RHEL, os_types.WINDOWS)}
+        for os_type in (os_types.UBUNTU1804, os_types.RHEL, os_types.WINDOWS)}
     expected_os_types = os_types.JUJU, os_types.WINDOWS
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._spec_class(
@@ -473,9 +482,9 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(str(cm.exception), (
         "VM groups in test_component may only have the following OS types: "
         "'juju', 'windows'. The following VM group options are invalid:{sep}"
-        "test_component.vm_groups['debian_group'].os_type: 'debian'{sep}"
-        "test_component.vm_groups['rhel_group'].os_type: 'rhel'".format(
-            sep=os.linesep)))
+        "test_component.vm_groups['rhel_group'].os_type: 'rhel'{sep}"
+        "test_component.vm_groups['ubuntu1804_group'].os_type: 'ubuntu1804'"
+        .format(sep=os.linesep)))
 
   def testFlagOverridesPropagate(self):
     self._kwargs['flags'] = {'cloud': providers.AWS,
@@ -492,7 +501,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(result.vm_groups['default'],
                           benchmark_config_spec._VmGroupSpec)
     self.assertEqual(result.vm_groups['default'].cloud, 'AWS')
-    self.assertEqual(result.vm_groups['default'].os_type, 'debian')
+    self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu1804')
     self.assertIsInstance(result.vm_groups['default'].vm_spec,
                           virtual_machine.BaseVmSpec)
 

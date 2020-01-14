@@ -267,44 +267,6 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       fake_rets.append((json.dumps(_CreateFakeDiskMetadata(fake_image)), '', 0))
     return fake_rets
 
-  def testCreateDebian(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.DEBIAN)
-    with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
-      vm = vm_class(self.spec)
-      vm._Create()
-      vm.created = True
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud compute instances create', command_string)
-      self.assertIn('--image ubuntu-14-04', command_string)
-      vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 2)
-      self.assertDictContainsSubset({'image': 'ubuntu-14-04'},
-                                    vm.GetResourceMetadata())
-
-  def testCreateUbuntu1404(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1404)
-    fake_image = 'fake-ubuntu1404'
-    with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
-      vm = vm_class(self.spec)
-      vm._Create()
-      vm.created = True
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud compute instances create', command_string)
-      self.assertIn(
-          '--image-family ubuntu-1404-lts --image-project ubuntu-os-cloud',
-          command_string)
-      vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 3)
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'ubuntu-1404-lts',
-                                     'image_project': 'ubuntu-os-cloud'},
-                                    vm.GetResourceMetadata())
-
   def testCreateUbuntu1604(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
     fake_image = 'fake-ubuntu1604'
@@ -406,7 +368,6 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     super(GCEVMFlagsTestCase, self).setUp()
     FLAGS.cloud = providers.GCP
     FLAGS.gcloud_path = 'test_gcloud'
-    FLAGS.os_type = os_types.DEBIAN
     FLAGS.run_uri = 'aaaaaa'
     FLAGS.gcp_instance_metadata = []
     FLAGS.gcp_instance_metadata_from_file = []

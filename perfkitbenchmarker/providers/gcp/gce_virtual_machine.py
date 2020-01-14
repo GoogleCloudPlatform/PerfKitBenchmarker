@@ -62,7 +62,6 @@ FLAGS = flags.FLAGS
 
 NVME = 'NVME'
 SCSI = 'SCSI'
-UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
@@ -795,16 +794,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return self.preemptible_status_code
 
 
-class ContainerizedGceVirtualMachine(GceVirtualMachine,
-                                     linux_vm.ContainerizedDebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
-
-
-class DebianBasedGceVirtualMachine(GceVirtualMachine,
-                                   linux_vm.DebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
-
-
 class Debian9BasedGceVirtualMachine(GceVirtualMachine,
                                     linux_vm.Debian9Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-9'
@@ -843,12 +832,6 @@ class ContainerOptimizedOsBasedGceVirtualMachine(
 class CoreOsBasedGceVirtualMachine(GceVirtualMachine, linux_vm.CoreOsMixin):
   DEFAULT_IMAGE_FAMILY = 'coreos-stable'
   DEFAULT_IMAGE_PROJECT = 'coreos-cloud'
-
-
-class Ubuntu1404BasedGceVirtualMachine(GceVirtualMachine,
-                                       linux_vm.Ubuntu1404Mixin):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1404-lts'
-  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
