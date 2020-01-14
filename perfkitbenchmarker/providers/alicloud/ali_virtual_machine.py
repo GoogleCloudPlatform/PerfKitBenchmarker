@@ -431,18 +431,6 @@ class AliCloudKeyFileManager(object):
     return keyfile.strip()
 
 
-class DebianBasedAliVirtualMachine(AliVirtualMachine,
-                                   linux_virtual_machine.DebianMixin):
-  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-
-
-class Ubuntu1404BasedAliVirtualMachine(AliVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1604Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-
-
 class Ubuntu1604BasedAliVirtualMachine(AliVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu_16_04_64*alibase*.vhd'

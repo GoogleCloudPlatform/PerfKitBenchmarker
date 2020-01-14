@@ -749,16 +749,6 @@ class AzureVirtualMachine(
     return self.low_priority_status_code
 
 
-class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
-                                     linux_virtual_machine.DebianMixin):
-  IMAGE_URN = 'Canonical:UbuntuServer:14.04.4-LTS:latest'
-
-
-class Ubuntu1404BasedAzureVirtualMachine(AzureVirtualMachine,
-                                         linux_virtual_machine.Ubuntu1404Mixin):
-  IMAGE_URN = 'Canonical:UbuntuServer:14.04.4-LTS:latest'
-
-
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'

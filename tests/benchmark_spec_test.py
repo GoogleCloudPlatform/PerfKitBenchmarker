@@ -21,7 +21,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -109,7 +108,6 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(_BenchmarkSpecTestCase, self).setUp()
     FLAGS.cloud = providers.GCP
-    FLAGS.os_type = os_types.DEBIAN
     FLAGS.temp_dir = 'tmp'
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
