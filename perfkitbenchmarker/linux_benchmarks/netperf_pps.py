@@ -28,10 +28,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import logging
-import os
 import re
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -39,10 +37,10 @@ from perfkitbenchmarker.linux_packages import netperf
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'netperf_aggregate'
+BENCHMARK_NAME = 'netperf_pps'
 BENCHMARK_CONFIG = """
-netperf_aggregate:
-  description: test packets per second performance
+netperf_pps:
+  description: test packets per second performance using netperf
   vm_groups:
     servers:
       vm_spec: *default_single_core
@@ -67,22 +65,9 @@ def GetConfig(user_config):
 def PrepareNetperfAggregate(vm):
   """Installs netperf on a single vm."""
 
-# INSTALL
-# Ensure gcc, make, automake, texinfo and python-rrdtool are installed
-# Bring a netperf source tree to the systems
-# cd to the top of the tree
-# run ./autogen.sh
-# ./configure --enable-burst --enable-demo --enable-histogram
-# make  # sudo make install if you prefer
   vm.Install('texinfo')
   vm.Install('python_rrdtool')
   vm.Install('netperf')
-
-  if vm.IS_REBOOTABLE:
-    vm.ApplySysctlPersistent({
-        'net.ipv4.tcp_keepalive_time': 60,
-        'net.ipv4.tcp_keepalive_intvl': 60,
-    })
 
   PORT_END = PORT_START
 
@@ -94,16 +79,6 @@ def PrepareNetperfAggregate(vm):
       netserver_path=netperf.NETSERVER_PATH)
   vm.RemoteCommand(netserver_cmd)
 
-  # logging.info("INPUT TO CONTINUE")
-  # lol = raw_input()
-
-  # SETUP
-  # push runemomniaggdemo.sh to server
-  # On the system to be the one under test,
-  # cd to  doc/examples/ in the netperf source tree
-  # Ensure that runemomniaggdemo.sh and
-  # find_max_burst.sh have the execute bit set
-  # chmod +x runemomniaggdemo.sh find_max_burst.sh
   remote_path = netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT
   vm.RemoteCommand('chmod +x %s' % (remote_path))
 
@@ -293,6 +268,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('sudo killall netserver')
-  vms[1].RemoteCommand('sudo killall netserver')
-  vms[2].RemoteCommand('sudo killall netserver')
+  for vm in vms:
+    vms.RemoteCommand('sudo killall netserver')

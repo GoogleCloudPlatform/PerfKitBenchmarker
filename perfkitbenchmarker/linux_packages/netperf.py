@@ -34,8 +34,6 @@ FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.7.0.tar.gz'
 NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
               NETPERF_TAR)
-
-NETPERF_GIT = 'https://github.com/HewlettPackard/netperf.git'
 NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
 
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
@@ -51,8 +49,10 @@ def _Install(vm):
   vm.RemoteCommand('sudo pip install absl-py')
   vm.Install('build_tools')
 
-  _LoadNetperf(vm)
-
+  _CopyTar(vm)
+  vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
+  # Modify netperf to print out all buckets in its histogram rather than
+  # aggregating.
   vm.PushDataFile('netperf.patch', NETLIB_PATCH)
 
   # print("INPUT TO CONTINUE")
@@ -62,10 +62,9 @@ def _Install(vm):
                    NETPERF_DIR)
 
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-                   './autogen.sh &&'
                    './configure --enable-burst'
                    '--enable-demo --enable-histogram '
-                   '&& make && sudo make install' %
+                   '&& make' %
                    (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
 
   vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh'
@@ -73,14 +72,17 @@ def _Install(vm):
                    % (NETPERF_EXAMPLE_DIR))
 
 
-def _LoadNetperf(vm):
+def _CopyTar(vm):
+  """Copy the tar file for installation.
+  Tries local data directory first, then NET_PERF_URL
+  """
+
   try:
     vm.PushDataFile(NETPERF_TAR, remote_path=(INSTALL_DIR + '/'))
-    vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
   except ResourceNotFound:
     vm.Install('curl')
-    vm.RemoteCommand('cd %s && git clone %s %s' % (
-        INSTALL_DIR, NETPERF_GIT, NETPERF_DIR))
+    vm.RemoteCommand('curl %s -L -o %s/%s' % (
+        NETPERF_URL, INSTALL_DIR, NETPERF_TAR))
 
 
 def YumInstall(vm):
