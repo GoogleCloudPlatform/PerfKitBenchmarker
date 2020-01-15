@@ -697,11 +697,6 @@ class BenchmarkSpec(object):
 
     if self.vpn_service:
       self.vpn_service.Delete()
-      self.vpn_service = None
-      self.vpns = {}  # dict of vpn's
-      self.vpn_gws = {}  # dict of vpn gw's
-      self.vpn_gws_lock = threading.Lock()
-      self.vpns_lock = threading.Lock()
 
     self.deleted = True
 
