@@ -126,16 +126,16 @@ class BaseVPNGW(object):
     VMs to call this method and all share the same BaseVPN object.
     """
     if cls.CLOUD is None:
-      raise errors.Error('VPNGWs should have CLOUD attributes.')
+      raise errors.Error('VPN GWs should have CLOUD attributes.')
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error('GetVPN called in a thread without a '
                          'BenchmarkSpec.')
-    with benchmark_spec.vpngws_lock:
+    with benchmark_spec.vpn_gws_lock:
       key = cls.CLOUD
-      if key not in benchmark_spec.vpngws:
-        benchmark_spec.vpngws[key] = cls()
-      return benchmark_spec.vpngws[key]
+      if key not in benchmark_spec.vpn_gws:
+        benchmark_spec.vpn_gws[key] = cls()
+      return benchmark_spec.vpn_gws[key]
 
   def IsTunnelConfigured(self):
     pass
@@ -144,11 +144,11 @@ class BaseVPNGW(object):
     pass
 
   def Create(self):
-    """Creates the actual VPNGW."""
+    """Creates the actual VPN GW."""
     pass
 
   def Delete(self):
-      """Deletes the actual VPNGW."""
+      """Deletes the actual VPN GW."""
       pass
 
 

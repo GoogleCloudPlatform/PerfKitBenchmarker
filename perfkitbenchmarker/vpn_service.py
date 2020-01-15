@@ -23,9 +23,9 @@ import json
 import uuid
 
 flags.DEFINE_integer('vpn_service_tunnel_count', None,
-                     'Number of tunnels to create for each VPNGW pair.')
+                     'Number of tunnels to create for each VPN GW pair.')
 flags.DEFINE_integer('vpn_service_gateway_count', None,
-                     'Number of VPN GWs to create for each VPNGW pair.')
+                     'Number of VPN GWs to create for each VPN GW pair.')
 flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
 flags.DEFINE_string('vpn_service_shared_key', None,
@@ -77,7 +77,7 @@ class VPN(object):
     if benchmark_spec is None:
       raise errors.Error('GetVPN called in a thread without a '
                          'BenchmarkSpec.')
-    with benchmark_spec.vpngws_lock:
+    with benchmark_spec.vpn_gws_lock:
       key = self.getKeyFromGWPair(gwpair, suffix)
       if key not in benchmark_spec.vpns:
         self.Create(gwpair, suffix)
@@ -87,14 +87,14 @@ class VPN(object):
   def ConfigureTunnel(self):
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    vpngw0 = benchmark_spec.vpngws[self.GWPair[0]]
-    vpngw1 = benchmark_spec.vpngws[self.GWPair[1]]
+    vpn_gw_0 = benchmark_spec.vpn_gws[self.GWPair[0]]
+    vpn_gw_1 = benchmark_spec.vpn_gws[self.GWPair[1]]
 
-    assert not (vpngw0.require_target_to_init and vpngw1.require_target_to_init), 'Cant connect 2 passive VPN GWs'
+    assert not (vpn_gw_0.require_target_to_init and vpn_gw_1.require_target_to_init), 'Cant connect 2 passive VPN GWs'
 
     while not self.isTunnelConfigured():
-        vpngw0.ConfigureTunnel(self.tunnel_config)
-        vpngw1.ConfigureTunnel(self.tunnel_config)
+        vpn_gw_0.ConfigureTunnel(self.tunnel_config)
+        vpn_gw_1.ConfigureTunnel(self.tunnel_config)
 
     tunnel_status = self.isTunnelReady()
     logging.info('Tunnel is ready?: %s ' % tunnel_status)
@@ -115,7 +115,7 @@ class VPN(object):
     timeout = time.time() + 60 * 5  # give up after 5 mins
     while(not ready and time.time() < timeout):
       logging.info('Tunnel endpoints configured. Waiting for tunnel...')
-      ready = benchmark_spec.vpngws[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpngws[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
+      ready = benchmark_spec.vpn_gws[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpn_gws[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
       time.sleep(5)
 
     return ready
@@ -212,10 +212,10 @@ class VPNService(resource.BaseResource):
                          'BenchmarkSpec.')
 
 
-    self.vpngw_pairs = self.GetVPNGWPairs(benchmark_spec.vpngws)
+    self.vpn_gw_pairs = self.GetVPNGWPairs(benchmark_spec.vpn_gws)
 
 
-    for gwpair in self.vpngw_pairs:
+    for gwpair in self.vpn_gw_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
       suffix = self.GetNewSuffix()
       vpn_id = VPN().getKeyFromGWPair(gwpair, suffix)
@@ -240,12 +240,12 @@ class VPNService(resource.BaseResource):
                   }
     return basic_data
 
-  def GetVPNGWPairs(self, vpngws):
+  def GetVPNGWPairs(self, vpn_gws):
     # vpngw-us-west1-0-28ed049a <-> vpngw-us-central1-0-28ed049a # yes
     # vpngw-us-west1-0-28ed049a <-> vpngw-us-central1-1-28ed049a # no
      # get all gw pairs then filter out the non matching tunnel id's
-    vpngw_pairs = itertools.combinations(vpngws, 2)
+    vpn_gw_pairs = itertools.combinations(vpn_gws, 2)
     r = re.compile(r"(?P<gw_prefix>.*-.*-.*)?-(?P<gw_tnum>[0-9])-(?P<run_id>.*)")
     # function = lambda x: r.search(x[0]).group('gw_tnum') == r.search(x[1]).group('gw_tnum')
     function = lambda x: r.search(x[0]).group('gw_prefix') != r.search(x[1]).group('gw_prefix')
-    return filter(function, vpngw_pairs)
+    return filter(function, vpn_gw_pairs)
