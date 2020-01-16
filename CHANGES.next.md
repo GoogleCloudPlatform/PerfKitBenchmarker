@@ -6,6 +6,7 @@
   - Ubuntu 16.04 is now the default.
 
 ### New features:
+- Add infiniband support in nccl benchmark.
 
 ### Enhancements:
 
