@@ -45,6 +45,8 @@ flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
                     'MPI home')
 flags.DEFINE_string('nccl_nccl_home', '/usr/local/nccl2', 'NCCL home')
+flags.DEFINE_boolean('nccl_install_mofed', False,
+                     'Install Mellanox OpenFabrics drivers')
 
 
 FLAGS = flags.FLAGS
@@ -72,7 +74,6 @@ nccl:
           boot_disk_size: 100
         Azure:
           machine_type: Standard_NC24rs_v3
-          image: microsoft-dsvm:aml-workstation:ubuntu:19.11.13
           zone: eastus
 """
 
@@ -158,6 +159,8 @@ def _PrepareVm(vm):
                          nccl=FLAGS.nccl_nccl_home,
                          cuda='/usr/local/cuda-{}'.format(
                              FLAGS.cuda_toolkit_version)))
+  if FLAGS.nccl_install_mofed:
+    vm.Install('mofed')
   vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
   vm.RemoteCommand('cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
                    'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
@@ -197,6 +200,8 @@ def _CreateMetadataDict():
               'nthreads': FLAGS.nccl_nthreads,
               'iters': FLAGS.nccl_iters,
               'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices}
+  if FLAGS.nccl_install_mofed:
+    metadata['mofed_version'] = FLAGS.mofed_version
   if FLAGS.nccl_extra_params:
     for extra_param in FLAGS.nccl_extra_params:
       param_key, param_value = extra_param.split('=', 1)

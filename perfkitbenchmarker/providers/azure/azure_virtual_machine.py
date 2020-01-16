@@ -714,7 +714,10 @@ class AzureVirtualMachine(
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.os_disk.disk_type
     result['boot_disk_size'] = self.os_disk.disk_size or 'default'
-    result['placement_group_strategy'] = FLAGS.placement_group_style
+    if self.network.placement_group:
+      result['placement_group_strategy'] = self.network.placement_group.strategy
+    else:
+      result['placement_group_strategy'] = None
     result['preemptible'] = self.low_priority
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
