@@ -95,7 +95,7 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
 
 
-def ParseNetperfAggregateOutput(stdout, metadata):
+def ParseNetperfAggregateOutput(stdout):
   """Parses the stdout of a single netperf process.
 
   Args:
@@ -108,7 +108,7 @@ def ParseNetperfAggregateOutput(stdout, metadata):
   # Don't modify the metadata dict that was passed in
 
   logging.info("Parsing netperf aggregate output")
-  metadata = metadata.copy()
+  metadata = {}
   aggregate_samples = []
 
   stdout_ascii = stdout.encode("ascii")
@@ -176,10 +176,8 @@ def RunNetperfAggregate(vm, server_ips):
                                               % (netperf.NETPERF_EXAMPLE_DIR),
                                               ignore_failure=True)
 
-  # Metadata to attach to samples
-  metadata = {'server_count': len(server_ips)}
 
-  samples = ParseNetperfAggregateOutput(proc_stdout, metadata)
+  samples = ParseNetperfAggregateOutput(proc_stdout)
 
   return samples
 
@@ -203,19 +201,11 @@ def Run(benchmark_spec):
 
   results = []
 
-  metadata = {
-      'client_zone': client_vm.zone,
-      'client_machine_type': client_vm.machine_type,
-      'server_zone': server_vms[0].zone,
-      'server_machine_type': server_vms[0].machine_type
-  }
-
   if vm_util.ShouldRunOnExternalIpAddress():
     server_ips = list((vm.ip_address for vm in server_vms))
     external_ip_results = RunNetperfAggregate(client_vm, server_ips)
     for external_ip_result in external_ip_results:
       external_ip_result.metadata['ip_type'] = 'external'
-      external_ip_result.metadata.update(metadata)
     results.extend(external_ip_results)
 
   # check if all server vms internal ips are reachable
@@ -230,7 +220,6 @@ def Run(benchmark_spec):
     internal_ip_results = RunNetperfAggregate(client_vm, server_ips)
 
     for internal_ip_result in internal_ip_results:
-      internal_ip_result.metadata.update(metadata)
       internal_ip_result.metadata['ip_type'] = 'internal'
     results.extend(internal_ip_results)
 
