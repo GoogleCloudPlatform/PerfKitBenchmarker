@@ -44,6 +44,11 @@ DEFAULT_LOCATION = 'eastus2'
 LOCATION = 'location'
 ZONE = 'zone'
 
+# https://azure.microsoft.com/en-us/blog/announcing-the-general-availability-of-proximity-placement-groups/
+# Central India does not support proximity placement groups.
+# Last Verified: 1/15/20
+UNSUPPORTED_PROXIMIY_PG_LOCATIONS = ['centralindia']
+
 
 def GetResourceGroup(zone=None):
   """Get the resource group for the current benchmark."""
@@ -58,6 +63,11 @@ def GetResourceGroup(zone=None):
         'pkb%s-%s' % (FLAGS.run_uri, spec.uid), zone=zone)
     spec.azure_resource_group = group
     return group
+
+
+def IsProximityPlacementGroupCompatible(location):
+  """Returns True if location supports Azure proximity placement groups."""
+  return location not in UNSUPPORTED_PROXIMIY_PG_LOCATIONS
 
 
 class AzureResourceGroup(resource.BaseResource):
@@ -486,6 +496,7 @@ class AzureNetwork(network.BaseNetwork):
     self.resource_group = GetResourceGroup()
     self.location = util.GetLocationFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
+
     placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(
         'AzurePlacementGroupSpec',
         flag_values=FLAGS,
@@ -494,24 +505,23 @@ class AzureNetwork(network.BaseNetwork):
 
     is_dedicated_host = bool(FLAGS.dedicated_hosts)
     in_availability_zone = bool(self.availability_zone)
-    no_placement_group = (
-        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
     cluster_placement_group = (
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER)
     spread_placement_group = (
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD)
 
-    # With dedicated hosting and/or an availability zone, an availability set
-    # cannot be created
-    if is_dedicated_host or no_placement_group or (in_availability_zone and
-                                                   spread_placement_group):
-      self.placement_group = None
-    elif cluster_placement_group:
+    if cluster_placement_group and IsProximityPlacementGroupCompatible(
+        self.location):
       self.placement_group = azure_placement_group.AzureProximityGroup(
           placement_group_spec)
-    else:
+    # With dedicated hosting and/or an availability zone, an availability set
+    # cannot be created
+    elif spread_placement_group and not (is_dedicated_host or
+                                         in_availability_zone):
       self.placement_group = azure_placement_group.AzureAvailSet(
           placement_group_spec)
+    else:
+      self.placement_group = None
 
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri
