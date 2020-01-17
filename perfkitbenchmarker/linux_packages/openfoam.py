@@ -57,4 +57,6 @@ def AptInstall(vm):
   vm.Install('build_tools')
   vm.InstallPackages('openfoam7')
   openfoam_bash_path = posixpath.join(OPENFOAM_ROOT, 'etc/bashrc')
-  vm.RemoteCommand('cat {} > $HOME/.bashrc'.format(openfoam_bash_path))
+  vm.RemoteCommand('cat {} {} | tee $HOME/.bashrc'.format(
+      openfoam_bash_path, '$WM_PROJECT_DIR/bin/tools/RunFunctions'))
+
