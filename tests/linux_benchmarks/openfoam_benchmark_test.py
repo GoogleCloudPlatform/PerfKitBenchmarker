@@ -19,8 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import subprocess
-import tempfile
 import unittest
 
 from absl.testing import flagsaver
@@ -75,6 +73,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         'case_name': 'motorbike',
         'decomp_method': 'scotch',
         'dimensions': '80 32 32',
+        'max_global_cells': 200000000,
         'mpi_mapping': 'core:SPAN',
         'openfoam_version': '7',
         'openmpi_version': '1.10.2',
@@ -94,30 +93,6 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
       self.mock_vm.Install('openfoam')
-
-  def _mockRemoteCommand(self, command):
-    subprocess.call(command, shell=True)
-
-  def testSetDimensionsCorrectlyReplacesText(self):
-    """Test of _SetDimensions().
-
-    This test creates a copy of the data/openfoam_blockmesh_dict.txt file,
-    replaces the dimensions line in the copy, and checks that the copy has
-    the correctly formatted line that we expect.
-    """
-    with open(TEST_BLOCKMESH_DICT_PATH, 'rb') as f:
-      lines = f.read()
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    temp_file.write(lines)
-    temp_file.close()
-    self.mock_vm.RemoteCommand = self._mockRemoteCommand
-    mock.patch.object(openfoam_benchmark, '_GetPath',
-                      return_value=temp_file.name).start()
-    openfoam_benchmark._SetDimensions(self.mock_vm, '10 10 10')
-    with open(temp_file.name, 'rb') as temp_file:
-      new_lines = temp_file.read()
-      expected = b'hex (0 1 2 3 4 5 6 7) (10 10 10) simpleGrading (1 1 1)'
-      self.assertIn(expected, new_lines)
 
 if __name__ == '__main__':
   unittest.main()
