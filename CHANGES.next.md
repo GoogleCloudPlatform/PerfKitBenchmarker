@@ -11,3 +11,6 @@
 ### Enhancements:
 
 ### Bug fixes and maintenance updates:
+- AWSBaseVirtualMachine subclasses require IMAGE_OWNER and IMAGE_NAME_FILTER.
+  Fixes issue where some windows 2012 AMIs were selected from the wrong
+  project.
