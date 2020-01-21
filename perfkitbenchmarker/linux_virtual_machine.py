@@ -152,11 +152,6 @@ flags.DEFINE_string(
     'non-empty string will cause a reboot to occur after VM prepare. '
     'If unspecified, the kernel command line will be unmodified.')
 
-flags.DEFINE_bool(
-    'increase_tcp_window', False,
-    'A flag to increase the TCP window for all VMs on the network. '
-    'As with other sysctrls, will cause a reboot to happen.')
-
 flags.DEFINE_integer(
     'tcp_max_receive_buffer', None, 
     'The maximum receive buffer for TCP socket connections. '
