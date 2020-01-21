@@ -153,13 +153,13 @@ flags.DEFINE_string(
     'If unspecified, the kernel command line will be unmodified.')
 
 flags.DEFINE_integer(
-    'tcp_max_receive_buffer', None, 
+    'tcp_max_receive_buffer', None,
     'The maximum receive buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
 
 flags.DEFINE_integer(
-    'tcp_max_send_buffer', None, 
+    'tcp_max_send_buffer', None,
     'The maximum send buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
@@ -468,20 +468,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def DoConfigureTCPWindow(self):
     """Change TCP window parameters in sysctl"""
 
-    # TODO add these values to metadata
-
     # TCP autotuning setting.
     # values are in bytes
-    # net.core.rmem_max sets max OS receive buffer for all connections
-    # net.core.wmem_max sets max OS send buffer for all connections
-    # net.ipv4.tcp_rmem overrides the /proc/sys/net/core/rmem_default value
-    # first value = <min receive buffer>
-    # second value = <default receive buffer>
-    # third value = <max receive buffer>
-    # net.ipv4.tcp_wmem, same as above, but with send instead of receive
-
-    # get values from computer
-
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_rmem')
     rmem_values = stdout.split()
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_wmem')
@@ -490,39 +478,26 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     max_receive = rmem_values[2]
     max_send = wmem_values[2]
 
-    print("RMEM AND WMEM")
     if FLAGS.tcp_max_receive_buffer:
       max_receive = FLAGS.tcp_max_receive_buffer
     if FLAGS.tcp_max_send_buffer:
       max_send = FLAGS.tcp_max_send_buffer
 
+    # Add values to metadata
     self.os_metadata['tcp_max_receive_buffer'] = max_receive
     self.os_metadata['tcp_max_send_buffer'] = max_send
 
+    rmem_string = '{} {} {}'.format(rmem_values[0],
+                                    rmem_values[1],
+                                    max_receive)
+    wmem_string = '{} {} {}'.format(wmem_values[0],
+                                    wmem_values[1],
+                                    max_send)
 
-    rmem_string = '{} {} {}'.format(rmem_values[0], rmem_values[1], max_receive)
-    wmem_string = '{} {} {}'.format(wmem_values[0], wmem_values[1], max_send)
-    print(rmem_string)
-    print(wmem_string)
     self.ApplySysctlPersistent({
         'net.ipv4.tcp_rmem': rmem_string,
         'net.ipv4.tcp_wmem': wmem_string
     })
-
-
-    #defaults rmem_max/wmem_max = 212992
-    #tcp_rmem = 4096 131072 6291456   -> 43690 bad
-    #tcp_wmem = 4096  16384 4194304   -> 43690
-
-        # 'net.core.rmem_max': '212992',
-        # 'net.core.wmem_max': '212992',
-        # 'net.ipv4.tcp_rmem': '4096 131072 6291456',
-        # 'net.ipv4.tcp_wmem': '4096 16384 4194304'
-
-        # 'net.core.rmem_max': '67108864',
-        # 'net.core.wmem_max': '67108864',
-        # 'net.ipv4.tcp_rmem': '4096 87380 33554432',
-        # 'net.ipv4.tcp_wmem': '4096 87380 33554432'
 
   def _RebootIfNecessary(self):
     """Will reboot the VM if self._needs_reboot has been set."""
