@@ -7,6 +7,7 @@
 
 ### New features:
 - Add infiniband support in nccl benchmark.
+- Added AwsVpcS3Endpoint for VPC connectivity to S3.
 
 ### Enhancements:
 
