@@ -72,7 +72,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     expected_metadata = {
         'case_name': 'motorbike',
         'decomp_method': 'scotch',
-        'dimensions': '80 32 32',
+        'dimensions': '80_32_32',
         'max_global_cells': 200000000,
         'mpi_mapping': 'core:SPAN',
         'openfoam_version': '7',
