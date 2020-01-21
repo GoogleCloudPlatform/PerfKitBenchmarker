@@ -59,4 +59,3 @@ def AptInstall(vm):
   openfoam_bash_path = posixpath.join(OPENFOAM_ROOT, 'etc/bashrc')
   vm.RemoteCommand('cat {} {} | tee $HOME/.bashrc'.format(
       openfoam_bash_path, '$WM_PROJECT_DIR/bin/tools/RunFunctions'))
-
