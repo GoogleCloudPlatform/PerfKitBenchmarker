@@ -35,9 +35,9 @@ TPC_DS_TABLES = [
     'call_center', 'catalog_page', 'catalog_returns', 'catalog_sales',
     'customer', 'customer_address', 'customer_demographics', 'date_dim',
     'dbgen_version', 'household_demographics', 'income_band', 'inventory',
-    'item', 'promotion', 'reason', 'result_table', 'result_table1', 'ship_mode',
-    'store', 'store_returns', 'store_sales', 'time_dim', 'warehouse',
-    'web_page', 'web_returns', 'web_sales', 'web_site'
+    'item', 'promotion', 'reason', 'ship_mode', 'store', 'store_returns',
+    'store_sales', 'time_dim', 'warehouse', 'web_page', 'web_returns',
+    'web_sales', 'web_site'
 ]
 
 FLAGS = flags.FLAGS

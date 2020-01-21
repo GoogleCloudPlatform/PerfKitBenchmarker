@@ -17,13 +17,12 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import spec
-from perfkitbenchmarker.providers.aws import aws_placement_group
 from tests import pkb_common_test_case
 
 CLOUD = providers.AWS
 ZONE = 'us-west-1a'
 REGION = 'us-west-1'
-STRATEGY = aws_placement_group._PLACEMENT_GROUP_DEFAULT
+STRATEGY = placement_group.PLACEMENT_GROUP_DEFAULT
 RUN_URI = 'run12345'
 UUID = 'random'
 GROUP_NAME = 'perfkit-{}-{}'.format(RUN_URI, UUID)
@@ -74,7 +73,7 @@ def AwsResponse(data):
 def CreateAwsPlacementGroupSpec(group_style=STRATEGY):
   spec_class = spec.GetSpecClass(
       placement_group.BasePlacementGroupSpec, CLOUD=CLOUD)
-  FLAGS.aws_placement_group_style = group_style
+  FLAGS.placement_group_style = group_style
   name = '{0}.placement_group_spec.{1}'.format(spec_class.SPEC_TYPE, CLOUD),
   return spec_class(name, zone=ZONE, flag_values=FLAGS)
 
@@ -103,7 +102,7 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetSpec(self):
     pg_spec = CreateAwsPlacementGroupSpec('spread')
-    self.assertEqual('spread', pg_spec.aws_placement_group_style)
+    self.assertEqual('spread', pg_spec.placement_group_style)
 
   def testGetPlacementGroup(self):
     pg = CreateAwsPlacementGroup()

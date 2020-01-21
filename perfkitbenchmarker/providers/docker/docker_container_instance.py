@@ -34,7 +34,7 @@ from perfkitbenchmarker.providers.docker import docker_disk
 
 FLAGS = flags.FLAGS
 
-UBUNTU_IMAGE = 'ubuntu:xenial'
+UBUNTU16_IMAGE = 'ubuntu:xenial'
 DEFAULT_DOCKER_IMAGE = 'pkb/ubuntu16'
 DOCKERFILE_DIRECTORY = 'perfkitbenchmarker/data/docker'
 
@@ -289,8 +289,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedDockerContainer(DockerContainer,
-                                 linux_virtual_machine.DebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
+                                 linux_virtual_machine.BaseDebianMixin):
 
   def _GetNumCpus(self):
     return self.cpus
@@ -311,9 +310,9 @@ class DebianBasedDockerContainer(DockerContainer,
     logging.warn('Docker Containers cannot be rebooted to apply flags')
 
 
-class Ubuntu1604BasedDockerContainer(
-    DebianBasedDockerContainer, linux_virtual_machine.Ubuntu1604Mixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
+class Ubuntu1604BasedDockerContainer(DebianBasedDockerContainer,
+                                     linux_virtual_machine.Ubuntu1604Mixin):
+  DEFAULT_IMAGE = UBUNTU16_IMAGE
 
 # Note: to add support for ubuntu 14 and ubuntu 18, we simply need to
 #       create/test Dockerfiles for those distros. This should be

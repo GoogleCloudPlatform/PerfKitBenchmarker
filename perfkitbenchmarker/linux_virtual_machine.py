@@ -1390,14 +1390,14 @@ class CoreOsMixin(BaseContainerLinuxMixin):
   BASE_OS_TYPE = os_types.CORE_OS
 
 
-class DebianMixin(BaseLinuxMixin):
+class BaseDebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  OS_TYPE = os_types.DEBIAN
+  OS_TYPE = 'base-only'
   BASE_OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
-    super(DebianMixin, self).__init__(*args, **kwargs)
+    super(BaseDebianMixin, self).__init__(*args, **kwargs)
 
     # Whether or not apt-get update has been called.
     # We defer running apt-get update until the first request to install a
@@ -1510,7 +1510,7 @@ class DebianMixin(BaseLinuxMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(DebianMixin, self).SetupProxy()
+    super(BaseDebianMixin, self).SetupProxy()
     apt_proxy_file = '/etc/apt/apt.conf'
     commands = []
 
@@ -1545,12 +1545,12 @@ class DebianMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class Debian9Mixin(DebianMixin):
+class Debian9Mixin(BaseDebianMixin):
   """Class holding Debian9 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN9
 
 
-class UbuntuMixin(DebianMixin):
+class BaseUbuntuMixin(BaseDebianMixin):
   """Class holding Ubuntu specific VM methods and attributes."""
 
   def AppendKernelCommandLine(self, command_line, reboot=True):
@@ -1564,22 +1564,17 @@ class UbuntuMixin(DebianMixin):
       self.Reboot()
 
 
-class Ubuntu1404Mixin(UbuntuMixin):
-  """Class holding Ubuntu1404 specific VM methods and attributes."""
-  OS_TYPE = os_types.UBUNTU1404
-
-
-class Ubuntu1604Mixin(UbuntuMixin):
+class Ubuntu1604Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604
 
 
-class Ubuntu1710Mixin(UbuntuMixin):
+class Ubuntu1710Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1710 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1710
 
 
-class Ubuntu1804Mixin(UbuntuMixin):
+class Ubuntu1804Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804
 
@@ -1594,12 +1589,12 @@ class Ubuntu1804Mixin(UbuntuMixin):
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
-class Ubuntu1604Cuda9Mixin(UbuntuMixin):
+class Ubuntu1604Cuda9Mixin(BaseUbuntuMixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
 
 
-class ContainerizedDebianMixin(DebianMixin):
+class ContainerizedDebianMixin(BaseDebianMixin):
   """Class representing a Containerized Virtual Machine.
 
   A Containerized Virtual Machine is a VM that runs remote commands
@@ -1609,7 +1604,7 @@ class ContainerizedDebianMixin(DebianMixin):
   """
 
   OS_TYPE = os_types.UBUNTU_CONTAINER
-  BASE_DOCKER_IMAGE = 'ubuntu:trusty-20161006'
+  BASE_DOCKER_IMAGE = 'ubuntu:xenial'
 
   def __init__(self, *args, **kwargs):
     super(ContainerizedDebianMixin, self).__init__(*args, **kwargs)
@@ -1962,7 +1957,7 @@ class ProcCpuResults(object):
     return processor_id, singles, stanza
 
 
-class JujuMixin(DebianMixin):
+class JujuMixin(BaseDebianMixin):
   """Class to allow running Juju-deployed workloads.
 
   Bootstraps a Juju environment using the manual provider:

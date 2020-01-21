@@ -368,13 +368,60 @@ class BaseRelationalDb(resource.BaseResource):
     """
     if (self.spec.engine_version == '5.6' or
         self.spec.engine_version.startswith('5.6.')):
-      self.client_vm.Install('mysqlclient56')
+      mysql_name = 'mysqlclient56'
     elif (self.spec.engine_version == '5.7' or
           self.spec.engine_version.startswith('5.7.')):
-      self.client_vm.Install('mysqlclient')
+      mysql_name = 'mysqlclient'
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
                       'are supported.' % self.spec.engine_version)
+    self.client_vm.Install(mysql_name)
+    self.client_vm.RemoteCommand(
+        'sudo sed -i '
+        '"s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" %s' %
+        self.client_vm.GetPathToConfig(mysql_name))
+    self.client_vm.RemoteCommand(
+        'sudo cat %s' % self.client_vm.GetPathToConfig(mysql_name),
+        should_log=True)
+
+  def _PrepareDataDirectories(self, mysql_name):
+    # Make the data directories in case they don't already exist.
+    self.server_vm.RemoteCommand('sudo mkdir -p /scratch/mysql')
+    self.server_vm.RemoteCommand('sudo mkdir -p /scratch/tmp')
+    self.server_vm.RemoteCommand('sudo chown mysql:mysql /scratch/mysql')
+    self.server_vm.RemoteCommand('sudo chown mysql:mysql /scratch/tmp')
+    # Copy all the contents of the default data directories to the new ones.
+    self.server_vm.RemoteCommand(
+        'sudo rsync -avzh /var/lib/mysql/ /scratch/mysql')
+    self.server_vm.RemoteCommand('sudo rsync -avzh /tmp/ /scratch/tmp')
+    self.server_vm.RemoteCommand('df', should_log=True)
+    # Configure AppArmor.
+    self.server_vm.RemoteCommand(
+        'echo "alias /var/lib/mysql -> /scratch/mysql," | sudo tee -a '
+        '/etc/apparmor.d/tunables/alias')
+    self.server_vm.RemoteCommand(
+        'echo "alias /tmp -> /scratch/tmp," | sudo tee -a '
+        '/etc/apparmor.d/tunables/alias')
+    self.server_vm.RemoteCommand(
+        'sudo sed -i '
+        '"s|# Allow data files dir access|'
+        '  /scratch/mysql/ r, /scratch/mysql/** rwk, /scratch/tmp/ r, '
+        '/scratch/tmp/** rwk, /proc/*/status r, '
+        '/sys/devices/system/node/ r, /sys/devices/system/node/node*/meminfo r,'
+        ' /sys/devices/system/node/*/* r, /sys/devices/system/node/* r, '
+        '# Allow data files dir access|g" /etc/apparmor.d/usr.sbin.mysqld')
+    self.server_vm.RemoteCommand(
+        'sudo apparmor_parser -r /etc/apparmor.d/usr.sbin.mysqld')
+    self.server_vm.RemoteCommand('sudo systemctl restart apparmor')
+    # Finally, change the MySQL data directory.
+    self.server_vm.RemoteCommand(
+        'sudo sed -i '
+        '"s|datadir\t\t= /var/lib/mysql|datadir\t\t= /scratch/mysql|g" '
+        '%s' % self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo sed -i '
+        '"s|tmpdir\t\t= /tmp|tmpdir\t\t= /scratch/tmp|g" '
+        '%s' % self.server_vm.GetPathToConfig(mysql_name))
 
   def _InstallMySQLServer(self):
     """Installs MySQL Server on the server vm.
@@ -387,34 +434,67 @@ class BaseRelationalDb(resource.BaseResource):
     if self.is_managed_db:
       raise Exception('Can\'t install MySQL Server when using a managed '
                       'database.')
+    if self.client_vm.IS_REBOOTABLE:
+      self.client_vm.ApplySysctlPersistent({
+          'net.ipv4.tcp_keepalive_time': 100,
+          'net.ipv4.tcp_keepalive_intvl': 100,
+          'net.ipv4.tcp_keepalive_probes': 10
+      })
+    if self.server_vm.IS_REBOOTABLE:
+      self.server_vm.ApplySysctlPersistent({
+          'net.ipv4.tcp_keepalive_time': 100,
+          'net.ipv4.tcp_keepalive_intvl': 100,
+          'net.ipv4.tcp_keepalive_probes': 10
+      })
     if (self.spec.engine_version == '5.6' or
         self.spec.engine_version.startswith('5.6.')):
       mysql_name = 'mysql56'
-      self.server_vm.Install(mysql_name)
     elif (self.spec.engine_version == '5.7' or
           self.spec.engine_version.startswith('5.7.')):
       mysql_name = 'mysql57'
-      self.server_vm.Install(mysql_name)
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
                       'are supported.' % self.spec.engine_version)
+    self.server_vm.Install(mysql_name)
     self.server_vm.RemoteCommand('chmod 777 %s' %
                                  self.server_vm.GetScratchDir())
     self.server_vm.RemoteCommand('sudo service %s stop' %
                                  self.server_vm.GetServiceName(mysql_name))
+    self._PrepareDataDirectories(mysql_name)
+
+    # These (and max_connections after restarting) help avoid losing connection.
+    self.server_vm.RemoteCommand(
+        'echo "\nskip-name-resolve\n'
+        'connect_timeout        = 86400\n'
+        'wait_timeout        = 86400\n'
+        'interactive_timeout        = 86400" | sudo tee -a %s' %
+        self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand('sudo sed -i "s/bind-address/#bind-address/g" '
+                                 '%s' %
+                                 self.server_vm.GetPathToConfig(mysql_name))
     self.server_vm.RemoteCommand(
         'sudo sed -i '
-        '"s/datadir=\\/var\\/lib\\/mysql/datadir=\\%s\\/mysql/" '
-        '%s' % (self.server_vm.GetScratchDir(),
-                self.server_vm.GetPathToConfig(mysql_name)))
-    self.server_vm.RemoteCommand('sudo cp -R -p /var/lib/mysql %s/' %
-                                 self.server_vm.GetScratchDir())
-    # Comments out the bind-address line in mysqld.cnf.
+        '"s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" %s' %
+        self.server_vm.GetPathToConfig(mysql_name))
+
+    # Configure logging (/var/log/mysql/error.log will print upon db deletion).
     self.server_vm.RemoteCommand(
-        'sudo sed -i \'s/bind-address/#bind-address/g\' '
-        '/etc/mysql/mysql.conf.d/mysqld.cnf')
+        'echo "\nlog_error_verbosity        = 3" | sudo tee -a %s' %
+        self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo cat /etc/mysql/mysql.conf.d/mysql.sock',
+        should_log=True,
+        ignore_failure=True)
+    # Restart.
     self.server_vm.RemoteCommand('sudo service %s restart' %
                                  self.server_vm.GetServiceName(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo cat %s' % self.server_vm.GetPathToConfig(mysql_name),
+        should_log=True)
+
+    self.server_vm.RemoteCommand(
+        'mysql %s -e "SET GLOBAL max_connections=8000;"' %
+        self.MakeMysqlConnectionString(use_localhost=True))
     self.server_vm.RemoteCommand(
         ('mysql %s -e "CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';"') %
         (self.MakeMysqlConnectionString(use_localhost=True),

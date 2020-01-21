@@ -18,7 +18,7 @@ import logging
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.mesos.mesos_disk import LocalDisk
@@ -245,8 +245,3 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
   def SetupLocalDisks(self):
     # Do not call parent's method
     return
-
-
-class DebianBasedMesosDockerInstance(MesosDockerInstance,
-                                     linux_virtual_machine.DebianMixin):
-  pass

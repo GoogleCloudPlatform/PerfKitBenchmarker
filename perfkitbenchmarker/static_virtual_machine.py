@@ -291,20 +291,15 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 def GetStaticVmClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
   if not os_type:
-    logging.warning('Could not find os type for VM. Defaulting to debian.')
-    os_type = os_types.DEBIAN
+    os_type = os_types.DEFAULT
+    logging.warning('Could not find os type for VM. Defaulting to %s.', os_type)
   return resource.GetResourceClass(virtual_machine.BaseVirtualMachine,
                                    CLOUD=StaticVirtualMachine.CLOUD,
                                    OS_TYPE=os_type)
 
 
-class ContainerizedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.ContainerizedDebianMixin):
-  pass
-
-
-class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
-                                      linux_virtual_machine.DebianMixin):
+class Ubuntu1604BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
   pass
 
 

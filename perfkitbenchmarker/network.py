@@ -20,8 +20,17 @@ others in the
 same project.
 """
 
+from enum import Enum
+
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import regex_util
+
+
+class NetType(Enum):
+  DEFAULT = 'default'
+  SINGLE = 'single'
+  MULTI = 'multi'
 
 
 class BaseFirewall(object):
@@ -78,13 +87,15 @@ class BaseFirewall(object):
 class BaseNetworkSpec(object):
   """Object containing all information needed to create a Network."""
 
-  def __init__(self, zone=None):
+  def __init__(self, zone=None, cidr=None):
     """Initializes the BaseNetworkSpec.
 
     Args:
       zone: The zone in which to create the network.
+      cidr: The subnet this network belongs to in CIDR notation
     """
     self.zone = zone
+    self.cidr = cidr
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
@@ -97,11 +108,12 @@ class BaseNetwork(object):
 
   def __init__(self, spec):
     self.zone = spec.zone
+    self.cidr = spec.cidr
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns a BaseNetworkSpec created from VM attributes."""
-    return BaseNetworkSpec(zone=vm.zone)
+    return BaseNetworkSpec(zone=vm.zone, cidr=vm.cidr)
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
@@ -125,6 +137,28 @@ class BaseNetwork(object):
     """
     return cls.GetNetworkFromNetworkSpec(cls._GetNetworkSpecFromVm(vm))
 
+  @staticmethod
+  def FormatCidrString(cidr_raw):
+    """Format CIDR string for use in resource name.
+
+    Removes or replaces illegal characters from CIDR.
+    eg '10.128.0.0/9' -> '10-128-0-0-9'
+
+    Args:
+      cidr_raw: The unformatted CIDR string.
+    Returns:
+      A CIDR string suitable for use in resource names.
+    Raises:
+      Error: Invalid CIDR format
+    """
+
+    delim = r'-'  # Safe delimiter for most providers
+    int_regex = r'[0-9]+'
+    octets_mask = regex_util.ExtractAllMatches(int_regex, str(cidr_raw))
+    if len(octets_mask) != 5:  # expecting 4 octets plus 1 prefix mask.
+      raise ValueError('Invalid CIDR format: "{0}"'.format(cidr_raw))
+    return delim.join(octets_mask)
+
   @classmethod
   def GetNetworkFromNetworkSpec(cls, spec):
     """Returns a BaseNetwork.
@@ -143,6 +177,11 @@ class BaseNetwork(object):
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
     key = cls._GetKeyFromNetworkSpec(spec)
+
+    #  Grab the list of other networks to setup firewalls, forwarding, etc.
+    if not hasattr(spec, 'custom_subnets'):
+      spec.__setattr__('custom_subnets', benchmark_spec.custom_subnets)
+
     with benchmark_spec.networks_lock:
       if key not in benchmark_spec.networks:
         benchmark_spec.networks[key] = cls(spec)

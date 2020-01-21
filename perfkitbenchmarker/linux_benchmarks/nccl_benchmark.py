@@ -22,7 +22,6 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
-flags.DEFINE_integer('nccl_np', 16, 'Number of processes to run')
 flags.DEFINE_integer('nccl_slots', 8,
                      'Launch n processes per node on all allocated nodes')
 flags.DEFINE_string('nccl_cuda_visible_devices', None, 'GPU identifiers are '
@@ -46,6 +45,8 @@ flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
                     'MPI home')
 flags.DEFINE_string('nccl_nccl_home', '/usr/local/nccl2', 'NCCL home')
+flags.DEFINE_boolean('nccl_install_mofed', False,
+                     'Install Mellanox OpenFabrics drivers')
 
 
 FLAGS = flags.FLAGS
@@ -53,15 +54,15 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'nccl'
 BENCHMARK_CONFIG = """
 nccl:
-  description: Runs NCCL Benchmark.
+  description: Runs NCCL Benchmark. Specify the number of VMs with --num_vms.
   vm_groups:
     default:
-      vm_count: 2
+      vm_count: null
       vm_spec:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: common-cu101
+          image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
           boot_disk_size: 100
           gpu_type: v100
@@ -69,11 +70,10 @@ nccl:
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-west-2a
-          image: ami-04121e1f9d541d468
+          image: ami-07728e9e2742b0662
           boot_disk_size: 100
         Azure:
           machine_type: Standard_NC24rs_v3
-          image: microsoft-dsvm:aml-workstation:ubuntu:19.11.13
           zone: eastus
 """
 
@@ -87,7 +87,7 @@ _SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
                              r'iters: (?P<iters>\d+) '
                              r'validation: (?P<validation>\d+)\s*')
 
-# Withoud '--mca btl_tcp_if_exclude docker0,lo', it stuck forever
+# Without '--mca btl_tcp_if_exclude docker0,lo', it stuck forever
 # This is caused by Docker network in DLVM, use mca btl_tcp_if_exclude to skip
 # docker network.
 
@@ -96,7 +96,6 @@ _RUN_CMD = ('{mpi} '
             '--mca btl tcp,self '
             '--mca btl_tcp_if_exclude docker0,lo '
             '--bind-to none '
-            '-np {np} '
             '-N {slots} '
             '{env} '
             'nccl-tests/build/all_reduce_perf '
@@ -143,6 +142,7 @@ def _PrepareVm(vm):
     vm.Install('nccl')
   if FLAGS.nccl_install_openmpi:
     vm.Install('openmpi')
+
   env = ''
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
@@ -159,6 +159,8 @@ def _PrepareVm(vm):
                          nccl=FLAGS.nccl_nccl_home,
                          cuda='/usr/local/cuda-{}'.format(
                              FLAGS.cuda_toolkit_version)))
+  if FLAGS.nccl_install_mofed:
+    vm.Install('mofed')
   vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
   vm.RemoteCommand('cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
                    'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
@@ -189,8 +191,7 @@ def _CreateMetadataDict():
   Returns:
     metadata dict
   """
-  metadata = {'np': FLAGS.nccl_np,
-              'slots': FLAGS.nccl_slots,
+  metadata = {'slots': FLAGS.nccl_slots,
               'minbytes': FLAGS.nccl_minbytes,
               'maxbytes': FLAGS.nccl_maxbytes,
               'stepfactor': FLAGS.nccl_stepfactor,
@@ -199,6 +200,8 @@ def _CreateMetadataDict():
               'nthreads': FLAGS.nccl_nthreads,
               'iters': FLAGS.nccl_iters,
               'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices}
+  if FLAGS.nccl_install_mofed:
+    metadata['mofed_version'] = FLAGS.mofed_version
   if FLAGS.nccl_extra_params:
     for extra_param in FLAGS.nccl_extra_params:
       param_key, param_value = extra_param.split('=', 1)
@@ -225,6 +228,7 @@ def MakeSamplesFromOutput(metadata, output):
   for rank, device in results:
     metadata[rank] = device
   results = regex_util.ExtractAllMatches(
+      r'^\s*'
       r'(\d+)\s+'
       r'(\d+)\s+'
       r'(\w+)\s+'
@@ -236,7 +240,7 @@ def MakeSamplesFromOutput(metadata, output):
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
-      r'(\S+)', output)
+      r'(\S+)', output, re.MULTILINE)
   max_out_of_place_algbw = 0
   for row in results:
     metadata_copy = metadata.copy()
@@ -278,7 +282,6 @@ def Run(benchmark_spec):
 
   cmd = _RUN_CMD.format(mpi=FLAGS.nccl_mpi,
                         hostfile=_HOSTFILE,
-                        np=FLAGS.nccl_np,
                         slots=FLAGS.nccl_slots,
                         env=' '.join(['-x {}'.format(x) for x in env]),
                         minbytes=FLAGS.nccl_minbytes,
@@ -292,12 +295,14 @@ def Run(benchmark_spec):
   sample_results = []
   max_out_of_place_algbw_results = []
 
-  for _ in range(FLAGS.nccl_num_runs):
+  for iteration in range(FLAGS.nccl_num_runs):
+    metadata['run_iteration'] = iteration
     stdout, _ = master.RobustRemoteCommand(cmd)
     samples, max_out_of_place_algbw = MakeSamplesFromOutput(metadata, stdout)
     sample_results.extend(samples)
     max_out_of_place_algbw_results.append(max_out_of_place_algbw)
     time.sleep(FLAGS.nccl_seconds_between_runs)
+  metadata['run_iteration'] = -1
   avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
   sample_results.append(
       sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s', metadata))

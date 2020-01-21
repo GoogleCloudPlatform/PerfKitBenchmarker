@@ -383,10 +383,10 @@ $ aws configure
 
 ### Windows Azure CLI and credentials
 
-This version of Perfkit Benchmarker is known to be compatible with Azure CLI 
+This version of Perfkit Benchmarker is known to be compatible with Azure CLI
 version 2.0.75, and will likely work with any version newer than that.
 
-Follow the instructions at https://docs.microsoft.com/en-us/cli/azure/install-azure-cli or 
+Follow the instructions at https://docs.microsoft.com/en-us/cli/azure/install-azure-cli or
 on Linux, run the following commands:
 
 ```bash
@@ -802,7 +802,7 @@ hbase_ycsb:
       vm_spec:
         GCP:
           machine_type: n1-standard-1
-          image: ubuntu-14-04
+          image: ubuntu-16-04
           zone: us-central1-c
         AWS:
           machine_type: m3.medium
@@ -821,7 +821,7 @@ hbase_ycsb:
           machine_type:
             cpus: 2
             memory: 10.0GiB
-          image: ubuntu-14-04
+          image: ubuntu-16-04
           zone: us-central1-c
         # Other clouds here...
       disk_count: 1
@@ -837,7 +837,7 @@ hbase_ycsb:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
-          image: ubuntu-14-04
+          image: ubuntu-16-04
           zone: us-central1-c
         # Other clouds here...
       disk_count: 1

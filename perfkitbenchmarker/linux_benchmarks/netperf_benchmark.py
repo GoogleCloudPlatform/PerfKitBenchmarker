@@ -65,8 +65,15 @@ flags.DEFINE_integer('netperf_thinktime_array_size', 0,
 flags.DEFINE_integer('netperf_thinktime_run_length', 0,
                      'The number of contiguous numbers to sum at a time in the '
                      'thinktime array.')
+flags.DEFINE_integer('netperf_udp_stream_send_size_in_bytes', 1024,
+                     'Send size to use for UDP_STREAM tests (netperf -m flag)',
+                     lower_bound=1, upper_bound=65507)
+# We set the default to 128KB (131072 bytes) to override the Linux default
+# of 16K so that we can achieve the "link rate".
+flags.DEFINE_integer('netperf_tcp_stream_send_size_in_bytes', 131072,
+                     'Send size to use for TCP_STREAM tests (netperf -m flag)')
 
-ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
+ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR', 'UDP_STREAM']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
                   'The netperf benchmark(s) to run.')
 flags.register_validator(
@@ -78,7 +85,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'netperf'
 BENCHMARK_CONFIG = """
 netperf:
-  description: Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM
+  description: Run TCP_RR, TCP_CRR, UDP_RR, TCP_STREAM and UDP_STREAM
   vm_groups:
     vm_1:
       vm_spec: *default_single_core
@@ -355,8 +362,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   """
   enable_latency_histograms = FLAGS.netperf_enable_histograms or num_streams > 1
   # Throughput benchmarks don't have latency histograms
-  enable_latency_histograms = enable_latency_histograms and \
-      benchmark_name != 'TCP_STREAM'
+  enable_latency_histograms = (enable_latency_histograms and
+                               (benchmark_name not in ['TCP_STREAM', 'UDP_STREAM']))
   # Flags:
   # -o specifies keys to include in CSV output.
   # -j keeps additional latency numbers
@@ -367,6 +374,14 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if enable_latency_histograms else ''
+
+  remote_cmd_timeout = (
+      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300)
+
+  metadata = {'netperf_test_length': FLAGS.netperf_test_length,
+              'sending_thread_count': num_streams,
+              'max_iter': FLAGS.netperf_max_iter or 1}
+
   netperf_cmd = ('{netperf_path} -p {{command_port}} -j {verbosity} '
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
@@ -377,7 +392,19 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
                      output_selector=OUTPUT_SELECTOR,
-                     confidence=confidence, verbosity=verbosity)
+                     confidence=confidence,
+                     verbosity=verbosity)
+
+  if benchmark_name.upper() == 'UDP_STREAM':
+    netperf_cmd += (' -R 1 -m {send_size} -M {send_size} '.format(
+                    send_size=FLAGS.netperf_udp_stream_send_size_in_bytes))
+    metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
+
+  elif benchmark_name.upper() == 'TCP_STREAM':
+    netperf_cmd += (' -m {send_size} -M {send_size} '.format(
+                    send_size=FLAGS.netperf_tcp_stream_send_size_in_bytes))
+    metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
+
   if FLAGS.netperf_thinktime != 0:
     netperf_cmd += (' -X {thinktime},{thinktime_array_size},'
                     '{thinktime_run_length} ').format(
@@ -401,11 +428,6 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   json_out = json.loads(remote_stdout)
   stdouts = json_out[0]
-
-  # Metadata to attach to samples
-  metadata = {'netperf_test_length': FLAGS.netperf_test_length,
-              'max_iter': FLAGS.netperf_max_iter or 1,
-              'sending_thread_count': num_streams}
 
   parsed_output = [ParseNetperfOutput(stdout, metadata, benchmark_name,
                                       enable_latency_histograms)

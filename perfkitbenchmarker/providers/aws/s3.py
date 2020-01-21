@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to S3."""
 
+import posixpath
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
@@ -66,6 +67,20 @@ class S3Service(object_storage_service.ObjectStorageService):
   def Copy(self, src_url, dst_url):
     """See base class."""
     vm_util.IssueCommand(['aws', 's3', 'cp', src_url, dst_url])
+
+  def CopyToBucket(self, src_path, bucket, object_path):
+    """See base class."""
+    dst_url = self.MakeRemoteCliDownloadUrl(bucket, object_path)
+    vm_util.IssueCommand(['aws', 's3', 'cp', src_path, dst_url])
+
+  def MakeRemoteCliDownloadUrl(self, bucket, object_path):
+    """See base class."""
+    path = posixpath.join(bucket, object_path)
+    return 's3://' + path
+
+  def GenerateCliDownloadFileCommand(self, src_url, local_path):
+    """See base class."""
+    return 'aws s3 cp "%s" "%s"' % (src_url, local_path)
 
   def List(self, buckets):
     """See base class."""

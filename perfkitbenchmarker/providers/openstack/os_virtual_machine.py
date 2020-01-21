@@ -42,7 +42,6 @@ from six.moves import range
 
 RHEL_IMAGE = 'rhel-7.2'
 CENTOS_IMAGE = 'centos7'
-UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'
 
 VALIDATION_ERROR_MESSAGE = '{0} {1} could not be found.'
@@ -393,11 +392,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
              for name in disks_names]
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
-
-
-class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                         linux_virtual_machine.DebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
