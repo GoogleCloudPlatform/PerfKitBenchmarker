@@ -122,35 +122,38 @@ _SSH_CONFIG_CMD = ('echo "LogLevel ERROR\nHost *\n  IdentitiesOnly yes\n" | '
 def GetConfig(user_config):
   """Returns the configuration of a benchmark."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  _ParseDimensions(FLAGS.openfoam_dimensions)
   if FLAGS['num_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   return config
 
 
-def _ParseDimensions(dimensions_list):
-  """Parse, validate, and return the supplied dimensions list.
+@flags.validator('openfoam_dimensions')
+def _CheckDimensions(dimensions_list):
+  # throws InvalidValue if an entry is not correct
+  for dimensions in dimensions_list:
+    _ParseDimensions(dimensions)
+  return True
+
+
+def _ParseDimensions(dimensions):
+  """Parse and validate an individual dimensions entry.
 
   Args:
-    dimensions_list: List of strings formatted as "_" separated integers. Like:
-      ['80_20_20', '20_8_8'].
+    dimensions: String formatted as "_" separated integers like: '80_20_20'.
 
   Returns:
-    A parsed list of dimensions like: ['80 20 20', '20 8 8'].
+    Parsed dimensions like: '80 20 20'.
 
   Raises:
     errors.Config.InvalidValue: If input dimensions are incorrectly formatted.
 
   """
-  parsed_dimensions_list = [
-      dimensions.split('_') for dimensions in dimensions_list
-  ]
-  for dimensions in parsed_dimensions_list:
-    if not all(value.isdigit() for value in dimensions):
-      raise errors.Config.InvalidValue(
-          'Expected list of ints separated by "_" in --openfoam_dimensions '
-          'but received %s.' % dimensions)
-  return [' '.join(dimensions) for dimensions in parsed_dimensions_list]
+  dimensions = dimensions.split('_')
+  if not all(value.isdigit() for value in dimensions):
+    raise errors.Config.InvalidValue(
+        'Expected list of ints separated by "_" in --openfoam_dimensions '
+        'but received %s.' % dimensions)
+  return ' '.join(dimensions)
 
 
 def Prepare(benchmark_spec):
@@ -302,13 +305,18 @@ def _RunCase(master_vm, dimensions):
     A list of performance samples for the given dimensions.
   """
   dims_entry = ('( hex ( 0 1 2 3 4 5 6 7 ) ( {dimensions} ) '
-                'simpleGrading ( 1 1 1 ) )').format(dimensions=dimensions)
+                'simpleGrading ( 1 1 1 ) )').format(
+                    dimensions=_ParseDimensions(dimensions))
   _SetDictEntry(master_vm, 'blocks', dims_entry, _BLOCK_MESH_DICT)
 
   run_command = ' && '.join(
       ['cd %s' % _GetWorkingDirPath(), './Allclean', 'time ./Allrun'])
   _, run_output = master_vm.RemoteCommand(run_command)
-  return _GetSamples(run_output)
+  results = _GetSamples(run_output)
+  # Update every run with run-specific metadata.
+  for result in results:
+    result.metadata['dimensions'] = dimensions
+  return results
 
 
 def Run(benchmark_spec):
@@ -368,12 +376,11 @@ def Run(benchmark_spec):
 
   # Run and gather samples.
   samples = []
-  for dimensions in _ParseDimensions(FLAGS.openfoam_dimensions):
+  for dimensions in FLAGS.openfoam_dimensions:
     results = _RunCase(master_vm, dimensions)
+    # Update every case run with common metadata.
     for result in results:
       result.metadata.update(common_metadata)
-      # TODO(liubrandon) Move to _RunCase for readability.
-      result.metadata['dimensions'] = dimensions
     samples.extend(results)
   return samples
 
