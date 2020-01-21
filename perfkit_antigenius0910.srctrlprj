@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<config>
+    <source_groups>
+        <source_group_87b5cbd7-9e09-4002-a51a-648d4689960c>
+            <name>Python Source Group</name>
+            <python_environment_path>/Users/yen/anaconda3/envs/softlayer/bin/python</python_environment_path>
+            <source_extensions>
+                <source_extension>.py</source_extension>
+            </source_extensions>
+            <source_paths>
+                <source_path>./</source_path>
+            </source_paths>
+            <status>enabled</status>
+            <type>Python Source Group</type>
+        </source_group_87b5cbd7-9e09-4002-a51a-648d4689960c>
+    </source_groups>
+    <version>8</version>
+</config>
