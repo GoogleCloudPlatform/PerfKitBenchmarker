@@ -224,7 +224,6 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     memory = '4096'
     cpus = '4'
     dedicated = False
-    #os = 'UBUNTU_14_64'
     os = 'UBUNTU_16_64'
     nic = '1000'
     private_vlan_id = None
@@ -482,8 +481,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     util.AddTags(self.id, self.zone, **kwargs)
 
 
-class DebianBasedSoftLayerVirtualMachine(SoftLayerVirtualMachine,
-                                         linux_virtual_machine.DebianMixin):
+class Ubuntu1604BasedSoftLayerVirtualMachine(SoftLayerVirtualMachine,
+                                        linux_virtual_machine.Ubuntu1604Mixin):
   pass
 
 
