@@ -154,13 +154,13 @@ flags.DEFINE_string(
 
 flags.DEFINE_integer(
     'tcp_max_receive_buffer', None, 
-    'The maximum receive buffer for TCP socket connections. '
+    'The maximum receive buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
 
 flags.DEFINE_integer(
     'tcp_max_send_buffer', None, 
-    'The maximum send buffer for TCP socket connections. '
+    'The maximum send buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
 
