@@ -25,3 +25,15 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
   vm.InstallPackages('mysql-client')
+
+
+def YumGetPathToConfig(vm):
+  """Returns the path to the mysql config file."""
+  del vm
+  return '/etc/my.cnf'
+
+
+def AptGetPathToConfig(vm):
+  """Returns the path to the mysql config file."""
+  del vm
+  return '/etc/mysql/conf.d/mysql.cnf'

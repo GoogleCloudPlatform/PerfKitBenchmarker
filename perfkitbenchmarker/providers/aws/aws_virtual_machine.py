@@ -985,24 +985,6 @@ class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
   DEFAULT_USER_NAME = 'core'
 
 
-class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
-                                   linux_virtual_machine.DebianMixin):
-  """Class with configuration for AWS Debian virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-  DEFAULT_USER_NAME = 'ubuntu'
-
-
-class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1404Mixin):
-  """Class with configuration for AWS Ubuntu1404 virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-  DEFAULT_USER_NAME = 'ubuntu'
-
-
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'

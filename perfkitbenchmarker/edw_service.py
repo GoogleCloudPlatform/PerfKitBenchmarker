@@ -235,10 +235,42 @@ class EdwService(resource.BaseResource):
     Args:
       dest_bucket: Name of the bucket to extract the data to. Should already
         exist.
-      dataset: Optional name of the dataset. If none, will be extracted from the
-        cluster_identifier.
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
       tables: Optional list of table names to extract. If none, all tables in
         the dataset will be extracted.
       dest_format: Format to extract data in.
+    """
+    raise NotImplementedError
+
+  def RemoveDataset(self, dataset=None):
+    """Removes a dataset.
+
+    Args:
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
+    """
+    raise NotImplementedError
+
+  def CreateDataset(self, dataset=None, description=None):
+    """Creates a new dataset.
+
+    Args:
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
+      description: Optional description of the dataset.
+    """
+    raise NotImplementedError
+
+  def LoadDataset(self, source_bucket, tables, dataset=None):
+    """Load all tables in a dataset to a database from object storage.
+
+    Args:
+      source_bucket: Name of the bucket to load the data from. Should already
+        exist. Each table must have its own subfolder in the bucket named after
+        the table, containing one or more csv files that make up the table data.
+      tables: List of table names to load.
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
     """
     raise NotImplementedError

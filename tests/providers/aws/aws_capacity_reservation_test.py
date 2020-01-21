@@ -47,7 +47,7 @@ class FakeAwsVirtualMachine(object):
     self.zone = 'us-west-1'
     self.region = 'us-west-1'
     self.machine_type = 'fake_machine_type'
-    self.OS_TYPE = 'debian'  # pylint: disable=invalid-name
+    self.OS_TYPE = 'ubuntu1804'  # pylint: disable=invalid-name
     self.network = mock.MagicMock()
 
 

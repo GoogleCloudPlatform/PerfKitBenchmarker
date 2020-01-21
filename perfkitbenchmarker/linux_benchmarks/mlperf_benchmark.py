@@ -40,10 +40,13 @@ mlperf:
           machine_type: n1-highmem-96
           zone: us-west1-b
           boot_disk_size: 100
+          boot_disk_type: pd-ssd
+          min_cpu_platform: skylake
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-east-1
           boot_disk_size: 100
+          image: ami-07728e9e2742b0662
         Azure:
           machine_type: Standard_ND40s_v2
           zone: eastus
