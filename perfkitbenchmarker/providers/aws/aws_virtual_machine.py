@@ -1107,15 +1107,14 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
     self.python_pip_package_config = 'python2-pip'
 
 
-class WindowsAwsVirtualMachine(AwsVirtualMachine,
-                               windows_virtual_machine.WindowsMixin):
+class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
+                                   windows_virtual_machine.BaseWindowsMixin):
   """Support for Windows machines on AWS."""
-  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
   DEFAULT_USER_NAME = 'Administrator'
   IMAGE_OWNER = WINDOWS_IMAGE_PROJECT
 
   def __init__(self, vm_spec):
-    super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
+    super(BaseWindowsAwsVirtualMachine, self).__init__(vm_spec)
     self.user_data = ('<powershell>%s</powershell>' %
                       windows_virtual_machine.STARTUP_SCRIPT)
 
@@ -1141,7 +1140,7 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
 
   def _PostCreate(self):
     """Retrieve generic VM info and then retrieve the VM's password."""
-    super(WindowsAwsVirtualMachine, self)._PostCreate()
+    super(BaseWindowsAwsVirtualMachine, self)._PostCreate()
 
     # Get the decoded password data.
     decoded_password_data = self._GetDecodedPasswordData()
@@ -1167,7 +1166,7 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
     Returns:
       dict mapping metadata key to value.
     """
-    result = super(WindowsAwsVirtualMachine, self).GetResourceMetadata()
+    result = super(BaseWindowsAwsVirtualMachine, self).GetResourceMetadata()
     result['disable_interrupt_moderation'] = self.disable_interrupt_moderation
     return result
 
@@ -1211,33 +1210,39 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
           'InterruptModeration failed to disable')
 
 
+class VersionlessWindowsAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.VersionlessWindowsMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+
+
 class Windows2012CoreAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
 
 
 class Windows2016CoreAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Core-Base-*'
 
 
 class Windows2019CoreAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
 
 
 class Windows2012BaseAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Base-*'
 
 
 class Windows2016BaseAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Full-Base-*'
 
 
 class Windows2019BaseAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
 
 

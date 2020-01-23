@@ -323,6 +323,6 @@ class Centos7BasedStaticVirtualMachine(StaticVirtualMachine,
     self.python_pip_package_config = 'python2-pip'
 
 
-class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,
-                                       windows_virtual_machine.WindowsMixin):
+class VersionlessWindowsBasedStaticVirtualMachine(
+    StaticVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
   pass

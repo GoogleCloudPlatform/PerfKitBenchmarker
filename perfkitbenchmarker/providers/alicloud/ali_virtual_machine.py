@@ -458,6 +458,6 @@ class RhelBasedAliVirtualMachine(AliVirtualMachine,
   pass
 
 
-class WindowsAliVirtualMachine(AliVirtualMachine,
-                               windows_virtual_machine.WindowsMixin):
+class VersionlessWindowsAliVirtualMachine(
+    AliVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
   pass

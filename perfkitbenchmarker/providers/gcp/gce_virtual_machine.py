@@ -863,11 +863,10 @@ class Ubuntu1804BasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
-class WindowsGceVirtualMachine(GceVirtualMachine,
-                               windows_virtual_machine.WindowsMixin):
+class BaseWindowsGceVirtualMachine(GceVirtualMachine,
+                                   windows_virtual_machine.BaseWindowsMixin):
   """Class supporting Windows GCE virtual machines."""
 
-  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
   BOOT_DISK_SIZE_GB = 50
 
@@ -879,7 +878,7 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     Args:
       vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
-    super(WindowsGceVirtualMachine, self).__init__(vm_spec)
+    super(BaseWindowsGceVirtualMachine, self).__init__(vm_spec)
     self.boot_metadata[
         'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
 
@@ -896,7 +895,7 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     return cmd
 
   def _PostCreate(self):
-    super(WindowsGceVirtualMachine, self)._PostCreate()
+    super(BaseWindowsGceVirtualMachine, self)._PostCreate()
     reset_password_cmd = self._GenerateResetPasswordCommand()
     stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
@@ -912,7 +911,7 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     Returns:
       dict mapping metadata key to value.
     """
-    result = super(WindowsGceVirtualMachine, self).GetResourceMetadata()
+    result = super(BaseWindowsGceVirtualMachine, self).GetResourceMetadata()
     result['disable_rss'] = self.disable_rss
     return result
 
@@ -946,40 +945,40 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
 
 
-class Windows2012CoreGceVirtualMachine(
-    WindowsGceVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+class VersionlessWindowsGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.VersionlessWindowsMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
+
+
+class Windows2012CoreGceVirtualMachine(
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
 
 
 class Windows2016CoreGceVirtualMachine(
-    WindowsGceVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2016-core'
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
 class Windows2019CoreGceVirtualMachine(
-    WindowsGceVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2019-core'
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
 class Windows2012BaseGceVirtualMachine(
-    WindowsGceVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
 class Windows2016BaseGceVirtualMachine(
-    WindowsGceVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2016'
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
 class Windows2019BaseGceVirtualMachine(
-    WindowsGceVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
