@@ -4,6 +4,9 @@
     2019.
   - `debian` os_type alias referred to Ubuntu 14.04 on all clouds.
   - Ubuntu 16.04 is now the default.
+- Deprecate versionless `windows` os_type.
+  - It will stop working in April 2020, and you will have to specify
+      `windows2012`.
 
 ### New features:
 - Add infiniband support in nccl benchmark.

@@ -806,14 +806,15 @@ class CoreOsBasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'CoreOS:CoreOS:Stable:latest'
 
 
-class WindowsAzureVirtualMachine(AzureVirtualMachine,
-                                 windows_virtual_machine.WindowsMixin):
+class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
+                                     windows_virtual_machine.BaseWindowsMixin):
   """Class supporting Windows Azure virtual machines."""
 
-  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
+  # This ia a required attribute, but this is a base class.
+  IMAGE_URN = 'non-existent'
 
   def __init__(self, vm_spec):
-    super(WindowsAzureVirtualMachine, self).__init__(vm_spec)
+    super(BaseWindowsAzureVirtualMachine, self).__init__(vm_spec)
     # The names of Windows VMs on Azure are limited to 15 characters so let's
     # drop the pkb prefix if necessary.
     if len(self.name) > 15:
@@ -822,7 +823,7 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
     self.password = vm_util.GenerateRandomWindowsPassword()
 
   def _PostCreate(self):
-    super(WindowsAzureVirtualMachine, self)._PostCreate()
+    super(BaseWindowsAzureVirtualMachine, self)._PostCreate()
     config_dict = {'commandToExecute': windows_virtual_machine.STARTUP_SCRIPT}
     config = json.dumps(config_dict)
     vm_util.IssueRetryableCommand([
@@ -833,37 +834,49 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
     ] + self.resource_group.args)
 
 
+class VersionlessWindowsAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.VersionlessWindowsMixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
+
+
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:
 # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/cli-ps-findimage#table-of-commonly-used-windows-images
 # nor in `az vm image list -p MicrosoftWindowsServer -f WindowsServer -s 2012`
 # Rather than exclude this just allow 2012 to refer to the 2012 Base image.
 class Windows2012CoreAzureVirtualMachine(
-    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.VersionlessWindowsMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016CoreAzureVirtualMachine(
-    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2016CoreMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter-Server-Core:latest'
 
 
 class Windows2019CoreAzureVirtualMachine(
-    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2019CoreMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
 
 
 class Windows2012BaseAzureVirtualMachine(
-    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2012BaseMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016BaseAzureVirtualMachine(
-    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2016BaseMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
 
 
 class Windows2019BaseAzureVirtualMachine(
-    WindowsAzureVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2019BaseMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
 
 
