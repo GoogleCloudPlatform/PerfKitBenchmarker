@@ -192,19 +192,21 @@ used to run PerfKitBenchmarker (as is done today for CoreMark and SPEC CPU2006).
 
 ## Cloud account setup
 
-This section describes the setup steps needed for each cloud system. Note that you only need to perform setup steps on the clouds you wish to test. If you only want to test Google Cloud, you only need to install and configure `gcloud`.
+This section describes the setup steps needed for each cloud system. Note that
+you only need to perform setup steps on the clouds you wish to test. If you only
+want to test Google Cloud, you only need to install and configure `gcloud`.
 
-* [Google Cloud](#install-gcloud-and-setup-authentication)
-* [OpenStack](#install-openstack-cli-client-and-setup-authentication)
-* [Kubernetes](#kubernetes-configuration-and-credentials)
-* [Mesos](#mesos-configuration)
-* [Cloudstack](#cloudstack-install-dependencies-and-set-the-api-keys)
-* [AWS](#install-aws-cli-and-setup-authentication)
-* [Azure](#windows-azure-cli-and-credentials)
-* [AliCloud](#install-alicloud-cli-and-setup-authentication)
-* [DigitalOcean](#digitalocean-configuration-and-credentials)
-* [RackSpace](#installing-clis-and-credentials-for-rackspace)
-* [ProfitBricks](#profitbricks-configuration-and-credentials)
+*   [Google Cloud](#install-gcloud-and-setup-authentication)
+*   [OpenStack](#install-openstack-cli-client-and-setup-authentication)
+*   [Kubernetes](#kubernetes-configuration-and-credentials)
+*   [Mesos](#mesos-configuration)
+*   [Cloudstack](#cloudstack-install-dependencies-and-set-the-api-keys)
+*   [AWS](#install-aws-cli-and-setup-authentication)
+*   [Azure](#windows-azure-cli-and-credentials)
+*   [AliCloud](#install-alicloud-cli-and-setup-authentication)
+*   [DigitalOcean](#digitalocean-configuration-and-credentials)
+*   [RackSpace](#installing-clis-and-credentials-for-rackspace)
+*   [ProfitBricks](#profitbricks-configuration-and-credentials)
 
 After configuring the clouds you intend to use, skip to
 [Running a Single Benchmark](#running-a-single-benchmark), unless you are going
@@ -430,12 +432,14 @@ Follow instructions at http://aws.amazon.com/cli/ or run the following command
 $ sudo pip install -r perfkitbenchmarker/providers/aws/requirements.txt
 ```
 
-Navigate to the AWS console to create access credentials: https://console.aws.amazon.com/ec2/
+Navigate to the AWS console to create access credentials:
+https://console.aws.amazon.com/ec2/
 
-* On the console click on your name (top left)
-* Click on "Security Credentials"
-* Click on "Access Keys", the create New Access Key. Download the file, it contains the Access key and Secret keys
-  to access services. Note the values and delete the file.
+*   On the console click on your name (top left)
+*   Click on "Security Credentials"
+*   Click on "Access Keys", the create New Access Key. Download the file, it
+    contains the Access key and Secret keys to access services. Note the values
+    and delete the file.
 
 Configure the CLI using the keys from the previous step:
 
@@ -979,13 +983,16 @@ cluster_boot:
       vm_count: 100
 ```
 
-You can achieve the same effect by specifying the `--config_override` flag.
-The value of the flag should be a path within the YAML (with keys delimited by
+You can achieve the same effect by specifying the `--config_override` flag. The
+value of the flag should be a path within the YAML (with keys delimited by
 periods), an equals sign, and finally the new value:
-```
+
+```bash
 --config_override=cluster_boot.vm_groups.default.vm_count=100
 ```
-See the section below for how to use static (i.e. pre-provisioned) machines in your config.
+
+See the section below for how to use static (i.e. pre-provisioned) machines in
+your config.
 
 # Advanced: How To Run Benchmarks Without Cloud Provisioning (e.g., local workstation)
 
@@ -995,8 +1002,9 @@ like iperf run from an external point to a Cloud VM.
 
 In order to do this you need to make sure:
 
-* The static (i.e. not provisioned by PerfKit Benchmarker) machine is ssh'able
-* The user PerfKitBenchmarker will login as has 'sudo' access.  (*** Note we hope to remove this restriction soon ***)
+*   The static (i.e. not provisioned by PerfKit Benchmarker) machine is ssh'able
+*   The user PerfKitBenchmarker will login as has 'sudo' access. (*** Note we
+    hope to remove this restriction soon ***)
 
 Next, you will want to create a YAML user config file describing how to connect
 to the machine as follows:
