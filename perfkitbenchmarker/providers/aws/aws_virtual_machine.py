@@ -120,6 +120,9 @@ X86 = 'x86_64'
 # These are the project numbers of projects owning common images.
 # Some numbers have corresponding owner aliases, but they are not used here.
 AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
+# From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
+# TODO(pclay): replace with Marketplace AMI when available
+DEBIAN_IMAGE_PROJECT = '136693071363'
 MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
 # https://help.ubuntu.com/community/EC2StartersGuide#Official_Ubuntu_Cloud_Guest_Amazon_Machine_Images_.28AMIs.29
 UBUNTU_IMAGE_PROJECT = '099720109477'  # Owned by canonical
@@ -1007,6 +1010,21 @@ class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
   # Note AMIs can also be found distributed by CoreOS in 595879546273
   DEFAULT_USER_NAME = 'core'
+
+
+class Debian9BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.Debian9Mixin):
+  IMAGE_NAME_FILTER = 'debian-stretch-*64-*'
+  DEFAULT_USER_NAME = 'admin'
+
+
+class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
+                                     linux_virtual_machine.Debian10Mixin):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
+  # TODO(pclay): replace with Marketplace AMI when available
+  IMAGE_NAME_FILTER = 'debian-10-*64*'
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_USER_NAME = 'admin'
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,

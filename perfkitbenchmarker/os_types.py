@@ -21,6 +21,7 @@ CLEAR = 'clear'
 COS = 'cos'
 CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
+DEBIAN10 = 'debian10'
 JUJU = 'juju'
 RHEL = 'rhel'
 UBUNTU_CONTAINER = 'ubuntu_container'
@@ -46,6 +47,7 @@ LINUX_OS_TYPES = [
     CORE_OS,
     COS,
     DEBIAN9,
+    DEBIAN10,
     JUJU,
     RHEL,
     UBUNTU_CONTAINER,
