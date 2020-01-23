@@ -799,6 +799,11 @@ class Debian9BasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
+class Debian10BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Debian10Mixin):
+  DEFAULT_IMAGE_FAMILY = 'debian-10'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
   """GCE RHEL 7 based VM."""

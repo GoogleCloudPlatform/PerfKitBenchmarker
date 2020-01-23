@@ -1550,6 +1550,11 @@ class Debian9Mixin(BaseDebianMixin):
   OS_TYPE = os_types.DEBIAN9
 
 
+class Debian10Mixin(BaseDebianMixin):
+  """Class holding Debian 10 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN10
+
+
 class BaseUbuntuMixin(BaseDebianMixin):
   """Class holding Ubuntu specific VM methods and attributes."""
 

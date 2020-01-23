@@ -752,6 +752,18 @@ class AzureVirtualMachine(
     return self.low_priority_status_code
 
 
+class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,
+                                      linux_virtual_machine.Debian9Mixin):
+  # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  IMAGE_URN = 'credativ:Debian:9:latest'
+
+
+class Debian10BasedAzureVirtualMachine(AzureVirtualMachine,
+                                       linux_virtual_machine.Debian10Mixin):
+  # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  IMAGE_URN = 'Debian:debian-10:10:latest'
+
+
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
