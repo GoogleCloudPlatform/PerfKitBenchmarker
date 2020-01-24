@@ -23,8 +23,6 @@ more detailed information:
     or to join us on #PerfKitBenchmarker on freenode to discuss issues you're
     having, pull requests, or anything else related to PerfKitBenchmarker
 
-# Known Issues
-
 # Licensing
 
 PerfKit Benchmarker provides wrappers and workload definitions around popular
@@ -120,7 +118,7 @@ with the following steps:
 PerfKit Benchmarker will use the tar file if it is present. Otherwise, it will
 search for the iso and cfg files.
 
-# Installing PerfKit Benchmarker and Prerequisites
+# Installation and Setup
 
 Before you can run the PerfKit Benchmarker, you need account(s) on the cloud
 provider(s) you want to benchmark:
@@ -137,46 +135,45 @@ You also need the software dependencies, which are mostly command line tools and
 credentials to access your accounts without a password. The following steps
 should help you get the CLI tool auth in place.
 
-If you are running on Windows, you will need to install GitHub Windows since it
-includes tools like `openssl` and an `ssh` client. Alternatively, you can
-install Cygwin since it should include the same tools.
+## Python 3
 
-## Install Python 2.7 and `pip`
+The recommended way to install and run PKB is in a virtualenv with the latest
+version of Python 3. Most Linux distributions and recent Mac OS X versions
+already have Python 3 installed at `/usr/bin/python3`.
 
-If you are running on Windows, get the latest version of Python 2.7
-[here](https://www.python.org/downloads/windows/). This should have `pip`
-bundled with it. Make sure your `PATH` environment variable is set so that you
-can use both `python` and `pip` on the command line (you can have the installer
-do it for you if you select the correct option).
-
-Most Linux distributions and recent Mac OS X versions already have Python 2.7
-installed. If Python is not installed, you can likely install it using your
-distribution's package manager, or see the
+If Python is not installed, you can likely install it using your distribution's
+package manager, or see the
 [Python Download page](https://www.python.org/downloads/).
 
-If you need to install `pip`, see
-[these instructions](http://pip.readthedocs.org/en/stable/installing/).
+```bash
+python3 -m venv
+$HOME/my_virtualenv source $HOME/my_virtualenv/bin/activate
+```
 
-## (*Windows Only*) Install GitHub Windows
+## Install PerfKit Benchmarker
 
-Instructions: https://windows.github.com/
-
-Make sure that `openssl`/`ssh`/`scp`/`ssh-keygen` are on your path (you will
-need to update the `PATH` environment variable). The path to these commands
-should be
-
-`C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
-
-## Install PerfKit
-
-[Download PerfKit Benchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases)
-from GitHub.
-
-## Install PerfKit Benchmarker dependencies
+Download the latest PerfKit Benchmarker release from
+[GitHub](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases). You
+can also clone the working version with:
 
 ```bash
-$ cd /path/to/PerfKitBenchmarker
-$ sudo pip install -r requirements.txt
+$ cd $HOME
+$ git clone https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git
+```
+
+Install Python library dependencies:
+
+```bash
+$ pip install -r $HOME/PerfKitBenchmarker/requirements.txt
+```
+
+You may need to install additional dependencies depending on the cloud provider
+you are using. For example, for
+[AWS](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/providers/aws/requirements.txt):
+
+```bash
+$ cd $HOME/PerfKitBenchmarker/perfkitbenchmarker/providers/aws
+$ pip install -r requirements.txt
 ```
 
 ## Preprovisioned data
@@ -185,10 +182,6 @@ Some benchmarks may require data to be preprovisioned in a cloud. To
 preprovision data, you will need to obtain the data and then upload it to that
 cloud. See more information below about which benchmarks require preprovisioned
 data and how to upload it to different clouds.
-
-Note. Before we start to switch over to preprovisioned data, we should support a
-fallback strategy of downloading files to the data/ directory on the machine
-used to run PerfKitBenchmarker (as is done today for CoreMark and SPEC CPU2006).
 
 ## Cloud account setup
 
@@ -215,20 +208,11 @@ to use an object storage benchmark, in which case you need to
 
 ### Install `gcloud` and setup authentication
 
-Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or
-Linux, you can run the command below:
-
-```bash
-$ curl https://sdk.cloud.google.com | bash
-```
-
-When prompted, pick the local folder, then Python project, then the defaults for
-all the rest.
+Follow the instructions at: https://developers.google.com/cloud/sdk/. When
+prompted, pick the local folder, then Python project, then the defaults for all
+the rest.
 
 Restart your shell window (or logout/ssh again if running on a VM)
-
-On Windows, visit the same page and follow the Windows installation instructions
-on the page.
 
 Next, create a project by visiting
 [Google Cloud Console](https://console.developers.google.com). After that, run:
@@ -255,7 +239,7 @@ Make sure you have installed pip (see the section above).
 Install OpenStack CLI utilities via the following command:
 
 ```bash
-$ sudo pip install -r perfkitbenchmarker/providers/openstack/requirements.txt
+$ pip install -r perfkitbenchmarker/providers/openstack/requirements.txt
 ```
 
 To setup credentials and endpoint information simply set the environment
@@ -402,7 +386,7 @@ are not, edit the `/etc/hosts` file appropriately.
 ### Cloudstack: Install dependencies and set the API keys
 
 ```bash
-$ sudo pip install -r perfkitbenchmarker/providers/cloudstack/requirements.txt
+$ pip install -r perfkitbenchmarker/providers/cloudstack/requirements.txt
 ```
 
 Get the API key and SECRET from Cloudstack. Set the following environement
@@ -429,7 +413,7 @@ Follow instructions at http://aws.amazon.com/cli/ or run the following command
 (omit the 'sudo' on Windows)
 
 ```bash
-$ sudo pip install -r perfkitbenchmarker/providers/aws/requirements.txt
+$ pip install -r perfkitbenchmarker/providers/aws/requirements.txt
 ```
 
 Navigate to the AWS console to create access credentials:
@@ -534,7 +518,8 @@ the flavor is supported in the region.
 Get started by running:
 
 ```bash
-$ sudo pip install -r perfkitbenchmarker/providers/profitbricks/requirements.txt
+$ pip install -r
+perfkitbenchmarker/providers/profitbricks/requirements.txt
 ```
 
 PerfKit Benchmarker uses the
@@ -1106,7 +1091,7 @@ PerfKit data can optionally be published to an Elasticsearch server. To enable
 this, the `elasticsearch` Python package must be installed.
 
 ```bash
-$ sudo pip install elasticsearch
+$ pip install elasticsearch
 ```
 
 Note: The `elasticsearch` Python library and Elasticsearch must have matching
