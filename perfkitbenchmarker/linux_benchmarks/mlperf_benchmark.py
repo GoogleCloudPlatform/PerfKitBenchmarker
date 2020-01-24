@@ -65,6 +65,10 @@ flags.DEFINE_string('gnmt_data_dir',
                     'Directory where the nv v0.6 WMT dataset is stored')
 flags.DEFINE_string('coco2017_data_dir', 'gs://pkb-sgpyc-europe-west4/coco2017',
                     'Directory where the coco2017 dataset is stored')
+flags.DEFINE_string('minigo_model_dir', None,
+                    'Directory on GCS to copy minigo source data from. Files '
+                    'will be copied from subdirectories of src_dir '
+                    'corresponding to the board size.')
 
 
 def GetConfig(user_config):
@@ -270,7 +274,9 @@ def Prepare(benchmark_spec, vm=None):
     if 'minigo' in benchmark_spec.benchmark:
       vm.RemoteCommand(
           'cd training_results_v0.6/NVIDIA/benchmarks/minigo/implementations/tensorflow && '
-          'sudo docker build --pull --network=host -t mlperf-nvidia:minigo .',
+          'sed -i "s/get_data.py/get_data.py --src_dir={}/g" ./run_and_time.sh && '
+          'sudo docker build --pull --network=host -t mlperf-nvidia:minigo .'
+          ''.format(FLAGS.minigo_model_dir.replace('/', r'\/')),
           should_log=True)
 
     if 'mask' in benchmark_spec.benchmark:
