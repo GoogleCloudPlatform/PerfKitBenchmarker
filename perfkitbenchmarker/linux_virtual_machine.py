@@ -166,12 +166,12 @@ flags.DEFINE_integer(
 
 flags.DEFINE_integer(
     'rmem_max', None,
-    'Sets the max OS receive buffer size for all types of connections')
+    'Sets the max OS receive buffer size in bytes for all types of '
+    'connections')
 
 flags.DEFINE_integer(
     'wmem_max', None,
-    'Sets the max OS send buffer size for all types of connections')
-
+    'Sets the max OS send buffer size in bytes for all types of connections')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
