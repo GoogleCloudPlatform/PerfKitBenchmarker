@@ -120,6 +120,8 @@ X86 = 'x86_64'
 # These are the project numbers of projects owning common images.
 # Some numbers have corresponding owner aliases, but they are not used here.
 AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
+# https://coreos.com/os/docs/latest/booting-on-ec2.html
+COREOS_IMAGE_PROJECT = '595879546273'
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
 # TODO(pclay): replace with Marketplace AMI when available
 DEBIAN_IMAGE_PROJECT = '136693071363'
@@ -1008,7 +1010,7 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.CoreOsMixin):
   IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
-  # Note AMIs can also be found distributed by CoreOS in 595879546273
+  IMAGE_OWNER = COREOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'core'
 
 
