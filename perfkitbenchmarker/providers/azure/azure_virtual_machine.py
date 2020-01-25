@@ -846,7 +846,7 @@ class VersionlessWindowsAzureVirtualMachine(
 # Rather than exclude this just allow 2012 to refer to the 2012 Base image.
 class Windows2012CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.VersionlessWindowsMixin):
+    windows_virtual_machine.Windows2012CoreMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
