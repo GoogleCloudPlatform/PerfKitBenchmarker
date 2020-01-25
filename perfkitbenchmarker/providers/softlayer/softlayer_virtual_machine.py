@@ -362,7 +362,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Get List of Records related to Zone
     dnsreclist_cmd = util.SoftLayer_PREFIX + ['dns',
                                               'record-list',
-                                               domainid.replace('\n', '')]
+                                               domainid.replace('\n','')]
 
     stdout, _, _ = vm_util.IssueCommand(dnsreclist_cmd)
 
@@ -375,7 +375,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     dnsrecdel_cmd = util.SoftLayer_PREFIX + ['-y',
                                              'dns',
                                              'record-remove',
-                                              recordid.replace('\n', '')]
+                                              recordid.replace('\n','')]
 
     vm_util.IssueCommand(dnsrecdel_cmd)
 # CPOMRS
