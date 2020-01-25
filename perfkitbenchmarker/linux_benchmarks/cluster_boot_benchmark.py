@@ -43,6 +43,10 @@ cluster_boot:
           boot_disk_type: pd-ssd
         Kubernetes:
           image: null
+        SoftLayer:
+          machine_type: '{"cpus": 2, "memory": 8192, "os": "UBUNTU_16_64", "nic": 1000}'
+          zone: wdc01
+          image: null
       vm_count: null
 """
 
