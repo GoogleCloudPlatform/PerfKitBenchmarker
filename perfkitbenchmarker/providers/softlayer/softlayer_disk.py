@@ -29,7 +29,7 @@ DISK_METADATA = {
     LOCAL: {
         disk.MEDIA: disk.HDD,
         disk.REPLICATION: disk.ZONE,
-#        disk.LEGACY_DISK_TYPE: disk.STANDARD
+        # disk.LEGACY_DISK_TYPE: disk.STANDARD
         disk.STANDARD: disk.STANDARD
     }
 }

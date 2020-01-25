@@ -143,24 +143,25 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     util.AddDefaultTags(self.id, self.zone)
     if(domain != util.defaultDomain):
-      #CPOVRB insert name into NS and wait 30 seconds to ensure activation of name
+      # CPOVRB insert name into NS and wait 30 seconds to ensure activation of name
       logging.info("reached DNS insert Point for IP: %s." % (self.ip_address))
-      dnsbld_cmd  =  util.SoftLayer_PREFIX + [
+
+      dnsbld_cmd = util.SoftLayer_PREFIX + [
         'dns',
         'record-add',
-        '%s'  % domain,
-        '%s'  % self.hostname,
+        '%s' % domain,
+        '%s' % self.hostname,
         'A',
-        '%s'  % self.ip_address]
+        '%s' % self.ip_address]
+
       logging.info(dnsbld_cmd)
       stdout, _, _ = vm_util.IssueCommand(dnsbld_cmd)
-      #CPOVRB
-      #CPOMRS Check to see if DNS addition is working
-      #DNS should not be used unless needed as it will cause an aditional 15minutes loadtime.
-      dnsgood = False;
+      # CPOVRB
+      # CPOMRS Check to see if DNS addition is working
+      # DNS should not be used unless needed as it will cause an aditional 15minutes loadtime.
+      dnsgood = False
       while(not dnsgood):
-        hostcmd = ['host',
-          self.hostname + '.' + domain]
+        hostcmd = ['host', self.hostname + '.' + domain]
         stdin, _, _ = vm_util.IssueCommand(hostcmd)
         if "NXDOMAIN" not in stdin:
           logging.info('DNS working')
@@ -168,7 +169,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         else:
           logging.info('DNS failed retrying in 60 seconds')
           sleep(60)
-      #CPOMRS
+      # CPOMRS
 
     # CPOMRS - Delete 127.0.1.1 hosts entry
     self.RemoteCommand('sed -i \'/127.0.1.1/d\' /etc/hosts')
@@ -265,7 +266,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         public_vlan_id = vm_attributes['public_vlan_id']
 
       if 'domain' in vm_attributes:
-        domain  = vm_attributes['domain']
+        domain = vm_attributes['domain']
       else:
         domain = util.defaultDomain
 
@@ -331,7 +332,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         'vs',
         'list',
         '--hostname',
-        '%s' % self.hostname,]
+        '%s' % self.hostname, ]
 
     stdout, _, _ = vm_util.IssueCommand(list_id_cmd)
     response = json.loads(stdout)
@@ -340,45 +341,45 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 # CPOMRS
   def UnregisterDNS(self):
     """Unregister Hostname from DNS"""
-    #Get Domain name
+    # Get Domain name
     vm_attributes = json.loads(self.machine_type)
 
     if 'domain' in vm_attributes:
-      domain  = vm_attributes['domain']
+      domain = vm_attributes['domain']
     else:
       return
 
-    #Get list of Zones
+    # Get list of Zones
     dnszone_cmd = util.SoftLayer_PREFIX + [
       'dns',
       'zone-list']
 
     stdout, _, _ = vm_util.IssueCommand(dnszone_cmd)
 
-    #Strip out Zone ID based on Zone name
+    # Strip out Zone ID based on Zone name
     for line in stdout.splitlines():
       if domain in line:
         domainid = line.split(' ', 1)[0]
 
-    #Get List of Records related to Zone
+    # Get List of Records related to Zone
     dnsreclist_cmd = util.SoftLayer_PREFIX + [
       'dns',
       'record-list',
-      domainid.replace('\n','')]
+      domainid.replace('\n', '')]
 
     stdout, _, _ = vm_util.IssueCommand(dnsreclist_cmd)
 
-    #Strip out Record ID based on Hostname
+    # Strip out Record ID based on Hostname
     for line in stdout.splitlines():
       if self.hostname in line:
         recordid = line.split(' ', 1)[0]
 
-    #Delete Record based on Record ID
+    # Delete Record based on Record ID
     dnsrecdel_cmd = util.SoftLayer_PREFIX + [
       '-y',
       'dns',
       'record-remove',
-      recordid.replace('\n','')]
+      recordid.replace('\n', '')]
 
     vm_util.IssueCommand(dnsrecdel_cmd)
 # CPOMRS
@@ -482,7 +483,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class Ubuntu1604BasedSoftLayerVirtualMachine(SoftLayerVirtualMachine,
-                                        linux_virtual_machine.Ubuntu1604Mixin):
+                                       linux_virtual_machine.Ubuntu1604Mixin):
   pass
 
 
