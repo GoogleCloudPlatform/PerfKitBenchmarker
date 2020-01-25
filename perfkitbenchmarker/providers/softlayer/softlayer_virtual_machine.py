@@ -349,9 +349,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
 
     # Get list of Zones
-    dnszone_cmd = util.SoftLayer_PREFIX + [
-      'dns',
-      'zone-list']
+    dnszone_cmd = util.SoftLayer_PREFIX + ['dns',
+                                           'zone-list']
 
     stdout, _, _ = vm_util.IssueCommand(dnszone_cmd)
 
@@ -361,10 +360,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         domainid = line.split(' ', 1)[0]
 
     # Get List of Records related to Zone
-    dnsreclist_cmd = util.SoftLayer_PREFIX + [
-      'dns',
-      'record-list',
-      domainid.replace('\n', '')]
+    dnsreclist_cmd = util.SoftLayer_PREFIX + ['dns',
+                                              'record-list',
+                                               domainid.replace('\n', '')]
 
     stdout, _, _ = vm_util.IssueCommand(dnsreclist_cmd)
 
@@ -374,11 +372,10 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         recordid = line.split(' ', 1)[0]
 
     # Delete Record based on Record ID
-    dnsrecdel_cmd = util.SoftLayer_PREFIX + [
-      '-y',
-      'dns',
-      'record-remove',
-      recordid.replace('\n', '')]
+    dnsrecdel_cmd = util.SoftLayer_PREFIX + ['-y',
+                                             'dns',
+                                             'record-remove',
+                                              recordid.replace('\n', '')]
 
     vm_util.IssueCommand(dnsrecdel_cmd)
 # CPOMRS
@@ -482,7 +479,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class Ubuntu1604BasedSoftLayerVirtualMachine(SoftLayerVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1604Mixin):
+                                             linux_virtual_machine.Ubuntu1604Mixin):
   pass
 
 
