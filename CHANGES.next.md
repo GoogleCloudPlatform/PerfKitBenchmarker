@@ -16,6 +16,8 @@
 
 ### Enhancements:
 
+-   Update Specsfs2014 to use the SP2 update rather than SP1.
+
 ### Bug fixes and maintenance updates:
 
 -   AWSBaseVirtualMachine subclasses require IMAGE_OWNER and IMAGE_NAME_FILTER.
