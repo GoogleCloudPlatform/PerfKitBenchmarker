@@ -147,12 +147,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info("reached DNS insert Point for IP: %s." % (self.ip_address))
 
       dnsbld_cmd = util.SoftLayer_PREFIX + [
-        'dns',
-        'record-add',
-        '%s' % domain,
-        '%s' % self.hostname,
-        'A',
-        '%s' % self.ip_address]
+                                            'dns',
+                                            'record-add',
+                                            '%s' % domain,
+                                            '%s' % self.hostname,
+                                            'A',
+                                            '%s' % self.ip_address]
 
       logging.info(dnsbld_cmd)
       stdout, _, _ = vm_util.IssueCommand(dnsbld_cmd)
