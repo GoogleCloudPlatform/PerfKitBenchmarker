@@ -146,8 +146,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
       # CPOVRB insert name into NS and wait 30 seconds to ensure activation of name
       logging.info("reached DNS insert Point for IP: %s." % (self.ip_address))
 
-      dnsbld_cmd = util.SoftLayer_PREFIX + [
-                                            'dns',
+      dnsbld_cmd = util.SoftLayer_PREFIX + ['dns',
                                             'record-add',
                                             '%s' % domain,
                                             '%s' % self.hostname,
