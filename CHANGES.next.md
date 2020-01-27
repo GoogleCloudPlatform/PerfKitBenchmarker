@@ -24,3 +24,4 @@
     Fixes issue where some windows 2012 AMIs were selected from the wrong
     project.
 -   Cassandra build uses HTTPS maven repository instead of HTTP
+-   Retry `yum install` commands to bypass transient issues.
