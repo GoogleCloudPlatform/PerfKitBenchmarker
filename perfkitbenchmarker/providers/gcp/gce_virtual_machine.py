@@ -62,6 +62,7 @@ FLAGS = flags.FLAGS
 
 NVME = 'NVME'
 SCSI = 'SCSI'
+RHEL_IMAGE = 'rhel-7'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
@@ -806,26 +807,13 @@ class Debian10BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Debian10Mixin):
 
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
-  """GCE RHEL 7 based VM."""
-  DEFAULT_IMAGE = 'rhel-7'
+  DEFAULT_IMAGE = RHEL_IMAGE
 
   def __init__(self, vm_spec):
     super(RhelBasedGceVirtualMachine, self).__init__(vm_spec)
     self.python_package_config = 'python'
     self.python_dev_package_config = 'python-devel'
     self.python_pip_package_config = 'python2-pip'
-
-  @vm_util.Retry()
-  def WaitForRhelCds(self):
-    # RHEL on GCP has an occasional race condition with its Content Delivery
-    # Service.
-    self.RemoteCommand('sudo curl --cacert /etc/pki/rhui/ca.crt '
-                       'https://cds.rhel.updates.googlecloud.com')
-
-  def PrepareVMEnvironment(self):
-    # Wait for CDS first to ensure yum installs work.
-    self.WaitForRhelCds()
-    super(RhelBasedGceVirtualMachine, self).PrepareVMEnvironment()
 
 
 class Centos7BasedGceVirtualMachine(GceVirtualMachine,

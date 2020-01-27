@@ -1289,10 +1289,14 @@ class RhelMixin(BaseLinuxMixin):
     return self.TryRemoteCommand('sudo yum info %s' % package,
                                  suppress_warning=True)
 
+  # yum talks to the network on each request so transient issues may fix
+  # themselves on retry
+  @vm_util.Retry()
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""
     self.RemoteCommand('sudo yum install -y %s' % packages)
 
+  @vm_util.Retry()
   def InstallPackageGroup(self, package_group):
     """Installs a 'package group' using the yum package manager."""
     self.RemoteCommand('sudo yum groupinstall -y "%s"' % package_group)
