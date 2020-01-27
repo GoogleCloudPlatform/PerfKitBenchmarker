@@ -95,9 +95,13 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     # them all.
     self.EmptyBucket(bucket)
 
-    vm_util.IssueCommand(
-        ['gsutil', 'rb',
-         'gs://%s' % bucket])
+    def _bucket_not_found(stdout, stderr, retcode):
+      del stdout  # unused
+
+      return retcode and 'BucketNotFoundException' in stderr
+
+    vm_util.IssueCommand(['gsutil', 'rb', 'gs://%s' % bucket],
+                         suppress_failure=_bucket_not_found)
 
   def EmptyBucket(self, bucket):
     # Ignore failures here and retry in DeleteBucket.  See more comments there.
