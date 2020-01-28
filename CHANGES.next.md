@@ -15,6 +15,10 @@
 
 - Add infiniband support in nccl benchmark.
 - Added AwsVpcS3Endpoint for VPC connectivity to S3.
+- Add `--tcp_max_receive_buffer` flag to set net.ipv4.tcp_rmem sysctl value
+- Add `--tcp_max_send_buffer` flag to set net.ipv4.tcp_wmem sysctl value
+- Add `--rmem_max` flag to set net.core.rmem_max sysctl value
+- Add `--wmem_max` flag to set net.core.wmem_max sysctl value
 - Add `--os_type=debian9` support for AWS and Azure Providers.
 - Add `--os_type=debian10` support for GCP, AWS and Azure Providers.
 - Add function to tune NCCL parameters.

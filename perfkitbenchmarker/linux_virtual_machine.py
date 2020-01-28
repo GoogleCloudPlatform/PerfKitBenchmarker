@@ -154,24 +154,27 @@ flags.DEFINE_string(
 
 flags.DEFINE_integer(
     'tcp_max_receive_buffer', None,
-    'The maximum receive buffer for TCP socket connections in bytes. '
+    'Changes the third component of the sysctl value net.ipv4.tcp_rmem. '
+    'This sets the maximum receive buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
 
 flags.DEFINE_integer(
     'tcp_max_send_buffer', None,
-    'The maximum send buffer for TCP socket connections in bytes. '
+    'Changes the third component of the sysctl value net.ipv4.tcp_wmem. '
+    'This sets the maximum send buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
 
 flags.DEFINE_integer(
     'rmem_max', None,
-    'Sets the max OS receive buffer size in bytes for all types of '
-    'connections')
+    'Sets the sysctl value net.core.rmem_max. This sets the max OS '
+    'receive buffer size in bytes for all types of connections')
 
 flags.DEFINE_integer(
     'wmem_max', None,
-    'Sets the max OS send buffer size in bytes for all types of connections')
+    'Sets the sysctl value net.core.wmem_max. This sets the max OS '
+    'send buffer size in bytes for all types of connections')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
