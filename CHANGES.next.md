@@ -25,3 +25,4 @@
     project.
 -   Cassandra build uses HTTPS maven repository instead of HTTP
 -   Retry `yum install` commands to bypass transient issues.
+-   Azure defaults to no placement group created.
