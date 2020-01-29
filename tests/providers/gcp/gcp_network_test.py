@@ -26,8 +26,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
-from six.moves import builtins
 from tests import pkb_common_test_case
+from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
