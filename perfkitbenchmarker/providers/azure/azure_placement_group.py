@@ -56,7 +56,7 @@ class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
         'resource_group': (option_decoders.StringDecoder, {'none_ok': False}),
         'placement_group_style': (option_decoders.EnumDecoder, {
             'valid_values': placement_group.PLACEMENT_GROUP_OPTIONS,
-            'default': placement_group.PLACEMENT_GROUP_DEFAULT
+            'default': placement_group.PLACEMENT_GROUP_NONE,
         })
     })
     return result
