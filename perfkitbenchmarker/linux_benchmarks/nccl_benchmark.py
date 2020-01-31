@@ -13,6 +13,7 @@
 # limitations under the License.
 """Run NCCL benchmarks."""
 
+import collections
 import re
 import time
 import numpy as np
@@ -26,7 +27,7 @@ flags.DEFINE_integer('nccl_slots', 8,
                      'Launch n processes per node on all allocated nodes')
 flags.DEFINE_string('nccl_cuda_visible_devices', None, 'GPU identifiers are '
                     'given as integer indices or as UUID strings.')
-flags.DEFINE_list('nccl_extra_params', None, 'Export an environment variable')
+flags.DEFINE_list('nccl_extra_params', [], 'Export an environment variable')
 flags.DEFINE_string('nccl_minbytes', '8', 'Minimum size to start with')
 flags.DEFINE_string('nccl_maxbytes', '256M', 'Maximum size to start with')
 flags.DEFINE_integer('nccl_stepfactor', 2,
@@ -106,6 +107,8 @@ _RUN_CMD = ('{mpi} '
             '--check {check} '
             '--nthreads {nthreads} '
             '--iters {iters}')
+
+_DEFAULT = 'DEFAULT'
 
 _METADATA_COLUMNS = ('size', 'count', 'nccl_type', 'redop', 'out_of_place_time',
                      'out_of_place_algbw', 'out_of_place_busbw',
@@ -202,10 +205,6 @@ def _CreateMetadataDict():
               'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices}
   if FLAGS.nccl_install_mofed:
     metadata['mofed_version'] = FLAGS.mofed_version
-  if FLAGS.nccl_extra_params:
-    for extra_param in FLAGS.nccl_extra_params:
-      param_key, param_value = extra_param.split('=', 1)
-      metadata[param_key] = param_value
   return metadata
 
 
@@ -261,6 +260,39 @@ def MakeSamplesFromOutput(metadata, output):
   return samples, max_out_of_place_algbw
 
 
+def _TuningPatameters(params):
+  """Get all NCCL tuning parameters combination.
+
+  For example:
+  params = [
+      ('NCCL_NSOCKS_PERTHREAD', ['DEFAULT', '2']),
+      ('NCCL_SOCKET_NTHREADS', ['DEFAULT', '8']),
+  ]
+
+  result = [
+      [],
+      [('NCCL_NSOCKS_PERTHREAD', '2')],
+      [('NCCL_SOCKET_NTHREADS', '8')],
+      [('NCCL_NSOCKS_PERTHREAD', '2'), ('NCCL_SOCKET_NTHREADS', '8')],
+  ]
+
+  Args:
+    params: list of (parameter name and a list of parameter value)
+
+  Returns:
+    a list of all NCCL tuning patameters combination.
+  """
+  if not params:
+    return [[]]
+  param_key, param_value_list = params.pop()
+  result = []
+  for param in _TuningPatameters(params):
+    for param_value in param_value_list:
+      param_args = [] if param_value == _DEFAULT else [(param_key, param_value)]
+      result.append(param + param_args)
+  return result
+
+
 def Run(benchmark_spec):
   """Run NCCL on the cluster.
 
@@ -274,46 +306,57 @@ def Run(benchmark_spec):
   master = benchmark_spec.vms[0]
   env = []
   if FLAGS.nccl_cuda_visible_devices:
-    env.append('CUDA_VISIBLE_DEVICES={}'.format(
-        FLAGS.nccl_cuda_visible_devices))
-  if FLAGS.nccl_extra_params:
-    for extra_param in FLAGS.nccl_extra_params:
-      env.append('{}'.format(extra_param))
-
-  cmd = _RUN_CMD.format(mpi=FLAGS.nccl_mpi,
-                        hostfile=_HOSTFILE,
-                        slots=FLAGS.nccl_slots,
-                        env=' '.join(['-x {}'.format(x) for x in env]),
-                        minbytes=FLAGS.nccl_minbytes,
-                        maxbytes=FLAGS.nccl_maxbytes,
-                        stepfactor=FLAGS.nccl_stepfactor,
-                        ngpus=FLAGS.nccl_ngpus,
-                        check=int(FLAGS.nccl_check),
-                        nthreads=FLAGS.nccl_nthreads,
-                        iters=FLAGS.nccl_iters)
+    env.append(('CUDA_VISIBLE_DEVICES', FLAGS.nccl_cuda_visible_devices))
+  extra_params = collections.defaultdict(list)
   metadata = _CreateMetadataDict()
   sample_results = []
-  max_out_of_place_algbw_results = []
+  for extra_param in FLAGS.nccl_extra_params:
+    param_key, param_value = extra_param.split('=', 1)
+    extra_params[param_key].append(param_value)
 
-  for iteration in range(FLAGS.nccl_num_runs):
-    metadata['run_iteration'] = iteration
-    stdout, _ = master.RobustRemoteCommand(cmd)
-    samples, max_out_of_place_algbw = MakeSamplesFromOutput(metadata, stdout)
-    sample_results.extend(samples)
-    max_out_of_place_algbw_results.append(max_out_of_place_algbw)
-    time.sleep(FLAGS.nccl_seconds_between_runs)
-  metadata['run_iteration'] = -1
-  avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
-  sample_results.append(
-      sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s', metadata))
-  sample_results.append(
-      sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s', metadata))
-  sample_results.append(
-      sample.Sample('max_out_of_place_algbw_mean',
-                    np.mean(max_out_of_place_algbw_results), 'Gbps', metadata))
-  sample_results.append(
-      sample.Sample('max_out_of_place_algbw_std',
-                    np.std(max_out_of_place_algbw_results), 'Gbps', metadata))
+  for extra_param in _TuningPatameters(list(extra_params.items())):
+    metadata_copy = metadata.copy()
+    for param_key, param_value in extra_param:
+      metadata_copy[param_key] = param_value
+    cmd = _RUN_CMD.format(mpi=FLAGS.nccl_mpi,
+                          hostfile=_HOSTFILE,
+                          slots=FLAGS.nccl_slots,
+                          env=' '.join(
+                              '-x {key}={value}'.format(key=key, value=value)
+                              for key, value in env + extra_param),
+                          minbytes=FLAGS.nccl_minbytes,
+                          maxbytes=FLAGS.nccl_maxbytes,
+                          stepfactor=FLAGS.nccl_stepfactor,
+                          ngpus=FLAGS.nccl_ngpus,
+                          check=int(FLAGS.nccl_check),
+                          nthreads=FLAGS.nccl_nthreads,
+                          iters=FLAGS.nccl_iters)
+    max_out_of_place_algbw_results = []
+
+    for iteration in range(FLAGS.nccl_num_runs):
+      metadata_copy['run_iteration'] = iteration
+      stdout, _ = master.RobustRemoteCommand(cmd)
+      samples, max_out_of_place_algbw = MakeSamplesFromOutput(metadata_copy,
+                                                              stdout)
+      sample_results.extend(samples)
+      max_out_of_place_algbw_results.append(max_out_of_place_algbw)
+      time.sleep(FLAGS.nccl_seconds_between_runs)
+    metadata_copy.pop('run_iteration')
+    avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
+    sample_results.append(
+        sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s',
+                      metadata_copy))
+    sample_results.append(
+        sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s',
+                      metadata_copy))
+    sample_results.append(
+        sample.Sample('max_out_of_place_algbw_mean',
+                      np.mean(max_out_of_place_algbw_results), 'Gbps',
+                      metadata_copy))
+    sample_results.append(
+        sample.Sample('max_out_of_place_algbw_std',
+                      np.std(max_out_of_place_algbw_results), 'Gbps',
+                      metadata_copy))
   return sample_results
 
 
