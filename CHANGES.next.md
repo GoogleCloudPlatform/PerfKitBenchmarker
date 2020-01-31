@@ -9,10 +9,12 @@
       `windows2012`.
 
 ### New features:
+
 - Add infiniband support in nccl benchmark.
 - Added AwsVpcS3Endpoint for VPC connectivity to S3.
 - Add `--os_type=debian-9` support for AWS and Azure Providers.
 - Add `--os_type=debian-10` support for GCP, AWS and Azure Providers.
+- Add function to tune NCCL parameters.
 
 ### Enhancements:
 
