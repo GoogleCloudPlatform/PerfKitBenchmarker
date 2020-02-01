@@ -160,6 +160,6 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
       self._CreateScratchDiskFromDisks(disk_spec, disks)
 
 
-class RhelBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,
-                                          linux_virtual_machine.RhelMixin):
+class VerionlessRhelBasedDigitalOceanVirtualMachine(
+    DigitalOceanVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
   pass

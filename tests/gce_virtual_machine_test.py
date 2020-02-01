@@ -289,6 +289,36 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
+  def testCreateUbuntuInCustomProject(self):
+    """Test simulating passing --image and --image_project."""
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
+    fake_image = 'fake-ubuntu1604'
+    fake_image_project = 'fake-project'
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                         machine_type='fake-machine-type',
+                                         image=fake_image,
+                                         image_project=fake_image_project)
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
+      vm = vm_class(spec)
+      vm._Create()
+      vm.created = True
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn(
+          '--image fake-ubuntu1604 --image-project fake-project',
+          command_string)
+      self.assertNotIn('--image-family', command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 2)
+      vm_metadata = vm.GetResourceMetadata()
+      self.assertDictContainsSubset({'image': fake_image,
+                                     'image_project': 'fake-project'},
+                                    vm_metadata)
+      self.assertNotIn('image_family', vm_metadata)
+
   def testCreateUbuntu1804(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
@@ -311,8 +341,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
-  def testCreateRhelCustomImage(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.RHEL)
+  def testCreateRhel7CustomImage(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.RHEL7)
     fake_image = 'fake-custom-rhel-image'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -325,24 +355,22 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
-      self.assertIn(
-          '--image ' + fake_image,
-          command_string)
+      self.assertIn('--image ' + fake_image, command_string)
+      self.assertIn('--image-project rhel-cloud', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 2)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset({'image': fake_image}, vm_metadata)
+      self.assertDictContainsSubset({'image': fake_image,
+                                     'image_project': 'rhel-cloud'},
+                                    vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
-      self.assertNotIn('image_project', vm_metadata)
 
   def testCreateCentos7CustomImage(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.CENTOS7)
     fake_image = 'fake-custom-centos7-image'
-    fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
-                                         image=fake_image,
-                                         image_project=fake_image_project)
+                                         image=fake_image)
     with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
       vm = vm_class(spec)
       vm._Create()
@@ -352,12 +380,12 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn('--image ' + fake_image, command_string)
-      self.assertIn('--image-project ' + fake_image_project, command_string)
+      self.assertIn('--image-project centos-cloud', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 2)
       vm_metadata = vm.GetResourceMetadata()
       self.assertDictContainsSubset({'image': fake_image,
-                                     'image_project': fake_image_project},
+                                     'image_project': 'centos-cloud'},
                                     vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
 

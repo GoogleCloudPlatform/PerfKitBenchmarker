@@ -779,15 +779,20 @@ class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
 
 
-class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
-                                   linux_virtual_machine.RhelMixin):
+class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
+                                    linux_virtual_machine.Rhel7Mixin):
   IMAGE_URN = 'RedHat:RHEL:7.4:latest'
 
   def __init__(self, vm_spec):
-    super(RhelBasedAzureVirtualMachine, self).__init__(vm_spec)
+    super(Rhel7BasedAzureVirtualMachine, self).__init__(vm_spec)
     self.python_package_config = 'python'
     self.python_dev_package_config = 'python-devel'
     self.python_pip_package_config = 'python2-pip'
+
+
+class VersionlessRhelBasedAzureVirutalMachine(
+    linux_virtual_machine.VersionlessRhelMixin, Rhel7BasedAzureVirtualMachine):
+  pass
 
 
 class CentosBasedAzureVirtualMachine(AzureVirtualMachine,

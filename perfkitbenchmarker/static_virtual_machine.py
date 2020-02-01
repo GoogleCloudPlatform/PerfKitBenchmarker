@@ -308,8 +308,13 @@ class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
-class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
-                                    linux_virtual_machine.RhelMixin):
+class VersionlessRhelBasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
+  pass
+
+
+class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
+                                     linux_virtual_machine.Rhel7Mixin):
   pass
 
 

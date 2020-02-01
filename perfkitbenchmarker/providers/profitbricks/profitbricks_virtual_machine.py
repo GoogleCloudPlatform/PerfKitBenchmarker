@@ -381,6 +381,6 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                   disk_spec))
 
 
-class RhelBasedProfitBricksVirtualMachine(ProfitBricksVirtualMachine,
-                                          linux_virtual_machine.RhelMixin):
+class VersionlessRhelBasedProfitBricksVirtualMachine(
+    ProfitBricksVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
     pass
