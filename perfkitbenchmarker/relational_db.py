@@ -90,6 +90,16 @@ POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 AURORA_MYSQL = 'aurora-mysql'
 AURORA_MYSQL56 = 'aurora'
+SQLSERVER = 'sqlserver'
+
+ALL_ENGINES = [
+    MYSQL,
+    POSTGRES,
+    AURORA_POSTGRES,
+    AURORA_MYSQL,
+    AURORA_MYSQL56,
+    SQLSERVER
+]
 
 FLAGS = flags.FLAGS
 
