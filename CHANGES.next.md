@@ -18,6 +18,7 @@
 - Add `--os_type=debian9` support for AWS and Azure Providers.
 - Add `--os_type=debian10` support for GCP, AWS and Azure Providers.
 - Add function to tune NCCL parameters.
+- Add Coremark demo scripts at PerfKitBenchmarker/tools/demos/coremark.
 
 ### Enhancements:
 
