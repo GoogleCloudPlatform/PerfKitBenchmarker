@@ -40,8 +40,6 @@ from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 from six.moves import range
 
-RHEL_IMAGE = 'rhel-7.2'
-CENTOS_IMAGE = 'centos7'
 NONE = 'None'
 
 VALIDATION_ERROR_MESSAGE = '{0} {1} could not be found.'
@@ -394,20 +392,26 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
 
-class RhelBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                       linux_virtual_machine.RhelMixin):
-  DEFAULT_IMAGE = RHEL_IMAGE
+class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                        linux_virtual_machine.Rhel7Mixin):
+  DEFAULT_IMAGE = 'rhel-7.2'
 
   def __init__(self, vm_spec):
-    super(RhelBasedOpenStackVirtualMachine, self).__init__(vm_spec)
+    super(Rhel7BasedOpenStackVirtualMachine, self).__init__(vm_spec)
     self.python_package_config = 'python'
     self.python_dev_package_config = 'python-devel'
     self.python_pip_package_config = 'python2-pip'
 
 
+class VersionlessRhel7BasedOpenStackVirtualMachine(
+    linux_virtual_machine.VersionlessRhelMixin,
+    Rhel7BasedOpenStackVirtualMachine):
+  pass
+
+
 class Centos7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                           linux_virtual_machine.Centos7Mixin):
-  DEFAULT_IMAGE = CENTOS_IMAGE
+  DEFAULT_IMAGE = 'centos7'
 
   def __init__(self, vm_spec):
     super(Centos7BasedOpenStackVirtualMachine, self).__init__(vm_spec)

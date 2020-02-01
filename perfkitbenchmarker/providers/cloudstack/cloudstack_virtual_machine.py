@@ -33,8 +33,6 @@ from perfkitbenchmarker.providers.cloudstack import util
 from perfkitbenchmarker import providers
 from six.moves import range
 
-RHEL_IMAGE = 'CentOS 7 HVM base (64bit)'
-
 FLAGS = flags.FLAGS
 
 
@@ -207,6 +205,11 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, self.disks)
 
 
-class RhelBasedCloudStackVirtualMachine(CloudStackVirtualMachine,
-                                        linux_vm.RhelMixin):
-  DEFAULT_IMAGE = RHEL_IMAGE
+class Centos7BasedCloudStackVirtualMachine(CloudStackVirtualMachine,
+                                           linux_vm.Centos7Mixin):
+  DEFAULT_IMAGE = 'CentOS 7 HVM base (64bit)'
+
+
+class VersionlessRhelBasedCloudStackVirtualMachine(
+    linux_vm.VersionlessRhelMixin, Centos7BasedCloudStackVirtualMachine):
+  ALTERNATIVE_OS = Centos7BasedCloudStackVirtualMachine.OS_TYPE

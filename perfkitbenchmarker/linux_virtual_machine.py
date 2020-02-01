@@ -1245,15 +1245,15 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
     raise NotImplementedError('Only use for cluster boot for now')
 
 
-class RhelMixin(BaseLinuxMixin):
-  """Class holding RHEL specific VM methods and attributes."""
+class BaseRhelMixin(BaseLinuxMixin):
+  """Class holding RHEL/CentOS specific VM methods and attributes."""
 
-  OS_TYPE = os_types.RHEL
+  # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    super(RhelMixin, self).OnStartup()
+    super(BaseRhelMixin, self).OnStartup()
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
@@ -1268,7 +1268,7 @@ class RhelMixin(BaseLinuxMixin):
     Performs the normal package cleanup, then deletes the file
     added to the /etc/sudoers.d directory during startup.
     """
-    super(RhelMixin, self).PackageCleanup()
+    super(BaseRhelMixin, self).PackageCleanup()
     self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
 
   def SnapshotPackages(self):
@@ -1346,7 +1346,7 @@ class RhelMixin(BaseLinuxMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(RhelMixin, self).SetupProxy()
+    super(BaseRhelMixin, self).SetupProxy()
     yum_proxy_file = '/etc/yum.conf'
 
     if FLAGS.http_proxy:
@@ -1364,13 +1364,30 @@ class RhelMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class AmazonLinux2Mixin(RhelMixin):
-  """Class holding Amazon Linux2 vm methods and attributes."""
+class AmazonLinux1Mixin(BaseRhelMixin):
+  """Class holding Amazon Linux 1 VM methods and attributes."""
+  OS_TYPE = os_types.AMAZONLINUX1
+
+
+class AmazonLinux2Mixin(BaseRhelMixin):
+  """Class holding Amazon Linux 2 VM methods and attributes."""
   OS_TYPE = os_types.AMAZONLINUX2
 
 
-class Centos7Mixin(RhelMixin):
-  """Class holding Centos 7 specific VM methods and attributes."""
+class VersionlessRhelMixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
+  """Class holding RHEL 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL
+  END_OF_LIFE = '2020-04-01'
+  ALTERNATIVE_OS = os_types.RHEL7
+
+
+class Rhel7Mixin(BaseRhelMixin):
+  """Class holding RHEL 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL7
+
+
+class Centos7Mixin(BaseRhelMixin):
+  """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
 
 

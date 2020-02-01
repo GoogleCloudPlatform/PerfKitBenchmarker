@@ -78,8 +78,6 @@ LSBLK_REGEX = (r'NAME="(.*)"\s+MODEL="(.*)"\s+SIZE="(.*)"'
                r'\s+TYPE="(.*)"\s+MOUNTPOINT="(.*)"\s+LABEL="(.*)"')
 LSBLK_PATTERN = re.compile(LSBLK_REGEX)
 
-RHEL_IMAGE = '92f8a8b8-6019-4c27-949b-cf9910b84ffb'
-
 INSTANCE_EXISTS_STATUSES = frozenset(
     ['BUILD', 'ACTIVE', 'PAUSED', 'SHUTOFF', 'ERROR'])
 INSTANCE_DELETED_STATUSES = frozenset(
@@ -525,6 +523,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
             blk_device['name'] not in self.allocated_disks)
 
 
-class RhelBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
-                                       linux_virtual_machine.RhelMixin):
-  DEFAULT_IMAGE = RHEL_IMAGE
+class Rhel7BasedRackspaceVirtualMachine(RackspaceVirtualMachine,
+                                        linux_virtual_machine.Rhel7Mixin):
+  DEFAULT_IMAGE = '92f8a8b8-6019-4c27-949b-cf9910b84ffb'
+
+
+class VersionlessRhelBasedRackspaceVirtualMachine(
+    linux_virtual_machine.VersionlessRhelMixin,
+    Rhel7BasedRackspaceVirtualMachine):
+  pass

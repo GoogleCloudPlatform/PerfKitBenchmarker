@@ -89,7 +89,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         sample.Sample('time_sys', 25, unit, expected_metadata), samples[2])
 
   def testYumInstallRaisesNotImplementedError(self):
-    self.mock_vm = linux_virtual_machine.RhelMixin()
+    self.mock_vm = linux_virtual_machine.Rhel7Mixin()
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
       self.mock_vm.Install('openfoam')

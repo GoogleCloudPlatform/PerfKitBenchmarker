@@ -7,13 +7,16 @@
 - Deprecate versionless `windows` os_type.
   - It will stop working in April 2020, and you will have to specify
       `windows2012`.
+- Deprecate versionless `rhel` os_type.
+  - It will stop working in April 2020, and you will have to specify
+      `rhel7` on most providers or `amazonlinux1` on AWS.
 
 ### New features:
 
 - Add infiniband support in nccl benchmark.
 - Added AwsVpcS3Endpoint for VPC connectivity to S3.
-- Add `--os_type=debian-9` support for AWS and Azure Providers.
-- Add `--os_type=debian-10` support for GCP, AWS and Azure Providers.
+- Add `--os_type=debian9` support for AWS and Azure Providers.
+- Add `--os_type=debian10` support for GCP, AWS and Azure Providers.
 - Add function to tune NCCL parameters.
 
 ### Enhancements:

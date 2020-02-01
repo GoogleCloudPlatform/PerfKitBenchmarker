@@ -265,7 +265,7 @@ class AwsVirtualMachineTest(BaseTest):
     self._CreatePatched(aws_network, 'AwsFirewall')
     vm_spec = aws_virtual_machine.AwsVmSpec(
         _COMPONENT, zone=_AWS_ZONE, machine_type='m2.2xlarge')
-    aws_machine = aws_virtual_machine.RhelBasedAwsVirtualMachine(vm_spec)
+    aws_machine = aws_virtual_machine.Rhel7BasedAwsVirtualMachine(vm_spec)
     aws_machine.RemoteCommand = mock.Mock()
     aws_machine.RemoteHostCommand = mock.Mock()
     return aws_machine

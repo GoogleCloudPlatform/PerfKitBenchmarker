@@ -62,7 +62,6 @@ FLAGS = flags.FLAGS
 
 NVME = 'NVME'
 SCSI = 'SCSI'
-RHEL_IMAGE = 'rhel-7'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
@@ -805,15 +804,20 @@ class Debian10BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Debian10Mixin):
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
-class RhelBasedGceVirtualMachine(GceVirtualMachine,
-                                 linux_vm.RhelMixin):
-  DEFAULT_IMAGE = RHEL_IMAGE
+class Rhel7BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel7Mixin):
+  DEFAULT_IMAGE_FAMILY = 'rhel-7'
+  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
   def __init__(self, vm_spec):
-    super(RhelBasedGceVirtualMachine, self).__init__(vm_spec)
+    super(Rhel7BasedGceVirtualMachine, self).__init__(vm_spec)
     self.python_package_config = 'python'
     self.python_dev_package_config = 'python-devel'
     self.python_pip_package_config = 'python2-pip'
+
+
+class VersionlessRhelBasedGceVirtualMachine(
+    linux_vm.VersionlessRhelMixin, Rhel7BasedGceVirtualMachine):
+  pass
 
 
 class Centos7BasedGceVirtualMachine(GceVirtualMachine,

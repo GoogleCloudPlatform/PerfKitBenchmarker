@@ -126,6 +126,8 @@ COREOS_IMAGE_PROJECT = '595879546273'
 # TODO(pclay): replace with Marketplace AMI when available
 DEBIAN_IMAGE_PROJECT = '136693071363'
 MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
+# https://access.redhat.com/articles/2962171
+RHEL_IMAGE_PROJECT = '309956199498'
 # https://help.ubuntu.com/community/EC2StartersGuide#Official_Ubuntu_Cloud_Guest_Amazon_Machine_Images_.28AMIs.29
 UBUNTU_IMAGE_PROJECT = '099720109477'  # Owned by canonical
 # Some Windows images are also available in marketplace project, but this is the
@@ -1061,7 +1063,7 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class AmazonLinux2BasedAwsVirtualMachine(
     AwsVirtualMachine, linux_virtual_machine.AmazonLinux2Mixin):
-  """Class with configuration for AWS Amazon Linux 2 Redhat virtual machines."""
+  """Class with configuration for AWS Amazon Linux 2 virtual machines."""
   IMAGE_NAME_FILTER = 'amzn2-ami-*-*-*'
   IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
 
@@ -1073,9 +1075,9 @@ class AmazonLinux2BasedAwsVirtualMachine(
     self.python_pip_package_config = 'python27-pip'
 
 
-class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
-                                 linux_virtual_machine.RhelMixin):
-  """Class with configuration for AWS Redhat virtual machines."""
+class AmazonLinux1BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux1Mixin):
+  """Class with configuration for AWS Amazon Linux 1 virtual machines."""
   IMAGE_NAME_FILTER = 'amzn-ami-*-*-*'
   IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
   # IMAGE_NAME_REGEX tightens up the image filter for Amazon Linux to avoid
@@ -1085,11 +1087,33 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
       r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
 
   def __init__(self, vm_spec):
-    super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
+    super(AmazonLinux1BasedAwsVirtualMachine, self).__init__(vm_spec)
     # package_config
     self.python_package_config = 'python27'
     self.python_dev_package_config = 'python27-devel'
     self.python_pip_package_config = 'python27-pip'
+
+
+class VersionlessRhelBaseAwsVirtualMachine(
+    linux_virtual_machine.VersionlessRhelMixin,
+    AmazonLinux1BasedAwsVirtualMachine):
+  ALTERNATIVE_OS = AmazonLinux1BasedAwsVirtualMachine.OS_TYPE
+
+
+class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
+                                  linux_virtual_machine.Rhel7Mixin):
+  """Class with configuration for AWS RHEL 7 virtual machines."""
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/2962171
+  IMAGE_NAME_FILTER = 'RHEL-7*_GA*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
+
+  def __init__(self, vm_spec):
+    super(Rhel7BasedAwsVirtualMachine, self).__init__(vm_spec)
+    # package_config
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,

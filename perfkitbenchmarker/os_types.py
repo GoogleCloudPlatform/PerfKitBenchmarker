@@ -15,6 +15,7 @@
 
 from perfkitbenchmarker import flags
 
+AMAZONLINUX1 = 'amazonlinux1'
 AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
 CLEAR = 'clear'
@@ -23,13 +24,12 @@ CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
 JUJU = 'juju'
-RHEL = 'rhel'
+RHEL7 = 'rhel7'
 UBUNTU_CONTAINER = 'ubuntu_container'
 UBUNTU1604 = 'ubuntu1604'
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
 UBUNTU1710 = 'ubuntu1710'
 UBUNTU1804 = 'ubuntu1804'
-WINDOWS = 'windows'
 WINDOWS2012_CORE = 'windows2012'
 WINDOWS2016_CORE = 'windows2016'
 WINDOWS2019_CORE = 'windows2019'
@@ -39,8 +39,11 @@ WINDOWS2019_BASE = 'windows2019_base'
 
 # Base-only OS types
 DEBIAN = 'debian'
+RHEL = 'rhel'
+WINDOWS = 'windows'
 
 LINUX_OS_TYPES = [
+    AMAZONLINUX1,
     AMAZONLINUX2,
     CENTOS7,
     CLEAR,
@@ -49,7 +52,8 @@ LINUX_OS_TYPES = [
     DEBIAN9,
     DEBIAN10,
     JUJU,
-    RHEL,
+    RHEL,  # deprecated
+    RHEL7,
     UBUNTU_CONTAINER,
     UBUNTU1604,
     UBUNTU1604_CUDA9,
@@ -57,7 +61,7 @@ LINUX_OS_TYPES = [
     UBUNTU1804,
 ]
 WINDOWS_OS_TYPES = [
-    WINDOWS,
+    WINDOWS,  # deprecated
     WINDOWS2012_CORE,
     WINDOWS2016_CORE,
     WINDOWS2019_CORE,

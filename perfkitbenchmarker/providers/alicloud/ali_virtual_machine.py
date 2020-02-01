@@ -453,8 +453,8 @@ class Centos7BasedAliVirtualMachine(AliVirtualMachine,
     self.python_pip_package_config = 'python2-pip'
 
 
-class RhelBasedAliVirtualMachine(AliVirtualMachine,
-                                 linux_virtual_machine.RhelMixin):
+class VersionlessRhelBasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
   pass
 
 
