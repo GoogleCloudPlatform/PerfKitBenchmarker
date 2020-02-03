@@ -33,3 +33,4 @@
 -   Retry `yum install` commands to bypass transient issues.
 -   Azure defaults to no placement group created.
 -   Add Sql Server support to managed relational DB
+-   Remove `py27` tox tests.
