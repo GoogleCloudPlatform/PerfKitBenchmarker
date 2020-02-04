@@ -781,13 +781,7 @@ class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
 
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
-  IMAGE_URN = 'RedHat:RHEL:7.4:latest'
-
-  def __init__(self, vm_spec):
-    super(Rhel7BasedAzureVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
+  IMAGE_URN = 'RedHat:RHEL:7.6:latest'
 
 
 class VersionlessRhelBasedAzureVirutalMachine(
@@ -795,15 +789,19 @@ class VersionlessRhelBasedAzureVirutalMachine(
   pass
 
 
-class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
-                                     linux_virtual_machine.Centos7Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:7.4:latest'
+class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
+                                    linux_virtual_machine.Rhel8Mixin):
+  IMAGE_URN = 'RedHat:RHEL:8:latest'
 
-  def __init__(self, vm_spec):
-    super(CentosBasedAzureVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
+
+class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
+                                      linux_virtual_machine.CentOs7Mixin):
+  IMAGE_URN = 'OpenLogic:CentOS:7.6:latest'
+
+
+class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
+                                      linux_virtual_machine.CentOs8Mixin):
+  IMAGE_URN = 'OpenLogic:CentOS:8.0:latest'
 
 
 class CoreOsBasedAzureVirtualMachine(AzureVirtualMachine,

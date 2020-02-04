@@ -18,6 +18,7 @@ from perfkitbenchmarker import flags
 AMAZONLINUX1 = 'amazonlinux1'
 AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
+CENTOS8 = 'centos8'
 CLEAR = 'clear'
 COS = 'cos'
 CORE_OS = 'core_os'
@@ -25,6 +26,7 @@ DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
 JUJU = 'juju'
 RHEL7 = 'rhel7'
+RHEL8 = 'rhel8'
 UBUNTU_CONTAINER = 'ubuntu_container'
 UBUNTU1604 = 'ubuntu1604'
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
@@ -46,6 +48,7 @@ LINUX_OS_TYPES = [
     AMAZONLINUX1,
     AMAZONLINUX2,
     CENTOS7,
+    CENTOS8,
     CLEAR,
     CORE_OS,
     COS,
@@ -54,6 +57,7 @@ LINUX_OS_TYPES = [
     JUJU,
     RHEL,  # deprecated
     RHEL7,
+    RHEL8,
     UBUNTU_CONTAINER,
     UBUNTU1604,
     UBUNTU1604_CUDA9,

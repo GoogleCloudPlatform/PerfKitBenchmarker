@@ -318,14 +318,9 @@ class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
-class Centos7BasedStaticVirtualMachine(StaticVirtualMachine,
-                                       linux_virtual_machine.Centos7Mixin):
-
-  def __init__(self, vm_spec):
-    super(Centos7BasedStaticVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
+class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.CentOs7Mixin):
+  pass
 
 
 class VersionlessWindowsBasedStaticVirtualMachine(

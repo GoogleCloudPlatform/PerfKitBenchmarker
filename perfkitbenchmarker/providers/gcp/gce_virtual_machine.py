@@ -808,28 +808,25 @@ class Rhel7BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel7Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-7'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
-  def __init__(self, vm_spec):
-    super(Rhel7BasedGceVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
-
 
 class VersionlessRhelBasedGceVirtualMachine(
     linux_vm.VersionlessRhelMixin, Rhel7BasedGceVirtualMachine):
   pass
 
 
-class Centos7BasedGceVirtualMachine(GceVirtualMachine,
-                                    linux_vm.Centos7Mixin):
+class Rhel8BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel8Mixin):
+  DEFAULT_IMAGE_FAMILY = 'rhel-8'
+  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
+
+
+class CentOs7BasedGceVirtualMachine(GceVirtualMachine, linux_vm.CentOs7Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-7'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
-  def __init__(self, vm_spec):
-    super(Centos7BasedGceVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
+
+class CentOs8BasedGceVirtualMachine(GceVirtualMachine, linux_vm.CentOs8Mixin):
+  DEFAULT_IMAGE_FAMILY = 'centos-8'
+  DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class ContainerOptimizedOsBasedGceVirtualMachine(

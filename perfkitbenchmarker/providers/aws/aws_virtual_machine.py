@@ -1067,13 +1067,6 @@ class AmazonLinux2BasedAwsVirtualMachine(
   IMAGE_NAME_FILTER = 'amzn2-ami-*-*-*'
   IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
 
-  def __init__(self, vm_spec):
-    super(AmazonLinux2BasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python27'
-    self.python_dev_package_config = 'python27-devel'
-    self.python_pip_package_config = 'python27-pip'
-
 
 class AmazonLinux1BasedAwsVirtualMachine(
     AwsVirtualMachine, linux_virtual_machine.AmazonLinux1Mixin):
@@ -1085,13 +1078,6 @@ class AmazonLinux1BasedAwsVirtualMachine(
   # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
   IMAGE_NAME_REGEX = (
       r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
-
-  def __init__(self, vm_spec):
-    super(AmazonLinux1BasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python27'
-    self.python_dev_package_config = 'python27-devel'
-    self.python_pip_package_config = 'python27-pip'
 
 
 class VersionlessRhelBaseAwsVirtualMachine(
@@ -1108,29 +1094,25 @@ class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'RHEL-7*_GA*'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
-  def __init__(self, vm_spec):
-    super(Rhel7BasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
+
+class Rhel8BasedAwsVirtualMachine(AwsVirtualMachine,
+                                  linux_virtual_machine.Rhel8Mixin):
+  """Class with configuration for AWS RHEL 8 virtual machines."""
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/2962181
+  # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
+  IMAGE_NAME_FILTER = 'RHEL-8*_HVM-*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
 
-class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
-                                    linux_virtual_machine.Centos7Mixin):
-  """Class with configuration for AWS Centos7 virtual machines."""
-  # Documentation on finding the Centos 7 image:
+class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.CentOs7Mixin):
+  """Class with configuration for AWS CentOS 7 virtual machines."""
+  # Documentation on finding the CentOS 7 image:
   # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   DEFAULT_USER_NAME = 'centos'
-
-  def __init__(self, vm_spec):
-    super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
 
 
 class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
