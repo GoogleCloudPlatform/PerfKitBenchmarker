@@ -121,10 +121,11 @@ search for the iso and cfg files.
 # Installation and Setup
 
 Before you can run the PerfKit Benchmarker, you need account(s) on the cloud
-provider(s) you want to benchmark. You also need the software dependencies,
-which are mostly command line tools and credentials to access your accounts
-without a password. The following steps should help you get up and running with
-PKB.
+provider(s) you want to benchmark (see
+[providers](perfkitbenchmarker/providers/README.md)). You also need the software
+dependencies, which are mostly command line tools and credentials to access your
+accounts without a password. The following steps should help you get up and
+running with PKB.
 
 ## Python 3
 
