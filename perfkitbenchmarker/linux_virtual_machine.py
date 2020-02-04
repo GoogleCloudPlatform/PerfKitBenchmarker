@@ -1251,6 +1251,8 @@ class BaseRhelMixin(BaseLinuxMixin):
   # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
 
+  PYTHON_PACKAGE = 'python'
+
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
     super(BaseRhelMixin, self).OnStartup()
@@ -1386,9 +1388,21 @@ class Rhel7Mixin(BaseRhelMixin):
   OS_TYPE = os_types.RHEL7
 
 
-class Centos7Mixin(BaseRhelMixin):
+class Rhel8Mixin(BaseRhelMixin):
+  """Class holding RHEL 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL8
+  PYTHON_PACKAGE = 'python2'
+
+
+class CentOs7Mixin(BaseRhelMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
+
+
+class CentOs8Mixin(BaseRhelMixin):
+  """Class holding CentOS 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS8
+  PYTHON_PACKAGE = 'python2'
 
 
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):

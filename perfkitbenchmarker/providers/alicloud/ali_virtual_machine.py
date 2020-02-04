@@ -442,15 +442,9 @@ class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu_18_04_64*alibase*.vhd'
 
 
-class Centos7BasedAliVirtualMachine(AliVirtualMachine,
-                                    linux_virtual_machine.Centos7Mixin):
+class CentOs7BasedAliVirtualMachine(AliVirtualMachine,
+                                    linux_virtual_machine.CentOs7Mixin):
   IMAGE_NAME_FILTER = 'centos_7_05_64*alibase*.vhd'
-
-  def __init__(self, vm_spec):
-    super(Centos7BasedAliVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python2-devel'
-    self.python_pip_package_config = 'python2-pip'
 
 
 class VersionlessRhelBasedAliVirtualMachine(

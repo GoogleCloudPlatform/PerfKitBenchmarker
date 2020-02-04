@@ -365,7 +365,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                     vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
 
-  def testCreateCentos7CustomImage(self):
+  def testCreateCentOs7CustomImage(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.CENTOS7)
     fake_image = 'fake-custom-centos7-image'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,

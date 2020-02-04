@@ -19,6 +19,8 @@
 - Add `--os_type=debian10` support for GCP, AWS and Azure Providers.
 - Add function to tune NCCL parameters.
 - Add Coremark demo scripts at PerfKitBenchmarker/tools/demos/coremark.
+- Add RHEL 8 to AWS, Azure and GCP providers
+- Add CentOS 8 to Azure and GCP providers
 
 ### Enhancements:
 

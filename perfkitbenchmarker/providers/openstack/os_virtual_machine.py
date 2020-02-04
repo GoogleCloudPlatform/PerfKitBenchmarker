@@ -396,12 +396,6 @@ class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                         linux_virtual_machine.Rhel7Mixin):
   DEFAULT_IMAGE = 'rhel-7.2'
 
-  def __init__(self, vm_spec):
-    super(Rhel7BasedOpenStackVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
-
 
 class VersionlessRhel7BasedOpenStackVirtualMachine(
     linux_virtual_machine.VersionlessRhelMixin,
@@ -409,12 +403,6 @@ class VersionlessRhel7BasedOpenStackVirtualMachine(
   pass
 
 
-class Centos7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                          linux_virtual_machine.Centos7Mixin):
+class CentOs7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                          linux_virtual_machine.CentOs7Mixin):
   DEFAULT_IMAGE = 'centos7'
-
-  def __init__(self, vm_spec):
-    super(Centos7BasedOpenStackVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
