@@ -66,12 +66,14 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   def Copy(self, src_url, dst_url):
     """See base class."""
-    vm_util.IssueCommand(['aws', 's3', 'cp', src_url, dst_url])
+    vm_util.IssueCommand(['aws', 's3', 'cp', src_url, dst_url,
+                          '--region', self.region])
 
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""
     dst_url = self.MakeRemoteCliDownloadUrl(bucket, object_path)
-    vm_util.IssueCommand(['aws', 's3', 'cp', src_path, dst_url])
+    vm_util.IssueCommand(['aws', 's3', 'cp', src_path, dst_url,
+                          '--region', self.region])
 
   def MakeRemoteCliDownloadUrl(self, bucket, object_path):
     """See base class."""
@@ -80,11 +82,13 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
-    return 'aws s3 cp "%s" "%s"' % (src_url, local_path)
+    return 'aws s3 cp "%s" "%s" --region=%s' % (
+        src_url, local_path, self.region)
 
   def List(self, buckets):
     """See base class."""
-    stdout, _, _ = vm_util.IssueCommand(['aws', 's3', 'ls', buckets])
+    stdout, _, _ = vm_util.IssueCommand(['aws', 's3', 'ls', buckets,
+                                         '--region', self.region])
     return stdout
 
   @vm_util.Retry()
