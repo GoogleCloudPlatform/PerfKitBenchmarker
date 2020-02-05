@@ -196,7 +196,8 @@ class Bigquery(edw_service.EdwService):
                   schema_dir,
                   dataset=None,
                   append=True,
-                  skip_header_row=True):
+                  skip_header_row=True,
+                  field_delimiter=','):
     """Load all tables in a dataset to a database from CSV object storage.
 
     See https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv
@@ -212,6 +213,7 @@ class Bigquery(edw_service.EdwService):
       append: If True, appends loaded data to the existing set. If False,
         replaces the existing data (if any).
       skip_header_row: If True, skips the first row of data being loaded.
+      field_delimiter: The separator for fields in the CSV file.
     """
     project_dataset = self.FormatProjectAndDatasetForCommand(dataset)
     for table in tables:
@@ -221,7 +223,8 @@ class Bigquery(edw_service.EdwService):
       cmd = [
           'bq', 'load', '--noreplace' if append else '--replace',
           '--source_format=CSV',
-          '--skip_leading_rows=%d' % 1 if skip_header_row else 0,
+          '--field_delimiter=%s' % field_delimiter,
+          '--skip_leading_rows=%d' % (1 if skip_header_row else 0),
           '%s.%s' % (project_dataset, table),
           'gs://%s/%s/*.csv' % (source_bucket, table), local_schema
       ]
