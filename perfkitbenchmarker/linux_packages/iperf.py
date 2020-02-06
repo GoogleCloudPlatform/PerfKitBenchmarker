@@ -21,36 +21,27 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 PACKAGE_NAME = 'iperf'
-IPERF_ZIP = '2.0.4-RELEASE.zip'
-IPERF_DIR = 'iperf-2.0.4-RELEASE'
-PREPROVISIONED_DATA = {
-    IPERF_ZIP:
-        '84000784e9286531c227b14c999b236f9cc5679564ba1bff8702f28c30513853'
-}
-PACKAGE_DATA_URL = {
-    IPERF_ZIP: posixpath.join('https://github.com/esnet/iperf/archive',
-                              IPERF_ZIP)}
+IPERF_TAR = 'iperf-2.0.13.tar.gz'
+IPERF_URL = 'https://sourceforge.net/projects/iperf2/files/iperf-2.0.13.tar.gz'
+IPERF_DIR = '%s/iperf-2.0.13' % INSTALL_DIR
 
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
-  vm.InstallPackages('iperf')
+  vm.Install('build_tools')
+  vm.Install('wget')
+
+  vm.RemoteCommand('wget -O %s/%s %s' % 
+                   (INSTALL_DIR, IPERF_TAR, IPERF_URL))
+
+  vm.RemoteCommand('cd %s; tar xvf %s; cd %s; '
+                   './configure; make; sudo make install' %
+                   (INSTALL_DIR, IPERF_TAR, IPERF_DIR))
 
 
 def YumInstall(vm):
   """Installs the iperf package on the VM."""
-  try:
-    vm.InstallEpelRepo()
-    _Install(vm)
-  # RHEL 7 does not have an iperf package in the standard/EPEL repositories
-  except errors.VirtualMachine.RemoteCommandError:
-    vm.Install('build_tools')
-    vm.Install('unzip')
-    vm.InstallPreprovisionedPackageData(
-        PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
-    vm.RemoteCommand(
-        'cd %s; unzip %s; cd %s; ./configure; make; sudo make install' % (
-            INSTALL_DIR, IPERF_ZIP, IPERF_DIR))
+  _Install(vm)
 
 
 def AptInstall(vm):
