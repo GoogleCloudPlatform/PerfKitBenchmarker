@@ -36,3 +36,4 @@
 -   Azure defaults to no placement group created.
 -   Add Sql Server support to managed relational DB
 -   Remove `py27` tox tests.
+-   Update AKS cluster creation service principle handling, which was broken
