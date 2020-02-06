@@ -41,30 +41,29 @@ class ServicePrincipal(resource.BaseResource):
 
   def _Create(self):
     """Creates the service principal."""
-    create_cmd = [
+    cmd = [
         azure.AZURE_PATH, 'ad', 'sp', 'create-for-rbac', '--name', self.name,
-        '--skip-assignment', '--create-cert'
+        '--skip-assignment'
     ]
-    vm_util.IssueCommand(create_cmd)
-
-  def _Exists(self):
-    """Returns True if the service principal exists."""
-    create_cmd = [
-        azure.AZURE_PATH, 'ad', 'sp', 'list',
-        '--spn', 'http://' + self.name,
-    ]
-    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    stdout, _ = vm_util.IssueCommand(cmd)
     response = json.loads(stdout)
     if response:
-      self.app_id = response[0]['appId']
-      self.password = response[0]['password']
+      self.app_id = response['appId']
+      self.password = response['password']
       return True
     return False
 
+  def _Exists(self):
+    """Returns True if the service principal exists."""
+    cmd = [
+        azure.AZURE_PATH, 'ad', 'sp', 'list', '--spn', 'http://' + self.name,
+    ]
+    stdout, _ = vm_util.IssueRetryableCommand(cmd)
+    return bool(json.loads(stdout))
+
   def _Delete(self):
     """Deletes the service principal."""
-    create_cmd = [
-        azure.AZURE_PATH, 'ad', 'sp', 'delete',
-        '--id', 'http://' + self.name,
+    cmd = [
+        azure.AZURE_PATH, 'ad', 'sp', 'delete', '--id', 'http://' + self.name,
     ]
-    vm_util.IssueCommand(create_cmd)
+    vm_util.IssueCommand(cmd)
