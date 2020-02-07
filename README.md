@@ -56,7 +56,7 @@ In its current release these are the benchmarks that are executed:
 -   `hpcc`: [Original BSD license](http://icl.cs.utk.edu/hpcc/faq/#263)
 -   [`hpcg`](https://github.com/hpcg-benchmark/hpcg/):
     [BSD 3-clause](https://github.com/hpcg-benchmark/hpcg/blob/master/LICENSE)
--   `iperf`: [BSD license](http://iperf.sourceforge.net/)
+-   `iperf`: [UIUC License](https://sourceforge.net/p/iperf2/code/ci/master/tree/doc/ui_license.html)
 -   `memtier_benchmark`:
     [GPL v2](https://github.com/RedisLabs/memtier_benchmark)
 -   `mesh_network`:
