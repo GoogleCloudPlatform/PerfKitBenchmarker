@@ -31,7 +31,6 @@ from __future__ import print_function
 
 import logging
 import posixpath
-import re
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -112,9 +111,6 @@ _BLOCK_MESH_DICT = 'system/blockMeshDict'
 _DECOMPOSE_DICT = 'system/decomposeParDict'
 _SNAPPY_HEX_MESH_DICT = 'system/snappyHexMeshDict'
 
-_TIME_RE = re.compile(r"""(\d+)m       # The minutes part
-                          (\d+)\.\d+s  # The seconds part """, re.VERBOSE)
-
 _SSH_CONFIG_CMD = ('echo "LogLevel ERROR\nHost *\n  IdentitiesOnly yes\n" | '
                    'tee -a $HOME/.ssh/config')
 
@@ -175,30 +171,11 @@ def Prepare(benchmark_spec):
   hpc_util.CreateMachineFile(vms, remote_path=_MACHINE_FILE)
 
 
-def _AsSeconds(input_time):
-  """Convert time from formatted string to seconds.
-
-  Input format: 200m1.419s
-  Should return 1201
-
-  Args:
-    input_time: The time to parse to an integer.
-
-  Returns:
-    An integer representing the time in seconds.
-  """
-  match = _TIME_RE.match(input_time)
-  assert match, 'Time "{}" does not match format "{}"'.format(input_time,
-                                                              _TIME_RE.pattern)
-  minutes, seconds = match.group(1, 2)
-  return int(minutes) * 60 + int(seconds)
-
-
 def _GetSample(line):
   """Parse a single output line into a performance sample.
 
   Input format:
-    real    4m1.419s
+    real 100.00
 
   Args:
     line: A single line from the OpenFOAM timing output.
@@ -207,9 +184,13 @@ def _GetSample(line):
     A single performance sample, with times in ms.
   """
   runtime_category, runtime_output = line.split()
-  runtime_seconds = _AsSeconds(runtime_output)
-  logging.info('Runtime of %s seconds from [%s, %s]',
-               runtime_seconds, runtime_category, runtime_output)
+  try:
+    runtime_seconds = int(float(runtime_output))
+  except:
+    raise ValueError(
+        'Output "%s" does not match expected format "real 100.00".' % line)
+  logging.info('Runtime of %s seconds from [%s, %s]', runtime_seconds,
+               runtime_category, runtime_output)
   runtime_category = 'time_' + runtime_category
   return sample.Sample(runtime_category, runtime_seconds, 'seconds')
 
@@ -217,10 +198,10 @@ def _GetSample(line):
 def _GetSamples(output):
   """Parse the output and return performance samples.
 
-  Output is in the format:
-    real    4m1.419s
-    user    23m11.198s
-    sys     0m25.274s
+  Output is in the format (example numbers):
+    real 100.00
+    user 60.55
+    sys 99.31
 
   Args:
     output: The output from running the OpenFOAM benchmark.
@@ -310,7 +291,7 @@ def _RunCase(master_vm, dimensions):
   _SetDictEntry(master_vm, 'blocks', dims_entry, _BLOCK_MESH_DICT)
 
   run_command = ' && '.join(
-      ['cd %s' % _GetWorkingDirPath(), './Allclean', 'time ./Allrun'])
+      ['cd %s' % _GetWorkingDirPath(), './Allclean', 'time -p ./Allrun'])
   _, run_output = master_vm.RemoteCommand(run_command)
   results = _GetSamples(run_output)
   # Update every run with run-specific metadata.
