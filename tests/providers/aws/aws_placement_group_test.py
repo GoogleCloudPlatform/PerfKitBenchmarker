@@ -22,7 +22,7 @@ from tests import pkb_common_test_case
 CLOUD = providers.AWS
 ZONE = 'us-west-1a'
 REGION = 'us-west-1'
-STRATEGY = placement_group.PLACEMENT_GROUP_DEFAULT
+STRATEGY = placement_group.PLACEMENT_GROUP_CLUSTER
 RUN_URI = 'run12345'
 UUID = 'random'
 GROUP_NAME = 'perfkit-{}-{}'.format(RUN_URI, UUID)

@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to Azure Blob Storage."""
 
+import datetime
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
@@ -130,6 +131,42 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   def Copy(self, src_url, dst_url):
     """See base class."""
     raise NotImplementedError()
+
+  def CopyToBucket(self, src_path, bucket, object_path):
+    vm_util.IssueCommand(['az', 'storage', 'blob', 'upload',
+                          '--account-name', self.storage_account.name,
+                          '--file', src_path,
+                          '--container', bucket,
+                          '--name', object_path])
+
+  def _GenerateDownloadToken(self, bucket, object_path):
+    blob_store_expiry = datetime.datetime.utcnow() + datetime.timedelta(
+        days=365)
+    stdout, _, _ = vm_util.IssueCommand([
+        'az', 'storage', 'blob', 'generate-sas',
+        '--account-name', self.storage_account.name,
+        '--container-name', bucket,
+        '--name', object_path,
+        '--expiry', blob_store_expiry.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        '--permissions', 'r'
+    ])
+    token = stdout.strip('\n').strip('"')
+    return token
+
+  def MakeRemoteCliDownloadUrl(self, bucket, object_path):
+    """See base class."""
+    token = self._GenerateDownloadToken(bucket, object_path)
+    url = 'https://{acc}.blob.core.windows.net/{con}/{src}?{tkn}'.format(
+        acc=self.storage_account.name,
+        con=bucket,
+        src=object_path,
+        tkn=token)
+    return url
+
+  def GenerateCliDownloadFileCommand(self, src_url, dst_url):
+    """See base class."""
+    return 'wget -O {dst_url} "{src_url}"'.format(src_url=src_url,
+                                                  dst_url=dst_url)
 
   def List(self, buckets):
     """See base class."""

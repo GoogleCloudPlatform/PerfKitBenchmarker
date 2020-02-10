@@ -46,6 +46,7 @@ class GcpDataproc(spark_service.BaseSparkService):
   def __init__(self, spark_service_spec):
     super(GcpDataproc, self).__init__(spark_service_spec)
     self.project = self.spec.master_group.vm_spec.project
+    self.region = self.zone.rsplit('-', 1)[0]
 
   @staticmethod
   def _ParseTime(state_time):
@@ -82,13 +83,18 @@ class GcpDataproc(spark_service.BaseSparkService):
           (start_time - pending_time).total_seconds())
     return stats
 
+  def DataprocGcloudCommand(self, *args):
+    all_args = ('dataproc',) + args
+    cmd = util.GcloudCommand(self, *all_args)
+    cmd.flags['region'] = self.region
+    return cmd
+
   def _Create(self):
     """Creates the cluster."""
 
     if self.cluster_id is None:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'create',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'create', self.cluster_id)
     if self.project is not None:
       cmd.flags['project'] = self.project
     cmd.flags['num-workers'] = self.spec.worker_group.vm_count
@@ -126,8 +132,7 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   def _Delete(self):
     """Deletes the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'delete', self.cluster_id)
     # If we don't put this here, zone is automatically added, which
     # breaks the dataproc clusters delete
     cmd.flags['zone'] = []
@@ -135,8 +140,7 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
     # If we don't put this here, zone is automatically added to
     # the command, which breaks dataproc clusters describe
     cmd.flags['zone'] = []
@@ -147,7 +151,7 @@ class GcpDataproc(spark_service.BaseSparkService):
                 job_poll_interval=None,
                 job_arguments=None, job_stdout_file=None,
                 job_type=spark_service.SPARK_JOB_TYPE):
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
+    cmd = self.DataprocGcloudCommand('jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     # If we don't put this here, zone is auotmatically added to the command
@@ -246,8 +250,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     return basic_data
 
   def GetZone(self):
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
     cmd.flags['zone'] = []
     cmd.flags['format'] = ['value(config.gceClusterConfig.zoneUri)']
     r = cmd.Issue()

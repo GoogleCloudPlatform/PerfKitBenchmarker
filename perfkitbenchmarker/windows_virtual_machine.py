@@ -79,14 +79,14 @@ class WaitTimeoutError(Exception):
   """Exception thrown if a wait operation takes too long."""
 
 
-class WindowsMixin(virtual_machine.BaseOsMixin):
+class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   """Class that holds Windows related VM methods and attributes."""
 
   OS_TYPE = os_types.WINDOWS
   BASE_OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
-    super(WindowsMixin, self).__init__()
+    super(BaseWindowsMixin, self).__init__()
     self.winrm_port = WINRM_PORT
     self.smb_port = SMB_PORT
     self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
@@ -694,31 +694,42 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       self.os_metadata['high_cpu_priority'] = [executable_name]
 
 
-class Windows2012CoreMixin(WindowsMixin):
+class VersionlessWindowsMixin(BaseWindowsMixin,
+                              virtual_machine.DeprecatedOsMixin):
+  """Deprecated class with a versionless windows server version.
+
+  By convention it resolves to Windows 2012 Core.
+  """
+  OS_TYPE = os_types.WINDOWS
+  ALTERNATIVE_OS = os_types.WINDOWS2012_CORE
+  END_OF_LIFE = '2020-04-01'
+
+
+class Windows2012CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2012 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2012_CORE
 
 
-class Windows2016CoreMixin(WindowsMixin):
+class Windows2016CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2016_CORE
 
 
-class Windows2019CoreMixin(WindowsMixin):
+class Windows2019CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2019_CORE
 
 
-class Windows2012BaseMixin(WindowsMixin):
+class Windows2012BaseMixin(BaseWindowsMixin):
   """Class holding Windows Server 2012 Server Base VM specifics."""
   OS_TYPE = os_types.WINDOWS2012_BASE
 
 
-class Windows2016BaseMixin(WindowsMixin):
+class Windows2016BaseMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 Server Base VM specifics."""
   OS_TYPE = os_types.WINDOWS2016_BASE
 
 
-class Windows2019BaseMixin(WindowsMixin):
+class Windows2019BaseMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 Server Base VM specifics."""
   OS_TYPE = os_types.WINDOWS2019_BASE

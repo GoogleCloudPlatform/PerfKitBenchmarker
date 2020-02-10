@@ -228,3 +228,18 @@ def IssueRetryableCommand(cmd, env=None, suppress_failure=None):
     raise errors.VmUtil.CalledProcessException(
         'The command had output on stderr:\n%s' % stderr)
   return stdout, stderr
+
+
+def AwsFilter(name, value):
+  """Returns a two element list suitable for an AWS command line.
+
+  The first element is "--filters"
+
+  For an example see
+  https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-instances.html#options
+
+  Args:
+    name: The name of the AWS attribute
+    value: The value for that attribute
+  """
+  return ['--filters', 'Name={},Values={}'.format(name, value)]

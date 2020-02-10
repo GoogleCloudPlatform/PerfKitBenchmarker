@@ -381,17 +381,6 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                   disk_spec))
 
 
-class ContainerizedProfitBricksVirtualMachine(
-        ProfitBricksVirtualMachine,
-        linux_virtual_machine.ContainerizedDebianMixin):
-    pass
-
-
-class DebianBasedProfitBricksVirtualMachine(ProfitBricksVirtualMachine,
-                                            linux_virtual_machine.DebianMixin):
-    pass
-
-
-class RhelBasedProfitBricksVirtualMachine(ProfitBricksVirtualMachine,
-                                          linux_virtual_machine.RhelMixin):
+class VersionlessRhelBasedProfitBricksVirtualMachine(
+    ProfitBricksVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
     pass
