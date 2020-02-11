@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing classes related to Swift Storage Service."""
 
 import os
 
@@ -72,6 +73,18 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
         raise_on_failure=False)
 
   def Copy(self, src_url, dst_url):
+    """See base class."""
+    raise NotImplementedError()
+
+  def CopyToBucket(self, src_path, bucket, object_path):
+    """See base class."""
+    raise NotImplementedError()
+
+  def MakeRemoteCliDownloadUrl(self, bucket, object_path):
+    """See base class."""
+    raise NotImplementedError()
+
+  def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
     raise NotImplementedError()
 

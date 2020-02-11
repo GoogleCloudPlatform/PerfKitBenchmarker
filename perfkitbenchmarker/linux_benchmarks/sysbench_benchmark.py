@@ -162,7 +162,13 @@ sysbench:
           Azure:
             machine_type: Standard_A4m_v2
             zone: westus
-        disk_spec: *default_500_gb
+        disk_spec:
+          GCP:
+            disk_size: 500
+          AWS:
+            disk_size: 500
+          Azure:
+            disk_size: 500
       servers:
         os_type: ubuntu1604
         vm_spec:

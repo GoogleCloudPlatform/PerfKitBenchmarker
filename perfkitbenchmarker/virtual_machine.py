@@ -1170,3 +1170,23 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       sock.settimeout(0.25)  # seconds
       sock.connect((self.ip_address, port))
     logging.info('Connected to port %s on %s', port, self)
+
+
+class DeprecatedOsMixin(BaseOsMixin):
+  """Class that adds a deprecation log message to OsBasedVms."""
+
+  # The time or version in which this OS input will be removed
+  END_OF_LIFE = None
+
+  # Optional alternative to use instead.
+  ALTERNATIVE_OS = None
+
+  def __init__(self):
+    super(DeprecatedOsMixin, self).__init__()
+    assert self.OS_TYPE
+    assert self.END_OF_LIFE
+    warning = "os_type '%s' is deprecated and will be removed after %s." % (
+        self.OS_TYPE, self.END_OF_LIFE)
+    if self.ALTERNATIVE_OS:
+      warning += " Use '%s' instead." % self.ALTERNATIVE_OS
+    logging.warning(warning)

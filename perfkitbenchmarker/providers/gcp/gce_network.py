@@ -303,9 +303,9 @@ class GceNetwork(network.BaseNetwork):
     gce_default_subnet = (FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region
                           else NETWORK_RANGE)
 
-    if network_spec.custom_subnets:
-      for (k, v) in network_spec.custom_subnets.items():
-        if not v['cidr'] and not v['cloud'] == 'GCP':
+    if hasattr(network_spec, 'custom_subnets'):
+      for (_, v) in network_spec.custom_subnets.items():
+        if not v['cidr'] and v['cloud'] != 'GCP':
           pass  # @TODO handle other providers defaults in net_util
         elif not v['cidr']:
           nets.add(gce_default_subnet)
@@ -348,6 +348,7 @@ class GceNetwork(network.BaseNetwork):
 
     Firewall rule names must be unique within a project so we include source
     and destination nets to disambiguate.
+
     Args:
       net_type: One of ['default', 'single', 'multi']
       src_cidr: The CIDR range of this network.
@@ -355,7 +356,8 @@ class GceNetwork(network.BaseNetwork):
       port_range_lo: The low port to open
       port_range_hi: The high port to open in range.
       uri: A firewall suffix (if different than FLAGS.run_uri)
-    Returns: The name of this firewall rule.
+    Returns:
+      The name of this firewall rule.
     """
     net_type = net_type or self.net_type
     uri = uri or FLAGS.run_uri

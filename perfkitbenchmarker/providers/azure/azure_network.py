@@ -21,22 +21,33 @@ for more information about Azure Virtual Networks.
 """
 
 import json
+import logging
 import threading
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import azure_placement_group
 from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 SSH_PORT = 22
 
 DEFAULT_LOCATION = 'eastus2'
+
+LOCATION = 'location'
+ZONE = 'zone'
+
+# https://azure.microsoft.com/en-us/blog/announcing-the-general-availability-of-proximity-placement-groups/
+# Central India does not support proximity placement groups.
+# Last Verified: 1/15/20
+UNSUPPORTED_PROXIMIY_PG_LOCATIONS = ['centralindia']
 
 
 def GetResourceGroup(zone=None):
@@ -52,6 +63,11 @@ def GetResourceGroup(zone=None):
         'pkb%s-%s' % (FLAGS.run_uri, spec.uid), zone=zone)
     spec.azure_resource_group = group
     return group
+
+
+def IsProximityPlacementGroupCompatible(location):
+  """Returns True if location supports Azure proximity placement groups."""
+  return location not in UNSUPPORTED_PROXIMIY_PG_LOCATIONS
 
 
 class AzureResourceGroup(resource.BaseResource):
@@ -129,40 +145,7 @@ class AzureResourceGroup(resource.BaseResource):
     ]
     _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
-      raise errors.resource.CreationError('Error tagging Azure resource group.')
-
-
-class AzureAvailSet(resource.BaseResource):
-  """Object representing an Azure Availability Set."""
-
-  def __init__(self, name, location):
-    super(AzureAvailSet, self).__init__()
-    self.name = name
-    self.location = location
-    self.resource_group = GetResourceGroup()
-
-  def _Create(self):
-    """Create the availability set."""
-    create_cmd = [
-        azure.AZURE_PATH, 'vm', 'availability-set', 'create',
-        '--resource-group', self.resource_group.name, '--name', self.name
-    ]
-    if self.location:
-      create_cmd.extend(['--location', self.location])
-    vm_util.IssueCommand(create_cmd)
-
-  def _Delete(self):
-    pass
-
-  @vm_util.Retry()
-  def _Exists(self):
-    """Returns True if the availability set exists."""
-    show_cmd = [
-        azure.AZURE_PATH, 'vm', 'availability-set', 'show', '--output', 'json',
-        '--resource-group', self.resource_group.name, '--name', self.name
-    ]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    return bool(json.loads(stdout))
+      raise errors.Resource.CreationError('Error tagging Azure resource group.')
 
 
 class AzureStorageAccount(resource.BaseResource):
@@ -245,42 +228,94 @@ class AzureStorageAccount(resource.BaseResource):
       return False
 
 
-class AzureVirtualNetwork(resource.BaseResource):
-  """Object representing an Azure Virtual Network."""
+class AzureVirtualNetwork(network.BaseNetwork):
+  """Object representing an Azure Virtual Network.
 
-  num_vnets = 0
+  The benchmark spec contains one instance of this class per region, which an
+  AzureNetwork may retrieve or create via AzureVirtualNetwork.GetForLocation.
+
+  Attributes:
+    name: string. Name of the virtual network.
+    resource_group: Resource Group instance that network belongs to.
+    location: string. Azure location of the network.
+  """
+
   vnet_lock = threading.Lock()
 
-  def __init__(self, location, name):
-    super(AzureVirtualNetwork, self).__init__()
+  CLOUD = providers.AZURE
+
+  def __init__(self, spec, location, name, number_subnets):
+    super(AzureVirtualNetwork, self).__init__(spec)
     self.name = name
     self.resource_group = GetResourceGroup()
     self.location = location
     self.args = ['--vnet-name', self.name]
+    self.address_index = 0
+    self.address_spaces = [
+        '10.%s.0.0/16' % zone_num for zone_num in range(number_subnets)
+    ]
+    self.is_created = False
 
+  @classmethod
+  def GetForLocation(cls, spec, location, name, number_subnets=1):
+    """Retrieves or creates an AzureVirtualNetwork.
+
+    Args:
+      spec: BaseNetworkSpec. Spec for Azure Network.
+      location: string. Azure region name.
+      name: string. Azure Network Name.
+      number_subnets: int. Optional. Number of subnets that network will
+        contain.
+
+    Returns:
+      AzureVirtualNetwork. If an AzureVirtualNetwork for the same region already
+      exists in the benchmark spec, that instance is returned. Otherwise, a new
+      AzureVirtualNetwork is created and returned.
+    """
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
+    key = cls.CLOUD, LOCATION, location
+    # Because this method is only called from the AzureNetwork constructor,
+    # which is only called from AzureNetwork.GetNetwork, we already hold the
+    # benchmark_spec.networks_lock.
+    number_subnets = max(number_subnets, len(FLAGS.zones))
+    if key not in benchmark_spec.networks:
+      benchmark_spec.networks[key] = cls(spec, location, name, number_subnets)
+    return benchmark_spec.networks[key]
+
+  def GetNextAddressSpace(self):
+    """Returns the next available address space for next subnet."""
     with self.vnet_lock:
-      self.vnet_num = self.num_vnets
-      self.__class__.num_vnets += 1
+      assert self.address_index < len(
+          self.address_spaces), 'Only allocated {} addresses'.format(
+              len(self.address_spaces))
+      next_address_space = self.address_spaces[self.address_index]
+      self.address_index += 1
+      return next_address_space
 
-    # Allocate a different /16 in each location. This allows for 255
-    # locations (should be enough for anyone), and 65536 VMs in each
-    # location. Using different address spaces prevents us from
-    # accidentally contacting the wrong VM.
-    self.address_space = '10.%s.0.0/16' % self.vnet_num
-
-  def _Create(self):
+  def Create(self):
     """Creates the virtual network."""
-    vm_util.IssueCommand([
-        azure.AZURE_PATH, 'network', 'vnet', 'create', '--location', self
-        .location, '--address-prefixes', self.address_space, '--name', self.name
-    ] + self.resource_group.args)
+    with self.vnet_lock:
+      if self.is_created:
+        return
 
-  def _Delete(self):
+      logging.info('Creating %d Azure subnets in %s', len(self.address_spaces),
+                   self.location)
+      vm_util.IssueRetryableCommand([
+          azure.AZURE_PATH, 'network', 'vnet', 'create', '--location', self
+          .location, '--name', self.name, '--address-prefixes'
+      ] + self.address_spaces + self.resource_group.args)
+
+      self.is_created = True
+
+  def Delete(self):
     """Deletes the virtual network."""
     pass
 
   @vm_util.Retry()
-  def _Exists(self):
+  def Exists(self):
     """Returns true if the virtual network exists."""
     stdout, _, _ = vm_util.IssueCommand(
         [
@@ -302,11 +337,16 @@ class AzureSubnet(resource.BaseResource):
     self.vnet = vnet
     self.name = name
     self.args = ['--subnet', self.name]
+    self.address_space = None
 
   def _Create(self):
+    # Avoids getting additional address space when create retries.
+    if not self.address_space:
+      self.address_space = self.vnet.GetNextAddressSpace()
+
     vm_util.IssueCommand([
         azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'create', '--vnet-name',
-        self.vnet.name, '--address-prefix', self.vnet.address_space, '--name',
+        self.vnet.name, '--address-prefix', self.address_space, '--name',
         self.name
     ] + self.resource_group.args)
 
@@ -455,14 +495,34 @@ class AzureNetwork(network.BaseNetwork):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
     self.location = util.GetLocationFromZone(self.zone)
+    self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
+
+    placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(
+        'AzurePlacementGroupSpec',
+        flag_values=FLAGS,
+        zone=self.zone,
+        resource_group=self.resource_group.name)
+
+    is_dedicated_host = bool(FLAGS.dedicated_hosts)
+    in_availability_zone = bool(self.availability_zone)
+    cluster_placement_group = (
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER)
+    spread_placement_group = (
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD)
+
+    if cluster_placement_group and IsProximityPlacementGroupCompatible(
+        self.location):
+      self.placement_group = azure_placement_group.AzureProximityGroup(
+          placement_group_spec)
     # With dedicated hosting and/or an availability zone, an availability set
     # cannot be created
-    if (FLAGS.dedicated_hosts or util.GetAvailabilityZoneFromZone(self.zone) or
-        not FLAGS.azure_availability_set):
-      self.avail_set = None
+    elif spread_placement_group and not (is_dedicated_host or
+                                         in_availability_zone):
+      self.placement_group = azure_placement_group.AzureAvailSet(
+          placement_group_spec)
     else:
-      avail_set_name = '%s-%s' % (self.resource_group.name, self.zone)
-      self.avail_set = AzureAvailSet(avail_set_name, self.location)
+      self.placement_group = None
+
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri
 
@@ -473,9 +533,14 @@ class AzureNetwork(network.BaseNetwork):
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.location,
         storage_account_prefix[:24 - len(suffix)] + suffix)
-    prefix = '%s-%s' % (self.resource_group.name, self.zone)
-    self.vnet = AzureVirtualNetwork(self.location, prefix + '-vnet')
-    self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
+    prefix = '%s-%s' % (self.resource_group.name, self.location)
+    self.vnet = AzureVirtualNetwork.GetForLocation(spec, self.location,
+                                                   prefix + '-vnet')
+    subnet_name = self.vnet.name
+    if self.availability_zone:
+      subnet_name += '-' + self.availability_zone
+    subnet_name += '-subnet'
+    self.subnet = AzureSubnet(self.vnet, subnet_name)
     self.nsg = AzureNetworkSecurityGroup(self.location, self.subnet,
                                          self.subnet.name + '-nsg')
 
@@ -488,8 +553,8 @@ class AzureNetwork(network.BaseNetwork):
     # commands more than once, so that is fine.
     self.resource_group.Create()
 
-    if self.avail_set:
-      self.avail_set.Create()
+    if self.placement_group:
+      self.placement_group.Create()
 
     self.storage_account.Create()
 
@@ -506,3 +571,8 @@ class AzureNetwork(network.BaseNetwork):
     # multiple times, but there will be no bad effects from multiple
     # deletes.
     self.resource_group.Delete()
+
+  @classmethod
+  def _GetKeyFromNetworkSpec(cls, spec):
+    """Returns a key used to register Network instances."""
+    return (cls.CLOUD, ZONE, spec.zone)

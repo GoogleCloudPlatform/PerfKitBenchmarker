@@ -1245,15 +1245,17 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
     raise NotImplementedError('Only use for cluster boot for now')
 
 
-class RhelMixin(BaseLinuxMixin):
-  """Class holding RHEL specific VM methods and attributes."""
+class BaseRhelMixin(BaseLinuxMixin):
+  """Class holding RHEL/CentOS specific VM methods and attributes."""
 
-  OS_TYPE = os_types.RHEL
+  # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
+
+  PYTHON_PACKAGE = 'python'
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    super(RhelMixin, self).OnStartup()
+    super(BaseRhelMixin, self).OnStartup()
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
@@ -1268,7 +1270,7 @@ class RhelMixin(BaseLinuxMixin):
     Performs the normal package cleanup, then deletes the file
     added to the /etc/sudoers.d directory during startup.
     """
-    super(RhelMixin, self).PackageCleanup()
+    super(BaseRhelMixin, self).PackageCleanup()
     self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
 
   def SnapshotPackages(self):
@@ -1289,10 +1291,14 @@ class RhelMixin(BaseLinuxMixin):
     return self.TryRemoteCommand('sudo yum info %s' % package,
                                  suppress_warning=True)
 
+  # yum talks to the network on each request so transient issues may fix
+  # themselves on retry
+  @vm_util.Retry()
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""
     self.RemoteCommand('sudo yum install -y %s' % packages)
 
+  @vm_util.Retry()
   def InstallPackageGroup(self, package_group):
     """Installs a 'package group' using the yum package manager."""
     self.RemoteCommand('sudo yum groupinstall -y "%s"' % package_group)
@@ -1342,7 +1348,7 @@ class RhelMixin(BaseLinuxMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(RhelMixin, self).SetupProxy()
+    super(BaseRhelMixin, self).SetupProxy()
     yum_proxy_file = '/etc/yum.conf'
 
     if FLAGS.http_proxy:
@@ -1360,14 +1366,43 @@ class RhelMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class AmazonLinux2Mixin(RhelMixin):
-  """Class holding Amazon Linux2 vm methods and attributes."""
+class AmazonLinux1Mixin(BaseRhelMixin):
+  """Class holding Amazon Linux 1 VM methods and attributes."""
+  OS_TYPE = os_types.AMAZONLINUX1
+
+
+class AmazonLinux2Mixin(BaseRhelMixin):
+  """Class holding Amazon Linux 2 VM methods and attributes."""
   OS_TYPE = os_types.AMAZONLINUX2
 
 
-class Centos7Mixin(RhelMixin):
-  """Class holding Centos 7 specific VM methods and attributes."""
+class VersionlessRhelMixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
+  """Class holding RHEL 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL
+  END_OF_LIFE = '2020-04-01'
+  ALTERNATIVE_OS = os_types.RHEL7
+
+
+class Rhel7Mixin(BaseRhelMixin):
+  """Class holding RHEL 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL7
+
+
+class Rhel8Mixin(BaseRhelMixin):
+  """Class holding RHEL 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL8
+  PYTHON_PACKAGE = 'python2'
+
+
+class CentOs7Mixin(BaseRhelMixin):
+  """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
+
+
+class CentOs8Mixin(BaseRhelMixin):
+  """Class holding CentOS 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS8
+  PYTHON_PACKAGE = 'python2'
 
 
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
@@ -1390,14 +1425,14 @@ class CoreOsMixin(BaseContainerLinuxMixin):
   BASE_OS_TYPE = os_types.CORE_OS
 
 
-class DebianMixin(BaseLinuxMixin):
+class BaseDebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  OS_TYPE = os_types.DEBIAN
+  OS_TYPE = 'base-only'
   BASE_OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
-    super(DebianMixin, self).__init__(*args, **kwargs)
+    super(BaseDebianMixin, self).__init__(*args, **kwargs)
 
     # Whether or not apt-get update has been called.
     # We defer running apt-get update until the first request to install a
@@ -1510,7 +1545,7 @@ class DebianMixin(BaseLinuxMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(DebianMixin, self).SetupProxy()
+    super(BaseDebianMixin, self).SetupProxy()
     apt_proxy_file = '/etc/apt/apt.conf'
     commands = []
 
@@ -1545,12 +1580,17 @@ class DebianMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class Debian9Mixin(DebianMixin):
+class Debian9Mixin(BaseDebianMixin):
   """Class holding Debian9 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN9
 
 
-class UbuntuMixin(DebianMixin):
+class Debian10Mixin(BaseDebianMixin):
+  """Class holding Debian 10 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN10
+
+
+class BaseUbuntuMixin(BaseDebianMixin):
   """Class holding Ubuntu specific VM methods and attributes."""
 
   def AppendKernelCommandLine(self, command_line, reboot=True):
@@ -1564,22 +1604,17 @@ class UbuntuMixin(DebianMixin):
       self.Reboot()
 
 
-class Ubuntu1404Mixin(UbuntuMixin):
-  """Class holding Ubuntu1404 specific VM methods and attributes."""
-  OS_TYPE = os_types.UBUNTU1404
-
-
-class Ubuntu1604Mixin(UbuntuMixin):
+class Ubuntu1604Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604
 
 
-class Ubuntu1710Mixin(UbuntuMixin):
+class Ubuntu1710Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1710 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1710
 
 
-class Ubuntu1804Mixin(UbuntuMixin):
+class Ubuntu1804Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804
 
@@ -1594,12 +1629,12 @@ class Ubuntu1804Mixin(UbuntuMixin):
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
-class Ubuntu1604Cuda9Mixin(UbuntuMixin):
+class Ubuntu1604Cuda9Mixin(BaseUbuntuMixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
 
 
-class ContainerizedDebianMixin(DebianMixin):
+class ContainerizedDebianMixin(BaseDebianMixin):
   """Class representing a Containerized Virtual Machine.
 
   A Containerized Virtual Machine is a VM that runs remote commands
@@ -1609,7 +1644,7 @@ class ContainerizedDebianMixin(DebianMixin):
   """
 
   OS_TYPE = os_types.UBUNTU_CONTAINER
-  BASE_DOCKER_IMAGE = 'ubuntu:trusty-20161006'
+  BASE_DOCKER_IMAGE = 'ubuntu:xenial'
 
   def __init__(self, *args, **kwargs):
     super(ContainerizedDebianMixin, self).__init__(*args, **kwargs)
@@ -1962,7 +1997,7 @@ class ProcCpuResults(object):
     return processor_id, singles, stanza
 
 
-class JujuMixin(DebianMixin):
+class JujuMixin(BaseDebianMixin):
   """Class to allow running Juju-deployed workloads.
 
   Bootstraps a Juju environment using the manual provider:

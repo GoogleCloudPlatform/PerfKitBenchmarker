@@ -30,14 +30,17 @@ from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 
-PLACEMENT_GROUP_OPTIONS = frozenset(['cluster', 'spread', 'none'])
-PLACEMENT_GROUP_DEFAULT = 'cluster'
+PLACEMENT_GROUP_CLUSTER = 'cluster'
+PLACEMENT_GROUP_SPREAD = 'spread'
 PLACEMENT_GROUP_NONE = 'none'
+PLACEMENT_GROUP_OPTIONS = frozenset(
+    [PLACEMENT_GROUP_CLUSTER, PLACEMENT_GROUP_SPREAD, PLACEMENT_GROUP_NONE])
 
+# Default placement group style is specified by Cloud Specific Placement Group.
 flags.DEFINE_enum(
-    'placement_group_style', PLACEMENT_GROUP_DEFAULT,
+    'placement_group_style', None,
     PLACEMENT_GROUP_OPTIONS,
-    'The vm placement group option to use. Default sets placement to cluster.')
+    'The vm placement group option to use. Default set by cloud.')
 
 
 def GetPlacementGroupSpecClass(cloud):
@@ -74,7 +77,8 @@ class BasePlacementGroupSpec(spec.BaseSpec):
           provided config values.
     """
     super(BasePlacementGroupSpec, cls)._ApplyFlags(config_values, flag_values)
-    config_values['placement_group_style'] = FLAGS.placement_group_style
+    if FLAGS.placement_group_style:
+      config_values['placement_group_style'] = FLAGS.placement_group_style
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

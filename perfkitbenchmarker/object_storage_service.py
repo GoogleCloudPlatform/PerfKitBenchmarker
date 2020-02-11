@@ -111,6 +111,41 @@ class ObjectStorageService(
     pass
 
   @abc.abstractmethod
+  def CopyToBucket(self, src_path, bucket, object_path):
+    """Copy a local file to a bucket.
+
+    Args:
+      src_path: string, the local source path.
+      bucket: string, the destination bucket.
+      object_path: string, the object's path in the bucket.
+    """
+    pass
+
+  @abc.abstractmethod
+  def MakeRemoteCliDownloadUrl(self, bucket, object_path):
+    """Creates a download url for an object in a bucket.
+
+    This is used by GenerateCliDownloadFileCommand().
+
+    Args:
+      bucket: string, the name of the bucket.
+      object_path: string, the path of the object in the bucket.
+    """
+    pass
+
+  @abc.abstractmethod
+  def GenerateCliDownloadFileCommand(self, src_url, local_path):
+    """Generates a CLI command to copy src_url to local_path.
+
+    This is suitable for use in scripts e.g. startup scripts.
+
+    Args:
+      src_url: string, the source url path.
+      local_path: string, the local path.
+    """
+    pass
+
+  @abc.abstractmethod
   def List(self, bucket):
     """List providers, buckets, or objects.
 

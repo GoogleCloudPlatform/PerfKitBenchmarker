@@ -39,7 +39,6 @@ import six
 
 FLAGS = flags.FLAGS
 
-UBUNTU_IMAGE = 'ubuntu-upstart'
 SELECTOR_PREFIX = 'pkb'
 
 
@@ -335,9 +334,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     return result_with_empty_values_removed
 
 
-class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
-                                          linux_virtual_machine.DebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
+class DebianBasedKubernetesVirtualMachine(
+    KubernetesVirtualMachine, linux_virtual_machine.BaseDebianMixin):
+  """Base class for Debian based containers running inside k8s."""
 
   def RemoteHostCommandWithReturnCode(self, command,
                                       should_log=False, retries=None,
@@ -536,16 +535,11 @@ def _install_sudo_command():
   ])
   return ['bash', '-c', container_command]
 
-
-class Ubuntu1404BasedKubernetesVirtualMachine(
-    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
-  # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
-  # Note that they do not include all packages that are typically
-  # included with Ubuntu. For example, sudo is not installed.
-  # KubernetesVirtualMachine takes care of this by installing
-  # sudo in the container startup script.
-  DEFAULT_IMAGE = 'ubuntu:14.04'
-  CONTAINER_COMMAND = _install_sudo_command()
+# All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
+# Note that they do not include all packages that are typically
+# included with Ubuntu. For example, sudo is not installed.
+# KubernetesVirtualMachine takes care of this by installing
+# sudo in the container startup script.
 
 
 class Ubuntu1604BasedKubernetesVirtualMachine(

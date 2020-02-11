@@ -34,6 +34,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_placement_group
+from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
 
 flags.DEFINE_string('aws_vpc', None,
@@ -44,6 +45,8 @@ flags.DEFINE_string(
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
 flags.DEFINE_string('aws_efa_version', '1.7.0',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
+flags.DEFINE_multi_enum('aws_endpoint', [], ['s3'],
+                        'List of AWS endpoints to create')
 
 FLAGS = flags.FLAGS
 
@@ -154,6 +157,10 @@ class AwsVpc(resource.BaseResource):
     self.default_security_group_id = None
     if self.id:
       self._SetSecurityGroupId()
+    self._endpoints = [
+        aws_vpc_endpoint.CreateEndpointService(service, self)
+        for service in set(FLAGS.aws_endpoint)
+    ]
 
   def _Create(self):
     """Creates the VPC."""
@@ -170,6 +177,8 @@ class AwsVpc(resource.BaseResource):
 
   def _PostCreate(self):
     self._SetSecurityGroupId()
+    for endpoint in self._endpoints:
+      endpoint.Create()
 
   def _SetSecurityGroupId(self):
     """Looks up the VPC default security group."""
@@ -225,6 +234,14 @@ class AwsVpc(resource.BaseResource):
         '{ "Value": true }']
 
     util.IssueRetryableCommand(enable_hostnames_command)
+
+  def _PreDelete(self):
+    """See base class.
+
+    Deletes the AWS endpoints if created.
+    """
+    for endpoint in self._endpoints:
+      endpoint.Delete()
 
   def _Delete(self):
     """Deletes the VPC."""

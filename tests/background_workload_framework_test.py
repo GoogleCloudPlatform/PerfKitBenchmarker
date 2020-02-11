@@ -23,7 +23,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import timing_util
@@ -43,7 +42,6 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     self.last_call = 0
     super(TestBackgroundWorkloadFramework, self).setUp()
-    FLAGS.os_type = os_types.DEBIAN
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)

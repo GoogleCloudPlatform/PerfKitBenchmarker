@@ -209,5 +209,18 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
                   str(cm.exception))
 
 
+class VmUtilTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(VmUtilTest, self).setUp()
+    self.mock_vm = mock.Mock()
+
+  def testReplaceTextUsesCorrectCommand(self):
+    """Test of vm_util.ReplaceText()."""
+    vm_util.ReplaceText(
+        self.mock_vm, 'current', 'new', 'test_file', regex_char='|')
+    self.mock_vm.RemoteCommand.assert_called_with(
+        'sed -i -r "s|current|new|" test_file')
+
 if __name__ == '__main__':
   unittest.main()

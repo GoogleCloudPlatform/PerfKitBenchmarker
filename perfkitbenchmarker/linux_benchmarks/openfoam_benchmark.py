@@ -31,7 +31,6 @@ from __future__ import print_function
 
 import logging
 import posixpath
-import re
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -45,7 +44,6 @@ from perfkitbenchmarker.linux_packages import openfoam
 _DEFAULT_CASE = 'motorbike'
 _CASE_PATHS = {
     'motorbike': 'tutorials/incompressible/simpleFoam/motorBike',
-    'pipe_cyclic': 'tutorials/incompressible/simpleFoam/pipeCyclic',
 }
 assert _DEFAULT_CASE in _CASE_PATHS
 
@@ -61,10 +59,15 @@ flags.DEFINE_integer(
 flags.DEFINE_string(
     'openfoam_mpi_mapping', 'core:SPAN',
     'Mpirun process mapping to use as arguments to "mpirun --map-by".')
-flags.DEFINE_string(
+flags.DEFINE_enum(
     'openfoam_decomp_method', 'scotch',
+    ['scotch', 'hierarchical', 'simple'],
     'Decomposition method to use in decomposePar. See: '
     'https://cfd.direct/openfoam/user-guide/v7-running-applications-parallel/')
+flags.DEFINE_integer(
+    'openfoam_max_global_cells', 200 * 1000 * 1000,
+    'The maximum number of refinement cells to use in snappHexMeshDict. See: '
+    'https://cfd.direct/openfoam/user-guide/v6-snappyhexmesh/')
 
 BENCHMARK_NAME = 'openfoam'
 _BENCHMARK_ROOT = '$HOME/OpenFOAM/run'
@@ -102,49 +105,51 @@ openfoam:
           nfs_managed: False
           mount_point: {path}
 """.format(path=_BENCHMARK_ROOT)
-_MACHINEFILE = 'MACHINEFILE'
-_RUNSCRIPT = 'Allrun'
-_DECOMPOSEDICT = 'system/decomposeParDict'
-_BLOCKMESHDICT = 'system/blockMeshDict'
+_MACHINE_FILE = posixpath.join(_BENCHMARK_ROOT, 'MACHINEFILE')
+_RUN_SCRIPT = 'Allrun'
+_BLOCK_MESH_DICT = 'system/blockMeshDict'
+_DECOMPOSE_DICT = 'system/decomposeParDict'
+_SNAPPY_HEX_MESH_DICT = 'system/snappyHexMeshDict'
 
-_TIME_RE = re.compile(r"""(\d+)m       # The minutes part
-                          (\d+)\.\d+s  # The seconds part """, re.VERBOSE)
-
-_SSH_CONFIG_CMD = 'echo "LogLevel ERROR" | tee -a $HOME/.ssh/config'
+_SSH_CONFIG_CMD = ('echo "LogLevel ERROR\nHost *\n  IdentitiesOnly yes\n" | '
+                   'tee -a $HOME/.ssh/config')
 
 
 def GetConfig(user_config):
   """Returns the configuration of a benchmark."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  _ParseDimensions(FLAGS.openfoam_dimensions)
   if FLAGS['num_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   return config
 
 
-def _ParseDimensions(dimensions_list):
-  """Parse, validate, and return the supplied dimensions list.
+@flags.validator('openfoam_dimensions')
+def _CheckDimensions(dimensions_list):
+  # throws InvalidValue if an entry is not correct
+  for dimensions in dimensions_list:
+    _ParseDimensions(dimensions)
+  return True
+
+
+def _ParseDimensions(dimensions):
+  """Parse and validate an individual dimensions entry.
 
   Args:
-    dimensions_list: List of strings formatted as "_" separated integers. Like:
-      ['80_20_20', '20_8_8'].
+    dimensions: String formatted as "_" separated integers like: '80_20_20'.
 
   Returns:
-    A parsed list of dimensions like: ['80 20 20', '20 8 8'].
+    Parsed dimensions like: '80 20 20'.
 
   Raises:
     errors.Config.InvalidValue: If input dimensions are incorrectly formatted.
 
   """
-  parsed_dimensions_list = [
-      dimensions.split('_') for dimensions in dimensions_list
-  ]
-  for dimensions in parsed_dimensions_list:
-    if not all(value.isdigit() for value in dimensions):
-      raise errors.Config.InvalidValue(
-          'Expected list of ints separated by "_" in --openfoam_dimensions '
-          'but received %s.' % dimensions)
-  return [' '.join(dimensions) for dimensions in parsed_dimensions_list]
+  dimensions = dimensions.split('_')
+  if not all(value.isdigit() for value in dimensions):
+    raise errors.Config.InvalidValue(
+        'Expected list of ints separated by "_" in --openfoam_dimensions '
+        'but received %s.' % dimensions)
+  return ' '.join(dimensions)
 
 
 def Prepare(benchmark_spec):
@@ -158,46 +163,19 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vm_util.RunThreaded(lambda vm: vm.Install('openfoam'), vms)
-
-  master_vm = vms[0]
-  master_vm.RemoteCommand('mkdir -p %s' % _BENCHMARK_ROOT)
-  master_vm.RemoteCommand('cp -r {case_path} {run_path}'.format(
-      case_path=posixpath.join(openfoam.OPENFOAM_ROOT,
-                               _CASE_PATHS[FLAGS.openfoam_case]),
-      run_path=_BENCHMARK_ROOT))
-
-  # Allow ssh access to other vms and avoid printing ssh warnings when running
-  # mpirun.
+  # Allow ssh access to other vms.
   vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
+  # Avoids printing ssh warnings and prevents too many auth errors.
   vm_util.RunThreaded(lambda vm: vm.RemoteCommand(_SSH_CONFIG_CMD), vms)
-  # Tells mpirun about other nodes
-  hpc_util.CreateMachineFile(vms, remote_path=_GetPath(_MACHINEFILE))
-
-
-def _AsSeconds(input_time):
-  """Convert time from formatted string to seconds.
-
-  Input format: 200m1.419s
-  Should return 1201
-
-  Args:
-    input_time: The time to parse to an integer.
-
-  Returns:
-    An integer representing the time in seconds.
-  """
-  match = _TIME_RE.match(input_time)
-  assert match, 'Time "{}" does not match format "{}"'.format(input_time,
-                                                              _TIME_RE.pattern)
-  minutes, seconds = match.group(1, 2)
-  return int(minutes) * 60 + int(seconds)
+  # Tell mpirun about other nodes.
+  hpc_util.CreateMachineFile(vms, remote_path=_MACHINE_FILE)
 
 
 def _GetSample(line):
   """Parse a single output line into a performance sample.
 
   Input format:
-    real    4m1.419s
+    real 100.00
 
   Args:
     line: A single line from the OpenFOAM timing output.
@@ -206,9 +184,13 @@ def _GetSample(line):
     A single performance sample, with times in ms.
   """
   runtime_category, runtime_output = line.split()
-  runtime_seconds = _AsSeconds(runtime_output)
-  logging.info('Runtime of %s seconds from [%s, %s]',
-               runtime_seconds, runtime_category, runtime_output)
+  try:
+    runtime_seconds = int(float(runtime_output))
+  except:
+    raise ValueError(
+        'Output "%s" does not match expected format "real 100.00".' % line)
+  logging.info('Runtime of %s seconds from [%s, %s]', runtime_seconds,
+               runtime_category, runtime_output)
   runtime_category = 'time_' + runtime_category
   return sample.Sample(runtime_category, runtime_seconds, 'seconds')
 
@@ -216,10 +198,10 @@ def _GetSample(line):
 def _GetSamples(output):
   """Parse the output and return performance samples.
 
-  Output is in the format:
-    real    4m1.419s
-    user    23m11.198s
-    sys     0m25.274s
+  Output is in the format (example numbers):
+    real 100.00
+    user 60.55
+    sys 99.31
 
   Args:
     output: The output from running the OpenFOAM benchmark.
@@ -251,43 +233,20 @@ def _GetPath(openfoam_file):
   return posixpath.join(_GetWorkingDirPath(), openfoam_file)
 
 
-def _SetDecomposeMethod(vm, decompose_method):
-  """Set the parallel decomposition method if using multiple cores."""
-  logging.info('Using %s decomposition', decompose_method)
-  vm_util.ReplaceText(vm, 'method.*', 'method %s;' % decompose_method,
-                      _GetPath(_DECOMPOSEDICT))
-
-
-def _SetNumProcesses(vm, num_processes):
-  """Configure OpenFOAM to use the correct number of processes."""
-  logging.info('Decomposing into %s subdomains', num_processes)
-  vm_util.ReplaceText(vm, 'numberOfSubdomains.*',
-                      'numberOfSubdomains %s;' % str(num_processes),
-                      _GetPath(_DECOMPOSEDICT))
-
-
-def _SetDimensions(vm, dimensions):
-  """Sets the mesh dimensions in blockMeshDict.
-
-  Replaces lines of the format:
-  hex (0 1 2 3 4 5 6 7) (20 8 8) simpleGrading (1 1 1)
-
-  with:
-  hex (0 1 2 3 4 5 6 7) (dimensions) simpleGrading (1 1 1)
-
-  The actual contents of the second set of parentheses doesn't matter. This
-  function will just replace whatever is inside those.
+def _SetDictEntry(vm, key, value, dict_file_name):
+  """Sets an entry in an OpenFOAM dictionary file.
 
   Args:
-    vm: The VM to make the replacement on.
-    dimensions: String, new mesh dimensions to run with.
-
+    vm: The VM to set the entry on.
+    key: String; name of the key to set (like hierarchicalCoeffs.n).
+    value: String; the value to set.
+    dict_file_name: String; name of the file to set the specified entry. This
+      file should be in the working directory. Example: system/snappyHexMeshDict
   """
-  logging.info('Using dimensions (%s) in blockMeshDict', dimensions)
-  vm_util.ReplaceText(vm, r'(hex \(.*\) \().*(\) .* \(.*\))',
-                      r'\1{}\2'.format(dimensions),
-                      _GetPath(_BLOCKMESHDICT),
-                      regex_char='|')
+  vm.RemoteCommand('foamDictionary -entry {key} -set "{value}" {file}'.format(
+      key=key,
+      value=value,
+      file=_GetPath(dict_file_name)))
 
 
 def _UseMpi(vm, num_processes, mapping):
@@ -302,17 +261,17 @@ def _UseMpi(vm, num_processes, mapping):
       MPI job.
     mapping: A string for the mpirun --map-by flag.
   """
-  runscript = _GetPath(_RUNSCRIPT)
+  run_script = _GetPath(_RUN_SCRIPT)
   vm_util.ReplaceText(
       vm, 'runParallel', 'mpirun '
       '-hostfile {machinefile} '
       '-mca btl ^openib '
       '--map-by {mapping} '
       '-np {num_processes}'.format(
-          machinefile=_GetPath(_MACHINEFILE),
+          machinefile=_MACHINE_FILE,
           mapping=mapping,
-          num_processes=num_processes), runscript, '|')
-  vm_util.ReplaceText(vm, '^mpirun.*', '& -parallel', runscript)
+          num_processes=num_processes), run_script, '|')
+  vm_util.ReplaceText(vm, '^mpirun.*', '& -parallel', run_script)
 
 
 def _RunCase(master_vm, dimensions):
@@ -326,11 +285,19 @@ def _RunCase(master_vm, dimensions):
   Returns:
     A list of performance samples for the given dimensions.
   """
-  _SetDimensions(master_vm, dimensions)
+  dims_entry = ('( hex ( 0 1 2 3 4 5 6 7 ) ( {dimensions} ) '
+                'simpleGrading ( 1 1 1 ) )').format(
+                    dimensions=_ParseDimensions(dimensions))
+  _SetDictEntry(master_vm, 'blocks', dims_entry, _BLOCK_MESH_DICT)
+
   run_command = ' && '.join(
-      ['cd %s' % _GetWorkingDirPath(), './Allclean', 'time ./Allrun'])
+      ['cd %s' % _GetWorkingDirPath(), './Allclean', 'time -p ./Allrun'])
   _, run_output = master_vm.RemoteCommand(run_command)
-  return _GetSamples(run_output)
+  results = _GetSamples(run_output)
+  # Update every run with run-specific metadata.
+  for result in results:
+    result.metadata['dimensions'] = dimensions
+  return results
 
 
 def Run(benchmark_spec):
@@ -355,11 +322,13 @@ def Run(benchmark_spec):
   case_name = FLAGS.openfoam_case
   mpi_mapping = FLAGS.openfoam_mpi_mapping
   decomp_method = FLAGS.openfoam_decomp_method
+  max_global_cells = FLAGS.openfoam_max_global_cells
   openfoam_version = _GetOpenfoamVersion(master_vm)
   openmpi_version = _GetOpenmpiVersion(master_vm)
   common_metadata = {
       'case_name': case_name,
       'decomp_method': decomp_method,
+      'max_global_cells': max_global_cells,
       'mpi_mapping': mpi_mapping,
       'openfoam_version': openfoam_version,
       'openmpi_version': openmpi_version,
@@ -370,21 +339,29 @@ def Run(benchmark_spec):
                num_cpus_to_use, num_cpus_available, num_vms)
   logging.info('Common metadata: %s', common_metadata)
 
-  # Configure the run
+  # Copy the run directory.
   master_vm.RemoteCommand('cp -r {case_path} {destination}'.format(
       case_path=posixpath.join(openfoam.OPENFOAM_ROOT, _CASE_PATHS[case_name]),
       destination=_BENCHMARK_ROOT))
-  _SetDecomposeMethod(master_vm, 'scotch')
-  _SetNumProcesses(master_vm, num_cpus_to_use)
+
+  # Configure common parameters.
+  _SetDictEntry(master_vm, 'method', decomp_method, _DECOMPOSE_DICT)
+  _SetDictEntry(master_vm, 'numberOfSubdomains', num_cpus_to_use,
+                _DECOMPOSE_DICT)
+  _SetDictEntry(master_vm, 'hierarchicalCoeffs.n',
+                '({} 1 1)'.format(num_cpus_to_use),
+                _DECOMPOSE_DICT)
+  _SetDictEntry(master_vm, 'castellatedMeshControls.maxGlobalCells',
+                max_global_cells, _SNAPPY_HEX_MESH_DICT)
   _UseMpi(master_vm, num_cpus_to_use, mpi_mapping)
 
   # Run and gather samples.
   samples = []
-  for dimensions in _ParseDimensions(FLAGS.openfoam_dimensions):
+  for dimensions in FLAGS.openfoam_dimensions:
     results = _RunCase(master_vm, dimensions)
+    # Update every case run with common metadata.
     for result in results:
       result.metadata.update(common_metadata)
-      result.metadata['dimensions'] = dimensions
     samples.extend(results)
   return samples
 
