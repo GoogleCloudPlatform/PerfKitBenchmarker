@@ -38,5 +38,15 @@
     "MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 10.240.31.117 () port 20001 AF_INET : +/-2.500% @ 99% conf.  : first burst 0",
     "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Local Transport Retransmissions,Remote Transport Retransmissions",
     "3313.49,Trans/s,7.546,20,214.64,295,330,406,200,500,0,0"
+  ],
+  [
+    "MIGRATED UDP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 104.198.67.251 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Confidence Iterations Run,Throughput Confidence Width (%),Local Transport Retransmissions,Remote Transport Retransmissions",
+    "1102.42,10^6bits/s,3,3,11,46.14,1,15144,1,-1.000,-1,-1"
+  ],
+    [
+    "MIGRATED UDP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 104.198.67.251 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Confidence Iterations Run,Throughput Confidence Width (%),Local Transport Retransmissions,Remote Transport Retransmissions",
+    "1802.72,10^6bits/s,3,3,11,46.14,1,15144,1,-1.000,-1,-1"
   ]
 ]

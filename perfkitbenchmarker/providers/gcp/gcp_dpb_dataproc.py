@@ -69,6 +69,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if not self.dpb_service_zone:
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
+    self.region = self.dpb_service_zone.rsplit('-', 1)[0]
 
   @staticmethod
   def _ParseTime(state_time):
@@ -109,10 +110,15 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
 
+  def DataprocGcloudCommand(self, *args):
+    all_args = ('dataproc',) + args
+    cmd = util.GcloudCommand(self, *all_args)
+    cmd.flags['region'] = self.region
+    return cmd
+
   def _Create(self):
     """Creates the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'create',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'create', self.cluster_id)
     if self.project is not None:
       cmd.flags['project'] = self.project
 
@@ -158,8 +164,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def _PostCreate(self):
     """Get the cluster's data and tag it."""
-    cmd = util.GcloudCommand(
-        self, 'dataproc', 'clusters', 'describe', self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
     stdout, _, _ = cmd.Issue()
     config = json.loads(stdout)['config']
     master = config['masterConfig']
@@ -171,20 +176,14 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       cmd.flags['zone'] = self.dpb_service_zone
       cmd.Issue()
 
-  def append_region(self, cmd):
-    region = self.dpb_service_zone.rsplit('-', 1)[0]
-    cmd.flags['region'] = region
-
   def _Delete(self):
     """Deletes the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'delete', self.cluster_id)
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
-                             self.cluster_id)
+    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
@@ -205,7 +204,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if job_type == self.PYSPARK_JOB_TYPE:
       args.append(pyspark_file)
 
-    cmd = util.GcloudCommand(self, 'dataproc', *args)
+    cmd = self.DataprocGcloudCommand(*args)
 
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -262,7 +261,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to generate data using a distributed job on the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
 
@@ -278,7 +277,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to read data using a distributed job on the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
 
@@ -294,7 +293,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['class'] = 'org.apache.hadoop.tools.DistCp'
 
@@ -309,7 +308,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   def cleanup_data(self, base_dir, udpate_default_fs):
     """Method to cleanup data using a distributed job on the cluster."""
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
 
@@ -340,7 +339,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       A dictionary with key 'success' and boolean value set to the status of
       data migration command.
     """
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
     if self.project is not None:
       cmd.flags['project'] = self.project
     cmd.flags['cluster'] = self.cluster_id

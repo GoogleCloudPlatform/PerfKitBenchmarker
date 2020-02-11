@@ -26,7 +26,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -252,7 +251,6 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(AwsVirtualMachineTestCase, self).setUp()
     FLAGS.cloud = providers.AWS
-    FLAGS.os_type = os_types.DEBIAN
     FLAGS.run_uri = 'aaaaaa'
     FLAGS.temp_dir = 'tmp'
     p = mock.patch('perfkitbenchmarker.providers.aws.'

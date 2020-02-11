@@ -431,18 +431,6 @@ class AliCloudKeyFileManager(object):
     return keyfile.strip()
 
 
-class DebianBasedAliVirtualMachine(AliVirtualMachine,
-                                   linux_virtual_machine.DebianMixin):
-  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-
-
-class Ubuntu1404BasedAliVirtualMachine(AliVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1604Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-
-
 class Ubuntu1604BasedAliVirtualMachine(AliVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu_16_04_64*alibase*.vhd'
@@ -454,22 +442,16 @@ class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu_18_04_64*alibase*.vhd'
 
 
-class Centos7BasedAliVirtualMachine(AliVirtualMachine,
-                                    linux_virtual_machine.Centos7Mixin):
+class CentOs7BasedAliVirtualMachine(AliVirtualMachine,
+                                    linux_virtual_machine.CentOs7Mixin):
   IMAGE_NAME_FILTER = 'centos_7_05_64*alibase*.vhd'
 
-  def __init__(self, vm_spec):
-    super(Centos7BasedAliVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python2-devel'
-    self.python_pip_package_config = 'python2-pip'
 
-
-class RhelBasedAliVirtualMachine(AliVirtualMachine,
-                                 linux_virtual_machine.RhelMixin):
+class VersionlessRhelBasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
   pass
 
 
-class WindowsAliVirtualMachine(AliVirtualMachine,
-                               windows_virtual_machine.WindowsMixin):
+class VersionlessWindowsAliVirtualMachine(
+    AliVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
   pass
