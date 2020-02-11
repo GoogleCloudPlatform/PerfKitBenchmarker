@@ -155,7 +155,7 @@ class Athena(edw_service.EdwService):
       If the database and/or tables don't already exist, the drop commands
       will simply fail, which won't raise errors.
       """
-      drop_script_path = data.ResourcePath('edw/athena/%s/ddl/s3_drop.sql' %
+      drop_script_path = data.ResourcePath('edw/athena/%s/ddl/drop.sql' %
                                            FLAGS.edw_tpc_dsb_type)
       drop_script_contents = ReadScript(drop_script_path)
       # Drop all tables so the database can be dropped.
@@ -199,8 +199,8 @@ class Athena(edw_service.EdwService):
       cumulative_table_create_time = 0
       for table in self.tables:
         for suffix in ['_csv', '_parquet']:
-          script = 'edw/athena/%s/ddl/s3_%s.sql' % (FLAGS.edw_tpc_dsb_type,
-                                                    table + suffix)
+          script = 'edw/athena/%s/ddl/%s.sql' % (FLAGS.edw_tpc_dsb_type,
+                                                 table + suffix)
           _, table_create_time = _CreateTable(script)
           cumulative_table_create_time += table_create_time
       return cumulative_table_create_time
