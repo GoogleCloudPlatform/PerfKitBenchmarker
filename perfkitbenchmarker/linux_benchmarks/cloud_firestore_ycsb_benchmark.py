@@ -13,12 +13,9 @@
 # limitations under the License.
 """Run YCSB benchmark against Google Cloud Firestore.
 
-Before running this benchmark, you have to download your P12
+Before running this benchmark, you have to download your JSON
 service account private key file to local machine, and pass the path
 via 'google_firestore_keyfile' parameters to PKB.
-
-Service Account email associated with the key file is also needed to
-pass to PKB.
 
 By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Firestore.
@@ -47,11 +44,11 @@ YCSB_BINDING_TAR_URL = ('https://github.com/charlie-lobo/YCSB/releases'
                         '/download/0.17.0fs/'
                         'ycsb-googlefirestore-binding-0.17.0.tar.gz')
 YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'lib')
-PRIVATE_KEYFILE_DIR = '/tmp/key.p12'
+PRIVATE_KEYFILE_DIR = '/tmp/key.json'
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('google_firestore_keyfile', None,
-                    'The path to Google API P12 private key file')
+                    'The path to Google API JSON private key file')
 flags.DEFINE_string('google_firestore_project_id', None,
                     'The project ID that has Cloud Firestore service')
 flags.DEFINE_string('google_firestore_debug', 'false',
