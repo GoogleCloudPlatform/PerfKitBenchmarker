@@ -55,8 +55,8 @@ DEFAULT_PORTS = {
 }
 
 DEFAULT_ENGINE_VERSIONS = {
-    relational_db.MYSQL: DEFAULT_GCP_MYSQL_VERSION,
-    relational_db.POSTGRES: DEFAULT_GCP_POSTGRES_VERSION,
+    relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
+    relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
     relational_db.SQLSERVER: DEFAULT_GCP_SQLSERVER_VERSION,
 }
 
@@ -299,7 +299,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       cmd.Issue(raise_on_failure=False)
 
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
-                             self.instance_id, '--quiet')
+                             self.instance_id, '--quiet', '--async')
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
