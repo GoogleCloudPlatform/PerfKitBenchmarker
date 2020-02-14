@@ -123,6 +123,15 @@ def ParseNetperfAggregateOutput(stdout):
       aggregate_samples.append(sample.Sample(
           metric, value, unit, metadata))
 
+      # Each Transaction consists of a send and a receive packet
+      # So Packets per second is Trans/s * 2
+      if "Trans/s" in metric:
+        metric = metric.split()[0] + " Packets/s"
+        value = value * 2
+        unit = "Packets/s"
+        aggregate_samples.append(sample.Sample(
+            metric, value, unit, metadata))
+
   return aggregate_samples
 
 
