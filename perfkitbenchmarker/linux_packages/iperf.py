@@ -31,7 +31,7 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('wget')
 
-  vm.RemoteCommand('wget -O %s/%s %s' % 
+  vm.RemoteCommand('wget -O %s/%s %s' %
                    (INSTALL_DIR, IPERF_TAR, IPERF_URL))
 
   vm.RemoteCommand('cd %s; tar xvf %s; cd %s; '
