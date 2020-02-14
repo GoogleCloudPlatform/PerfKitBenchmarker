@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.gcp.google_container_engine."""
+"""Tests for perfkitbenchmarker.providers.gcp.google_kubernetes_engine."""
 
 # pylint: disable=not-context-manager
 
@@ -26,7 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.providers.gcp import google_container_engine
+from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 from six.moves import builtins
@@ -66,12 +66,12 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     yield issue_command
 
 
-class GoogleContainerEngineMinCpuPlatformTestCase(
+class GoogleKubernetesEngineMinCpuPlatformTestCase(
     pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
-  def create_container_engine_spec():
-    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -81,12 +81,12 @@ class GoogleContainerEngineMinCpuPlatformTestCase(
                 },
             },
         })
-    return container_engine_spec
+    return kubernetes_engine_spec
 
   def testCreate(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -96,12 +96,12 @@ class GoogleContainerEngineMinCpuPlatformTestCase(
       self.assertIn('--min-cpu-platform skylake', command_string)
 
 
-class GoogleContainerEngineCustomMachineTypeTestCase(
+class GoogleKubernetesEngineCustomMachineTypeTestCase(
     pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
-  def create_container_engine_spec():
-    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -113,12 +113,12 @@ class GoogleContainerEngineCustomMachineTypeTestCase(
                 },
             },
         })
-    return container_engine_spec
+    return kubernetes_engine_spec
 
   def testCreate(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -127,11 +127,11 @@ class GoogleContainerEngineCustomMachineTypeTestCase(
       self.assertIn('--machine-type custom-4-1024', command_string)
 
 
-class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
+class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
-  def create_container_engine_spec():
-    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -142,12 +142,12 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
             },
             'vm_count': 2,
         })
-    return container_engine_spec
+    return kubernetes_engine_spec
 
   def testCreate(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -158,7 +158,7 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--zone us-central1-a', command_string)
 
   def testCreateResourcesExhausted(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects(
         stderr="""
         [ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS]:
@@ -166,18 +166,18 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'projects/artemis-prod/zones/us-central1-a' does not have enough
         resources available to fulfill the request.""",
         return_code=1) as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       with self.assertRaises(
           errors.Benchmarks.InsufficientCapacityCloudFailure):
         cluster._Create()
       self.assertEqual(issue_command.call_count, 1)
 
   @mock.patch.object(
-      google_container_engine.GkeCluster, '_AddTags', return_value=None)
+      google_kubernetes_engine.GkeCluster, '_AddTags', return_value=None)
   def testPostCreate(self, _):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -188,9 +188,9 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
   def testDelete(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -200,9 +200,9 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--zone us-central1-a', command_string)
 
   def testExists(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Exists()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -212,12 +212,12 @@ class GoogleContainerEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
           command_string)
 
 
-class GoogleContainerEngineVersionFlagTestCase(
+class GoogleKubernetesEngineVersionFlagTestCase(
     pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
-  def create_container_engine_spec():
-    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -226,13 +226,13 @@ class GoogleContainerEngineVersionFlagTestCase(
                 },
             },
         })
-    return container_engine_spec
+    return kubernetes_engine_spec
 
   def testCreateCustomVersion(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     FLAGS.container_cluster_version = 'fake-version'
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -240,9 +240,9 @@ class GoogleContainerEngineVersionFlagTestCase(
       self.assertIn('--cluster-version fake-version', command_string)
 
   def testCreateDefaultVersion(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -250,12 +250,12 @@ class GoogleContainerEngineVersionFlagTestCase(
       self.assertIn('--cluster-version latest', command_string)
 
 
-class GoogleContainerEngineWithGpusTestCase(
+class GoogleKubernetesEngineWithGpusTestCase(
     pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
-  def create_container_engine_spec():
-    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -267,12 +267,12 @@ class GoogleContainerEngineWithGpusTestCase(
             },
             'vm_count': 2,
         })
-    return container_engine_spec
+    return kubernetes_engine_spec
 
   def testCreate(self):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -285,11 +285,11 @@ class GoogleContainerEngineWithGpusTestCase(
 
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
   @mock.patch.object(
-      google_container_engine.GkeCluster, '_AddTags', return_value=None)
+      google_kubernetes_engine.GkeCluster, '_AddTags', return_value=None)
   def testPostCreate(self, _, create_from_file_patch):
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -314,15 +314,15 @@ class GoogleContainerEngineWithGpusTestCase(
       create_from_file_patch.assert_has_calls(expected_calls)
 
 
-class GoogleContainerEngineGetNodesTestCase(GoogleContainerEngineTestCase):
+class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 
   def testGetInstancesFromInstanceGroups(self):
     instance_group_name = 'gke-pkb-0c47e6fa-default-pool-167d73ee-grp'
     path = os.path.join(os.path.dirname(__file__), _INSTANCE_GROUPS_LIST_OUTPUT)
     output = open(path).read()
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects(stdout=output) as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       instances = cluster._GetInstancesFromInstanceGroup(instance_group_name)
 
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -340,9 +340,9 @@ class GoogleContainerEngineGetNodesTestCase(GoogleContainerEngineTestCase):
   def testGetInstanceGroups(self):
     path = os.path.join(os.path.dirname(__file__), _NODE_POOLS_LIST_OUTPUT)
     output = open(path).read()
-    spec = self.create_container_engine_spec()
+    spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects(stdout=output) as issue_command:
-      cluster = google_container_engine.GkeCluster(spec)
+      cluster = google_kubernetes_engine.GkeCluster(spec)
       instance_groups = cluster._GetInstanceGroups()
 
       command_string = ' '.join(issue_command.call_args[0][0])
