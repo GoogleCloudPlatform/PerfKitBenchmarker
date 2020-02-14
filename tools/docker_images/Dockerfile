@@ -1,4 +1,4 @@
-FROM ubuntu:trusty
+FROM ubuntu:xenial
 
 RUN apt-get update && apt-get install -y ssh
 RUN mkdir /var/run/sshd ;\

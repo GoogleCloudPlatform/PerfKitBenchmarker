@@ -491,13 +491,7 @@ class _RelationalDbSpec(spec.BaseSpec):
             'valid_values': providers.VALID_CLOUDS
         }),
         'engine': (option_decoders.EnumDecoder, {
-            'valid_values': [
-                relational_db.MYSQL,
-                relational_db.POSTGRES,
-                relational_db.AURORA_POSTGRES,
-                relational_db.AURORA_MYSQL,
-                relational_db.AURORA_MYSQL56,
-            ]
+            'valid_values': relational_db.ALL_ENGINES,
         }),
         'zones': (option_decoders.ListDecoder, {
             'item_decoder': option_decoders.StringDecoder(),

@@ -42,9 +42,23 @@ DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
+DEFAULT_GCP_SQLSERVER_VERSION = 'SQLSERVER_2017_STANDARD'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
+DEFAULT_SQLSERVER_PORT = 1433
+
+DEFAULT_PORTS = {
+    relational_db.MYSQL: DEFAULT_MYSQL_PORT,
+    relational_db.POSTGRES: DEFAULT_POSTGRES_PORT,
+    relational_db.SQLSERVER: DEFAULT_SQLSERVER_PORT,
+}
+
+DEFAULT_ENGINE_VERSIONS = {
+    relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
+    relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
+    relational_db.SQLSERVER: DEFAULT_GCP_SQLSERVER_VERSION,
+}
 
 # PostgreSQL restrictions on memory.
 # Source: https://cloud.google.com/sql/docs/postgres/instance-settings.
@@ -116,6 +130,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     ]
     if self.spec.engine == relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
+
+    if self.spec.engine == relational_db.SQLSERVER:
+      # `--root-password` is required when creating SQL Server instances.
+      cmd_string.append('--root-password={0}'.format(
+          self.spec.database_password))
 
     if (self.spec.db_spec.cpus and self.spec.db_spec.memory):
       self._ValidateSpec()
@@ -266,6 +285,13 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       if hasattr(self, 'firewall'):
         self.firewall.DisallowAllPorts()
       self.unmanaged_db_exists = False
+      self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
+      self.server_vm.RemoteCommand(
+          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_connects\';"' %
+          self.MakeMysqlConnectionString(use_localhost=True))
+      self.server_vm.RemoteCommand(
+          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_clients\';"' %
+          self.MakeMysqlConnectionString(use_localhost=True))
       return
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
@@ -273,7 +299,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       cmd.Issue(raise_on_failure=False)
 
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
-                             self.instance_id, '--quiet')
+                             self.instance_id, '--quiet', '--async')
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
@@ -345,7 +371,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     stdout, _, _ = cmd.Issue()
     json_output = json.loads(stdout)
     self.endpoint = self._ParseEndpoint(json_output)
-    self.port = DEFAULT_MYSQL_PORT
+    self.port = self._GetDefaultPort(self.spec.engine)
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
@@ -398,10 +424,10 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       (string): Default version for the given database engine.
     """
-    if engine == relational_db.MYSQL:
-      return DEFAULT_MYSQL_VERSION
-    elif engine == relational_db.POSTGRES:
-      return DEFAULT_POSTGRES_VERSION
+    if engine not in DEFAULT_ENGINE_VERSIONS:
+      raise NotImplementedError('Default engine not specified for '
+                                'engine {0}'.format(engine))
+    return DEFAULT_ENGINE_VERSIONS[engine]
 
   @staticmethod
   def _GetEngineVersionString(engine, version):
@@ -425,8 +451,19 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     elif engine == relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION
-    raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
-                              'POSTGRES 9.6')
+    elif engine == relational_db.SQLSERVER:
+      if version == DEFAULT_GCP_SQLSERVER_VERSION:
+        return DEFAULT_GCP_SQLSERVER_VERSION
+    raise NotImplementedError('Unsupported managed DB version: '
+                              '{0}, {1}'.format(engine, version))
+
+  @staticmethod
+  def _GetDefaultPort(engine):
+    """Returns default port for the db engine from the spec."""
+    if engine not in DEFAULT_PORTS:
+      raise NotImplementedError('Default port not specified for '
+                                'engine {0}'.format(engine))
+    return DEFAULT_PORTS[engine]
 
   def _FailoverHA(self):
     """Fail over from master to replica."""

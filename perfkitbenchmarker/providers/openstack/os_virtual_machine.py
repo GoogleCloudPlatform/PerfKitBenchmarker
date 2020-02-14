@@ -40,10 +40,7 @@ from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 from six.moves import range
 
-RHEL_IMAGE = 'rhel-7.2'
-CENTOS_IMAGE = 'centos7'
-UBUNTU_IMAGE = 'ubuntu-14.04'
-CLEAR_IMAGE = 'upstream-clear'
+
 NONE = 'None'
 
 VALIDATION_ERROR_MESSAGE = '{0} {1} could not be found.'
@@ -396,39 +393,22 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
 
-class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                         linux_virtual_machine.DebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
+class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                        linux_virtual_machine.Rhel7Mixin):
+  DEFAULT_IMAGE = 'rhel-7.2'
 
 
-class RhelBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                       linux_virtual_machine.RhelMixin):
-  DEFAULT_IMAGE = RHEL_IMAGE
+class VersionlessRhel7BasedOpenStackVirtualMachine(
+    linux_virtual_machine.VersionlessRhelMixin,
+    Rhel7BasedOpenStackVirtualMachine):
+  pass
 
-  def __init__(self, vm_spec):
-    super(RhelBasedOpenStackVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
-
-
-class Centos7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                          linux_virtual_machine.Centos7Mixin):
-  DEFAULT_IMAGE = CENTOS_IMAGE
-
-  def __init__(self, vm_spec):
-    super(Centos7BasedOpenStackVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
 
 class ClearBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                           linux_virtual_machine.ClearMixin):
-  DEFAULT_IMAGE = CLEAR_IMAGE
+  DEFAULT_IMAGE = 'ubuntu-14.04'
 
-  def __init__(self, vm_spec):
-    super(ClearBasedOpenStackVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
 
+class CentOs7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                          linux_virtual_machine.CentOs7Mixin):
+  DEFAULT_IMAGE = 'centos7'

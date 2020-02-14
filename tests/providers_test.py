@@ -69,7 +69,7 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
         'vm_groups': {
             'group1': {
                 'cloud': 'AWS',
-                'os_type': 'debian',
+                'os_type': 'ubuntu1804',
                 'vm_count': 0,
                 'vm_spec': {'AWS': {}}
             }

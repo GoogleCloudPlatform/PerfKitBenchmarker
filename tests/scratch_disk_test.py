@@ -156,7 +156,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = azure_virtual_machine.AzureVmSpec(
         'test_vm_spec.Azure', zone='eastus2', machine_type='test_machine_type')
-    return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
+    return azure_virtual_machine.Ubuntu1604BasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return azure_disk.AzureDisk
@@ -170,7 +170,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec('test_vm_spec.GCP',
                                             machine_type='test_machine_type')
-    return gce_virtual_machine.DebianBasedGceVirtualMachine(vm_spec)
+    return gce_virtual_machine.Ubuntu1604BasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk
@@ -191,7 +191,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
                                             zone='us-east-1a',
                                             machine_type='test_machine_type')
-    return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
+    return aws_virtual_machine.Ubuntu1604BasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk

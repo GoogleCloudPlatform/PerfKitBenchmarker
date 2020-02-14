@@ -291,20 +291,15 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 def GetStaticVmClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
   if not os_type:
-    logging.warning('Could not find os type for VM. Defaulting to debian.')
-    os_type = os_types.DEBIAN
+    os_type = os_types.DEFAULT
+    logging.warning('Could not find os type for VM. Defaulting to %s.', os_type)
   return resource.GetResourceClass(virtual_machine.BaseVirtualMachine,
                                    CLOUD=StaticVirtualMachine.CLOUD,
                                    OS_TYPE=os_type)
 
 
-class ContainerizedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.ContainerizedDebianMixin):
-  pass
-
-
-class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
-                                      linux_virtual_machine.DebianMixin):
+class Ubuntu1604BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
   pass
 
 
@@ -313,21 +308,21 @@ class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
-class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
-                                    linux_virtual_machine.RhelMixin):
+class VersionlessRhelBasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
   pass
 
 
-class Centos7BasedStaticVirtualMachine(StaticVirtualMachine,
-                                       linux_virtual_machine.Centos7Mixin):
-
-  def __init__(self, vm_spec):
-    super(Centos7BasedStaticVirtualMachine, self).__init__(vm_spec)
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
+class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
+                                     linux_virtual_machine.Rhel7Mixin):
+  pass
 
 
-class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,
-                                       windows_virtual_machine.WindowsMixin):
+class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.CentOs7Mixin):
+  pass
+
+
+class VersionlessWindowsBasedStaticVirtualMachine(
+    StaticVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
   pass

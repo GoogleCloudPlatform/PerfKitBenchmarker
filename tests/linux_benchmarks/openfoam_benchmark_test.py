@@ -19,8 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import subprocess
-import tempfile
 import unittest
 
 from absl.testing import flagsaver
@@ -58,7 +56,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
                                            mock_getmpiversion):
     # Run with mocked output data
     self.mock_vm.RemoteCommand.return_value = None, '\n'.join(
-        ['real    4m1.419s', 'user    23m11.198s', 'sys     0m25.274s'])
+        ['real 131.64', 'user 327.05', 'sys 137.04'])
     self.mock_vm.NumCpusForBenchmark.return_value = 8
     samples = openfoam_benchmark.Run(self.mock_benchmark_spec)
 
@@ -66,7 +64,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     run_cmd = [
         'cd $HOME/OpenFOAM/run/motorBike',
         './Allclean',
-        'time ./Allrun'
+        'time -p ./Allrun'
     ]
     self.mock_vm.RemoteCommand.assert_called_with(' && '.join(run_cmd))
 
@@ -74,7 +72,8 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     expected_metadata = {
         'case_name': 'motorbike',
         'decomp_method': 'scotch',
-        'dimensions': '80 32 32',
+        'dimensions': '80_32_32',
+        'max_global_cells': 200000000,
         'mpi_mapping': 'core:SPAN',
         'openfoam_version': '7',
         'openmpi_version': '1.10.2',
@@ -83,41 +82,17 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     }
     unit = 'seconds'
     self.assertSamplesEqualUpToTimestamp(
-        sample.Sample('time_real', 241, unit, expected_metadata), samples[0])
+        sample.Sample('time_real', 131, unit, expected_metadata), samples[0])
     self.assertSamplesEqualUpToTimestamp(
-        sample.Sample('time_user', 1391, unit, expected_metadata), samples[1])
+        sample.Sample('time_user', 327, unit, expected_metadata), samples[1])
     self.assertSamplesEqualUpToTimestamp(
-        sample.Sample('time_sys', 25, unit, expected_metadata), samples[2])
+        sample.Sample('time_sys', 137, unit, expected_metadata), samples[2])
 
   def testYumInstallRaisesNotImplementedError(self):
-    self.mock_vm = linux_virtual_machine.RhelMixin()
+    self.mock_vm = linux_virtual_machine.Rhel7Mixin()
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
       self.mock_vm.Install('openfoam')
-
-  def _mockRemoteCommand(self, command):
-    subprocess.call(command, shell=True)
-
-  def testSetDimensionsCorrectlyReplacesText(self):
-    """Test of _SetDimensions().
-
-    This test creates a copy of the data/openfoam_blockmesh_dict.txt file,
-    replaces the dimensions line in the copy, and checks that the copy has
-    the correctly formatted line that we expect.
-    """
-    with open(TEST_BLOCKMESH_DICT_PATH, 'rb') as f:
-      lines = f.read()
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    temp_file.write(lines)
-    temp_file.close()
-    self.mock_vm.RemoteCommand = self._mockRemoteCommand
-    mock.patch.object(openfoam_benchmark, '_GetPath',
-                      return_value=temp_file.name).start()
-    openfoam_benchmark._SetDimensions(self.mock_vm, '10 10 10')
-    with open(temp_file.name, 'rb') as temp_file:
-      new_lines = temp_file.read()
-      expected = b'hex (0 1 2 3 4 5 6 7) (10 10 10) simpleGrading (1 1 1)'
-      self.assertIn(expected, new_lines)
 
 if __name__ == '__main__':
   unittest.main()
