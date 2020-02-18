@@ -32,8 +32,8 @@ DELETE_RES = {'Unsuccessful': []}
 
 QUERY_ENDPOINTS_CMD = [
     'describe-vpc-endpoints', '--filters',
-    'Name=vpc-id,Values={}'.format(VPC_ID), '--filters',
-    'Name=service-name,Values={}'.format(FULL_SERVICE_NAME), '--query',
+    'Name=service-name,Values={}'.format(FULL_SERVICE_NAME),
+    'Name=vpc-id,Values={}'.format(VPC_ID), '--query',
     'VpcEndpoints[].VpcEndpointId'
 ]
 DESCRIBE_ROUTES_CMD = [
