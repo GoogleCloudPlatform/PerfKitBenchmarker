@@ -1,0 +1,338 @@
+:::NVLOGv0.2.3 None 1582159752.469244242 (resnet_v1_5.py:93) Model HParams:
+:::NVLOGv0.2.3 None 1582159752.469933271 (resnet_v1_5.py:94) Name: "resnet50_v1.5"
+:::NVLOGv0.2.3 None 1582159752.470527649 (resnet_v1_5.py:95) Number of classes: 1001
+:::NVLOGv0.2.3 None 1582159752.471081972 (resnet_v1_5.py:96) Compute_format: "NHWC"
+:::NVLOGv0.2.3 None 1582159752.471639395 (resnet_v1_5.py:97) Input_format: "NHWC"
+:::NVLOGv0.2.3 None 1582159752.472204924 (resnet_v1_5.py:98) dtype: "<dtype: 'float16'>"
+:::NVLOGv0.2.3 None 1582159752.472712755 (runner.py:174) Deterministic Run - Seed: 1
+:::NVLOGv0.2.3 None 1582159752.473762512 (runner.py:343) TF Loss Auto Scaling is activated
+:::NVLOGv0.2.3 None 1582159752.782484293 (runner.py:379) Starting Model Training...
+:::NVLOGv0.2.3 None 1582159752.783164024 (runner.py:380) Training Epochs: 10.0
+:::NVLOGv0.2.3 None 1582159752.783694506 (runner.py:381) Total Steps: 780.0
+:::NVLOGv0.2.3 None 1582159752.784229755 (runner.py:382) Steps per Epoch: 78.0
+:::NVLOGv0.2.3 None 1582159752.784712553 (runner.py:383) Decay Steps: 780.0
+:::NVLOGv0.2.3 None 1582159752.785205364 (runner.py:384) Weight Decay Factor: 0.0001
+:::NVLOGv0.2.3 None 1582159752.785724401 (runner.py:385) Init Learning Rate: 0.1
+:::NVLOGv0.2.3 None 1582159752.786204100 (runner.py:386) Momentum: 0.9
+:::NVLOGv0.2.3 None 1582159752.786676168 (runner.py:387) Num GPUs: 64
+:::NVLOGv0.2.3 None 1582159752.787189245 (runner.py:388) Per-GPU Batch Size: 256
+:::NVLOGv0.2.3 resnet 1582159762.104167223 (learning_rate.py:52) Using step learning rate schedule
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Bootstrap : Using [0]eth0:10.128.0.73<0>
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_ENABLE_FAST_SOCKET set by environment to 1.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_DYNAMIC_CHUNK_SIZE set by environment to 131072.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_INLINE_THRESHOLD set by environment to 4096.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_ENABLE_THREAD_SPIN set by environment to 0.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_SOCK_NOTSENT_LOWAT set by environment to 1.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_MIN_ZCOPY_SIZE set by environment to 0.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket : Using [0]eth0:10.128.0.73<0>
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket plugin initialized
+NCCL version 2.4.8+cuda10.0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Setting affinity for GPU 0 to ff,ffff0000,00ffffff
+pkb-fde62675-0:27016:27812 [0] NCCL INFO CUDA Dev 0[0], FastSocket NIC distance :  PHB
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_MAX_NRINGS set by environment to 2.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Limiting to 2 rings per user request.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Channel 00 :    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Channel 01 :    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_BUFFSIZE set by environment to 8388608.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 63 -> 0 [receive] via NET/FastSocket/0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_NSOCKS_PERTHREAD set by environment to 1.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_SOCKET_NTHREADS set by environment to 6.
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 0[0] -> 1[1] via P2P/IPC
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 32 -> 0 [receive] via NET/FastSocket/0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 0 -> 32 [send] via NET/FastSocket/0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 63 -> 0 [receive] via NET/FastSocket/0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 0[0] -> 1[1] via P2P/IPC
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 0 -> 56 [send] via NET/FastSocket/0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 56 -> 0 [receive] via NET/FastSocket/0
+pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Trees [0] -1->0->1/32/-1 [1] 56->0->1/-1/-1
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Using 256 threads, Min Comp Cap 7, Trees enabled up to size 9150000
+pkb-fde62675-0:27016:27812 [0] NCCL INFO comm 0x7fc09872bf40 rank 0 nranks 64 cudaDev 0 nvmlDev 0 - Init COMPLETE
+pkb-fde62675-0:27016:27812 [0] NCCL INFO Launch mode Parallel
+pkb-fde62675-0:27016:28876 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 1 started
+pkb-fde62675-0:27016:28877 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 1 started
+pkb-fde62675-0:27016:28879 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 2 started
+pkb-fde62675-0:27016:28881 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 3 started
+pkb-fde62675-0:27016:28882 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 3 started
+pkb-fde62675-0:27016:28880 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 2 started
+pkb-fde62675-0:27016:28884 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 4 started
+pkb-fde62675-0:27016:28885 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 5 started
+pkb-fde62675-0:27016:28891 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 0 started
+pkb-fde62675-0:27016:28886 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 4 started
+pkb-fde62675-0:27016:28887 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 5 started
+pkb-fde62675-0:27016:28895 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 0 started
+pkb-fde62675-0:27016:28936 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 1 started
+pkb-fde62675-0:27016:28942 [0] NCCL INFO Comm 0x7fc098d2e660 thread 1 started
+pkb-fde62675-0:27016:28943 [0] NCCL INFO Comm 0x7fc098d31b20 thread 1 started
+pkb-fde62675-0:27016:28944 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 1 started
+pkb-fde62675-0:27016:28979 [0] NCCL INFO Comm 0x7fc098d2e660 thread 2 started
+pkb-fde62675-0:27016:28980 [0] NCCL INFO Comm 0x7fc098d31b20 thread 2 started
+pkb-fde62675-0:27016:28981 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 2 started
+pkb-fde62675-0:27016:28982 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 3 started
+pkb-fde62675-0:27016:28983 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 4 started
+pkb-fde62675-0:27016:28984 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 5 started
+pkb-fde62675-0:27016:28985 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 0 started
+pkb-fde62675-0:27016:28986 [0] NCCL INFO Comm 0x7fc098d2e660 thread 3 started
+pkb-fde62675-0:27016:28987 [0] NCCL INFO Comm 0x7fc098d2e660 thread 4 started
+pkb-fde62675-0:27016:28988 [0] NCCL INFO Comm 0x7fc098d2e660 thread 5 started
+pkb-fde62675-0:27016:28989 [0] NCCL INFO Comm 0x7fc098d2e660 thread 0 started
+pkb-fde62675-0:27016:28990 [0] NCCL INFO Comm 0x7fc098d31b20 thread 3 started
+pkb-fde62675-0:27016:28991 [0] NCCL INFO Comm 0x7fc098d31b20 thread 4 started
+pkb-fde62675-0:27016:28992 [0] NCCL INFO Comm 0x7fc098d31b20 thread 5 started
+pkb-fde62675-0:27016:28993 [0] NCCL INFO Comm 0x7fc098d31b20 thread 0 started
+pkb-fde62675-0:27016:28994 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 2 started
+pkb-fde62675-0:27016:28995 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 3 started
+pkb-fde62675-0:27016:28996 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 4 started
+pkb-fde62675-0:27016:28997 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 5 started
+pkb-fde62675-0:27016:28998 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 0 started
+:::NVLOGv0.2.3 resnet 1582159815.362699032 (benchmark_hooks.py:59) iteration: 50
+:::NVLOGv0.2.3 resnet 1582159815.363994360 (benchmark_hooks.py:60) total_ips: 37510.67235662921
+:::NVLOGv0.2.3 resnet 1582159819.848632336 (benchmark_hooks.py:59) iteration: 60
+:::NVLOGv0.2.3 resnet 1582159819.850585699 (benchmark_hooks.py:60) total_ips: 36883.09533536929
+:::NVLOGv0.2.3 resnet 1582159824.346121311 (benchmark_hooks.py:59) iteration: 70
+:::NVLOGv0.2.3 resnet 1582159824.347266436 (benchmark_hooks.py:60) total_ips: 35312.341755363566
+:::NVLOGv0.2.3 resnet 1582159828.817882299 (benchmark_hooks.py:59) iteration: 80
+:::NVLOGv0.2.3 resnet 1582159828.819027424 (benchmark_hooks.py:60) total_ips: 36688.191104647565
+:::NVLOGv0.2.3 resnet 1582159833.305439472 (benchmark_hooks.py:59) iteration: 90
+:::NVLOGv0.2.3 resnet 1582159833.307281256 (benchmark_hooks.py:60) total_ips: 37406.17181277611
+:::NVLOGv0.2.3 resnet 1582159839.979021311 (benchmark_hooks.py:59) iteration: 100
+:::NVLOGv0.2.3 resnet 1582159839.980183363 (benchmark_hooks.py:60) total_ips: 6152.398243688215
+:::NVLOGv0.2.3 resnet 1582159844.448809624 (benchmark_hooks.py:59) iteration: 110
+:::NVLOGv0.2.3 resnet 1582159844.450631618 (benchmark_hooks.py:60) total_ips: 36347.491827305785
+:::NVLOGv0.2.3 resnet 1582159848.928247929 (benchmark_hooks.py:59) iteration: 120
+:::NVLOGv0.2.3 resnet 1582159848.929651022 (benchmark_hooks.py:60) total_ips: 36875.77231290984
+:::NVLOGv0.2.3 resnet 1582159853.449352503 (benchmark_hooks.py:59) iteration: 130
+:::NVLOGv0.2.3 resnet 1582159853.450479269 (benchmark_hooks.py:60) total_ips: 35871.30119333536
+:::NVLOGv0.2.3 resnet 1582159858.047381401 (benchmark_hooks.py:59) iteration: 140
+:::NVLOGv0.2.3 resnet 1582159858.048593760 (benchmark_hooks.py:60) total_ips: 37066.82097053025
+:::NVLOGv0.2.3 resnet 1582159862.541098356 (benchmark_hooks.py:59) iteration: 150
+:::NVLOGv0.2.3 resnet 1582159862.542908192 (benchmark_hooks.py:60) total_ips: 36023.53957875413
+:::NVLOGv0.2.3 resnet 1582159867.034475803 (benchmark_hooks.py:59) iteration: 160
+:::NVLOGv0.2.3 resnet 1582159867.036347628 (benchmark_hooks.py:60) total_ips: 35892.791268667315
+:::NVLOGv0.2.3 resnet 1582159871.564660549 (benchmark_hooks.py:59) iteration: 170
+:::NVLOGv0.2.3 resnet 1582159871.566016197 (benchmark_hooks.py:60) total_ips: 37491.435463719994
+:::NVLOGv0.2.3 resnet 1582159876.045536518 (benchmark_hooks.py:59) iteration: 180
+:::NVLOGv0.2.3 resnet 1582159876.046773911 (benchmark_hooks.py:60) total_ips: 37198.847398577964
+:::NVLOGv0.2.3 resnet 1582159880.568768978 (benchmark_hooks.py:59) iteration: 190
+:::NVLOGv0.2.3 resnet 1582159880.570594072 (benchmark_hooks.py:60) total_ips: 37138.71715668313
+:::NVLOGv0.2.3 resnet 1582159885.051631689 (benchmark_hooks.py:59) iteration: 200
+:::NVLOGv0.2.3 resnet 1582159885.052983046 (benchmark_hooks.py:60) total_ips: 36457.541779536296
+:::NVLOGv0.2.3 resnet 1582159889.597553492 (benchmark_hooks.py:59) iteration: 210
+:::NVLOGv0.2.3 resnet 1582159889.598702431 (benchmark_hooks.py:60) total_ips: 36733.689805361275
+:::NVLOGv0.2.3 resnet 1582159894.078658104 (benchmark_hooks.py:59) iteration: 220
+:::NVLOGv0.2.3 resnet 1582159894.079894066 (benchmark_hooks.py:60) total_ips: 34946.98754673534
+:::NVLOGv0.2.3 resnet 1582159898.580398083 (benchmark_hooks.py:59) iteration: 230
+:::NVLOGv0.2.3 resnet 1582159898.581535578 (benchmark_hooks.py:60) total_ips: 36250.109055000146
+:::NVLOGv0.2.3 resnet 1582159903.041210890 (benchmark_hooks.py:59) iteration: 240
+:::NVLOGv0.2.3 resnet 1582159903.043050766 (benchmark_hooks.py:60) total_ips: 37413.258906949595
+:::NVLOGv0.2.3 resnet 1582159907.534811735 (benchmark_hooks.py:59) iteration: 250
+:::NVLOGv0.2.3 resnet 1582159907.536144257 (benchmark_hooks.py:60) total_ips: 36413.28370943547
+:::NVLOGv0.2.3 resnet 1582159912.040065527 (benchmark_hooks.py:59) iteration: 260
+:::NVLOGv0.2.3 resnet 1582159912.041195869 (benchmark_hooks.py:60) total_ips: 36464.8350638166
+:::NVLOGv0.2.3 resnet 1582159916.543462753 (benchmark_hooks.py:59) iteration: 270
+:::NVLOGv0.2.3 resnet 1582159916.545404196 (benchmark_hooks.py:60) total_ips: 37645.390396408104
+:::NVLOGv0.2.3 resnet 1582159921.036260366 (benchmark_hooks.py:59) iteration: 280
+:::NVLOGv0.2.3 resnet 1582159921.038029432 (benchmark_hooks.py:60) total_ips: 35304.450149551856
+:::NVLOGv0.2.3 resnet 1582159925.531387091 (benchmark_hooks.py:59) iteration: 290
+:::NVLOGv0.2.3 resnet 1582159925.532652140 (benchmark_hooks.py:60) total_ips: 36287.320851639066
+:::NVLOGv0.2.3 resnet 1582159930.006504059 (benchmark_hooks.py:59) iteration: 300
+:::NVLOGv0.2.3 resnet 1582159930.007672548 (benchmark_hooks.py:60) total_ips: 36994.266564239
+:::NVLOGv0.2.3 resnet 1582159934.576426744 (benchmark_hooks.py:59) iteration: 310
+:::NVLOGv0.2.3 resnet 1582159934.577636480 (benchmark_hooks.py:60) total_ips: 36744.04080373389
+:::NVLOGv0.2.3 resnet 1582159939.056905508 (benchmark_hooks.py:59) iteration: 320
+:::NVLOGv0.2.3 resnet 1582159939.058114052 (benchmark_hooks.py:60) total_ips: 37060.82386321043
+:::NVLOGv0.2.3 resnet 1582159943.542388916 (benchmark_hooks.py:59) iteration: 330
+:::NVLOGv0.2.3 resnet 1582159943.543546677 (benchmark_hooks.py:60) total_ips: 35284.02093849433
+:::NVLOGv0.2.3 resnet 1582159948.029252052 (benchmark_hooks.py:59) iteration: 340
+:::NVLOGv0.2.3 resnet 1582159948.031070232 (benchmark_hooks.py:60) total_ips: 36013.892462704476
+:::NVLOGv0.2.3 resnet 1582159952.541968822 (benchmark_hooks.py:59) iteration: 350
+:::NVLOGv0.2.3 resnet 1582159952.543198824 (benchmark_hooks.py:60) total_ips: 35844.22703046678
+:::NVLOGv0.2.3 resnet 1582159956.996303082 (benchmark_hooks.py:59) iteration: 360
+:::NVLOGv0.2.3 resnet 1582159956.997462988 (benchmark_hooks.py:60) total_ips: 36596.47853987886
+:::NVLOGv0.2.3 resnet 1582159961.503876448 (benchmark_hooks.py:59) iteration: 370
+:::NVLOGv0.2.3 resnet 1582159961.505698681 (benchmark_hooks.py:60) total_ips: 36955.29339994515
+:::NVLOGv0.2.3 resnet 1582159965.937754631 (benchmark_hooks.py:59) iteration: 380
+:::NVLOGv0.2.3 resnet 1582159965.938937426 (benchmark_hooks.py:60) total_ips: 38333.803808865036
+:::NVLOGv0.2.3 resnet 1582159970.447065592 (benchmark_hooks.py:59) iteration: 390
+:::NVLOGv0.2.3 resnet 1582159970.448903799 (benchmark_hooks.py:60) total_ips: 35038.34348545454
+:::NVLOGv0.2.3 resnet 1582159974.901950121 (benchmark_hooks.py:59) iteration: 400
+:::NVLOGv0.2.3 resnet 1582159974.903898001 (benchmark_hooks.py:60) total_ips: 36290.67442760689
+:::NVLOGv0.2.3 resnet 1582159979.451853991 (benchmark_hooks.py:59) iteration: 410
+:::NVLOGv0.2.3 resnet 1582159979.453080416 (benchmark_hooks.py:60) total_ips: 35940.75417372508
+:::NVLOGv0.2.3 resnet 1582159983.948755264 (benchmark_hooks.py:59) iteration: 420
+:::NVLOGv0.2.3 resnet 1582159983.950186014 (benchmark_hooks.py:60) total_ips: 36152.8092482873
+:::NVLOGv0.2.3 resnet 1582159988.434495926 (benchmark_hooks.py:59) iteration: 430
+:::NVLOGv0.2.3 resnet 1582159988.435680866 (benchmark_hooks.py:60) total_ips: 36511.488155194136
+:::NVLOGv0.2.3 resnet 1582159992.928598166 (benchmark_hooks.py:59) iteration: 440
+:::NVLOGv0.2.3 resnet 1582159992.929788113 (benchmark_hooks.py:60) total_ips: 35283.912239328616
+:::NVLOGv0.2.3 resnet 1582159997.373732567 (benchmark_hooks.py:59) iteration: 450
+:::NVLOGv0.2.3 resnet 1582159997.374869347 (benchmark_hooks.py:60) total_ips: 35465.20659001403
+:::NVLOGv0.2.3 resnet 1582160001.839509964 (benchmark_hooks.py:59) iteration: 460
+:::NVLOGv0.2.3 resnet 1582160001.841399908 (benchmark_hooks.py:60) total_ips: 35710.6916899777
+:::NVLOGv0.2.3 resnet 1582160006.320781708 (benchmark_hooks.py:59) iteration: 470
+:::NVLOGv0.2.3 resnet 1582160006.321911097 (benchmark_hooks.py:60) total_ips: 35986.97961891844
+:::NVLOGv0.2.3 resnet 1582160010.787042618 (benchmark_hooks.py:59) iteration: 480
+:::NVLOGv0.2.3 resnet 1582160010.788214684 (benchmark_hooks.py:60) total_ips: 36531.79078692267
+:::NVLOGv0.2.3 resnet 1582160015.457456112 (benchmark_hooks.py:59) iteration: 490
+:::NVLOGv0.2.3 resnet 1582160015.458606720 (benchmark_hooks.py:60) total_ips: 36050.1478245679
+:::NVLOGv0.2.3 resnet 1582160019.978160381 (benchmark_hooks.py:59) iteration: 500
+:::NVLOGv0.2.3 resnet 1582160019.979422569 (benchmark_hooks.py:60) total_ips: 35381.685274629766
+:::NVLOGv0.2.3 resnet 1582160024.450509071 (benchmark_hooks.py:59) iteration: 510
+:::NVLOGv0.2.3 resnet 1582160024.451734543 (benchmark_hooks.py:60) total_ips: 35363.69601604759
+:::NVLOGv0.2.3 resnet 1582160028.936058998 (benchmark_hooks.py:59) iteration: 520
+:::NVLOGv0.2.3 resnet 1582160028.937254906 (benchmark_hooks.py:60) total_ips: 37620.968449497355
+:::NVLOGv0.2.3 resnet 1582160033.397711515 (benchmark_hooks.py:59) iteration: 530
+:::NVLOGv0.2.3 resnet 1582160033.398849249 (benchmark_hooks.py:60) total_ips: 37106.00981329682
+:::NVLOGv0.2.3 resnet 1582160037.839997053 (benchmark_hooks.py:59) iteration: 540
+:::NVLOGv0.2.3 resnet 1582160037.841424942 (benchmark_hooks.py:60) total_ips: 36560.983800147376
+:::NVLOGv0.2.3 resnet 1582160042.314376116 (benchmark_hooks.py:59) iteration: 550
+:::NVLOGv0.2.3 resnet 1582160042.315502167 (benchmark_hooks.py:60) total_ips: 37047.89670501951
+:::NVLOGv0.2.3 resnet 1582160046.796023369 (benchmark_hooks.py:59) iteration: 560
+:::NVLOGv0.2.3 resnet 1582160046.797188044 (benchmark_hooks.py:60) total_ips: 36350.06817593948
+:::NVLOGv0.2.3 resnet 1582160051.269979000 (benchmark_hooks.py:59) iteration: 570
+:::NVLOGv0.2.3 resnet 1582160051.271843672 (benchmark_hooks.py:60) total_ips: 36497.79760032589
+:::NVLOGv0.2.3 resnet 1582160055.767156124 (benchmark_hooks.py:59) iteration: 580
+:::NVLOGv0.2.3 resnet 1582160055.768342257 (benchmark_hooks.py:60) total_ips: 35896.18481870252
+:::NVLOGv0.2.3 resnet 1582160060.304273605 (benchmark_hooks.py:59) iteration: 590
+:::NVLOGv0.2.3 resnet 1582160060.305403471 (benchmark_hooks.py:60) total_ips: 36411.02636004591
+:::NVLOGv0.2.3 resnet 1582160064.787214756 (benchmark_hooks.py:59) iteration: 600
+:::NVLOGv0.2.3 resnet 1582160064.789097309 (benchmark_hooks.py:60) total_ips: 35445.212557356484
+:::NVLOGv0.2.3 resnet 1582160069.283154488 (benchmark_hooks.py:59) iteration: 610
+:::NVLOGv0.2.3 resnet 1582160069.284336329 (benchmark_hooks.py:60) total_ips: 37360.29293476252
+:::NVLOGv0.2.3 resnet 1582160073.759320021 (benchmark_hooks.py:59) iteration: 620
+:::NVLOGv0.2.3 resnet 1582160073.760699511 (benchmark_hooks.py:60) total_ips: 36664.584119504405
+:::NVLOGv0.2.3 resnet 1582160078.252969503 (benchmark_hooks.py:59) iteration: 630
+:::NVLOGv0.2.3 resnet 1582160078.254781485 (benchmark_hooks.py:60) total_ips: 35855.8599815919
+:::NVLOGv0.2.3 resnet 1582160082.672213554 (benchmark_hooks.py:59) iteration: 640
+:::NVLOGv0.2.3 resnet 1582160082.673584461 (benchmark_hooks.py:60) total_ips: 36299.08984093145
+:::NVLOGv0.2.3 resnet 1582160087.138610840 (benchmark_hooks.py:59) iteration: 650
+:::NVLOGv0.2.3 resnet 1582160087.139968157 (benchmark_hooks.py:60) total_ips: 36010.5521027713
+:::NVLOGv0.2.3 resnet 1582160091.669317245 (benchmark_hooks.py:59) iteration: 660
+:::NVLOGv0.2.3 resnet 1582160091.670458317 (benchmark_hooks.py:60) total_ips: 36617.18800873875
+:::NVLOGv0.2.3 resnet 1582160096.111882210 (benchmark_hooks.py:59) iteration: 670
+:::NVLOGv0.2.3 resnet 1582160096.113028526 (benchmark_hooks.py:60) total_ips: 36237.3781150303
+:::NVLOGv0.2.3 resnet 1582160100.616281986 (benchmark_hooks.py:59) iteration: 680
+:::NVLOGv0.2.3 resnet 1582160100.617408276 (benchmark_hooks.py:60) total_ips: 37336.056808612135
+:::NVLOGv0.2.3 resnet 1582160105.077036381 (benchmark_hooks.py:59) iteration: 690
+:::NVLOGv0.2.3 resnet 1582160105.078839302 (benchmark_hooks.py:60) total_ips: 37373.70329665548
+:::NVLOGv0.2.3 resnet 1582160109.566270351 (benchmark_hooks.py:59) iteration: 700
+:::NVLOGv0.2.3 resnet 1582160109.567404747 (benchmark_hooks.py:60) total_ips: 33662.61918725121
+:::NVLOGv0.2.3 resnet 1582160114.049432755 (benchmark_hooks.py:59) iteration: 710
+:::NVLOGv0.2.3 resnet 1582160114.050585270 (benchmark_hooks.py:60) total_ips: 37773.14652706473
+:::NVLOGv0.2.3 resnet 1582160118.559016466 (benchmark_hooks.py:59) iteration: 720
+:::NVLOGv0.2.3 resnet 1582160118.560217381 (benchmark_hooks.py:60) total_ips: 36825.3620729107
+:::NVLOGv0.2.3 resnet 1582160123.027698755 (benchmark_hooks.py:59) iteration: 730
+:::NVLOGv0.2.3 resnet 1582160123.029191256 (benchmark_hooks.py:60) total_ips: 37004.34650160334
+:::NVLOGv0.2.3 resnet 1582160127.502898693 (benchmark_hooks.py:59) iteration: 740
+:::NVLOGv0.2.3 resnet 1582160127.504770041 (benchmark_hooks.py:60) total_ips: 36890.30244480638
+:::NVLOGv0.2.3 resnet 1582160131.992484331 (benchmark_hooks.py:59) iteration: 750
+:::NVLOGv0.2.3 resnet 1582160131.994381905 (benchmark_hooks.py:60) total_ips: 37098.1574060028
+:::NVLOGv0.2.3 resnet 1582160136.489326239 (benchmark_hooks.py:59) iteration: 760
+:::NVLOGv0.2.3 resnet 1582160136.490505457 (benchmark_hooks.py:60) total_ips: 36185.93389381938
+:::NVLOGv0.2.3 resnet 1582160140.979393721 (benchmark_hooks.py:59) iteration: 770
+:::NVLOGv0.2.3 resnet 1582160140.980606794 (benchmark_hooks.py:60) total_ips: 36461.352495143845
+:::NVLOGv0.2.3 resnet 1582160145.751477242 (benchmark_hooks.py:66) Average total_ips: 36517.134955740126
+:::NVLOGv0.2.3 resnet 1582160146.086755276 (runner.py:502) Ending Model Training ...
+2020-02-20 00:49:09.072060: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/horovod/tensorflow/__init__.py:117: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/horovod/tensorflow/__init__.py:143: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/RN50v1.5/utils/hooks/training_hooks.py:29: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/RN50v1.5/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/RN50v1.5/main.py:34: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/RN50v1.5/main.py:34: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+2020-02-20 00:49:13.544665: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-02-20 00:49:19.709857: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.720919: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-02-20 00:49:19.721104: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.731897: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-02-20 00:49:19.732059: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.742541: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-02-20 00:49:19.742696: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.753160: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-02-20 00:49:19.753270: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.763586: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-02-20 00:49:19.763728: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.774377: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-02-20 00:49:19.774483: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.785155: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-02-20 00:49:19.785254: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.795775: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-02-20 00:49:19.795824: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-02-20 00:49:19.797097: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-02-20 00:49:19.798280: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-02-20 00:49:19.798677: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-02-20 00:49:19.800289: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-02-20 00:49:19.801436: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-02-20 00:49:19.804574: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-02-20 00:49:19.804698: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.814935: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.825379: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.836459: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.847278: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.858188: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.869065: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.879779: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.890831: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.901068: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.911867: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.922531: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.933393: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.944146: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.954619: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.965077: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:19.974738: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1746] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-02-20 00:49:27.096091: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 AVX512F FMA
+2020-02-20 00:49:27.102593: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000140000 Hz
+2020-02-20 00:49:27.102743: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55c69c167f40 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-02-20 00:49:27.102768: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-02-20 00:49:27.985102: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:27.992236: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55c69c16a140 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-02-20 00:49:27.992267: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-02-20 00:49:27.992550: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:27.998780: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-02-20 00:49:27.998831: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-02-20 00:49:27.998891: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-02-20 00:49:27.998907: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-02-20 00:49:27.998917: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-02-20 00:49:27.998927: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-02-20 00:49:27.998937: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-02-20 00:49:27.998948: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-02-20 00:49:27.999031: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:28.006052: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:28.013170: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1746] Adding visible gpu devices: 0
+2020-02-20 00:49:28.013256: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-02-20 00:49:28.711286: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1159] Device interconnect StreamExecutor with strength 1 edge matrix:
+2020-02-20 00:49:28.711335: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1165]      0
+2020-02-20 00:49:28.711343: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1178] 0:   N
+2020-02-20 00:49:28.711807: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:28.713016: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-20 00:49:28.714113: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1304] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14816 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:00:04.0, compute capability: 7.0)
+2020-02-20 00:49:42.990599: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-02-20 00:49:43.319733: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7

@@ -11,11 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Run Horovod distributed Tensorflow Training benchmark."""
 
 import logging
-import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -27,71 +25,60 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit
 FLAGS = flags.FLAGS
 MACHINEFILE = 'HOSTFILE'
 
-BENCHMARK_VERSION = 0.33
+BENCHMARK_VERSION = 0.34
 BENCHMARK_NAME = 'horovod'
 BENCHMARK_CONFIG = """
 horovod:
   description: Runs Horovod. Specify the number of VMs with --num_vms
   vm_groups:
     default:
-      os_type: ubuntu1604
       vm_spec:
         GCP:
-          machine_type: n1-standard-4
-          zone: us-east1-d
+          machine_type: n1-highmem-96
+          zone: us-central1-a
+          image_family: tf-latest-gpu-gvnic
+          image_project: deeplearning-platform-release
           boot_disk_size: 500
-          gpu_type: k80
-          gpu_count: 1
+          gpu_type: v100
+          gpu_count: 8
         AWS:
-          machine_type: p2.xlarge
+          machine_type: p3dn.24xlarge
           zone: us-east-1
+          image: ami-07728e9e2742b0662
           boot_disk_size: 500
         Azure:
-          machine_type: Standard_NC6
+          machine_type: Standard_NC24rs_v3
+          image: microsoft-dsvm:aml-workstation:ubuntu:19.11.13
           zone: eastus
       vm_count: null
 """
-# The data is downloaded from http://image-net.org/
-# For data preprocessing, please check
-# https://github.com/mlperf/training/tree/master/image_classification#3-datasetenvironment
-BENCHMARK_DATA = {
-    'ILSVRC2012.tar':
-        'ae83026644feeaf42a387d29765980830387756eff3293bb96fa91f3911a1b15'}
 
-GITHUB_MODELS_URL = 'https://github.com/aws-samples/deep-learning-models.git'
+# TODO(user): Use NVIDIA's repo after
+# https://github.com/NVIDIA/DeepLearningExamples/pull/386 is merged
+GITHUB_MODELS_URL = 'https://github.com/changlan/DeepLearningExamples.git'
 
-flags.DEFINE_enum(
-    'horovod_model', 'resnet50',
-    ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152'],
-    'name of the model to run.')
+flags.DEFINE_enum('horovod_model', 'resnet-50',
+                  ['resnet-50', 'bert-base', 'bert-large'],
+                  'name of the model to run.')
+
+flags.DEFINE_integer('horovod_batch_size', 64, 'Batch size per compute device.')
 
 flags.DEFINE_integer(
-    'horovod_batch_size', 64, 'Batch size per compute device.')
+    'horovod_num_epochs', 10, 'Number of epochs to train for. ')
 
-# AWS script trained for 90 epochs when using real data.
-# Note that using too small a batch size (1 for example) with
-# 8 GPUs will cause the run script to fail for reasons not understood.
-flags.DEFINE_integer(
-    'horovod_num_epochs', 10,
-    'Number of epochs to train for.')
+flags.DEFINE_enum('horovod_max_seq_len', '128', ['128', '384'],
+                  'Max sequence length for BERT.')
 
-flags.DEFINE_enum(
-    'horovod_precision', 'fp16', ['fp16', 'fp32'], 'Precision.')
-
-flags.DEFINE_boolean(
-    'horovod_synthetic', True, 'Whether to use synthetic data.')
+flags.DEFINE_enum('horovod_precision', 'fp16', ['fp16', 'fp32'], 'Precision.')
 
 flags.DEFINE_string(
-    'horovod_deep_learning_examples_commit',
-    '599adf2',
-    'Commit hash of the AWS deep learning samples github repo '
-    'to use for the benchmark.')
+    'horovod_cuda_visible_devices', None,
+    'GPU identifiers are given as integer indices or as UUID strings.')
 
-flags.DEFINE_boolean(
-    'horovod_using_deep_learning_image', False,
-    'Whether the VM under test is using a deep learning image. '
-    'This will case PKB to skip the installation of Horovod '
-    'and its dependencies.')
+flags.DEFINE_bool('horovod_bert_finetune', True,
+                  'Pretrain or finetune a BERT model.')
+
+flags.DEFINE_bool('horovod_timelime', False, 'Enable timeline in Horovod.')
 
 
 class HorovodParseOutputError(errors.Benchmarks.RunError):
@@ -139,57 +126,68 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.batch_size = FLAGS.horovod_batch_size
   benchmark_spec.num_epochs = FLAGS.horovod_num_epochs
   benchmark_spec.precision = FLAGS.horovod_precision
-  benchmark_spec.synthetic = FLAGS.horovod_synthetic
-  benchmark_spec.deep_learning_examples_commit = (
-      FLAGS.horovod_deep_learning_examples_commit)
+  benchmark_spec.max_seq_len = int(FLAGS.horovod_max_seq_len)
+  benchmark_spec.bert_finetune = FLAGS.horovod_bert_finetune
+  benchmark_spec.timeline = FLAGS.horovod_timelime
+  benchmark_spec.nccl_net_plugin = FLAGS.nccl_net_plugin
+  benchmark_spec.cuda_visible_devices = FLAGS.horovod_cuda_visible_devices
 
 
-def _CopyAndUpdateRunScripts(vm):
+def _CopyAndUpdateRunScripts(model, vm):
   """Copy and update all necessary run scripts on the given vm.
 
   Args:
+    model: name of the model
     vm: vm to place and update run scripts on
   """
-  vm.InstallPackages('git')
-  vm.RemoteCommand('rm -rf deep-learning-models')
-  vm.RemoteCommand('git clone %s' % GITHUB_MODELS_URL)
-  vm.RemoteCommand(
-      'cd deep-learning-models && git checkout {}'.format(
-          FLAGS.horovod_deep_learning_examples_commit)
-  )
-  # Copy the benchmark script from the github repo to the home directory.
-  vm.RemoteCommand(
-      'cp %s .' % posixpath.join('deep-learning-models',
-                                 'models',
-                                 'resnet',
-                                 'tensorflow',
-                                 'train_imagenet_resnet_hvd.py'))
+  vm.RemoteCommand('rm -rf DeepLearningExamples')
+  vm.RemoteCommand('git clone --branch clan-dev %s' % GITHUB_MODELS_URL)
+
+  resnet_base_dir = 'DeepLearningExamples/TensorFlow/Classification/RN50v1.5'
+  bert_base_dir = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT'
+
+  if model.startswith('resnet'):
+    vm.RemoteCommand('sed -i "/from utils import dali_utils/d" '
+                     '{}/utils/data_utils.py'.format(resnet_base_dir))
+    vm.RemoteCommand('sed -i "/from utils import dali_utils/d" '
+                     '{}/utils/__init__.py'.format(resnet_base_dir))
+    vm.RemoteCommand(
+        'mkdir -p {base}/imagenet && '
+        'gsutil -m rsync gs://pkb-sgpyc-us-central1/perfzero_dataset/imagenet '
+        '{base}/imagenet'.format(base=resnet_base_dir))
+
+  if model.startswith('bert'):
+    vm.RemoteCommand(
+        'mkdir -p {bert}/data/download/google_pretrained_weights &&'
+        'mkdir -p {bert}/data/download/squad/v1.1 && '
+        'cd {bert}/data/download/squad/v1.1 && '
+        'wget https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json'
+        .format(bert=bert_base_dir))
+
+    if model == 'bert-base':
+      vm.RemoteCommand(
+          'cd {bert}/data/download/google_pretrained_weights/ && '
+          'wget https://storage.googleapis.com/bert_models/2018_10_18/uncased_L-12_H-768_A-12.zip && '
+          'unzip uncased_L-12_H-768_A-12.zip'.format(bert=bert_base_dir))
+    else:  # 'bert-large':
+      vm.RemoteCommand(
+          'cd {bert}/data/download/google_pretrained_weights/ && '
+          'wget https://storage.googleapis.com/bert_models/2018_10_18/uncased_L-24_H-1024_A-16.zip && '
+          'unzip uncased_L-24_H-1024_A-16.zip'.format(bert=bert_base_dir))
 
 
 def _PrepareHorovod(vm):
-  """Install Horovod on a single vm.
+  """Install dependencies on a single vm.
 
   Args:
     vm: vm to operate on
   """
-  # TODO(ferneyhough): Consider moving horovod installation to a package.
   logging.info('Installing Horovod on %s', vm)
   vm.AuthenticateVm()
-  if not FLAGS.horovod_synthetic:
-    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, BENCHMARK_DATA,
-                                          vm_util.VM_TMP_DIR)
-    vm.RemoteCommand('tar xvf %s' % posixpath.join(vm_util.VM_TMP_DIR,
-                                                   'ILSVRC2012.tar'))
-  if FLAGS.horovod_using_deep_learning_image:
-    return
-  vm.Install('tensorflow')
-  vm.Install('openmpi')
-  vm.RemoteCommand(
-      'sudo apt-get install -y g++-4.9 && '
-      'sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 20 && '
-      'sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 10')
-  vm.RemoteCommand('sudo HOROVOD_GPU_ALLREDUCE=NCCL pip install '
-                   '--no-cache-dir horovod')
+
+  vm.Install('cuda_toolkit')
+  vm.Install('nccl')
+  vm.InstallPackages('wget git unzip')
 
 
 def Prepare(benchmark_spec):
@@ -201,10 +199,9 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm_util.RunThreaded(_PrepareHorovod, vms)
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  for vm in vms:
-    _CopyAndUpdateRunScripts(vm)
-  hpc_util.CreateMachineFile(vms,
-                             lambda _: benchmark_spec.gpus_per_node,
+  vm_util.RunThreaded(
+      lambda vm: _CopyAndUpdateRunScripts(benchmark_spec.model, vm), vms)
+  hpc_util.CreateMachineFile(vms, lambda _: benchmark_spec.gpus_per_node,
                              MACHINEFILE)
 
 
@@ -227,56 +224,79 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['batch_size'] = benchmark_spec.batch_size
   metadata['num_epochs'] = benchmark_spec.num_epochs
   metadata['precision'] = benchmark_spec.precision
-  metadata['synthetic'] = benchmark_spec.synthetic
-  metadata['deep_learning_examples_commit'] = (
-      benchmark_spec.deep_learning_examples_commit)
+  metadata['max_seq_len'] = benchmark_spec.max_seq_len
+  metadata['nccl_net_plugin'] = benchmark_spec.nccl_net_plugin
+  metadata['cuda_visible_devices'] = benchmark_spec.cuda_visible_devices
   return metadata
 
 
-def _ExtractThroughputAndRuntime(output):
-  """Extract throughput and runtime from Horovod output.
+def _ExtractResNetThroughput(output):
+  """Extract throughput from Horovod output.
 
   Args:
-    output: Horvod output
+    output: Horovod output
 
   Returns:
-    Tuple of:
-      Average throuput in images per second (float),
-      Runtime in seconds (float).
+    A tuple of:
+      Average throuput in images per second (float)
+      Unit of the throughput metric (str)
   """
   # Start from last line and iterate backwards.
-  throughput_samples = []
-  runtime = 0
+  avg_throughput = 0
   for line in output.splitlines()[::-1]:
-    split_line = line.split()
-    if split_line[0].startswith('Finished'):
-      runtime = float(split_line[2])
-      continue
-    split_line = line.split()
-    if split_line[0] == '1':  # We are done parsing.
+    if 'Average total_ips' in line:
+      split_line = line.split()
+      avg_throughput = float(split_line[-1])
       break
-    throughput_samples.append(float(split_line[2]))
-  avg_throughput = sum(throughput_samples) / len(throughput_samples)
-  return round(avg_throughput, 1), round(runtime, 1)
+  return round(avg_throughput, 1), 'images/second'
 
 
-def _MakeSamplesFromOutput(benchmark_spec, output):
+def _ExtractBertThroughput(output):
+  """Extract throughput from Horovod output.
+
+  Args:
+    output: Horovod output
+
+  Returns:
+    A tuple of:
+      Average throughput in sentences per second (float)
+      Unit of the throughput metric (str)
+  """
+  # Start from last line and iterate backwards.
+  avg_throughput = 0
+  for line in output.splitlines()[::-1]:
+    if 'Throughput Average (sentences/sec) =' in line:
+      split_line = line.split()
+      avg_throughput = float(split_line[-1])
+      break
+  return round(avg_throughput, 1), 'sentences/second'
+
+
+def _MakeSamplesFromOutput(benchmark_spec, stdout, stderr):
   """Create a sample continaing the measured Horovod throughput.
 
   Args:
     benchmark_spec: benchmark spec
-    output: Horovod output
+    stdout: stdout
+    stderr: stderr
 
   Returns:
-    a Sample containing the Horovod throughput in images/sec
+    list of a Sample containing the Horovod throughput
   """
   metadata = _CreateMetadataDict(benchmark_spec)
-  images_sec, runtime = _ExtractThroughputAndRuntime(output)
+  output = stdout + stderr
+
+  extractor = {
+      'resnet-50': _ExtractResNetThroughput,
+      'bert-base': _ExtractBertThroughput,
+      'bert-large': _ExtractBertThroughput,
+  }
+
+  throughput, unit = extractor[benchmark_spec.model](output)
+
   samples = []
-  samples.append(sample.Sample('Training throughput', images_sec,
-                               'images/second', metadata))
-  samples.append(sample.Sample('Runtime', runtime,
-                               'seconds', metadata))
+  samples.append(
+      sample.Sample('Training throughput', throughput, unit, metadata))
   return samples
 
 
@@ -285,54 +305,114 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
+  _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vms = benchmark_spec.vms
+  vm_util.RunThreaded(lambda vm: vm.RemoteCommand('rm -rf /tmp/models'), vms)
   master_vm = vms[0]
 
   # GCP should work out of the box with the deep learning image but the AWS
   # image requires us to use the correct Tensorflow Python environment.
-  if FLAGS.cloud == 'AWS' and FLAGS.horovod_using_deep_learning_image:
+  if FLAGS.cloud == 'AWS':
     master_vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
     python_interpreter = 'anaconda3/envs/tensorflow_p36/bin/python'
   else:
-    python_interpreter = 'python'
+    python_interpreter = 'python3'
 
-  # This mpirun command was copied from the horovod example training script
-  # in the tensorflow_p36 environment on the AWS DLAMI.
-  # https://aws.amazon.com/releasenotes/deep-learning-ami-ubuntu-version-21-2
-  run_command = (
-      'mpirun -np {num_gpus} -hostfile HOSTFILE -mca plm_rsh_no_tree_spawn 1 '
-      '-bind-to socket -map-by slot -x HOROVOD_HIERARCHICAL_ALLREDUCE=1 '
-      '-x HOROVOD_FUSION_THRESHOLD=16777216 -x NCCL_MIN_NRINGS=4 '
-      '-x LD_LIBRARY_PATH -x PATH -mca pml ob1 -mca btl ^openib '
-      '-mca btl_tcp_if_exclude lo,docker0 -x TF_CPP_MIN_LOG_LEVEL=0 '
-      '{python} -W ignore {training_script} --num_epochs {num_epochs} '
-      '-b {batch_size} --model {model} {fp16} --clear_log'
-  ).format(
-      num_gpus=benchmark_spec.total_gpus,
-      python=python_interpreter,
-      training_script='train_imagenet_resnet_hvd.py',
-      num_epochs=benchmark_spec.num_epochs,
-      batch_size=benchmark_spec.batch_size,
-      model=benchmark_spec.model,
-      fp16='--fp16' if benchmark_spec.precision == 'fp16' else '--nofp16'
-  )
+  nccl_params = [
+      'TF_CPP_MIN_LOG_LEVEL=0',
+      'NCCL_SOCKET_IFNAME=^lo,docker0',
+  ]
 
-  if benchmark_spec.synthetic:
-    run_command += ' --synthetic'
-    # The use of larc and loss scale is taken from the AWS DLAMI training
-    # script (see comment above).
-    if benchmark_spec.total_gpus >= 128:
-      run_command += ' --use_larc --loss_scale 256'
-  else:
-    run_command += ' --data_dir ~/ILSVRC2012/ILSVRC2012 --warmup_epochs 10'
+  if benchmark_spec.timeline:
+    nccl_params.extend([
+        'HOROVOD_TIMELINE={}/timeline.json'.format(vm_util.VM_TMP_DIR),
+        'HOROVOD_TIMELINE_MARK_CYCLES=1',
+    ])
 
-  _, stderr = master_vm.RobustRemoteCommand(run_command, should_log=True)
-  return _MakeSamplesFromOutput(benchmark_spec, stderr)
+  if benchmark_spec.cuda_visible_devices:
+    nccl_params.append('CUDA_VISIBLE_DEVICES={}'.format(
+        benchmark_spec.cuda_visible_devices))
+
+  if FLAGS.nccl_extra_params:
+    for extra_param in FLAGS.nccl_extra_params:
+      nccl_params.append(extra_param)
+
+  run_command = ('mpirun -np {num_gpus} -hostfile {host_file} '
+                 '-mca plm_rsh_no_tree_spawn 1 '
+                 '--allow-run-as-root '
+                 '-bind-to socket -map-by slot '
+                 '{nccl_params} '
+                 '-mca pml ob1 -mca btl ^openib '
+                 '-mca btl_tcp_if_exclude lo,docker0 '
+                 '{python} ').format(
+                     num_gpus=benchmark_spec.total_gpus,
+                     host_file=MACHINEFILE,
+                     python=python_interpreter,
+                     nccl_params=' '.join(
+                         ['-x {}'.format(param) for param in nccl_params]))
+
+  if benchmark_spec.model == 'resnet-50':
+    resnet_dir = 'DeepLearningExamples/TensorFlow/Classification/RN50v1.5/'
+    run_command += (
+        'DeepLearningExamples/TensorFlow/Classification/RN50v1.5/main.py '
+        '--mode=training_benchmark '
+        '--warmup_steps 50 '
+        '--precision {precision} '
+        '--batch_size {batch_size} '
+        '--results_dir /tmp/models '
+        '--data_dir {data_dir} '
+        '--iter_unit epoch '
+        '--data_format NHWC '
+        '--num_iter {num_epochs} ').format(
+            precision=benchmark_spec.precision,
+            batch_size=benchmark_spec.batch_size,
+            num_epochs=benchmark_spec.num_epochs,
+            data_dir='{}/imagenet'.format(resnet_dir))
+  else:  # bert
+    if not benchmark_spec.bert_finetune:
+      raise NotImplementedError('BERT pretraining is not supported.')
+    bert_dir = (
+        'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/'
+        'data/download/google_pretrained_weights/{}').format(
+            'uncased_L-12_H-768_A-12' if benchmark_spec.model ==
+            'bert-base' else 'uncased_L-24_H-1024_A-16')
+    run_command += (
+        'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py '
+        '--vocab_file={vocab_file} '
+        '--bert_config_file={bert_config} '
+        '--init_checkpoint={init_ckpt} '
+        '--do_train=True '
+        '--train_file={train_file} '
+        '--train_batch_size={batch_size} '
+        '--learning_rate=5e-6 '
+        '--num_train_epochs={num_epochs} '
+        '--max_seq_length={max_seq_len} '
+        '--doc_stride={doc_stride} '
+        '--output_dir=/tmp/models '
+        '--horovod '
+        '{fp16} '
+    ).format(
+        batch_size=benchmark_spec.batch_size,
+        num_epochs=benchmark_spec.num_epochs,
+        fp16='--use_fp16' if benchmark_spec.precision == 'fp16' else '',
+        vocab_file='{}/vocab.txt'.format(bert_dir),
+        bert_config='{}/bert_config.json'.format(bert_dir),
+        init_ckpt='{}/bert_model.ckpt'.format(bert_dir),
+        max_seq_len=benchmark_spec.max_seq_len,
+        doc_stride=64 if benchmark_spec.max_seq_len == 128 else 128,
+        train_file='DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/squad/v1.1/train-v1.1.json',
+    )
+  stdout, stderr = master_vm.RobustRemoteCommand(run_command, should_log=True)
+
+  if benchmark_spec.timeline:
+    master_vm.PullFile(vm_util.GetTempDir(),
+                       '{}/timeline.json'.format(vm_util.VM_TMP_DIR))
+  return _MakeSamplesFromOutput(benchmark_spec, stdout, stderr)
 
 
 def Cleanup(benchmark_spec):
