@@ -373,14 +373,15 @@ def Run(benchmark_spec):
             batch_size=benchmark_spec.batch_size,
             num_epochs=benchmark_spec.num_epochs,
             data_dir='{}/imagenet'.format(resnet_dir),
-        )
+            )
   else:  # bert
     if not benchmark_spec.bert_finetune:
       raise NotImplementedError('BERT pretraining is not supported.')
-    bert_dir = ('DeepLearningExamples/TensorFlow/LanguageModeling/BERT/'
-                'data/download/google_pretrained_weights/{}'
-               ).format('uncased_L-12_H-768_A-12' if benchmark_spec.model ==
-                        'bert-base' else 'uncased_L-24_H-1024_A-16')
+    bert_dir = (
+        'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/'
+        'data/download/google_pretrained_weights/{}').format(
+            'uncased_L-12_H-768_A-12' if benchmark_spec.model ==
+            'bert-base' else 'uncased_L-24_H-1024_A-16')
     run_command += (
         'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py '
         '--vocab_file={vocab_file} '
