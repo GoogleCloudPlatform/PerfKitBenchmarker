@@ -372,8 +372,7 @@ def Run(benchmark_spec):
             precision=benchmark_spec.precision,
             batch_size=benchmark_spec.batch_size,
             num_epochs=benchmark_spec.num_epochs,
-            data_dir='{}/imagenet'.format(resnet_dir),
-            )
+            data_dir='{}/imagenet'.format(resnet_dir))
   else:  # bert
     if not benchmark_spec.bert_finetune:
       raise NotImplementedError('BERT pretraining is not supported.')
