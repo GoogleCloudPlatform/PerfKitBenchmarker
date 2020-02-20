@@ -127,8 +127,10 @@ class AksCluster(container_service.KubernetesCluster):
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self._deleted = False
 
-  # TODO(ferneyhough): Consider adding
-  # --kubernetes-version=FLAGS.container_cluster_version.
+  # Creating an AKS cluster with a fresh service principal usually fails due
+  # to a race condition. Active Directory knows the service principal exists,
+  # but AKS does not. (https://github.com/Azure/azure-cli/issues/9585)
+  @vm_util.Retry()
   def _Create(self):
     """Creates the AKS cluster."""
     vm_util.IssueCommand([
@@ -139,9 +141,11 @@ class AksCluster(container_service.KubernetesCluster):
         '--location', self.location,
         '--dns-name-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
-        # TODO(pclay): Debug ocassional invalid service principal error.
         '--service-principal', self.service_principal.app_id,
+        # TODO(pclay): avoid logging client secret
         '--client-secret', self.service_principal.password,
+        # TODO(pclay): Consider adding
+        # --kubernetes-version=FLAGS.container_cluster_version.
     ] + self.resource_group.args, timeout=1800)
 
   def _Exists(self):

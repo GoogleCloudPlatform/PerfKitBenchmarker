@@ -45,3 +45,7 @@
 -   Remove `py27` tox tests.
 -   Update AKS cluster creation service principle handling, which was broken
 -   Update glibc version to 2.31.
+-   Propagate Azure credentials to AKS when running as a service principal. This
+    is consistent with propagating VM credentials in azure_credentials.py.
+    -   This can be disabled by setting
+        `--bootstrap_azure_service_principal=False`.
