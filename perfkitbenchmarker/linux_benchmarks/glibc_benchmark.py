@@ -31,6 +31,7 @@ from __future__ import print_function
 
 import json
 import logging
+import re
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -49,6 +50,7 @@ glibc:
     default:
       vm_spec: *default_dual_core
       vm_count: null
+      os_type: ubuntu1804
 """
 
 glibc_default_benchset = ['bench-math',
@@ -73,6 +75,8 @@ GLIBC_MATH_BENCHSET = ['math-benchset']
 
 RESULTS_DIR = '%s/glibc/glibc-build/benchtests' % linux_packages.INSTALL_DIR
 
+_GCC_VERSION_RE = re.compile(r'gcc\ version\ (.*?)\ ')
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -96,9 +100,19 @@ def Prepare(benchmark_spec):
   PrepareGlibc(vm)
 
 
-def UpdateMetadata(metadata):
+def _GetGccVersion(vm):
+  """Get the currently installed gcc version."""
+  _, stderr = vm.RemoteCommand('gcc -v')
+  match = _GCC_VERSION_RE.search(stderr)
+  if not match:
+    raise Exception('stderr: {} does not match pattern "{}"'.format(
+        stderr, _GCC_VERSION_RE.pattern))
+  return match.group(1)
+
+
+def UpdateMetadata(vm, metadata):
   """Update metadata with glibc-related flag values."""
-  metadata['gcc'] = '5.5.0-12'
+  metadata['gcc'] = _GetGccVersion(vm)
   metadata['glibc_benchset'] = FLAGS.glibc_benchset
   metadata['glibc_version'] = glibc.GLIBC_VERSION
 
@@ -149,7 +163,7 @@ def ParseOutput(glibc_output, benchmark_spec, upper_key, results):
 
   metadata = dict()
   metadata['num_machines'] = len(benchmark_spec.vms)
-  UpdateMetadata(metadata)
+  UpdateMetadata(benchmark_spec.vms[0], metadata)
 
   jsondata = json.loads(glibc_output, object_pairs_hook=HelperParseOutput)
   for function, items in six.iteritems(jsondata[upper_key]):

@@ -41,3 +41,4 @@
 -   Add Sql Server support to managed relational DB
 -   Remove `py27` tox tests.
 -   Update AKS cluster creation service principle handling, which was broken
+-   Update glibc version to 2.31.
