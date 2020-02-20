@@ -18,7 +18,6 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 PACKAGE_NAME = 'glibc'
 GLIBC_DIR = '%s/glibc' % INSTALL_DIR
-# TODO(b/149871950) update glibc version, consider pulling from GitHub.
 GLIBC_VERSION = '2.31'
 GLIBC_TAR = 'glibc-{}.tar.xz'.format(GLIBC_VERSION)
 
