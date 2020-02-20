@@ -10,6 +10,7 @@
 - Deprecate versionless `rhel` os_type.
   - It will stop working in April 2020, and you will have to specify
       `rhel7` on most providers or `amazonlinux1` on AWS.
+- Remove the `Runtime` metric for Horovod.
 
 ### New features:
 
@@ -25,6 +26,8 @@
 - Add Coremark demo scripts at PerfKitBenchmarker/tools/demos/coremark.
 - Add RHEL 8 to AWS, Azure and GCP providers
 - Add CentOS 8 to Azure and GCP providers
+- Add BERT models in Horovod benchmark
+- Add timeline support in Horovod benchmark
 
 ### Enhancements:
 
