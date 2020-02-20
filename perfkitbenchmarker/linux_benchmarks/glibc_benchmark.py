@@ -34,6 +34,7 @@ import logging
 import re
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
@@ -105,8 +106,9 @@ def _GetGccVersion(vm):
   _, stderr = vm.RemoteCommand('gcc -v')
   match = _GCC_VERSION_RE.search(stderr)
   if not match:
-    raise Exception('stderr: {} does not match pattern "{}"'.format(
-        stderr, _GCC_VERSION_RE.pattern))
+    raise errors.Benchmarks.RunError(
+        'stderr: {} does not match pattern "{}"'.format(
+            stderr, _GCC_VERSION_RE.pattern))
   return match.group(1)
 
 
