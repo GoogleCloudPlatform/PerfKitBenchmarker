@@ -25,16 +25,24 @@ class HorovodBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(HorovodBenchmarkTestCase, self).setUp()
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'horovod_results.txt')
-    with open(path) as fp:
-      self.test_output = fp.read()
+    filenames = [
+        'horovod_output_resnet.txt',
+        'horovod_output_bert.txt',
+    ]
+    self.test_output = dict()
+    for fn in filenames:
+      path = os.path.join(os.path.dirname(__file__), '../data', fn)
+      self.test_output[fn] = open(path).read()
 
-  def testExtractThroughputAndRuntime(self):
-    throughput, runtime = horovod_benchmark._ExtractThroughputAndRuntime(
-        self.test_output)
-    self.assertEqual(789.5, throughput)
-    self.assertEqual(1650.5, runtime)
+  def testExtractResNetThroughput(self):
+    throughput, _ = horovod_benchmark._ExtractResNetThroughput(
+        self.test_output['horovod_output_resnet.txt'])
+    self.assertEqual(36517.1, throughput)
+
+  def testExtractBertThroughput(self):
+    throughput, _ = horovod_benchmark._ExtractBertThroughput(
+        self.test_output['horovod_output_bert.txt'])
+    self.assertEqual(52.3, throughput)
 
 
 if __name__ == '__main__':
