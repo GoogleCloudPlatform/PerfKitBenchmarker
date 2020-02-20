@@ -21,13 +21,17 @@ import mock
 
 from perfkitbenchmarker.linux_benchmarks import glibc_benchmark
 
+_TEST_GCC_VERSION = '7.4.0'
+
 
 class GlibcTestCase(unittest.TestCase):
 
   def setUp(self):
+    super(GlibcTestCase, self).setUp()
     p = mock.patch(glibc_benchmark.__name__ + '.FLAGS')
     p.start()
     self.addCleanup(p.stop)
+    glibc_benchmark._GetGccVersion = mock.Mock(return_value=_TEST_GCC_VERSION)
 
   def CallParseOutput(self, filename, benchmark_spec, upper_key, results):
     """Read sample outputs of glibc_benchmark and call ParseOutput function.
@@ -65,6 +69,7 @@ class GlibcTestCase(unittest.TestCase):
     self.assertAlmostEqual(9626.89, metadata['max'])
     self.assertAlmostEqual(5.198, metadata['min'])
     self.assertAlmostEqual(5.3685, metadata['mean'])
+    self.assertEqual(_TEST_GCC_VERSION, metadata['gcc'])
 
   def testParseGlibc2(self):
     benchmark_spec = mock.MagicMock()
@@ -81,6 +86,7 @@ class GlibcTestCase(unittest.TestCase):
     self.assertAlmostEqual(8.42329e+06, metadata['duration'])
     self.assertAlmostEqual(500, metadata['iterations'])
     self.assertAlmostEqual(16846, metadata['mean'])
+    self.assertEqual(_TEST_GCC_VERSION, metadata['gcc'])
 
   def testParseGlibc3(self):
     benchmark_spec = mock.MagicMock()
@@ -103,6 +109,7 @@ class GlibcTestCase(unittest.TestCase):
     self.assertAlmostEqual(4, metadata['min_size'])
     self.assertAlmostEqual(32768, metadata['max_size'])
     self.assertAlmostEqual(88, metadata['random_seed'])
+    self.assertEqual(_TEST_GCC_VERSION, metadata['gcc'])
 
 
 if __name__ == '__main__':
