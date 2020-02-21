@@ -27,6 +27,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
 GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
@@ -97,7 +98,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   Attributes:
     cluster_id: ID of the cluster.
-    project: ID of the project.
+    project: ID of the project in which the cluster is being launched.
+    dpb_service_type: Set to 'emr'.
+    cmd_prefix: Setting default prefix for the emr commands (region optional).
+    network: Dedicated network for the EMR cluster
+    s3_service: Region specific instance of S3 for bucket management.
+    bucket_to_delete: Cluster associated bucket to be cleaned up.
+    dpb_version: EMR version to use.
   """
 
   CLOUD = providers.AWS
@@ -114,6 +121,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       self.cmd_prefix += ['--region', region]
       self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
           aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
+      self.s3_service = s3.S3Service()
+      self.s3_service.PrepareService(region)
     else:
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
@@ -125,13 +134,19 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     del benchmark_config  # Unused
 
   def _CreateLogBucket(self):
-    bucket_name = 's3://pkb-{0}-emr'.format(FLAGS.run_uri)
-    cmd = self.cmd_prefix + ['s3', 'mb', bucket_name]
-    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if retcode != 0:
-      raise Exception('Error creating logs bucket')
-    self.bucket_to_delete = bucket_name
-    return bucket_name
+    """Create the s3 bucket for the EMR cluster's logs."""
+    log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
+    self.s3_service.MakeBucket(log_bucket_name)
+    return 's3://{}'.format(log_bucket_name)
+
+  def _DeleteLogBucket(self):
+    """Delete the s3 bucket holding the EMR cluster's logs.
+
+    This method is part of the Delete lifecycle of the resource.
+    """
+    # TODO(saksena): Deprecate the use of FLAGS.run_uri and plumb as argument.
+    log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
+    self.s3_service.DeleteBucket(log_bucket_name)
 
   def _Create(self):
     """Creates the cluster."""
@@ -173,7 +188,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     instance_groups.append(master_instance)
 
     # Create the log bucket to hold job's log output
-    logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
+    # TODO(saksena): Deprecate aws_emr_loguri flag and move
+    # the log bucket creation to Create dependencies.
+    logs_bucket = self._CreateLogBucket()
 
     # Spark SQL needs to access Hive
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
@@ -246,10 +263,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def _DeleteDependencies(self):
     if self.network:
       self._DeleteSecurityGroups()
-    if self.bucket_to_delete:
-      bucket_del_cmd = self.cmd_prefix + ['s3', 'rb', '--force',
-                                          self.bucket_to_delete]
-      vm_util.IssueCommand(bucket_del_cmd)
+    self._DeleteLogBucket()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
@@ -389,9 +403,20 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     pass
 
   def CreateBucket(self, source_bucket):
-    mb_cmd = self.cmd_prefix + ['s3', 'mb', '{}{}'.format(
-        self.PERSISTENT_FS_PREFIX, source_bucket)]
-    _, _, _ = vm_util.IssueCommand(mb_cmd)
+    """Create a bucket on S3 for use during the persistent data processing.
+
+    Args:
+      source_bucket: String, name of the bucket to create.
+    """
+    self.s3_service.MakeBucket(source_bucket)
+
+  def DeleteBucket(self, source_bucket):
+    """Delete a bucket on S3 used during the persistent data processing.
+
+    Args:
+      source_bucket: String, name of the bucket to delete.
+    """
+    self.s3_service.DeleteBucket(source_bucket)
 
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):
