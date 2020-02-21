@@ -350,6 +350,28 @@ class BaseDpbService(resource.BaseResource):
     end_time = datetime.datetime.now()
     return self._ProcessWallTime(start_time, end_time), stats
 
+  def CreateBucket(self, source_bucket):
+    """Creates an object-store bucket used during persistent data processing.
+
+    Default behaviour is a no-op as concrete implementations will have native
+    implementations.
+
+    Args:
+      source_bucket: String, name of the bucket to create.
+    """
+    pass
+
+  def DeleteBucket(self, source_bucket):
+    """Deletes an object-store bucket used during persistent data processing.
+
+    Default behaviour is a no-op as concrete implementations will have native
+    implementations.
+
+    Args:
+      source_bucket: String, name of the bucket to delete.
+    """
+    pass
+
 
 class UnmanagedDpbService(BaseDpbService):
   """Object representing an un-managed dpb service."""
