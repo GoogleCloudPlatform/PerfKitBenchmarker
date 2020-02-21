@@ -309,60 +309,32 @@ Sets can be combined with individual benchmarks or other named sets.
 
 The following are some common flags used when configuring PerfKit Benchmarker.
 
-| Flag               | Notes                                                 |
-| ------------------ | ----------------------------------------------------- |
-| `--helpmatch=pkb`  | see all global flags                                  |
-| `--helpmatch=hpcc` | see all flags associated with the hpcc benchmark. You |
-:                    : can substitute any benchmark name to see the          :
-:                    : associated flags.                                     :
-| `--benchmarks`     | A comma separated list of benchmarks or benchmark     |
-:                    : sets to run such as `--benchmarks=iperf,ping` . To    :
-:                    : see the full list, run `./pkb.py                      :
-:                    : --helpmatch=benchmarks | grep perfkitbenchmarker`     :
-| `--cloud`          | Cloud where the benchmarks are run. See the table     |
-:                    : below for choices.                                    :
-| `--machine_type`   | Type of machine to provision if pre-provisioned       |
-:                    : machines are not used. Most cloud providers accept    :
-:                    : the names of pre-defined provider-specific machine    :
-:                    : types (for example, GCP supports                      :
-:                    : `--machine_type=n1-standard-8` for a GCE              :
-:                    : n1-standard-8 VM). Some cloud providers support YAML  :
-:                    : expressions that match the corresponding VM spec      :
-:                    : machine_type property in the [YAML                    :
-:                    : configs](#configurations-and-configuration-overrides) :
-:                    : (for example, GCP supports `--machine_type="{cpus\:   :
-:                    : 1, memory\: 4.5GiB}"` for a GCE custom VM with 1 vCPU :
-:                    : and 4.5GiB memory). Note that the value provided by   :
-:                    : this flag will affect all provisioned machines; users :
-:                    : who wish to provision different machine types for     :
-:                    : different roles within a single benchmark run should  :
-:                    : use the [YAML                                         :
-:                    : configs](#configurations-and-configuration-overrides) :
-:                    : for finer control.                                    :
-| `--zones`          | This flag allows you to override the default zone.    |
-:                    : See the table below.                                  :
-| `--data_disk_type` | Type of disk to use. Names are provider-specific, but |
-:                    : see table below.                                      :
+Flag | Notes
+-----|------
+`--helpmatch=pkb`         | see all global flags
+`--helpmatch=hpcc` | see all flags associated with the hpcc benchmark. You can substitute any benchmark name to see the associated flags.
+`--benchmarks`   | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --helpmatch=benchmarks \| grep perfkitbenchmarker`
+`--cloud`        | Cloud where the benchmarks are run. See the table below for choices.
+`--machine_type` | Type of machine to provision if pre-provisioned machines are not used. Most cloud providers accept the names of pre-defined provider-specific machine types (for example, GCP supports `--machine_type=n1-standard-8` for a GCE n1-standard-8 VM). Some cloud providers support YAML expressions that match the corresponding VM spec machine_type property in the [YAML configs](#configurations-and-configuration-overrides) (for example, GCP supports `--machine_type="{cpus: 1, memory: 4.5GiB}"` for a GCE custom VM with 1 vCPU and 4.5GiB memory). Note that the value provided by this flag will affect all provisioned machines; users who wish to provision different machine types for different roles within a single benchmark run should use the [YAML configs](#configurations-and-configuration-overrides) for finer control.
+`--zones`         | This flag allows you to override the default zone. See the table below.
+`--data_disk_type` | Type of disk to use. Names are provider-specific, but see table below.
 
-The default cloud is 'GCP', override with the `--cloud` flag. Each cloud has a
-default zone which you can override with the `--zones` flag, the flag supports
-the same values that the corresponding Cloud CLIs take:
+The default cloud is 'GCP', override with the `--cloud` flag. Each cloud has a default
+zone which you can override with the `--zones` flag, the flag supports the same values
+that the corresponding Cloud CLIs take:
 
-| Cloud name   | Default zone  | Notes                                       |
-| ------------ | ------------- | ------------------------------------------- |
-| GCP          | us-central1-a |                                             |
-| AWS          | us-east-1a    |                                             |
-| Azure        | eastus2       |                                             |
-| AliCloud     | West US       |                                             |
-| DigitalOcean | sfo1          | You must use a zone that supports the       |
-:              :               : features 'metadata' (for cloud config) and  :
-:              :               : 'private_networking'.                       :
-| OpenStack    | nova          |                                             |
-| CloudStack   | QC-1          |                                             |
-| Rackspace    | IAD           | OnMetal machine-types are available only in |
-:              :               : IAD zone                                    :
-| Kubernetes   | k8s           |                                             |
-| ProfitBricks | AUTO          | Additional zones: ZONE_1, ZONE_2, or ZONE_3 |
+Cloud name | Default zone | Notes
+-------|---------|-------
+GCP | us-central1-a | |
+AWS | us-east-1a | |
+Azure | eastus2 | | A PKB zone can be either a Azure location or an Azure location with an availability zone. Format for Azure availability zone support is "location-availability_zone". Example: eastus2-1 specifies Azure location eastus2 with availability zone 1.
+AliCloud | West US | |
+DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
+OpenStack | nova | |
+CloudStack | QC-1 | |
+Rackspace | IAD | OnMetal machine-types are available only in IAD zone
+Kubernetes | k8s | |
+ProfitBricks | AUTO | Additional zones: ZONE_1, ZONE_2, or ZONE_3
 
 Example:
 
@@ -398,13 +370,11 @@ use the same `<protocol>://<server>:<port>` syntax as the corresponding
 environment variables, for example `--http_proxy=http://proxy.example.com:8080`
 .
 
-| Flag            | Notes                                                   |
-| --------------- | ------------------------------------------------------- |
-| `--http_proxy`  | Needed for package manager on Guest OS and for some     |
-:                 : Perfkit packages                                        :
-| `--https_proxy` | Needed for package manager or Ubuntu guest and for from |
-:                 : github downloaded packages                              :
-| `--ftp_proxy`   | Needed for some Perfkit packages                        |
+Flag | Notes
+-----|------
+`--http_proxy`       | Needed for package manager on Guest OS and for some Perfkit packages
+`--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
+`--ftp_proxy`       | Needed for some Perfkit packages
 
 ## Preprovisioned Data
 
@@ -676,13 +646,11 @@ major versions.
 The following are flags used by the Elasticsearch publisher. At minimum, all
 that is needed is the `--es_uri` flag.
 
-| Flag         | Notes                                                     |
-| ------------ | --------------------------------------------------------- |
-| `--es_uri`   | The Elasticsearch server address and port (e.g.           |
-:              : localhost\:9200)                                          :
-| `--es_index` | The Elasticsearch index name to store documents (default: |
-:              : perfkit)                                                  :
-| `--es_type`  | The Elasticsearch document type (default: result)         |
+Flag | Notes
+-----|------
+`--es_uri`         | The Elasticsearch server address and port (e.g. localhost:9200)
+`--es_index`       | The Elasticsearch index name to store documents (default: perfkit)
+`--es_type`        | The Elasticsearch document type (default: result)
 
 Note: Amazon ElasticSearch service currently does not support transport on port
 9200 therefore you must use endpoint with port 80 eg.
@@ -698,12 +666,10 @@ The publisher will default to the pre-set defaults, identified below, if no uri
 or DB name is set. However, the user is required to at the very least call the
 `--influx_uri` flag to publish data to Influx.
 
-| Flag               | Notes                               | Default        |
-| ------------------ | ----------------------------------- | -------------- |
-| `--influx_uri`     | The Influx DB address and port.     | localhost:8086 |
-:                    : Expects the format hostname\:port   :                :
-| `--influx_db_name` | The name of Influx DB database that | perfkit        |
-:                    : you wish to publish to or create    :                :
+| Flag               | Notes                                                                | Default        |
+|--------------------|----------------------------------------------------------------------|----------------|
+| `--influx_uri`     | The Influx DB address and port. Expects the format hostname:port     | localhost:8086 |
+| `--influx_db_name` | The name of Influx DB database that you wish to publish to or create | perfkit        |
 
 # How to Extend PerfKit Benchmarker
 
