@@ -32,6 +32,7 @@
 ### Enhancements:
 
 -   Update Specsfs2014 to use the SP2 update rather than SP1.
+-   Update Multichase version to enable AARCH64 build support.
 
 ### Bug fixes and maintenance updates:
 
