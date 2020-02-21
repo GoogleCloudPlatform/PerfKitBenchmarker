@@ -38,7 +38,6 @@
 -   AWSBaseVirtualMachine subclasses require IMAGE_OWNER and IMAGE_NAME_FILTER.
     Fixes issue where some windows 2012 AMIs were selected from the wrong
     project.
--   Cassandra build uses HTTPS maven repository instead of HTTP
 -   Retry `yum install` commands to bypass transient issues.
 -   Azure defaults to no placement group created.
 -   Add Sql Server support to managed relational DB
