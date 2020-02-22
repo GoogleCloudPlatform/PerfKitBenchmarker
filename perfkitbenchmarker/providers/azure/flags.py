@@ -81,3 +81,11 @@ flags.DEFINE_enum('azure_redis_size',
 
 flags.DEFINE_boolean('azure_low_priority_vms', False,
                      'Whether to set the priority to low for Azure VMs')
+
+flags.DEFINE_boolean('bootstrap_azure_service_principal', True,
+                     'Whether to use the current service principal credentials '
+                     'when passing a service principal to a service. This has '
+                     'no effect if the logged in user is not a service '
+                     'principal. This is useful, because service principals '
+                     "usually lack the 'User Authentication Admin' role that "
+                     'allows creation of new service principals.')

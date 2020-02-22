@@ -230,16 +230,21 @@ def IssueRetryableCommand(cmd, env=None, suppress_failure=None):
   return stdout, stderr
 
 
-def AwsFilter(name, value):
-  """Returns a two element list suitable for an AWS command line.
+def AwsFilter(filter_keys_and_values):
+  """Returns a list suitable for an AWS command line filter.
 
-  The first element is "--filters"
+  Example:
+    AwsFilter({'a': 'b', 'c': 'd'}) returns a three element array:
+    ['--filters', 'Name=a,Values=b', 'Name=c,Values=d']
 
   For an example see
   https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-instances.html#options
 
   Args:
-    name: The name of the AWS attribute
-    value: The value for that attribute
+    filter_keys_and_values: A dict with the key as the name of the AWS attribute
+      and the value is the value of that attribute
   """
-  return ['--filters', 'Name={},Values={}'.format(name, value)]
+  filters = ['--filters']
+  for name, value in sorted(filter_keys_and_values.items()):
+    filters.append('Name={},Values={}'.format(name, value))
+  return filters
