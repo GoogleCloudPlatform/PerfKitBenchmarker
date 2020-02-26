@@ -49,3 +49,4 @@
     is consistent with propagating VM credentials in azure_credentials.py.
     -   This can be disabled by setting
         `--bootstrap_azure_service_principal=False`.
+-   Registered AWS VPC quota failures as quota failures.

@@ -102,6 +102,15 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(vpc_id, self.vpc.id)
     self.assertEqual(security_group_id, self.vpc.default_security_group_id)
 
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testInstanceVpcQuotaExceededDuringCreate(self, mock_cmd):
+    stderr = ('An error occurred (VpcLimitExceeded) when calling the CreateVpc '
+              'operation: The maximum number of VPCs has been reached.')
+    mock_cmd.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
+      self.vpc.Create()
+    self.assertEqual(str(e.exception), stderr)
+
   def testVpcDeleted(self):
     response = '{"Vpcs": [] }'
     util.IssueRetryableCommand.side_effect = [(response, None)]
