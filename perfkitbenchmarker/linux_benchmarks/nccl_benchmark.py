@@ -164,6 +164,7 @@ def _PrepareVm(vm):
                              FLAGS.cuda_toolkit_version)))
   if FLAGS.nccl_install_mofed:
     vm.Install('mofed')
+  vm.RemoteCommand('rm -rf nccl-tests')
   vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
   vm.RemoteCommand('cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
                    'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
@@ -182,6 +183,7 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
   vm_util.RunThreaded(_PrepareVm, benchmark_spec.vms)
   host = benchmark_spec.vms[0]
+  host.RemoteCommand('rm -rf {hostfile}'.format(hostfile=_HOSTFILE))
   for vm in benchmark_spec.vms:
     cmd = 'echo "{ip} slots={slots}" >> {hostfile}'.format(
         ip=vm.internal_ip, hostfile=_HOSTFILE, slots=FLAGS.nccl_slots)

@@ -187,6 +187,11 @@ def Run(benchmark_spec):
     cumulative_runtime += running_time
   results.append(sample.Sample('cumulative_runtime', cumulative_runtime,
                                'seconds', metadata))
+  # TODO(saksena): Refactor and migrate bucket management for all clouds to the
+  #  cleanup phase.
+  if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
+    run_uri = benchmark_spec.uuid.split('-')[0]
+    dpb_service_instance.DeleteBucket(run_uri)
   return results
 
 
