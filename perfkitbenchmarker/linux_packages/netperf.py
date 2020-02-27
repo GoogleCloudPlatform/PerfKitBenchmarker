@@ -39,7 +39,8 @@ NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
 NETPERF_PATH = NETPERF_SRC_DIR + '/netperf'
-NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
+NETLIB_PATCH = NETPERF_DIR + '/netperf.patch'
+NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 
 def _Install(vm):
@@ -47,16 +48,32 @@ def _Install(vm):
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install absl-py')
   vm.Install('build_tools')
+
   _CopyTar(vm)
   vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
   # Modify netperf to print out all buckets in its histogram rather than
-  # aggregating.
+  # aggregating, edit runemomniaggdemo script, and apply fix to
+  # allow it to compile with --enable-demo flag correctly
   vm.PushDataFile('netperf.patch', NETLIB_PATCH)
-  vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
-                   NETPERF_SRC_DIR)
+
+  vm.RemoteCommand('cd %s && patch -p1 < netperf.patch' %
+                   NETPERF_DIR)
+
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
-                   './configure --enable-histogram=yes '
-                   '&& make' % (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+                   './configure --enable-burst '
+                   '--enable-demo --enable-histogram '
+                   '&& make && sudo make install' %
+                   (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+
+  vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh'
+                   '&& chmod +x find_max_burst.sh'
+                   % (NETPERF_EXAMPLE_DIR))
+
+  if vm.IS_REBOOTABLE:
+    vm.ApplySysctlPersistent({
+        'net.ipv4.tcp_keepalive_time': 60,
+        'net.ipv4.tcp_keepalive_intvl': 60,
+    })
 
 
 def _CopyTar(vm):
