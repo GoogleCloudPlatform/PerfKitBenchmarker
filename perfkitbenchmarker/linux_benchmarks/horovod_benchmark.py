@@ -129,8 +129,9 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.max_seq_len = int(FLAGS.horovod_max_seq_len)
   benchmark_spec.bert_finetune = FLAGS.horovod_bert_finetune
   benchmark_spec.timeline = FLAGS.horovod_timelime
-  benchmark_spec.nccl_net_plugin = FLAGS.nccl_net_plugin
   benchmark_spec.cuda_visible_devices = FLAGS.horovod_cuda_visible_devices
+  benchmark_spec.nccl_net_plugin = FLAGS.nccl_net_plugin
+  benchmark_spec.nccl_extra_params = FLAGS.nccl_extra_params
 
 
 def _CopyAndUpdateRunScripts(model, vm):
@@ -227,6 +228,7 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['max_seq_len'] = benchmark_spec.max_seq_len
   metadata['nccl_net_plugin'] = benchmark_spec.nccl_net_plugin
   metadata['cuda_visible_devices'] = benchmark_spec.cuda_visible_devices
+  metadata['nccl_extra_params'] = benchmark_spec.nccl_extra_params
   return metadata
 
 
