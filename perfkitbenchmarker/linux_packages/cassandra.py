@@ -56,11 +56,22 @@ CLUSTER_START_TRIES = 10
 CLUSTER_START_SLEEP = 60
 # Time, in seconds, to sleep between node starts.
 NODE_START_SLEEP = 5
+# for setting a maven repo with --cassandra_maven_repo_url
+_MAVEN_REPO_PARAMS = """
+artifact.remoteRepository.central: {0}
+artifact.remoteRepository.apache: {0}
+"""
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('cassandra_replication_factor', 3, 'Num of replicas.')
 flags.DEFINE_integer('cassandra_concurrent_reads', 32,
                      'Concurrent read requests each server accepts.')
+# Partial list of known mirrors:
+# https://repo.maven.apache.org/maven2/.meta/repository-metadata.xml
+# See instructions for setting up own mirror:
+# https://maven.apache.org/guides/mini/guide-mirror-settings.html
+flags.DEFINE_boolean('cassandra_maven_repo_url', None,
+                     'Optional maven repo mirror to use.')
 
 
 def CheckPrerequisites():
@@ -80,13 +91,14 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('openjdk')
   vm.Install('curl')
-  vm.RemoteCommand(
-      'cd {0}; git clone {1}; cd {2}; git checkout {3}; {4}/bin/ant'.format(
-          INSTALL_DIR,
-          CASSANDRA_GIT_REPRO,
-          CASSANDRA_DIR,
-          CASSANDRA_VERSION,
-          ANT_HOME_DIR))
+  vm.RemoteCommand('cd {0}; git clone {1}; cd {2}; git checkout {3}'.format(
+      INSTALL_DIR, CASSANDRA_GIT_REPRO, CASSANDRA_DIR, CASSANDRA_VERSION))
+  if FLAGS.cassandra_maven_repo_url:
+    # sets maven repo properties in the build.properties
+    file_contents = _MAVEN_REPO_PARAMS.format(FLAGS.cassandra_maven_repo_url)
+    vm.RemoteCommand('echo "{}" > {}/build.properties'.format(
+        file_contents, CASSANDRA_DIR))
+  vm.RemoteCommand('cd {}; {}/bin/ant'.format(CASSANDRA_DIR, ANT_HOME_DIR))
   # Add JNA
   vm.RemoteCommand('cd {0} && curl -LJO {1}'.format(
       posixpath.join(CASSANDRA_DIR, 'lib'),
