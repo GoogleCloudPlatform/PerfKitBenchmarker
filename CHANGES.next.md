@@ -33,6 +33,9 @@
 
 -   Update Specsfs2014 to use the SP2 update rather than SP1.
 -   Update Multichase version to enable AARCH64 build support.
+-   Added flag '--cassandra_maven_repo_url' to use a maven repo when building
+    cassandra, for example https://maven-central.storage-download.googleapis.com
+/maven2
 
 ### Bug fixes and maintenance updates:
 
