@@ -32,6 +32,8 @@ DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_POSTGRES_PORT = 5432
+DEFALUT_SQLSERVER_VERSION = 'DEFAULT'
+DEFAULT_SQLSERVER_PORT = 1433
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 
@@ -106,6 +108,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       return DEFAULT_POSTGRES_VERSION
     elif engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
+    elif engine == relational_db.SQLSERVER:
+      return DEFAULT_MYSQL_VERSION
     else:
       raise relational_db.RelationalDbEngineNotFoundException(
           'Unsupported engine {0}'.format(engine))
@@ -124,6 +128,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       return DEFAULT_POSTGRES_PORT
     elif engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_PORT
+    elif engine == relational_db.SQLSERVER:
+      return DEFAULT_SQLSERVER_PORT
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
@@ -133,60 +139,136 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       return 'postgres'
     elif engine == relational_db.MYSQL:
       return 'mysql'
+    elif engine == relational_db.SQLSERVER:
+      return 'sql'
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
-  def _CreateAzureSqlInstance(self):
-    if self.spec.engine == relational_db.POSTGRES or (
-        self.spec.engine == relational_db.MYSQL):
-
-      if not self.spec.high_availability:
-        raise Exception('Azure databases can only be used in high '
-                        'availability.')
-
+  def _ApplyManagedMysqlFlags(self):
+    """Applies the MySqlFlags to a managed instance."""
+    for flag in FLAGS.mysql_flags:
+      name_and_value = flag.split('=')
       cmd = [
           azure.AZURE_PATH,
-          self.GetAzCommandForEngine(),
-          'server',
-          'create',
-          '--resource-group',
-          self.resource_group.name,
-          '--name',
-          self.instance_id,
-          '--location',
-          self.location,
-          '--admin-user',
-          self.spec.database_username,
-          '--admin-password',
-          self.spec.database_password,
-          '--performance-tier',
-          self.spec.db_spec.tier,
-          '--compute-units',
-          str(self.spec.db_spec.compute_units),
-          # AZ command line expects 128000MB-1024000MB in increments of 128000MB
-          '--storage-size',
-          str(self.spec.db_disk_spec.disk_size * 1000),
-          '--version',
-          self.spec.engine_version,
+          self.GetAzCommandForEngine(), 'server', 'configuration', 'set',
+          '--name', name_and_value[0], '--resource-group',
+          self.resource_group.name, '--server', self.instance_id, '--value',
+          name_and_value[1]
       ]
-      vm_util.IssueCommand(cmd)
+      _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+      if stderr:
+        raise Exception('Invalid MySQL flags: {0}.  Error {1}'.format(
+            name_and_value, stderr))
 
-      for flag in FLAGS.mysql_flags:
-        name_and_value = flag.split('=')
-        cmd = [
-            azure.AZURE_PATH,
-            self.GetAzCommandForEngine(), 'server', 'configuration', 'set',
-            '--name', name_and_value[0], '--resource-group',
-            self.resource_group.name, '--server', self.instance_id, '--value',
-            name_and_value[1]
-        ]
-        _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
-        if stderr:
-          raise Exception('Invalid MySQL flags: %s' % stderr)
+  def _CreateMySqlOrPostgresInstanceS(self):
+    """Creates a managed MySql or Postgres instance."""
+    if not self.spec.high_availability:
+      raise Exception('Azure databases can only be used in high '
+                      'availability.')
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        'server',
+        'create',
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
+        '--location',
+        self.location,
+        '--admin-user',
+        self.spec.database_username,
+        '--admin-password',
+        self.spec.database_password,
+        '--performance-tier',
+        self.spec.db_spec.tier,
+        '--compute-units',
+        str(self.spec.db_spec.compute_units),
+        # AZ command line expects 128000MB-1024000MB in increments of 128000MB
+        '--storage-size',
+        str(self.spec.db_disk_spec.disk_size * 1000),
+        '--version',
+        self.spec.engine_version,
+    ]
+    vm_util.IssueCommand(cmd)
 
+  def _CreateSqlServerInstance(self):
+    """Creates a managed sql server instance."""
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        'server',
+        'create',
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
+        '--location',
+        self.location,
+        '--admin-user',
+        self.spec.database_username,
+        '--admin-password',
+        self.spec.database_password
+    ]
+    vm_util.IssueCommand(cmd)
+
+    # Supported families & capacities for 'Standard' are:
+    # [(None, 10), (None, 20), (None, 50), (None, 100), (None, 200),
+    # (None, 400), (None, 800), (None, 1600), (None, 3000)]
+
+    # Supported families & capacities for 'Premium' are:
+    # [(None, 125), (None, 250), (None, 500), (None, 1000), (None, 1750),
+    #  (None, 4000)].
+
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        'db',
+        'create',
+        '--resource-group',
+        self.resource_group.name,
+        '--server',
+        self.instance_id,
+        '--name',
+        'tpcc',
+        '--edition',
+        self.spec.db_spec.tier,
+        '--capacity',
+        str(self.spec.db_spec.compute_units),
+        '--zone-redundant',
+        'true' if self.spec.high_availability else 'false'
+    ]
+    vm_util.IssueCommand(cmd)
+
+  def _CreateAzureManagedSqlInstance(self):
+    """Creates an Azure Sql Instance from a managed service."""
+    if self.spec.engine == relational_db.POSTGRES:
+      self._CreateMySqlOrPostgresInstance()
+    elif self.spec.engine == relational_db.MYSQL:
+      self._CreateMySqlOrPostgresInstance()
+      self._ApplyManagedMysqlFlags()
+    elif self.spec.engine == relational_db.SQLSERVER:
+      self._CreateSqlServerInstance()
     else:
       raise NotImplementedError('Unknown how to create Azure data base '
                                 'engine {0}'.format(self.spec.engine))
+
+  def _CreateAzureUnmanagedSqlInstance(self):
+    """Creates an Azure Sql Instance hosted inside of a VM."""
+    self.endpoint = self.server_vm.ip_address
+    if self.spec.engine == relational_db.MYSQL:
+      self._InstallMySQLServer()
+      self._ApplyMySqlFlags()
+    else:
+      raise Exception(
+          'Engine {0} not supported for unmanaged databases.'.format(
+              self.spec.engine))
+
+    self.firewall = azure_network.AzureFirewall()
+    self.firewall.AllowPort(
+        self.server_vm,
+        '3306',
+        source_range=['%s/32' % self.client_vm.ip_address])
 
   def _Create(self):
     """Creates the Azure RDS instance.
@@ -199,22 +281,10 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     if self.spec.engine == relational_db.MYSQL:
       self._InstallMySQLClient()
     if self.is_managed_db:
-      self._CreateAzureSqlInstance()
+      self._CreateAzureManagedSqlInstance()
     else:
-      self.endpoint = self.server_vm.ip_address
-      if self.spec.engine == relational_db.MYSQL:
-        self._InstallMySQLServer()
-      else:
-        raise Exception(
-            'Engine {0} not supported for unmanaged databases.'.format(
-                self.spec.engine))
-      self.firewall = azure_network.AzureFirewall()
-      self.firewall.AllowPort(
-          self.server_vm,
-          '3306',
-          source_range=['%s/32' % self.client_vm.ip_address])
       self.unmanaged_db_exists = True
-      self._ApplyMySqlFlags()
+      self._CreateAzureUnmanagedSqlInstance()
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -318,8 +388,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
-        user_visibile_state = server_show_json['userVisibleState']
-        if user_visibile_state == 'Ready':
+        state = server_show_json['state']
+        if state == 'Ready':
           break
       time.sleep(5)
 
