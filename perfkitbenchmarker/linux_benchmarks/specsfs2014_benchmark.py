@@ -173,7 +173,7 @@ def _ConfigureSpec(prime_client, clients, benchmark,
   exec_path = posixpath.join(stdout.strip(), _SPEC_DIR, 'binaries',
                              'linux', 'x86_64', 'netmist')
   load = load or FLAGS.specsfs2014_load
-  num_runs = num_runs or FLAGS.specsfs2014_load
+  num_runs = num_runs or FLAGS.specsfs2014_num_runs
   incr_load = incr_load or FLAGS.specsfs2014_incr_load
   configuration_overrides = {
       'USER': prime_client.user_name,
