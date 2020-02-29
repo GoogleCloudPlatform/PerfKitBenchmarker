@@ -397,6 +397,16 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(OpenStackVirtualMachine, self).GetResourceMetadata()
+    if FLAGS.openstack_post_provisioning_script:
+      result['openstack_post_provisioning_script'] = FLAGS.openstack_post_provisioning_script
+    return result
 
 class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                          linux_virtual_machine.DebianMixin):
