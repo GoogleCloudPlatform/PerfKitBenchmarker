@@ -27,6 +27,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -70,6 +71,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
+    self.gcs_service = gcs.GoogleCloudStorageService()
+    self.gcs_service.PrepareService(location=self.region)
 
   @staticmethod
   def _ParseTime(state_time):
@@ -249,15 +252,20 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags[flag_name] = cmd_value
 
   def CreateBucket(self, source_bucket):
-    mb_command = ['gsutil', 'mb']
-    region = self.dpb_service_zone.rsplit('-', 1)[0]
-    mb_command.extend(['-c', 'regional', '-l', region])
+    """Create a bucket on GCS used during the persistent data processing.
 
-    if self.project is not None:
-      mb_command.extend(['-p', self.project])
+    Args:
+      source_bucket: String, name of the bucket to create.
+    """
+    self.gcs_service.MakeBucket(source_bucket)
 
-    mb_command.append('{}{}'.format(self.PERSISTENT_FS_PREFIX, source_bucket))
-    vm_util.IssueCommand(mb_command)
+  def DeleteBucket(self, source_bucket):
+    """Delete a bucket on GCS used during the persistent data processing.
+
+    Args:
+      source_bucket: String, name of the bucket to delete.
+    """
+    self.gcs_service.DeleteBucket(source_bucket)
 
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to generate data using a distributed job on the cluster."""

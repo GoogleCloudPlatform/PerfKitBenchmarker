@@ -152,6 +152,30 @@ flags.DEFINE_string(
     'non-empty string will cause a reboot to occur after VM prepare. '
     'If unspecified, the kernel command line will be unmodified.')
 
+flags.DEFINE_integer(
+    'tcp_max_receive_buffer', None,
+    'Changes the third component of the sysctl value net.ipv4.tcp_rmem. '
+    'This sets the maximum receive buffer for TCP socket connections in bytes. '
+    'Increasing this value may increase single stream TCP throughput '
+    'for high latency connections')
+
+flags.DEFINE_integer(
+    'tcp_max_send_buffer', None,
+    'Changes the third component of the sysctl value net.ipv4.tcp_wmem. '
+    'This sets the maximum send buffer for TCP socket connections in bytes. '
+    'Increasing this value may increase single stream TCP throughput '
+    'for high latency connections')
+
+flags.DEFINE_integer(
+    'rmem_max', None,
+    'Sets the sysctl value net.core.rmem_max. This sets the max OS '
+    'receive buffer size in bytes for all types of connections')
+
+flags.DEFINE_integer(
+    'wmem_max', None,
+    'Sets the sysctl value net.core.wmem_max. This sets the max OS '
+    'send buffer size in bytes for all types of connections')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -334,6 +358,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
     self.DoConfigureNetworkForBBR()
+    self.DoConfigureTCPWindow()
     self.UpdateEnvironmentPath()
     self._RebootIfNecessary()
     self._DisableCpus()
@@ -450,6 +475,60 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._ApplySysctlPersistent({
         'net.core.default_qdisc': 'fq',
         'net.ipv4.tcp_congestion_control': 'bbr'
+    })
+
+  def DoConfigureTCPWindow(self):
+    """Change TCP window parameters in sysctl"""
+
+    # Return if none of these flags are set
+    if all(x is None for x in [FLAGS.tcp_max_receive_buffer,
+                               FLAGS.tcp_max_send_buffer,
+                               FLAGS.rmem_max,
+                               FLAGS.wmem_max]):
+      return
+
+    # Get current values from VM
+    stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_rmem')
+    rmem_values = stdout.split()
+    stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_wmem')
+    wmem_values = stdout.split()
+    stdout, _ = self.RemoteCommand('cat /proc/sys/net/core/rmem_max')
+    rmem_max = int(stdout)
+    stdout, _ = self.RemoteCommand('cat /proc/sys/net/core/wmem_max')
+    wmem_max = int(stdout)
+
+    # third number is max receive/send
+    max_receive = rmem_values[2]
+    max_send = wmem_values[2]
+
+    # if flags are set, override current values from vm
+    if FLAGS.tcp_max_receive_buffer:
+      max_receive = FLAGS.tcp_max_receive_buffer
+    if FLAGS.tcp_max_send_buffer:
+      max_send = FLAGS.tcp_max_send_buffer
+    if FLAGS.rmem_max:
+      rmem_max = FLAGS.rmem_max
+    if FLAGS.wmem_max:
+      wmem_max = FLAGS.wmem_max
+
+    # Add values to metadata
+    self.os_metadata['tcp_max_receive_buffer'] = max_receive
+    self.os_metadata['tcp_max_send_buffer'] = max_send
+    self.os_metadata['rmem_max'] = rmem_max
+    self.os_metadata['wmem_max'] = wmem_max
+
+    rmem_string = '{} {} {}'.format(rmem_values[0],
+                                    rmem_values[1],
+                                    max_receive)
+    wmem_string = '{} {} {}'.format(wmem_values[0],
+                                    wmem_values[1],
+                                    max_send)
+
+    self._ApplySysctlPersistent({
+        'net.ipv4.tcp_rmem': rmem_string,
+        'net.ipv4.tcp_wmem': wmem_string,
+        'net.core.rmem_max': rmem_max,
+        'net.core.wmem_max': wmem_max
     })
 
   def _RebootIfNecessary(self):

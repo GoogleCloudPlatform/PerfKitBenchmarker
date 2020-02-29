@@ -138,11 +138,6 @@ def PrepareNetperf(vm):
   # and enable keepalive on the control socket in addition to changing the
   # system defaults below.
   #
-  if vm.IS_REBOOTABLE:
-    vm.ApplySysctlPersistent({
-        'net.ipv4.tcp_keepalive_time': 60,
-        'net.ipv4.tcp_keepalive_intvl': 60,
-    })
 
 
 def Prepare(benchmark_spec):

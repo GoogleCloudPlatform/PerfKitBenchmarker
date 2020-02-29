@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing gcc-5 installation and cleanup functions."""
 
-
-def _Install(vm):
-  """Installs the gcc-5 package on the VM."""
-  pass
+"""Module containing build tools installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs the gcc-5 package on the VM."""
-  # TODO: Figure out how to install gcc with yum
-  raise NotImplementedError
+  """Installs build tools on the VM."""
+  vm.InstallPackages('python-rrdtool')
 
 
 def AptInstall(vm):
-  """Installs the gcc-5 package on the VM."""
-  vm.RemoteCommand('sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y && '
-                   'sudo apt-get update')
-  vm.InstallPackages('gcc-snapshot')
-  vm.InstallPackages('gcc-5')
+  """Installs build tools on the VM."""
+  vm.InstallPackages('python-rrdtool')
