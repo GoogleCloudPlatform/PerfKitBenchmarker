@@ -53,7 +53,7 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
     result.update({
         'placement_group_style': (option_decoders.EnumDecoder, {
             'valid_values': placement_group.PLACEMENT_GROUP_OPTIONS,
-            'default': placement_group.PLACEMENT_GROUP_DEFAULT
+            'default': placement_group.PLACEMENT_GROUP_CLUSTER,
         })
     })
     return result

@@ -100,7 +100,6 @@ class TestBackgroundNetworkWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(TestBackgroundNetworkWorkload, self).setUp()
-    FLAGS.os_type = os_types.DEBIAN
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
     p = patch(util.__name__ + '.GetDefaultProject')

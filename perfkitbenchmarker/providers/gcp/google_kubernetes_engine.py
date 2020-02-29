@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains classes/functions related to GKE (Google Container Engine)."""
+"""Contains classes/functions related to GKE (Google Kubernetes Engine)."""
 
 import json
 import logging
@@ -81,7 +81,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
 
 
 class GkeCluster(container_service.KubernetesCluster):
-  """Class representing a Google Container Engine cluster."""
+  """Class representing a Google Kubernetes Engine cluster."""
 
   CLOUD = providers.GCP
 

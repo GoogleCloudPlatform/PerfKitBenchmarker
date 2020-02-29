@@ -117,6 +117,23 @@ ARM_PROCESSOR_PREFIXES = ['a1']
 ARM = 'arm64'
 X86 = 'x86_64'
 
+# These are the project numbers of projects owning common images.
+# Some numbers have corresponding owner aliases, but they are not used here.
+AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
+# https://coreos.com/os/docs/latest/booting-on-ec2.html
+COREOS_IMAGE_PROJECT = '595879546273'
+# From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
+# TODO(pclay): replace with Marketplace AMI when available
+DEBIAN_IMAGE_PROJECT = '136693071363'
+MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
+# https://access.redhat.com/articles/2962171
+RHEL_IMAGE_PROJECT = '309956199498'
+# https://help.ubuntu.com/community/EC2StartersGuide#Official_Ubuntu_Cloud_Guest_Amazon_Machine_Images_.28AMIs.29
+UBUNTU_IMAGE_PROJECT = '099720109477'  # Owned by canonical
+# Some Windows images are also available in marketplace project, but this is the
+# one selected by the AWS console.
+WINDOWS_IMAGE_PROJECT = '801119661308'  # alias amazon
+
 # Machine type to host architecture.
 _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
     'a1': 'cortex-a72',
@@ -152,6 +169,10 @@ class AwsUnexpectedWindowsAdapterOutputError(Exception):
 
 class AwsUnknownStatusError(Exception):
   """Error indicating an unknown status was encountered."""
+
+
+class AwsImageNotFoundError(Exception):
+  """Error indicating no appropriate AMI could be found."""
 
 
 def GetRootBlockDeviceSpecForImage(image_id, region):
@@ -434,9 +455,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.AWS
 
   # The IMAGE_NAME_FILTER is passed to the AWS CLI describe-images command to
-  # filter images by name. This may be overridden by the aws_image_name_filter
-  # flag, and is otherwise overridden by most OS specializations, e.g.,
-  # Ubuntu1604BasedAwsVirtualMachine.
+  # filter images by name. This must be set by subclasses, but may be overridden
+  # by the aws_image_name_filter flag.
   IMAGE_NAME_FILTER = None
 
   # The IMAGE_NAME_REGEX can be used to further filter images by name. It
@@ -448,8 +468,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # images considered.
   IMAGE_NAME_REGEX = None
 
-  IMAGE_OWNER = None
+  # Project that owns the AMIs of this OS type. Default to AWS Marketplace
+  # official image project.
+  IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
+
+  # Some AMIs use a project code to find the latest (in addition to owner, and
+  # filter)
   IMAGE_PRODUCT_CODE_FILTER = None
+
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
   DEFAULT_USER_NAME = 'ec2-user'
 
@@ -529,12 +555,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         type.
       region: The region of the VM, as images are region specific.
 
+    Raises:
+      AwsImageNotFoundError: If a default image cannot be found.
+
     Returns:
       The ID of the latest image, or None if no default image is configured or
       none can be found.
     """
-    if cls.IMAGE_NAME_FILTER is None:
-      return None
+
+    # These cannot be REQUIRED_ATTRS, because nesting REQUIRED_ATTRS breaks.
+    if not cls.IMAGE_OWNER:
+      raise NotImplementedError('AWS OSMixins require IMAGE_OWNER')
+    if not cls.IMAGE_NAME_FILTER:
+      raise NotImplementedError('AWS OSMixins require IMAGE_NAME_FILTER')
 
     if FLAGS.aws_image_name_filter:
       cls.IMAGE_NAME_FILTER = FLAGS.aws_image_name_filter
@@ -560,12 +593,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if cls.IMAGE_PRODUCT_CODE_FILTER:
       describe_cmd.extend(['Name=product-code,Values=%s' %
                            cls.IMAGE_PRODUCT_CODE_FILTER])
-    if cls.IMAGE_OWNER:
-      describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
+    describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
     if not stdout:
-      return None
+      raise AwsImageNotFoundError('aws describe-images did not produce valid '
+                                  'output.')
 
     if cls.IMAGE_NAME_REGEX:
       # Further filter images by the IMAGE_NAME_REGEX filter.
@@ -588,7 +621,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       images = json.loads(stdout)
 
     if not images:
-      return None
+      raise AwsImageNotFoundError('No AMIs with given filters found.')
 
     # We want to return the latest version of the image, and since the wildcard
     # portion of the image name is the image's creation date, we can just take
@@ -973,54 +1006,49 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.ClearMixin):
   IMAGE_NAME_FILTER = 'clear/images/*/clear-*'
-  IMAGE_OWNER = '679593333241'  # For marketplace images.
   DEFAULT_USER_NAME = 'clear'
 
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.CoreOsMixin):
   IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
-  # Note AMIs can also be found distributed by CoreOS in 595879546273
-  IMAGE_OWNER = '679593333241'  # For marketplace images.
+  IMAGE_OWNER = COREOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'core'
 
 
-class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
-                                   linux_virtual_machine.DebianMixin):
-  """Class with configuration for AWS Debian virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-  DEFAULT_USER_NAME = 'ubuntu'
+class Debian9BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.Debian9Mixin):
+  IMAGE_NAME_FILTER = 'debian-stretch-*64-*'
+  DEFAULT_USER_NAME = 'admin'
 
 
-class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1404Mixin):
-  """Class with configuration for AWS Ubuntu1404 virtual machines."""
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-  DEFAULT_USER_NAME = 'ubuntu'
+class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
+                                     linux_virtual_machine.Debian10Mixin):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
+  # TODO(pclay): replace with Marketplace AMI when available
+  IMAGE_NAME_FILTER = 'debian-10-*64*'
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_USER_NAME = 'admin'
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
 
 
 class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
 
 
@@ -1028,68 +1056,73 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
   """Class with configuration for AWS Juju virtual machines."""
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
   DEFAULT_USER_NAME = 'ubuntu'
 
 
 class AmazonLinux2BasedAwsVirtualMachine(
     AwsVirtualMachine, linux_virtual_machine.AmazonLinux2Mixin):
-  """Class with configuration for AWS Amazon Linux 2 Redhat virtual machines."""
+  """Class with configuration for AWS Amazon Linux 2 virtual machines."""
   IMAGE_NAME_FILTER = 'amzn2-ami-*-*-*'
-
-  def __init__(self, vm_spec):
-    super(AmazonLinux2BasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python27'
-    self.python_dev_package_config = 'python27-devel'
-    self.python_pip_package_config = 'python27-pip'
+  IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
 
 
-class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
-                                 linux_virtual_machine.RhelMixin):
-  """Class with configuration for AWS Redhat virtual machines."""
+class AmazonLinux1BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux1Mixin):
+  """Class with configuration for AWS Amazon Linux 1 virtual machines."""
   IMAGE_NAME_FILTER = 'amzn-ami-*-*-*'
+  IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
   # IMAGE_NAME_REGEX tightens up the image filter for Amazon Linux to avoid
   # non-standard Amazon Linux images. This fixes a bug in which we were
   # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
   IMAGE_NAME_REGEX = (
       r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
 
-  def __init__(self, vm_spec):
-    super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python27'
-    self.python_dev_package_config = 'python27-devel'
-    self.python_pip_package_config = 'python27-pip'
+
+class VersionlessRhelBaseAwsVirtualMachine(
+    linux_virtual_machine.VersionlessRhelMixin,
+    AmazonLinux1BasedAwsVirtualMachine):
+  ALTERNATIVE_OS = AmazonLinux1BasedAwsVirtualMachine.OS_TYPE
 
 
-class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
-                                    linux_virtual_machine.Centos7Mixin):
-  """Class with configuration for AWS Centos7 virtual machines."""
-  # Documentation on finding the Centos 7 image:
+class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
+                                  linux_virtual_machine.Rhel7Mixin):
+  """Class with configuration for AWS RHEL 7 virtual machines."""
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/2962171
+  IMAGE_NAME_FILTER = 'RHEL-7*_GA*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
+
+
+class Rhel8BasedAwsVirtualMachine(AwsVirtualMachine,
+                                  linux_virtual_machine.Rhel8Mixin):
+  """Class with configuration for AWS RHEL 8 virtual machines."""
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/2962181
+  # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
+  IMAGE_NAME_FILTER = 'RHEL-8*_HVM-*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
+
+
+class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.CentOs7Mixin):
+  """Class with configuration for AWS CentOS 7 virtual machines."""
+  # Documentation on finding the CentOS 7 image:
   # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
-  IMAGE_OWNER = 'aws-marketplace'
   DEFAULT_USER_NAME = 'centos'
 
-  def __init__(self, vm_spec):
-    super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
-    # package_config
-    self.python_package_config = 'python'
-    self.python_dev_package_config = 'python-devel'
-    self.python_pip_package_config = 'python2-pip'
 
-
-class WindowsAwsVirtualMachine(AwsVirtualMachine,
-                               windows_virtual_machine.WindowsMixin):
+class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
+                                   windows_virtual_machine.BaseWindowsMixin):
   """Support for Windows machines on AWS."""
-  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
   DEFAULT_USER_NAME = 'Administrator'
+  IMAGE_OWNER = WINDOWS_IMAGE_PROJECT
 
   def __init__(self, vm_spec):
-    super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
+    super(BaseWindowsAwsVirtualMachine, self).__init__(vm_spec)
     self.user_data = ('<powershell>%s</powershell>' %
                       windows_virtual_machine.STARTUP_SCRIPT)
 
@@ -1115,7 +1148,7 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
 
   def _PostCreate(self):
     """Retrieve generic VM info and then retrieve the VM's password."""
-    super(WindowsAwsVirtualMachine, self)._PostCreate()
+    super(BaseWindowsAwsVirtualMachine, self)._PostCreate()
 
     # Get the decoded password data.
     decoded_password_data = self._GetDecodedPasswordData()
@@ -1141,7 +1174,7 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
     Returns:
       dict mapping metadata key to value.
     """
-    result = super(WindowsAwsVirtualMachine, self).GetResourceMetadata()
+    result = super(BaseWindowsAwsVirtualMachine, self).GetResourceMetadata()
     result['disable_interrupt_moderation'] = self.disable_interrupt_moderation
     return result
 
@@ -1185,33 +1218,39 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
           'InterruptModeration failed to disable')
 
 
+class VersionlessWindowsAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.VersionlessWindowsMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+
+
 class Windows2012CoreAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
 
 
 class Windows2016CoreAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Core-Base-*'
 
 
 class Windows2019CoreAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
 
 
 class Windows2012BaseAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Base-*'
 
 
 class Windows2016BaseAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Full-Base-*'
 
 
 class Windows2019BaseAwsVirtualMachine(
-    WindowsAwsVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
 
 

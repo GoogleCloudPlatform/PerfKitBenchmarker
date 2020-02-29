@@ -33,9 +33,6 @@ from perfkitbenchmarker.providers.cloudstack import util
 from perfkitbenchmarker import providers
 from six.moves import range
 
-UBUNTU_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
-RHEL_IMAGE = 'CentOS 7 HVM base (64bit)'
-
 FLAGS = flags.FLAGS
 
 
@@ -45,7 +42,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.CLOUDSTACK
   DEFAULT_ZONE = 'QC-1'
   DEFAULT_MACHINE_TYPE = '1vCPU.1GB'
-  DEFAULT_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
+  DEFAULT_IMAGE = None
   DEFAULT_USER_NAME = 'cca-user'
   DEFAULT_PROJECT = 'cloudops-Engineering'
 
@@ -208,11 +205,11 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, self.disks)
 
 
-class DebianBasedCloudStackVirtualMachine(CloudStackVirtualMachine,
-                                          linux_vm.DebianMixin):
-  DEFAULT_IMAGE = UBUNTU_IMAGE
+class CentOs7BasedCloudStackVirtualMachine(CloudStackVirtualMachine,
+                                           linux_vm.CentOs7Mixin):
+  DEFAULT_IMAGE = 'CentOS 7 HVM base (64bit)'
 
 
-class RhelBasedCloudStackVirtualMachine(CloudStackVirtualMachine,
-                                        linux_vm.RhelMixin):
-  DEFAULT_IMAGE = RHEL_IMAGE
+class VersionlessRhelBasedCloudStackVirtualMachine(
+    linux_vm.VersionlessRhelMixin, CentOs7BasedCloudStackVirtualMachine):
+  ALTERNATIVE_OS = CentOs7BasedCloudStackVirtualMachine.OS_TYPE

@@ -16,7 +16,7 @@
 
 SPEC SFS 2014 homepage: http://www.spec.org/sfs2014/
 
-In order to run this benchmark copy your 'SPECsfs2014_SP1.iso'
+In order to run this benchmark copy your 'SPECsfs2014_SP2.iso'
 and 'netmist_license_key' files into the data/ directory.
 
 TODO: This benchmark should be decoupled from Gluster and allow users
@@ -29,7 +29,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import logging
 import posixpath
 import xml.etree.ElementTree
 
@@ -44,7 +43,7 @@ from perfkitbenchmarker.linux_packages import gluster
 import six
 
 FLAGS = flags.FLAGS
-BENCHMARKS = ['VDI', 'DATABASE', 'SWBUILD', 'VDA']
+BENCHMARKS = ['VDI', 'DATABASE', 'SWBUILD', 'VDA', 'EDA']
 
 flags.DEFINE_string(
     'specsfs2014_config', None,
@@ -78,11 +77,6 @@ flags.DEFINE_boolean(
     'If True, automatically find the max passing score for each benchmark. '
     'This ignores other flags such as specsfs2014_load, specsfs2014_incr_load, '
     'and specsfs2014_num_runs.')
-flags.DEFINE_float(
-    'specsfs2014_auto_mode_upper_bound', float('inf'),
-    'The upper bound for specsfs load. Relevant when specsfs2014_auto_mode '
-    'is set to True.')
-
 
 BENCHMARK_NAME = 'specsfs2014'
 BENCHMARK_CONFIG = """
@@ -90,7 +84,7 @@ specsfs2014:
   description: >
     Run SPEC SFS 2014. For a full explanation of all benchmark modes
     see http://www.spec.org/sfs2014/. In order to run this benchmark
-    copy your 'SPECsfs2014_SP1.iso' and 'netmist_license_key' files
+    copy your 'SPECsfs2014_SP2.iso' and 'netmist_license_key' files
     into the data/ directory.
   vm_groups:
     clients:
@@ -102,7 +96,7 @@ specsfs2014:
       vm_count: 3
 """
 
-_SPEC_SFS_2014_ISO = 'SPECsfs2014_SP1.iso'
+_SPEC_SFS_2014_ISO = 'SPECsfs2014_SP2.iso'
 _SPEC_SFS_2014_LICENSE = 'netmist_license_key'
 _SPEC_DIR = 'spec'
 _SPEC_CONFIG = 'sfs_rc'
@@ -120,6 +114,11 @@ _METADATA_KEYS = frozenset([
     'maximum file space'
 ])
 
+BENCHMARK_DATA = {
+    _SPEC_SFS_2014_ISO:
+        '666d3f79e9184211736c32c825edb007c6a5ad88eeceb3c99aa01acf733c6fb3'
+}
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -131,7 +130,6 @@ def CheckPrerequisites(unused_benchmark_config):
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  data.ResourcePath(_SPEC_SFS_2014_ISO)
   data.ResourcePath(_SPEC_SFS_2014_LICENSE)
   if FLAGS.specsfs2014_config:
     data.ResourcePath(FLAGS.specsfs2014_config)
@@ -142,7 +140,8 @@ def _PrepareSpec(vm):
   mount_dir = 'spec_mnt'
   vm.RemoteCommand('mkdir %s' % mount_dir)
   vm.RemoteCommand('mkdir %s' % _SPEC_DIR)
-  vm.PushFile(data.ResourcePath(_SPEC_SFS_2014_ISO))
+  vm.InstallPreprovisionedBenchmarkData('specsfs2014', [_SPEC_SFS_2014_ISO],
+                                        '~/')
   vm.PushFile(data.ResourcePath(_SPEC_SFS_2014_LICENSE), _SPEC_DIR)
   vm.RemoteCommand('sudo mount -t iso9660 -o loop %s %s' %
                    (_SPEC_SFS_2014_ISO, mount_dir))
@@ -172,7 +171,7 @@ def _ConfigureSpec(prime_client, clients, benchmark,
 
   stdout, _ = prime_client.RemoteCommand('pwd')
   exec_path = posixpath.join(stdout.strip(), _SPEC_DIR, 'binaries',
-                             'linux', 'x64', 'netmist')
+                             'linux', 'x86_64', 'netmist')
   load = load or FLAGS.specsfs2014_load
   num_runs = num_runs or FLAGS.specsfs2014_load
   incr_load = incr_load or FLAGS.specsfs2014_incr_load
@@ -184,6 +183,7 @@ def _ConfigureSpec(prime_client, clients, benchmark,
       'LOAD': ' '.join([str(x) for x in load]),
       'NUM_RUNS': num_runs,
       'INCR_LOAD': incr_load,
+      'WARMUP_TIME': 60,
   }
   # Any special characters in the overrides dictionary should be escaped so
   # that they don't interfere with sed.
@@ -291,9 +291,10 @@ def _RunSpecSfs(benchmark_spec):
     A list of sample.Sample objects.
   """
   prime_client = benchmark_spec.vm_groups['clients'][0]
-  prime_client.RobustRemoteCommand(
-      'cd %s && ./sfsmanager -r sfs_rc' % _SPEC_DIR, ignore_failure=True)
-  results_file = posixpath.join(_SPEC_DIR, 'results', 'sfssum_sfs2014.xml')
+  run_cmd = 'cd {0} && ./sfsmanager -r sfs_rc {1}'.format(
+      _SPEC_DIR, '-a' if FLAGS.specsfs2014_auto_mode else '')
+  prime_client.RobustRemoteCommand(run_cmd, ignore_failure=True)
+  results_file = posixpath.join(_SPEC_DIR, 'results', 'sfssum_sfs2014_SP2.xml')
   output, _ = prime_client.RemoteCommand('cat %s' % results_file)
 
   if benchmark_spec.vm_groups['gluster_servers']:
@@ -305,52 +306,6 @@ def _RunSpecSfs(benchmark_spec):
     gluster_metadata = {}
 
   return _ParseSpecSfsOutput(output, extra_metadata=gluster_metadata)
-
-
-def _FindBestPassingScore(benchmark_spec, benchmark):
-  """Find the highest load that will still produce valid runs.
-
-  Once this benchmark has been updated to wrap SPEC SFS SP2 rather than SP1,
-  this will use sfsmanager's "-a" option which does this automatically.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-    benchmark: The sub-benchmark to run.
-
-  Returns:
-    A list of sample.Sample objects.
-  """
-  clients = benchmark_spec.vm_groups['clients']
-  prime_client = clients[0]
-  results = []
-  load = 1
-
-  lower_bound = 1
-  upper_bound = FLAGS.specsfs2014_auto_mode_upper_bound
-  while (upper_bound - lower_bound) > 1:
-    logging.info('Running SPEC SFS with LOAD=%s', load)
-    _ConfigureSpec(prime_client, clients, benchmark, load=[load], num_runs=1)
-    last_run_results = _RunSpecSfs(benchmark_spec)
-    valid_run = all([result.metadata['valid_run']
-                     for result in last_run_results])
-    results += last_run_results
-    prime_client.RemoteCommand(
-        'rm %s' % posixpath.join(_SPEC_DIR, 'results', '*'))
-    if valid_run:
-      lower_bound = load
-    else:
-      upper_bound = load
-    # Double the load until we reach the upper bound, then binary search.
-    # If we pass everything up to the upper bound, we finish immediately.
-    if upper_bound == FLAGS.specsfs2014_auto_mode_upper_bound:
-      if load * 2 <= upper_bound:
-        load *= 2
-      else:
-        load = upper_bound - 1
-    else:
-      load = (upper_bound + lower_bound) // 2
-  return results
 
 
 def Run(benchmark_spec):
@@ -372,9 +327,6 @@ def Run(benchmark_spec):
         data.ResourcePath(FLAGS.specsfs2014_config),
         posixpath.join(_SPEC_DIR, _SPEC_CONFIG))
     results += _RunSpecSfs(benchmark_spec)
-  elif FLAGS.specsfs2014_auto_mode:
-    for benchmark in FLAGS.specsfs2014_benchmarks:
-      results += _FindBestPassingScore(benchmark_spec, benchmark)
   else:
     for benchmark in FLAGS.specsfs2014_benchmarks:
       _ConfigureSpec(prime_client, clients, benchmark)
