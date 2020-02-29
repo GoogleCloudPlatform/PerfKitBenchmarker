@@ -28,6 +28,7 @@ ELASTICACHE_PORT = 11211
 
 
 class ElastiCacheMemcacheService(MemcacheService):
+  """Class for AWS elasticache memcache service."""
 
   CLOUD = providers.AWS
 
@@ -90,7 +91,7 @@ class ElastiCacheMemcacheService(MemcacheService):
     vm_util.RunThreaded(memcached_server.FlushMemcachedServer, self.hosts)
 
   def GetHosts(self):
-    return ["%s:%s" % (ip, port) for ip, port in self.hosts]
+    return ['%s:%s' % (ip, port) for ip, port in self.hosts]
 
   def GetMetadata(self):
     return {'num_servers': self.num_servers,
@@ -103,7 +104,7 @@ class ElastiCacheMemcacheService(MemcacheService):
     cmd += ['--region=%s' % self.region]
     cmd += ['--show-cache-node-info']
     out, _, _ = vm_util.IssueCommand(cmd)
-    return json.loads(out)["CacheClusters"][0]
+    return json.loads(out)['CacheClusters'][0]
 
   @vm_util.Retry(poll_interval=15, timeout=300,
                  retryable_exceptions=(errors.Resource.RetryableCreationError))
@@ -123,19 +124,19 @@ class ElastiCacheMemcacheService(MemcacheService):
         if there is an error connecting to the port or otherwise running the
         remote check command.
     """
-    logging.info("Trying to get ElastiCache cluster info for %s",
+    logging.info('Trying to get ElastiCache cluster info for %s',
                  self.cluster_id)
     cluster_status = None
     try:
       cluster_info = self._GetClusterInfo()
       cluster_status = cluster_info['CacheClusterStatus']
       if cluster_status == 'available':
-        logging.info("ElastiCache memcached cluster is up and running.")
+        logging.info('ElastiCache memcached cluster is up and running.')
         return cluster_info
     except errors.VirtualMachine.RemoteCommandError as e:
       raise errors.Resource.RetryableCreationError(
-          "ElastiCache memcached cluster not up yet: %s." % str(e))
+          'ElastiCache memcached cluster not up yet: %s.' % str(e))
     else:
       raise errors.Resource.RetryableCreationError(
-          "ElastiCache memcached cluster not up yet. Status: %s" %
+          'ElastiCache memcached cluster not up yet. Status: %s' %
           cluster_status)
