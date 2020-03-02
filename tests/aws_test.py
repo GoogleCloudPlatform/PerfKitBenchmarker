@@ -102,14 +102,22 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(vpc_id, self.vpc.id)
     self.assertEqual(security_group_id, self.vpc.default_security_group_id)
 
-  @mock.patch.object(vm_util, 'IssueCommand')
-  def testInstanceVpcQuotaExceededDuringCreate(self, mock_cmd):
+  def testInstanceVpcQuotaExceededDuringCreate(self):
     stderr = ('An error occurred (VpcLimitExceeded) when calling the CreateVpc '
               'operation: The maximum number of VPCs has been reached.')
-    mock_cmd.side_effect = [(None, stderr, None)]
+    self.MockIssueCommand(None, stderr, 255)
     with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
       self.vpc.Create()
     self.assertEqual(str(e.exception), stderr)
+
+  def testVpcCreateError(self):
+    stderr = ('An unknown error occurred when calling the CreateVpc opeartion.')
+    retcode = 1
+    error_msg = 'Failed to create Vpc: %s return code: %s' % (retcode, stderr)
+    self.MockIssueCommand(None, stderr, retcode)
+    with self.assertRaises(errors.Resource.CreationError) as e:
+      self.vpc.Create()
+    self.assertEqual(str(e.exception), error_msg)
 
   def testVpcDeleted(self):
     response = '{"Vpcs": [] }'
