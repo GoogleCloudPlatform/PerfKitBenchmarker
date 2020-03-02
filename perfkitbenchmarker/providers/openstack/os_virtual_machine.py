@@ -405,6 +405,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['openstack_post_provisioning_script'] = FLAGS.openstack_post_provisioning_script
     return result
 
+
 class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                         linux_virtual_machine.Rhel7Mixin):
   DEFAULT_IMAGE = 'rhel-7.2'
