@@ -85,6 +85,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = None
     self.public_network = None
     self.subnet_id = None
+    self.post_provisioning_script = FLAGS.openstack_post_provisioning_script
 
   @property
   def group_id(self):
@@ -292,8 +293,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       cmd.flags['image'] = self.image
 
-    if FLAGS.openstack_post_provisioning_script:
-      cmd.flags['user-data'] = FLAGS.openstack_post_provisioning_script
+    if self.post_provisioning_script:
+      cmd.flags['user-data'] = self.post_provisioning_script
 
     return cmd
 
@@ -401,8 +402,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       dict mapping string property key to value.
     """
     result = super(OpenStackVirtualMachine, self).GetResourceMetadata()
-    if FLAGS.openstack_post_provisioning_script:
-      result['openstack_post_provisioning_script'] = FLAGS.openstack_post_provisioning_script
+    if self.post_provisioning_script:
+      result['post_provisioning_script'] = self.post_provisioning_script
     return result
 
 
