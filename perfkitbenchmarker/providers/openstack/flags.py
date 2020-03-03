@@ -70,4 +70,5 @@ flags.DEFINE_enum('openstack_scheduler_policy', NONE,
                   [NONE, 'affinity', 'anti-affinity'],
                   'Add possibility to use affinity or anti-affinity '
                   'policy in scheduling process')
-flags.DEFINE_string('openstack_post_provisioning_script', None, 'post provisioning script file path')
+flags.DEFINE_string('openstack_post_provisioning_script', None,
+                    'post provisioning script file path')
