@@ -127,18 +127,6 @@ def PrepareNetperf(vm):
   """Installs netperf on a single vm."""
   vm.Install('netperf')
 
-  # Set keepalive to a low value to ensure that the control connection
-  # is not closed by the cloud networking infrastructure.
-  # This causes keepalive packets to be sent every minute on all ipv4
-  # tcp connections.
-  #
-  # TODO(user): Keepalive is not enabled on the netperf control socket.
-  # While (for unknown reasons) this hack fixes the issue with the socket
-  # being closed anyway, a more correct approach would be to patch netperf
-  # and enable keepalive on the control socket in addition to changing the
-  # system defaults below.
-  #
-
 
 def Prepare(benchmark_spec):
   """Install netperf on the target vm.
