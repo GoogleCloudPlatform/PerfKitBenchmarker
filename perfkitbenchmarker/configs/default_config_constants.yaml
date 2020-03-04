@@ -22,6 +22,9 @@ default_single_core: &default_single_core
     machine_type: 2gb
     zone: sfo1
     image: null
+  YandexCloud:
+    image: null
+    machine_type: Small
   OpenStack:
     machine_type: m1.small
     zone: nova
@@ -99,6 +102,10 @@ default_500_gb: &default_500_gb
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
+  YandexCloud:
+    disk_type: network-hdd
+    disk_size: 500
+    mount_point: /scratch
   CloudStack:
     disk_size: 500
     mount_point: /scratch
@@ -145,6 +152,10 @@ default_50_gb: &default_50_gb
     mount_point: /scratch
   DigitalOcean:
     disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  YandexCloud:
+    disk_type: network-hdd
     disk_size: 50
     mount_point: /scratch
   OpenStack:

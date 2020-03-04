@@ -191,6 +191,27 @@ BENCHMARK_SETS = {
             'sysbench',
         ]
     },
+    'yandexcloud_set': {
+        MESSAGE:
+            'YandexCloud benchmark set.',
+        BENCHMARK_LIST: [
+            'aerospike',
+            'block_storage_workload',
+            'cassandra_stress',
+            'copy_throughput',
+            'coremark',
+            'fio',
+            'hpcc',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'ping',
+            'stress_ng',
+            'redis',
+            'unixbench',
+        ]
+    },
     'mellanox_set': {
         MESSAGE: 'Mellanox benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
