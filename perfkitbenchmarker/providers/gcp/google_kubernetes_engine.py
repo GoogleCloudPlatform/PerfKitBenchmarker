@@ -17,6 +17,7 @@
 import json
 import logging
 import os
+import re
 
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
@@ -34,6 +35,7 @@ FLAGS.kubernetes_anti_affinity = False
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 DEFAULT_CONTAINER_VERSION = 'latest'
+SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 
 
 class GoogleContainerRegistry(container_service.BaseContainerRegistry):
@@ -130,10 +132,16 @@ class GkeCluster(container_service.KubernetesCluster):
     user = util.GetDefaultUser()
     if FLAGS.gcp_service_account:
       cmd.flags['service-account'] = FLAGS.gcp_service_account
-    elif 'gserviceaccount.com' in user:
+    # Matches service accounts that either definitely belongs to this project or
+    # are a GCP managed service account like the GCE default service account,
+    # which we can't tell to which project they belong.
+    elif re.match(SERVICE_ACCOUNT_PATTERN, user):
+      logging.info(
+          'Re-using configured service-account for GKE Cluster: %s', user)
       cmd.flags['service-account'] = user
       self.use_application_default_credentials = False
     else:
+      logging.info('Using default GCE service account for GKE cluster')
       cmd.flags['scopes'] = 'cloud-platform'
 
     if self.gpu_count:
