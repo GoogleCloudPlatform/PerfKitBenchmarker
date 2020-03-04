@@ -1,7 +1,24 @@
-diff -u -r netperf-2.6.0/src/netlib.c netperf-2.6.0-patch/src/netlib.c
---- netperf-2.6.0/src/netlib.c	2012-06-19 13:32:29.000000000 -0700
-+++ netperf-2.6.0-patch/src/netlib.c	2016-11-04 16:36:08.681187811 -0700
-@@ -234,6 +234,11 @@
+diff -u -r netperf-2.7.0/src/netlib.c netperf-2.7.0-patch/src/netlib.c
+--- netperf-2.7.0/src/netlib.c	2015-07-20 12:39:35.000000000 -0500
++++ netperf-2.7.0-patch/src/netlib.c	2020-01-13 14:40:59.727719673 -0600
+@@ -110,6 +110,7 @@ char    netlib_id[]="\
+ #include <time.h>
+ #include <winsock2.h>
+ #define netperf_socklen_t socklen_t
++#define WIN32_LEAN_AND_MEAN 1
+ #include <windows.h>
+ #include <mmsystem.h>
+ /* the only time someone should need to define DONT_IPV6 in the
+@@ -119,8 +120,6 @@ char    netlib_id[]="\
+ #include <ws2tcpip.h>
+ #endif
+ 
+-#include <windows.h>
+-
+ #define SIGALRM (14)
+ #define sleep(x) Sleep((x)*1000)
+ 
+@@ -229,6 +228,11 @@ int     local_proc_affinity = -1,remote_
  char local_data_port[10];
  char remote_data_port[10];
  
@@ -13,7 +30,90 @@ diff -u -r netperf-2.6.0/src/netlib.c netperf-2.6.0-patch/src/netlib.c
  char *local_data_address=NULL;
  char *remote_data_address=NULL;
  
-@@ -4288,9 +4293,8 @@
+@@ -2271,7 +2275,7 @@ shutdown_control()
+   2004/12/13 */
+ 
+ void
+-bind_to_specific_processor(int processor_affinity, int use_cpu_map)
++bind_to_specific_processor(int use_cpu_affinity, int use_cpu_map)
+ {
+ 
+   int mapped_affinity;
+@@ -2282,10 +2286,10 @@ bind_to_specific_processor(int processor
+      a suitable CPU id even when the space is not contiguous and
+      starting from zero */
+   if (use_cpu_map) {
+-    mapped_affinity = lib_cpu_map[processor_affinity];
++    mapped_affinity = lib_cpu_map[use_cpu_affinity];
+   }
+   else {
+-    mapped_affinity = processor_affinity;
++    mapped_affinity = use_cpu_affinity;
+   }
+ 
+ #ifdef HAVE_MPCTL
+@@ -2378,7 +2382,7 @@ bind_to_specific_processor(int processor
+     if ((mapped_affinity < 0) ||
+ 	(mapped_affinity > MAXIMUM_PROCESSORS)) {
+       fprintf(where,
+-	      "Invalid processor_affinity specified: %d\n", mapped_affinity);      fflush(where);
++	      "Invalid use_cpu_affinity specified: %d\n", mapped_affinity);      fflush(where);
+       return;
+     }
+ 
+@@ -2406,6 +2410,22 @@ bind_to_specific_processor(int processor
+     }
+   }
+ 
++#elif defined(__FreeBSD__)
++#include <sys/param.h>
++  /* FreeBSD introduced cpuset_setaffinity() in version 7.1 */
++#if (__FreeBSD_version > 701000)
++#include <sys/cpuset.h>  
++
++  cpuset_t mask;
++
++  CPU_ZERO(&mask);
++  CPU_SET(mapped_affinity, &mask);
++  if (cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, -1,
++			 sizeof(mask), &mask)) {
++	perror("cpuset_setaffinity failed");
++	fflush(stderr);
++  }
++#endif /* __FreeBSD_version */    
+ #else
+   if (debug) {
+     fprintf(where,
+@@ -3997,11 +4017,7 @@ void demo_stream_setup(uint32_t a, uint3
+   }
+ }
+ 
+-#ifdef WIN32
+-__forceinline void demo_interval_display(double actual_interval)
+-#else
+-  inline void demo_interval_display(double actual_interval)
+-#endif
++void demo_interval_display(double actual_interval)
+ {
+   static int count = 0;
+   struct timeval now;
+@@ -4060,15 +4076,7 @@ __forceinline void demo_interval_display
+    important compilers have supported such a construct so it should
+    not be a big deal. raj 2012-01-23 */
+ 
+-#ifdef WIN32
+-/* It would seem that the Microsoft compiler will not inline across
+-   source files. So there is little point in having an inline
+-   directive in that situation.  Of course that makes me wonder if an
+-   inline directive has to appear in netlib.h... */
+ void demo_interval_tick(uint32_t units)
+-#else
+-  inline void demo_interval_tick(uint32_t units)
+-#endif
+ {
+   double actual_interval = 0.0;
+ 
+@@ -4328,9 +4336,8 @@ output_row(FILE *fd, char *title, int *r
    for(i = 0; i < 10; i++){
      sum = 0;
      for (j = i * base; j <  (i + 1) * base; j++) {
@@ -68,7 +168,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
  	 to zero above raj 20090803 */
        if (rem_nodelay)
 @@ -4932,6 +4936,11 @@
- 	  omni_request->cong_control,
+	  omni_request->cong_control,
  	  sizeof(local_cong_control_req));
  
 +  // Extract think_time parameters
@@ -158,3 +258,62 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
      case 'W':
        /* set the "width" of the user space data */
        /* buffer. This will be the number of */
+diff -u -r netperf-2.6.0/doc/examples/runemomniaggdemo.sh netperf-2.6.0-patch/doc/examples/runemomniaggdemo.sh
+--- netperf-2.6.0/doc/examples/runemomniaggdemo.sh 2020-01-13 13:37:25.111724897 -0600
++++ netperf-2.6.0-patch/doc/examples/runemomniaggdemo.sh 2020-01-13 13:38:21.111724897 -0600
+@@ -1,13 +1,20 @@
+ # this is a quick and dirty migration of runemomniagg2.sh to the 
+ # --enable-demo mode of aggregate testing
+ function kill_netperfs {
++    echo "Killing netperfs"
+     pkill -ALRM netperf
++    NETPERF_PROC=$(pgrep -P 1 -f netperf)
++
++    if [ -n "$NETPERF_PROC" ]; 
++    then
++        kill $NETPERF_PROC; 
++    fi
+ 
+     pgrep -P 1 -f netperf > /dev/null
+     while [ $? -eq 0 ]
+     do
+-	sleep 1
+-	pgrep -P 1 -f netperf > /dev/null
++    sleep 1
++    pgrep -P 1 -f netperf > /dev/null
+     done
+ }
+ 
+@@ -148,7 +155,7 @@
+ 
+ # we assume that netservers are already running on all the load generators
+ 
+-DURATION=120
++DURATION=60
+ # do not have a uuidgen? then use the one in netperf
+ MY_UUID=`uuidgen`
+ # with top-of-trunk we could make this 0 and run forever
+@@ -157,16 +164,16 @@
+ LENGTH="-l 7200"
+ OUTPUT="-o all"
+ 
+-DO_STREAM=1;
+-DO_MAERTS=1;
++DO_STREAM=0;
++DO_MAERTS=0;
+ # NOTE!  The Bidir test depends on being able to set a socket buffer
+ # size greater than 13 * 64KB or 832 KB or there is a risk of the test
+ # hanging.  If you are running linux, make certain that
+ # net.core.[r|w]mem_max are sufficiently large
+-DO_BIDIR=1;
++DO_BIDIR=0;
+ DO_RRAGG=1;
+-DO_RR=1;
+-DO_ANCILLARY=1;
++DO_RR=0;
++DO_ANCILLARY=0;
+ 
+ # UDP_RR for TPC/PPS using single-byte transactions. we do not use
+ # TCP_RR any longer because any packet losses or other matters
+
+

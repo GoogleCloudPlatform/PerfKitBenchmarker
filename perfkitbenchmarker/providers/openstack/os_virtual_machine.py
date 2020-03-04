@@ -85,6 +85,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = None
     self.public_network = None
     self.subnet_id = None
+    self.post_provisioning_script = FLAGS.openstack_post_provisioning_script
 
   @property
   def group_id(self):
@@ -292,6 +293,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       cmd.flags['image'] = self.image
 
+    if self.post_provisioning_script:
+      cmd.flags['user-data'] = self.post_provisioning_script
+
     return cmd
 
   def _GetSchedulerHints(self):
@@ -390,6 +394,17 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
              for name in disks_names]
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(OpenStackVirtualMachine, self).GetResourceMetadata()
+    if self.post_provisioning_script:
+      result['post_provisioning_script'] = self.post_provisioning_script
+    return result
 
 
 class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
