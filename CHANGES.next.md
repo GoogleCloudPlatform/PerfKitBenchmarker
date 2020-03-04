@@ -54,3 +54,5 @@
     -   This can be disabled by setting
         `--bootstrap_azure_service_principal=False`.
 -   Registered AWS VPC quota failures as quota failures.
+-   Do not try to use the GCP service account that is running PKB inside a
+    GKE cluster if it obviously belongs to the wrong project.
