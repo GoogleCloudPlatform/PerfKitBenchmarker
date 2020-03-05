@@ -30,10 +30,8 @@ from __future__ import print_function
 
 import json
 import logging
-import re
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
@@ -75,8 +73,6 @@ GLIBC_MATH_BENCHSET = ['math-benchset']
 
 RESULTS_DIR = '%s/glibc/glibc-build/benchtests' % linux_packages.INSTALL_DIR
 
-_GCC_VERSION_RE = re.compile(r'gcc\ version\ (.*?)\ ')
-
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -97,25 +93,13 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vm = vms[0]
-  # Checks that we have a valid gcc version before preparing anything.
-  vm.InstallPackages('gcc-snapshot')
-  _GetGccVersion(vm)
   PrepareGlibc(vm)
-
-
-def _GetGccVersion(vm):
-  """Get the currently installed gcc version."""
-  _, stderr = vm.RemoteCommand('gcc -v')
-  match = _GCC_VERSION_RE.search(stderr)
-  if not match:
-    raise errors.Benchmarks.RunError('Invalid gcc version %s' % stderr)
-  return match.group(1)
 
 
 def GetCommonMetadata(benchmark_spec):
   """Update metadata with glibc-related flag values."""
   metadata = dict()
-  metadata['gcc'] = _GetGccVersion(benchmark_spec.vms[0])
+  metadata['gcc'] = glibc.GetGccVersion(benchmark_spec.vms[0])
   metadata['glibc_benchset'] = FLAGS.glibc_benchset
   metadata['glibc_version'] = glibc.GLIBC_VERSION
   metadata['num_machines'] = len(benchmark_spec.vms)

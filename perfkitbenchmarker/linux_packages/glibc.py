@@ -14,6 +14,8 @@
 
 """Module containing Glibc Benchmark installation and cleanup functions."""
 import posixpath
+import re
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 PACKAGE_NAME = 'glibc'
@@ -37,14 +39,27 @@ PACKAGE_DATA_URL = {
         'https://fossies.org/linux/misc', GLIBC_TAR)
 }
 
+_GCC_VERSION_RE = re.compile(r'gcc\ version\ (.*?)\ ')
+
+
+def GetGccVersion(vm):
+  """Get the currently installed gcc version."""
+  _, stderr = vm.RemoteCommand('gcc -v')
+  match = _GCC_VERSION_RE.search(stderr)
+  if not match:
+    raise errors.Benchmarks.RunError('Invalid gcc version %s' % stderr)
+  return match.group(1)
+
 
 def _Install(vm):
   """Installs the Glibc Benchmark package on the VM."""
-  vm.Install('build_tools')
-  # bison and texinfo are required for compiling newer versions of glibc > 2.27.
   # The included version of gcc-7.4 in Ubuntu 1804 does not work out of the box
   # without gcc-snapshot.
-  vm.InstallPackages('gcc-snapshot bison texinfo')
+  vm.InstallPackages('gcc-snapshot')
+  GetGccVersion(vm)
+  vm.Install('build_tools')
+  # bison and texinfo are required for compiling newer versions of glibc > 2.27.
+  vm.InstallPackages('bison texinfo')
 
   vm.RemoteCommand('cd {0} && mkdir binutils'.format(INSTALL_DIR))
   vm.InstallPreprovisionedPackageData(
