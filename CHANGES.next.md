@@ -29,6 +29,7 @@
 -   Add CentOS 8 to Azure and GCP providers
 -   Add BERT models in Horovod benchmark
 -   Add timeline support in Horovod benchmark
+-   Add GceNfsService to support Filestore on GCP.
 
 ### Enhancements:
 
