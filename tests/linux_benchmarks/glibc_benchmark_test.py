@@ -41,7 +41,7 @@ class GlibcTestCase(unittest.TestCase):
     """Tests regex calls to parse gcc version."""
     mock_vm = mock.Mock()
     mock_vm.RemoteCommand.return_value = None, 'gcc version 7.4.0 20190909'
-    self.assertEqual(_TEST_GCC_VERSION, glibc_benchmark._GetGccVersion(mock_vm))
+    self.assertEqual(_TEST_GCC_VERSION, glibc.GetGccVersion(mock_vm))
 
   def CallParseOutput(self, filename, upper_key, results, metadata):
     """Read sample outputs of glibc_benchmark and call ParseOutput function.
