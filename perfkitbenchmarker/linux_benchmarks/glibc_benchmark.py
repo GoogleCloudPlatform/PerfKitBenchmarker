@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs Glibc Microbenchmark.
 
 The glibc microbenchmark suite automatically generates code for specified
@@ -94,10 +93,13 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
+  # Checks that we have a valid gcc version before preparing anything.
+  vm.InstallPackages('gcc-snapshot')
+  _GetGccVersion(vm)
   PrepareGlibc(vm)
 
 
@@ -106,17 +108,18 @@ def _GetGccVersion(vm):
   _, stderr = vm.RemoteCommand('gcc -v')
   match = _GCC_VERSION_RE.search(stderr)
   if not match:
-    raise errors.Benchmarks.RunError(
-        'stderr: {} does not match pattern "{}"'.format(
-            stderr, _GCC_VERSION_RE.pattern))
+    raise errors.Benchmarks.RunError('Invalid gcc version %s' % stderr)
   return match.group(1)
 
 
-def UpdateMetadata(vm, metadata):
+def GetCommonMetadata(benchmark_spec):
   """Update metadata with glibc-related flag values."""
-  metadata['gcc'] = _GetGccVersion(vm)
+  metadata = dict()
+  metadata['gcc'] = _GetGccVersion(benchmark_spec.vms[0])
   metadata['glibc_benchset'] = FLAGS.glibc_benchset
   metadata['glibc_version'] = glibc.GLIBC_VERSION
+  metadata['num_machines'] = len(benchmark_spec.vms)
+  return metadata
 
 
 # The reason to write this helper function is that glibc_benchset_output.json
@@ -134,6 +137,7 @@ def HelperParseOutput(lst):
 
   Args:
     lst: A list of tuples contains the output of benchmark tests.
+
   Returns:
     A dict contains the output of benchmark tests.
   """
@@ -150,23 +154,16 @@ def HelperParseOutput(lst):
   return result
 
 
-def ParseOutput(glibc_output, benchmark_spec, upper_key, results):
+def ParseOutput(glibc_output, upper_key, results, metadata):
   """Parses the output from glibc.
 
   Args:
     glibc_output: A json format string containing the output of benchmark tests.
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
     upper_key: The first dimension key of the glibc_output dict.
-    results:
-      A list to which this function will append new samples based on the glibc
-      output. (in the same format as Run() returns).
+    results: A list to which this function will append new samples based on the
+      glibc output. (in the same format as Run() returns).
+    metadata: Common metadata to attach to samples.
   """
-
-  metadata = dict()
-  metadata['num_machines'] = len(benchmark_spec.vms)
-  UpdateMetadata(benchmark_spec.vms[0], metadata)
-
   jsondata = json.loads(glibc_output, object_pairs_hook=HelperParseOutput)
   for function, items in six.iteritems(jsondata[upper_key]):
     # handle the jsondata with duplicate keys
@@ -193,7 +190,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -202,17 +199,20 @@ def Run(benchmark_spec):
   vm = vms[0]
   results = []
 
+  # Ensure that we can get common metadata before running.
+  metadata = GetCommonMetadata(benchmark_spec)
+
   glibc_user_benchset = ' '.join(FLAGS.glibc_benchset)
   vm.RobustRemoteCommand('cd %s/glibc/glibc-build && '
-                         'make bench BENCHSET="%s"' % (
-                             linux_packages.INSTALL_DIR, glibc_user_benchset))
+                         'make bench BENCHSET="%s"' %
+                         (linux_packages.INSTALL_DIR, glibc_user_benchset))
 
   logging.info('Glibc Benchmark Tests Results:')
   # Parse the output for "bench-math", "bench-string" and "bench-pthread".
   if any(i in GLIBC_BENCH for i in FLAGS.glibc_benchset):
     stdout, _ = vm.RemoteCommand(
         'cat {0}/bench.out'.format(RESULTS_DIR), should_log=True)
-    ParseOutput(stdout, benchmark_spec, 'functions', results)
+    ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "malloc-thread".
   if any(i in GLIBC_BENCH_MALLOC for i in FLAGS.glibc_benchset):
     thread_num = ['1', '8', '16', '32']
@@ -220,12 +220,12 @@ def Run(benchmark_spec):
       stdout, _ = vm.RemoteCommand(
           'cat {0}/bench-malloc-thread-{1}.out'.format(RESULTS_DIR, num),
           should_log=True)
-      ParseOutput(stdout, benchmark_spec, 'functions', results)
+      ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "math-benchset".
   if any(i in GLIBC_MATH_BENCHSET for i in FLAGS.glibc_benchset):
     stdout, _ = vm.RemoteCommand(
         'cat {0}/bench-math-inlines.out'.format(RESULTS_DIR), should_log=True)
-    ParseOutput('{%s}' % stdout, benchmark_spec, 'math-inlines', results)
+    ParseOutput('{%s}' % stdout, 'math-inlines', results, metadata)
   return results
 
 

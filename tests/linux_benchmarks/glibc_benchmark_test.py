@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +21,12 @@ import unittest
 import mock
 
 from perfkitbenchmarker.linux_benchmarks import glibc_benchmark
+from perfkitbenchmarker.linux_packages import glibc
 
+
+# Test metadata values
 _TEST_GCC_VERSION = '7.4.0'
+_TEST_NUM_VMS = 5
 
 
 class GlibcTestCase(unittest.TestCase):
@@ -31,34 +36,58 @@ class GlibcTestCase(unittest.TestCase):
     p = mock.patch(glibc_benchmark.__name__ + '.FLAGS')
     p.start()
     self.addCleanup(p.stop)
-    glibc_benchmark._GetGccVersion = mock.Mock(return_value=_TEST_GCC_VERSION)
 
-  def CallParseOutput(self, filename, benchmark_spec, upper_key, results):
+  def testGetGccVersion(self):
+    """Tests regex calls to parse gcc version."""
+    mock_vm = mock.Mock()
+    mock_vm.RemoteCommand.return_value = None, 'gcc version 7.4.0 20190909'
+    self.assertEqual(_TEST_GCC_VERSION, glibc_benchmark._GetGccVersion(mock_vm))
+
+  def CallParseOutput(self, filename, upper_key, results, metadata):
     """Read sample outputs of glibc_benchmark and call ParseOutput function.
 
     Args:
       filename: The name of the sample output file
-      benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
       upper_key: The first dimension key of the glibc_output dict.
       results:
         A list to which the ParseOutput function will append new samples based
         on the glibc output.
+      metadata: Common metadata to attach to samples.
     """
     path = os.path.join(os.path.dirname(__file__), '../data',
                         filename)
     with open(path) as fp:
       self.contents = fp.read()
-    glibc_benchmark.ParseOutput(self.contents, benchmark_spec,
-                                upper_key, results)
+    glibc_benchmark.ParseOutput(self.contents, upper_key, results, metadata)
 
-  def testParseGlibc(self):
-    benchmark_spec = mock.MagicMock()
+  def testParseOutputAttachesCorrectCommonMetadata(self):
+    """Tests that a run of ParseOutput attaches the correct common metadata."""
+    metadata = {
+        'gcc': _TEST_GCC_VERSION,
+        'glibc_benchset': glibc_benchmark.glibc_default_benchset,
+        'glibc_version': glibc.GLIBC_VERSION,
+        'num_machines': _TEST_NUM_VMS,
+    }
     results = []
     upper_key = 'functions'
 
     self.CallParseOutput(
-        'glibc_bench_output.txt', benchmark_spec, upper_key, results)
+        'glibc_bench_output.txt', upper_key, results, metadata)
+    for sample in results:
+      result_metadata = sample.metadata
+      self.assertEqual(result_metadata['gcc'], _TEST_GCC_VERSION)
+      self.assertEqual(result_metadata['glibc_benchset'],
+                       glibc_benchmark.glibc_default_benchset)
+      self.assertEqual(result_metadata['glibc_version'], glibc.GLIBC_VERSION)
+      self.assertEqual(result_metadata['num_machines'], _TEST_NUM_VMS)
+
+  def testParseGlibc(self):
+    results = []
+    upper_key = 'functions'
+
+    self.CallParseOutput(
+        'glibc_bench_output.txt', upper_key, results, {})
 
     result = {i.metric: i.metadata for i in results}
     metadata = result['pthread_once:']
@@ -69,15 +98,13 @@ class GlibcTestCase(unittest.TestCase):
     self.assertAlmostEqual(9626.89, metadata['max'])
     self.assertAlmostEqual(5.198, metadata['min'])
     self.assertAlmostEqual(5.3685, metadata['mean'])
-    self.assertEqual(_TEST_GCC_VERSION, metadata['gcc'])
 
   def testParseGlibc2(self):
-    benchmark_spec = mock.MagicMock()
     results = []
     upper_key = 'math-inlines'
 
     self.CallParseOutput(
-        'glibc_benchset_output.txt', benchmark_spec, upper_key, results)
+        'glibc_benchset_output.txt', upper_key, results, {})
 
     result = {i.metric: i.metadata for i in results}
     metadata = result['__isnan:inf/nan']
@@ -86,15 +113,13 @@ class GlibcTestCase(unittest.TestCase):
     self.assertAlmostEqual(8.42329e+06, metadata['duration'])
     self.assertAlmostEqual(500, metadata['iterations'])
     self.assertAlmostEqual(16846, metadata['mean'])
-    self.assertEqual(_TEST_GCC_VERSION, metadata['gcc'])
 
   def testParseGlibc3(self):
-    benchmark_spec = mock.MagicMock()
     results = []
     upper_key = 'functions'
 
     self.CallParseOutput(
-        'glibc_malloc_output.txt', benchmark_spec, upper_key, results)
+        'glibc_malloc_output.txt', upper_key, results, {})
 
     metadata = results[0].metadata
     metric = results[0].metric
@@ -109,7 +134,6 @@ class GlibcTestCase(unittest.TestCase):
     self.assertAlmostEqual(4, metadata['min_size'])
     self.assertAlmostEqual(32768, metadata['max_size'])
     self.assertAlmostEqual(88, metadata['random_seed'])
-    self.assertEqual(_TEST_GCC_VERSION, metadata['gcc'])
 
 
 if __name__ == '__main__':
