@@ -19,6 +19,7 @@ import logging
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import azure_credentials
@@ -47,8 +48,8 @@ class ServicePrincipal(resource.BaseResource):
   @classmethod
   def LoadFromFile(cls):
     """Loads a service principal from a file."""
-    with open(azure_credentials.FindCredentialFile(azure_credentials.AZURE_CREDENTIAL_PROFILE_FILE), encoding='utf-8-sig') as profile_fp, \
-        open(azure_credentials.FindCredentialFile(azure_credentials.AZURE_CREDENTIAL_TOKENS_FILE)) as tokens_fp:
+    with open(object_storage_service.FindCredentialFile(azure_credentials.AZURE_CREDENTIAL_PROFILE_FILE), encoding='utf-8-sig') as profile_fp, \
+        open(object_storage_service.FindCredentialFile(azure_credentials.AZURE_CREDENTIAL_TOKENS_FILE)) as tokens_fp:
       subscriptions = json.load(profile_fp)['subscriptions']
       subscription = [sub for sub in subscriptions if sub['isDefault']][0]
       subscription_type = subscription['user']['type']
