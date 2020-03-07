@@ -30,6 +30,7 @@
 -   Add BERT models in Horovod benchmark
 -   Add timeline support in Horovod benchmark
 -   Add GceNfsService to support Filestore on GCP.
+-   Add replication cluster support to bigtable.
 
 ### Enhancements:
 

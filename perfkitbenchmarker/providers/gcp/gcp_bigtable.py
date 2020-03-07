@@ -25,12 +25,26 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
+
+def _ValidateReplicationFlags(flag_dict):
+  """Verifies correct usage of the bigtable replication flags."""
+  return (not flag_dict['bigtable_replication_cluster'] or
+          flag_dict['bigtable_replication_cluster_zone'])
+
 flags.DEFINE_integer('bigtable_node_count', 3,
                      'Number of nodes to create in the bigtable cluster.')
 flags.DEFINE_enum('bigtable_storage_type', 'ssd', ['ssd', 'hdd'],
                   'Storage class for the cluster')
 flags.DEFINE_string('google_bigtable_zone', 'us-central1-b',
                     'Bigtable zone.')
+flags.DEFINE_boolean('bigtable_replication_cluster', False,
+                     'Whether to create a Bigtable replication cluster.')
+flags.DEFINE_string('bigtable_replication_cluster_zone', None,
+                    'Zone in which to create a Bigtable replication cluster.')
+flags.register_multi_flags_validator(
+    ['bigtable_replication_cluster', 'bigtable_replication_cluster_zone'],
+    _ValidateReplicationFlags, message='bigtable_replication_cluster_zone must '
+    'be set if bigtable_replication_cluster is True.')
 
 
 class GcpBigtableInstance(resource.BaseResource):
@@ -56,7 +70,7 @@ class GcpBigtableInstance(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'create',
                              self.name)
     cmd.flags['display-name'] = self.name
-    cmd.flags['cluster'] = self.name
+    cmd.flags['cluster'] = '{}-0'.format(self.name)
     cmd.flags['cluster-num-nodes'] = self.num_nodes
     cmd.flags['cluster-storage-type'] = self.storage_type
     cmd.flags['cluster-zone'] = self.zone
@@ -64,6 +78,16 @@ class GcpBigtableInstance(resource.BaseResource):
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
     cmd.Issue()
+
+    if FLAGS.bigtable_replication_cluster:
+      cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'clusters', 'create',
+                               '{}-1'.format(self.name))
+      cmd.flags['instance'] = self.name
+      cmd.flags['zone'] = FLAGS.bigtable_replication_cluster_zone
+      cmd.flags['num-nodes'] = self.num_nodes
+      cmd.Issue()
+
+    logging.info('Creating instance %s.', self.name)
 
   def _Delete(self):
     """Deletes the instance."""
@@ -91,6 +115,41 @@ class GcpBigtableInstance(resource.BaseResource):
                     'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
       return False
     result = json.loads(stdout)
-    instances = {instance['name'] for instance in result}
-    full_name = 'projects/{}/instances/{}'.format(self.project, self.name)
-    return full_name in instances
+    for instance in result:
+      if instance['displayName'] == self.name:
+        return instance['state'] == 'READY'
+
+
+def GetClustersDecription(instance_name, project):
+  """Gets descriptions of all the clusters given the instance and project.
+
+  This is a module function to allow getting description of clusters not created
+  by pkb.
+
+  Args:
+    instance_name: Instance to get cluster descriptions for.
+    project: Project where instance is in.
+
+  Returns:
+    A list of cluster descriptions dicts.
+  """
+  cmd = util.GcloudCommand(None, 'beta', 'bigtable', 'clusters', 'list')
+  cmd.flags['instances'] = instance_name
+  cmd.flags['project'] = project
+  stdout, stderr, retcode = cmd.Issue(
+      suppress_warning=True, raise_on_failure=False)
+  if retcode:
+    logging.error('Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
+                  ' '.join(cmd), stdout, stderr)
+  output = json.loads(stdout)
+
+  result = []
+  for cluster_details in output:
+    current_instance_name = cluster_details['name'].split('/')[3]
+    if current_instance_name == instance_name:
+      cluster_details['name'] = cluster_details['name'].split('/')[5]
+      cluster_details['zone'] = cluster_details['location'].split('/')[3]
+      result.append(cluster_details)
+
+  return result
+
