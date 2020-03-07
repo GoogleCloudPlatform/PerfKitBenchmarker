@@ -26,13 +26,13 @@ ZONE = 'testzone'
 
 VALID_JSON_BASE = """[
     {{
-      "displayName": "SSD Instance",
-      "name": "projects/{0}/instances/not{1}",
+      "displayName": "not{name}",
+      "name": "projects/{project}/instances/not{name}",
       "state": "READY"
     }},
     {{
-      "displayName": "HDD Instance",
-      "name": "projects/{0}/instances/{1}",
+      "displayName": "{name}",
+      "name": "projects/{project}/instances/{name}",
       "state": "READY"
     }}
 ]"""
@@ -56,13 +56,13 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertFalse(self.bigtable._Exists())
 
   def testFoundTable(self):
-    stdout = VALID_JSON_BASE.format(PROJECT, NAME)
+    stdout = VALID_JSON_BASE.format(project=PROJECT, name=NAME)
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=(stdout, '', 0)):
       self.assertTrue(self.bigtable._Exists())
 
   def testNotFoundTable(self):
-    stdout = VALID_JSON_BASE.format(PROJECT, NAME + 'nope')
+    stdout = VALID_JSON_BASE.format(project=PROJECT, name=NAME + 'nope')
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=(stdout, '', 0)):
       self.assertFalse(self.bigtable._Exists())
