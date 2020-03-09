@@ -24,6 +24,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.azure import util as azure_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
 from tests import pkb_common_test_case
@@ -350,6 +351,7 @@ class KubernetesVirtualMachineTestCase(
       self.assertIn('s3', command_string)
 
   def testDownloadPreprovisionedDataAzure(self):
+    azure_util.GetAzureStorageConnectionString = mock.Mock(return_value='')
     spec = self.create_virtual_machine_spec()
     FLAGS.container_cluster_cloud = 'Azure'
     with patch_critical_objects() as (issue_command, _):
@@ -361,6 +363,7 @@ class KubernetesVirtualMachineTestCase(
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)
       self.assertIn('az storage blob download', command_string)
+      self.assertIn('--connection-string', command_string)
 
   def testDownloadPreprovisionedDataGcp(self):
     spec = self.create_virtual_machine_spec()
