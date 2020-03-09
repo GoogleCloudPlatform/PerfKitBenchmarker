@@ -43,7 +43,7 @@ horovod:
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-east-1
+          zone: us-west-2a
           image: ami-07728e9e2742b0662
           boot_disk_size: 500
         Azure:
