@@ -60,6 +60,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker.linux_packages import maven
 import six
 from six.moves import filter
 from six.moves import range
@@ -236,14 +237,15 @@ def _Install(vm):
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
   if _GetVersionIndex(FLAGS.ycsb_version) >= 11:
+    vm.Install('maven')
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
-    vm.RemoteCommand('sudo apt-get --assume-yes install maven > /dev/null 2>&1')
     # _JAVA_OPTIONS needed to work around this issue:
     # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
-    vm.RemoteCommand('cd {0}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
-                     'disableClassPathURLCheck=true  '
-                     'mvn install > /dev/null 2>&1'.format(
-                         HDRHISTOGRAM_DIR))
+    vm.RemoteCommand('cd {hist_dir}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
+                     'disableClassPathURLCheck=true '
+                     '{mvn_cmd} > /dev/null 2>&1'.format(
+                         hist_dir=HDRHISTOGRAM_DIR,
+                         mvn_cmd=maven.GetRunCommand('install')))
 
 
 def YumInstall(vm):
