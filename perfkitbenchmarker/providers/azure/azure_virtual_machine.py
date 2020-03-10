@@ -681,6 +681,11 @@ class AzureVirtualMachine(
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
+  def InstallCli(self):
+    """Installs the Azure cli and credentials on this Azure vm."""
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
@@ -697,8 +702,7 @@ class AzureVirtualMachine(
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
-    self.Install('azure_cli')
-    self.Install('azure_credentials')
+    self.InstallCli()
     self.RemoteCommand(
         GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                                   filename))
