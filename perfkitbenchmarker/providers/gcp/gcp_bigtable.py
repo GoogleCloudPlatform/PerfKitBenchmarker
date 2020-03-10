@@ -152,4 +152,3 @@ def GetClustersDecription(instance_name, project):
       result.append(cluster_details)
 
   return result
-
