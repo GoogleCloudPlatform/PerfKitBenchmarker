@@ -21,6 +21,7 @@ from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
 FLAGS = flags.FLAGS
 MACHINEFILE = 'HOSTFILE'
@@ -155,8 +156,9 @@ def _CopyAndUpdateRunScripts(model, vm):
                      '{}/utils/__init__.py'.format(resnet_base_dir))
     vm.RemoteCommand(
         'mkdir -p {base}/imagenet && '
-        'gsutil -m rsync gs://pkb-sgpyc-us-central1/perfzero_dataset/imagenet '
-        '{base}/imagenet'.format(base=resnet_base_dir))
+        '{gsutil_path} -m rsync gs://pkb-sgpyc-us-central1/perfzero_dataset/imagenet '
+        '{base}/imagenet'.format(gsutil_path=google_cloud_sdk.GSUTIL_PATH,
+                                 base=resnet_base_dir))
 
   if model.startswith('bert'):
     vm.RemoteCommand(
