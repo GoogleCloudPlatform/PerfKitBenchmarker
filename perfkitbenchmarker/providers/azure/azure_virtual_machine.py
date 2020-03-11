@@ -163,7 +163,12 @@ class AzurePublicIPAddress(resource.BaseResource):
       # Availability Zones require Standard IPs.
       cmd += ['--zone', self.availability_zone, '--sku', 'Standard']
 
-    vm_util.IssueCommand(cmd)
+    _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+
+    if retcode and re.search(r'Cannot create more than \d+ public IP addresses',
+                             stderr):
+      raise errors.Benchmarks.QuotaFailure(
+          virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
 
   def _Exists(self):
     if self._deleted:
