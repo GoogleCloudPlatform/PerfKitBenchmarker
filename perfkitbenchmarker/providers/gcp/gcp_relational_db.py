@@ -83,7 +83,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   MySQL 5.7 and Postgres 9.6 are supported.
   """
   CLOUD = providers.GCP
-  GCP_PRICING_PLAN = 'PACKAGE'
 
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
@@ -125,7 +124,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         '--authorized-networks=%s' % authorized_network,
         '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
-        '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size,
     ]
     if self.spec.engine == relational_db.MYSQL:
