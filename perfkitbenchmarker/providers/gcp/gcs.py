@@ -159,7 +159,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       vm_pwd, _ = vm.RemoteCommand('pwd')
       vm.RemoteCommand(
           'sed -i '
-          '-e "s/^gs_service_key_file.*/gs_service_key_file = %s/" %s' % (
+          '-e "s|^gs_service_key_file.*|gs_service_key_file = %s|" %s' % (
               re.escape(posixpath.join(vm_pwd.strip(),
                                        _DEFAULT_GCP_SERVICE_KEY_FILE)),
               object_storage_service.DEFAULT_BOTO_LOCATION))
