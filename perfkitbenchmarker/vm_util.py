@@ -289,6 +289,15 @@ class _BoxedObject(object):
     self.value = initial_value
 
 
+def _ReadIssueCommandOutput(tf_out, tf_err):
+  """Reads IssueCommand Output from stdout and stderr."""
+  tf_out.seek(0)
+  stdout = tf_out.read().decode('ascii', 'ignore')
+  tf_err.seek(0)
+  stderr = tf_err.read().decode('ascii', 'ignore')
+  return stdout, stderr
+
+
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
                  env=None, timeout=DEFAULT_TIMEOUT, cwd=None,
                  raise_on_failure=True, suppress_failure=None,
@@ -378,10 +387,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     finally:
       timer.cancel()
 
-    tf_out.seek(0)
-    stdout = tf_out.read().decode('ascii', 'ignore')
-    tf_err.seek(0)
-    stderr = tf_err.read().decode('ascii', 'ignore')
+    stdout, stderr = _ReadIssueCommandOutput(tf_out, tf_err)
 
     timing_output = ''
     if should_time:

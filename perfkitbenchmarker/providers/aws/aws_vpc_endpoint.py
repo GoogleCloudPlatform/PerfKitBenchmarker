@@ -85,10 +85,10 @@ class AwsVpcEndpoint(resource.BaseResource):
     if not self.vpc_id:
       # When creating an SDDC there will not be a VPC to have an endpoint
       return None
-    ids = self._RunCommand(['describe-vpc-endpoints'] +
-                           util.AwsFilter('vpc-id', self.vpc_id) +
-                           util.AwsFilter('service-name', self._service_name) +
-                           ['--query', 'VpcEndpoints[].VpcEndpointId'])
+    ids = self._RunCommand(['describe-vpc-endpoints'] + util.AwsFilter({
+        'vpc-id': self.vpc_id,
+        'service-name': self._service_name
+    }) + ['--query', 'VpcEndpoints[].VpcEndpointId'])
     if not ids:
       # There is a VPC but no endpoint
       return None
@@ -105,7 +105,7 @@ class AwsVpcEndpoint(resource.BaseResource):
     """
     assert self.vpc_id, 'No defined VPC id.'
     table_ids = self._RunCommand(['describe-route-tables'] +
-                                 util.AwsFilter('vpc-id', self.vpc_id) +
+                                 util.AwsFilter({'vpc-id': self.vpc_id}) +
                                  ['--query', 'RouteTables[].RouteTableId'])
     assert len(table_ids) == 1, 'Only want 1 route table: {}'.format(table_ids)
     return table_ids[0]

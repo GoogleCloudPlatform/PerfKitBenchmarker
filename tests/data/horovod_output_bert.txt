@@ -1,0 +1,583 @@
+decayed_learning_rate_at_crossover_point = 2.880094e-04, adjusted_init_lr = 3.555440e-04
+Initializing ADAM Weight Decay Optimizer
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Bootstrap : Using [0]eth0:10.128.0.73<0>
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_ENABLE_FAST_SOCKET set by environment to 1.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_DYNAMIC_CHUNK_SIZE set by environment to 131072.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_INLINE_THRESHOLD set by environment to 4096.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_ENABLE_THREAD_SPIN set by environment to 0.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_SOCK_NOTSENT_LOWAT set by environment to 1.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_MIN_ZCOPY_SIZE set by environment to 0.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NET/FastSocket : Using [0]eth0:10.128.0.73<0>
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NET/FastSocket plugin initialized
+NCCL version 2.4.8+cuda10.0
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Setting affinity for GPU 0 to ff,ffff0000,00ffffff
+pkb-fde62675-0:34051:34867 [0] NCCL INFO CUDA Dev 0[0], FastSocket NIC distance :  PHB
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_MAX_NRINGS set by environment to 1.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Limiting to 1 rings per user request.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Channel 00 :    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_BUFFSIZE set by environment to 8388608.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Ring 00 : 63 -> 0 [receive] via NET/FastSocket/0
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_NSOCKS_PERTHREAD set by environment to 1.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NCCL_SOCKET_NTHREADS set by environment to 6.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Ring 00 : 0[0] -> 1[1] via P2P/IPC
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Ring 00 : 32 -> 0 [receive] via NET/FastSocket/0
+pkb-fde62675-0:34051:34867 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Ring 00 : 0 -> 32 [send] via NET/FastSocket/0
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Trees [0] -1->0->1/32/-1
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Using 256 threads, Min Comp Cap 7, Trees enabled up to size 4575000
+pkb-fde62675-0:34051:34867 [0] NCCL INFO comm 0x7facc150add0 rank 0 nranks 64 cudaDev 0 nvmlDev 0 - Init COMPLETE
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Launch mode Parallel
+pkb-fde62675-0:34051:38555 [0] NCCL INFO Comm 0x7facc0bde0a0 thread 1 started
+pkb-fde62675-0:34051:38563 [0] NCCL INFO Comm 0x7facc0bde0a0 thread 2 started
+pkb-fde62675-0:34051:38576 [0] NCCL INFO Comm 0x7facc0c1a080 thread 1 started
+pkb-fde62675-0:34051:38583 [0] NCCL INFO Comm 0x7facc0c1a080 thread 2 started
+pkb-fde62675-0:34051:38596 [0] NCCL INFO Comm 0x7facc0bf9880 thread 1 started
+pkb-fde62675-0:34051:38597 [0] NCCL INFO Comm 0x7facc0bf9880 thread 2 started
+pkb-fde62675-0:34051:38598 [0] NCCL INFO Comm 0x7facc0bf9880 thread 3 started
+pkb-fde62675-0:34051:38599 [0] NCCL INFO Comm 0x7facc0bf9880 thread 4 started
+pkb-fde62675-0:34051:38600 [0] NCCL INFO Comm 0x7facc0bf9880 thread 5 started
+pkb-fde62675-0:34051:38601 [0] NCCL INFO Comm 0x7facc0bf9880 thread 0 started
+pkb-fde62675-0:34051:38874 [0] NCCL INFO Comm 0x7facc0bde0a0 thread 3 started
+pkb-fde62675-0:34051:38875 [0] NCCL INFO Comm 0x7facc0c1a080 thread 3 started
+pkb-fde62675-0:34051:38892 [0] NCCL INFO Comm 0x7facc0bde0a0 thread 4 started
+pkb-fde62675-0:34051:38893 [0] NCCL INFO Comm 0x7facc0c1a080 thread 4 started
+pkb-fde62675-0:34051:38902 [0] NCCL INFO Comm 0x7facc0bde0a0 thread 5 started
+pkb-fde62675-0:34051:38903 [0] NCCL INFO Comm 0x7facc0bde0a0 thread 0 started
+pkb-fde62675-0:34051:38904 [0] NCCL INFO Comm 0x7facc0c1a080 thread 5 started
+pkb-fde62675-0:34051:38905 [0] NCCL INFO Comm 0x7facc0c1a080 thread 0 started
+Skipping time record for  1  due to checkpoint-saving/warmup overhead
+Skipping time record for  1000  due to checkpoint-saving/warmup overhead
+Skipping time record for  1001  due to checkpoint-saving/warmup overhead
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Setting affinity for GPU 0 to ff,ffff0000,00ffffff
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Limiting to 1 rings per user request.
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Channel 00 :    0   1   2   3   4   5   6   7
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Ring 00 : 0[0] -> 1[1] via P2P/IPC
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Using 256 threads, Min Comp Cap 7, Trees disabled
+pkb-fde62675-0:34051:34867 [0] NCCL INFO comm 0x7facc122f460 rank 0 nranks 8 cudaDev 0 nvmlDev 0 - Init COMPLETE
+pkb-fde62675-0:34051:34867 [0] NCCL INFO Launch mode Parallel
+Skipping time record for  2000  due to checkpoint-saving/warmup overhead
+Skipping time record for  2001  due to checkpoint-saving/warmup overhead
+Skipping time record for  3000  due to checkpoint-saving/warmup overhead
+Skipping time record for  3001  due to checkpoint-saving/warmup overhead
+2020-02-19 19:31:56.337097: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/horovod/tensorflow/__init__.py:117: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/horovod/tensorflow/__init__.py:143: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+INFO:tensorflow:Multi-GPU training with TF Horovod
+I0219 19:32:04.511386 140385099970304 run_squad.py:931] Multi-GPU training with TF Horovod
+INFO:tensorflow:hvd.size() = 64 hvd.rank() = 0
+I0219 19:32:04.511739 140385099970304 run_squad.py:932] hvd.size() = 64 hvd.rank() = 0
+INFO:tensorflow:***** Configuaration *****
+I0219 19:32:04.512327 140385099970304 run_squad.py:949] ***** Configuaration *****
+INFO:tensorflow:  only_check_args: False
+I0219 19:32:04.512509 140385099970304 run_squad.py:951]   only_check_args: False
+INFO:tensorflow:  use_fp16: False
+I0219 19:32:04.512619 140385099970304 run_squad.py:951]   use_fp16: False
+INFO:tensorflow:  do_train: True
+I0219 19:32:04.512747 140385099970304 run_squad.py:951]   do_train: True
+INFO:tensorflow:  run_with_profiling: False
+I0219 19:32:04.512845 140385099970304 run_squad.py:951]   run_with_profiling: False
+INFO:tensorflow:  predict_file: None
+I0219 19:32:04.512911 140385099970304 run_squad.py:951]   predict_file: None
+INFO:tensorflow:  version_2_with_negative: False
+I0219 19:32:04.512973 140385099970304 run_squad.py:951]   version_2_with_negative: False
+INFO:tensorflow:  test_randomize_ordering_seed: None
+I0219 19:32:04.513047 140385099970304 run_squad.py:951]   test_randomize_ordering_seed: None
+INFO:tensorflow:  verbosity: 0
+I0219 19:32:04.513109 140385099970304 run_squad.py:951]   verbosity: 0
+INFO:tensorflow:  v: 0
+I0219 19:32:04.513169 140385099970304 run_squad.py:951]   v: 0
+INFO:tensorflow:  xml_output_file:
+I0219 19:32:04.513238 140385099970304 run_squad.py:951]   xml_output_file:
+INFO:tensorflow:  trtis_model_version: 1
+I0219 19:32:04.513298 140385099970304 run_squad.py:951]   trtis_model_version: 1
+INFO:tensorflow:  trtis_model_name: bert
+I0219 19:32:04.513357 140385099970304 run_squad.py:951]   trtis_model_name: bert
+INFO:tensorflow:  do_lower_case: True
+I0219 19:32:04.513413 140385099970304 run_squad.py:951]   do_lower_case: True
+INFO:tensorflow:  export_trtis: False
+I0219 19:32:04.513484 140385099970304 run_squad.py:951]   export_trtis: False
+INFO:tensorflow:  max_answer_length: 30
+I0219 19:32:04.513540 140385099970304 run_squad.py:951]   max_answer_length: 30
+INFO:tensorflow:  profile_file: None
+I0219 19:32:04.513597 140385099970304 run_squad.py:951]   profile_file: None
+INFO:tensorflow:  helpxml: False
+I0219 19:32:04.513655 140385099970304 run_squad.py:951]   helpxml: False
+INFO:tensorflow:  num_train_epochs: 5.0
+I0219 19:32:04.513715 140385099970304 run_squad.py:951]   num_train_epochs: 5.0
+INFO:tensorflow:  test_tmpdir: /tmp/absl_testing
+I0219 19:32:04.513807 140385099970304 run_squad.py:951]   test_tmpdir: /tmp/absl_testing
+INFO:tensorflow:  test_random_seed: 301
+I0219 19:32:04.513871 140385099970304 run_squad.py:951]   test_random_seed: 301
+INFO:tensorflow:  log_dir:
+I0219 19:32:04.513930 140385099970304 run_squad.py:951]   log_dir:
+INFO:tensorflow:  iterations_per_loop: 1000
+I0219 19:32:04.513990 140385099970304 run_squad.py:951]   iterations_per_loop: 1000
+INFO:tensorflow:  bert_config_file: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/uncased_L-24_H-1024_A-16/bert_config.json
+I0219 19:32:04.514049 140385099970304 run_squad.py:951]   bert_config_file: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/uncased_L-24_H-1024_A-16/bert_config.json
+INFO:tensorflow:  use_cprofile_for_profiling: True
+I0219 19:32:04.514110 140385099970304 run_squad.py:951]   use_cprofile_for_profiling: True
+INFO:tensorflow:  pdb_post_mortem: False
+I0219 19:32:04.514168 140385099970304 run_squad.py:951]   pdb_post_mortem: False
+INFO:tensorflow:  train_file: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/squad/v1.1/train-v1.1.json
+I0219 19:32:04.514231 140385099970304 run_squad.py:951]   train_file: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/squad/v1.1/train-v1.1.json
+INFO:tensorflow:  stderrthreshold: fatal
+I0219 19:32:04.514290 140385099970304 run_squad.py:951]   stderrthreshold: fatal
+INFO:tensorflow:  trtis_engine_count: 1
+I0219 19:32:04.514349 140385099970304 run_squad.py:951]   trtis_engine_count: 1
+INFO:tensorflow:  run_with_pdb: False
+I0219 19:32:04.514408 140385099970304 run_squad.py:951]   run_with_pdb: False
+INFO:tensorflow:  train_batch_size: 2
+I0219 19:32:04.514466 140385099970304 run_squad.py:951]   train_batch_size: 2
+INFO:tensorflow:  do_predict: False
+I0219 19:32:04.514523 140385099970304 run_squad.py:951]   do_predict: False
+INFO:tensorflow:  verbose_logging: False
+I0219 19:32:04.514580 140385099970304 run_squad.py:951]   verbose_logging: False
+INFO:tensorflow:  max_query_length: 64
+I0219 19:32:04.514638 140385099970304 run_squad.py:951]   max_query_length: 64
+INFO:tensorflow:  trtis_server_url: localhost:8001
+I0219 19:32:04.514696 140385099970304 run_squad.py:951]   trtis_server_url: localhost:8001
+INFO:tensorflow:  num_accumulation_steps: 1
+I0219 19:32:04.514753 140385099970304 run_squad.py:951]   num_accumulation_steps: 1
+INFO:tensorflow:  trtis_model_overwrite: False
+I0219 19:32:04.514812 140385099970304 run_squad.py:951]   trtis_model_overwrite: False
+INFO:tensorflow:  horovod: True
+I0219 19:32:04.514870 140385099970304 run_squad.py:951]   horovod: True
+INFO:tensorflow:  save_checkpoints_steps: 1000
+I0219 19:32:04.514928 140385099970304 run_squad.py:951]   save_checkpoints_steps: 1000
+INFO:tensorflow:  alsologtostderr: False
+I0219 19:32:04.514986 140385099970304 run_squad.py:951]   alsologtostderr: False
+INFO:tensorflow:  trtis_dyn_batching_delay: 0.0
+I0219 19:32:04.515045 140385099970304 run_squad.py:951]   trtis_dyn_batching_delay: 0.0
+INFO:tensorflow:  ?: False
+I0219 19:32:04.515104 140385099970304 run_squad.py:951]   ?: False
+INFO:tensorflow:  test_srcdir:
+I0219 19:32:04.515162 140385099970304 run_squad.py:951]   test_srcdir:
+INFO:tensorflow:  predict_batch_size: 8
+I0219 19:32:04.515224 140385099970304 run_squad.py:951]   predict_batch_size: 8
+INFO:tensorflow:  n_best_size: 20
+I0219 19:32:04.515282 140385099970304 run_squad.py:951]   n_best_size: 20
+INFO:tensorflow:  output_dir: /tmp/pkb/bert
+I0219 19:32:04.515339 140385099970304 run_squad.py:951]   output_dir: /tmp/pkb/bert
+INFO:tensorflow:  vocab_file: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/uncased_L-24_H-1024_A-16/vocab.txt
+I0219 19:32:04.515398 140385099970304 run_squad.py:951]   vocab_file: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/uncased_L-24_H-1024_A-16/vocab.txt
+INFO:tensorflow:  showprefixforinfo: True
+I0219 19:32:04.515457 140385099970304 run_squad.py:951]   showprefixforinfo: True
+INFO:tensorflow:  warmup_proportion: 0.1
+I0219 19:32:04.515517 140385099970304 run_squad.py:951]   warmup_proportion: 0.1
+INFO:tensorflow:  help: False
+I0219 19:32:04.515576 140385099970304 run_squad.py:951]   help: False
+INFO:tensorflow:  null_score_diff_threshold: 0.0
+I0219 19:32:04.515667 140385099970304 run_squad.py:951]   null_score_diff_threshold: 0.0
+INFO:tensorflow:  max_seq_length: 384
+I0219 19:32:04.515727 140385099970304 run_squad.py:951]   max_seq_length: 384
+INFO:tensorflow:  use_xla: False
+I0219 19:32:04.515962 140385099970304 run_squad.py:951]   use_xla: False
+INFO:tensorflow:  op_conversion_fallback_to_while_loop: False
+I0219 19:32:04.516093 140385099970304 run_squad.py:951]   op_conversion_fallback_to_while_loop: False
+INFO:tensorflow:  init_checkpoint: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/uncased_L-24_H-1024_A-16/bert_model.ckpt
+I0219 19:32:04.516165 140385099970304 run_squad.py:951]   init_checkpoint: DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/uncased_L-24_H-1024_A-16/bert_model.ckpt
+INFO:tensorflow:  helpshort: False
+I0219 19:32:04.516232 140385099970304 run_squad.py:951]   helpshort: False
+INFO:tensorflow:  doc_stride: 128
+I0219 19:32:04.516294 140385099970304 run_squad.py:951]   doc_stride: 128
+INFO:tensorflow:  helpfull: False
+I0219 19:32:04.516354 140385099970304 run_squad.py:951]   helpfull: False
+INFO:tensorflow:  trtis_max_batch_size: 8
+I0219 19:32:04.516414 140385099970304 run_squad.py:951]   trtis_max_batch_size: 8
+INFO:tensorflow:  learning_rate: 5e-06
+I0219 19:32:04.516478 140385099970304 run_squad.py:951]   learning_rate: 5e-06
+INFO:tensorflow:  use_trt: False
+I0219 19:32:04.516537 140385099970304 run_squad.py:951]   use_trt: False
+INFO:tensorflow:  num_eval_iterations: None
+I0219 19:32:04.516606 140385099970304 run_squad.py:951]   num_eval_iterations: None
+INFO:tensorflow:  logtostderr: False
+I0219 19:32:04.516665 140385099970304 run_squad.py:951]   logtostderr: False
+INFO:tensorflow:**************************
+I0219 19:32:04.516718 140385099970304 run_squad.py:952] **************************
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/utils/create_squad_data.py:154: The name tf.gfile.Open is deprecated. Please use tf.io.gfile.GFile instead.
+
+W0219 19:32:04.516957 140385099970304 module_wrapper.py:139] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/utils/create_squad_data.py:154: The name tf.gfile.Open is deprecated. Please use tf.io.gfile.GFile instead.
+
+INFO:tensorflow:Using config: {'_num_ps_replicas': 0, '_tf_random_seed': None, '_service': None, '_eval_distribute': None, '_save_summary_steps': 100, '_task_type': 'worker', '_task_id': 0, '_device_fn': None, '_save_checkpoints_steps': 1000, '_keep_checkpoint_max': 1, '_save_checkpoints_secs': None, '_session_config': gpu_options {
+  visible_device_list: "0"
+}
+, '_session_creation_timeout_secs': 7200, '_global_id_in_cluster': 0, '_is_chief': True, '_keep_checkpoint_every_n_hours': 10000, '_train_distribute': None, '_experimental_max_worker_delay_secs': None, '_master': '', '_experimental_distribute': None, '_num_worker_replicas': 1, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7faddf57b1d0>, '_protocol': None, '_model_dir': '/tmp/pkb/bert', '_evaluation_master': '', '_log_step_count_steps': 100}
+I0219 19:32:12.901947 140385099970304 estimator.py:212] Using config: {'_num_ps_replicas': 0, '_tf_random_seed': None, '_service': None, '_eval_distribute': None, '_save_summary_steps': 100, '_task_type': 'worker', '_task_id': 0, '_device_fn': None, '_save_checkpoints_steps': 1000, '_keep_checkpoint_max': 1, '_save_checkpoints_secs': None, '_session_config': gpu_options {
+  visible_device_list: "0"
+}
+, '_session_creation_timeout_secs': 7200, '_global_id_in_cluster': 0, '_is_chief': True, '_keep_checkpoint_every_n_hours': 10000, '_train_distribute': None, '_experimental_max_worker_delay_secs': None, '_master': '', '_experimental_distribute': None, '_num_worker_replicas': 1, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7faddf57b1d0>, '_protocol': None, '_model_dir': '/tmp/pkb/bert', '_evaluation_master': '', '_log_step_count_steps': 100}
+WARNING:tensorflow:Estimator's model_fn (<function model_fn_builder.<locals>.model_fn at 0x7fad327eba60>) includes params argument, but params are not passed to Estimator.
+W0219 19:32:12.902963 140385099970304 model_fn.py:630] Estimator's model_fn (<function model_fn_builder.<locals>.model_fn at 0x7fad327eba60>) includes params argument, but params are not passed to Estimator.
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/utils/create_squad_data.py:479: The name tf.python_io.TFRecordWriter is deprecated. Please use tf.io.TFRecordWriter instead.
+
+W0219 19:32:12.903646 140385099970304 module_wrapper.py:139] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/utils/create_squad_data.py:479: The name tf.python_io.TFRecordWriter is deprecated. Please use tf.io.TFRecordWriter instead.
+
+[2020-02-19 19:35:04.572105: W horovod/common/stall_inspector.cc:105] One or more tensors were submitted to be reduced, gathered or broadcasted by subset of ranks and are waiting for remainder of ranks for more than 60 seconds. This may indicate that different ranks are trying to submit different tensors or that only subset of ranks is submitting tensors, which will cause deadlock.
+Stalled ranks:
+0: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+8: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+16: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+24: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+32: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+40: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+48: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+56: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+[2020-02-19 19:36:04.589127: W horovod/common/stall_inspector.cc:105] One or more tensors were submitted to be reduced, gathered or broadcasted by subset of ranks and are waiting for remainder of ranks for more than 60 seconds. This may indicate that different ranks are trying to submit different tensors or that only subset of ranks is submitting tensors, which will cause deadlock.
+Stalled ranks:
+0: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+8: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+16: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+24: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+32: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+40: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+48: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+56: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+[2020-02-19 19:37:04.604081: W horovod/common/stall_inspector.cc:105] One or more tensors were submitted to be reduced, gathered or broadcasted by subset of ranks and are waiting for remainder of ranks for more than 60 seconds. This may indicate that different ranks are trying to submit different tensors or that only subset of ranks is submitting tensors, which will cause deadlock.
+Stalled ranks:
+0: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+8: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+16: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+24: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+32: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+40: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+48: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+56: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+[2020-02-19 19:38:04.617314: W horovod/common/stall_inspector.cc:105] One or more tensors were submitted to be reduced, gathered or broadcasted by subset of ranks and are waiting for remainder of ranks for more than 60 seconds. This may indicate that different ranks are trying to submit different tensors or that only subset of ranks is submitting tensors, which will cause deadlock.
+Stalled ranks:
+0: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+8: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+16: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+24: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+32: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+40: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+48: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+56: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+INFO:tensorflow:***** Running training *****
+I0219 19:38:35.425679 140385099970304 run_squad.py:1002] ***** Running training *****
+INFO:tensorflow:  Num orig examples = 87599
+I0219 19:38:35.426012 140385099970304 run_squad.py:1003]   Num orig examples = 87599
+INFO:tensorflow:  Num split examples = 88641
+I0219 19:38:35.426826 140385099970304 run_squad.py:1004]   Num split examples = 88641
+INFO:tensorflow:  Batch size = 2
+I0219 19:38:35.426905 140385099970304 run_squad.py:1005]   Batch size = 2
+INFO:tensorflow:  Num steps = 3421
+I0219 19:38:35.426969 140385099970304 run_squad.py:1006]   Num steps = 3421
+INFO:tensorflow:  LR = 0.000320
+I0219 19:38:35.427021 140385099970304 run_squad.py:1007]   LR = 0.000320
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/training/training_util.py:236: Variable.initialized_value (from tensorflow.python.ops.variables) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use Variable.read_value. Variables in 2.X are initialized automatically both in eager and graph (inside tf.defun) contexts.
+W0219 19:38:35.514727 140385099970304 deprecation.py:323] From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/training/training_util.py:236: Variable.initialized_value (from tensorflow.python.ops.variables) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use Variable.read_value. Variables in 2.X are initialized automatically both in eager and graph (inside tf.defun) contexts.
+WARNING:tensorflow:
+The TensorFlow contrib module will not be included in TensorFlow 2.0.
+For more information, please see:
+  * https://github.com/tensorflow/community/blob/master/rfcs/20180907-contrib-sunset.md
+  * https://github.com/tensorflow/addons
+  * https://github.com/tensorflow/io (for I/O related ops)
+If you depend on functionality not listed there, please file an issue.
+
+W0219 19:38:35.552990 140385099970304 lazy_loader.py:50]
+The TensorFlow contrib module will not be included in TensorFlow 2.0.
+For more information, please see:
+  * https://github.com/tensorflow/community/blob/master/rfcs/20180907-contrib-sunset.md
+  * https://github.com/tensorflow/addons
+  * https://github.com/tensorflow/io (for I/O related ops)
+If you depend on functionality not listed there, please file an issue.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:417: map_and_batch (from tensorflow.contrib.data.python.ops.batching) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.data.experimental.map_and_batch(...)`.
+W0219 19:38:36.254502 140385099970304 deprecation.py:323] From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:417: map_and_batch (from tensorflow.contrib.data.python.ops.batching) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.data.experimental.map_and_batch(...)`.
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/tensorflow_core/contrib/data/python/ops/batching.py:276: map_and_batch (from tensorflow.python.data.experimental.ops.batching) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.data.Dataset.map(map_func, num_parallel_calls)` followed by `tf.data.Dataset.batch(batch_size, drop_remainder)`. Static tf.data optimizations will take care of using the fused implementation.
+W0219 19:38:36.254777 140385099970304 deprecation.py:323] From /usr/local/lib/python3.5/dist-packages/tensorflow_core/contrib/data/python/ops/batching.py:276: map_and_batch (from tensorflow.python.data.experimental.ops.batching) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.data.Dataset.map(map_func, num_parallel_calls)` followed by `tf.data.Dataset.batch(batch_size, drop_remainder)`. Static tf.data optimizations will take care of using the fused implementation.
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/autograph/converters/directives.py:119: The name tf.parse_single_example is deprecated. Please use tf.io.parse_single_example instead.
+
+W0219 19:38:36.323491 140385099970304 module_wrapper.py:139] From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/autograph/converters/directives.py:119: The name tf.parse_single_example is deprecated. Please use tf.io.parse_single_example instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:391: to_int32 (from tensorflow.python.ops.math_ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.cast` instead.
+W0219 19:38:36.431301 140385099970304 deprecation.py:323] From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:391: to_int32 (from tensorflow.python.ops.math_ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.cast` instead.
+INFO:tensorflow:Calling model_fn.
+I0219 19:38:36.451272 140385099970304 estimator.py:1148] Calling model_fn.
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:176: The name tf.variable_scope is deprecated. Please use tf.compat.v1.variable_scope instead.
+
+W0219 19:38:36.451565 140385099970304 module_wrapper.py:139] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:176: The name tf.variable_scope is deprecated. Please use tf.compat.v1.variable_scope instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:427: The name tf.get_variable is deprecated. Please use tf.compat.v1.get_variable instead.
+
+W0219 19:38:36.453097 140385099970304 module_wrapper.py:139] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:427: The name tf.get_variable is deprecated. Please use tf.compat.v1.get_variable instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:366: calling dropout (from tensorflow.python.ops.nn_ops) with keep_prob is deprecated and will be removed in a future version.
+Instructions for updating:
+Please use `rate` instead of `keep_prob`. Rate should be set to `rate = 1 - keep_prob`.
+W0219 19:38:36.498583 140385099970304 deprecation.py:506] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:366: calling dropout (from tensorflow.python.ops.nn_ops) with keep_prob is deprecated and will be removed in a future version.
+Instructions for updating:
+Please use `rate` instead of `keep_prob`. Rate should be set to `rate = 1 - keep_prob`.
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:683: dense (from tensorflow.python.layers.core) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use keras.layers.Dense instead.
+W0219 19:38:36.511254 140385099970304 deprecation.py:323] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/modeling.py:683: dense (from tensorflow.python.layers.core) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use keras.layers.Dense instead.
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/layers/core.py:187: Layer.apply (from tensorflow.python.keras.engine.base_layer) is deprecated and will be removed in a future version.
+Instructions for updating:
+Please use `layer.__call__` method instead.
+W0219 19:38:36.512941 140385099970304 deprecation.py:323] From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/layers/core.py:187: Layer.apply (from tensorflow.python.keras.engine.base_layer) is deprecated and will be removed in a future version.
+Instructions for updating:
+Please use `layer.__call__` method instead.
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:305: The name tf.trainable_variables is deprecated. Please use tf.compat.v1.trainable_variables instead.
+
+W0219 19:38:40.499104 140385099970304 module_wrapper.py:139] From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:305: The name tf.trainable_variables is deprecated. Please use tf.compat.v1.trainable_variables instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:312: The name tf.train.init_from_checkpoint is deprecated. Please use tf.compat.v1.train.init_from_checkpoint instead.
+
+W0219 19:38:40.503357 140385099970304 module_wrapper.py:139] From DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py:312: The name tf.train.init_from_checkpoint is deprecated. Please use tf.compat.v1.train.init_from_checkpoint instead.
+
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/ops/math_grad.py:1375: where (from tensorflow.python.ops.array_ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use tf.where in 2.0, which has the same broadcast rule as np.where
+W0219 19:38:42.039398 140385099970304 deprecation.py:323] From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/ops/math_grad.py:1375: where (from tensorflow.python.ops.array_ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use tf.where in 2.0, which has the same broadcast rule as np.where
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/optimization.py:168: The name tf.global_norm is deprecated. Please use tf.linalg.global_norm instead.
+
+W0219 19:38:48.542502 140385099970304 module_wrapper.py:139] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/optimization.py:168: The name tf.global_norm is deprecated. Please use tf.linalg.global_norm instead.
+
+INFO:tensorflow:Done calling model_fn.
+I0219 19:38:57.393008 140385099970304 estimator.py:1150] Done calling model_fn.
+INFO:tensorflow:Create CheckpointSaverHook.
+I0219 19:38:57.394366 140385099970304 basic_session_run_hooks.py:541] Create CheckpointSaverHook.
+[2020-02-19 19:39:04.631421: W horovod/common/stall_inspector.cc:105] One or more tensors were submitted to be reduced, gathered or broadcasted by subset of ranks and are waiting for remainder of ranks for more than 60 seconds. This may indicate that different ranks are trying to submit different tensors or that only subset of ranks is submitting tensors, which will cause deadlock.
+Stalled ranks:
+0: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+16: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+24: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+32: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+40: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+48: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+56: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0 ...]
+INFO:tensorflow:Graph was finalized.
+I0219 19:39:05.532068 140385099970304 monitored_session.py:240] Graph was finalized.
+2020-02-19 19:39:05.532683: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 AVX512F FMA
+2020-02-19 19:39:05.543018: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000140000 Hz
+2020-02-19 19:39:05.545256: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55a6f31af6c0 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-02-19 19:39:05.545283: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-02-19 19:39:05.548515: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-02-19 19:39:05.869824: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-19 19:39:05.871563: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55a6f1960830 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-02-19 19:39:05.871594: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-02-19 19:39:05.871982: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-19 19:39:05.873131: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-02-19 19:39:05.873171: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-02-19 19:39:05.874865: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-02-19 19:39:05.876327: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-02-19 19:39:05.876754: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-02-19 19:39:05.878710: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-02-19 19:39:05.880110: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-02-19 19:39:05.884095: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-02-19 19:39:05.884238: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-19 19:39:05.885353: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-19 19:39:05.886437: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1746] Adding visible gpu devices: 0
+2020-02-19 19:39:05.886484: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-02-19 19:39:06.522843: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1159] Device interconnect StreamExecutor with strength 1 edge matrix:
+2020-02-19 19:39:06.522897: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1165]      0
+2020-02-19 19:39:06.522906: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1178] 0:   N
+2020-02-19 19:39:06.523361: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-19 19:39:06.524674: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-02-19 19:39:06.525904: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1304] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14816 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:00:04.0, compute capability: 7.0)
+INFO:tensorflow:Running local_init_op.
+I0219 19:39:25.853507 140385099970304 session_manager.py:500] Running local_init_op.
+INFO:tensorflow:Done running local_init_op.
+I0219 19:39:26.642657 140385099970304 session_manager.py:502] Done running local_init_op.
+INFO:tensorflow:Saving checkpoints for 0 into /tmp/pkb/bert/model.ckpt.
+I0219 19:39:44.333187 140385099970304 basic_session_run_hooks.py:606] Saving checkpoints for 0 into /tmp/pkb/bert/model.ckpt.
+[2020-02-19 19:40:06.227702: W horovod/common/stall_inspector.cc:105] One or more tensors were submitted to be reduced, gathered or broadcasted by subset of ranks and are waiting for remainder of ranks for more than 60 seconds. This may indicate that different ranks are trying to submit different tensors or that only subset of ranks is submitting tensors, which will cause deadlock.
+Stalled ranks:
+0: [HorovodBroadcast_bert_embeddings_LayerNorm_beta_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_beta_adam_v_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_m_0, HorovodBroadcast_bert_embeddings_LayerNorm_gamma_adam_v_0, HorovodBroadcast_bert_embeddings_position_embeddings_adam_m_0 ...]
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/utils/utils.py:53: The name tf.train.get_global_step is deprecated. Please use tf.compat.v1.train.get_global_step instead.
+
+W0219 19:40:15.673207 140385099970304 module_wrapper.py:139] From /home/perfkit/DeepLearningExamples/TensorFlow/LanguageModeling/BERT/utils/utils.py:53: The name tf.train.get_global_step is deprecated. Please use tf.compat.v1.train.get_global_step instead.
+
+2020-02-19 19:40:47.328144: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+INFO:tensorflow:loss = 5.912186, step = 0
+I0219 19:40:50.550084 140385099970304 basic_session_run_hooks.py:262] loss = 5.912186, step = 0
+INFO:tensorflow:global_step/sec: 0.44182
+I0219 19:44:36.885695 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.44182
+INFO:tensorflow:loss = 0.5478101, step = 100 (226.336 sec)
+I0219 19:44:36.886151 140385099970304 basic_session_run_hooks.py:260] loss = 0.5478101, step = 100 (226.336 sec)
+INFO:tensorflow:global_step/sec: 0.505379
+I0219 19:47:54.756985 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.505379
+INFO:tensorflow:loss = 1.8391619, step = 200 (197.871 sec)
+I0219 19:47:54.757463 140385099970304 basic_session_run_hooks.py:260] loss = 1.8391619, step = 200 (197.871 sec)
+INFO:tensorflow:global_step/sec: 0.715055
+I0219 19:50:14.606255 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.715055
+INFO:tensorflow:loss = 3.8679254, step = 300 (139.849 sec)
+I0219 19:50:14.606698 140385099970304 basic_session_run_hooks.py:260] loss = 3.8679254, step = 300 (139.849 sec)
+INFO:tensorflow:global_step/sec: 0.825971
+I0219 19:52:15.675891 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.825971
+INFO:tensorflow:loss = 5.9112086, step = 400 (121.070 sec)
+I0219 19:52:15.676443 140385099970304 basic_session_run_hooks.py:260] loss = 5.9112086, step = 400 (121.070 sec)
+INFO:tensorflow:global_step/sec: 0.701082
+I0219 19:54:38.312533 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.701082
+INFO:tensorflow:loss = 5.941061, step = 500 (142.637 sec)
+I0219 19:54:38.312964 140385099970304 basic_session_run_hooks.py:260] loss = 5.941061, step = 500 (142.637 sec)
+INFO:tensorflow:global_step/sec: 0.753004
+I0219 19:56:51.114038 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.753004
+INFO:tensorflow:loss = 5.9476423, step = 600 (132.802 sec)
+I0219 19:56:51.114468 140385099970304 basic_session_run_hooks.py:260] loss = 5.9476423, step = 600 (132.802 sec)
+INFO:tensorflow:global_step/sec: 1.19312
+I0219 19:58:14.928054 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.19312
+INFO:tensorflow:loss = 5.8977222, step = 700 (83.814 sec)
+I0219 19:58:14.928440 140385099970304 basic_session_run_hooks.py:260] loss = 5.8977222, step = 700 (83.814 sec)
+INFO:tensorflow:global_step/sec: 1.21362
+I0219 19:59:37.325938 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.21362
+INFO:tensorflow:loss = 6.012174, step = 800 (82.398 sec)
+I0219 19:59:37.326317 140385099970304 basic_session_run_hooks.py:260] loss = 6.012174, step = 800 (82.398 sec)
+INFO:tensorflow:global_step/sec: 0.826421
+I0219 20:01:38.329515 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.826421
+INFO:tensorflow:loss = 5.888052, step = 900 (121.004 sec)
+I0219 20:01:38.330021 140385099970304 basic_session_run_hooks.py:260] loss = 5.888052, step = 900 (121.004 sec)
+INFO:tensorflow:Saving checkpoints for 1000 into /tmp/pkb/bert/model.ckpt.
+I0219 20:04:01.432119 140385099970304 basic_session_run_hooks.py:606] Saving checkpoints for 1000 into /tmp/pkb/bert/model.ckpt.
+WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/training/saver.py:963: remove_checkpoint (from tensorflow.python.training.checkpoint_management) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use standard file APIs to delete files with this prefix.
+W0219 20:04:05.498760 140385099970304 deprecation.py:323] From /usr/local/lib/python3.5/dist-packages/tensorflow_core/python/training/saver.py:963: remove_checkpoint (from tensorflow.python.training.checkpoint_management) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use standard file APIs to delete files with this prefix.
+INFO:tensorflow:global_step/sec: 0.611362
+I0219 20:04:21.898610 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.611362
+INFO:tensorflow:loss = 6.00292, step = 1000 (163.569 sec)
+I0219 20:04:21.898993 140385099970304 basic_session_run_hooks.py:260] loss = 6.00292, step = 1000 (163.569 sec)
+INFO:tensorflow:global_step/sec: 0.830277
+I0219 20:06:22.340379 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.830277
+INFO:tensorflow:loss = 5.967967, step = 1100 (120.442 sec)
+I0219 20:06:22.340740 140385099970304 basic_session_run_hooks.py:260] loss = 5.967967, step = 1100 (120.442 sec)
+INFO:tensorflow:global_step/sec: 0.797658
+I0219 20:08:27.707541 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.797658
+INFO:tensorflow:loss = 5.923644, step = 1200 (125.367 sec)
+I0219 20:08:27.707985 140385099970304 basic_session_run_hooks.py:260] loss = 5.923644, step = 1200 (125.367 sec)
+INFO:tensorflow:global_step/sec: 0.2214
+I0219 20:15:59.378308 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.2214
+INFO:tensorflow:loss = 5.9819794, step = 1300 (451.671 sec)
+I0219 20:15:59.378658 140385099970304 basic_session_run_hooks.py:260] loss = 5.9819794, step = 1300 (451.671 sec)
+INFO:tensorflow:global_step/sec: 0.299791
+I0219 20:21:32.944232 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.299791
+INFO:tensorflow:loss = 6.0076294, step = 1400 (333.566 sec)
+I0219 20:21:32.944700 140385099970304 basic_session_run_hooks.py:260] loss = 6.0076294, step = 1400 (333.566 sec)
+INFO:tensorflow:global_step/sec: 0.195579
+I0219 20:30:04.247255 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.195579
+INFO:tensorflow:loss = 5.961006, step = 1500 (511.303 sec)
+I0219 20:30:04.247680 140385099970304 basic_session_run_hooks.py:260] loss = 5.961006, step = 1500 (511.303 sec)
+INFO:tensorflow:global_step/sec: 0.238633
+I0219 20:37:03.301132 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.238633
+INFO:tensorflow:loss = 5.962338, step = 1600 (419.054 sec)
+I0219 20:37:03.301471 140385099970304 basic_session_run_hooks.py:260] loss = 5.962338, step = 1600 (419.054 sec)
+INFO:tensorflow:global_step/sec: 0.18308
+I0219 20:46:09.510756 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.18308
+INFO:tensorflow:loss = 5.952487, step = 1700 (546.210 sec)
+I0219 20:46:09.511189 140385099970304 basic_session_run_hooks.py:260] loss = 5.952487, step = 1700 (546.210 sec)
+INFO:tensorflow:global_step/sec: 0.174223
+I0219 20:55:43.487011 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.174223
+INFO:tensorflow:loss = 5.968776, step = 1800 (573.976 sec)
+I0219 20:55:43.487413 140385099970304 basic_session_run_hooks.py:260] loss = 5.968776, step = 1800 (573.976 sec)
+INFO:tensorflow:global_step/sec: 0.243809
+I0219 21:02:33.645057 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.243809
+INFO:tensorflow:loss = 5.947493, step = 1900 (410.158 sec)
+I0219 21:02:33.645410 140385099970304 basic_session_run_hooks.py:260] loss = 5.947493, step = 1900 (410.158 sec)
+INFO:tensorflow:Saving checkpoints for 2000 into /tmp/pkb/bert/model.ckpt.
+I0219 21:08:25.775357 140385099970304 basic_session_run_hooks.py:606] Saving checkpoints for 2000 into /tmp/pkb/bert/model.ckpt.
+INFO:tensorflow:global_step/sec: 0.275086
+I0219 21:08:37.167088 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.275086
+INFO:tensorflow:loss = 6.006036, step = 2000 (363.522 sec)
+I0219 21:08:37.167663 140385099970304 basic_session_run_hooks.py:260] loss = 6.006036, step = 2000 (363.522 sec)
+INFO:tensorflow:global_step/sec: 0.148212
+I0219 21:19:51.874433 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.148212
+INFO:tensorflow:loss = 5.9612207, step = 2100 (674.707 sec)
+I0219 21:19:51.874839 140385099970304 basic_session_run_hooks.py:260] loss = 5.9612207, step = 2100 (674.707 sec)
+INFO:tensorflow:global_step/sec: 0.197087
+I0219 21:28:19.265117 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.197087
+INFO:tensorflow:loss = 5.8822365, step = 2200 (507.391 sec)
+I0219 21:28:19.265539 140385099970304 basic_session_run_hooks.py:260] loss = 5.8822365, step = 2200 (507.391 sec)
+INFO:tensorflow:global_step/sec: 0.32207
+I0219 21:33:29.756736 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.32207
+INFO:tensorflow:loss = 5.973096, step = 2300 (310.492 sec)
+I0219 21:33:29.757133 140385099970304 basic_session_run_hooks.py:260] loss = 5.973096, step = 2300 (310.492 sec)
+INFO:tensorflow:global_step/sec: 0.928253
+I0219 21:35:17.485926 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.928253
+INFO:tensorflow:loss = 5.9460697, step = 2400 (107.729 sec)
+I0219 21:35:17.486285 140385099970304 basic_session_run_hooks.py:260] loss = 5.9460697, step = 2400 (107.729 sec)
+INFO:tensorflow:global_step/sec: 0.852743
+I0219 21:37:14.754511 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.852743
+INFO:tensorflow:loss = 5.9446926, step = 2500 (117.269 sec)
+I0219 21:37:14.754886 140385099970304 basic_session_run_hooks.py:260] loss = 5.9446926, step = 2500 (117.269 sec)
+INFO:tensorflow:global_step/sec: 0.97322
+I0219 21:38:57.506188 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.97322
+INFO:tensorflow:loss = 5.927392, step = 2600 (102.752 sec)
+I0219 21:38:57.506544 140385099970304 basic_session_run_hooks.py:260] loss = 5.927392, step = 2600 (102.752 sec)
+INFO:tensorflow:global_step/sec: 1.17806
+I0219 21:40:22.391475 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.17806
+INFO:tensorflow:loss = 5.949076, step = 2700 (84.885 sec)
+I0219 21:40:22.391853 140385099970304 basic_session_run_hooks.py:260] loss = 5.949076, step = 2700 (84.885 sec)
+INFO:tensorflow:global_step/sec: 1.18736
+I0219 21:41:46.612281 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.18736
+INFO:tensorflow:loss = 5.939441, step = 2800 (84.221 sec)
+I0219 21:41:46.612905 140385099970304 basic_session_run_hooks.py:260] loss = 5.939441, step = 2800 (84.221 sec)
+INFO:tensorflow:global_step/sec: 1.15993
+I0219 21:43:12.824687 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.15993
+INFO:tensorflow:loss = 5.9415116, step = 2900 (86.212 sec)
+I0219 21:43:12.825114 140385099970304 basic_session_run_hooks.py:260] loss = 5.9415116, step = 2900 (86.212 sec)
+INFO:tensorflow:Saving checkpoints for 3000 into /tmp/pkb/bert/model.ckpt.
+I0219 21:45:37.873365 140385099970304 basic_session_run_hooks.py:606] Saving checkpoints for 3000 into /tmp/pkb/bert/model.ckpt.
+INFO:tensorflow:global_step/sec: 0.6492
+I0219 21:45:46.860520 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.6492
+INFO:tensorflow:loss = 5.9376173, step = 3000 (154.036 sec)
+I0219 21:45:46.860929 140385099970304 basic_session_run_hooks.py:260] loss = 5.9376173, step = 3000 (154.036 sec)
+INFO:tensorflow:global_step/sec: 1.03445
+I0219 21:47:23.529901 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.03445
+INFO:tensorflow:loss = 5.942039, step = 3100 (96.669 sec)
+I0219 21:47:23.530416 140385099970304 basic_session_run_hooks.py:260] loss = 5.942039, step = 3100 (96.669 sec)
+INFO:tensorflow:global_step/sec: 1.11251
+I0219 21:48:53.416523 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.11251
+INFO:tensorflow:loss = 5.9516697, step = 3200 (89.886 sec)
+I0219 21:48:53.416910 140385099970304 basic_session_run_hooks.py:260] loss = 5.9516697, step = 3200 (89.886 sec)
+INFO:tensorflow:global_step/sec: 1.11684
+I0219 21:50:22.954685 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 1.11684
+INFO:tensorflow:loss = 5.959817, step = 3300 (89.538 sec)
+I0219 21:50:22.955103 140385099970304 basic_session_run_hooks.py:260] loss = 5.959817, step = 3300 (89.538 sec)
+INFO:tensorflow:global_step/sec: 0.199708
+I0219 21:58:43.685187 140385099970304 basic_session_run_hooks.py:692] global_step/sec: 0.199708
+INFO:tensorflow:loss = 5.9242654, step = 3400 (500.730 sec)
+I0219 21:58:43.685583 140385099970304 basic_session_run_hooks.py:260] loss = 5.9242654, step = 3400 (500.730 sec)
+INFO:tensorflow:Saving checkpoints for 3421 into /tmp/pkb/bert/model.ckpt.
+I0219 22:01:11.270682 140385099970304 basic_session_run_hooks.py:606] Saving checkpoints for 3421 into /tmp/pkb/bert/model.ckpt.
+INFO:tensorflow:Loss for final step: 5.9410143.
+I0219 22:01:19.485722 140385099970304 estimator.py:371] Loss for final step: 5.9410143.
+INFO:tensorflow:-----------------------------
+I0219 22:01:19.492127 140385099970304 run_squad.py:1027] -----------------------------
+INFO:tensorflow:Total Training Time = 8563.98 for Sentences = 437888
+I0219 22:01:19.492219 140385099970304 run_squad.py:1029] Total Training Time = 8563.98 for Sentences = 437888
+INFO:tensorflow:Total Training Time W/O Overhead = 8353.34 for Sentences = 436992
+I0219 22:01:19.492305 140385099970304 run_squad.py:1031] Total Training Time W/O Overhead = 8353.34 for Sentences = 436992
+INFO:tensorflow:Throughput Average (sentences/sec) with overhead = 51.13
+I0219 22:01:19.492391 140385099970304 run_squad.py:1032] Throughput Average (sentences/sec) with overhead = 51.13
+INFO:tensorflow:Throughput Average (sentences/sec) = 52.31
+I0219 22:01:19.492461 140385099970304 run_squad.py:1033] Throughput Average (sentences/sec) = 52.31
+INFO:tensorflow:-----------------------------
+I0219 22:01:19.496566 140385099970304 run_squad.py:1034] -----------------------------

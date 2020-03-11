@@ -169,7 +169,14 @@ class AwsVpc(resource.BaseResource):
         'create-vpc',
         '--region=%s' % self.region,
         '--cidr-block=10.0.0.0/16']
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        create_cmd, raise_on_failure=False)
+    if 'VpcLimitExceeded' in stderr:
+      raise errors.Benchmarks.QuotaFailure(stderr)
+    if retcode:
+      raise errors.Resource.CreationError(
+          'Failed to create Vpc: %s return code: %s' % (retcode, stderr))
+
     response = json.loads(stdout)
     self.id = response['Vpc']['VpcId']
     self._EnableDnsHostnames()

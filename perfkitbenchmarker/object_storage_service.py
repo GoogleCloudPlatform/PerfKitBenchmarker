@@ -285,6 +285,7 @@ class ObjectStorageService(
     return []
 
 
+# TODO(user): Move somewhere more generic
 def FindCredentialFile(default_location):
   """Return the path to the credential file."""
 

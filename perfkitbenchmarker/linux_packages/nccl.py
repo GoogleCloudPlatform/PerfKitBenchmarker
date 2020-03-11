@@ -64,3 +64,5 @@ def AptInstall(vm):
                      '/usr/lib/x86_64-linux-gnu/libnccl-net.so'.format(
                          gsutil_path=google_cloud_sdk.GSUTIL_PATH,
                          nccl_net_plugin_path=FLAGS.nccl_net_plugin))
+  else:
+    vm.RemoteCommand('sudo rm -rf /usr/lib/x86_64-linux-gnu/libnccl-net.so')

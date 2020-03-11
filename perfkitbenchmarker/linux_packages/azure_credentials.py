@@ -15,23 +15,22 @@
 """Package for installing the Azure credentials."""
 
 import os
+
 from perfkitbenchmarker import object_storage_service
 
-AZURE_CREDENTIAL_LOCATION = '.azure'
-AZURE_CREDENTIAL_TOKENS_FILE = os.path.join(
-    AZURE_CREDENTIAL_LOCATION, 'accessTokens.json')
-AZURE_CREDENTIAL_PROFILE_FILE = os.path.join(
-    AZURE_CREDENTIAL_LOCATION, 'azureProfile.json')
+AZURE_CREDENTIAL_DIRECTORY = os.path.join('~', '.azure')
+AZURE_CREDENTIAL_TOKENS_FILE = os.path.join(AZURE_CREDENTIAL_DIRECTORY,
+                                            'accessTokens.json')
+AZURE_CREDENTIAL_PROFILE_FILE = os.path.join(AZURE_CREDENTIAL_DIRECTORY,
+                                             'azureProfile.json')
 
 
 def Install(vm):
   """Copies Azure credentials to the VM."""
-  vm.RemoteCommand('mkdir -p {0}'.format(AZURE_CREDENTIAL_LOCATION))
+  vm.RemoteCommand('mkdir -p {0}'.format(AZURE_CREDENTIAL_DIRECTORY))
   vm.PushFile(
-      object_storage_service.FindCredentialFile(
-          os.path.join('~', AZURE_CREDENTIAL_TOKENS_FILE)),
+      object_storage_service.FindCredentialFile(AZURE_CREDENTIAL_TOKENS_FILE),
       AZURE_CREDENTIAL_TOKENS_FILE)
   vm.PushFile(
-      object_storage_service.FindCredentialFile(
-          os.path.join('~', AZURE_CREDENTIAL_PROFILE_FILE)),
+      object_storage_service.FindCredentialFile(AZURE_CREDENTIAL_PROFILE_FILE),
       AZURE_CREDENTIAL_PROFILE_FILE)

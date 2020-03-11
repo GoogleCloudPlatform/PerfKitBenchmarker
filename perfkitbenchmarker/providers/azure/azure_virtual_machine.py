@@ -573,7 +573,7 @@ class AzureVirtualMachine(
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
     if retcode and ('Error Code: QuotaExceeded' in stderr or
-                    re.match(r'exceeding approved \S+ \S+ quota', stderr) or
+                    re.search(r'exceeding approved \S+ \S+ quota', stderr) or
                     'exceeding quota limit' in stderr):
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
@@ -892,22 +892,36 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   # TODO(ferneyhough): Refactor this so that this mkdir command
   # is run on all clouds, and is os-agnostic (this is linux specific).
   mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
+
+  account_name = FLAGS.azure_preprovisioned_data_bucket
+  connection_string = util.GetAzureStorageConnectionString(account_name, [])
   download_command = (
       'az storage blob download '
       '--no-progress '
-      '--account-name %s '
-      '--container-name %s '
-      '--name %s '
-      '--file %s' % (FLAGS.azure_preprovisioned_data_bucket,
-                     module_name_with_underscores_removed, filename, destpath))
+      '--account-name {account_name} '
+      '--container-name {container_name} '
+      '--name {name} '
+      '--file {file} '
+      '--connection-string "{connection_string}"'.format(
+          account_name=account_name,
+          container_name=module_name_with_underscores_removed,
+          name=filename,
+          file=destpath,
+          connection_string=connection_string))
   return '{0} && {1}'.format(mkdir_command, download_command)
 
 
 def GenerateStatPreprovisionedDataCommand(module_name, filename):
   """Returns a string used to download preprovisioned data."""
   module_name_with_underscores_removed = module_name.replace('_', '-')
+  account_name = FLAGS.azure_preprovisioned_data_bucket
+  connection_string = util.GetAzureStorageConnectionString(account_name, [])
   return ('az storage blob show '
-          '--account-name %s '
-          '--container-name %s '
-          '--name %s' % (FLAGS.azure_preprovisioned_data_bucket,
-                         module_name_with_underscores_removed, filename))
+          '--account-name {account_name} '
+          '--container-name {container_name} '
+          '--name {name} '
+          '--connection-string "{connection_string}"'.format(
+              account_name=account_name,
+              container_name=module_name_with_underscores_removed,
+              name=filename,
+              connection_string=connection_string))
