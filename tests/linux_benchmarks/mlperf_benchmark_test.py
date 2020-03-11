@@ -32,7 +32,7 @@ class MlperfBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   @mock.patch('time.time', mock.MagicMock(return_value=1550279509.59))
   def testTrainResults(self):
-    samples = mlperf_benchmark.MakeSamplesFromOutput({},
+    samples = mlperf_benchmark.MakeSamplesFromOutput({'version': 'v0.6.0'},
                                                      self.contents,
                                                      use_tpu=True,
                                                      model='resnet')
