@@ -318,6 +318,7 @@ def _CreateMetadataDict(benchmark_spec):
       'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'model': benchmark_spec.benchmark,
+      'version': 'v0.6.0',
   }
   if benchmark_spec.tpus:
     metadata.update({
@@ -349,7 +350,6 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
       r':::MLL (\d+\.\d+) eval_accuracy: {(.*)}', output)
 
   start = None
-  version = 'v0.6.0'
   for wall_time, result in results:
     wall_time = float(wall_time)
     if not start:
@@ -366,7 +366,6 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
       value = regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)', result)
     metadata_copy['times'] = wall_time - start
     metadata_copy['epoch'] = int(epoch)
-    metadata_copy['version'] = version
     samples.append(
         sample.Sample('Eval Accuracy',
                       float(value) * 100, '%', metadata_copy))
