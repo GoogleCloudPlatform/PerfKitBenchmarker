@@ -419,7 +419,7 @@ def Run(benchmark_spec):
   else:
     metadata['bigtable_zone'] = FLAGS.google_bigtable_zone
     metadata[
-        'bigtalbe_replication_zone'] = FLAGS.bigtable_replication_cluster_zone
+        'bigtable_replication_zone'] = FLAGS.bigtable_replication_cluster_zone
     metadata['bigtable_storage_type'] = FLAGS.bigtable_storage_type
     metadata['bigtable_node_count'] = FLAGS.bigtable_node_count
 
