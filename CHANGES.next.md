@@ -39,6 +39,12 @@
 -   Added flag '--cassandra_maven_repo_url' to use a maven repo when building
     cassandra, for example https://maven-central.storage-download.googleapis.com
     /maven2
+-   Migrate EKS cluster creation to use eksctl (requires a local eksctl).
+    -   Deprecate `--eks_zones` in favor of setting
+        `container_cluster.vm_spec.AWS.zone`.
+    -   Make `container_cluster.vm_spec.AWS.zone` accept a region or comma
+        separated list of zones.
+    -   Delete the obsolete `--eks-verify-ssl`
 
 ### Bug fixes and maintenance updates:
 
