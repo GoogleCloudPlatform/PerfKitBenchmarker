@@ -748,6 +748,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
 
+  def InstallCli(self):
+    """Installs the gcloud cli on this GCP vm."""
+    self.Install('google_cloud_sdk')
+
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(

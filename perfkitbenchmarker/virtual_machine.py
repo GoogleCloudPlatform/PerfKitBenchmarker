@@ -624,6 +624,10 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     raise NotImplementedError()
 
+  def InstallCli(self):
+    """Installs the cloud specific cli along with credentials on this vm."""
+    raise NotImplementedError()
+
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads preprovisioned benchmark data.
 

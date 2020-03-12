@@ -942,6 +942,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_spot_instance:
       util.AddDefaultTags(self.spot_instance_request_id, self.region)
 
+  def InstallCli(self):
+    """Installs the AWS cli and credentials on this AWS vm."""
+    self.Install('awscli')
+    self.Install('aws_credentials')
+
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
 
@@ -952,8 +957,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
-    self.Install('aws_credentials')
-    self.Install('awscli')
+    self.InstallCli()
     # TODO(deitz): Add retry logic.
     self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
         install_path, module_name, filename))
