@@ -68,16 +68,13 @@ flags.DEFINE_string('aws_efs_token', None,
                     'instead of creating a new one.')
 flags.DEFINE_boolean('aws_delete_file_system', True,
                      'Whether to delete the EFS file system.')
-flags.DEFINE_list('eks_zones', ['us-east-1a', 'us-east-1c'],
-                  'The zones into which the EKS cluster will be deployed. '
-                  'There must be at least two zones and all zones must be '
-                  'from the same region.')
+flags.DEFINE_list('eks_zones', [],
+                  'DEPRECATED: Set container_cluster.vm_spec.AWS.zone instead.'
+                  'The single region or multiple zones into which the EKS '
+                  'cluster will be deployed. If a region is passed zones will '
+                  'be decided by EKS. All zones must be from the same region.')
 flags.register_validator('eks_zones',
                          util.EksZonesValidator)
-flags.DEFINE_boolean('eks_verify_ssl', True,
-                     'Whether to verify the ssl certificate when communicating '
-                     'with the EKS service. This requires SNI support which is '
-                     'not available in the SSL modules of Python < 2.7.9.')
 flags.DEFINE_enum('efs_throughput_mode', 'provisioned',
                   ['provisioned', 'bursting'],
                   'The throughput mode to use for EFS.')
@@ -90,3 +87,4 @@ flags.DEFINE_boolean('teardown_athena', True,
                      'Whether to teardown the Athena database.')
 flags.DEFINE_string('athena_output_location', None,
                     'Athena Query Output Location.')
+flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
