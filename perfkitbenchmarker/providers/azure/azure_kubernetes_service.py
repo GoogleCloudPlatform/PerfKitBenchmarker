@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains classes/functions related to Azure Container Service."""
+"""Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
 
