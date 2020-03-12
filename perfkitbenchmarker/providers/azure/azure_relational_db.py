@@ -26,6 +26,8 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
 
+DEFAULT_DATABASE_NAME = 'database'
+
 FLAGS = flags.FLAGS
 
 DEFAULT_MYSQL_VERSION = '5.7'
@@ -144,6 +146,30 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
+  def RenameDatabase(self, new_name):
+    """Renames an the database instace."""
+    engine = self.spec.engine
+    if engine == relational_db.SQLSERVER:
+      cmd = [
+          azure.AZURE_PATH,
+          self.GetAzCommandForEngine(),
+          'db',
+          'rename',
+          '--resource-group',
+          self.resource_group.name,
+          '--server',
+          self.instance_id,
+          '--name',
+          self.database_name,
+          '--new-name',
+          new_name
+      ]
+      vm_util.IssueCommand(cmd)
+      self.database_name = new_name
+    else:
+      raise relational_db.RelationalDbEngineNotFoundException(
+          'Unsupported engine {0}'.format(engine))
+
   def _ApplyManagedMysqlFlags(self):
     """Applies the MySqlFlags to a managed instance."""
     for flag in FLAGS.mysql_flags:
@@ -230,7 +256,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--server',
         self.instance_id,
         '--name',
-        'tpcc',
+        DEFAULT_DATABASE_NAME,
         '--edition',
         self.spec.db_spec.tier,
         '--capacity',
@@ -239,6 +265,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         'true' if self.spec.high_availability else 'false'
     ]
     vm_util.IssueCommand(cmd)
+    self.database_name = DEFAULT_DATABASE_NAME
 
   def _CreateAzureManagedSqlInstance(self):
     """Creates an Azure Sql Instance from a managed service."""
