@@ -1485,6 +1485,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'app_groups': (_AppGroupsDecoder, {
             'default': {}
         }),
+        'vpc_peering': (option_decoders.BooleanDecoder, {
+            'default': False,
+            'none_ok': True,
+        }),
     })
     return result
 
