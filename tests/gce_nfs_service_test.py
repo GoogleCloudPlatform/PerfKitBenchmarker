@@ -23,7 +23,6 @@ FLAGS = flags.FLAGS
 _RUN_URI = 'fb810a9b'
 _PROJECT = 'bionic-baton-343'
 _ZONE = 'us-west1-a'
-_IP_RANGE = '10.197.10.0/29'
 _NET_NAME = 'gce-network'
 
 _NFS_NAME = 'nfs-%s' % _RUN_URI
@@ -34,7 +33,7 @@ _CREATE_CMD = [
     '--file-share',
     'name=vol0,capacity=1024',
     '--network',
-    'name=%s,reserved-ip-range=%s' % (_NET_NAME, _IP_RANGE),
+    'name=%s' % (_NET_NAME),
     '--tier',
     'STANDARD',
 ]
@@ -79,7 +78,6 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super(GceNfsServiceTest, self).setUp()
     self.issue_cmd = self._CreatePatched(vm_util, 'IssueCommand')
     self._SetNetwork()
-    FLAGS['nfs_gce_ip_range'].parse(_IP_RANGE)
     FLAGS['gce_network_name'].parse(_NET_NAME)
     FLAGS['project'].parse(_PROJECT)
     FLAGS['run_uri'].parse(_RUN_URI)
@@ -113,12 +111,14 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.issue_cmd.side_effect = responses_as_tuples
 
   def assertCommandCalled(self, *args):
-    self.issue_cmd.assert_called_with(_FullGcloud(args), raise_on_failure=False)
+    self.issue_cmd.assert_called_with(
+        _FullGcloud(args), raise_on_failure=False, timeout=1800)
 
   def assertMultipleCommands(self, *cmds):
-    self.assertEqual([mock.call(_FullGcloud(cmd), raise_on_failure=False)
-                      for cmd in cmds],
-                     self.issue_cmd.call_args_list)
+    self.assertEqual([
+        mock.call(_FullGcloud(cmd), raise_on_failure=False, timeout=1800)
+        for cmd in cmds
+    ], self.issue_cmd.call_args_list)
 
   def testCreate(self):
     nfs = self._NfsService()

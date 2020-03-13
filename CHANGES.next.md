@@ -66,3 +66,4 @@
 -   Do not try to use the GCP service account that is running PKB inside a GKE
     cluster if it obviously belongs to the wrong project.
 -   Upgrade psutil version to 5.6.6 from 3.0.0.
+-   Remove nfs_gce_ip_range from filestore options.
