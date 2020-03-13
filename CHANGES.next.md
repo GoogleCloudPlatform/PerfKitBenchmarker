@@ -36,9 +36,15 @@
 
 -   Update Specsfs2014 to use the SP2 update rather than SP1.
 -   Update Multichase version to enable AARCH64 build support.
--   Added flag '--cassandra_maven_repo_url' to use a maven repo when building
-    cassandra, for example https://maven-central.storage-download.googleapis.com
-    /maven2
+-   Added flag `--cassandra_maven_repo_url` to use a maven repo when building
+    cassandra, for example
+    https://maven-central.storage-download.googleapis.com/maven2
+-   Migrate EKS cluster creation to use eksctl (requires a local eksctl).
+    -   Deprecate `--eks_zones` in favor of setting
+        `container_cluster.vm_spec.AWS.zone`.
+    -   Make `container_cluster.vm_spec.AWS.zone` accept a region or comma
+        separated list of zones.
+    -   Delete the obsolete `--eks-verify-ssl`
 
 ### Bug fixes and maintenance updates:
 
@@ -56,5 +62,6 @@
     -   This can be disabled by setting
         `--bootstrap_azure_service_principal=False`.
 -   Registered AWS VPC quota failures as quota failures.
--   Do not try to use the GCP service account that is running PKB inside a
-    GKE cluster if it obviously belongs to the wrong project.
+-   Do not try to use the GCP service account that is running PKB inside a GKE
+    cluster if it obviously belongs to the wrong project.
+-   Upgrade psutil version to 5.6.6 from 3.0.0.

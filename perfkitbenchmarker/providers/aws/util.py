@@ -95,8 +95,11 @@ def GroupZonesIntoRegions(zones):
 
 
 def EksZonesValidator(value):
-  if len(value) < 2:
-    return False
+  """Validates that the value is a single region or a list of zones."""
+  if not value:
+    return True
+  if len(value) == 1:
+    return IsRegion(value)
   if any(IsRegion(zone) for zone in value):
     return False
   region = GetRegionFromZone(value[0])
