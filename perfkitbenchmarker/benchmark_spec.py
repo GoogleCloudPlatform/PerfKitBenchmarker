@@ -156,6 +156,7 @@ class BenchmarkSpec(object):
     self.vms_to_boot = (
         self.config.vm_groups if self.config.relational_db is None else
         relational_db.VmsToBoot(self.config.relational_db.vm_groups))
+    self.vpc_peering = self.config.vpc_peering
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -545,6 +546,17 @@ class BenchmarkSpec(object):
                 for key in sorted(six.iterkeys(self.networks))]
 
     vm_util.RunThreaded(lambda net: net.Create(), networks)
+
+    # VPC peering is currently only supported for connecting 2 VPC networks
+    if self.vpc_peering:
+      if len(networks) > 2:
+        raise errors.Error(
+            'Networks of size %d are not currently supported.' %
+            (len(networks)))
+      # Ignore Peering for one network
+      elif len(networks) == 2:
+        networks[0].Peer(networks[1])
+
     if self.container_registry:
       self.container_registry.Create()
       for container_spec in six.itervalues(self.container_specs):
