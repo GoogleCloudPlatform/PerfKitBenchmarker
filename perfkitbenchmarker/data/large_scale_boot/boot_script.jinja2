@@ -1,0 +1,43 @@
+#! /bin/bash -xv
+
+{# This is the shell script that launcher vms for large_scale_boot benchmark
+uses to spin up vms. The vms are spun up with a startup script to curl a
+listening server. The time taken to boot is the time between executing this
+script and the time the vms call back on the server. #}
+
+gcloud_args=(
+--format json
+--quiet
+--async
+--project {{ project }}
+--scopes compute-rw
+--network-interface no-address,network-tier=PREMIUM
+--image-family {{ image_family }}
+--image-project {{ image_project }}
+--boot-disk-auto-delete
+--boot-disk-size 10
+--boot-disk-type pd-ssd
+--machine-type {{ boot_machine_type }}
+--tags perfkitbenchmarker
+--no-restart-on-failure
+--zone {{ zone }}
+--metadata startup-script="#! /bin/bash
+curl -H 'X-Header: {{ launcher_vm_name }}' http://{{ server_ip }}:{{ server_port }}
+# Sleep 10min before final cleanup and VM termination.
+sleep {{ timeout }}
+{{ gcloud_path }} --quiet compute instances delete booter-{{ launcher_vm_name }}-$i --zone {{ zone }} --project {{ project }}
+/sbin/shutdown -hP now"
+)
+
+# Launcher VM record the system nanoseconds as start time.
+echo $(date +%s%N) > {{start_time_file}}
+
+# Launch some VMs
+{% if cloud == 'GCP' %}
+for i in {1..{{vm_count}}}; do
+{{ gcloud_path }} compute instances create booter-{{ launcher_vm_name }}-$i  \
+"${gcloud_args[@]}" &
+done
+{% endif %}
+
+wait
