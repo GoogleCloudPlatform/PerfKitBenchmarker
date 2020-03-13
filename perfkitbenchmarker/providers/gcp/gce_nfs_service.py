@@ -3,7 +3,6 @@
 
 import json
 import logging
-import random
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -12,25 +11,16 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
 
-flags.DEFINE_string('nfs_gce_ip_range', None,
-                    'GCE reserved IP range.  Example: 10.197.5.0/29')
-
 FLAGS = flags.FLAGS
-
-
-def _GenRandomIpRange():
-  """Returns a random /29 ip range in 172.16.0.0/12."""
-  ip_range = '172.{0}.{1}.{2}/29'.format(random.randint(16, 31),
-                                         random.randint(0, 255),
-                                         random.randint(0, 255) & 0xf8)
-  return ip_range
 
 
 class GceNfsService(nfs_service.BaseNfsService):
   """Resource for GCE NFS service."""
-
   CLOUD = providers.GCP
-  NFS_TIERS = ('STANDARD', 'PREMIUM')
+  NFS_TIERS = (
+      'STANDARD',
+      'PREMIUM'
+  )
   DEFAULT_NFS_VERSION = '3.0'
   DEFAULT_TIER = 'STANDARD'
   user_managed = False
@@ -53,8 +43,7 @@ class GceNfsService(nfs_service.BaseNfsService):
     logging.info('Creating NFS server %s', self.name)
     volume_arg = 'name={0},capacity={1}'.format(
         self.server_directory.strip('/'), self.disk_spec.disk_size)
-    network_arg = 'name={0},reserved-ip-range={1}'.format(
-        self.network, FLAGS.nfs_gce_ip_range or _GenRandomIpRange())
+    network_arg = 'name={0}'.format(self.network)
     args = ['--file-share', volume_arg, '--network', network_arg]
     if self.nfs_tier:
       args += ['--tier', self.nfs_tier]
@@ -101,7 +90,8 @@ class GceNfsService(nfs_service.BaseNfsService):
     cmd += ['filestore', 'instances', verb, self.name]
     cmd += [str(arg) for arg in args]
     cmd += ['--location', self.zone]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        cmd, raise_on_failure=False, timeout=1800)
     if retcode:
       raise errors.Error('Error running command %s : %s' % (verb, stderr))
     return json.loads(stdout)
