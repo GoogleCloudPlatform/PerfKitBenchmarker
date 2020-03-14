@@ -113,7 +113,7 @@ class AzureSmbService(smb_service.BaseSmbService):
       # See links in description for more details.
       self.storage_account = azure_network.AzureStorageAccount(
           storage_type='Premium_LRS',
-          location='westus',
+          location=FLAGS.zone[0] or 'westus2',
           name=self.storage_account_name,
           kind='FileStorage',
           resource_group=self.resource_group,
