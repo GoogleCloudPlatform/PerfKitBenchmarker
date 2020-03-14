@@ -40,6 +40,7 @@
 -   Added flag `--cassandra_maven_repo_url` to use a maven repo when building
     cassandra, for example
     https://maven-central.storage-download.googleapis.com/maven2
+-   Optimize Azure Files settings.
 -   Migrate EKS cluster creation to use eksctl (requires a local eksctl).
     -   Deprecate `--eks_zones` in favor of setting
         `container_cluster.vm_spec.AWS.zone`.
@@ -66,4 +67,5 @@
 -   Do not try to use the GCP service account that is running PKB inside a GKE
     cluster if it obviously belongs to the wrong project.
 -   Upgrade psutil version to 5.6.6 from 3.0.0.
+-   Change default ior script to use 1GB sizes rather than 4GB.
 -   Remove nfs_gce_ip_range from filestore options.

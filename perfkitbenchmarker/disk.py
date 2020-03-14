@@ -556,6 +556,9 @@ class SmbDisk(NetworkDisk):
         'dir_mode': '0777',
         'file_mode': '0777',
         'serverino': None,
+        # the following mount option is a suggestion from
+        # https://docs.microsoft.com/en-us/azure/storage/files/storage-troubleshooting-files-performance#throughput-on-linux-clients-is-significantly-lower-when-compared-to-windows-clients
+        'nostrictsync': None,
     }
     return options
 
