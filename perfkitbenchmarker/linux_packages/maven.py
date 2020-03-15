@@ -4,7 +4,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 try:
-  import urlparse
+  from urlparse import urlparse
 except ImportError:
   from urllib.parse import urlparse
 
@@ -26,19 +26,17 @@ def GetRunCommand(arguments):
   """ Return Maven run command including proxy settings """
   command = "source {} && mvn {}".format(MVN_ENV_PATH, arguments)
   proxy_settings = ""
-  http_proxy_params = " -Dhttp.proxyHost={host} -Dhttp.proxyPort={port} "
-  https_proxy_params = " -Dhttps.proxyHost={host} -Dhttps.proxyPort={port} "
 
   if FLAGS["http_proxy"].present:
-    parsed_url = urlparse.urlparse(FLAGS.http_proxy)
-    proxy_settings += http_proxy_params.format(host=parsed_url.hostname, port=parsed_url.port)
+    parsed_url = urlparse(FLAGS.http_proxy)
+    http_proxy_params = " -Dhttp.proxyHost={host} -Dhttp.proxyPort={port} "
+    command += http_proxy_params.format(host=parsed_url.hostname, port=parsed_url.port)
 
   if FLAGS["https_proxy"].present:
-    parsed_url = urlparse.urlparse(FLAGS.https_proxy)
-    proxy_settings += https_proxy_params.format(host=parsed_url.hostname, port=parsed_url.port)
+    parsed_url = urlparse(FLAGS.https_proxy)
+    https_proxy_params = " -Dhttps.proxyHost={host} -Dhttps.proxyPort={port} "
+    command += https_proxy_params.format(host=parsed_url.hostname, port=parsed_url.port)
 
-  if proxy_settings:
-    command += proxy_settings
   return command
 
 
