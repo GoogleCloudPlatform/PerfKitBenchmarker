@@ -25,7 +25,6 @@ export PATH={maven_home}/bin:$PATH
 def GetRunCommand(arguments):
   """ Return Maven run command including proxy settings """
   command = "source {} && mvn {}".format(MVN_ENV_PATH, arguments)
-  proxy_settings = ""
 
   if FLAGS["http_proxy"].present:
     parsed_url = urlparse(FLAGS.http_proxy)
