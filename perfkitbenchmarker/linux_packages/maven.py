@@ -28,12 +28,12 @@ def GetRunCommand(arguments):
 
   if FLAGS["http_proxy"].present:
     parsed_url = urlparse(FLAGS.http_proxy)
-    http_proxy_params = " -Dhttp.proxyHost={host} -Dhttp.proxyPort={port} "
+    http_proxy_params = " -Dhttp.proxyHost={host} -Dhttp.proxyPort={port}"
     command += http_proxy_params.format(host=parsed_url.hostname, port=parsed_url.port)
 
   if FLAGS["https_proxy"].present:
     parsed_url = urlparse(FLAGS.https_proxy)
-    https_proxy_params = " -Dhttps.proxyHost={host} -Dhttps.proxyPort={port} "
+    https_proxy_params = " -Dhttps.proxyHost={host} -Dhttps.proxyPort={port}"
     command += https_proxy_params.format(host=parsed_url.hostname, port=parsed_url.port)
 
   return command
