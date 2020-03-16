@@ -65,7 +65,7 @@ class MavenTest(unittest.TestCase):
   def testGetRunCommandWithProxy(self):
     FLAGS['http_proxy'].parse('http://some-proxy.com:888')
     FLAGS['https_proxy'].parse('https://some-proxy.com:888')
-    cmd = maven.GetRunCommand("install") 
+    cmd = maven.GetRunCommand("install")
     expected = ("source {} && mvn install"
                 " -Dhttp.proxyHost=some-proxy.com -Dhttp.proxyPort=888"
                 " -Dhttps.proxyHost=some-proxy.com -Dhttps.proxyPort=888".format(
@@ -75,7 +75,7 @@ class MavenTest(unittest.TestCase):
   def testGetRunCommandNoProxy(self):
     FLAGS['http_proxy'].present = 0
     FLAGS['https_proxy'].present = 0
-    cmd = maven.GetRunCommand("install") 
+    cmd = maven.GetRunCommand("install")
     expected = ("source {} && mvn install".format(maven.MVN_ENV_PATH))
     self.assertEqual(expected, cmd)
 
@@ -89,8 +89,7 @@ class MavenTest(unittest.TestCase):
         'tar -C {0} --strip-components=1 -xzf -'.format(maven.MVN_DIR, maven_url),
         'readlink -f `which java`',
         'echo "{0}" | sudo tee -a {1}'.format(maven.MVN_ENV.format(java_home="", maven_home=maven.MVN_DIR),
-                                              maven.MVN_ENV_PATH),
-        'source {0}'.format(maven.MVN_ENV_PATH)
+                                              maven.MVN_ENV_PATH)
     ])
     self.assertVmInstallCommandsEqual(['openjdk'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand', 'Install')
