@@ -91,7 +91,7 @@ class MavenTest(unittest.TestCase):
         'echo "{0}" | sudo tee -a {1}'.format(maven.MVN_ENV.format(java_home="", maven_home=maven.MVN_DIR),
                                               maven.MVN_ENV_PATH)
     ])
-    self.assertVmInstallCommandsEqual(['openjdk'])
+    self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand', 'Install')
 
 

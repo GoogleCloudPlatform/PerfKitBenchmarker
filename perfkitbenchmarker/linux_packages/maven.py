@@ -50,6 +50,7 @@ def YumInstall(vm):
 
 def _Install(vm):
   vm.Install('openjdk')
+  vm.Install('curl')
 
   # Download and extract maven
   maven_full_ver = FLAGS.maven_version
