@@ -67,7 +67,6 @@ def _Install(vm):
   maven_env = MVN_ENV.format(java_home=java_home, maven_home=MVN_DIR)
   cmd = 'echo "{0}" | sudo tee -a {1}'.format(maven_env, MVN_ENV_PATH)
   vm.RemoteCommand(cmd)
-  vm.RemoteCommand("source {0}".format(MVN_ENV_PATH))
 
 
 def Uninstall(vm):
