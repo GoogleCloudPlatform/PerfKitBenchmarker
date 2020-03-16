@@ -16,11 +16,7 @@ import posixpath
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
-
-try:
-  from urlparse import urlparse
-except ImportError:
-  from urllib.parse import urlparse
+from urllib.parse import urlparse
 
 flags.DEFINE_string('maven_version', '3.6.3', 'The version of maven')
 FLAGS = flags.FLAGS
