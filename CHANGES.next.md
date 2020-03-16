@@ -69,3 +69,4 @@
 -   Upgrade psutil version to 5.6.6 from 3.0.0.
 -   Change default ior script to use 1GB sizes rather than 4GB.
 -   Remove nfs_gce_ip_range from filestore options.
+-   Upgrade YCSB to version 0.17.0.
