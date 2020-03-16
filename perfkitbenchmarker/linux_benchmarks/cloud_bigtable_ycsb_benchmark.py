@@ -47,9 +47,7 @@ HBASE_CLIENT_VERSION = '1.x'
 BIGTABLE_CLIENT_VERSION = '1.4.0'
 
 # TODO(user): remove the custom ycsb build once the head version of YCSB
-# is updated to share Bigtable table object, and PKB is updated to work with the
-# new YCSB version (as of now, YCSB 0.17.0 does not work for PKB due to package
-# move from com.yahoo.ycsb to site.ycsb). The source code of the patched YCSB
+# is updated to share Bigtable table object. The source code of the patched YCSB
 # 0.14.0 can be found at 'https://storage.googleapis.com/cbt_ycsb_client_jar/'
 # 'YCSB-0.14.0-Bigtable-table-object-sharing.zip'.
 YCSB_BIGTABLE_TABLE_SHARING_TAR_URL = (
