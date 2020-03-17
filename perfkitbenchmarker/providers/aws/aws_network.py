@@ -803,7 +803,7 @@ class AwsVpcPeering(network.BaseVPCPeering):
         '--region=%s' % self.network_a.region,
         '--peer-region=%s' % self.network_b.region,
         '--vpc-id=%s' % self.network_a.vpc.id,
-        '--peer-vpc-id=%s' % self.network_b.vpc.id,]
+        '--peer-vpc-id=%s' % self.network_b.vpc.id]
 
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
