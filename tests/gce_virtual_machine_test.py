@@ -491,8 +491,8 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('k3=p3', actual_metadata_from_file)
 
   def testGceTags(self):
-    self.assertIn('--tags perfkitbenchmarker ', self._CreateVmCommand()[0])
-    self.assertIn('--tags perfkitbenchmarker,testtag ',
+    self.assertIn('--tags perfkitbenchmarker', self._CreateVmCommand()[0])
+    self.assertIn('--tags perfkitbenchmarker,testtag',
                   self._CreateVmCommand(gce_tags=['testtag'])[0])
 
   def testShieldedSecureBootFlag(self):

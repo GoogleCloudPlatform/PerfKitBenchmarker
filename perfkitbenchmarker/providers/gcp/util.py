@@ -187,7 +187,7 @@ class GcloudCommand(object):
     """
     cmd = [FLAGS.gcloud_path]
     cmd.extend(self.args)
-    for flag_name, values in self.flags.items():
+    for flag_name, values in sorted(self.flags.items()):
       flag_name_str = '--{0}'.format(flag_name)
       if values is True:
         cmd.append(flag_name_str)
