@@ -4,6 +4,7 @@ filePerProc=1
 useO_DIRECT=1
 fsync=1
 keepFile=1
+reorderTasks=1
 
 # Sequential write test.
 writeFile=1
