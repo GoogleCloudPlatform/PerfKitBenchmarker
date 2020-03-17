@@ -126,6 +126,7 @@ class BenchmarkSpec(object):
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.vms = []
+    self.regional_networks = {}
     self.networks = {}
     self.custom_subnets = {k: {
         'cloud': v.cloud,
@@ -156,6 +157,7 @@ class BenchmarkSpec(object):
     self.vms_to_boot = (
         self.config.vm_groups if self.config.relational_db is None else
         relational_db.VmsToBoot(self.config.relational_db.vm_groups))
+    self.vpc_peering = self.config.vpc_peering
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -537,14 +539,23 @@ class BenchmarkSpec(object):
     # provision networks. Until support is added to provision resources in an
     # order based on dependencies, this key ordering can be used to avoid
     # deadlock by placing dependent networks later and their dependencies
-    # earlier. As an example, AWS stores both per-region and per-zone objects
-    # in this dict, and each per-zone object depends on a corresponding
-    # per-region object, so the per-region objects are given keys that come
-    # first when sorted.
-    networks = [self.networks[key]
-                for key in sorted(six.iterkeys(self.networks))]
+    # earlier.
+    networks = [
+        self.networks[key] for key in sorted(six.iterkeys(self.networks))
+    ]
 
     vm_util.RunThreaded(lambda net: net.Create(), networks)
+
+    # VPC peering is currently only supported for connecting 2 VPC networks
+    if self.vpc_peering:
+      if len(networks) > 2:
+        raise errors.Error(
+            'Networks of size %d are not currently supported.' %
+            (len(networks)))
+      # Ignore Peering for one network
+      elif len(networks) == 2:
+        networks[0].Peer(networks[1])
+
     if self.container_registry:
       self.container_registry.Create()
       for container_spec in six.itervalues(self.container_specs):

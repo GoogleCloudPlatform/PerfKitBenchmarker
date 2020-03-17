@@ -84,6 +84,8 @@ class EksCluster(container_service.KubernetesCluster):
         'ssh-public-key':
             aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
         'version': self.cluster_version,
+        # NAT mode uses an EIP.
+        'vpc-nat-mode': 'Disable',
         'zones': ','.join(self.zones),
     }
     cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(

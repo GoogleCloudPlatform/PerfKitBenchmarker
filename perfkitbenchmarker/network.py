@@ -25,6 +25,7 @@ from enum import Enum
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import resource
 
 
 class NetType(Enum):
@@ -194,3 +195,54 @@ class BaseNetwork(object):
   def Delete(self):
     """Deletes the actual network."""
     pass
+
+  def Peer(self, peering_network):
+    """Peers the network with the peering_network.
+
+    This method is used for VPC peering. It will connect 2 VPCs together.
+
+    Args:
+      peering_network: BaseNetwork. The network to peer with.
+    """
+    pass
+
+
+class BaseVPCPeeringSpec(object):
+  """Object containing all information needed to create a VPC Peering Object."""
+
+  def __init__(self, network_a=None, network_b=None):
+    """Initializes BaseVPCPeeringSpec.
+
+    Args:
+      network_a: BaseNetwork. The network initiating the peering.
+      network_b: BaseNetwork. The network to be peered to.
+    """
+    self.network_a = network_a
+    self.network_b = network_b
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
+
+
+class BaseVPCPeering(resource.BaseResource):
+  """Base class for VPC Peering.
+
+  This class holds VPC Peering methods and attributes relating to the
+  VPC Peering as a cloud resource.
+
+  Attributes:
+    network_a: BaseNetwork. The network initiating the peering.
+    network_b: BaseNetwork. The network to be peered to.
+  """
+
+  RESOURCE_TYPE = 'BaseVPCPeering'
+
+  def __init__(self, vpc_peering_spec):
+    """Initialize BaseVPCPeering class.
+
+    Args:
+      vpc_peering_spec: BaseVPCPeeringSpec. Spec for VPC peering object.
+    """
+    super(BaseVPCPeering, self).__init__()
+    self.network_a = vpc_peering_spec.network_a
+    self.network_b = vpc_peering_spec.network_b
