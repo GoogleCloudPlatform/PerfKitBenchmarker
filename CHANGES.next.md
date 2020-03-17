@@ -31,7 +31,7 @@
 -   Add timeline support in Horovod benchmark
 -   Add GceNfsService to support Filestore on GCP.
 -   Add replication cluster support to bigtable.
--   Add Basic VPC peering support
+-   Add AWS VPC peering support
 
 ### Enhancements:
 

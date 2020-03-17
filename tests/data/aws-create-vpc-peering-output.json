@@ -1,0 +1,32 @@
+{
+  "VpcPeeringConnection": {
+    "RequesterVpcInfo": {
+      "PeeringOptions": {
+        "AllowDnsResolutionFromRemoteVpc": false,
+        "AllowEgressFromLocalClassicLinkToRemoteVpc": false,
+        "AllowEgressFromLocalVpcToRemoteClassicLink": false
+      },
+      "Region": "us-east-1",
+      "VpcId": "vpc-0fafe2372772bc77d",
+      "OwnerId": "1234",
+      "CidrBlock": "10.0.0.0/16",
+      "CidrBlockSet": [
+        {
+          "CidrBlock": "10.0.0.0/16"
+        }
+      ]
+    },
+    "Status": {
+      "Message": "Initiating Request to 835761027970",
+      "Code": "initiating-request"
+    },
+    "Tags": [],
+    "ExpirationTime": "2020-03-03T22:59:58.000Z",
+    "VpcPeeringConnectionId": "pcx-086ebdfa9ff2f20a8",
+    "AccepterVpcInfo": {
+      "Region": "us-west-1",
+      "VpcId": "vpc-0ed1cb1300dcb27df",
+      "OwnerId": "835761027970"
+    }
+  }
+}

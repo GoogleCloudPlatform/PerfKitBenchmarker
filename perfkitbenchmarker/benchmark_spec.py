@@ -126,6 +126,7 @@ class BenchmarkSpec(object):
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.vms = []
+    self.regional_networks = {}
     self.networks = {}
     self.custom_subnets = {k: {
         'cloud': v.cloud,
@@ -538,12 +539,10 @@ class BenchmarkSpec(object):
     # provision networks. Until support is added to provision resources in an
     # order based on dependencies, this key ordering can be used to avoid
     # deadlock by placing dependent networks later and their dependencies
-    # earlier. As an example, AWS stores both per-region and per-zone objects
-    # in this dict, and each per-zone object depends on a corresponding
-    # per-region object, so the per-region objects are given keys that come
-    # first when sorted.
-    networks = [self.networks[key]
-                for key in sorted(six.iterkeys(self.networks))]
+    # earlier.
+    networks = [
+        self.networks[key] for key in sorted(six.iterkeys(self.networks))
+    ]
 
     vm_util.RunThreaded(lambda net: net.Create(), networks)
 
