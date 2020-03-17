@@ -32,7 +32,8 @@
 -   Add GceNfsService to support Filestore on GCP.
 -   Add maven package and use it in ycsb.
 -   Add replication cluster support to bigtable.
--   Add AWS VPC peering support
+-   Add Basic VPC peering support
+-   Add Snowflake Warehouse support
 
 ### Enhancements:
 

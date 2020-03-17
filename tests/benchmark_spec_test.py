@@ -102,6 +102,17 @@ cluster_boot:
 ALWAYS_SUPPORTED = 'iperf'
 NEVER_SUPPORTED = 'sysbench'
 
+_SIMPLE_EDW_CONFIG = """
+edw_benchmark:
+  description: Sample edw benchmark
+  edw_service:
+    type: snowflake_aws
+    cluster_identifier: _fake_cluster_id_
+  vm_groups:
+    client:
+      vm_spec: *default_single_core
+"""
+
 
 class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -124,6 +135,16 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
                              if b.BENCHMARK_NAME == benchmark_name))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, UID)
+
+
+class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
+
+  def testSimpleConfig(self):
+    spec = self._CreateBenchmarkSpecFromYaml(
+        yaml_string=_SIMPLE_EDW_CONFIG, benchmark_name='edw_benchmark')
+    spec.ConstructEdwService()
+    self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)
+    self.assertIsInstance(spec.edw_service, providers.aws.snowflake.Snowflake)
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):

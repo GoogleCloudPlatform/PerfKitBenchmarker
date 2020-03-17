@@ -273,14 +273,22 @@ class BenchmarkSpec(object):
     if self.config.edw_service is None:
       return
     # Load necessary modules from the provider to account for dependencies
+    # TODO(saksena): Replace with
+    # providers.LoadProvider(string.lower(FLAGS.cloud))
     providers.LoadProvider(
         edw_service.TYPE_2_PROVIDER.get(self.config.edw_service.type))
     # Load the module for the edw service based on type
-    edw_service_module = importlib.import_module(edw_service.TYPE_2_MODULE.get(
-        self.config.edw_service.type))
-    edw_service_class = getattr(edw_service_module,
-                                self.config.edw_service.type[0].upper() +
-                                self.config.edw_service.type[1:])
+    edw_service_type = self.config.edw_service.type
+    edw_service_module = importlib.import_module(
+        edw_service.TYPE_2_MODULE.get(edw_service_type))
+    # The edw_service_type in certain cases may be qualified with a hosting
+    # cloud eg. snowflake_aws,snowflake_gcp, etc.
+    # However the edw_service_class_name in all cases will still be cloud
+    # agnostic eg. Snowflake.
+    edw_service_class_name = edw_service_type.split('_')[0]
+    edw_service_class = getattr(
+        edw_service_module,
+        edw_service_class_name[0].upper() + edw_service_class_name[1:])
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
 
