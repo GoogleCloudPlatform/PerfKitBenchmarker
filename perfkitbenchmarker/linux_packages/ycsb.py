@@ -274,7 +274,7 @@ def _Install(vm):
                      '{mvn_cmd} > /dev/null 2>&1'.format(
                          hist_dir=HDRHISTOGRAM_DIR,
                          mvn_cmd=maven.GetRunCommand('install')))
-    
+
 
 def YumInstall(vm):
   """Installs the YCSB package on the VM."""
