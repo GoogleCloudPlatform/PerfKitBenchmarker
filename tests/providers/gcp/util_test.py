@@ -63,7 +63,7 @@ class GcloudCommandTestCase(unittest.TestCase):
     cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
     self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-        '--quiet', '--project', 'test-project', '--zone', 'test-zone'
+        '--project', 'test-project', '--quiet', '--zone', 'test-zone'
     ])
 
   def testListValue(self):
@@ -71,9 +71,17 @@ class GcloudCommandTestCase(unittest.TestCase):
     cmd = util.GcloudCommand(gce_resource, 'compute', 'instances', 'create')
     cmd.flags['local-ssd'] = ['interface=nvme', 'interface=SCSI']
     self.assertEqual(cmd.GetCommand(), [
-        'path/gcloud', 'compute', 'instances', 'create', '--format', 'json',
-        '--quiet', '--local-ssd', 'interface=nvme', '--local-ssd',
-        'interface=SCSI'
+        'path/gcloud',
+        'compute',
+        'instances',
+        'create',
+        '--format',
+        'json',
+        '--local-ssd',
+        'interface=nvme',
+        '--local-ssd',
+        'interface=SCSI',
+        '--quiet',
     ])
 
   def testIssue(self):
