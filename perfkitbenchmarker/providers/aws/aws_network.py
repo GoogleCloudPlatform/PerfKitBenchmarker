@@ -145,12 +145,14 @@ class AwsFirewall(network.BaseFirewall):
 class AwsVpc(resource.BaseResource):
   """An object representing an Aws VPC."""
 
-  def __init__(self, region, vpc_id=None):
+  def __init__(self, region, vpc_id=None, regional_network_index=0):
     super(AwsVpc, self).__init__(vpc_id is not None)
     self.region = region
+    self.regional_network_index = regional_network_index
+    self.cidr = util.GetCidrBlock(self.regional_network_index)
     self.id = vpc_id
     # Subnets are assigned per-AZ.
-    # _subnet_index tracks the next unused 10.0.x.0/24 block.
+    # _subnet_index tracks the next unused 10.x.y.0/24 block.
     self._subnet_index = 0
     # Lock protecting _subnet_index
     self._subnet_index_lock = threading.Lock()
@@ -168,7 +170,7 @@ class AwsVpc(resource.BaseResource):
         'ec2',
         'create-vpc',
         '--region=%s' % self.region,
-        '--cidr-block=10.0.0.0/16']
+        '--cidr-block=%s' % self.cidr]
     stdout, stderr, retcode = vm_util.IssueCommand(
         create_cmd, raise_on_failure=False)
     if 'VpcLimitExceeded' in stderr:
@@ -275,7 +277,7 @@ class AwsVpc(resource.BaseResource):
       if self._subnet_index >= (1 << 8) - 1:
         raise ValueError('Exceeded subnet limit ({0}).'.format(
             self._subnet_index))
-      cidr = '10.0.{0}.0/24'.format(self._subnet_index)
+      cidr = util.GetCidrBlock(self.regional_network_index, self._subnet_index)
       self._subnet_index += 1
     return cidr
 
@@ -296,6 +298,21 @@ class AwsVpc(resource.BaseResource):
       # do not retry if this rule already exists
       if ex.message.find('InvalidPermission.Duplicate') == -1:
         raise ex
+
+  def AllowVpcPeerInBound(self, peer_vpc):
+    """Allow inbound connections on all ports in the default security group from peer vpc.
+
+    Args:
+      peer_vpc: AwsVpc. Peer vpc to allow inbound traffic from.
+    """
+    cmd = util.AWS_PREFIX + [
+        'ec2', 'authorize-security-group-ingress',
+        '--region=%s' % self.region,
+        '--group-id=%s' % self.default_security_group_id,
+        '--protocol=%s' % 'all',
+        '--cidr=%s' % peer_vpc.cidr
+    ]
+    vm_util.IssueRetryableCommand(cmd)
 
 
 class AwsSubnet(resource.BaseResource):
@@ -533,6 +550,17 @@ class AwsRouteTable(resource.BaseResource):
         '--destination-cidr-block=0.0.0.0/0']
     util.IssueRetryableCommand(create_cmd)
 
+  def CreateVpcPeeringRoute(self, vpc_peering_id, destination_cidr):
+    """Adds a route to peer VPC."""
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-route',
+        '--region=%s' % self.region,
+        '--route-table-id=%s' % self.id,
+        '--vpc-peering-connection-id=%s' % vpc_peering_id,
+        '--destination-cidr-block=%s' % destination_cidr]
+    util.IssueRetryableCommand(create_cmd)
+
 
 class _AwsRegionalNetwork(network.BaseNetwork):
   """Object representing regional components of an AWS network.
@@ -547,6 +575,9 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     route_table: an AwsRouteTable instance. The default route table.
   """
 
+  _regional_network_count = 0
+  _regional_network_lock = threading.Lock()
+
   CLOUD = providers.AWS
 
   def __repr__(self):
@@ -554,7 +585,6 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 
   def __init__(self, region, vpc_id=None):
     self.region = region
-    self.vpc = AwsVpc(self.region, vpc_id)
     self.internet_gateway = AwsInternetGateway(region, vpc_id)
     self.route_table = None
     self.created = False
@@ -568,6 +598,14 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     # is destroyed.
     self._reference_count = 0
     self._reference_count_lock = threading.Lock()
+
+    # Each regional network needs unique cidr_block for VPC peering.
+    with _AwsRegionalNetwork._regional_network_lock:
+      self.vpc = AwsVpc(self.region, vpc_id,
+                        _AwsRegionalNetwork._regional_network_count)
+      self.cidr_block = util.GetCidrBlock(
+          _AwsRegionalNetwork._regional_network_count)
+      _AwsRegionalNetwork._regional_network_count += 1
 
   @classmethod
   def GetForRegion(cls, region, vpc_id=None):
@@ -590,9 +628,9 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     # Because this method is only called from the AwsNetwork constructor, which
     # is only called from AwsNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
-    if key not in benchmark_spec.networks:
-      benchmark_spec.networks[key] = cls(region, vpc_id)
-    return benchmark_spec.networks[key]
+    if key not in benchmark_spec.regional_networks:
+      benchmark_spec.regional_networks[key] = cls(region, vpc_id)
+    return benchmark_spec.regional_networks[key]
 
   def Create(self):
     """Creates the network."""
@@ -679,6 +717,7 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id)
     self.subnet = None
+    self.vpc_peering = None
     if (FLAGS.placement_group_style ==
         placement_group.PLACEMENT_GROUP_NONE):
       self.placement_group = None
@@ -693,7 +732,7 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet = AwsSubnet(
           self.zone,
           spec.vpc_id,
-          cidr_block=spec.cidr_block,
+          cidr_block=self.regional_network.cidr_block,
           subnet_id=spec.subnet_id)
 
   @staticmethod
@@ -719,9 +758,86 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet.Delete()
     if self.placement_group:
       self.placement_group.Delete()
+    if self.vpc_peering:
+      self.vpc_peering.Delete()
     self.regional_network.Delete()
+
+  def Peer(self, peering_network):
+    """Peers the network with the peering_network.
+
+    This method is used for VPC peering. It will connect 2 VPCs together.
+
+    Args:
+      peering_network: BaseNetwork. The network to peer with.
+    """
+
+    # Skip Peering if the networks are the same
+    if self.regional_network is peering_network.regional_network:
+      return
+
+    spec = network.BaseVPCPeeringSpec(self.regional_network,
+                                      peering_network.regional_network)
+    self.vpc_peering = AwsVpcPeering(spec)
+    peering_network.vpc_peering = self.vpc_peering
+    self.vpc_peering.Create()
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
     """Returns a key used to register Network instances."""
     return (cls.CLOUD, ZONE, spec.zone)
+
+
+class AwsVpcPeering(network.BaseVPCPeering):
+  """Object containing all information needed to create a VPC Peering Object."""
+
+  def _Create(self):
+    """Creates the peering object.
+
+    Documentation on creating a vpc object:
+    https://docs.aws.amazon.com/vpc/latest/peering/vpc-pg.pdf
+    """
+    # Creates Peering Connection
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-vpc-peering-connection',
+        '--region=%s' % self.network_a.region,
+        '--peer-region=%s' % self.network_b.region,
+        '--vpc-id=%s' % self.network_a.vpc.id,
+        '--peer-vpc-id=%s' % self.network_b.vpc.id,]
+
+    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    response = json.loads(stdout)
+
+    self.id = response['VpcPeeringConnection'][
+        'VpcPeeringConnectionId']
+
+    # Accepts Peering Connection
+    accept_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'accept-vpc-peering-connection',
+        '--region=%s' % self.network_b.region,
+        '--vpc-peering-connection-id=%s' % self.id]
+    vm_util.IssueRetryableCommand(accept_cmd)
+
+    util.AddDefaultTags(self.id, self.network_a.region)
+    logging.info('Creating VPC peering between %s and %s',
+                 self.network_a.vpc.cidr, self.network_b.vpc.cidr)
+
+    # Adds VPC peering to both networks' route tables
+    self.network_a.route_table.CreateVpcPeeringRoute(self.id,
+                                                     self.network_b.vpc.cidr)
+    self.network_b.route_table.CreateVpcPeeringRoute(self.id,
+                                                     self.network_a.vpc.cidr)
+
+    # Updates security group to allow inbound traffic from peering networks
+    self.network_a.vpc.AllowVpcPeerInBound(self.network_b.vpc)
+    self.network_b.vpc.AllowVpcPeerInBound(self.network_a.vpc)
+
+  def _Delete(self):
+    """Creates the deletes the peering object."""
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-vpc-peering-connection',
+        '--region=%s' % self.network_a.region,
+        '--vpc-peering-connection-id=%s' % self.id]
+    vm_util.IssueCommand(delete_cmd)
