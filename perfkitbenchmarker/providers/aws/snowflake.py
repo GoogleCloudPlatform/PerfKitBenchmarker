@@ -56,7 +56,7 @@ class Snowflake(edw_service.EdwService):
     """
     return True
 
-  def InstallAndAuthenticateRunner(self, vm):
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
     """Method to perform installation and authentication of snowsql client.
 
     SnowSQL is a cli client to submit queries to a Snowflake Warehouse instance.
@@ -64,6 +64,9 @@ class Snowflake(edw_service.EdwService):
 
     Args:
       vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     vm.Install('snowsql')
     # TODO(saksena): Support snowsql_config_file from pre-provisioned data.

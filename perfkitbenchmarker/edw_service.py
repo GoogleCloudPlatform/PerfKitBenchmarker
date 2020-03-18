@@ -157,7 +157,7 @@ class EdwService(resource.BaseResource):
     """
     raise NotImplementedError
 
-  def InstallAndAuthenticateRunner(self, vm):
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
     """Method to perform installation and authentication of runner utilities.
 
     The default implementation raises an Error, to ensure client specific
@@ -165,18 +165,24 @@ class EdwService(resource.BaseResource):
 
     Args:
       vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     raise NotImplementedError
 
-  def PrepareClientVm(self, vm):
+  def PrepareClientVm(self, vm, benchmark_name):
     """Prepare phase to install the runtime environment on the client vm.
 
     Args:
       vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     vm.Install('pip')
     vm.RemoteCommand('sudo pip install absl-py')
-    self.InstallAndAuthenticateRunner(vm)
+    self.InstallAndAuthenticateRunner(vm, benchmark_name)
 
   def PushDataDefinitionDataManipulationScripts(self, vm):
     """Method to push the database bootstrap and teardown scripts to the vm.
