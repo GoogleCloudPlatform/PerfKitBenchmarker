@@ -43,7 +43,7 @@ MAX_TIME_SECONDS = 30
 _STOP_QUEUE_ENTRY = 'stop'
 
 
-def ConfirmIPAccessible(client_host, port=22, timeout=MAX_TIME_SECONDS):
+def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
   """Confirm the given host's port is accessible and return the access time."""
   netcat_command = 'nc -zv -w 1 {client} {port}'.format(
       client=client_host,
@@ -55,11 +55,11 @@ def ConfirmIPAccessible(client_host, port=22, timeout=MAX_TIME_SECONDS):
     _, stderr = p.communicate()
     if 'open' in stderr.decode('utf-8'):
       # return the system time in nanoseconds
-      return 'Pass:%s:%d' % (client_host, time.time()*1e9)
+      return 'Pass:%s:%d' % (client_host, time.time() * 1e9)
 
   logging.warning('Could not netcat to port %s on client vm %s.',
                   port, client_host)
-  return 'Fail:%s:%d' % (client_host, time.time()*1e9)
+  return 'Fail:%s:%d' % (client_host, time.time() * 1e9)
 
 
 def StoreResult(result_str, queue):
@@ -83,19 +83,21 @@ def WriteResultsToFile(results_path, queue):
 class RequestHandler(server.BaseHTTPRequestHandler):
   """Request handler for incoming curl requests from booted vms."""
 
-  def __init__(self, pool, launcher, queue, *args, **kwargs):
+  def __init__(self, pool, launcher, queue, access_port, *args, **kwargs):
     """Creates a RequestHandler for a http request received by the server.
 
     Args:
       pool: multiprocessing process pool object.
       launcher: name string of the launcher vm that the server is on.
       queue: multiprocessing queue object.
+      access_port: port number to call on the booted vms.
       *args: Other argments to apply to the request handler.
       **kwargs: Keyword arguments to apply to the request handler.
     """
     self.process_pool = pool
     self.launcher = launcher
     self.timing_queue = queue
+    self.access_port = access_port
     # BaseHTTPRequestHandler calls do_GET inside __init__
     # So we have to call super().__init__ after setting attributes.
     super(RequestHandler, self).__init__(*args, **kwargs)
@@ -119,7 +121,7 @@ class RequestHandler(server.BaseHTTPRequestHandler):
     logging.info(client_host)
     store_results_func = functools.partial(StoreResult, queue=self.timing_queue)
     self.process_pool.apply_async(ConfirmIPAccessible,
-                                  args=(client_host,),
+                                  args=(client_host, self.access_port,),
                                   callback=store_results_func)
 
   def shutdown(self):
@@ -131,12 +133,14 @@ class RequestHandler(server.BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
-  if len(sys.argv) != 3:
+  if len(sys.argv) != 4:
     raise ValueError('Got unexpected number of command-line arguments. '
-                     'There should be 2 command-line arguments, first being '
-                     'the server port and second being the results file path.')
+                     'There should be 3 command-line arguments, first being '
+                     'the server port, second being the results file path, '
+                     'and third being the port to access the boot VMs.')
   server_address = ('', int(sys.argv[1]))
   results_file_path = sys.argv[2]
+  clients_port = sys.argv[3]
   hostname = socket.gethostname()
   process_pool = multiprocessing.Pool()
   multiprocessing_manager = multiprocessing.Manager()
@@ -148,7 +152,7 @@ if __name__ == '__main__':
 
   # The start the server to listen and put results on queue.
   handler = functools.partial(
-      RequestHandler, process_pool, hostname, timing_queue)
+      RequestHandler, process_pool, hostname, timing_queue, clients_port)
   listener = server.HTTPServer(server_address, handler)
   logging.info('Starting httpserver...\n')
   try:

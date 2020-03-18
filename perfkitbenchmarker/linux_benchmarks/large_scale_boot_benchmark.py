@@ -38,9 +38,11 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_virtual_machine
 
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
@@ -118,13 +120,6 @@ _RESULTS_FILE_PATH = posixpath.join(_REMOTE_DIR, _RESULTS_FILE)
 _TIMEOUT_SECONDS = 60 * 10
 # Seconds to deplay between polling for launcher server task complete.
 _POLLING_DELAY = 3
-# command to start the listener server
-_START_SERVER_COMMAND = (
-    'python3 {server} {port} {results_path} > {server_log} 2>&1 &'.format(
-        server=posixpath.join(_REMOTE_DIR, _LISTENER_SERVER.split('/')[-1]),
-        port=_PORT,
-        results_path=_RESULTS_FILE_PATH,
-        server_log=_LISTENER_SERVER_LOG))
 # sha256sum for preprovisioned service account credentials.
 # If not using service account credentials from preprovisioned data bucket,
 # use --gcp_service_account_key_file flag to specify the same credentials.
@@ -132,6 +127,28 @@ BENCHMARK_DATA = {
     'p3rf-scaling-a1828b03ba93.json':
         'c0cf08d79dd717e33e155164e35c8330bb26e9031eafab30064fff31afa86e99',
 }
+# default linux ssh port
+_SSH_PORT = linux_virtual_machine.DEFAULT_SSH_PORT
+# default windows rdp port
+_RDP_PORT = windows_virtual_machine.RDP_PORT
+
+
+def _GetServerStartCommand(client_port):
+  # command to start the listener server
+  return (
+      'python3 {server_path} {port} {results_path} {client_port} '
+      ' > {server_log} 2>&1 &'.format(
+          server_path=posixpath.join(
+              _REMOTE_DIR, _LISTENER_SERVER.split('/')[-1]),
+          port=_PORT,
+          results_path=_RESULTS_FILE_PATH,
+          client_port=client_port,
+          server_log=_LISTENER_SERVER_LOG))
+
+
+def _IsLinux():
+  """Returns whether the boot vms are Linux VMs."""
+  return FLAGS.boot_os_type in os_types.LINUX_OS_TYPES
 
 
 class InsufficientBootsError(Exception):
@@ -150,9 +167,6 @@ def CheckPrerequisites(_):
   if FLAGS.cloud != 'GCP':
     raise errors.Benchmarks.PrepareException(
         'Booting VMs on non-GCP clouds is not yet supported.')
-  if FLAGS.boot_os_type in os_types.WINDOWS_OS_TYPES:
-    raise errors.Benchmarks.PrepareException(
-        'Booting Windows VMs is not yet supported')
 
 
 def GetConfig(user_config):
@@ -189,6 +203,7 @@ def GetConfig(user_config):
 def _BuildContext(launcher_vm, booter_template_vm):
   """Returns the context variables for Jinja2 template during rendering."""
   return {
+      'os_type': 'linux' if _IsLinux() else 'windows',
       'cloud': FLAGS.cloud,
       'start_time_file': _START_TIME_FILE_PATH,
       'vm_count': FLAGS.boots_per_launcher,
@@ -196,6 +211,7 @@ def _BuildContext(launcher_vm, booter_template_vm):
       'project': FLAGS.project,
       'image_family': booter_template_vm.image_family,
       'image_project': booter_template_vm.image_project,
+      'boot_disk_size': booter_template_vm.boot_disk_size,
       'boot_machine_type': booter_template_vm.machine_type,
       'server_ip': launcher_vm.internal_ip,
       'server_port': _PORT,
@@ -215,7 +231,8 @@ def _Install(launcher_vm, booter_template_vm):
   # Installs and start listener server on launcher VM(s).
   launcher_vm.InstallPackages('netcat')
   launcher_vm.PushDataFile(_LISTENER_SERVER, _REMOTE_DIR)
-  launcher_vm.RemoteCommand(_START_SERVER_COMMAND)
+  client_port = _SSH_PORT if _IsLinux() else _RDP_PORT
+  launcher_vm.RemoteCommand(_GetServerStartCommand(client_port))
   # Render clean up script on launcher server VM(s).
   launcher_vm.RenderTemplate(data.ResourcePath(_CLEAN_UP_TEMPLATE),
                              _CLEAN_UP_SCRIPT_PATH, context)
