@@ -34,6 +34,7 @@
 -   Add replication cluster support to bigtable.
 -   Add Basic VPC peering support
 -   Add Snowflake Warehouse support
+-   Add large_scale_boot benchmark.
 
 ### Enhancements:
 
