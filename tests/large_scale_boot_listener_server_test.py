@@ -30,7 +30,8 @@ class ListenerServerTest(pkb_common_test_case.PkbCommonTestCase):
     mock_subproc_popen.return_value = process_mock
     process_mock.communicate.return_value = None, reply.encode('utf-8')
     fake_client_host = '1.2.3.4'
-    success = listener_server.ConfirmIPAccessible(fake_client_host)
+    fake_port = 22
+    success = listener_server.ConfirmIPAccessible(fake_client_host, fake_port)
     self.assertEqual(success.split(':')[0], 'Pass')
     self.assertEqual(success.split(':')[1], fake_client_host)
 
@@ -41,7 +42,9 @@ class ListenerServerTest(pkb_common_test_case.PkbCommonTestCase):
     mock_subproc_popen.return_value = process_mock
     process_mock.communicate.return_value = None, reply.encode('utf-8')
     fake_client_host = '1.2.3.4'
-    success = listener_server.ConfirmIPAccessible(fake_client_host, timeout=1)
+    fake_port = 22
+    success = listener_server.ConfirmIPAccessible(
+        fake_client_host, fake_port, timeout=1)
     self.assertEqual(success.split(':')[0], 'Fail')
     self.assertEqual(success.split(':')[1], fake_client_host)
 

@@ -5,6 +5,23 @@ uses to spin up vms. The vms are spun up with a startup script to curl a
 listening server. The time taken to boot is the time between executing this
 script and the time the vms call back on the server. #}
 
+{% if os_type == 'linux' %}
+export START_UP_SCRIPT="startup-script=#! /bin/bash
+curl -H 'X-Header: {{ launcher_vm_name }}' http://{{ server_ip }}:{{ server_port }}
+# Sleep 10min before final cleanup and VM termination.
+sleep {{ timeout }}
+{{ gcloud_path }} --quiet compute instances delete booter-{{ launcher_vm_name }}-$i --zone {{ zone }} --project {{ project }}
+/sbin/shutdown -hP now"
+{% endif %}
+
+{% if os_type == 'windows' %}
+export START_UP_SCRIPT="windows-startup-script-ps1=Invoke-WebRequest -Uri '{{ server_ip }}:{{ server_port }}' -Headers @{'X-Header'='{{ launcher_vm_name }}'}
+# Sleep 10min before final cleanup and VM termination.
+Start-Sleep -Seconds {{ timeout }}
+{{ gcloud_path }} --quiet compute instances delete booter-{{ launcher_vm_name }}-$i --zone {{ zone }} --project {{ project }}
+/sbin/shutdown -hP now"
+{% endif %}
+
 gcloud_args=(
 --format json
 --quiet
@@ -15,18 +32,13 @@ gcloud_args=(
 --image-family {{ image_family }}
 --image-project {{ image_project }}
 --boot-disk-auto-delete
---boot-disk-size 10
+--boot-disk-size {{ boot_disk_size }}
 --boot-disk-type pd-ssd
 --machine-type {{ boot_machine_type }}
 --tags perfkitbenchmarker
 --no-restart-on-failure
 --zone {{ zone }}
---metadata startup-script="#! /bin/bash
-curl -H 'X-Header: {{ launcher_vm_name }}' http://{{ server_ip }}:{{ server_port }}
-# Sleep 10min before final cleanup and VM termination.
-sleep {{ timeout }}
-{{ gcloud_path }} --quiet compute instances delete booter-{{ launcher_vm_name }}-$i --zone {{ zone }} --project {{ project }}
-/sbin/shutdown -hP now"
+--metadata "${START_UP_SCRIPT}"
 )
 
 # Launcher VM record the system nanoseconds as start time.
