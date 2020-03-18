@@ -587,7 +587,7 @@ class CloudStoragePublisher(SamplePublisher):
     with vm_util.NamedTemporaryFile(prefix='perfkit-gcs-pub',
                                     dir=vm_util.GetTempDir(),
                                     suffix='.json') as tf:
-      json_publisher = NewlineDelimitedJSONPublisher(tf.name)
+      json_publisher = NewlineDelimitedJSONPublisher(tf.name, collapse_labels=FLAGS.collapse_labels)
       json_publisher.PublishSamples(samples)
       tf.close()
       object_name = self._GenerateObjectName()
