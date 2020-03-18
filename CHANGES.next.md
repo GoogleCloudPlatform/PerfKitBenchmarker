@@ -35,6 +35,7 @@
 -   Add Basic VPC peering support
 -   Add Snowflake Warehouse support
 -   Add large_scale_boot benchmark for linux and windows.
+-   Replace Boto connection library with Python client library for GCS.
 
 ### Enhancements:
 

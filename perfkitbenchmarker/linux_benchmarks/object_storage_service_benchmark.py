@@ -1510,15 +1510,14 @@ def Run(benchmark_spec):
                           ('api_multistream_writes',
                            MultiStreamWriteBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
-      benchmark(results, metadata, vms, command_builder, benchmark_spec.service,
-                bucket_name)
+      benchmark(results, metadata, vms, command_builder, service, bucket_name)
 
   # MultiStreamRead has the additional 'read_objects' parameter
   if FLAGS.object_storage_scenario in {'api_multistream_reads', 'all'}:
     metadata['cold_objects_filename'] = benchmark_spec.read_objects_filename
     metadata['cold_objects_age_hours'] = benchmark_spec.read_objects_age_hours
-    MultiStreamReadBenchmark(results, metadata, vms, command_builder,
-                             benchmark_spec.service, bucket_name,
+    MultiStreamReadBenchmark(results, metadata, vms, command_builder, service,
+                             bucket_name,
                              benchmark_spec.read_objects['objects_written'])
 
   # Clear the bucket if we're not saving the objects for later
