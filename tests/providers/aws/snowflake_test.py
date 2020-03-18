@@ -76,7 +76,7 @@ class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     snowflake_local = snowflake.Snowflake(spec)
     snowflake_local.InstallAndAuthenticateRunner(
-        vm=FakeRemoteVMCreateLambdaRole())
+        vm=FakeRemoteVMCreateLambdaRole(), benchmark_name='fake_benchmark')
 
   def testRunCommandHelper(self):
     kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)

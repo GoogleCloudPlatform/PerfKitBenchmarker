@@ -55,6 +55,16 @@ class ClientVm(object):
     pass
 
 
+class PreparedClientVm(object):
+
+  def Install(self, package_name):
+    if package_name != 'pip':
+      raise RuntimeError
+
+  def RemoteCommand(self, command):
+    pass
+
+
 class FakeEdwService(edw_service.EdwService):
   """A fake Edw Service class."""
 
@@ -67,6 +77,9 @@ class FakeEdwService(edw_service.EdwService):
   def GenerateScriptExecutionCommand(self, script):
     return ' '.join(
         super(FakeEdwService, self).GenerateScriptExecutionCommand(script))
+
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
+    pass
 
 
 class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
@@ -127,6 +140,13 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual('pkb-' + FLAGS.run_uri,
                      edw_local.GetClusterIdentifier(spec))
     self.assertEqual('pkb-' + FLAGS.run_uri, edw_local.cluster_identifier)
+
+  def testPrepareClientVm(self):
+    kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    edw_local = FakeEdwService(spec)
+    edw_local.PrepareClientVm(
+        vm=PreparedClientVm(), benchmark_name='fake_benchmark_name')
 
 
 if __name__ == '__main__':

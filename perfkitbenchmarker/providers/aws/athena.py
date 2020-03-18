@@ -233,7 +233,7 @@ class Athena(edw_service.EdwService):
     """Athena data warehouse specific run script command components."""
     raise NotImplementedError
 
-  def InstallAndAuthenticateRunner(self, vm):
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
     """Method to perform installation and authentication of Athena query runner.
 
     Athena APIs are included in the default AWS cli
@@ -241,18 +241,12 @@ class Athena(edw_service.EdwService):
 
     Args:
       vm: Client vm on which the query will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     for pkg in ('aws_credentials', 'awscli'):
       vm.Install(pkg)
-
-  def PrepareClientVm(self, vm):
-    """Prepare phase to install the runtime environment on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-    """
-    super(Athena, self).PrepareClientVm(vm)
-    self.InstallAndAuthenticateRunner(vm)
 
   @classmethod
   def RunScriptOnClientVm(cls, vm, database, script):

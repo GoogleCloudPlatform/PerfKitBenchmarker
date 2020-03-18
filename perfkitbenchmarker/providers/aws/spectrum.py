@@ -135,3 +135,17 @@ class Spectrum(redshift.Redshift):
                                                           self.
                                                           cluster_identifier)
     AddTags(self.arn, self.region)
+
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
+    """Method to perform installation and authentication of runner utilities.
+
+    The default implementation raises an Error, to ensure client specific
+    implementation.
+
+    Args:
+      vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    raise NotImplementedError
