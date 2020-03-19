@@ -15,7 +15,6 @@
 import copy
 import unittest
 
-from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -41,11 +40,14 @@ class FakeRemoteVM(object):
       raise RuntimeError
 
 
-class AzureDWTestCase(pkb_common_test_case.PkbCommonTestCase):
+class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  @flagsaver.flagsaver(cloud='GCP')
-  @flagsaver.flagsaver(run_uri=_TEST_RUN_URI)
-  @flagsaver.flagsaver(zones=[_GCP_ZONE_US_CENTRAL_1_C])
+  def setUp(self):
+    super(BigqueryTestCase, self).setUp()
+    FLAGS.cloud = 'GCP'
+    FLAGS.run_uri = _TEST_RUN_URI
+    FLAGS.zones = [_GCP_ZONE_US_CENTRAL_1_C]
+
   def testInstallAndAuthenticateRunner(self):
     kwargs = copy.copy(_BASE_BIGQUERY_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
