@@ -759,7 +759,7 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet.Delete()
     if self.placement_group:
       self.placement_group.Delete()
-    if self.vpc_peering:
+    if hasattr(self, 'vpc_peering') and self.vpc_peering:
       self.vpc_peering.Delete()
     self.regional_network.Delete()
 
