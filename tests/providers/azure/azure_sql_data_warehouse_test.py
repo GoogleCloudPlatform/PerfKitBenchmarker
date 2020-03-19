@@ -15,7 +15,6 @@
 import copy
 import unittest
 
-from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -52,9 +51,12 @@ class FakeRemoteVM(object):
 
 class AzureDWTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  @flagsaver.flagsaver(cloud='Azure')
-  @flagsaver.flagsaver(run_uri=_TEST_RUN_URI)
-  @flagsaver.flagsaver(zones=[_AZURE_REGION_WEST_US_2])
+  def setUp(self):
+    super(AzureDWTestCase, self).setUp()
+    FLAGS.cloud = 'Azure'
+    FLAGS.run_uri = _TEST_RUN_URI
+    FLAGS.zones = [_AZURE_REGION_WEST_US_2]
+
   def testInstallAndAuthenticateRunner(self):
     kwargs = copy.copy(_BASE_AZURE_DW_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)

@@ -16,7 +16,6 @@
 import copy
 import unittest
 
-from absl.testing import flagsaver
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import athena
@@ -38,9 +37,12 @@ class FakeRemoteVMCreateLambdaRole(object):
 
 class AthenaTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  @flagsaver.flagsaver(cloud='AWS')
-  @flagsaver.flagsaver(run_uri=_TEST_RUN_URI)
-  @flagsaver.flagsaver(zones=[_AWS_ZONE_US_EAST_1A])
+  def setUp(self):
+    super(AthenaTestCase, self).setUp()
+    FLAGS.cloud = 'AWS'
+    FLAGS.run_uri = _TEST_RUN_URI
+    FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
+
   def testInstallAndAuthenticateRunner(self):
     kwargs = copy.copy(_BASE_ATHENA_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)

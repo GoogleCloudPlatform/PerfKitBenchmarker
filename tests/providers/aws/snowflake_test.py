@@ -16,7 +16,6 @@
 import copy
 import unittest
 
-from absl.testing import flagsaver
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import snowflake
@@ -43,14 +42,13 @@ class FakeRemoteVMCreateLambdaRole(object):
 
 class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  @flagsaver.flagsaver(cloud='AWS')
-  @flagsaver.flagsaver(run_uri=_TEST_RUN_URI)
-  @flagsaver.flagsaver(zones=[_AWS_ZONE_US_EAST_1A])
-  @flagsaver.flagsaver(snowflake_snowsql_config_file=
-                       'snowflake_snowsql_config_file')
-  @flagsaver.flagsaver(snowflake_connection='fake_connection')
   def setUp(self):
     super(SnowflakeTestCase, self).setUp()
+    FLAGS.cloud = 'AWS'
+    FLAGS.run_uri = _TEST_RUN_URI
+    FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
+    FLAGS.snowflake_snowsql_config_file = 'snowflake_snowsql_config_file'
+    FLAGS.snowflake_connection = 'fake_connection'
 
   def testCreateRequestError(self):
     kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
