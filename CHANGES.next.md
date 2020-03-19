@@ -32,7 +32,7 @@
 -   Add GceNfsService to support Filestore on GCP.
 -   Add maven package and use it in ycsb.
 -   Add replication cluster support to bigtable.
--   Add Basic VPC peering support
+-   Add AWS and Azure VPC peering support
 -   Add Snowflake Warehouse support
 -   Add large_scale_boot benchmark for linux and windows.
 -   Replace Boto connection library with Python client library for GCS.
