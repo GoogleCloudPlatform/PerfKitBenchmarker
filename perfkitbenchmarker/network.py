@@ -196,6 +196,7 @@ class BaseNetwork(object):
     """Deletes the actual network."""
     pass
 
+  # TODO(b/151853196): Generalize AWS and Azure implementation of this function.
   def Peer(self, peering_network):
     """Peers the network with the peering_network.
 
@@ -246,3 +247,21 @@ class BaseVPCPeering(resource.BaseResource):
     super(BaseVPCPeering, self).__init__()
     self.network_a = vpc_peering_spec.network_a
     self.network_b = vpc_peering_spec.network_b
+
+
+def GetCidrBlock(regional_index=0, subnet_index=0):
+  """Returns a Cidr Block.
+
+  Each cloud region should be assigned a unique IP Address Space. And each
+  Subnet within a regional cloud network should also have an unique space. This
+  function returns the IP Address allocation based on the regional and subnet
+  index given. It is expected that each cloud regional network will have a
+  unique regional index and each of its subnets will also have a unique index.
+
+  Args:
+    regional_index: Int. The IP Address allocation dependent on the region.
+      Default index is 0.
+    subnet_index: Int. The IP Address section dependent on the subnet.
+      Default index is 0.
+  """
+  return '10.{}.{}.0/24'.format(regional_index, subnet_index)

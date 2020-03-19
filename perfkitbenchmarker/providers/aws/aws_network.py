@@ -149,7 +149,7 @@ class AwsVpc(resource.BaseResource):
     super(AwsVpc, self).__init__(vpc_id is not None)
     self.region = region
     self.regional_network_index = regional_network_index
-    self.cidr = util.GetCidrBlock(self.regional_network_index)
+    self.cidr = network.GetCidrBlock(self.regional_network_index)
     self.id = vpc_id
     # Subnets are assigned per-AZ.
     # _subnet_index tracks the next unused 10.x.y.0/24 block.
@@ -277,7 +277,8 @@ class AwsVpc(resource.BaseResource):
       if self._subnet_index >= (1 << 8) - 1:
         raise ValueError('Exceeded subnet limit ({0}).'.format(
             self._subnet_index))
-      cidr = util.GetCidrBlock(self.regional_network_index, self._subnet_index)
+      cidr = network.GetCidrBlock(self.regional_network_index,
+                                  self._subnet_index)
       self._subnet_index += 1
     return cidr
 
@@ -603,7 +604,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     with _AwsRegionalNetwork._regional_network_lock:
       self.vpc = AwsVpc(self.region, vpc_id,
                         _AwsRegionalNetwork._regional_network_count)
-      self.cidr_block = util.GetCidrBlock(
+      self.cidr_block = network.GetCidrBlock(
           _AwsRegionalNetwork._regional_network_count)
       _AwsRegionalNetwork._regional_network_count += 1
 
