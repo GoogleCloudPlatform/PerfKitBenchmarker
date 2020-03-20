@@ -149,7 +149,7 @@ class AwsVpc(resource.BaseResource):
     super(AwsVpc, self).__init__(vpc_id is not None)
     self.region = region
     self.regional_network_index = regional_network_index
-    self.cidr = network.GetCidrBlock(self.regional_network_index)
+    self.cidr = network.GetCidrBlock(self.regional_network_index, 0, 16)
     self.id = vpc_id
     # Subnets are assigned per-AZ.
     # _subnet_index tracks the next unused 10.x.y.0/24 block.
