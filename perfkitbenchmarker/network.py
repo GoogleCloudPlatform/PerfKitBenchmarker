@@ -196,7 +196,6 @@ class BaseNetwork(object):
     """Deletes the actual network."""
     pass
 
-  # TODO(b/151853196): Generalize AWS and Azure implementation of this function.
   def Peer(self, peering_network):
     """Peers the network with the peering_network.
 
