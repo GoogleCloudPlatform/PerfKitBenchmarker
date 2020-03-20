@@ -248,7 +248,7 @@ class BaseVPCPeering(resource.BaseResource):
     self.network_b = vpc_peering_spec.network_b
 
 
-def GetCidrBlock(regional_index=0, subnet_index=0):
+def GetCidrBlock(regional_index=0, subnet_index=0, mask_size=24):
   """Returns a Cidr Block.
 
   Each cloud region should be assigned a unique IP Address Space. And each
@@ -256,11 +256,17 @@ def GetCidrBlock(regional_index=0, subnet_index=0):
   function returns the IP Address allocation based on the regional and subnet
   index given. It is expected that each cloud regional network will have a
   unique regional index and each of its subnets will also have a unique index.
+  Regional cidr blocks should be large enough to cover the subnet cidr blocks.
+  Chose a mask_size for regional cidr block accordingly. For example, a
+  mask_size of 16 with regional starting block 10.0.0.0 will cover a subnet of
+  10.0.1.0/24.
 
   Args:
     regional_index: Int. The IP Address allocation dependent on the region.
       Default index is 0.
     subnet_index: Int. The IP Address section dependent on the subnet.
       Default index is 0.
+    mask_size: Int. Mask size to request from cidr block.
+      Default index is 24.
   """
-  return '10.{}.{}.0/24'.format(regional_index, subnet_index)
+  return '10.{}.{}.0/{}'.format(regional_index, subnet_index, mask_size)
