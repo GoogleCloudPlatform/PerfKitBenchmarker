@@ -608,7 +608,8 @@ class AzureVpcPeering(network.BaseVPCPeering):
 
   def _Create(self):
     """Creates the peering object."""
-    self.name = '%s-%s' % (self.network_a.name, self.network_b.name)
+    self.name = '%s-%s-%s' % (self.network_a.resource_group.name,
+                              self.network_a.location, self.network_b.location)
 
     # Creates Peering Connection
     create_cmd = [
