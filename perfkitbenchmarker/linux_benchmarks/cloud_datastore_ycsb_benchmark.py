@@ -45,9 +45,6 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-YCSB_BINDING_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases'
-                        '/download/0.9.0/'
-                        'ycsb-googledatastore-binding-0.9.0.tar.gz')
 YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'lib')
 PRIVATE_KEYFILE_DIR = '/tmp/key.p12'
 
@@ -101,18 +98,12 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
-  default_ycsb_tar_url = ycsb.YCSB_TAR_URL
   vms = benchmark_spec.vms
-
-  # TODO: figure out a less hacky way to override.
-  # Override so that we only need to download the required binding.
-  ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
 
   # Install required packages and copy credential files
   vm_util.RunThreaded(_Install, vms)
 
   # Restore YCSB_TAR_URL
-  ycsb.YCSB_TAR_URL = default_ycsb_tar_url
   benchmark_spec.executor = ycsb.YCSBExecutor('googledatastore')
 
 
