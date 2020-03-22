@@ -204,7 +204,9 @@ def _CreateMetadataDict():
               'check': FLAGS.nccl_check,
               'nthreads': FLAGS.nccl_nthreads,
               'iters': FLAGS.nccl_iters,
-              'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices}
+              'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices,
+              'net_plugin': FLAGS.nccl_net_plugin,
+              'extra_params': FLAGS.nccl_extra_params}
   if FLAGS.nccl_install_mofed:
     metadata['mofed_version'] = FLAGS.mofed_version
   return metadata
