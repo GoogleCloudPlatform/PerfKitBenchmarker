@@ -67,6 +67,16 @@ class GceVPNGW(network.BaseVPNGW):
     self.routing = None
     self.psk = None
 
+    # Add gateway to benchmark spec at init().
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
+    key = self.name
+    with benchmark_spec.vpn_gws_lock:
+      if key not in benchmark_spec.vpn_gws:
+        benchmark_spec.vpn_gws[key] = self
+
   def ConfigureTunnel(self, tunnel_config):
     network.BaseVPNGW.ConfigureTunnel(self, tunnel_config)
     logging.info('Configuring Tunnel with params:')
@@ -208,12 +218,8 @@ class GceVPNGW(network.BaseVPNGW):
       return
     if self.vpn_gw_resource:
       self.vpn_gw_resource.Create()
-    key = self.name
-    if key not in benchmark_spec.vpn_gws:
-      benchmark_spec.vpn_gws[key] = self
 
     self.created = True
-    return benchmark_spec.vpn_gws[key]
 
   def Delete(self):
     """Deletes the actual VPNGW."""
@@ -289,7 +295,7 @@ class GceIPAddress(resource.BaseResource):
     cmd.flags['region'] = self.region
     cmd.flags['format'] = 'value(address)'
     stdout, _, _ = cmd.Issue()
-    self.ip_address = stdout.encode('ascii', 'ignore').rstrip()
+    self.ip_address = stdout.encode('ascii', 'ignore').rstrip().decode()
 
   def _Delete(self):
     """ Deletes a public IP for the VPN GW """
