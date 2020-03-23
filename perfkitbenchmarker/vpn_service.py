@@ -246,6 +246,7 @@ class VPNService(resource.BaseResource):
      # get all gw pairs then filter out the non matching tunnel id's
     vpn_gw_pairs = itertools.combinations(vpn_gws, 2)
     r = re.compile(r"(?P<gw_prefix>.*-.*-.*)?-(?P<gw_tnum>[0-9])-(?P<run_id>.*)")
-    # function = lambda x: r.search(x[0]).group('gw_tnum') == r.search(x[1]).group('gw_tnum')
-    function = lambda x: r.search(x[0]).group('gw_prefix') != r.search(x[1]).group('gw_prefix')
-    return list(filter(function, vpn_gw_pairs))
+    def filterGateways(gateway_pair):
+      return r.search(gateway_pair[0]).group('gw_prefix') != r.search(
+          gateway_pair[1]).group('gw_prefix')
+    return list(filter(filterGateways, vpn_gw_pairs))
