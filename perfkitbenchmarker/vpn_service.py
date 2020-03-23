@@ -61,7 +61,7 @@ class VPN(object):
   def Create(self, gwpair, suffix=''):
     self.GWPair = gwpair
     self.name = self.getKeyFromGWPair(gwpair)
-    self.tunnel_config = TunnelConfig(name=self.name, suffix=suffix)
+    self.tunnel_config = TunnelConfig(tunnel_name=self.name, suffix=suffix)
 
   def Delete(self):
     pass
@@ -248,4 +248,4 @@ class VPNService(resource.BaseResource):
     r = re.compile(r"(?P<gw_prefix>.*-.*-.*)?-(?P<gw_tnum>[0-9])-(?P<run_id>.*)")
     # function = lambda x: r.search(x[0]).group('gw_tnum') == r.search(x[1]).group('gw_tnum')
     function = lambda x: r.search(x[0]).group('gw_prefix') != r.search(x[1]).group('gw_prefix')
-    return filter(function, vpn_gw_pairs)
+    return list(filter(function, vpn_gw_pairs))
