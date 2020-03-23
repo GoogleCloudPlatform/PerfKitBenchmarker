@@ -53,7 +53,7 @@ class GceVPNGW(network.BaseVPNGW):
     self.tunnels = {}
     self.routes = {}
     self.ip_resource = None
-    self.vpn_gw_resource = GceVPNGWResource(name, network_name, region, cidr, project)
+    self.vpn_gateway_resource = GceVPNGWResource(name, network_name, region, cidr, project)
 
     self.name = name
     self.network_name = network_name
@@ -73,9 +73,9 @@ class GceVPNGW(network.BaseVPNGW):
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
     key = self.name
-    with benchmark_spec.vpn_gws_lock:
-      if key not in benchmark_spec.vpn_gws:
-        benchmark_spec.vpn_gws[key] = self
+    with benchmark_spec.vpn_gateways_lock:
+      if key not in benchmark_spec.vpn_gateways:
+        benchmark_spec.vpn_gateways[key] = self
 
   def ConfigureTunnel(self, tunnel_config):
     network.BaseVPNGW.ConfigureTunnel(self, tunnel_config)
@@ -151,14 +151,14 @@ class GceVPNGW(network.BaseVPNGW):
     target_endpoint = [k for k in tunnel_config.endpoints.keys() if k not in self.name][0]
     project = tunnel_config.endpoints[self.name]['project']
     region = tunnel_config.endpoints[self.name]['region']
-    vpn_gw_id = self.name
+    vpn_gateway_id = self.name
     target_ip = tunnel_config.endpoints[target_endpoint]['ip_address']
     psk = tunnel_config.psk
     ike_version = tunnel_config.ike_version
     suffix = tunnel_config.suffix
     name = 'tun-' + self.name + '-' + suffix
     if name not in self.tunnels:
-      self.tunnels[name] = GceStaticTunnel(project, region, name, vpn_gw_id, target_ip, ike_version, psk)
+      self.tunnels[name] = GceStaticTunnel(project, region, name, vpn_gateway_id, target_ip, ike_version, psk)
       self.tunnels[name].Create()
       tunnel_config.endpoints[self.name]['tunnel_id'] = name
 
@@ -216,8 +216,8 @@ class GceVPNGW(network.BaseVPNGW):
                          'BenchmarkSpec.')
     if self.created:
       return
-    if self.vpn_gw_resource:
-      self.vpn_gw_resource.Create()
+    if self.vpn_gateway_resource:
+      self.vpn_gateway_resource.Create()
 
     self.created = True
 
@@ -238,8 +238,8 @@ class GceVPNGW(network.BaseVPNGW):
       for route in self.routes:
         self.routes[route].Delete()
 
-    if self.vpn_gw_resource:
-      self.vpn_gw_resource.Delete()
+    if self.vpn_gateway_resource:
+      self.vpn_gateway_resource.Delete()
 
     self.created = False
 
@@ -315,12 +315,12 @@ class GceIPAddress(resource.BaseResource):
 class GceStaticTunnel(resource.BaseResource):
   """An object representing a GCE Tunnel."""
 
-  def __init__(self, project, region, name, vpn_gw_id, target_ip, ike_version, psk):
+  def __init__(self, project, region, name, vpn_gateway_id, target_ip, ike_version, psk):
     super(GceStaticTunnel, self).__init__()
     self.project = project
     self.region = region
     self.name = name
-    self.vpn_gw_id = vpn_gw_id
+    self.vpn_gateway_id = vpn_gateway_id
     self.target_ip = target_ip
     self.ike_version = ike_version
     self.psk = psk
@@ -329,7 +329,7 @@ class GceStaticTunnel(resource.BaseResource):
     """Creates the Tunnel."""
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create', self.name)
     cmd.flags['peer-address'] = self.target_ip
-    cmd.flags['target-vpn-gateway'] = self.vpn_gw_id
+    cmd.flags['target-vpn-gateway'] = self.vpn_gateway_id
     cmd.flags['ike-version'] = self.ike_version
     cmd.flags['local-traffic-selector'] = '0.0.0.0/0'
     cmd.flags['remote-traffic-selector'] = '0.0.0.0/0'
@@ -401,15 +401,15 @@ class GceRoute(resource.BaseResource):
 class GceForwardingRule(resource.BaseResource):
   """An object representing a GCE Forwarding Rule."""
 
-  def __init__(self, name, protocol, src_vpn_gw, port=None):
+  def __init__(self, name, protocol, src_vpn_gateway, port=None):
     super(GceForwardingRule, self).__init__()
     self.name = name
     self.protocol = protocol
     self.port = port
-    self.target_name = src_vpn_gw.name
-    self.target_ip = src_vpn_gw.ip_address
-    self.src_region = src_vpn_gw.region
-    self.project = src_vpn_gw.project
+    self.target_name = src_vpn_gateway.name
+    self.target_ip = src_vpn_gateway.ip_address
+    self.src_region = src_vpn_gateway.region
+    self.project = src_vpn_gateway.project
 
   def __eq__(self, other):
     """Defines equality to make comparison easy."""
@@ -648,7 +648,7 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
-    self.vpn_gw = {}
+    self.vpn_gateway = {}
 
     #  Figuring out the type of network here.
     #  Precedence: User Managed > MULTI > SINGLE > DEFAULT
@@ -696,10 +696,10 @@ class GceNetwork(network.BaseNetwork):
     # Add VPNGWs to the network.
     if FLAGS.use_vpn:
       for gwnum in range(0, FLAGS.vpn_service_gateway_count):
-        vpn_gw_name = 'vpngw-%s-%s-%s' % (
+        vpn_gateway_name = 'vpngw-%s-%s-%s' % (
             util.GetRegionFromZone(network_spec.zone), gwnum, FLAGS.run_uri)
-        self.vpn_gw[vpn_gw_name] = GceVPNGW(
-            vpn_gw_name, name, util.GetRegionFromZone(network_spec.zone),
+        self.vpn_gateway[vpn_gateway_name] = GceVPNGW(
+            vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
 
   def _GetNetworksFromSpec(self, network_spec):
@@ -817,16 +817,16 @@ class GceNetwork(network.BaseNetwork):
       if self.external_nets_rules:
         for rule in self.external_nets_rules:
           self.external_nets_rules[rule].Create()
-      if getattr(self, 'vpn_gw', False):
-        for gw in self.vpn_gw:
-          self.vpn_gw[gw].Create()
+      if getattr(self, 'vpn_gateway', False):
+        for gw in self.vpn_gateway:
+          self.vpn_gateway[gw].Create()
 
   def Delete(self):
     """Deletes the actual network."""
     if not FLAGS.gce_network_name:
-      if getattr(self, 'vpn_gw', False):
-        for gw in self.vpn_gw:
-          self.vpn_gw[gw].Delete()
+      if getattr(self, 'vpn_gateway', False):
+        for gw in self.vpn_gateway:
+          self.vpn_gateway[gw].Delete()
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:

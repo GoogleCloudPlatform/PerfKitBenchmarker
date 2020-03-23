@@ -1287,8 +1287,8 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
 
 class _VPNServiceSpec(spec.BaseSpec):
   """Spec needed to configure a vpn tunnel between two vm_groups.
-    Since vpn_gw may be across cloud providers we only create tunnel when
-    vpn_gw's are up and known
+    Since vpn_gateway may be across cloud providers we only create tunnel when
+    vpn_gateway's are up and known
   """
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_VPNServiceSpec, self).__init__(

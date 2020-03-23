@@ -131,11 +131,11 @@ class BaseVPNGW(object):
     if benchmark_spec is None:
       raise errors.Error('GetVPN called in a thread without a '
                          'BenchmarkSpec.')
-    with benchmark_spec.vpn_gws_lock:
+    with benchmark_spec.vpn_gateways_lock:
       key = cls.CLOUD
-      if key not in benchmark_spec.vpn_gws:
-        benchmark_spec.vpn_gws[key] = cls()
-      return benchmark_spec.vpn_gws[key]
+      if key not in benchmark_spec.vpn_gateways:
+        benchmark_spec.vpn_gateways[key] = cls()
+      return benchmark_spec.vpn_gateways[key]
 
   def IsTunnelConfigured(self):
     pass

@@ -163,8 +163,8 @@ class BenchmarkSpec(object):
 
     self.vpn_service = None
     self.vpns = {}  # dict of vpn's
-    self.vpn_gws = {}  # dict of vpn gw's
-    self.vpn_gws_lock = threading.Lock()
+    self.vpn_gateways = {}  # dict of vpn gw's
+    self.vpn_gateways_lock = threading.Lock()
     self.vpns_lock = threading.Lock()
 
     # Modules can't be pickled, but functions can, so we store the functions
