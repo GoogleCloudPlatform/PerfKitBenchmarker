@@ -40,7 +40,7 @@ class FakeRemoteVMCreateLambdaRole(object):
 
   def PushFile(self, file_to_push, push_destination):
     del push_destination
-    if file_to_push != 'snowflake_snowsql_config_file':
+    if file_to_push != 'snowflake_snowsql_config_override_file':
       raise RuntimeError
 
 
@@ -51,7 +51,7 @@ class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = 'AWS'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
-    FLAGS.snowflake_snowsql_config_file = 'snowflake_snowsql_config_file'
+    FLAGS.snowflake_snowsql_config_override_file = 'snowflake_snowsql_config_override_file'
     FLAGS.snowflake_connection = 'fake_connection'
 
   def testCreateRequestError(self):

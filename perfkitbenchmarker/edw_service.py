@@ -42,7 +42,7 @@ flags.DEFINE_string('edw_service_cluster_user', None,
 flags.DEFINE_string('edw_service_cluster_password', None,
                     'If set, the password authorized on cluster (only '
                     'applicable when using snapshots).')
-flags.DEFINE_string('snowflake_snowsql_config_file', None,
+flags.DEFINE_string('snowflake_snowsql_config_override_file', None,
                     'The SnowSQL configuration to use.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file')  # pylint: disable=line-too-long
 flags.DEFINE_string('snowflake_connection', None,
