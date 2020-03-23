@@ -137,10 +137,39 @@ class BaseVPNGW(object):
         benchmark_spec.vpn_gateways[key] = cls()
       return benchmark_spec.vpn_gateways[key]
 
-  def IsTunnelConfigured(self):
+  def IsTunnelConfigured(self, tunnel_config):
+    """ Returns True if the tunnel_config is complete.
+
+    Args:
+     tunnel_config: The tunnel_config of the tunnel to check.
+    Returns:
+       boolean.
+    """
+    pass
+
+  def IsTunnelReady(self, tunnel_id):
+    """Returns True if the tunnel is ready.
+
+    Args:
+      tunnel_id: The id of the tunnel to check.
+
+    Returns:
+      boolean.
+    """
     pass
 
   def ConfigureTunnel(self, tunnel_config):
+    """Updates the tunnel_config object with new information.
+
+    Each provider may require different information to setup a VPN tunnel,
+    and all information needed to configure the tunnel may not be available
+    up front. Incremental updates to tunnel_config are made by calling this
+    function on each endpoint until either both endpoint tunnels are configured
+    or no more updates can be made.
+
+    Args:
+      tunnel_config: The tunnel_config object of the tunnel to configure.
+    """
     pass
 
   def Create(self):

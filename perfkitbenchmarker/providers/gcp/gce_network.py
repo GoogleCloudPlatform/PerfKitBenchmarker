@@ -44,6 +44,7 @@ ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 
 class GceVPNGW(network.BaseVPNGW):
+  """Object representing a GCE VPN Gateway"""
   CLOUD = providers.GCP
 
   def __init__(self, name, network_name, region, cidr, project):
@@ -78,6 +79,11 @@ class GceVPNGW(network.BaseVPNGW):
         benchmark_spec.vpn_gateways[key] = self
 
   def ConfigureTunnel(self, tunnel_config):
+    """Updates tunnel config with new information.
+    
+    Args:
+      tunnel_config: The tunnel configuration for this VPN.
+    """
     network.BaseVPNGW.ConfigureTunnel(self, tunnel_config)
     logging.info('Configuring Tunnel with params:')
     logging.info(tunnel_config)
@@ -145,9 +151,23 @@ class GceVPNGW(network.BaseVPNGW):
     tunnel_config.endpoints[self.name]['is_configured'] = True
 
   def IsTunnelReady(self, tunnel_id):
+    """Returns True if the tunnel is up and ready for traffic.
+
+    Args:
+      tunnel_id: The id of the tunnel to check.
+
+    Returns:
+      boolean.
+
+    """
     return self.tunnels[tunnel_id].IsReady()
 
   def _SetupTunnel(self, tunnel_config):
+    """Register a new GCE VPN tunnel for this endpoint.
+
+    Args:
+      tunnel_config: VPN tunnel configuration.
+    """
     target_endpoint = [k for k in tunnel_config.endpoints.keys() if k not in self.name][0]
     project = tunnel_config.endpoints[self.name]['project']
     region = tunnel_config.endpoints[self.name]['region']
@@ -164,7 +184,8 @@ class GceVPNGW(network.BaseVPNGW):
 
   def _SetupForwarding(self, tunnel_config):
     """Create IPSec forwarding rules
-    Forwards ESP protocol, and UDP 500/4500 for tunnel setup
+
+    Forwards ESP protocol, and UDP 500/4500 for tunnel setup.
 
     Args:
       source_gw: The BaseVPN object to add forwarding rules to.
@@ -245,6 +266,7 @@ class GceVPNGW(network.BaseVPNGW):
 
 
 class GceVPNGWResource(resource.BaseResource):
+  """Object representing a GCE VPN Gateway Resource."""
 
   def __init__(self, name, network_name, region, cidr, project):
     super(GceVPNGWResource, self).__init__()
@@ -276,6 +298,7 @@ class GceVPNGWResource(resource.BaseResource):
 
 
 class GceIPAddress(resource.BaseResource):
+  """Object representing a GCE IP address."""
 
   def __init__(self, project, region, name):
     super(GceIPAddress, self).__init__()

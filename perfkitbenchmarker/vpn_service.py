@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,21 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import threading
+"""VPN support for network benchmarks.
 
-from perfkitbenchmarker import errors, context, resource, flags
+This module contains the main VPNService class, which manages the VPN lifecycle,
+the VPN class, which manages the VPN tunnel lifecycle between two endpoints, and
+the TunnelConfig class, which maintains the parameters needed to configure a
+tunnel between two endpoints. Related: perfkitbenchmarker.network
+module includes the BaseVPNGW class to manage VPN gateway endpoints.
+"""
+
 import itertools
-import re
-# from itertools import ifilter
-import time
-import logging
 import json
+import logging
+import re
+import threading
+import time
 import uuid
+
+from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import resource
 
 flags.DEFINE_integer('vpn_service_tunnel_count', None,
                      'Number of tunnels to create for each VPN GW pair.')
 flags.DEFINE_integer('vpn_service_gateway_count', None,
-                     'Number of VPN GWs to create for each VPN GW pair.')
+                     'Number of VPN GWs to create for each vm_group.')
 flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
 flags.DEFINE_string('vpn_service_shared_key', None,
@@ -49,12 +60,25 @@ def GetVPNServiceClass():
 
 
 class VPN(object):
-  """An object representing the VPN."""
+  """An object representing the VPN.
+
+  A VPN instance manages tunnel configurations for exactly 1 pair of endpoints.
+  """
 
   def __init__(self, *args, **kwargs):
       return object.__init__(self, *args, **kwargs)
 
   def getKeyFromGWPair(self, gwpair, suffix=''):
+    """Return the VPN key for a pair of endpoints.
+
+    Args:
+      gwpair: A tuple of 2 VPN gateways which define the VPN tunnel.
+      suffix: A unique suffix if multiple tunnels b/t this gateway pair exist.
+
+    Returns:
+      string. The VPN key.
+
+    """
     key = 'vpn' + ''.join(gw for gw in gwpair) + suffix + FLAGS.run_uri
     return key
 
@@ -85,6 +109,7 @@ class VPN(object):
       return benchmark_spec.vpns[key]
 
   def ConfigureTunnel(self):
+    """Configure the VPN tunnel."""
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     vpn_gateway_0 = benchmark_spec.vpn_gateways[self.GWPair[0]]
@@ -100,6 +125,11 @@ class VPN(object):
     logging.info('Tunnel is ready?: %s ' % tunnel_status)
 
   def isTunnelConfigured(self):
+    """Returns True if the tunnel configuration is complete.
+
+    Returns:
+      boolean.
+    """
     is_tunnel_configured = False
     if len(self.tunnel_config.endpoints) == 2:
       if self.tunnel_config.endpoints[self.GWPair[0]]['is_configured'] and self.tunnel_config.endpoints[self.GWPair[1]]['is_configured']:
@@ -110,6 +140,12 @@ class VPN(object):
   # tunnel should be up now, just wait for all clear
   # blocking here for now
   def isTunnelReady(self):
+    """ Returns True if the tunnel is up.
+
+    Returns:
+      boolean.
+
+    """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     ready = False
     timeout = time.time() + 60 * 5  # give up after 5 mins
@@ -164,6 +200,8 @@ class TunnelConfig(object):
 
 
 class VPNService(resource.BaseResource):
+  """Service class to manage VPN lifecycle."""
+
   RESOURCE_TYPE = 'BaseVPNService'
   REQUIRED_ATTRS = ['SERVICE']
 
@@ -203,8 +241,7 @@ class VPNService(resource.BaseResource):
     return result
 
   def _Create(self):
-    """Creates VPN objects for VPNGW pairs.
-    """
+    """Creates VPN objects for VPNGW pairs."""
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
@@ -226,7 +263,11 @@ class VPNService(resource.BaseResource):
     pass
 
   def GetNewSuffix(self):
-    # Names for tunnels, fr's, routes, etc need to be unique
+    """Names for tunnels, fr's, routes, etc need to be unique.
+
+    Returns:
+      string. A random string value.
+    """
     return format(uuid.uuid4().fields[1], 'x')
 
   def GetMetadata(self):
@@ -241,9 +282,22 @@ class VPNService(resource.BaseResource):
     return basic_data
 
   def GetVPNGWPairs(self, vpn_gateways):
-    # vpngw-us-west1-0-28ed049a <-> vpngw-us-central1-0-28ed049a # yes
-    # vpngw-us-west1-0-28ed049a <-> vpngw-us-central1-1-28ed049a # no
-     # get all gw pairs then filter out the non matching tunnel id's
+    """Returns pairs of gateways to create VPNs between.
+
+    Currently creates a pair between all non-matching region endpoints (mesh).
+    --vpn_service_gateway_count flag dictates how many gateways are created in
+    each vm_group(region).
+    --vpn_service_tunnel_count flag dictates how many VPN tunnels to create for
+    each gateway pair.
+    @TODO Add more pairing strategies as needed.
+
+    Args:
+      vpn_gateways: The dict of gateways created.
+
+    Returns:
+      list. The list of tuples of gateway pairs to create VPNs for.
+
+    """
     vpn_gateway_pairs = itertools.combinations(vpn_gateways, 2)
     r = re.compile(r"(?P<gw_prefix>.*-.*-.*)?-(?P<gw_tnum>[0-9])-(?P<run_id>.*)")
     def filterGateways(gateway_pair):
