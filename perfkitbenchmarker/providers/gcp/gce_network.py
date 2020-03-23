@@ -85,13 +85,13 @@ class GceVPNGW(network.BaseVPNGW):
     # update tunnel_config if needed
     if self.name not in tunnel_config.endpoints:
       logging.info('tunnel_config: This endpoint isnt registered yet... %s' % self.name)
-      tunnel_config.endpoints[self.name] = {}
-      tunnel_config.endpoints[self.name]['is_configured'] = False
-      tunnel_config.endpoints[self.name]['cidr'] = self.cidr
-      tunnel_config.endpoints[self.name]['project'] = self.project
-      tunnel_config.endpoints[self.name]['network_name'] = self.network_name
-      tunnel_config.endpoints[self.name]['region'] = self.region
-      tunnel_config.endpoints[self.name]['require_target_to_init'] = self.require_target_to_init
+      tunnel_config.endpoints[self.name] = {'is_configured': False,
+                                            'cidr': self.cidr,
+                                            'project': self.project,
+                                            'network_name':  self.network_name,
+                                            'region': self.region,
+                                            'require_target_to_init': self.require_target_to_init,
+                                            }
 
     # attach public IP to this GW if doesnt exist
     # and update tunnel_config if needed
