@@ -97,7 +97,7 @@ class EksCluster(container_service.KubernetesCluster):
     cmd = [FLAGS.eksctl, 'delete', 'cluster',
            '--name', self.name,
            '--region', self.region]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=1800)
 
   def _IsReady(self):
     """Returns True if the workers are ready, else False."""
