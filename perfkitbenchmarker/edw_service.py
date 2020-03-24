@@ -42,26 +42,29 @@ flags.DEFINE_string('edw_service_cluster_user', None,
 flags.DEFINE_string('edw_service_cluster_password', None,
                     'If set, the password authorized on cluster (only '
                     'applicable when using snapshots).')
+flags.DEFINE_string('snowflake_snowsql_config_override_file', None,
+                    'The SnowSQL configuration to use.'
+                    'https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file')  # pylint: disable=line-too-long
+flags.DEFINE_string('snowflake_connection', None,
+                    'Named Snowflake connection defined in SnowSQL config file.'
+                    'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
 
 FLAGS = flags.FLAGS
 
 
-TYPE_2_PROVIDER = dict([('athena', 'aws'),
-                        ('redshift', 'aws'),
-                        ('spectrum', 'aws'),
+TYPE_2_PROVIDER = dict([('athena', 'aws'), ('redshift', 'aws'),
+                        ('spectrum', 'aws'), ('snowflake_aws', 'aws'),
                         ('bigquery', 'gcp'),
                         ('azuresqldatawarehouse', 'azure')])
-TYPE_2_MODULE = dict([('athena',
-                       'perfkitbenchmarker.providers.aws.athena'),
-                      ('redshift',
-                       'perfkitbenchmarker.providers.aws.redshift'),
-                      ('spectrum',
-                       'perfkitbenchmarker.providers.aws.spectrum'),
-                      ('bigquery',
-                       'perfkitbenchmarker.providers.gcp.bigquery'),
-                      ('azuresqldatawarehouse',
-                       'perfkitbenchmarker.providers.azure.'
-                       'azure_sql_data_warehouse')])
+TYPE_2_MODULE = dict([
+    ('athena', 'perfkitbenchmarker.providers.aws.athena'),
+    ('redshift', 'perfkitbenchmarker.providers.aws.redshift'),
+    ('spectrum', 'perfkitbenchmarker.providers.aws.spectrum'),
+    ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake'),
+    ('bigquery', 'perfkitbenchmarker.providers.gcp.bigquery'),
+    ('azuresqldatawarehouse', 'perfkitbenchmarker.providers.azure.'
+     'azure_sql_data_warehouse')
+])
 DEFAULT_NUMBER_OF_NODES = 1
 # The order of stages is important to the successful lifecycle completion.
 EDW_SERVICE_LIFECYCLE_STAGES = ['create', 'load', 'query', 'delete']
@@ -78,13 +81,10 @@ class EdwService(resource.BaseResource):
     """
     # Hand over the actual creation to the resource module, which assumes the
     # resource is pkb managed by default
+    is_user_managed = self.IsUserManaged(edw_service_spec)
     # edw_service attribute
-    if edw_service_spec.cluster_identifier:
-      super(EdwService, self).__init__(user_managed=True)
-      self.cluster_identifier = edw_service_spec.cluster_identifier
-    else:
-      super(EdwService, self).__init__(user_managed=False)
-      self.cluster_identifier = 'pkb-' + FLAGS.run_uri
+    self.cluster_identifier = self.GetClusterIdentifier(edw_service_spec)
+    super(EdwService, self).__init__(user_managed=is_user_managed)
 
     # Provision related attributes
     if edw_service_spec.snapshot:
@@ -114,6 +114,32 @@ class EdwService(resource.BaseResource):
     # resource workflow management
     self.supports_wait_on_delete = True
 
+  def IsUserManaged(self, edw_service_spec):
+    """Indicates if the edw service instance is user managed.
+
+    Args:
+      edw_service_spec: spec of the edw service.
+
+    Returns:
+      A boolean, set to True if the edw service instance is user managed, False
+       otherwise.
+    """
+    return edw_service_spec.cluster_identifier is not None
+
+  def GetClusterIdentifier(self, edw_service_spec):
+    """Returns a string name of the Cluster Identifier.
+
+    Args:
+      edw_service_spec: spec of the edw service.
+
+    Returns:
+      A string, set to the name of the cluster identifier.
+    """
+    if self.IsUserManaged(edw_service_spec):
+      return edw_service_spec.cluster_identifier
+    else:
+      return 'pkb-' + FLAGS.run_uri
+
   def GetMetadata(self):
     """Return a dictionary of the metadata for this edw service."""
     basic_data = {'edw_service_type': self.spec.type,
@@ -131,22 +157,32 @@ class EdwService(resource.BaseResource):
     """
     raise NotImplementedError
 
-  def InstallAndAuthenticateRunner(self, vm):
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
     """Method to perform installation and authentication of runner utilities.
+
+    The default implementation raises an Error, to ensure client specific
+    implementation.
 
     Args:
       vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     raise NotImplementedError
 
-  def PrepareClientVm(self, vm):
+  def PrepareClientVm(self, vm, benchmark_name):
     """Prepare phase to install the runtime environment on the client vm.
 
     Args:
       vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     vm.Install('pip')
     vm.RemoteCommand('sudo pip install absl-py')
+    self.InstallAndAuthenticateRunner(vm, benchmark_name)
 
   def PushDataDefinitionDataManipulationScripts(self, vm):
     """Method to push the database bootstrap and teardown scripts to the vm.

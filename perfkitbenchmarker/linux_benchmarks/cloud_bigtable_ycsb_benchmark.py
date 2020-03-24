@@ -47,9 +47,7 @@ HBASE_CLIENT_VERSION = '1.x'
 BIGTABLE_CLIENT_VERSION = '1.4.0'
 
 # TODO(user): remove the custom ycsb build once the head version of YCSB
-# is updated to share Bigtable table object, and PKB is updated to work with the
-# new YCSB version (as of now, YCSB 0.17.0 does not work for PKB due to package
-# move from com.yahoo.ycsb to site.ycsb). The source code of the patched YCSB
+# is updated to share Bigtable table object. The source code of the patched YCSB
 # 0.14.0 can be found at 'https://storage.googleapis.com/cbt_ycsb_client_jar/'
 # 'YCSB-0.14.0-Bigtable-table-object-sharing.zip'.
 YCSB_BIGTABLE_TABLE_SHARING_TAR_URL = (
@@ -166,7 +164,8 @@ def CheckPrerequisites(benchmark_config):
   if FLAGS.google_bigtable_instance_name:
     instance = _GetInstanceDescription(FLAGS.project or _GetDefaultProject(),
                                        FLAGS.google_bigtable_instance_name)
-    logging.info('Found instance: %s', instance)
+    if instance:
+      logging.info('Found instance: %s', instance)
   else:
     logging.info('No instance; will create in Prepare.')
 
@@ -187,23 +186,16 @@ def _GetInstanceDescription(project, instance_name):
   """
   env = {'CLOUDSDK_CORE_DISABLE_PROMPTS': '1'}
   env.update(os.environ)
-  # List clusters and get the cluster associated with this instance so we can
-  # read the number of nodes in the cluster.
-  cmd = [FLAGS.gcloud_path, 'beta', 'bigtable', 'clusters', 'list', '--quiet',
-         '--format', 'json', '--project', project]
+
+  cmd = [FLAGS.gcloud_path, 'beta', 'bigtable', 'instances', 'describe',
+         instance_name,
+         '--format', 'json',
+         '--project', project]
   stdout, stderr, returncode = vm_util.IssueCommand(cmd, env=env)
   if returncode:
     raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
         ' '.join(cmd), stdout, stderr))
-  result = json.loads(stdout)
-  instances = {
-      instance['name'].split('/')[3]: instance for instance in result
-  }
-  try:
-    return instances[instance_name]
-  except KeyError:
-    raise KeyError('Instance {0} not found in {1}'.format(
-        instance_name, list(instances)))
+  return json.loads(stdout)
 
 
 def _GetTableName():
@@ -213,7 +205,7 @@ def _GetTableName():
 
 def _GetDefaultProject():
   cmd = [FLAGS.gcloud_path, 'config', 'list', '--format', 'json']
-  stdout, stderr, return_code = vm_util.IssueCommand(cmd)
+  stdout, _, return_code = vm_util.IssueCommand(cmd)
   if return_code:
     raise subprocess.CalledProcessError(return_code, cmd, stdout)
 
@@ -376,8 +368,6 @@ def Prepare(benchmark_spec):
     benchmark_spec.bigtable_instance = gcp_bigtable.GcpBigtableInstance(
         instance_name, project, zone)
     benchmark_spec.bigtable_instance.Create()
-    instance = _GetInstanceDescription(project, instance_name)
-    logging.info('Instance %s created successfully', instance)
 
   vm_util.RunThreaded(_Install, vms)
 
@@ -410,17 +400,26 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
 
-  instance_name = (FLAGS.google_bigtable_instance_name or
-                   'pkb-bigtable-{0}'.format(FLAGS.run_uri))
-  instance_info = _GetInstanceDescription(
-      FLAGS.project or _GetDefaultProject(), instance_name)
-
   metadata = {
       'ycsb_client_vms': len(vms),
-      'bigtable_zone': instance_info.get('location').split('/')[-1],
-      'bigtable_storage_type': instance_info.get('defaultStorageType'),
-      'bigtable_node_count': instance_info.get('serveNodes')
   }
+  instance_name = 'pkb-bigtable-{0}'.format(FLAGS.run_uri)
+  if FLAGS.google_bigtable_instance_name:
+    instance_name = FLAGS.google_bigtable_instance_name
+    clusters = gcp_bigtable.GetClustersDecription(
+        instance_name, FLAGS.project or _GetDefaultProject())
+    metadata['bigtable_zone'] = [
+        cluster['zone'] for cluster in clusters]
+    metadata['bigtable_storage_type'] = [
+        cluster['defaultStorageType'] for cluster in clusters]
+    metadata['bigtable_node_count'] = [
+        cluster['serveNodes'] for cluster in clusters]
+  else:
+    metadata['bigtable_zone'] = FLAGS.google_bigtable_zone
+    metadata[
+        'bigtable_replication_zone'] = FLAGS.bigtable_replication_cluster_zone
+    metadata['bigtable_storage_type'] = FLAGS.bigtable_storage_type
+    metadata['bigtable_node_count'] = FLAGS.bigtable_node_count
 
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
   # This leads to incorrect update latencies, since since the call returns

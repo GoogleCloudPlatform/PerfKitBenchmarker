@@ -20,7 +20,6 @@ import re
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -143,26 +142,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
                      '--rc-path=.bash_profile '
                      '--path-update=true '
                      '--bash-completion=true')
+    vm.Install('google_cloud_storage')
 
     vm.RemoteCommand('mkdir -p .config')
-    boto_file = object_storage_service.FindBotoFile()
-    vm.PushFile(boto_file, object_storage_service.DEFAULT_BOTO_LOCATION)
-
-    # If the boto file specifies a service key file, copy that service key file
-    # to the VM and modify the .boto file on the VM to point to the copied file.
-    with open(boto_file) as f:
-      boto_contents = f.read()
-    match = re.search(r'gs_service_key_file\s*=\s*(.*)', boto_contents)
-    if match:
-      service_key_file = match.group(1)
-      vm.PushFile(service_key_file, _DEFAULT_GCP_SERVICE_KEY_FILE)
-      vm_pwd, _ = vm.RemoteCommand('pwd')
-      vm.RemoteCommand(
-          'sed -i '
-          '-e "s/^gs_service_key_file.*/gs_service_key_file = %s/" %s' % (
-              re.escape(posixpath.join(vm_pwd.strip(),
-                                       _DEFAULT_GCP_SERVICE_KEY_FILE)),
-              object_storage_service.DEFAULT_BOTO_LOCATION))
 
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
     vm.gsutil_path = vm.gsutil_path.split()[0]
@@ -190,13 +172,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       logging.info('compiled crcmod is available, not installing again.')
       vm.installed_crcmod = False
 
-    vm.Install('gcs_boto_plugin')
-
   def CleanupVM(self, vm):
     vm.RemoveFile('google-cloud-sdk')
     vm.RemoveFile(GCLOUD_CONFIG_PATH)
-    vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION)
-    vm.Uninstall('gcs_boto_plugin')
 
   def CLIUploadDirectory(self, vm, directory, files, bucket):
     return vm.RemoteCommand(
@@ -208,12 +186,10 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         'time %s -m cp gs://%s/* %s' % (vm.gsutil_path, bucket, dest))
 
   def Metadata(self, vm):
-    metadata = {'pkb_installed_crcmod': vm.installed_crcmod,
-                object_storage_service.BOTO_LIB_VERSION:
-                linux_packages.GetPipPackageVersion(vm, 'boto')}
+    metadata = {'pkb_installed_crcmod': vm.installed_crcmod}
 
     return metadata
 
   @classmethod
   def APIScriptFiles(cls):
-    return ['boto_service.py', 'gcs.py']
+    return ['gcs.py']

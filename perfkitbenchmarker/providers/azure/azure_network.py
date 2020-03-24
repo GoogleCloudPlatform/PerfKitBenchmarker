@@ -240,6 +240,8 @@ class AzureVirtualNetwork(network.BaseNetwork):
     location: string. Azure location of the network.
   """
 
+  # Initializes an address space for a new AzureVirtualNetwork
+  _regional_network_count = 0
   vnet_lock = threading.Lock()
 
   CLOUD = providers.AZURE
@@ -251,9 +253,11 @@ class AzureVirtualNetwork(network.BaseNetwork):
     self.location = location
     self.args = ['--vnet-name', self.name]
     self.address_index = 0
-    self.address_spaces = [
-        '10.%s.0.0/16' % zone_num for zone_num in range(number_subnets)
-    ]
+    self.regional_index = AzureVirtualNetwork._regional_network_count
+    self.address_spaces = []
+    for zone_num in range(number_subnets):
+      self.address_spaces.append(
+          network.GetCidrBlock(self.regional_index, zone_num))
     self.is_created = False
 
   @classmethod
@@ -281,9 +285,11 @@ class AzureVirtualNetwork(network.BaseNetwork):
     # which is only called from AzureNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
     number_subnets = max(number_subnets, len(FLAGS.zones))
-    if key not in benchmark_spec.networks:
-      benchmark_spec.networks[key] = cls(spec, location, name, number_subnets)
-    return benchmark_spec.networks[key]
+    if key not in benchmark_spec.regional_networks:
+      benchmark_spec.regional_networks[key] = cls(spec, location, name,
+                                                  number_subnets)
+      AzureVirtualNetwork._regional_network_count += 1
+    return benchmark_spec.regional_networks[key]
 
   def GetNextAddressSpace(self):
     """Returns the next available address space for next subnet."""
@@ -572,7 +578,65 @@ class AzureNetwork(network.BaseNetwork):
     # deletes.
     self.resource_group.Delete()
 
+  def Peer(self, peering_network):
+    """Peers the network with the peering_network.
+
+    This method is used for VPC peering. It will connect 2 VPCs together.
+
+    Args:
+      peering_network: BaseNetwork. The network to peer with.
+    """
+
+    # Skip Peering if the networks are the same
+    if self.vnet is peering_network.vnet:
+      return
+
+    spec = network.BaseVPCPeeringSpec(self.vnet,
+                                      peering_network.vnet)
+    self.vpc_peering = AzureVpcPeering(spec)
+    peering_network.vpc_peering = self.vpc_peering
+    self.vpc_peering.Create()
+
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
     """Returns a key used to register Network instances."""
     return (cls.CLOUD, ZONE, spec.zone)
+
+
+class AzureVpcPeering(network.BaseVPCPeering):
+  """Object containing all information needed to create a VPC Peering Object."""
+
+  def _Create(self):
+    """Creates the peering object."""
+    self.name = '%s-%s-%s' % (self.network_a.resource_group.name,
+                              self.network_a.location, self.network_b.location)
+
+    # Creates Peering Connection
+    create_cmd = [
+        azure.AZURE_PATH, 'network', 'vnet', 'peering', 'create',
+        '--name', self.name,
+        '--vnet-name', self.network_a.name,
+        '--remote-vnet', self.network_b.name,
+        '--allow-vnet-access'
+    ] + self.network_a.resource_group.args
+
+    vm_util.IssueRetryableCommand(create_cmd)
+
+    # Accepts Peering Connection
+    accept_cmd = [
+        azure.AZURE_PATH, 'network', 'vnet', 'peering', 'create',
+        '--name', self.name,
+        '--vnet-name', self.network_b.name,
+        '--remote-vnet', self.network_a.name,
+        '--allow-vnet-access'
+    ] + self.network_b.resource_group.args
+    vm_util.IssueRetryableCommand(accept_cmd)
+
+    logging.info('Created VPC peering between %s and %s',
+                 self.network_a.address_spaces[0],
+                 self.network_b.address_spaces[0])
+
+  def _Delete(self):
+    """Deletes the peering connection."""
+    # Gets Deleted with resource group deletion
+    pass

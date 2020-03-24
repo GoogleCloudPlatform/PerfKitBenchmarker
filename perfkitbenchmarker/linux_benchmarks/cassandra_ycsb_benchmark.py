@@ -154,7 +154,7 @@ def Prepare(benchmark_spec):
       seed_vm, replication_factor=FLAGS.cassandra_replication_factor)
 
   benchmark_spec.executor = ycsb.YCSBExecutor(
-      'cassandra-10',
+      'cassandra2-cql',
       hosts=','.join(vm.internal_ip for vm in cassandra_vms))
 
 

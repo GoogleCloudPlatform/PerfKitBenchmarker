@@ -60,6 +60,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker.linux_packages import maven
 import six
 from six.moves import filter
 from six.moves import range
@@ -103,8 +104,8 @@ AGGREGATE_OPERATORS = {
     'MaxLatency(ms)': max}
 
 
-flags.DEFINE_string('ycsb_version', '0.9.0', 'YCSB version to use. Defaults to '
-                    'version 0.9.0.')
+flags.DEFINE_string('ycsb_version', '0.17.0',
+                    'YCSB version to use. Defaults to version 0.17.0.')
 flags.DEFINE_string('ycsb_tar_url', None, 'URL to a YCSB tarball to use '
                     'instead of the releases located on github.')
 flags.DEFINE_enum('ycsb_measurement_type', HISTOGRAM,
@@ -199,6 +200,22 @@ def _GetVersionIndex(version_str):
   return int(version_str.split('.')[1])
 
 
+def _GetVersionIndexFromUrl(url):
+  """Returns the version index from ycsb url string.
+
+  Args:
+    url: ycsb url string with format
+    'https://github.com/brianfrankcooper/YCSB/releases/'
+      'download/0.<version-index>.0/ycsb-0.<version-index>.0.tar.gz'
+     OR
+    'https://storage.googleapis.com/<ycsb_client_jar>/ycsb-0.<version-index>.0.tar.gz'
+
+  Returns:
+    (int) version index.
+  """
+  return _GetVersionIndex(url.split('-')[-1].replace('.tar.gz', ''))
+
+
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
   return [int(thread_count) for thread_count in FLAGS.ycsb_threads_per_client]
@@ -217,13 +234,25 @@ def _GetWorkloadFileList():
 
 
 def CheckPrerequisites():
+  """Verifies that the specified workload files are present and the YCSB version is 0.17.0 or higher.
+
+  Raises:
+    IOError: On missing workload file.
+    errors.Config.InvalidValue on unsupported YCSB version.
+  """
   for workload_file in _GetWorkloadFileList():
     if not os.path.exists(workload_file):
       raise IOError('Missing workload file: {0}'.format(workload_file))
-  if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
-    if _GetVersionIndex(FLAGS.ycsb_version) < 11:
-      raise errors.Config.InvalidValue('hdrhistogram not supported on earlier '
-                                       'ycsb versions.')
+
+  if _ycsb_tar_url:
+    ycsb_version = _GetVersionIndexFromUrl(_ycsb_tar_url)
+  elif FLAGS.ycsb_tar_url:
+    ycsb_version = _GetVersionIndexFromUrl(FLAGS.ycsb_tar_url)
+  else:
+    ycsb_version = _GetVersionIndex(FLAGS.ycsb_version)
+
+  if ycsb_version < 17:
+    raise errors.Config.InvalidValue('must use YCSB version 0.17.0 or higher.')
 
 
 def _Install(vm):
@@ -236,14 +265,15 @@ def _Install(vm):
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
   if _GetVersionIndex(FLAGS.ycsb_version) >= 11:
+    vm.Install('maven')
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
-    vm.RemoteCommand('sudo apt-get --assume-yes install maven > /dev/null 2>&1')
     # _JAVA_OPTIONS needed to work around this issue:
     # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
-    vm.RemoteCommand('cd {0}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
-                     'disableClassPathURLCheck=true  '
-                     'mvn install > /dev/null 2>&1'.format(
-                         HDRHISTOGRAM_DIR))
+    vm.RemoteCommand('cd {hist_dir}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
+                     'disableClassPathURLCheck=true '
+                     '{mvn_cmd} > /dev/null 2>&1'.format(
+                         hist_dir=HDRHISTOGRAM_DIR,
+                         mvn_cmd=maven.GetRunCommand('install')))
 
 
 def YumInstall(vm):
@@ -279,7 +309,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
 
   Example input for hdrhistogram datatype:
 
-    YCSB Client 0.12.0
+    YCSB Client 0.17.0
     Command line: -db com.yahoo.ycsb.db.RedisClient -P /opt/pkb/workloadb
     [OVERALL], RunTime(ms), 29770.0
     [OVERALL], Throughput(ops/sec), 33590.86328518643
@@ -292,11 +322,11 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
     [UPDATE], Return=OK, 49856
     ...
 
-  Example input for ycsb version after 0.13.0:
+  Example input for ycsb version 0.17.0+:
 
     ...
     Command line: -db com.yahoo.ycsb.db.HBaseClient10 ... -load
-    YCSB Client 0.14.0
+    YCSB Client 0.17.0
 
     Loading workload...
     Starting test.
@@ -351,8 +381,6 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   Raises:
     IOError: If the results contained unexpected lines.
   """
-  # TODO: YCSB 0.9.0 output client and command line string to stderr, so
-  # we need to support it in the future.
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'

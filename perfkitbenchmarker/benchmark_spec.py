@@ -126,6 +126,7 @@ class BenchmarkSpec(object):
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.vms = []
+    self.regional_networks = {}
     self.networks = {}
     self.custom_subnets = {k: {
         'cloud': v.cloud,
@@ -156,6 +157,7 @@ class BenchmarkSpec(object):
     self.vms_to_boot = (
         self.config.vm_groups if self.config.relational_db is None else
         relational_db.VmsToBoot(self.config.relational_db.vm_groups))
+    self.vpc_peering = self.config.vpc_peering
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -271,14 +273,22 @@ class BenchmarkSpec(object):
     if self.config.edw_service is None:
       return
     # Load necessary modules from the provider to account for dependencies
+    # TODO(saksena): Replace with
+    # providers.LoadProvider(string.lower(FLAGS.cloud))
     providers.LoadProvider(
         edw_service.TYPE_2_PROVIDER.get(self.config.edw_service.type))
     # Load the module for the edw service based on type
-    edw_service_module = importlib.import_module(edw_service.TYPE_2_MODULE.get(
-        self.config.edw_service.type))
-    edw_service_class = getattr(edw_service_module,
-                                self.config.edw_service.type[0].upper() +
-                                self.config.edw_service.type[1:])
+    edw_service_type = self.config.edw_service.type
+    edw_service_module = importlib.import_module(
+        edw_service.TYPE_2_MODULE.get(edw_service_type))
+    # The edw_service_type in certain cases may be qualified with a hosting
+    # cloud eg. snowflake_aws,snowflake_gcp, etc.
+    # However the edw_service_class_name in all cases will still be cloud
+    # agnostic eg. Snowflake.
+    edw_service_class_name = edw_service_type.split('_')[0]
+    edw_service_class = getattr(
+        edw_service_module,
+        edw_service_class_name[0].upper() + edw_service_class_name[1:])
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
 
@@ -537,14 +547,23 @@ class BenchmarkSpec(object):
     # provision networks. Until support is added to provision resources in an
     # order based on dependencies, this key ordering can be used to avoid
     # deadlock by placing dependent networks later and their dependencies
-    # earlier. As an example, AWS stores both per-region and per-zone objects
-    # in this dict, and each per-zone object depends on a corresponding
-    # per-region object, so the per-region objects are given keys that come
-    # first when sorted.
-    networks = [self.networks[key]
-                for key in sorted(six.iterkeys(self.networks))]
+    # earlier.
+    networks = [
+        self.networks[key] for key in sorted(six.iterkeys(self.networks))
+    ]
 
     vm_util.RunThreaded(lambda net: net.Create(), networks)
+
+    # VPC peering is currently only supported for connecting 2 VPC networks
+    if self.vpc_peering:
+      if len(networks) > 2:
+        raise errors.Error(
+            'Networks of size %d are not currently supported.' %
+            (len(networks)))
+      # Ignore Peering for one network
+      elif len(networks) == 2:
+        networks[0].Peer(networks[1])
+
     if self.container_registry:
       self.container_registry.Create()
       for container_spec in six.itervalues(self.container_specs):

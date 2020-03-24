@@ -1,0 +1,12 @@
+#! /bin/bash -xv
+
+# delete some VMs
+{% if cloud == 'GCP' %}
+for i in {1..{{vm_count}}}; do
+/usr/bin/gcloud --quiet compute instances delete booter-{{ launcher_vm_name }}-$i  \
+--format json  \
+--quiet  \
+--zone {{ zone }}  \
+--project {{ project }} &
+done
+{% endif %}

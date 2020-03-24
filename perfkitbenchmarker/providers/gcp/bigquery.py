@@ -83,7 +83,7 @@ class Bigquery(edw_service.EdwService):
     return ((self.cluster_identifier.split('.')[0] + ':' +
              dataset) if dataset else self.cluster_identifier.replace('.', ':'))
 
-  def InstallAndAuthenticateRunner(self, vm):
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
     """Method to perform installation and authentication of bigquery runner.
 
     Native Bigquery client that ships with the google_cloud_sdk
@@ -91,9 +91,12 @@ class Bigquery(edw_service.EdwService):
 
     Args:
       vm: Client vm on which the script will be run.
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
     """
     vm.Install('google_cloud_sdk')
-    gcp_util.AuthenticateServiceAccount(vm)
+    gcp_util.AuthenticateServiceAccount(vm, benchmark=benchmark_name)
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""

@@ -1,4 +1,4 @@
-workload=com.yahoo.ycsb.workloads.CoreWorkload
+workload=site.ycsb.workloads.CoreWorkload
 
 readallfields=true
 operationcount=1000000

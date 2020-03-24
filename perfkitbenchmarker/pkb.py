@@ -126,6 +126,8 @@ flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
                   'default is the standard set. For more information about '
                   'benchmarks and benchmark sets, see the README and '
                   'benchmark_sets.py.')
+flags.DEFINE_boolean('multi_os_benchmark', False, 'Whether is benchmark will '
+                     'involve multiple os types.')
 flags.DEFINE_string('archive_bucket', None,
                     'Archive results to the given S3/GCS bucket.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
@@ -539,7 +541,7 @@ def _CreateBenchmarkSpecs():
   for benchmark_module, user_config in benchmark_tuple_list:
     # Construct benchmark config object.
     name = benchmark_module.BENCHMARK_NAME
-    expected_os_types = (
+    expected_os_types = None if FLAGS.multi_os_benchmark else (
         os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
         else os_types.LINUX_OS_TYPES)
     with flag_util.OverrideFlags(FLAGS, user_config.get('flags')):

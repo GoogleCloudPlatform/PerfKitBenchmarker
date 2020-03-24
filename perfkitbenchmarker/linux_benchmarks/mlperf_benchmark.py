@@ -19,6 +19,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.linux_packages import tensorflow
@@ -55,16 +56,20 @@ mlperf:
 flags.DEFINE_enum('mlperf_benchmark', 'resnet',
                   ['resnet', 'transformer', 'mask', 'gnmt', 'ssd', 'minigo'],
                   'MLPerf benchmark test to run.')
+flags.DEFINE_string(
+    'mlperf_gcs_resnet_checkpoint',
+    'gs://cloud-tpu-artifacts/resnet/resnet-nhwc-2018-02-07/model.ckpt-112603',
+    'A ResNet backbone trained on the ImageNet dataset.')
+flags.DEFINE_string(
+    'mlperf_transformer_decode_dir', '', 'Transformer decode directory')
 flags.DEFINE_string('wmt_data_dir',
-                    'gs://pkb-sgpyc-europe-west4/mlperf_v0.6_nv_transformer',
+                    'gs://pkb-sgpyc-us-west1/mlperf_v0.6_nv_transformer/',
                     'Directory where the wmt dataset is stored')
-flags.DEFINE_string('coco_data_dir', 'gs://pkb-sgpyc-europe-west4/coco',
+flags.DEFINE_string('coco_data_dir', 'gs://pkb-sgpyc-us-west1/coco2017/',
                     'Directory where the coco dataset is stored')
 flags.DEFINE_string('gnmt_data_dir',
-                    'gs://pkb-sgpyc-europe-west4/mlperf_v0.6_nv_gnmt',
+                    'gs://pkb-sgpyc-us-west1/mlperf_v0.6_nv_gnmt/',
                     'Directory where the nv v0.6 WMT dataset is stored')
-flags.DEFINE_string('coco2017_data_dir', 'gs://pkb-sgpyc-europe-west4/coco2017',
-                    'Directory where the coco2017 dataset is stored')
 flags.DEFINE_string('minigo_model_dir', None,
                     'Directory on GCS to copy minigo source data from. Files '
                     'will be copied from subdirectories of src_dir '
@@ -95,7 +100,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.wmt_data_dir = FLAGS.wmt_data_dir
   benchmark_spec.coco_data_dir = FLAGS.coco_data_dir
   benchmark_spec.gnmt_data_dir = FLAGS.gnmt_data_dir
-  benchmark_spec.coco2017_data_dir = FLAGS.coco2017_data_dir
   benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
 
 
@@ -117,16 +121,6 @@ def _DownloadData(data_dir, data_path, vm):
                        data_dir=data_dir,
                        gsutil_path=google_cloud_sdk.GSUTIL_PATH,
                        data_path=data_path))
-
-  # vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [_ILSVRC2012_TAR],
-  #                                       local_imagenet_data_path)
-  # vm.RemoteCommand('sudo tar -xvf {tar} -C {data_dir}'.format(
-  #     tar=posixpath.join(imagenet_data_dir, _ILSVRC2012_TAR),
-  #     data_dir=imagenet_data_dir))
-  # Some of the data are in the sub directory. Copy all the data to current
-  # directory.
-  # vm.RemoteCommand('find {data_dir} -name "*-*-of-*" -exec mv {{}} {data_dir}'
-  #                 ' \\;'.format(data_dir=imagenet_data_dir))
 
 
 def Prepare(benchmark_spec, vm=None):
@@ -208,43 +202,77 @@ def Prepare(benchmark_spec, vm=None):
           'wget https://storage.cloud.google.com/mlperf_artifcats/v0.6_training/coco-1.1-cp36-cp36m-linux_x86_64.whl'
       )
 
-      vm.RemoteCommand('cd {path} && '
-                       'sed "s/--progress-bar off/ /g" ./setup.sh | '
-                       'sed "s/pip /pip3 /g" > ./setup1.sh && '
-                       'chmod 755 ./setup1.sh && '
-                       './setup1.sh'.format(path=run_path))
-    else:
-      vm.RemoteCommand(
-          'cd {path} && '
-          'sed "s/--progress-bar off/ /g" ./setup.sh > ./setup1.sh && '
-          'chmod 755 ./setup1.sh && '
-          './setup1.sh'.format(path=run_path))
+    run_script = posixpath.join(run_path, 'setup.sh')
+    vm_util.ReplaceText(vm, '--progress-bar off', ' ', run_script)
+    vm_util.ReplaceText(vm, 'pip ', 'pip3 ', run_script)
+    vm.RemoteCommand('chmod 755 {script} && {script}'.format(script=run_script))
 
     if 'mask' not in benchmark_spec.benchmark:
       vm.RemoteCommand(
           'pip3 uninstall -y tf-estimator-nightly && '
           'pip3 install tf-estimator-nightly==1.14.0.dev2019051801')
 
-    vm.RemoteCommand(
-        r'cd {path} && '
-        r'sed "s/--model_dir=.*/--model_dir=gs:\/\/{bucket} \\\/g" run_and_time.sh | '
-        r'sed "s/--tpu=.*/--tpu={tpu} \\\/g" | '
-        r'sed "s/--output_dir=.*/--output_dir=gs:\/\/{bucket} \\\/g" | '
-        r'sed "s/--cloud_tpu_name=.*/--cloud_tpu_name={tpu} \\\/g" | '
-        r'sed "s/--out_dir=.*/--out_dir=gs:\/\/{bucket} \\\/g" | '
-        r'sed "s/--tpu_name=.*/--tpu_name={tpu} \\\/g" > run_and_time1.sh && '
-        r'chmod 755 run_and_time1.sh '.format(
-            path=run_path,
-            bucket=bucket,
-            tpu=benchmark_spec.tpu_groups['train'].GetName()))
+    if 'resnet' in benchmark_spec.benchmark:
+      data_dir = benchmark_spec.imagenet_data_dir
+    elif 'transformer' in benchmark_spec.benchmark:
+      data_dir = benchmark_spec.wmt_data_dir
+    elif 'mask' in benchmark_spec.benchmark:
+      data_dir = benchmark_spec.coco_data_dir
+    elif 'gnmt' in benchmark_spec.benchmark:
+      data_dir = benchmark_spec.gnmt_data_dir
+    elif 'ssd' in benchmark_spec.benchmark:
+      data_dir = benchmark_spec.coco_data_dir
+    else:
+      raise ValueError('Unknown operation, cannot find {} in benchmark'.format(
+          benchmark_spec.benchmark))
+
+    run_script = posixpath.join(run_path, 'run_and_time.sh')
+    data_dir = data_dir.replace('/', r'\/')
+    checkpoint = FLAGS.mlperf_gcs_resnet_checkpoint.replace('/', r'\/'),
+    decode_dir = FLAGS.mlperf_transformer_decode_dir.replace('/', r'\/'),
+    tpu = benchmark_spec.tpu_groups['train'].GetName()
+    vm_util.ReplaceText(vm, '--model_dir=.*', r'--model_dir=gs:\/\/{} \\\\'
+                        .format(bucket), run_script)
+    vm_util.ReplaceText(vm, '--data_dir=.*',
+                        r'--data_dir={} \\\\'.format(data_dir), run_script)
+    vm_util.ReplaceText(vm, '--training_file_pattern=.*',
+                        r'--training_file_pattern={}\/train-* \\\\'
+                        .format(data_dir), run_script)
+    vm_util.ReplaceText(vm, '--validation_file_pattern=.*',
+                        r'--validation_file_pattern={}\/val-* \\\\'
+                        .format(data_dir), run_script)
+    vm_util.ReplaceText(vm, '--val_json_file=.*',
+                        r'--val_json_file={}\/instances_val2017.json \\\\'
+                        .format(data_dir), run_script)
+    vm_util.ReplaceText(vm, '--resnet_checkpoint=.*',
+                        r'--resnet_checkpoint={} \\\\'.format(checkpoint),
+                        run_script)
+    vm_util.ReplaceText(vm, '--decode_from_file=.*',
+                        r'--decode_from_file={}\/wmt14-en-de.src \\\\'
+                        .format(decode_dir), run_script)
+    vm_util.ReplaceText(vm, '--decode_reference=.*',
+                        r'--decode_reference={}\/wmt14-en-de.ref \\\\'
+                        .format(decode_dir), run_script)
+    vm_util.ReplaceText(vm, '--decode_to_file=.*',
+                        r'--decode_to_file={}\/decode.transformer_mlperf_tpu.'
+                        r'translate_ende_wmt32k_packed.2x2_log_1018_2 \\\\'
+                        .format(bucket), run_script)
+    vm_util.ReplaceText(vm, '--tpu=.*', r'--tpu={} \\\\'.format(tpu),
+                        run_script)
+    vm_util.ReplaceText(vm, '--output_dir=.*', r'--output_dir=gs:\/\/{} \\\\'
+                        .format(bucket), run_script)
+    vm_util.ReplaceText(vm, '--cloud_tpu_name=.*',
+                        r'--cloud_tpu_name={} \\\\'.format(tpu), run_script)
+    vm_util.ReplaceText(vm, '--out_dir=.*',
+                        r'--out_dir=gs:\/\/{} \\\\'.format(bucket), run_script)
+    vm_util.ReplaceText(vm, '--tpu_name=.*', r'--tpu_name={} \\\\'.format(tpu),
+                        run_script)
+    vm.RemoteCommand('chmod 755 {}'.format(run_script))
 
     if 'gnmt' in benchmark_spec.benchmark:
-      vm.RemoteCommand(
-          'cd {code_path}/{model} && '
-          'cp metric.py metric0.py && '
-          'sed "s/ sacrebleu -t/ python3 -m sacrebleu -t/g" metric0.py > metric.py'
-          .format(code_path=code_path, model=model))
-
+      run_script = posixpath.join(code_path, model, 'metric.py')
+      vm_util.ReplaceText(vm, ' sacrebleu -t', ' python3 -m sacrebleu -t',
+                          run_script)
   else:
     benchmark_spec.model_dir = '/tmp'
 
@@ -272,20 +300,21 @@ def Prepare(benchmark_spec, vm=None):
                     vm)
 
     if 'minigo' in benchmark_spec.benchmark:
-      vm.RemoteCommand(
-          'cd training_results_v0.6/NVIDIA/benchmarks/minigo/implementations/tensorflow && '
-          'sed -i "s/get_data.py/get_data.py --src_dir={}/g" ./run_and_time.sh && '
-          'sudo docker build --pull --network=host -t mlperf-nvidia:minigo .'
-          ''.format(FLAGS.minigo_model_dir.replace('/', r'\/')),
-          should_log=True)
+      build_path = 'training_results_v0.6/NVIDIA/benchmarks/minigo/implementations/tensorflow'
+      run_script = posixpath.join(build_path, 'run_and_time.sh')
+      vm_util.ReplaceText(vm, 'get_data.py', 'get_data.py --src_dir={}'.format(
+          FLAGS.minigo_model_dir.replace('/', r'\/')), run_script)
+      vm.RemoteCommand('cd {} && sudo docker build --pull --network=host -t '
+                       'mlperf-nvidia:minigo .'.format(build_path),
+                       should_log=True)
 
     if 'mask' in benchmark_spec.benchmark:
       vm.RemoteCommand(
           'cd training_results_v0.6/NVIDIA/benchmarks/maskrcnn/implementations/pytorch && '
           'sudo docker build --pull --network=host -t mlperf-nvidia:object_detection . ',
           should_log=True)
-      _DownloadData(benchmark_spec.coco2017_data_dir,
-                    posixpath.join('/data', 'coco2017'), vm)
+      _DownloadData(benchmark_spec.coco_data_dir,
+                    posixpath.join('/data', 'coco'), vm)
 
     if 'gnmt' in benchmark_spec.benchmark:
       vm.RemoteCommand(
@@ -300,8 +329,8 @@ def Prepare(benchmark_spec, vm=None):
           'cd training_results_v0.6/NVIDIA/benchmarks/ssd/implementations/pytorch && '
           'sudo docker build --pull --network=host -t mlperf-nvidia:single_stage_detector . ',
           should_log=True)
-      _DownloadData(benchmark_spec.coco2017_data_dir,
-                    posixpath.join('/data', 'coco2017'), vm)
+      _DownloadData(benchmark_spec.coco_data_dir,
+                    posixpath.join('/data', 'coco'), vm)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -318,6 +347,7 @@ def _CreateMetadataDict(benchmark_spec):
       'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'model': benchmark_spec.benchmark,
+      'version': 'v0.6.0',
   }
   if benchmark_spec.tpus:
     metadata.update({
@@ -349,7 +379,6 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
       r':::MLL (\d+\.\d+) eval_accuracy: {(.*)}', output)
 
   start = None
-  version = 'v0.6.0'
   for wall_time, result in results:
     wall_time = float(wall_time)
     if not start:
@@ -366,7 +395,6 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
       value = regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)', result)
     metadata_copy['times'] = wall_time - start
     metadata_copy['epoch'] = int(epoch)
-    metadata_copy['version'] = version
     samples.append(
         sample.Sample('Eval Accuracy',
                       float(value) * 100, '%', metadata_copy))
@@ -422,7 +450,7 @@ def Run(benchmark_spec):
       mlperf_benchmark_cmd = ('cd {code_path} && '
                               'export PYTHONPATH=$(pwd):$(pwd)/{model} && '
                               'cd {model} && '
-                              '{run_path}/run_and_time1.sh'.format(
+                              '{run_path}/run_and_time.sh'.format(
                                   code_path=code_path,
                                   model=model,
                                   run_path=run_path))
@@ -430,62 +458,45 @@ def Run(benchmark_spec):
       if 'ssd' in benchmark_spec.benchmark:
         mlperf_benchmark_cmd = (
             'export '
-            'MLP_GCS_RESNET_CHECKPOINT=gs://download.tensorflow.org/models/mlperf/v0.5.0/resnet34_ssd_checkpoint'
-            ' && {cmd}'.format(cmd=mlperf_benchmark_cmd))
-
+            'MLP_GCS_RESNET_CHECKPOINT={checkpoint}'
+            ' && {cmd}'.format(
+                checkpoint=FLAGS.mlperf_gcs_resnet_checkpoint,
+                cmd=mlperf_benchmark_cmd))
     else:
       raise ValueError(
           'MLPerf configurations do not support the hardware in PKB. PKB may '
           'need to be updated if this is a new TPU type.')
 
   else:
+    benchmark_path = '$HOME/training_results_v0.6/NVIDIA/benchmarks'
+    common_env = 'DGXSYSTEM=DGX1 NEXP=1'
     if 'resnet' in benchmark_spec.benchmark:
-      mlperf_benchmark_cmd = (
-          'cd '
-          'training_results_v0.6/NVIDIA/benchmarks/resnet/implementations/mxnet'
-          ' && sed \'s/SYSLOGGING=1/SYSLOGGING=0/g\' ./run.sub > ./run1.sub &&'
-          ' chmod 755 ./run1.sub && sudo DATADIR=/data/imagenet '
-          'LOGDIR=/tmp/resnet PULL=0 DGXSYSTEM=DGX1 NEXP=1 ./run1.sub ')
+      run_path = posixpath.join(benchmark_path, 'resnet/implementations/mxnet')
+      env = 'DATADIR=/data/imagenet LOGDIR=/tmp/resnet PULL=0 '
+    elif 'transformer' in benchmark_spec.benchmark:
+      run_path = posixpath.join(benchmark_path,
+                                'transformer/implementations/pytorch')
+      env = 'DATADIR=/data/wmt/utf8 LOGDIR=/tmp/transformer PULL=0 '
+    elif 'minigo' in benchmark_spec.benchmark:
+      run_path = posixpath.join(benchmark_path,
+                                'minigo/implementations/tensorflow')
+      env = 'LOGDIR=/tmp/minigo CONT=mlperf-nvidia:minigo '
+    elif 'mask' in benchmark_spec.benchmark:
+      run_path = posixpath.join(benchmark_path,
+                                'maskrcnn/implementations/pytorch')
+      env = 'LOGDIR=/tmp/mask DATADIR=/data PULL=0 '
+    elif 'gnmt' in benchmark_spec.benchmark:
+      run_path = posixpath.join(benchmark_path, 'gnmt/implementations/pytorch')
+      env = 'LOGDIR=/tmp/gnmt DATADIR=/data/gnmt PULL=0 '
+    elif 'ssd' in benchmark_spec.benchmark:
+      run_path = posixpath.join(benchmark_path, 'ssd/implementations/pytorch')
+      env = 'LOGDIR=/tmp/ssd DATADIR=/data PULL=0 '
 
-    if 'transformer' in benchmark_spec.benchmark:
-      mlperf_benchmark_cmd = (
-          'cd '
-          'training_results_v0.6/NVIDIA/benchmarks/transformer/implementations/pytorch'
-          ' && sed \'s/SYSLOGGING=1/SYSLOGGING=0/g\' ./run.sub > ./run1.sub &&'
-          ' chmod 755 ./run1.sub && sudo DATADIR=/data/wmt/utf8 '
-          'LOGDIR=/tmp/transformer PULL=0 DGXSYSTEM=DGX1 NEXP=1 ./run1.sub ')
-
-    if 'minigo' in benchmark_spec.benchmark:
-      mlperf_benchmark_cmd = (
-          'cd '
-          '$HOME/training_results_v0.6/NVIDIA/benchmarks/minigo/implementations/tensorflow'
-          ' && sed \'s/SYSLOGGING=1/SYSLOGGING=0/g\' ./run.sub > run1.sub && '
-          'chmod 755 ./run1.sub && sudo LOGDIR=/tmp/minigo '
-          'CONT=mlperf-nvidia:minigo DGXSYSTEM=DGX1 NEXP=1 ./run1.sub ')
-
-    if 'mask' in benchmark_spec.benchmark:
-      mlperf_benchmark_cmd = (
-          'cd '
-          '$HOME/training_results_v0.6/NVIDIA/benchmarks/maskrcnn/implementations/pytorch'
-          ' && sed "s/SYSLOGGING=1/SYSLOGGING=0/g" ./run.sub > ./run1.sub && '
-          'chmod 755 ./run1.sub && sudo LOGDIR=/tmp/mask DATADIR=/data PULL=0 '
-          'DGXSYSTEM=DGX1 NEXP=1 ./run1.sub ')
-
-    if 'gnmt' in benchmark_spec.benchmark:
-      mlperf_benchmark_cmd = (
-          'cd '
-          '$HOME/training_results_v0.6/NVIDIA/benchmarks/gnmt/implementations/pytorch'
-          ' && sed "s/SYSLOGGING=1/SYSLOGGING=0/g" ./run.sub > ./run1.sub && '
-          'chmod 755 ./run1.sub && sudo LOGDIR=/tmp/gnmt DATADIR=/data/gnmt '
-          'PULL=0 DGXSYSTEM=DGX1 NEXP=1 ./run1.sub ')
-
-    if 'ssd' in benchmark_spec.benchmark:
-      mlperf_benchmark_cmd = (
-          'cd '
-          '$HOME/training_results_v0.6/NVIDIA/benchmarks/ssd/implementations/pytorch'
-          ' && sed "s/SYSLOGGING=1/SYSLOGGING=0/g" ./run.sub > ./run1.sub && '
-          'chmod 755 ./run1.sub && sudo LOGDIR=/tmp/ssd DATADIR=/data PULL=0 '
-          'DGXSYSTEM=DGX1 NEXP=1 ./run1.sub ')
+    run_script = posixpath.join(run_path, 'run.sub')
+    vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
+    mlperf_benchmark_cmd = (
+        'chmod 755 {run_script} && sudo {common_env} {env} {run_script} '
+        .format(run_script=run_script, common_env=common_env, env=env))
 
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(

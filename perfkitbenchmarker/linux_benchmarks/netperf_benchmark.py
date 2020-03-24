@@ -86,6 +86,7 @@ BENCHMARK_NAME = 'netperf'
 BENCHMARK_CONFIG = """
 netperf:
   description: Run TCP_RR, TCP_CRR, UDP_RR, TCP_STREAM and UDP_STREAM
+  vpc_peering: True
   vm_groups:
     vm_1:
       vm_spec: *default_single_core

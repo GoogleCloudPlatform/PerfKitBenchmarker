@@ -240,6 +240,7 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
         'dir_mode': '0777',
         'file_mode': '0777',
         'serverino': None,
+        'nostrictsync': None,
     }
     mount_options.update(overrides)
     return mount_options

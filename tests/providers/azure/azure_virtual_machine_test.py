@@ -56,5 +56,22 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
       vm._Create()
 
 
+class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(AzurePublicIPAddressTest, self).setUp()
+    mock.patch(azure_virtual_machine.__name__ +
+               '.azure_network.GetResourceGroup').start()
+    self.mock_cmd = mock.patch.object(vm_util, 'IssueCommand').start()
+    self.ip_address = azure_virtual_machine.AzurePublicIPAddress(
+        'westus2', None, 'test_ip')
+
+  def testQuotaExceeded(self):
+    quota_error = ('ERROR: Cannot create more than 20 public IP addresses for '
+                   'this subscription in this region.')
+    self.mock_cmd.side_effect = [('', quota_error, 1)]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+      self.ip_address._Create()
+
 if __name__ == '__main__':
   unittest.main()

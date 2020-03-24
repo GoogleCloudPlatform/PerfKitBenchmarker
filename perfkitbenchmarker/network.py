@@ -25,6 +25,7 @@ from enum import Enum
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import resource
 
 
 class NetType(Enum):
@@ -194,3 +195,78 @@ class BaseNetwork(object):
   def Delete(self):
     """Deletes the actual network."""
     pass
+
+  def Peer(self, peering_network):
+    """Peers the network with the peering_network.
+
+    This method is used for VPC peering. It will connect 2 VPCs together.
+
+    Args:
+      peering_network: BaseNetwork. The network to peer with.
+    """
+    pass
+
+
+class BaseVPCPeeringSpec(object):
+  """Object containing all information needed to create a VPC Peering Object."""
+
+  def __init__(self, network_a=None, network_b=None):
+    """Initializes BaseVPCPeeringSpec.
+
+    Args:
+      network_a: BaseNetwork. The network initiating the peering.
+      network_b: BaseNetwork. The network to be peered to.
+    """
+    self.network_a = network_a
+    self.network_b = network_b
+
+  def __repr__(self):
+    return '%s(%r)' % (self.__class__, self.__dict__)
+
+
+class BaseVPCPeering(resource.BaseResource):
+  """Base class for VPC Peering.
+
+  This class holds VPC Peering methods and attributes relating to the
+  VPC Peering as a cloud resource.
+
+  Attributes:
+    network_a: BaseNetwork. The network initiating the peering.
+    network_b: BaseNetwork. The network to be peered to.
+  """
+
+  RESOURCE_TYPE = 'BaseVPCPeering'
+
+  def __init__(self, vpc_peering_spec):
+    """Initialize BaseVPCPeering class.
+
+    Args:
+      vpc_peering_spec: BaseVPCPeeringSpec. Spec for VPC peering object.
+    """
+    super(BaseVPCPeering, self).__init__()
+    self.network_a = vpc_peering_spec.network_a
+    self.network_b = vpc_peering_spec.network_b
+
+
+def GetCidrBlock(regional_index=0, subnet_index=0, mask_size=24):
+  """Returns a Cidr Block.
+
+  Each cloud region should be assigned a unique IP Address Space. And each
+  Subnet within a regional cloud network should also have an unique space. This
+  function returns the IP Address allocation based on the regional and subnet
+  index given. It is expected that each cloud regional network will have a
+  unique regional index and each of its subnets will also have a unique index.
+  Regional cidr blocks should be large enough to cover the subnet cidr blocks.
+  Chose a mask_size for regional cidr block accordingly. For example, a
+  mask_size of 16 with regional starting block 10.0.0.0 will cover a subnet of
+  10.0.1.0/24.
+
+  Args:
+    regional_index: Int. The IP Address allocation dependent on the region.
+      Default index is 0.
+    subnet_index: Int. The IP Address section dependent on the subnet.
+      Default index is 0.
+    mask_size: Int. Mask size to request from cidr block.
+      Default index is 24.
+  """
+  return '10.{}.{}.0/{}'.format(regional_index, subnet_index, mask_size)

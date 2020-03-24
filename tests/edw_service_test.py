@@ -19,26 +19,31 @@ import unittest
 
 import mock
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
 
-CLUSTER_PARAMETER_GROUP = 'fake_redshift_cluster_parameter_group'
-CLUSTER_SUBNET_GROUP = 'fake_redshift_cluster_subnet_group'
-PKB_CLUSTER = 'pkb-cluster'
-PKB_CLUSTER_DATABASE = 'pkb-database'
-REDSHIFT_NODE_TYPE = 'dc2.large'
-USERNAME = 'pkb-username'
-PASSWORD = 'pkb-password'
-TEST_RUN_URI = 'fakeru'
+_CLUSTER_PARAMETER_GROUP = 'fake_redshift_cluster_parameter_group'
+_CLUSTER_SUBNET_GROUP = 'fake_redshift_cluster_subnet_group'
+_PKB_CLUSTER = 'pkb-cluster'
+_PKB_CLUSTER_DATABASE = 'pkb-database'
+_REDSHIFT_NODE_TYPE = 'dc2.large'
+_USERNAME = 'pkb-username'
+_PASSWORD = 'pkb-password'
+_TEST_RUN_URI = 'fakeru'
 
-BASE_REDSHIFT_SPEC = {
-    'cluster_identifier': PKB_CLUSTER,
-    'db': PKB_CLUSTER_DATABASE,
-    'user': USERNAME,
-    'password': PASSWORD,
-    'node_type': REDSHIFT_NODE_TYPE,
+_AWS_ZONE_US_EAST_1A = 'us-east-1a'
+
+_BASE_REDSHIFT_SPEC = {
+    'cluster_identifier': _PKB_CLUSTER,
+    'db': _PKB_CLUSTER_DATABASE,
+    'user': _USERNAME,
+    'password': _PASSWORD,
+    'node_type': _REDSHIFT_NODE_TYPE,
     'node_count': 1
 }
+
+FLAGS = flags.FLAGS
 
 
 class ClientVm(object):
@@ -46,6 +51,16 @@ class ClientVm(object):
 
   def RemoteCommand(self, command):
     """Returns sample output for executing a query."""
+    pass
+
+
+class PreparedClientVm(object):
+
+  def Install(self, package_name):
+    if package_name != 'pip':
+      raise RuntimeError
+
+  def RemoteCommand(self, command):
     pass
 
 
@@ -62,11 +77,19 @@ class FakeEdwService(edw_service.EdwService):
     return ' '.join(
         super(FakeEdwService, self).GenerateScriptExecutionCommand(script))
 
+  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
+    pass
+
 
 class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
+  def setUp(self):
+    super(EdwServiceTest, self).setUp()
+    FLAGS.run_uri = _TEST_RUN_URI
+    FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
+
   def testGetScriptExecutionResultsMocked(self):
-    kwargs = copy.copy(BASE_REDSHIFT_SPEC)
+    kwargs = copy.copy(_BASE_REDSHIFT_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     edw_local = FakeEdwService(spec)
     client_vm = ClientVm()
@@ -81,6 +104,46 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
       performance, _ = edw_local.GetScriptExecutionResults(
           'test.sql', client_vm)
       self.assertEqual(performance, 1.0)
+
+  def testIsUserManaged(self):
+    kwargs = copy.copy({
+        'cluster_identifier': _PKB_CLUSTER,
+        'db': _PKB_CLUSTER_DATABASE
+    })
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    edw_local = FakeEdwService(spec)
+    self.assertTrue(edw_local.IsUserManaged(spec))
+
+  def testIsPkbManaged(self):
+    kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    edw_local = FakeEdwService(spec)
+    self.assertFalse(edw_local.IsUserManaged(spec))
+
+  def testUserManagedGetClusterIdentifier(self):
+    kwargs = copy.copy({
+        'cluster_identifier': _PKB_CLUSTER,
+        'db': _PKB_CLUSTER_DATABASE
+    })
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    edw_local = FakeEdwService(spec)
+    self.assertEqual(_PKB_CLUSTER, edw_local.GetClusterIdentifier(spec))
+    self.assertEqual(_PKB_CLUSTER, edw_local.cluster_identifier)
+
+  def testPkbManagedGetClusterIdentifier(self):
+    kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    edw_local = FakeEdwService(spec)
+    self.assertEqual('pkb-' + FLAGS.run_uri,
+                     edw_local.GetClusterIdentifier(spec))
+    self.assertEqual('pkb-' + FLAGS.run_uri, edw_local.cluster_identifier)
+
+  def testPrepareClientVm(self):
+    kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    edw_local = FakeEdwService(spec)
+    edw_local.PrepareClientVm(
+        vm=PreparedClientVm(), benchmark_name='fake_benchmark_name')
 
 
 if __name__ == '__main__':

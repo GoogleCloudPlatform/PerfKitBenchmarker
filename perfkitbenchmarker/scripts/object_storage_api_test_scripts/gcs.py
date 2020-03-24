@@ -12,26 +12,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""An interface to Google Cloud Storage, using the boto library."""
+"""An interface to Google Cloud Storage, using the python library."""
 
+import logging
 import time
 
 from absl import flags
-import boto_service
-import gcs_oauth2_boto_plugin  # noqa
+import object_storage_interface
+from google.cloud import storage
 
 FLAGS = flags.FLAGS
 
 
-class GCSService(boto_service.BotoService):
+class GCSService(object_storage_interface.ObjectStorageServiceBase):
+  """An interface to Google Cloud Storage, using the python library."""
 
   def __init__(self):
-    super(GCSService, self).__init__('gs', host_to_connect=None)
+    self.client = storage.Client()
 
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
+  def ListObjects(self, bucket_name, prefix):
+    bucket = storage.bucket.Bucket(self.client, bucket_name)
+    return [obj.name for obj in self.client.list_blobs(bucket, prefix=prefix)]
+
+  def DeleteObjects(self, bucket_name, objects_to_delete, objects_deleted=None):
+    bucket = storage.bucket.Bucket(self.client, bucket_name)
+    for object_name in objects_to_delete:
+      obj = storage.blob.Blob(object_name, bucket)
+      try:
+        obj.delete(client=self.client)
+        if objects_deleted is not None:
+          objects_deleted.append(object_name)
+      except Exception as e:  # pylint: disable=broad-except
+        logging.exception('Caught exception while deleting object %s: %s',
+                          object_name, e)
+
+  def WriteObjectFromBuffer(self, bucket_name, object_name, stream, size):
     stream.seek(0)
     start_time = time.time()
-    object_uri = self._StorageURI(bucket, object)
-    object_uri.set_contents_from_file(stream, size=size)
+    data = str(stream.read(size))
+    bucket = storage.bucket.Bucket(self.client, bucket_name)
+    obj = storage.blob.Blob(object_name, bucket)
+    obj.upload_from_string(data, client=self.client)
+    latency = time.time() - start_time
+    return start_time, latency
+
+  def ReadObject(self, bucket_name, object_name):
+    start_time = time.time()
+    bucket = storage.bucket.Bucket(self.client, bucket_name)
+    obj = storage.blob.Blob(object_name, bucket)
+    obj.download_as_string(client=self.client)
     latency = time.time() - start_time
     return start_time, latency
