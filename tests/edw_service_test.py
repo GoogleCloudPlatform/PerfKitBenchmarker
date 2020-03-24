@@ -17,6 +17,7 @@ import copy
 import json
 import unittest
 
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
@@ -83,6 +84,8 @@ class FakeEdwService(edw_service.EdwService):
 
 class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
+  @flagsaver.flagsaver(run_uri=_TEST_RUN_URI)
+  @flagsaver.flagsaver(zones=[_AWS_ZONE_US_EAST_1A])
   def setUp(self):
     super(EdwServiceTest, self).setUp()
     FLAGS.run_uri = _TEST_RUN_URI
