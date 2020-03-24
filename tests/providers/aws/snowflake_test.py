@@ -16,10 +16,6 @@
 import copy
 import unittest
 
-<<<<<<< HEAD
-=======
-from absl.testing import flagsaver
->>>>>>> Adding Snowflake Warehouse support in Perfkitbenchmarker.
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import snowflake
