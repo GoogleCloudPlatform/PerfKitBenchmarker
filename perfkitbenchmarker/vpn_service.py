@@ -28,7 +28,7 @@ import threading
 import time
 import uuid
 
-from perfkitbenchmarker import context
+from perfkitbenchmarker import context, vm_util
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -68,43 +68,43 @@ class VPN(object):
   def __init__(self, *args, **kwargs):
       return object.__init__(self, *args, **kwargs)
 
-  def getKeyFromGWPair(self, gwpair, suffix=''):
+  def getKeyFromGWPair(self, gateway_pair, suffix=''):
     """Return the VPN key for a pair of endpoints.
 
     Args:
-      gwpair: A tuple of 2 VPN gateways which define the VPN tunnel.
+      gateway_pair: A tuple of 2 VPN gateways which define the VPN tunnel.
       suffix: A unique suffix if multiple tunnels b/t this gateway pair exist.
 
     Returns:
       string. The VPN key.
 
     """
-    key = 'vpn' + ''.join(gw for gw in gwpair) + suffix + FLAGS.run_uri
+    key = 'vpn' + ''.join(gw for gw in gateway_pair) + suffix + FLAGS.run_uri
     return key
 
-  def Create(self, gwpair, suffix=''):
-    self.GWPair = gwpair
-    self.name = self.getKeyFromGWPair(gwpair)
+  def Create(self, gateway_pair, suffix=''):
+    self.GWPair = gateway_pair
+    self.name = self.getKeyFromGWPair(gateway_pair)
     self.tunnel_config = TunnelConfig(tunnel_name=self.name, suffix=suffix)
 
   def Delete(self):
     pass
 
-  def GetVPN(self, gwpair, suffix=''):
-    """Gets a VPN object for the gwpair or creates one if none exists
+  def GetVPN(self, gateway_pair, suffix=''):
+    """Gets a VPN object for the gateway_pair or creates one if none exists
 
     Args:
-    gwpair: a tuple of two VPNGWs
+    gateway_pair: a tuple of two VPNGWs
     """
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error('GetVPN called in a thread without a '
                          'BenchmarkSpec.')
-    with benchmark_spec.vpn_gateways_lock:
-      key = self.getKeyFromGWPair(gwpair, suffix)
+    with benchmark_spec.vpns_lock:
+      key = self.getKeyFromGWPair(gateway_pair, suffix)
       if key not in benchmark_spec.vpns:
-        self.Create(gwpair, suffix)
+        self.Create(gateway_pair, suffix)
         benchmark_spec.vpns[key] = self
       return benchmark_spec.vpns[key]
 
@@ -117,9 +117,13 @@ class VPN(object):
 
     assert not (vpn_gateway_0.require_target_to_init and vpn_gateway_1.require_target_to_init), 'Cant connect 2 passive VPN GWs'
 
+    tunnel_config_hash = None
     while not self.isTunnelConfigured():
         vpn_gateway_0.ConfigureTunnel(self.tunnel_config)
         vpn_gateway_1.ConfigureTunnel(self.tunnel_config)
+        if self.tunnel_config.hash() == tunnel_config_hash:
+          raise ValueError('Not enough info to configure tunnel.')
+        tunnel_config_hash = self.tunnel_config.hash()
 
     tunnel_status = self.isTunnelReady()
     logging.info('Tunnel is ready?: %s ' % tunnel_status)
@@ -137,22 +141,18 @@ class VPN(object):
         is_tunnel_configured = True
     return is_tunnel_configured
 
-  # tunnel should be up now, just wait for all clear
-  # blocking here for now
+  @vm_util.Retry(retryable_exceptions=errors.Resource.RetryableCreationError)
   def isTunnelReady(self):
     """ Returns True if the tunnel is up.
 
     Returns:
       boolean.
-
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    ready = False
-    timeout = time.time() + 60 * 5  # give up after 5 mins
-    while(not ready and time.time() < timeout):
-      logging.info('Tunnel endpoints configured. Waiting for tunnel...')
-      ready = benchmark_spec.vpn_gateways[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpn_gateways[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
-      time.sleep(5)
+    logging.info('Tunnel endpoints configured. Waiting for tunnel...')
+    ready = benchmark_spec.vpn_gateways[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpn_gateways[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
+    if not ready:
+      raise errors.Resource.RetryableCreationError()
 
     return ready
 
@@ -183,20 +183,29 @@ class TunnelConfig(object):
 
   def __init__(self, **kwargs):
     super(TunnelConfig, self).__init__()
-    self.tunnel_name = kwargs.get('tunnel_name', 'unnamed_tunnel')  # uniquely id this tunnel
+    self.tunnel_name = kwargs.get('tunnel_name', 'unnamed_tunnel')
     self.endpoints = {}
-    self.routing = kwargs.get('routing', 'static')  # @TODO dynamic(bgp)
-    self.ike_version = kwargs.get('ike_version', '1')
-    self.psk = kwargs.get('psk', 'key' + FLAGS.run_uri)
+    self.routing = kwargs.get('routing', 'static')
+    self.ike_version = kwargs.get('ike_version', 2)
+    self.shared_key = kwargs.get('shared_key', 'key' + FLAGS.run_uri)
     self.suffix = kwargs.get('suffix', '')
 
-  def set(self, **kwargs):
+  def setConfig(self, **kwargs):
     with self._tunnelconfig_lock:
       for key in kwargs:
           setattr(self, key, kwargs[key])
 
   def __str__(self):
-    return str(json.dumps(self.__dict__))
+    return str(json.dumps(self.__dict__, sort_keys=True, default=str))
+
+  def hash(self):
+    """Hash the current tunnel config.
+
+    Returns:
+      int: An integer that changes if any properties have changes.
+
+    """
+    return hash(json.dumps(self.__dict__, sort_keys=True, default=str))
 
 
 class VPNService(resource.BaseResource):
@@ -217,9 +226,16 @@ class VPNService(resource.BaseResource):
     self.gateway_count = FLAGS.vpn_service_gateway_count
     self.routing = spec.routing_type
     self.ike_version = spec.ike_version
-    self.psk = FLAGS.run_uri
+    self.shared_key = spec.shared_key
     self.spec = spec
     self.vpns = {}
+    self.vpn_properties = {'tunnel_count': self.tunnel_count,
+                           'gateway_count': self.gateway_count,
+                           'routing': self.routing,
+                           'ike_version': self.ike_version,
+                           'shared_key': self.shared_key,
+                           }
+
 
   def GetResourceMetadata(self):
     """Returns a dictionary of metadata about the resource."""
@@ -252,12 +268,15 @@ class VPNService(resource.BaseResource):
     self.vpn_gateway_pairs = self.GetVPNGWPairs(benchmark_spec.vpn_gateways)
 
 
-    for gwpair in self.vpn_gateway_pairs:
+    for gateway_pair in self.vpn_gateway_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
       suffix = self.GetNewSuffix()
-      vpn_id = VPN().getKeyFromGWPair(gwpair, suffix)
-      self.vpns[vpn_id] = VPN().GetVPN(gwpair, suffix)
-      self.vpns[vpn_id].ConfigureTunnel()
+      vpn_id = VPN().getKeyFromGWPair(gateway_pair, suffix)
+      self.vpns[vpn_id] = VPN().GetVPN(gateway_pair, suffix)
+      self.vpns[vpn_id].tunnel_config.setConfig(**self.vpn_properties)
+
+
+    vm_util.RunThreaded(lambda vpn: self.vpns[vpn].ConfigureTunnel(), list(self.vpns.keys()))
 
   def _Delete(self):
     pass
@@ -299,8 +318,9 @@ class VPNService(resource.BaseResource):
 
     """
     vpn_gateway_pairs = itertools.combinations(vpn_gateways, 2)
-    r = re.compile(r"(?P<gw_prefix>.*-.*-.*)?-(?P<gw_tnum>[0-9])-(?P<run_id>.*)")
+    r = re.compile(r"(?P<gateway_prefix>.*-.*-.*)?-(?P<gateway_tnum>[0-9])-(?P<run_id>.*)")
+
     def filterGateways(gateway_pair):
-      return r.search(gateway_pair[0]).group('gw_prefix') != r.search(
-          gateway_pair[1]).group('gw_prefix')
+      return r.search(gateway_pair[0]).group('gateway_prefix') != r.search(
+          gateway_pair[1]).group('gateway_prefix')
     return list(filter(filterGateways, vpn_gateway_pairs))

@@ -29,6 +29,7 @@ import logging
 import threading
 
 from perfkitbenchmarker import context
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
@@ -51,10 +52,12 @@ class GceVPNGW(network.BaseVPNGW):
     super(GceVPNGW, self).__init__()
 
     self.forwarding_rules = {}
+    self.forwarding_rules_lock = threading.Lock()
     self.tunnels = {}
     self.routes = {}
     self.ip_resource = None
     self.vpn_gateway_resource = GceVPNGWResource(name, network_name, region, cidr, project)
+    self.vpn_gateway_resource_lock = threading.Lock()
 
     self.name = name
     self.network_name = network_name
@@ -63,6 +66,7 @@ class GceVPNGW(network.BaseVPNGW):
     self.project = project
 
     self.ip_address = None
+    self.ip_address_lock = threading.Lock()
     self.created = False
     self.require_target_to_init = False
     self.routing = None
@@ -80,7 +84,7 @@ class GceVPNGW(network.BaseVPNGW):
 
   def ConfigureTunnel(self, tunnel_config):
     """Updates tunnel config with new information.
-    
+
     Args:
       tunnel_config: The tunnel configuration for this VPN.
     """
@@ -94,7 +98,7 @@ class GceVPNGW(network.BaseVPNGW):
       tunnel_config.endpoints[self.name] = {'is_configured': False,
                                             'cidr': self.cidr,
                                             'project': self.project,
-                                            'network_name':  self.network_name,
+                                            'network_name': self.network_name,
                                             'region': self.region,
                                             'require_target_to_init': self.require_target_to_init,
                                             }
@@ -102,22 +106,24 @@ class GceVPNGW(network.BaseVPNGW):
     # attach public IP to this GW if doesnt exist
     # and update tunnel_config if needed
     # requires project, region, name
-    if not self.ip_address:
-      if not self.ip_resource:
-        self.ip_resource = GceIPAddress(self.project, self.region, self.name)
-        self.ip_resource.Create()
-      self.ip_address = self.ip_resource.ip_address
-    if 'ip_address' not in tunnel_config.endpoints[self.name]:
-      logging.info('tunnel_config: Configuring IP for %s' % self.name)
-      tunnel_config.endpoints[self.name]['ip_address'] = self.ip_address
+    with self.ip_address_lock:
+      if not self.ip_address:
+        if not self.ip_resource:
+          self.ip_resource = GceIPAddress(self.project, self.region, self.name)
+          self.ip_resource.Create()
+        self.ip_address = self.ip_resource.ip_address
+      if 'ip_address' not in tunnel_config.endpoints[self.name]:
+        logging.info('tunnel_config: Configuring IP for %s' % self.name)
+        tunnel_config.endpoints[self.name]['ip_address'] = self.ip_address
 
     # configure forwarding
     # requires: -
-    if len(self.forwarding_rules) == 3:
-      logging.info('tunnel_config: Forwarding already configured, skipping')
-    else:
-      logging.info('tunnel_config: Setting up forwarding')
-      self._SetupForwarding(tunnel_config)
+    with self.forwarding_rules_lock:
+      if len(self.forwarding_rules) == 3:
+        logging.info('tunnel_config: Forwarding already configured, skipping')
+      else:
+        logging.info('tunnel_config: Setting up forwarding')
+        self._SetupForwarding(tunnel_config)
 
     # Abort if we don't have a target info configured yet
     if len(tunnel_config.endpoints) < 2:
@@ -237,8 +243,7 @@ class GceVPNGW(network.BaseVPNGW):
                          'BenchmarkSpec.')
     if self.created:
       return
-    if self.vpn_gateway_resource:
-      self.vpn_gateway_resource.Create()
+    self.vpn_gateway_resource.Create()
 
     self.created = True
 
@@ -248,16 +253,16 @@ class GceVPNGW(network.BaseVPNGW):
       self.ip_resource.Delete()
 
     if self.tunnels:
-      for tun in self.tunnels:
-        self.tunnels[tun].Delete()
+      vm_util.RunThreaded(lambda tun: self.tunnels[tun].Delete(),
+                          list(self.tunnels.keys()))
 
     if self.forwarding_rules:
-      for fr in self.forwarding_rules:
-        self.forwarding_rules[fr].Delete()
+      vm_util.RunThreaded(lambda fr: self.forwarding_rules[fr].Delete(),
+                          list(self.forwarding_rules.keys()))
 
     if self.routes:
-      for route in self.routes:
-        self.routes[route].Delete()
+      vm_util.RunThreaded(lambda route: self.routes[route].Delete(),
+                          list(self.routes.keys()))
 
     if self.vpn_gateway_resource:
       self.vpn_gateway_resource.Delete()
@@ -361,8 +366,7 @@ class GceStaticTunnel(resource.BaseResource):
     cmd.Issue()
 
   def _Delete(self):
-    """Delete IPSec tunnel
-    """
+    """Delete IPSec tunnel"""
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'delete', self.name)
     cmd.flags['region'] = self.region
     cmd.Issue(raise_on_failure=False)
@@ -402,7 +406,6 @@ class GceRoute(resource.BaseResource):
     cmd.flags['next-hop-vpn-tunnel'] = self.next_hop_tun
     cmd.flags['next-hop-vpn-tunnel-region'] = self.next_hop_region
     cmd.Issue()
-#     return self.id
 
   def _Delete(self):
     """Delete route
@@ -838,18 +841,20 @@ class GceNetwork(network.BaseNetwork):
       if self.default_firewall_rule:
         self.default_firewall_rule.Create()
       if self.external_nets_rules:
-        for rule in self.external_nets_rules:
-          self.external_nets_rules[rule].Create()
+        vm_util.RunThreaded(lambda rule: self.external_nets_rules[rule].Create(),
+                            list(self.external_nets_rules.keys()))
+        # for rule in self.external_nets_rules:
+        #   self.external_nets_rules[rule].Create()
       if getattr(self, 'vpn_gateway', False):
-        for gw in self.vpn_gateway:
-          self.vpn_gateway[gw].Create()
+        vm_util.RunThreaded(lambda gw: self.vpn_gateway[gw].Create(),
+                            list(self.vpn_gateway.keys()))
 
   def Delete(self):
     """Deletes the actual network."""
     if not FLAGS.gce_network_name:
       if getattr(self, 'vpn_gateway', False):
-        for gw in self.vpn_gateway:
-          self.vpn_gateway[gw].Delete()
+        vm_util.RunThreaded(lambda gw: self.vpn_gateway[gw].Delete(),
+                            list(self.vpn_gateway.keys()))
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:
