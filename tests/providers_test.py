@@ -36,7 +36,7 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
     p.start()
     self.addCleanup(p.stop)
 
-  # TODO(b/118760960): See if this can be fixed.
+  # TODO(user): See if this can be fixed.
   @unittest.skip('This fails because modules are being imported multiple '
                  'times in the instance of this process. Not sure how this '
                  'ever worked.')

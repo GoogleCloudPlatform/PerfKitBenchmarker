@@ -17,6 +17,7 @@ import contextlib
 import unittest
 import mock
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -45,13 +46,6 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
         'tpu_zone': 'us-central1-a',
         'tpu_preemptible': True
     }
-
-  def CreateTpuFromSpec(self, spec_dict):
-    mock_tpu_spec = mock.Mock(
-        spec=benchmark_config_spec._TpuGroupSpec)
-    mock_tpu_spec.configure_mock(**spec_dict)
-    tpu_class = gcp_tpu.GcpTpu(mock_tpu_spec)
-    return tpu_class
 
   def setUp(self):
     super(GcpTpuTestCase, self).setUp()
@@ -97,6 +91,19 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--version nightly', command_string)
       self.assertIn('--zone us-central1-a', command_string)
       self.assertIn('--preemptible', command_string)
+
+  def testStockout(self):
+    stderr = """Create request issued for: [pkb-tpu-train-9baf32202]
+Waiting for operation [projects/artemis-prod/locations/us-central1-b/operations/operation-1567697651843-591d00da740fa-ed64d57f-8a2533cb] to complete failed.
+ERROR: (gcloud.compute.tpus.create) {
+  "code": 8,
+  "message": "There is no more capacity in the zone \"us-central1-b\"; you can try in another zone where Cloud TPU Nodes are offered (see https://cloud.google.com/tpu/docs/regions) [EID: 0xf3bb52b78a15cd16]"
+}"""
+    with self._PatchCriticalObjects(stderr=stderr, return_code=1):
+      with self.assertRaises(
+          errors.Benchmarks.InsufficientCapacityCloudFailure):
+        tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
+        tpu._Create()
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:

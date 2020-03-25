@@ -93,7 +93,7 @@ DEFAULT_MOUNT_OPTIONS = 'discard'
 DEFAULT_FSTAB_OPTIONS = 'defaults'
 
 
-# TODO(nlavine): remove this function when we remove the deprecated
+# TODO(user): remove this function when we remove the deprecated
 # flags and disk type names.
 def RegisterDiskTypeMap(provider_name, type_map):
   """Register a map from legacy disk type names to modern ones.

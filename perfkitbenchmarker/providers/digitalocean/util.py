@@ -46,7 +46,7 @@ def DoctlAndParse(arg_list):
       raise_on_failure=False)
 
   # In case of error, doctl sometimes prints "null" before printing a
-  # JSON error string to stdout. TODO(noahl): improve parsing of
+  # JSON error string to stdout. TODO(user): improve parsing of
   # error messages.
   if retcode and stdout.startswith('null'):
     output = stdout[4:]
