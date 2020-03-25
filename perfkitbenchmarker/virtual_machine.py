@@ -552,7 +552,7 @@ class BaseVirtualMachine(resource.BaseResource):
           'Cannot install preprovisioned data for undefined benchmark %s.' %
           benchmark_name)
     try:
-      # TODO(yanfeiren): Change BENCHMARK_DATA to PREPROVISIONED_DATA.
+      # TODO(user): Change BENCHMARK_DATA to PREPROVISIONED_DATA.
       preprovisioned_data = benchmark_module.BENCHMARK_DATA
     except AttributeError:
       raise errors.Setup.BadPreprovisionedDataError(

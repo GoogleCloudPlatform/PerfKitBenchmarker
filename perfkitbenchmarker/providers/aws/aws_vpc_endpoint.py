@@ -30,7 +30,6 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.aws import util
 
 
-
 def GetAwsVpcEndpointClass(aws_service):
   """Returns the AwsVpcEndpoint class for the given service."""
   return resource.GetResourceClass(

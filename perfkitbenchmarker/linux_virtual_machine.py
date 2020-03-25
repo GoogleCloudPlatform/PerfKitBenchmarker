@@ -1447,6 +1447,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 
 class AmazonLinux1Mixin(BaseRhelMixin):
   """Class holding Amazon Linux 1 VM methods and attributes."""
+  # MOE:strip_line TODO(user): Deprecate in favor of AZLinux2 in April
   OS_TYPE = os_types.AMAZONLINUX1
 
 
@@ -1458,6 +1459,7 @@ class AmazonLinux2Mixin(BaseRhelMixin):
 class VersionlessRhelMixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding RHEL 7 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL
+  # MOE:strip_line TODO(user): Delete in April
   END_OF_LIFE = '2020-04-01'
   ALTERNATIVE_OS = os_types.RHEL7
 

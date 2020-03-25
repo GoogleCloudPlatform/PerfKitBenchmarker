@@ -42,6 +42,8 @@ RATE_LIMITED_MAX_POLLING_INTERVAL = 200
 # This must be set. Otherwise, calling Issue() will fail in util_test.py.
 RATE_LIMITED_FUZZ = 0.5
 RATE_LIMITED_TIMEOUT = 1200
+STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
+                    'potential stockout scenario.')
 
 
 @functools.lru_cache()

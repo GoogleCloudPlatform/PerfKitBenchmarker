@@ -20,12 +20,14 @@ import json
 import logging
 
 from perfkitbenchmarker import cloud_tpu
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 TPU_TIMEOUT = 1200
+_INSUFFICIENT_CAPACITY = 'There is no more capacity in the zone'
 
 
 class GcpTpu(cloud_tpu.BaseTpu):
@@ -67,7 +69,13 @@ class GcpTpu(cloud_tpu.BaseTpu):
     if self.spec.tpu_preemptible:
       cmd.flags['preemptible'] = self.spec.tpu_preemptible
     cmd.flags['project'] = self.project
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+
+    if _INSUFFICIENT_CAPACITY in stderr:
+      logging.error(util.STOCKOUT_MESSAGE)
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          util.STOCKOUT_MESSAGE)
+
     if retcode != 0:
       logging.error('Create GCP cloud TPU failed.')
 

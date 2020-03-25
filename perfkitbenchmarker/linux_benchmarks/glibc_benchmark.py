@@ -68,7 +68,7 @@ flags.DEFINE_multi_enum(
 
 GLIBC_BENCH = ['bench-math', 'bench-pthread', 'bench-string']
 GLIBC_BENCH_MALLOC = ['malloc-thread']
-# TODO(yanfeiren): Parse other *-benchset benchmarks.
+# TODO(user): Parse other *-benchset benchmarks.
 GLIBC_MATH_BENCHSET = ['math-benchset']
 
 RESULTS_DIR = '%s/glibc/glibc-build/benchtests' % linux_packages.INSTALL_DIR
