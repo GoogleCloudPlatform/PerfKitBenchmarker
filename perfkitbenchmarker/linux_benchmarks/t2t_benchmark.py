@@ -132,7 +132,7 @@ def _MakeSamplesFromOutput(metadata, output):
                                         metadata, 'Global Steps Per Second',
                                         'global_steps/sec'))
 
-  # TODO(b/115633403) Workaround until t2t can use TPUEstimator on a GPU
+  # TODO(user) Workaround until t2t can use TPUEstimator on a GPU
   try:
     samples.extend(
         mnist_benchmark.ExtractThroughput(r'examples/sec: (\S+)', output,

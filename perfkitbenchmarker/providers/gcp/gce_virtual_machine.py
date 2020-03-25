@@ -64,8 +64,6 @@ NVME = 'NVME'
 SCSI = 'SCSI'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
-STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
-                    'potential stockout scenario.')
 _GCE_VM_CREATE_TIMEOUT = 600
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 
@@ -467,7 +465,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
-    # TODO(gareth-ferneyhough): If GCE one day supports live migration on GPUs
+    # TODO(user): If GCE one day supports live migration on GPUs
     #                           this can be revised.
     if (FLAGS['gce_migrate_on_maintenance'].present and
         FLAGS.gce_migrate_on_maintenance and self.gpu_count):
@@ -520,8 +518,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Resource.RetryableCreationError()
     if (not self.use_dedicated_host and retcode and
         _INSUFFICIENT_HOST_CAPACITY in stderr):
-      logging.error(STOCKOUT_MESSAGE)
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
+      logging.error(util.STOCKOUT_MESSAGE)
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          util.STOCKOUT_MESSAGE)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     if retcode:
       if (create_cmd.rate_limited and 'already exists' in stderr and

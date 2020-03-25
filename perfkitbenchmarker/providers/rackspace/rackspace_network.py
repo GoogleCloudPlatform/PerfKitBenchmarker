@@ -297,13 +297,13 @@ class RackspaceFirewall(network.BaseFirewall):
   CLOUD = providers.RACKSPACE
 
   def __init__(self):
-    # TODO(meteorfox) Support a Firewall per region
+    # TODO(user) Support a Firewall per region
     self._lock = threading.Lock()  # Guards security-group creation/deletion
     self.firewall_rules = {}
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     # At Rackspace all ports are open by default
-    # TODO(meteorfox) Implement security groups support
+    # TODO(user) Implement security groups support
     if FLAGS.rackspace_use_security_group:
       raise NotImplementedError()
 

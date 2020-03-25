@@ -21,7 +21,7 @@ MKL_TAG = 'l_mkl_2018.2.199'
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
 MKL_VERSION = '2018.2.199'
 
-# TODO(yanfeiren): InstallPreprovisionedBenchmarkData currently assumes that
+# TODO(user): InstallPreprovisionedBenchmarkData currently assumes that
 # BENCHMARK_NAME is associated with a benchmark. Once it is expanded to include
 # packages, we can associate the preprovisioned data for MKL with this package.
 BENCHMARK_NAME = 'hpcc'

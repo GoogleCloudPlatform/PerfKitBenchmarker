@@ -132,7 +132,7 @@ class IpAddressSubset(object):
 flags.DEFINE_enum('ip_addresses', IpAddressSubset.REACHABLE,
                   IpAddressSubset.ALL,
                   'For networking tests: use both internal and external '
-                  'IP addresses (BOTH), external and internal only if '
+                  'IP addresses (BOTH), internal and external only if '
                   'the receiving VM is reachable by internal IP (REACHABLE), '
                   'external IP only (EXTERNAL) or internal IP only (INTERNAL)')
 

@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,15 +16,17 @@
 
 import unittest
 import mock
-from perfkitbenchmarker.linux_packages import maven
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import maven
+from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
 
-class MavenTest(unittest.TestCase):
+class MavenTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
+    super(MavenTest, self).setUp()
     self.vm = mock.Mock()
     self.vm.RemoteCommand.return_value = ('/jre/java', '')
 
@@ -35,7 +38,6 @@ class MavenTest(unittest.TestCase):
     As all the mocked method calls have one single argument (ie 'x') they need
     to be converted into the tuple of positional arguments tuple that mock
     expects.
-
     Args:
       call_args_singles: List of single arguments sent to the mock_method,
         ie ['x', 'y'] is for when mock_method was called twice: once with
@@ -65,18 +67,19 @@ class MavenTest(unittest.TestCase):
   def testGetRunCommandWithProxy(self):
     FLAGS['http_proxy'].parse('http://some-proxy.com:888')
     FLAGS['https_proxy'].parse('https://some-proxy.com:888')
-    cmd = maven.GetRunCommand("install")
-    expected = ("source {} && mvn install"
-                " -Dhttp.proxyHost=some-proxy.com -Dhttp.proxyPort=888"
-                " -Dhttps.proxyHost=some-proxy.com -Dhttps.proxyPort=888".format(
-                    maven.MVN_ENV_PATH))
+    cmd = maven.GetRunCommand('install')
+    expected = (
+        'source {} && mvn install'
+        ' -Dhttp.proxyHost=some-proxy.com -Dhttp.proxyPort=888'
+        ' -Dhttps.proxyHost=some-proxy.com -Dhttps.proxyPort=888'.format(
+            maven.MVN_ENV_PATH))
     self.assertEqual(expected, cmd)
 
   def testGetRunCommandNoProxy(self):
     FLAGS['http_proxy'].present = 0
     FLAGS['https_proxy'].present = 0
-    cmd = maven.GetRunCommand("install")
-    expected = ("source {} && mvn install".format(maven.MVN_ENV_PATH))
+    cmd = maven.GetRunCommand('install')
+    expected = ('source {} && mvn install'.format(maven.MVN_ENV_PATH))
     self.assertEqual(expected, cmd)
 
   def testAptInstall(self):
@@ -86,10 +89,11 @@ class MavenTest(unittest.TestCase):
     maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
     self.assertRemoteCommandsEqual([
         'mkdir {0} && curl -L {1} | '
-        'tar -C {0} --strip-components=1 -xzf -'.format(maven.MVN_DIR, maven_url),
-        'readlink -f `which java`',
-        'echo "{0}" | sudo tee -a {1}'.format(maven.MVN_ENV.format(java_home="", maven_home=maven.MVN_DIR),
-                                              maven.MVN_ENV_PATH)
+        'tar -C {0} --strip-components=1 -xzf -'.format(maven.MVN_DIR,
+                                                        maven_url),
+        'readlink -f `which java`', 'echo "{0}" | sudo tee -a {1}'.format(
+            maven.MVN_ENV.format(java_home='', maven_home=maven.MVN_DIR),
+            maven.MVN_ENV_PATH)
     ])
     self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand', 'Install')

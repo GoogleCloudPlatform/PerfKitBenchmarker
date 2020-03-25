@@ -173,12 +173,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.profile = vm_spec.rack_profile
     # Isolated tenant networks are regional, not globally available.
     # Security groups (firewalls) apply to a network, hence they are regional.
-    # TODO(meteorfox) Create tenant network if it doesn't exist in the region.
+    # TODO(user) Create tenant network if it doesn't exist in the region.
     self.firewall = rackspace_network.RackspaceFirewall.GetFirewall()
 
   def _CreateDependencies(self):
     """Create dependencies prior creating the VM."""
-    # TODO(meteorfox) Create security group (if applies)
+    # TODO(user) Create security group (if applies)
     self._UploadSSHPublicKey()
 
   def _Create(self):
@@ -221,7 +221,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _DeleteDependencies(self):
     """Deletes dependencies that were need for the VM after the VM has been
     deleted."""
-    # TODO(meteorfox) Delete security group (if applies)
+    # TODO(user) Delete security group (if applies)
     self._DeleteSSHPublicKey()
 
   def _UploadSSHPublicKey(self):

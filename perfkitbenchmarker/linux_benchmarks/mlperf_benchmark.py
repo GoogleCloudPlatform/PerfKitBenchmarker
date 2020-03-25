@@ -196,7 +196,7 @@ def Prepare(benchmark_spec, vm=None):
     vm.RemoteCommand('pip3 install cloud-tpu-profiler==1.12')
     if ('mask' in benchmark_spec.benchmark or
         'ssd' in benchmark_spec.benchmark):
-      # TODO(b/141876878): coco whl package for python 3.5
+      # TODO(user): coco whl package for python 3.5
       vm.RemoteCommand(
           'cd /tmp && '
           'wget https://storage.cloud.google.com/mlperf_artifcats/v0.6_training/coco-1.1-cp36-cp36m-linux_x86_64.whl'
@@ -389,7 +389,7 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
       value = regex_util.ExtractExactlyOneMatch(r'"value": "(\d+\.\d+)"',
                                                 result)
     elif 'mask' in model:
-      # TODO(b/141889167): Add support for two accuracy values
+      # TODO(user): Add support for two accuracy values
       value = 0
     else:
       value = regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)', result)

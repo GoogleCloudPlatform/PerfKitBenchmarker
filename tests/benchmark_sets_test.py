@@ -205,7 +205,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
         'test_nested_derived_set': {
             benchmark_sets.MESSAGE: 'test nested derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
-      # TODO(voellm): better check would be to make sure both lists are the same
+      # TODO(user): better check would be to make sure both lists are the same
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
       self.assertIsNotNone(benchmark_tuple_list)
       self.assertIsNotNone(standard_module_list)

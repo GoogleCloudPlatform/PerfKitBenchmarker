@@ -136,7 +136,7 @@ class AwsIamRole(resource.BaseResource):
 
     # Make sure the role is available for the downstream users (e.g., DAX).
     # Without this, the step of creating DAX cluster may fail.
-    # TODO(b/144769073): use a more robust way to handle this.
+    # TODO(user): use a more robust way to handle this.
     time.sleep(_ROLE_CREATION_DELAY)
 
   def _Delete(self):
