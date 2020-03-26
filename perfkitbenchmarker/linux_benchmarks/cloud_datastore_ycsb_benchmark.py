@@ -25,14 +25,13 @@ By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Datastore.
 """
 
-import logging
-import posixpath
-
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
+from perfkitbenchmarker.providers.gcp import gcp_datastore
 
+PRIVATE_KEYFILE_DIR = '/tmp/key.p12'
 
 BENCHMARK_NAME = 'cloud_datastore_ycsb'
 BENCHMARK_CONFIG = """
@@ -45,20 +44,8 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'lib')
-PRIVATE_KEYFILE_DIR = '/tmp/key.p12'
-
 FLAGS = flags.FLAGS
-flags.DEFINE_string('google_datastore_keyfile',
-                    None,
-                    'The path to Google API P12 private key file')
-flags.DEFINE_string('google_datastore_serviceAccount',
-                    None,
-                    'The service account email associated with'
-                    'datastore private key file')
-flags.DEFINE_string('google_datastore_datasetId',
-                    None,
-                    'The project ID that has Cloud Datastore service')
+
 flags.DEFINE_string('google_datastore_debug',
                     'false',
                     'The logging level when running YCSB')
@@ -80,14 +67,7 @@ def CheckPrerequisites(benchmark_config):
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  # Before YCSB Cloud Datastore supports Application Default Credential,
-  # we should always make sure valid credential flags are set.
-  if not FLAGS.google_datastore_keyfile:
-    raise ValueError('"google_datastore_keyfile" must be set')
-  if not FLAGS.google_datastore_serviceAccount:
-    raise ValueError('"google_datastore_serviceAccount" must be set')
-  if not FLAGS.google_datastore_datasetId:
-    raise ValueError('"google_datastore_datasetId" must be set ')
+  benchmark_config.datastore_instance = gcp_datastore.GcpDatastoreInstance()
 
 
 def Prepare(benchmark_spec):
@@ -100,10 +80,11 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
 
-  # Install required packages and copy credential files
-  vm_util.RunThreaded(_Install, vms)
+  datastore_keyfile = benchmark_spec.datastore_instance.keyfile
 
-  # Restore YCSB_TAR_URL
+  # Install required packages and copy credential files
+  vm_util.RunThreaded(_Install, vms, datastore_keyfile)
+
   benchmark_spec.executor = ycsb.YCSBExecutor('googledatastore')
 
 
@@ -118,13 +99,9 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
-  run_kwargs = {
-      'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
-      'googledatastore.privateKeyFile': PRIVATE_KEYFILE_DIR,
-      'googledatastore.serviceAccountEmail':
-          FLAGS.google_datastore_serviceAccount,
-      'googledatastore.debug': FLAGS.google_datastore_debug,
-  }
+  run_kwargs = benchmark_spec.datastore_instance.run_kwargs
+  run_kwargs['googledatastore.privateKeyFile'] = PRIVATE_KEYFILE_DIR
+  run_kwargs['googledatastore.debug'] = FLAGS.google_datastore_debug
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
@@ -134,13 +111,18 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  # TODO(buggay): support automatic cleanup.
-  logging.warning(
-      'For now, we can only manually delete all the entries via GCP portal.')
+  """Cleanup.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
+  # TODO(buggay): change when gcloud datastore delete is supported.
+  benchmark_spec.datastore_instance.DeleteDatabase()
 
 
-def _Install(vm):
+def _Install(vm, datastore_keyfile):
   vm.Install('ycsb')
 
   # Copy private key file to VM
-  vm.RemoteCopy(FLAGS.google_datastore_keyfile, PRIVATE_KEYFILE_DIR)
+  vm.RemoteCopy(datastore_keyfile, PRIVATE_KEYFILE_DIR)
