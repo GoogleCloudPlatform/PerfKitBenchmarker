@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for vpn service"""
+from absl.testing import flagsaver
 import pickle
 import sys
 
@@ -88,9 +89,8 @@ class BaseVPNServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
 class VpnServiceTestCase(BaseVPNServiceTest):
 
+  @flagsaver.flagsaver(use_vpn=True, vpn_service_gateway_count=1)
   def testVpnServiceConfig(self):
-    FLAGS.use_vpn = True
-    FLAGS.vpn_service_gateway_count = 1
     spec = self._CreateBenchmarkSpecFromYaml(DEFAULT_CFG)
     spec.ConstructVPNService()
     spec.ConstructVirtualMachines()
@@ -118,13 +118,12 @@ class VpnServiceTestCase(BaseVPNServiceTest):
     self.assertTrue(hasattr(pspec, 'vpn_gateways'))
     self.assertTrue(pspec.vpn_gateways is not None)
 
+  @flagsaver.flagsaver(use_vpn=True, vpn_service_gateway_count=1)
   def testGetVPNGatewayPairs(self):
     vpn_gateways = {'vpngw-us-west1-0-None': None,
                     'vpngw-us-west1-1-None': None,
                     'vpngw-us-central1-0-None': None,
                     'vpngw-us-central1-1-None': None, }
-    FLAGS.use_vpn = True
-    FLAGS.vpn_service_gateway_count = 1
     spec = self._CreateBenchmarkSpecFromYaml(DEFAULT_CFG)
     spec.ConstructVPNService()
     pairs = spec.vpn_service.GetVpnGatewayPairs(vpn_gateways)
@@ -137,8 +136,8 @@ class VpnServiceTestCase(BaseVPNServiceTest):
 
 class TunnelConfigTestCase(BaseVPNServiceTest):
 
+  @flagsaver.flagsaver(run_uri=URI)
   def testTunnelConfigHash(self):
-    FLAGS.run_uri = URI
     ep1 = {
         'name': 'ep1',
         'ip': '1.2.3.4',

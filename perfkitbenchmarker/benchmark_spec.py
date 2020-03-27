@@ -529,8 +529,7 @@ class BenchmarkSpec(object):
     """Create the VPNService object."""
     if self.config.vpn_service is None:
       return
-    vpn_service_spec = self.config.vpn_service
-    self.vpn_service = vpn_service.VPNService(vpn_service_spec)
+    self.vpn_service = vpn_service.VPNService(self.config.vpn_service)
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

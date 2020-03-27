@@ -20,6 +20,8 @@ others in the
 same project.
 """
 
+import abc
+
 from enum import Enum
 
 from perfkitbenchmarker import context
@@ -114,39 +116,20 @@ class BaseVpnGateway(object):
     """
     self.zone = zone
     self.cidr = cidr
-    self.require_target_to_init = False  # True if we need taget Gateway up front (AWS)
+    self.require_target_to_init = False  # True if we need target Gateway up front (AWS)
 
-  @classmethod
-  def GetVpnGateway(cls):
-    """Returns a BaseVpnGateway.
-    This method is used instead of directly calling the class's constructor.
-    It creates BaseVpnGateway instances and registers them.
-    If a BaseVpnGateway object has already been registered, that object
-    will be returned rather than creating a new one. This enables multiple
-    VMs to call this method and all share the same BaseVPN object.
-    """
-    if cls.CLOUD is None:
-      raise errors.Error('VPN Gateways should have CLOUD attributes.')
-    benchmark_spec = context.GetThreadBenchmarkSpec()
-    if benchmark_spec is None:
-      raise errors.Error('GetVPN called in a thread without a '
-                         'BenchmarkSpec.')
-    with benchmark_spec.vpn_gateways_lock:
-      key = cls.CLOUD
-      if key not in benchmark_spec.vpn_gateways:
-        benchmark_spec.vpn_gateways[key] = cls()
-      return benchmark_spec.vpn_gateways[key]
-
+  @abc.abstractmethod
   def IsTunnelConfigured(self, tunnel_config):
-    """ Returns True if the tunnel_config is complete.
+    """Returns True if the tunnel_config is complete.
 
     Args:
      tunnel_config: The tunnel_config of the tunnel to check.
     Returns:
        boolean.
     """
-    pass
+    raise NotImplementedError()
 
+  @abc.abstractmethod
   def IsTunnelReady(self, tunnel_id):
     """Returns True if the tunnel is ready.
 
@@ -156,8 +139,9 @@ class BaseVpnGateway(object):
     Returns:
       boolean.
     """
-    pass
+    raise NotImplementedError()
 
+  @abc.abstractmethod
   def ConfigureTunnel(self, tunnel_config):
     """Updates the tunnel_config object with new information.
 
@@ -170,15 +154,17 @@ class BaseVpnGateway(object):
     Args:
       tunnel_config: The tunnel_config object of the tunnel to configure.
     """
-    pass
+    raise NotImplementedError()
 
+  @abc.abstractmethod
   def Create(self):
     """Creates the actual VPN Gateway."""
-    pass
+    raise NotImplementedError()
 
+  @abc.abstractmethod
   def Delete(self):
       """Deletes the actual VPN Gateway."""
-      pass
+      raise NotImplementedError()
 
 
 class BaseNetwork(object):

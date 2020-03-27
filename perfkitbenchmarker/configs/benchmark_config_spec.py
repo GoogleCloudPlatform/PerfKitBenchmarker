@@ -1130,7 +1130,7 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     Returns:
       _SparkServiceSpec Build from the config passed in in value.
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     spark_service_config = super(_SparkServiceDecoder, self).Decode(
         value, component_full_name, flag_values)
@@ -1160,7 +1160,7 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
       _RelationalDbService built from the config passed in in value.
 
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     relational_db_config = super(_RelationalDbDecoder,
                                  self).Decode(value, component_full_name,
@@ -1191,7 +1191,7 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
       _Tpu built from the config passed in in value.
 
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     tpu_group_configs = super(_TpuGroupsDecoder, self).Decode(
         value, component_full_name, flag_values)
@@ -1273,7 +1273,7 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
       _CloudRedis built from the config passed in in value.
 
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     cloud_redis_config = super(
         _CloudRedisDecoder, self).Decode(value, component_full_name,
@@ -1282,7 +1282,6 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
         self._GetOptionFullName(component_full_name), flag_values,
         **cloud_redis_config)
     return result
-
 
 
 class _VPNServiceSpec(spec.BaseSpec):
@@ -1374,7 +1373,7 @@ class _VPNServiceDecoder(option_decoders.TypeVerifier):
       _VPNService built from the config passed in in value.
 
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     vpn_service_config = super(
         _VPNServiceDecoder, self).Decode(value, component_full_name,
@@ -1387,7 +1386,6 @@ class _VPNServiceDecoder(option_decoders.TypeVerifier):
 
 class _AppGroupSpec(spec.BaseSpec):
   """Configurable options of a AppService group."""
-
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1441,7 +1439,7 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
      dict mapping app group name string to _AppGroupSpec.
 
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     app_group_configs = super(_AppGroupsDecoder, self).Decode(
         value, component_full_name, flag_values)
@@ -1475,7 +1473,7 @@ class _AppServiceDecoder(option_decoders.TypeVerifier):
       AppService object built from config.
 
     Raises:
-      errors.Config.InvalidateValue upon invalid input value.
+      errors.Config.InvalidValue upon invalid input value.
     """
     config = super(_AppServiceDecoder, self).Decode(
         value, component_full_name, flag_values)

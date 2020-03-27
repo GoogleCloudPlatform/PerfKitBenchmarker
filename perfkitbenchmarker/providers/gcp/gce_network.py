@@ -88,9 +88,9 @@ class GceVpnGateway(network.BaseVpnGateway):
     Args:
       tunnel_config: The tunnel configuration for this VPN.
     """
-    network.BaseVpnGateway.ConfigureTunnel(self, tunnel_config)
-    logging.info('Configuring Tunnel with params:')
-    logging.info(tunnel_config)
+    # network.BaseVpnGateway.ConfigureTunnel(self, tunnel_config)
+    logging.debug('Configuring Tunnel with params:')
+    logging.debug(tunnel_config)
 
     # update tunnel_config if needed
     if self.name not in tunnel_config.endpoints:
@@ -120,7 +120,7 @@ class GceVpnGateway(network.BaseVpnGateway):
     # requires: -
     with self.forwarding_rules_lock:
       if len(self.forwarding_rules) == 3:
-        logging.info('tunnel_config: Forwarding already configured, skipping')
+        logging.debug('tunnel_config: Forwarding already configured, skipping')
       else:
         logging.info('tunnel_config: Setting up forwarding')
         self._SetupForwarding(tunnel_config)
@@ -139,7 +139,7 @@ class GceVpnGateway(network.BaseVpnGateway):
       logging.info('tunnel_config: Target IP needed... waiting for target to configure')
       return
     if not hasattr(tunnel_config, 'psk'):
-      logging.info('tunnel_config: PSK not provided... setting to runid')
+      logging.debug('tunnel_config: PSK not provided... setting to runid')
       tunnel_config.psk = 'key' + FLAGS.run_uri
     self._SetupTunnel(tunnel_config)
 
@@ -722,7 +722,7 @@ class GceNetwork(network.BaseNetwork):
     # Add VpnGateways to the network.
     if FLAGS.use_vpn:
       for gatewaynum in range(0, FLAGS.vpn_service_gateway_count):
-        vpn_gateway_name = 'VpnGateway-%s-%s-%s' % (
+        vpn_gateway_name = 'vpngw-%s-%s-%s' % (
             util.GetRegionFromZone(network_spec.zone), gatewaynum, FLAGS.run_uri)
         self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
             vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
@@ -843,8 +843,6 @@ class GceNetwork(network.BaseNetwork):
       if self.external_nets_rules:
         vm_util.RunThreaded(lambda rule: self.external_nets_rules[rule].Create(),
                             list(self.external_nets_rules.keys()))
-        # for rule in self.external_nets_rules:
-        #   self.external_nets_rules[rule].Create()
       if getattr(self, 'vpn_gateway', False):
         vm_util.RunThreaded(lambda gateway: self.vpn_gateway[gateway].Create(),
                             list(self.vpn_gateway.keys()))
@@ -858,8 +856,8 @@ class GceNetwork(network.BaseNetwork):
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:
-        for rule in self.external_nets_rules:
-          self.external_nets_rules[rule].Delete()
+        vm_util.RunThreaded(lambda rule: self.external_nets_rules[rule].Delete(),
+                            list(self.external_nets_rules.keys()))
       if self.subnet_resource:
         self.subnet_resource.Delete()
       self.network_resource.Delete()
