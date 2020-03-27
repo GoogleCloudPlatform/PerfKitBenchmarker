@@ -102,7 +102,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     dpb_service_type: Set to 'emr'.
     cmd_prefix: Setting default prefix for the emr commands (region optional).
     network: Dedicated network for the EMR cluster
-    s3_service: Region specific instance of S3 for bucket management.
+    storage_service: Region specific instance of S3 for bucket management.
     bucket_to_delete: Cluster associated bucket to be cleaned up.
     dpb_version: EMR version to use.
   """
@@ -121,8 +121,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       self.cmd_prefix += ['--region', region]
       self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
           aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
-      self.s3_service = s3.S3Service()
-      self.s3_service.PrepareService(region)
+      self.storage_service = s3.S3Service()
+      self.storage_service.PrepareService(region)
     else:
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
@@ -136,7 +136,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def _CreateLogBucket(self):
     """Create the s3 bucket for the EMR cluster's logs."""
     log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
-    self.s3_service.MakeBucket(log_bucket_name)
+    self.storage_service.MakeBucket(log_bucket_name)
     return 's3://{}'.format(log_bucket_name)
 
   def _DeleteLogBucket(self):
@@ -146,7 +146,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """
     # TODO(saksena): Deprecate the use of FLAGS.run_uri and plumb as argument.
     log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
-    self.s3_service.DeleteBucket(log_bucket_name)
+    self.storage_service.DeleteBucket(log_bucket_name)
 
   def _Create(self):
     """Creates the cluster."""
@@ -408,7 +408,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     Args:
       source_bucket: String, name of the bucket to create.
     """
-    self.s3_service.MakeBucket(source_bucket)
+    self.storage_service.MakeBucket(source_bucket)
 
   def DeleteBucket(self, source_bucket):
     """Delete a bucket on S3 used during the persistent data processing.
@@ -416,7 +416,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     Args:
       source_bucket: String, name of the bucket to delete.
     """
-    self.s3_service.DeleteBucket(source_bucket)
+    self.storage_service.DeleteBucket(source_bucket)
 
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):

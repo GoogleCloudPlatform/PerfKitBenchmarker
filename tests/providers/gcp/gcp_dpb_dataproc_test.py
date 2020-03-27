@@ -34,8 +34,8 @@ class LocalGcpDpbDataproc(gcp_dpb_dataproc.GcpDpbDataproc):
   def __init__(self):
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
-    self.gcs_service = gcs.GoogleCloudStorageService()
-    self.gcs_service.PrepareService(location=self.region)
+    self.storage_service = gcs.GoogleCloudStorageService()
+    self.storage_service.PrepareService(location=self.region)
 
 
 class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):

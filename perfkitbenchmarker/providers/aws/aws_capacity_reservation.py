@@ -41,6 +41,7 @@ import datetime
 import json
 import logging
 from perfkitbenchmarker import capacity_reservation
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
@@ -48,6 +49,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
+_INSUFFICIENT_CAPACITY = 'InsufficientInstanceCapacity'
 
 
 class InvalidVmGroupSizeError(Exception):
@@ -132,13 +134,17 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           '--instance-match-criteria=targeted',
           '--region=%s' % self.region,
           '--end-date-type=limited',
-          '--end-date=%s' % end_date,
+          '--end-date="%s"' % end_date,
       ]
       stdout, stderr, retcode = vm_util.IssueCommand(cmd,
                                                      raise_on_failure=False)
       if retcode:
         logging.info('Unable to create CapacityReservation in %s. '
                      'This may be retried. Details: %s', zone, stderr)
+        if _INSUFFICIENT_CAPACITY in stderr:
+          logging.error(util.STOCKOUT_MESSAGE)
+          raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+              util.STOCKOUT_MESSAGE + ' CapacityReservation in ' + zone)
         continue
       json_output = json.loads(stdout)
       self.capacity_reservation_id = (

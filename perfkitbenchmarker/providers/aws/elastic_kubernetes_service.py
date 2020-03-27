@@ -42,7 +42,7 @@ class EksCluster(container_service.KubernetesCluster):
     super(EksCluster, self).__init__(spec)
     # EKS requires a region and optionally a list of zones.
     # Interpret the zone as a comma separated list of zones or a region.
-    self.zones = sorted(FLAGS.eks_zones) or self.zone.split(',')
+    self.zones = sorted(FLAGS.eks_zones) or (self.zone and self.zone.split(','))
     if not self.zones:
       raise errors.Config.MissingOption(
           'container_cluster.vm_spec.AWS.zone is required.')

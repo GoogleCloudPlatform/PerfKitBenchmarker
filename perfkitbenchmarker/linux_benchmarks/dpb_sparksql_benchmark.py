@@ -33,7 +33,6 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
@@ -133,8 +132,10 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   dpb_service_instance = benchmark_spec.dpb_service
-  run_uri = benchmark_spec.uuid.split('-')[0]
-  dpb_service_instance.CreateBucket(run_uri)
+  # buckets must start with a letter
+  bucket = 'pkb-' + benchmark_spec.uuid.split('-')[0]
+  storage_service = dpb_service_instance.storage_service
+  storage_service.MakeBucket(bucket)
 
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
@@ -143,10 +144,6 @@ def Prepare(benchmark_spec):
                        cwd=spark_sql_perf_dir)
   query_dir = os.path.join(spark_sql_perf_dir, 'src', 'main', 'resources',
                            FLAGS.dpb_sparksql_query)
-
-  storage_service = object_storage_service.GetObjectStorageClass(FLAGS.cloud)()
-  dst_url = '{prefix}{uri}'.format(
-      prefix=dpb_service_instance.PERSISTENT_FS_PREFIX, uri=run_uri)
   for dir_name, _, files in os.walk(query_dir):
     for filename in files:
       match = re.match(r'q?([0-9]+)a?.sql', filename)
@@ -156,11 +153,10 @@ def Prepare(benchmark_spec):
         if not FLAGS.dpb_sparksql_order or query_id in FLAGS.dpb_sparksql_order:
           query = '{}.sql'.format(query_id)
           src_url = os.path.join(dir_name, filename)
-          storage_service.Copy(src_url, os.path.join(dst_url, query))
+          storage_service.CopyToBucket(src_url, bucket, query)
   for script in [SPARK_TABLE_SCRIPT, SPARK_SQL_RUNNER_SCRIPT]:
     src_url = data.ResourcePath(script)
-    storage_service.Copy(src_url, dst_url)
-  benchmark_spec.base_dir = dst_url
+    storage_service.CopyToBucket(src_url, bucket, script)
 
   # Create external Hive tables if not reading the data from BigQuery
   if FLAGS.dpb_sparksql_data:
@@ -172,7 +168,8 @@ def Prepare(benchmark_spec):
         continue
       table = re.split(' |/', table_dir.rstrip('/')).pop()
       stats = dpb_service_instance.SubmitJob(
-          pyspark_file=os.path.join(dst_url, SPARK_TABLE_SCRIPT),
+          pyspark_file=os.path.join(benchmark_spec.base_dir,
+                                    SPARK_TABLE_SCRIPT),
           job_type=BaseDpbService.PYSPARK_JOB_TYPE,
           job_arguments=[FLAGS.dpb_sparksql_data, table])
       logging.info(stats)

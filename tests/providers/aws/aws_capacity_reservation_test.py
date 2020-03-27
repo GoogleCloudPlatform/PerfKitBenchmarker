@@ -86,7 +86,7 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
           '--instance-type=fake_machine_type '
           '--instance-platform=Linux/UNIX --availability-zone=us-west-1a '
           '--instance-count=1 --instance-match-criteria=targeted '
-          '--region=us-west-1 --end-date-type=limited --end-date=%s' %
+          '--region=us-west-1 --end-date-type=limited --end-date="%s"' %
           expected_end_date)
 
       self.assertEqual(issue_command.call_count, 1)

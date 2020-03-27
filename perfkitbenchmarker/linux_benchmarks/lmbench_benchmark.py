@@ -240,7 +240,7 @@ def _ParseOutput(lmbench_output):
   _UpdataMetadata(lmbench_output, metadata)
 
   # Parse results for "Processor, Processes - times in microseconds - smaller is better"
-  # TODO(yanfeiren): Parse more metric for processor section.
+  # TODO(user): Parse more metric for processor section.
   processor_metric_list = ('syscall', 'read', 'write', 'stat', 'fstat',
                            'open/close', 'Signal handler installation',
                            'Signal handler overhead', 'Protection fault',

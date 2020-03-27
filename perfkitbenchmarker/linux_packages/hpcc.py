@@ -318,7 +318,7 @@ def _CompileHpccMKL(vm):
 
   The following link provides instructions of using intel MKL in hpcc_benchmark.
   https://software.intel.com/en-us/articles/performance-tools-for-software-developers-use-of-intel-mkl-in-hpcc-benchmark
-  TODO(yanfeiren):The free version MKL pacakage does not have
+  TODO(user):The free version MKL pacakage does not have
   'interfaces/fftw2x_cdft' which is the MPI FFTW 2.x interfaces to the
   Intel MKL Cluster FFT. Such that we have to at first install OpenBlas and
   build hpcc binary using OpenBlas. Need to investigate how to build hpcc

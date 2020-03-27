@@ -31,8 +31,8 @@ FLAGS = flags.FLAGS
 class LocalAwsDpbEmr(aws_dpb_emr.AwsDpbEmr):
 
   def __init__(self):
-    self.s3_service = s3.S3Service()
-    self.s3_service.PrepareService(
+    self.storage_service = s3.S3Service()
+    self.storage_service.PrepareService(
         util.GetRegionFromZone(FLAGS.dpb_service_zone))
 
 

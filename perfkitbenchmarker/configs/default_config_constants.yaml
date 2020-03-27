@@ -72,7 +72,7 @@ default_dual_core: &default_dual_core
     zone: cn-beijing-g
     image: null
 
-# TODO(nlavine): update the disk types below as more providers are
+# TODO(user): update the disk types below as more providers are
 # updated for the disk types refactor.
 default_500_gb: &default_500_gb
   GCP:
@@ -124,7 +124,7 @@ default_500_gb: &default_500_gb
     mount_point: /scratch
 
 
-# TODO(nlavine): update the disk types below as more providers are
+# TODO(user): update the disk types below as more providers are
 # updated for the disk types refactor.
 default_50_gb: &default_50_gb
   GCP:

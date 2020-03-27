@@ -39,7 +39,6 @@ flags.DEFINE_integer('nccl_num_runs', 10, 'The number of consecutive run.',
                      lower_bound=1)
 flags.DEFINE_integer('nccl_seconds_between_runs', 10,
                      'Sleep between consecutive run.')
-flags.DEFINE_boolean('nccl_install_openmpi', False, 'Install Open MPI')
 flags.DEFINE_boolean('nccl_install_nccl', False, 'Install NCCL')
 flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
 flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
@@ -65,17 +64,18 @@ nccl:
           zone: us-central1-a
           image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
-          boot_disk_size: 100
+          boot_disk_size: 105
           gpu_type: v100
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-west-2a
           image: ami-07728e9e2742b0662
-          boot_disk_size: 100
+          boot_disk_size: 105
         Azure:
           machine_type: Standard_NC24rs_v3
           zone: eastus
+          boot_disk_size: 105
 """
 
 _HOSTFILE = 'HOSTFILE'
@@ -141,10 +141,9 @@ def _PrepareVm(vm):
   """
   vm.AuthenticateVm()
   vm.Install('cuda_toolkit')
+  vm.Install('openmpi')
   if FLAGS.nccl_install_nccl:
     vm.Install('nccl')
-  if FLAGS.nccl_install_openmpi:
-    vm.Install('openmpi')
 
   env = ''
   if FLAGS.aws_efa:

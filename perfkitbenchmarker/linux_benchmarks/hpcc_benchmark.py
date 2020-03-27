@@ -54,7 +54,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import hpcc
 from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import openblas
-from perfkitbenchmarker.linux_packages import openmpi
 import six
 from six.moves import range
 
@@ -211,7 +210,7 @@ def UpdateMetadata(metadata):
     metadata['math_library_version'] = mkl.MKL_VERSION
   elif FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_OPEN_BLAS:
     metadata['math_library_version'] = openblas.GIT_TAG
-  metadata['openmpi_version'] = openmpi.MPI_VERSION
+  metadata['openmpi_version'] = FLAGS.openmpi_version
 
 
 def ParseOutput(hpcc_output, benchmark_spec):

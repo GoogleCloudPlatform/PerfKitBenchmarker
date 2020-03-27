@@ -131,6 +131,7 @@ class BaseDpbService(resource.BaseResource):
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_version = 'latest'
     self.dpb_service_type = 'unknown'
+    self.storage_service = None
 
   @abc.abstractmethod
   def SubmitJob(self,

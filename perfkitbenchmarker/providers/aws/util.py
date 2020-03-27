@@ -33,6 +33,8 @@ import six
 AWS_PATH = 'aws'
 AWS_PREFIX = [AWS_PATH, '--output', 'json']
 FLAGS = flags.FLAGS
+STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
+                    'potential stockout scenario.')
 
 
 def IsRegion(zone_or_region):
@@ -99,7 +101,7 @@ def EksZonesValidator(value):
   if not value:
     return True
   if len(value) == 1:
-    return IsRegion(value)
+    return IsRegion(value[0])
   if any(IsRegion(zone) for zone in value):
     return False
   region = GetRegionFromZone(value[0])

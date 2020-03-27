@@ -71,8 +71,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
-    self.gcs_service = gcs.GoogleCloudStorageService()
-    self.gcs_service.PrepareService(location=self.region)
+    self.storage_service = gcs.GoogleCloudStorageService()
+    self.storage_service.PrepareService(location=self.region)
 
   @staticmethod
   def _ParseTime(state_time):
@@ -257,7 +257,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     Args:
       source_bucket: String, name of the bucket to create.
     """
-    self.gcs_service.MakeBucket(source_bucket)
+    self.storage_service.MakeBucket(source_bucket)
 
   def DeleteBucket(self, source_bucket):
     """Delete a bucket on GCS used during the persistent data processing.
@@ -265,7 +265,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     Args:
       source_bucket: String, name of the bucket to delete.
     """
-    self.gcs_service.DeleteBucket(source_bucket)
+    self.storage_service.DeleteBucket(source_bucket)
 
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to generate data using a distributed job on the cluster."""

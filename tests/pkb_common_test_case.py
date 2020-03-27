@@ -39,7 +39,7 @@ class PkbCommonTestCase(absltest.TestCase):
     saved_flag_values = flagsaver.save_flag_values()
     self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
 
-  # TODO(b/150622460): Extend MockIssueCommand to support multiple calls to
+  # TODO(user): Extend MockIssueCommand to support multiple calls to
   # vm_util.IssueCommand
   def MockIssueCommand(self, stdout, stderr, retcode):
     """Mocks function calls inside vm_util.IssueCommand.
