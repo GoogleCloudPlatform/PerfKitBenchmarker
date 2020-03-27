@@ -118,7 +118,7 @@ class VpnServiceTestCase(BaseVPNServiceTest):
     self.assertTrue(hasattr(pspec, 'vpn_gateways'))
     self.assertTrue(pspec.vpn_gateways is not None)
 
-  def testGetVPNGWPairs(self):
+  def testGetVPNGatewayPairs(self):
     vpn_gateways = {'vpngw-us-west1-0-None': None,
                     'vpngw-us-west1-1-None': None,
                     'vpngw-us-central1-0-None': None,
@@ -127,11 +127,11 @@ class VpnServiceTestCase(BaseVPNServiceTest):
     FLAGS.vpn_service_gateway_count = 1
     spec = self._CreateBenchmarkSpecFromYaml(DEFAULT_CFG)
     spec.ConstructVPNService()
-    pairs = spec.vpn_service.GetVPNGWPairs(vpn_gateways)
+    pairs = spec.vpn_service.GetVpnGatewayPairs(vpn_gateways)
     self.assertEqual(len(pairs), 4)
     # test unpickled values
     pspec = pickle.loads(pickle.dumps(spec))
-    ppairs = pspec.vpn_service.GetVPNGWPairs(vpn_gateways)
+    ppairs = pspec.vpn_service.GetVpnGatewayPairs(vpn_gateways)
     self.assertEqual(len(ppairs), 4)
 
 

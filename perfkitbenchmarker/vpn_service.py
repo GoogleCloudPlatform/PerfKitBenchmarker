@@ -34,9 +34,9 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
 flags.DEFINE_integer('vpn_service_tunnel_count', None,
-                     'Number of tunnels to create for each VPN GW pair.')
+                     'Number of tunnels to create for each VPN Gateway pair.')
 flags.DEFINE_integer('vpn_service_gateway_count', None,
-                     'Number of VPN GWs to create for each vm_group.')
+                     'Number of VPN Gateways to create for each vm_group.')
 flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
 flags.DEFINE_string('vpn_service_shared_key', None,
@@ -68,7 +68,7 @@ class VPN(object):
   def __init__(self, *args, **kwargs):
       return object.__init__(self, *args, **kwargs)
 
-  def getKeyFromGWPair(self, gateway_pair, suffix=''):
+  def getKeyFromGatewayPair(self, gateway_pair, suffix=''):
     """Return the VPN key for a pair of endpoints.
 
     Args:
@@ -79,12 +79,12 @@ class VPN(object):
       string. The VPN key.
 
     """
-    key = 'vpn' + ''.join(gw for gw in gateway_pair) + suffix + FLAGS.run_uri
+    key = 'vpn' + ''.join(gateway for gateway in gateway_pair) + suffix + FLAGS.run_uri
     return key
 
   def Create(self, gateway_pair, suffix=''):
-    self.GWPair = gateway_pair
-    self.name = self.getKeyFromGWPair(gateway_pair)
+    self.GatewayPair = gateway_pair
+    self.name = self.getKeyFromGatewayPair(gateway_pair)
     self.tunnel_config = TunnelConfig(tunnel_name=self.name, suffix=suffix)
 
   def Delete(self):
@@ -102,7 +102,7 @@ class VPN(object):
       raise errors.Error('GetVPN called in a thread without a '
                          'BenchmarkSpec.')
     with benchmark_spec.vpns_lock:
-      key = self.getKeyFromGWPair(gateway_pair, suffix)
+      key = self.getKeyFromGatewayPair(gateway_pair, suffix)
       if key not in benchmark_spec.vpns:
         self.Create(gateway_pair, suffix)
         benchmark_spec.vpns[key] = self
@@ -112,10 +112,10 @@ class VPN(object):
     """Configure the VPN tunnel."""
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    vpn_gateway_0 = benchmark_spec.vpn_gateways[self.GWPair[0]]
-    vpn_gateway_1 = benchmark_spec.vpn_gateways[self.GWPair[1]]
+    vpn_gateway_0 = benchmark_spec.vpn_gateways[self.GatewayPair[0]]
+    vpn_gateway_1 = benchmark_spec.vpn_gateways[self.GatewayPair[1]]
 
-    assert not (vpn_gateway_0.require_target_to_init and vpn_gateway_1.require_target_to_init), 'Cant connect 2 passive VPN GWs'
+    assert not (vpn_gateway_0.require_target_to_init and vpn_gateway_1.require_target_to_init), 'Cant connect 2 passive VPN Gateways'
 
     tunnel_config_hash = None
     while not self.isTunnelConfigured():
@@ -136,7 +136,7 @@ class VPN(object):
     """
     is_tunnel_configured = False
     if len(self.tunnel_config.endpoints) == 2:
-      if self.tunnel_config.endpoints[self.GWPair[0]]['is_configured'] and self.tunnel_config.endpoints[self.GWPair[1]]['is_configured']:
+      if self.tunnel_config.endpoints[self.GatewayPair[0]]['is_configured'] and self.tunnel_config.endpoints[self.GatewayPair[1]]['is_configured']:
         logging.info('Tunnel is configured.')
         is_tunnel_configured = True
     return is_tunnel_configured
@@ -150,7 +150,7 @@ class VPN(object):
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     logging.info('Tunnel endpoints configured. Waiting for tunnel...')
-    ready = benchmark_spec.vpn_gateways[self.GWPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[0]]['tunnel_id']) and benchmark_spec.vpn_gateways[self.GWPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GWPair[1]]['tunnel_id'])
+    ready = benchmark_spec.vpn_gateways[self.GatewayPair[0]].IsTunnelReady(self.tunnel_config.endpoints[self.GatewayPair[0]]['tunnel_id']) and benchmark_spec.vpn_gateways[self.GatewayPair[1]].IsTunnelReady(self.tunnel_config.endpoints[self.GatewayPair[1]]['tunnel_id'])
     if not ready:
       raise errors.Resource.RetryableCreationError()
 
@@ -271,7 +271,7 @@ class VPNService(resource.BaseResource):
     for gateway_pair in self.vpn_gateway_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
       suffix = self.GetNewSuffix()
-      vpn_id = VPN().getKeyFromGWPair(gateway_pair, suffix)
+      vpn_id = VPN().getKeyFromGatewayPair(gateway_pair, suffix)
       self.vpns[vpn_id] = VPN().GetVPN(gateway_pair, suffix)
       self.vpns[vpn_id].tunnel_config.setConfig(**self.vpn_properties)
 

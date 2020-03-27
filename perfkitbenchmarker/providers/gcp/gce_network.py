@@ -103,7 +103,7 @@ class GceVpnGateway(network.BaseVpnGateway):
                                             'require_target_to_init': self.require_target_to_init,
                                             }
 
-    # attach public IP to this GW if doesnt exist
+    # attach public IP to this gateway if doesnt exist
     # and update tunnel_config if needed
     # requires project, region, name
     with self.ip_address_lock:
@@ -194,7 +194,7 @@ class GceVpnGateway(network.BaseVpnGateway):
     Forwards ESP protocol, and UDP 500/4500 for tunnel setup.
 
     Args:
-      source_gw: The BaseVPN object to add forwarding rules to.
+      source_gateway: The BaseVPN object to add forwarding rules to.
     """
     if len(self.forwarding_rules) == 3:
       return  # backout if already set
@@ -224,10 +224,10 @@ class GceVpnGateway(network.BaseVpnGateway):
       fr_ESP.Create()
 
   def _SetupRouting(self, suffix, next_hop_tun, dest_cidr):
-    """Create IPSec routing rules between the source gw and the target gw.
+    """Create IPSec routing rules between the source gateway and the target gateway.
 
     Args:
-      target_gw: The VpnGateway object to point routing rules at.
+      target_gateway: The VpnGateway object to point routing rules at.
     """
 
     route_name = 'route-' + self.name + '-' + suffix
@@ -313,7 +313,7 @@ class GceIPAddress(resource.BaseResource):
     self.ip_address = None
 
   def _Create(self):
-    """ Allocates a public IP for the VPN GW """
+    """ Allocates a public IP for the VPN gateway """
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'create', self.name)
     cmd.flags['region'] = self.region
     cmd.Issue()
@@ -326,7 +326,7 @@ class GceIPAddress(resource.BaseResource):
     self.ip_address = stdout.encode('ascii', 'ignore').rstrip().decode()
 
   def _Delete(self):
-    """ Deletes a public IP for the VPN GW """
+    """ Deletes a public IP for the VPN gateway """
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'delete', self.name)
     cmd.flags['region'] = self.region
     cmd.Issue(raise_on_failure=False)
@@ -721,9 +721,9 @@ class GceNetwork(network.BaseNetwork):
 
     # Add VpnGateways to the network.
     if FLAGS.use_vpn:
-      for gwnum in range(0, FLAGS.vpn_service_gateway_count):
+      for gatewaynum in range(0, FLAGS.vpn_service_gateway_count):
         vpn_gateway_name = 'VpnGateway-%s-%s-%s' % (
-            util.GetRegionFromZone(network_spec.zone), gwnum, FLAGS.run_uri)
+            util.GetRegionFromZone(network_spec.zone), gatewaynum, FLAGS.run_uri)
         self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
             vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
@@ -846,14 +846,14 @@ class GceNetwork(network.BaseNetwork):
         # for rule in self.external_nets_rules:
         #   self.external_nets_rules[rule].Create()
       if getattr(self, 'vpn_gateway', False):
-        vm_util.RunThreaded(lambda gw: self.vpn_gateway[gw].Create(),
+        vm_util.RunThreaded(lambda gateway: self.vpn_gateway[gateway].Create(),
                             list(self.vpn_gateway.keys()))
 
   def Delete(self):
     """Deletes the actual network."""
     if not FLAGS.gce_network_name:
       if getattr(self, 'vpn_gateway', False):
-        vm_util.RunThreaded(lambda gw: self.vpn_gateway[gw].Delete(),
+        vm_util.RunThreaded(lambda gateway: self.vpn_gateway[gateway].Delete(),
                             list(self.vpn_gateway.keys()))
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()

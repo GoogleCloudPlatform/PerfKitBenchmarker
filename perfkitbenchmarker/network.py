@@ -103,7 +103,7 @@ class BaseNetworkSpec(object):
 
 
 class BaseVpnGateway(object):
-  """An object representing the Base VPN GW."""
+  """An object representing the Base VPN Gateway."""
   CLOUD = None
 
   def __init__(self, zone=None, cidr=None):
@@ -114,7 +114,7 @@ class BaseVpnGateway(object):
     """
     self.zone = zone
     self.cidr = cidr
-    self.require_target_to_init = False  # True if we need taget GW up front (AWS)
+    self.require_target_to_init = False  # True if we need taget Gateway up front (AWS)
 
   @classmethod
   def GetVpnGateway(cls):
@@ -126,7 +126,7 @@ class BaseVpnGateway(object):
     VMs to call this method and all share the same BaseVPN object.
     """
     if cls.CLOUD is None:
-      raise errors.Error('VPN GWs should have CLOUD attributes.')
+      raise errors.Error('VPN Gateways should have CLOUD attributes.')
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error('GetVPN called in a thread without a '
@@ -173,11 +173,11 @@ class BaseVpnGateway(object):
     pass
 
   def Create(self):
-    """Creates the actual VPN GW."""
+    """Creates the actual VPN Gateway."""
     pass
 
   def Delete(self):
-      """Deletes the actual VPN GW."""
+      """Deletes the actual VPN Gateway."""
       pass
 
 
