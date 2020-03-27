@@ -153,7 +153,7 @@ class VPN(object):
     if len(self.tunnel_config.endpoints) == 2:
       if (self.tunnel_config.endpoints[self.GatewayPair[0]]['is_configured'] and
           self.tunnel_config.endpoints[self.GatewayPair[1]]['is_configured']):
-        logging.info('Tunnel is configured.')
+        logging.debug('Tunnel is configured.')
         is_tunnel_configured = True
     return is_tunnel_configured
 
@@ -165,7 +165,7 @@ class VPN(object):
       boolean.
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    logging.info('Tunnel endpoints configured. Waiting for tunnel...')
+    logging.debug('Tunnel endpoints configured. Waiting for tunnel...')
     ready = (benchmark_spec.vpn_gateways[self.GatewayPair[0]].IsTunnelReady(
         self.tunnel_config.endpoints[self.GatewayPair[0]]['tunnel_id']) and
         benchmark_spec.vpn_gateways[self.GatewayPair[1]].IsTunnelReady(

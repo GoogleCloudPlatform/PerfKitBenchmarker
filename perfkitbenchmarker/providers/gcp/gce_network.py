@@ -94,7 +94,7 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     # update tunnel_config if needed
     if self.name not in tunnel_config.endpoints:
-      logging.info('tunnel_config: This endpoint isnt registered yet... %s' % self.name)
+      logging.debug('tunnel_config: This endpoint isnt registered yet... %s' % self.name)
       tunnel_config.endpoints[self.name] = {'is_configured': False,
                                             'cidr': self.cidr,
                                             'project': self.project,
@@ -113,7 +113,7 @@ class GceVpnGateway(network.BaseVpnGateway):
           self.ip_resource.Create()
         self.ip_address = self.ip_resource.ip_address
       if 'ip_address' not in tunnel_config.endpoints[self.name]:
-        logging.info('tunnel_config: Configuring IP for %s' % self.name)
+        logging.debug('tunnel_config: Configuring IP for %s' % self.name)
         tunnel_config.endpoints[self.name]['ip_address'] = self.ip_address
 
     # configure forwarding
@@ -122,12 +122,12 @@ class GceVpnGateway(network.BaseVpnGateway):
       if len(self.forwarding_rules) == 3:
         logging.debug('tunnel_config: Forwarding already configured, skipping')
       else:
-        logging.info('tunnel_config: Setting up forwarding')
+        logging.debug('tunnel_config: Setting up forwarding')
         self._SetupForwarding(tunnel_config)
 
     # Abort if we don't have a target info configured yet
     if len(tunnel_config.endpoints) < 2:
-      logging.info('tunnel_config: Only found %d endpoints... waiting for target to configure' % len(tunnel_config.endpoints))
+      logging.debug('tunnel_config: Only found %d endpoints... waiting for target to configure' % len(tunnel_config.endpoints))
       return
 
     # Get target endpoint config key
@@ -136,7 +136,7 @@ class GceVpnGateway(network.BaseVpnGateway):
     # configure tunnel resources
     # requires: target_ip_address, IKE version (default 1),
     if 'ip_address' not in tunnel_config.endpoints[target_endpoint]:
-      logging.info('tunnel_config: Target IP needed... waiting for target to configure')
+      logging.debug('tunnel_config: Target IP needed... waiting for target to configure')
       return
     if not hasattr(tunnel_config, 'psk'):
       logging.debug('tunnel_config: PSK not provided... setting to runid')
@@ -147,7 +147,7 @@ class GceVpnGateway(network.BaseVpnGateway):
     # requires: next_hop_tunnel_id, target_cidr,
     dest_cidr = tunnel_config.endpoints[target_endpoint].get('cidr')
     if not dest_cidr or not dest_cidr.strip():
-      logging.info('tunnel_config: destination CIDR needed... waiting for target to configure')
+      logging.debug('tunnel_config: destination CIDR needed... waiting for target to configure')
       return
     self._SetupRouting(
         tunnel_config.suffix,
