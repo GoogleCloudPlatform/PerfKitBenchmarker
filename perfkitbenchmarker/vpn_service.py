@@ -17,7 +17,7 @@ This module contains the main VPNService class, which manages the VPN lifecycle,
 the VPN class, which manages the VPN tunnel lifecycle between two endpoints, and
 the TunnelConfig class, which maintains the parameters needed to configure a
 tunnel between two endpoints. Related: perfkitbenchmarker.network
-module includes the BaseVPNGW class to manage VPN gateway endpoints.
+module includes the BaseVpnGateway class to manage VPN gateway endpoints.
 """
 
 import itertools
@@ -94,7 +94,7 @@ class VPN(object):
     """Gets a VPN object for the gateway_pair or creates one if none exists
 
     Args:
-    gateway_pair: a tuple of two VPNGWs
+    gateway_pair: a tuple of two VpnGateways
     """
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
@@ -257,7 +257,7 @@ class VPNService(resource.BaseResource):
     return result
 
   def _Create(self):
-    """Creates VPN objects for VPNGW pairs."""
+    """Creates VPN objects for VpnGateway pairs."""
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
@@ -265,7 +265,7 @@ class VPNService(resource.BaseResource):
                          'BenchmarkSpec.')
 
 
-    self.vpn_gateway_pairs = self.GetVPNGWPairs(benchmark_spec.vpn_gateways)
+    self.vpn_gateway_pairs = self.GetVpnGatewayPairs(benchmark_spec.vpn_gateways)
 
 
     for gateway_pair in self.vpn_gateway_pairs:
@@ -300,7 +300,7 @@ class VPNService(resource.BaseResource):
                   }
     return basic_data
 
-  def GetVPNGWPairs(self, vpn_gateways):
+  def GetVpnGatewayPairs(self, vpn_gateways):
     """Returns pairs of gateways to create VPNs between.
 
     Currently creates a pair between all non-matching region endpoints (mesh).

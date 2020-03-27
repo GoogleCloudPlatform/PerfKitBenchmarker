@@ -44,19 +44,19 @@ NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 
-class GceVPNGW(network.BaseVPNGW):
+class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway"""
   CLOUD = providers.GCP
 
   def __init__(self, name, network_name, region, cidr, project):
-    super(GceVPNGW, self).__init__()
+    super(GceVpnGateway, self).__init__()
 
     self.forwarding_rules = {}
     self.forwarding_rules_lock = threading.Lock()
     self.tunnels = {}
     self.routes = {}
     self.ip_resource = None
-    self.vpn_gateway_resource = GceVPNGWResource(name, network_name, region, cidr, project)
+    self.vpn_gateway_resource = GceVpnGatewayResource(name, network_name, region, cidr, project)
     self.vpn_gateway_resource_lock = threading.Lock()
 
     self.name = name
@@ -88,7 +88,7 @@ class GceVPNGW(network.BaseVPNGW):
     Args:
       tunnel_config: The tunnel configuration for this VPN.
     """
-    network.BaseVPNGW.ConfigureTunnel(self, tunnel_config)
+    network.BaseVpnGateway.ConfigureTunnel(self, tunnel_config)
     logging.info('Configuring Tunnel with params:')
     logging.info(tunnel_config)
 
@@ -227,7 +227,7 @@ class GceVPNGW(network.BaseVPNGW):
     """Create IPSec routing rules between the source gw and the target gw.
 
     Args:
-      target_gw: The VPNGW object to point routing rules at.
+      target_gw: The VpnGateway object to point routing rules at.
     """
 
     route_name = 'route-' + self.name + '-' + suffix
@@ -236,7 +236,7 @@ class GceVPNGW(network.BaseVPNGW):
       self.routes[route_name].Create()
 
   def Create(self):
-    """Creates the actual VPNGW."""
+    """Creates the actual VpnGateway."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
@@ -248,7 +248,7 @@ class GceVPNGW(network.BaseVPNGW):
     self.created = True
 
   def Delete(self):
-    """Deletes the actual VPNGW."""
+    """Deletes the actual VpnGateway."""
     if self.ip_resource:
       self.ip_resource.Delete()
 
@@ -270,11 +270,11 @@ class GceVPNGW(network.BaseVPNGW):
     self.created = False
 
 
-class GceVPNGWResource(resource.BaseResource):
+class GceVpnGatewayResource(resource.BaseResource):
   """Object representing a GCE VPN Gateway Resource."""
 
   def __init__(self, name, network_name, region, cidr, project):
-    super(GceVPNGWResource, self).__init__()
+    super(GceVpnGatewayResource, self).__init__()
     self.name = name
     self.network_name = network_name
     self.region = region
@@ -719,12 +719,12 @@ class GceNetwork(network.BaseNetwork):
                                                             ALLOW_ALL, name,
                                                             ext_net)
 
-    # Add VPNGWs to the network.
+    # Add VpnGateways to the network.
     if FLAGS.use_vpn:
       for gwnum in range(0, FLAGS.vpn_service_gateway_count):
-        vpn_gateway_name = 'vpngw-%s-%s-%s' % (
+        vpn_gateway_name = 'VpnGateway-%s-%s-%s' % (
             util.GetRegionFromZone(network_spec.zone), gwnum, FLAGS.run_uri)
-        self.vpn_gateway[vpn_gateway_name] = GceVPNGW(
+        self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
             vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
 

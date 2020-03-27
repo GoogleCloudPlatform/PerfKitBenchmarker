@@ -102,26 +102,26 @@ class BaseNetworkSpec(object):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
 
-class BaseVPNGW(object):
+class BaseVpnGateway(object):
   """An object representing the Base VPN GW."""
   CLOUD = None
 
   def __init__(self, zone=None, cidr=None):
-    """Initializes the BaseVPNGW.
+    """Initializes the BaseVpnGateway.
 
     Args:
-      zone: The zone in which to create the VPNGW.
+      zone: The zone in which to create the VpnGateway.
     """
     self.zone = zone
     self.cidr = cidr
     self.require_target_to_init = False  # True if we need taget GW up front (AWS)
 
   @classmethod
-  def GetVPNGW(cls):
-    """Returns a BaseVPNGW.
+  def GetVpnGateway(cls):
+    """Returns a BaseVpnGateway.
     This method is used instead of directly calling the class's constructor.
-    It creates BaseVPNGW instances and registers them.
-    If a BaseVPNGW object has already been registered, that object
+    It creates BaseVpnGateway instances and registers them.
+    If a BaseVpnGateway object has already been registered, that object
     will be returned rather than creating a new one. This enables multiple
     VMs to call this method and all share the same BaseVPN object.
     """
