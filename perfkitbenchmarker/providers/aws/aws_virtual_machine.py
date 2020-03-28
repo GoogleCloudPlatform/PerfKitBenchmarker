@@ -24,6 +24,7 @@ from __future__ import print_function
 
 import base64
 import collections
+import datetime
 import json
 import logging
 import posixpath
@@ -153,6 +154,10 @@ _EFA_INSTALL_CMD = ';'.join([
     'curl -O {url}', 'tar -xvzf {tarfile}', 'cd aws-efa-installer',
     'sudo ./efa_installer.sh -y', 'rm -rf {tarfile} aws-efa-installer'
 ])
+
+LINUX = 'Linux/UNIX'
+RHEL = 'Red Hat Enterprise Linux'
+WINDOWS = 'Windows'
 
 
 class AwsTransitionalVmRetryableError(Exception):
@@ -505,7 +510,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.use_spot_instance = vm_spec.use_spot_instance
-    self.spot_price = vm_spec.spot_price
+    if FLAGS.aws_use_latest_spot_price:
+      self.spot_price = self.GetLatestSpotPrice(self.machine_type, self.zone)
+    else:
+      self.spot_price = vm_spec.spot_price
     self.boot_disk_size = vm_spec.boot_disk_size
     self.client_token = str(uuid.uuid4())
     self.host = None
@@ -532,6 +540,33 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host and self.use_spot_instance:
       raise ValueError(
           'Tenancy=host is not supported for Spot Instances')
+
+  @classmethod
+  def GetLatestSpotPrice(cls, machine_type, zone):
+    """Get the the latest spot price from history data.
+
+    Args:
+      machine_type: The machine type of VMs that may be created.
+      zone: The AWS availability zone.
+
+    Returns:
+      the spot price or None.
+    """
+    cmd = util.AWS_PREFIX + [
+        'ec2', 'describe-spot-price-history',
+        '--start-time={}'.format(datetime.datetime.utcnow().isoformat()),
+        '--filters',
+        'Name=instance-type,Values={}'.format(machine_type),
+        'Name=availability-zone,Values={}'.format(zone),
+        'Name=product-description,Values={}'.format(cls.PRODUCT_DESCRIPTIONS),
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      raise errors.Benchmarks.PrepareException(stderr)
+    spot_price_history = json.loads(stdout)['SpotPriceHistory']
+    if spot_price_history:
+      spot = max(spot_price_history, key=lambda spot: spot['Timestamp'])
+      return float(spot['SpotPrice'])
 
   @property
   def host_list(self):
@@ -1011,6 +1046,7 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.ClearMixin):
   IMAGE_NAME_FILTER = 'clear/images/*/clear-*'
   DEFAULT_USER_NAME = 'clear'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1018,12 +1054,14 @@ class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
   IMAGE_OWNER = COREOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'core'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class Debian9BasedAwsVirtualMachine(AwsVirtualMachine,
                                     linux_virtual_machine.Debian9Mixin):
   IMAGE_NAME_FILTER = 'debian-stretch-*64-*'
   DEFAULT_USER_NAME = 'admin'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1033,6 +1071,7 @@ class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'debian-10-*64*'
   IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1040,6 +1079,7 @@ class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1047,6 +1087,7 @@ class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1054,6 +1095,7 @@ class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1063,6 +1105,7 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
   DEFAULT_USER_NAME = 'ubuntu'
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class AmazonLinux2BasedAwsVirtualMachine(
@@ -1070,6 +1113,7 @@ class AmazonLinux2BasedAwsVirtualMachine(
   """Class with configuration for AWS Amazon Linux 2 virtual machines."""
   IMAGE_NAME_FILTER = 'amzn2-ami-*-*-*'
   IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class AmazonLinux1BasedAwsVirtualMachine(
@@ -1082,12 +1126,14 @@ class AmazonLinux1BasedAwsVirtualMachine(
   # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
   IMAGE_NAME_REGEX = (
       r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
+  PRODUCT_DESCRIPTIONS = LINUX
 
 
 class VersionlessRhelBaseAwsVirtualMachine(
     linux_virtual_machine.VersionlessRhelMixin,
     AmazonLinux1BasedAwsVirtualMachine):
   ALTERNATIVE_OS = AmazonLinux1BasedAwsVirtualMachine.OS_TYPE
+  PRODUCT_DESCRIPTIONS = RHEL
 
 
 class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1097,6 +1143,7 @@ class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
   # https://access.redhat.com/articles/2962171
   IMAGE_NAME_FILTER = 'RHEL-7*_GA*'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
+  PRODUCT_DESCRIPTIONS = RHEL
 
 
 class Rhel8BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1107,6 +1154,7 @@ class Rhel8BasedAwsVirtualMachine(AwsVirtualMachine,
   # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
   IMAGE_NAME_FILTER = 'RHEL-8*_HVM-*'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
+  PRODUCT_DESCRIPTIONS = RHEL
 
 
 class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1117,6 +1165,7 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   DEFAULT_USER_NAME = 'centos'
+  PRODUCT_DESCRIPTIONS = RHEL
 
 
 class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
@@ -1226,36 +1275,43 @@ class VersionlessWindowsAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.VersionlessWindowsMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 class Windows2012CoreAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 class Windows2016CoreAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Core-Base-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 class Windows2019CoreAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 class Windows2012BaseAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Base-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 class Windows2016BaseAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2016-English-Full-Base-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 class Windows2019BaseAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
+  PRODUCT_DESCRIPTIONS = WINDOWS
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
