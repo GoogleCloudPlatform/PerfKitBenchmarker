@@ -1226,6 +1226,7 @@ def _CreateProcCpuSamples(vms):
 
 
 def Main():
+  print('This is a test.')
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
   _ParseFlags()
