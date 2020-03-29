@@ -27,7 +27,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('openmpi_version', '3.1.2',
                     'OpenMPI version to install, such as 3.1.2 and 4.0.2.'
-                    'Set to None to ignore the intallation of OpenMPI.')
+                    'Set to empty to ignore the intallation of OpenMPI.')
 flags.DEFINE_bool('openmpi_enable_shared', False,
                   'Whether openmpi should build shared libraries '
                   'in addition to static ones.')
@@ -72,7 +72,7 @@ def GetMpiVersion(vm):
 def _Install(vm):
   """Installs the OpenMPI package on the VM."""
   version_to_install = FLAGS.openmpi_version
-  if version_to_install is None:
+  if not version_to_install:
     return
   current_version = GetMpiVersion(vm)
   if current_version == version_to_install:
@@ -121,7 +121,7 @@ def GetMpiDir():
 
 def YumInstall(vm):
   """Installs the OpenMPI package on the VM."""
-  if FLAGS.openmpi_version is None:
+  if not FLAGS.openmpi_version:
     return
   vm.RobustRemoteCommand('sudo yum {}'.format(REMOVE_MPI_CMD))
   _Install(vm)
@@ -129,7 +129,7 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the OpenMPI package on the VM."""
-  if FLAGS.openmpi_version is None:
+  if not FLAGS.openmpi_version:
     return
   vm.RobustRemoteCommand('sudo apt-get {}'.format(REMOVE_MPI_CMD))
   _Install(vm)
