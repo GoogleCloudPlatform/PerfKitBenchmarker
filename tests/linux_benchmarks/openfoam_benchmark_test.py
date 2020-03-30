@@ -69,6 +69,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.mock_vm.RemoteCommand.assert_called_with(' && '.join(run_cmd))
 
     # Verify sample equality
+    print('hi')
     expected_metadata = {
         'case_name': 'motorbike',
         'decomp_method': 'scotch',
