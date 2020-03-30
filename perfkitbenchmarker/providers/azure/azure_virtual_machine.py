@@ -580,7 +580,7 @@ class AzureVirtualMachine(
     if retcode and (
         'Error Code: QuotaExceeded' in stderr or
         re.search(r'exceeding approved \S+ \S+ quota', stderr) or
-        re.search(r'CloudError\(The template deployment .+ is not valid',
+        re.search(r'CloudError\("The template deployment .+ is not valid',
                   stderr) or
         'exceeding quota limit' in stderr):
       raise errors.Benchmarks.QuotaFailure(
