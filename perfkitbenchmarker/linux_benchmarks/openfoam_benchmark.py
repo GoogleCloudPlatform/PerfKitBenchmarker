@@ -16,7 +16,7 @@
 OpenFOAM is a C++ toolbox for the development of customized numerical solvers,
 and pre-/post-processing utilities for the solution of continuum mechanics
 problems, most prominently including computational fluid dynamics.
-https://openfoam.org/
+See: https://openfoam.org/
 
 This benchmark runs a motorbike simulation that is popularly used to measure
 scalability of OpenFOAM across multiple cores. Since this is a complex
