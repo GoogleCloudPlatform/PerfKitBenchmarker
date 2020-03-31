@@ -136,6 +136,7 @@ def Prepare(benchmark_spec):
   bucket = 'pkb-' + benchmark_spec.uuid.split('-')[0]
   storage_service = dpb_service_instance.storage_service
   storage_service.MakeBucket(bucket)
+  benchmark_spec.base_dir = dpb_service_instance.PERSISTENT_FS_PREFIX + bucket
 
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
