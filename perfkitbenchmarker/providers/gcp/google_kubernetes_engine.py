@@ -87,12 +87,6 @@ class GkeCluster(container_service.KubernetesCluster):
 
   CLOUD = providers.GCP
 
-  def _GetRequiredGkeEnv(self):
-    env = os.environ.copy()
-    if self.use_application_default_credentials:
-      env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
-    return env
-
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
@@ -170,7 +164,7 @@ class GkeCluster(container_service.KubernetesCluster):
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
     _, stderr, retcode = cmd.Issue(
-        timeout=1200, env=self._GetRequiredGkeEnv(), raise_on_failure=False)
+        timeout=1200, raise_on_failure=False)
     if retcode != 0:
       # Log specific type of failure, if known.
       if 'ZONE_RESOURCE_POOL_EXHAUSTED' in stderr:
@@ -185,7 +179,7 @@ class GkeCluster(container_service.KubernetesCluster):
     super(GkeCluster, self)._PostCreate()
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'get-credentials', self.name)
-    env = self._GetRequiredGkeEnv()
+    env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
