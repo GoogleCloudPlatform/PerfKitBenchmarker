@@ -702,6 +702,7 @@ class VersionlessWindowsMixin(BaseWindowsMixin,
   """
   OS_TYPE = os_types.WINDOWS
   ALTERNATIVE_OS = os_types.WINDOWS2012_CORE
+  # MOE:strip_line TODO(user): Delete in April
   END_OF_LIFE = '2020-04-01'
 
 
