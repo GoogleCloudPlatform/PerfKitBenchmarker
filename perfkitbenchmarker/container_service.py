@@ -31,8 +31,10 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -400,21 +402,16 @@ class BaseContainerCluster(resource.BaseResource):
   def __init__(self, cluster_spec):
     super(BaseContainerCluster, self).__init__()
     self.name = 'pkb-%s' % FLAGS.run_uri
-    self.machine_type = cluster_spec.vm_spec.machine_type
-    if self.machine_type is None:  # custom machine type
-      self.cpus = cluster_spec.vm_spec.cpus
-      self.memory = cluster_spec.vm_spec.memory
-    else:
-      self.cpus = None
-      self.memory = None
-    self.gpu_count = cluster_spec.vm_spec.gpu_count
-    self.gpu_type = cluster_spec.vm_spec.gpu_type
-    self.zone = cluster_spec.vm_spec.zone
+    # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
+    # Provider specific information like disks out of the spec.
+    self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
+        cluster_spec.vm_spec)
     self.num_nodes = cluster_spec.vm_count
     self.min_nodes = cluster_spec.min_vm_count or self.num_nodes
     self.max_nodes = cluster_spec.max_vm_count or self.num_nodes
     self.containers = collections.defaultdict(list)
     self.services = {}
+    self.zone = self.vm_config.zone
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
@@ -431,21 +428,16 @@ class BaseContainerCluster(resource.BaseResource):
     metadata = {
         'cloud': self.CLOUD,
         'cluster_type': self.CLUSTER_TYPE,
-        'machine_type': self.machine_type,
         'zone': self.zone,
         'size': self.num_nodes,
-    }
+    } or self.vm_config.GetResourceMetadata()
+
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       metadata.update({
           'max_size': self.max_nodes,
           'min_size': self.min_nodes,
       })
 
-    if self.gpu_count:
-      metadata.update({
-          'gpu_type': self.gpu_type,
-          'num_gpus': self.gpu_count,
-      })
     return metadata
 
   def DeployContainer(self, name, container_spec):

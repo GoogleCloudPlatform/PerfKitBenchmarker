@@ -26,6 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
@@ -59,41 +60,19 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     stack.enter_context(
         mock.patch(
             util.__name__ + '.GetDefaultUser', return_value='fakeuser'))
+    stack.enter_context(
+        mock.patch(
+            gce_network.__name__ + '.GceFirewall.GetFirewall',
+            return_value='fakefirewall'))
+    stack.enter_context(
+        mock.patch(
+            gce_network.__name__ + '.GceNetwork.GetNetwork',
+            return_value='fakenetwork'))
 
     retval = (stdout, stderr, return_code)
     issue_command = stack.enter_context(
         mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval))
     yield issue_command
-
-
-class GoogleKubernetesEngineMinCpuPlatformTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
-
-  @staticmethod
-  def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
-        'NAME', **{
-            'cloud': 'GCP',
-            'vm_spec': {
-                'GCP': {
-                    'machine_type': 'fake-machine-type',
-                    'min_cpu_platform': 'skylake',
-                },
-            },
-        })
-    return kubernetes_engine_spec
-
-  def testCreate(self):
-    spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
-      cluster = google_kubernetes_engine.GkeCluster(spec)
-      cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud beta container clusters create', command_string)
-      self.assertIn('--machine-type fake-machine-type', command_string)
-      self.assertIn('--min-cpu-platform skylake', command_string)
 
 
 class GoogleKubernetesEngineCustomMachineTypeTestCase(
@@ -137,7 +116,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
             'vm_spec': {
                 'GCP': {
                     'machine_type': 'fake-machine-type',
-                    'zone': 'us-central1-a'
+                    'zone': 'us-central1-a',
+                    'min_cpu_platform': 'skylake',
                 },
             },
             'vm_count': 2,
@@ -156,6 +136,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--zone us-central1-a', command_string)
+      self.assertIn('--min-cpu-platform skylake', command_string)
 
   def testCreateResourcesExhausted(self):
     spec = self.create_kubernetes_engine_spec()
@@ -277,7 +258,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud beta container clusters create', command_string)
+      self.assertIn('gcloud container clusters create', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',

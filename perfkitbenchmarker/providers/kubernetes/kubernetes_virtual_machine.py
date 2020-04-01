@@ -462,9 +462,7 @@ class DebianBasedKubernetesVirtualMachine(
     the VirtualMachine class which generates a string used to download
     preprovisioned data for the given cloud.
 
-    Note that this implementation is specific to debian os types.
-    Windows support will need to be handled in
-    WindowsBasedKubernetesVirtualMachine.
+    Note that this implementation is specific to Debian OS types.
 
     Args:
       install_path: The install path on this VM.

@@ -78,7 +78,7 @@ class EksCluster(container_service.KubernetesCluster):
         'nodes': self.num_nodes,
         'nodes-min': self.min_nodes,
         'nodes-max': self.max_nodes,
-        'node-type': self.machine_type,
+        'node-type': self.vm_config.machine_type,
         'region': self.region,
         'tags': ' '.join('{}={}'.format(k, v) for k, v in tags.items()),
         'ssh-public-key':

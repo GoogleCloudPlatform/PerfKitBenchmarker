@@ -136,7 +136,7 @@ class AksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand([
         azure.AZURE_PATH, 'aks', 'create',
         '--name', self.name,
-        '--node-vm-size', self.machine_type,
+        '--node-vm-size', self.vm_config.machine_type,
         '--node-count', str(self.num_nodes),
         '--location', self.location,
         '--dns-name-prefix', 'pkb' + FLAGS.run_uri,

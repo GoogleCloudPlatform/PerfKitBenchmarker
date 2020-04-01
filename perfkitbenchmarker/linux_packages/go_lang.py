@@ -27,6 +27,7 @@ PREPROVISIONED_DATA = {
 PACKAGE_DATA_URL = {GO_TAR: GO_URL}
 GO_VERSION = '1.12.9'
 GO_DIR = '%s/go-%s' % (INSTALL_DIR, GO_VERSION)
+GO_BIN = '/usr/local/go/bin/go'
 
 
 def Install(vm):

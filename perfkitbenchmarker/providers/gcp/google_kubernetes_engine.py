@@ -87,17 +87,9 @@ class GkeCluster(container_service.KubernetesCluster):
 
   CLOUD = providers.GCP
 
-  def _GetRequiredGkeEnv(self):
-    env = os.environ.copy()
-    if self.use_application_default_credentials:
-      env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
-    return env
-
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
-    self.min_cpu_platform = spec.vm_spec.min_cpu_platform
-    self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.cluster_version = (FLAGS.container_cluster_version or
                             DEFAULT_CONTAINER_VERSION)
     self.use_application_default_credentials = True
@@ -109,19 +101,12 @@ class GkeCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(GkeCluster, self).GetResourceMetadata()
-    if self.gce_accelerator_type_override:
-      result['accelerator_type_override'] = self.gce_accelerator_type_override
     result['container_cluster_version'] = self.cluster_version
     return result
 
   def _Create(self):
     """Creates the cluster."""
-    if self.min_cpu_platform or self.gpu_count:
-      cmd = util.GcloudCommand(
-          self, 'beta', 'container', 'clusters', 'create', self.name)
-    else:
-      cmd = util.GcloudCommand(
-          self, 'container', 'clusters', 'create', self.name)
+    cmd = util.GcloudCommand(self, 'container', 'clusters', 'create', self.name)
 
     cmd.flags['cluster-version'] = self.cluster_version
     if FLAGS.gke_enable_alpha:
@@ -144,12 +129,12 @@ class GkeCluster(container_service.KubernetesCluster):
       logging.info('Using default GCE service account for GKE cluster')
       cmd.flags['scopes'] = 'cloud-platform'
 
-    if self.gpu_count:
-      cmd.flags['accelerator'] = (gce_virtual_machine.
-                                  GenerateAcceleratorSpecString(self.gpu_type,
-                                                                self.gpu_count))
-    if self.min_cpu_platform:
-      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
+    if self.vm_config.gpu_count:
+      cmd.flags['accelerator'] = (
+          gce_virtual_machine.GenerateAcceleratorSpecString(
+              self.vm_config.gpu_type, self.vm_config.gpu_count))
+    if self.vm_config.min_cpu_platform:
+      cmd.flags['min-cpu-platform'] = self.vm_config.min_cpu_platform
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       cmd.args.append('--enable-autoscaling')
@@ -158,11 +143,11 @@ class GkeCluster(container_service.KubernetesCluster):
 
     cmd.flags['num-nodes'] = self.num_nodes
 
-    if self.machine_type is None:
+    if self.vm_config.machine_type is None:
       cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
-          self.cpus, self.memory)
+          self.vm_config.cpus, self.vm_config.memory_mib)
     else:
-      cmd.flags['machine-type'] = self.machine_type
+      cmd.flags['machine-type'] = self.vm_config.machine_type
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -170,7 +155,7 @@ class GkeCluster(container_service.KubernetesCluster):
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
     _, stderr, retcode = cmd.Issue(
-        timeout=1200, env=self._GetRequiredGkeEnv(), raise_on_failure=False)
+        timeout=1200, raise_on_failure=False)
     if retcode != 0:
       # Log specific type of failure, if known.
       if 'ZONE_RESOURCE_POOL_EXHAUSTED' in stderr:
@@ -185,13 +170,13 @@ class GkeCluster(container_service.KubernetesCluster):
     super(GkeCluster, self)._PostCreate()
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'get-credentials', self.name)
-    env = self._GetRequiredGkeEnv()
+    env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
     self._AddTags()
 
-    if self.gpu_count:
+    if self.vm_config.gpu_count:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
       kubernetes_helper.CreateFromFile(
           data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))

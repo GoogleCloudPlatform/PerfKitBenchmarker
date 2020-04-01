@@ -20,7 +20,8 @@
     -   You may run the the PKB command under different zones and machine types.
 
     -   You may adjust the number of Coremark iterations per run (currently set
-        to 5) and the operating system to use windows2019 instead of ubuntu1804.
+        to 5) and the `os_type` to use `windows2019_core` instead of
+        `ubuntu1804`.
 
     -   The --gcp_min_cpu_platform=skylake flag is only supported for the N1
         machine family. To run on other machine families (e.g. C2, N2, E2),

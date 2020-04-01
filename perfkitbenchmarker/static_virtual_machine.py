@@ -323,6 +323,6 @@ class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
-class VersionlessWindowsBasedStaticVirtualMachine(
+class VersionlessWindowsDesktopStaticVirtualMachine(
     StaticVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
   pass
