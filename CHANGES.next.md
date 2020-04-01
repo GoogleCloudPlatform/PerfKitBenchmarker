@@ -7,11 +7,21 @@
     -   Ubuntu 16.04 is now the default.
 -   Deprecate versionless `windows` os_type.
     -   It will stop working in April 2020, and you will have to specify
-        `windows2012`.
+        `windows2012_core`.
 -   Deprecate versionless `rhel` os_type.
     -   It will stop working in April 2020, and you will have to specify `rhel7`
         on most providers or `amazonlinux1` on AWS.
 -   Remove the `Runtime` metric for Horovod.
+-   Change `windows201X` os_types to `windows201X_core` and `windows201X_base`
+    to `windows201X_desktop`.
+    -   Windows Server Core is now referred to as `windows201X_core`.
+        -   This is recommended for most benchmarks, because PKB does not
+            benefit from GUIs except for debugging.
+    -   Windows Server with Desktop Experience is now referred to as
+        `windows201X_desktop`.
+    -   See
+        [the microsoft documenation](https://docs.microsoft.com/en-us/windows-server/administration/server-core/what-is-server-core)
+        for more information on the differences.
 
 ### New features:
 

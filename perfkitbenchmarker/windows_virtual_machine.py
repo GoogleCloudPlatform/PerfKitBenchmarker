@@ -720,16 +720,16 @@ class Windows2019CoreMixin(BaseWindowsMixin):
   OS_TYPE = os_types.WINDOWS2019_CORE
 
 
-class Windows2012BaseMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2012 Server Base VM specifics."""
-  OS_TYPE = os_types.WINDOWS2012_BASE
+class Windows2012DesktopMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2012 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2012_DESKTOP
 
 
-class Windows2016BaseMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2016 Server Base VM specifics."""
-  OS_TYPE = os_types.WINDOWS2016_BASE
+class Windows2016DesktopMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2016 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2016_DESKTOP
 
 
-class Windows2019BaseMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2019 Server Base VM specifics."""
-  OS_TYPE = os_types.WINDOWS2019_BASE
+class Windows2019DesktopMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_DESKTOP

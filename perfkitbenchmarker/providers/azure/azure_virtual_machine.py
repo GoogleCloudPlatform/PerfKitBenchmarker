@@ -878,21 +878,21 @@ class Windows2019CoreAzureVirtualMachine(
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
 
 
-class Windows2012BaseAzureVirtualMachine(
+class Windows2012DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2012BaseMixin):
+    windows_virtual_machine.Windows2012DesktopMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
-class Windows2016BaseAzureVirtualMachine(
+class Windows2016DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2016BaseMixin):
+    windows_virtual_machine.Windows2016DesktopMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
 
 
-class Windows2019BaseAzureVirtualMachine(
+class Windows2019DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2019BaseMixin):
+    windows_virtual_machine.Windows2019DesktopMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
 
 

@@ -958,18 +958,21 @@ class Windows2019CoreGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'windows-2019-core'
 
 
-class Windows2012BaseGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2012BaseMixin):
+class Windows2012DesktopGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2012DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
 
 
-class Windows2016BaseGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2016BaseMixin):
+class Windows2016DesktopGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2016DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2016'
 
 
-class Windows2019BaseGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2019BaseMixin):
+class Windows2019DesktopGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
 
 
