@@ -67,7 +67,7 @@ CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 IS_READY_TIMEOUT = 600  # 10 minutes
-CREATION_TIMEOUT = 600  # 10 minutes
+CREATION_TIMEOUT = 1200  # 20 minutes
 
 
 class UnsupportedDatabaseEngineException(Exception):
