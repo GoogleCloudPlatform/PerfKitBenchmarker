@@ -88,7 +88,6 @@ class GceVpnGateway(network.BaseVpnGateway):
     Args:
       tunnel_config: The tunnel configuration for this VPN.
     """
-    # network.BaseVpnGateway.ConfigureTunnel(self, tunnel_config)
     logging.debug('Configuring Tunnel with params:')
     logging.debug(tunnel_config)
 
@@ -232,7 +231,7 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     route_name = 'route-' + self.name + '-' + suffix
     if route_name not in self.routes:
-      self.routes[route_name] = GceRoute(route_name, dest_cidr, self.network_name, next_hop_tun, self.region, self.project, self.region)
+      self.routes[route_name] = GceRoute(route_name, dest_cidr, self.network_name, next_hop_tun, self.region, self.project)
       self.routes[route_name].Create()
 
   def Create(self):
@@ -323,7 +322,7 @@ class GceIPAddress(resource.BaseResource):
     cmd.flags['region'] = self.region
     cmd.flags['format'] = 'value(address)'
     stdout, _, _ = cmd.Issue()
-    self.ip_address = stdout.encode('ascii', 'ignore').rstrip().decode()
+    self.ip_address = stdout.rstrip()
 
   def _Delete(self):
     """ Deletes a public IP for the VPN gateway """
@@ -388,7 +387,7 @@ class GceStaticTunnel(resource.BaseResource):
 class GceRoute(resource.BaseResource):
   """An object representing a GCE Route."""
 
-  def __init__(self, route_name, dest_cidr, network_name, next_hop_tun, next_hop_region, project, region):
+  def __init__(self, route_name, dest_cidr, network_name, next_hop_tun, next_hop_region, project):
     super(GceRoute, self).__init__()
     self.name = route_name
     self.dest_cidr = dest_cidr
@@ -396,7 +395,6 @@ class GceRoute(resource.BaseResource):
     self.next_hop_tun = next_hop_tun
     self.network_name = network_name
     self.project = project
-    self.region = region
 
   def _Create(self):
     """Creates the Route."""

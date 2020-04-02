@@ -42,16 +42,19 @@ flags.DEFINE_string('vpn_service_name', None,
                     'If set, use this name for VPN Service.')
 flags.DEFINE_string('vpn_service_shared_key', None,
                     'If set, use this PSK for VPNs.')
-flags.DEFINE_string('vpn_service_routing_type', None, 'static or dynamic(BGP)')
 flags.DEFINE_integer('vpn_service_ike_version', None, 'IKE version')
-
-FLAGS = flags.FLAGS
 
 
 class VPN_ROUTING_TYPE(Enum):
-  DEFAULT = None
   STATIC = 'static'
   DYNAMIC = 'dynamic'
+
+flags.DEFINE_enum(
+    'vpn_service_routing_type', None,
+    [VPN_ROUTING_TYPE.STATIC.value, VPN_ROUTING_TYPE.DYNAMIC.value],
+    'static or dynamic(BGP)')
+
+FLAGS = flags.FLAGS
 
 
 def GetVPNServiceClass():
@@ -204,7 +207,7 @@ class TunnelConfig(object):
     super(TunnelConfig, self).__init__()
     self.tunnel_name = kwargs.get('tunnel_name', 'unnamed_tunnel')
     self.endpoints = {}
-    self.routing = kwargs.get('routing', VPN_ROUTING_TYPE.DEFAULT.value)
+    self.routing = kwargs.get('routing', None)
     self.ike_version = kwargs.get('ike_version', 2)
     self.shared_key = kwargs.get('shared_key', 'key' + FLAGS.run_uri)
     self.suffix = kwargs.get('suffix', '')
