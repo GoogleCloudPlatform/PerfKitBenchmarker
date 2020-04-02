@@ -121,7 +121,6 @@ X86 = 'x86_64'
 # Some numbers have corresponding owner aliases, but they are not used here.
 AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
 # https://coreos.com/os/docs/latest/booting-on-ec2.html
-# MOE:strip_line also available in AWS marketplace, but requires TOS.
 COREOS_IMAGE_PROJECT = '595879546273'
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
 # TODO(pclay): replace with Marketplace AMI when available
