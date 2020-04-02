@@ -118,6 +118,9 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
                     'machine_type': 'fake-machine-type',
                     'zone': 'us-central1-a',
                     'min_cpu_platform': 'skylake',
+                    'boot_disk_type': 'foo',
+                    'boot_disk_size': 200,
+                    'num_local_ssds': 2,
                 },
             },
             'vm_count': 2,
@@ -137,6 +140,9 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--zone us-central1-a', command_string)
       self.assertIn('--min-cpu-platform skylake', command_string)
+      self.assertIn('--disk-size 200', command_string)
+      self.assertIn('--disk-type foo', command_string)
+      self.assertIn('--local-ssd-count 2', command_string)
 
   def testCreateResourcesExhausted(self):
     spec = self.create_kubernetes_engine_spec()

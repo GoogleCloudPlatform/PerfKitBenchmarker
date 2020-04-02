@@ -133,7 +133,7 @@ class AksCluster(container_service.KubernetesCluster):
   @vm_util.Retry()
   def _Create(self):
     """Creates the AKS cluster."""
-    vm_util.IssueCommand([
+    cmd = [
         azure.AZURE_PATH, 'aks', 'create',
         '--name', self.name,
         '--node-vm-size', self.vm_config.machine_type,
@@ -146,7 +146,11 @@ class AksCluster(container_service.KubernetesCluster):
         '--client-secret', self.service_principal.password,
         # TODO(pclay): Consider adding
         # --kubernetes-version=FLAGS.container_cluster_version.
-    ] + self.resource_group.args, timeout=1800)
+    ] + self.resource_group.args
+    if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
+      cmd += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
+
+    vm_util.IssueCommand(cmd, timeout=1800)
 
   def _Exists(self):
     """Returns True if the cluster exists."""

@@ -136,6 +136,13 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.vm_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.vm_config.min_cpu_platform
 
+    if self.vm_config.boot_disk_size:
+      cmd.flags['disk-size'] = self.vm_config.boot_disk_size
+    if self.vm_config.boot_disk_type:
+      cmd.flags['disk-type'] = self.vm_config.boot_disk_type
+    if self.vm_config.max_local_disks:
+      cmd.flags['local-ssd-count'] = self.vm_config.max_local_disks
+
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
