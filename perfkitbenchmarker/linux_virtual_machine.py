@@ -1309,6 +1309,45 @@ class ClearMixin(BaseLinuxMixin):
     stdout, _ = self.RemoteCommand('swupd info | grep Installed')
     return "Clear Linux build: {0}".format(regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout))
 
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    super(ClearMixin, self).SetupProxy()
+    profile_file = '/etc/profile'
+    commands = []
+
+    if FLAGS.http_proxy:
+      commands.append("echo 'export http_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.http_proxy, profile_file))
+
+    if FLAGS.https_proxy:
+      commands.append("echo 'https_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.https_proxy, profile_file))
+
+    if FLAGS.ftp_proxy:
+      commands.append("echo 'ftp_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.ftp_proxy, profile_file))
+
+    if FLAGS.no_proxy:
+      commands.append("echo 'export no_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.no_proxy, profile_file))
+    if commands:
+      self.RemoteCommand(';'.join(commands))
+
+  def RemoteCommand(self, command, **kwargs):
+    """Runs a command inside the container.
+
+    Args:
+      command: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
+
+    Returns:
+      A tuple of stdout and stderr from running the command.
+    """
+    # Escapes bash sequences
+    command = '. /etc/profile; %s' % (command)
+    return self.RemoteHostCommand(command, **kwargs)[:2]
+
 
 class BaseContainerLinuxMixin(BaseLinuxMixin):
   """Class holding VM methods for minimal container-based OSes like Core OS."""
