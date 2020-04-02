@@ -134,7 +134,7 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           '--instance-match-criteria=targeted',
           '--region=%s' % self.region,
           '--end-date-type=limited',
-          '--end-date="%s"' % end_date,
+          '--end-date=%s' % end_date.isoformat(),
       ]
       stdout, stderr, retcode = vm_util.IssueCommand(cmd,
                                                      raise_on_failure=False)
