@@ -577,12 +577,9 @@ class AzureVirtualMachine(
     azure_vm_create_timeout = 1200
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
-    if retcode and (
-        'Error Code: QuotaExceeded' in stderr or
-        re.search(r'exceeding approved \S+ \S+ quota', stderr) or
-        re.search(r'CloudError\("The template deployment .+ is not valid',
-                  stderr) or
-        'exceeding quota limit' in stderr):
+    if retcode and ('Error Code: QuotaExceeded' in stderr or
+                    re.search(r'exceeding approved \S+ \S+ quota', stderr) or
+                    'exceeding quota limit' in stderr):
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
     # TODO(buggay) refactor to share code with gcp_virtual_machine.py
