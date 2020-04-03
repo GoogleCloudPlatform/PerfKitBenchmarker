@@ -124,8 +124,8 @@ _POLLING_DELAY = 3
 # If not using service account credentials from preprovisioned data bucket,
 # use --gcp_service_account_key_file flag to specify the same credentials.
 BENCHMARK_DATA = {
-    'p3rf-scaling-a1828b03ba93.json':
-        'c0cf08d79dd717e33e155164e35c8330bb26e9031eafab30064fff31afa86e99',
+    'large-scale-boot-381ea7fa0a7d.json':
+        '22cd2412f38f5b6f1615ae565cd74073deff3f30829769ec66eebb5cf9672329',
 }
 # default linux ssh port
 _SSH_PORT = linux_virtual_machine.DEFAULT_SSH_PORT
