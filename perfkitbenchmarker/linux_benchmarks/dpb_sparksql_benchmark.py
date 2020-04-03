@@ -28,6 +28,7 @@ https://github.com/GoogleCloudPlatform/spark-bigquery-connector.
 import logging
 import os
 import re
+import numpy as np
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_service
@@ -76,6 +77,11 @@ flags.DEFINE_list(
     'A list of BigQuery tables to load as Temporary Spark SQL views instead '
     'of reading from external Hive tables.'
 )
+flags.DEFINE_string(
+    'bigquery_record_format', None,
+    'The record format to use when connecting to BigQuery storage. See: '
+    'https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties'
+)
 
 FLAGS = flags.FLAGS
 
@@ -103,8 +109,7 @@ def CheckPrerequisites(benchmark_config):
     benchmark_config: Config needed to run the Spark SQL.
 
   Raises:
-    perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid
-    configuration.
+    Config.InvalidValue: On encountering invalid configuration.
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
   if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
@@ -179,26 +184,29 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  """Runs Spark SQL.
+  """Runs a sequence of Spark SQL Query.
 
   Args:
     benchmark_spec: Spec needed to run the Spark SQL.
 
   Returns:
     A list of samples, comprised of the detailed run times of individual query.
+
+  Raises:
+    Benchmarks.RunError if no query succeeds.
   """
   dpb_service_instance = benchmark_spec.dpb_service
   metadata = benchmark_spec.dpb_service.GetMetadata()
 
   results = []
-  total_wall_time = 0
-  total_run_time = 0
   unit = 'seconds'
-  all_succeeded = True
-  for query_number in FLAGS.dpb_sparksql_order:
-    query = '{}.sql'.format(query_number)
+  failing_queries = []
+  run_times = {}
+  wall_times = {}
+  for query in FLAGS.dpb_sparksql_order:
     stats = _RunSparkSqlJob(
-        dpb_service_instance, os.path.join(benchmark_spec.base_dir, query),
+        dpb_service_instance,
+        os.path.join(benchmark_spec.base_dir, query + '.sql'),
         os.path.join(benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT))
     logging.info(stats)
     metadata_copy = metadata.copy()
@@ -210,18 +218,33 @@ def Run(benchmark_spec):
           sample.Sample('sparksql_wall_time', wall_time, unit, metadata_copy))
       results.append(
           sample.Sample('sparksql_run_time', run_time, unit, metadata_copy))
-      total_wall_time += wall_time
-      total_run_time += run_time
+      wall_times[query] = wall_time
+      run_times[query] = run_time
     else:
-      all_succeeded = False
+      failing_queries.append(query)
 
-  if all_succeeded:
+  metadata['failing_queries'] = ','.join(sorted(failing_queries))
+
+  if results:
     results.append(
-        sample.Sample('sparksql_total_wall_time', total_wall_time, unit,
-                      metadata))
+        sample.Sample(
+            'sparksql_total_wall_time',
+            np.fromiter(wall_times.values(), dtype='float').sum(),
+            unit, metadata))
     results.append(
-        sample.Sample('sparksql_total_run_time', total_run_time, unit,
-                      metadata))
+        sample.Sample(
+            'sparksql_total_run_time',
+            np.fromiter(run_times.values(), dtype='float').sum(),
+            unit, metadata))
+    results.append(
+        sample.Sample('sparksql_geomean_wall_time',
+                      sample.GeoMean(wall_times.values()), unit, metadata))
+    results.append(
+        sample.Sample('sparksql_geomean_run_time',
+                      sample.GeoMean(run_times.values()), unit, metadata))
+  else:
+    raise errors.Benchmarks.RunError('No queries succeeded.')
+
   return results
 
 
@@ -231,9 +254,11 @@ def _RunSparkSqlJob(dpb_service_instance,
   """Run a Spark SQL script either with the spark-sql command or spark_sql_runner.py."""
   if staged_sql_runner_file and FLAGS.bigquery_tables:
     args = [
-        os.path.basename(staged_sql_file), '--bigquery_tables',
-        ','.join(FLAGS.bigquery_tables)
+        os.path.basename(staged_sql_file),
+        '--bigquery_tables', ','.join(FLAGS.bigquery_tables)
     ]
+    if FLAGS.bigquery_record_format:
+      args += ['--bigquery-record-format', FLAGS.bigquery_record_format]
     return dpb_service_instance.SubmitJob(
         pyspark_file=staged_sql_runner_file,
         job_arguments=args,

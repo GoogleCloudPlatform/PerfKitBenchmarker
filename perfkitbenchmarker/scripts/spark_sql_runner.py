@@ -32,6 +32,10 @@ def parse_args():
       default=[],
       help='Comma separated list of fully qualified BigQuery '
       'tables. Views will share the name of the tables.')
+  parser.add_argument(
+      '--bigquery-record-format',
+      metavar='FORMAT',
+      help='Data Format for reading from BigQuery Storage')
   data_sources.add_argument(
       '--hcfs_dirs',
       metavar='DIRS',
@@ -42,13 +46,17 @@ def parse_args():
   return parser.parse_args()
 
 
-def register_views(spark, bigquery_tables, hcfs_dirs):
+def register_views(
+    spark, bigquery_tables, hcfs_dirs, bigquery_record_format=None):
   """Pre-register BigQuery tables and Parquet directories as temporary views."""
   temp_dfs = {}
   for table in bigquery_tables:
     name = table.split('.')[-1]
     logging.info('Loading %s', table)
-    temp_dfs[name] = spark.read.format('bigquery').option('table', table).load()
+    reader = spark.read.format('bigquery').option('table', table)
+    if bigquery_record_format:
+      reader.option('readDataFormat', bigquery_record_format)
+    temp_dfs[name] = reader.load()
   for hcfs_dir in hcfs_dirs:
     name = hcfs_dir.split('/')[-1]
     logging.info('Loading %s', hcfs_dir)
@@ -57,12 +65,13 @@ def register_views(spark, bigquery_tables, hcfs_dirs):
     df.createTempView(name)
 
 
-def main(sql_script, bigquery_tables, hcfs_dirs):
+def main(args):
   spark = (SparkSession.builder.appName('Spark SQL Query').getOrCreate())
-  register_views(spark, bigquery_tables, hcfs_dirs)
+  register_views(
+      spark, args.bigquery_tables, args.hcfs_dirs, args.bigquery_record_format)
 
-  logging.info('Running %s', sql_script)
-  with open(sql_script) as f:
+  logging.info('Running %s', args.sql_script)
+  with open(args.sql_script) as f:
     sql = f.read()
 
   # spark-sql does not limit it's output. Replicate that here by setting limit
@@ -74,5 +83,4 @@ def main(sql_script, bigquery_tables, hcfs_dirs):
 
 
 if __name__ == '__main__':
-  args = parse_args()
-  main(args.sql_script, args.bigquery_tables, args.hcfs_dirs)
+  main(parse_args())

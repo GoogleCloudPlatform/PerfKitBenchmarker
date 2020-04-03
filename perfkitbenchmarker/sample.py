@@ -15,7 +15,8 @@
 
 import collections
 import time
-PERCENTILES_LIST = [0.1, 1, 5, 10, 50, 90, 95, 99, 99.9]
+import numpy as np
+PERCENTILES_LIST = 0.1, 1, 5, 10, 50, 90, 95, 99, 99.9
 
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
@@ -37,7 +38,7 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
 
   """
 
-  if not len(numbers):  # 'if not numbers' will fail if numbers is a pd.Series.
+  if not len(numbers):
     raise ValueError("Can't compute percentiles of empty list.")
 
   numbers_sorted = sorted(numbers)
@@ -63,6 +64,24 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
     result['stddev'] = 0
 
   return result
+
+
+def GeoMean(iterable):
+  """Calculate the geometric mean of a collection of numbers.
+
+  Args:
+    iterable: A sequence of numbers.
+
+  Returns:
+    The geometric mean
+
+  Raises:
+    ValueError, if numbers is empty.
+  """
+  arr = np.fromiter(iterable, dtype='float')
+  if not arr:
+    raise ValueError("Can't compute geomean of empty list.")
+  return arr.prod() / len(arr)
 
 
 class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
