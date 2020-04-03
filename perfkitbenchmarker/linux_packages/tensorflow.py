@@ -17,6 +17,7 @@
 import posixpath
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import nvidia_driver
 
 
 FLAGS = flags.FLAGS
@@ -52,16 +53,16 @@ def GetEnvironmentVars(vm):
     string of environment variables
   """
   env_vars = []
-  if cuda_toolkit.CheckNvidiaGpuExists(vm):
+  if nvidia_driver.CheckNvidiaGpuExists(vm):
     output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
     long_bit = output.strip()
     lib_name = 'lib' if long_bit == '32' else 'lib64'
     env_vars.extend([
         'PATH=%s${PATH:+:${PATH}}' %
-        posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
-        'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
+        posixpath.join(cuda_toolkit.CUDA_HOME, 'bin'),
+        'CUDA_HOME=%s' % cuda_toolkit.CUDA_HOME,
         'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-        posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name)])
+        posixpath.join(cuda_toolkit.CUDA_HOME, lib_name)])
   if FLAGS.aws_s3_region:
     env_vars.append('AWS_REGION={}'.format(FLAGS.aws_s3_region))
   return ' '.join(env_vars)
@@ -85,20 +86,14 @@ def GetTensorFlowVersion(vm):
 
 def Install(vm):
   """Installs TensorFlow on the VM."""
-  has_gpu = cuda_toolkit.CheckNvidiaGpuExists(vm)
+  has_gpu = nvidia_driver.CheckNvidiaGpuExists(vm)
   tf_pip_package = (FLAGS.tf_gpu_pip_package if has_gpu else
                     FLAGS.tf_cpu_pip_package)
 
   if has_gpu:
     vm.Install('cuda_toolkit')
+    vm.Install('nccl')
     vm.Install('cudnn')
-
-    # TODO(ferneyhough): Move NCCL installation to its own package.
-    # Currently this is dependent on CUDA 9 being installed.
-    vm.RemoteCommand('wget %s' % NCCL_URL)
-    vm.RemoteCommand('sudo dpkg -i %s' % NCCL_PACKAGE)
-    vm.RemoteCommand('sudo apt install libnccl2=2.3.5-2+cuda9.0 '
-                     'libnccl-dev=2.3.5-2+cuda9.0')
 
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install requests')

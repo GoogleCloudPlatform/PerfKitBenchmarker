@@ -62,6 +62,7 @@
     -   Make `container_cluster.vm_spec.AWS.zone` accept a region or comma
         separated list of zones.
     -   Delete the obsolete `--eks-verify-ssl`
+-   Separate NVIDIA driver functionality from CUDA toolkit
 
 ### Bug fixes and maintenance updates:
 

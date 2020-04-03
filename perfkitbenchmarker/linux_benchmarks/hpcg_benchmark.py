@@ -29,6 +29,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
+from perfkitbenchmarker.linux_packages import nvidia_driver
 
 FLAGS = flags.FLAGS
 RUN_SCRIPT = 'run_hpcg.sh'
@@ -122,7 +123,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   gpus_per_node = (FLAGS.hpcg_gpus_per_node or
-                   cuda_toolkit.QueryNumberOfGpus(benchmark_spec.vms[0]))
+                   nvidia_driver.QueryNumberOfGpus(benchmark_spec.vms[0]))
   cpus_per_rank = int(benchmark_spec.vms[0].NumCpusForBenchmark() /
                       gpus_per_node)
   num_vms = len(benchmark_spec.vms)
@@ -173,7 +174,7 @@ def _PrepareHpcg(vm):
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')
   vm.AuthenticateVm()
-  cuda_toolkit.SetAndConfirmGpuClocks(vm)
+  nvidia_driver.SetAndConfirmGpuClocks(vm)
 
 
 def Prepare(benchmark_spec):

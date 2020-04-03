@@ -17,10 +17,12 @@
 import posixpath
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
 flags.DEFINE_string('nccl_version', '2.5.6-2',
-                    'NCCL version to install')
+                    'NCCL version to install. '
+                    'Input "None" to bypass installation.')
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
 
 FLAGS = flags.FLAGS
@@ -32,7 +34,7 @@ def _Build(vm):
   """Installs the OpenMPI package on the VM."""
   vm.RemoteCommand('[ -d "nccl" ] || git clone {git_repo} --branch v{version}'
                    .format(git_repo=GIT_REPO, version=FLAGS.nccl_version))
-  cuda_home = '/usr/local/cuda'
+  cuda_home = cuda_toolkit.CUDA_HOME
   vm.InstallPackages('build-essential devscripts debhelper fakeroot')
 
   env_vars = {}
@@ -43,12 +45,16 @@ def _Build(vm):
                                  .format(lib_path=posixpath.join(
                                      cuda_home, 'lib64')))
 
-  vm.RemoteCommand('cd nccl && {env} make -j pkg.debian.build'
+  vm.RemoteCommand('cd nccl && {env} make -j 20 pkg.debian.build'
                    .format(env=vm_util.DictonaryToEnvString(env_vars)))
 
 
 def AptInstall(vm):
   """Installs the NCCL package on the VM."""
+  if FLAGS.nccl_version == 'None':
+    return
+
+  vm.Install('cuda_toolkit')
   _Build(vm)
   vm.InstallPackages('{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
                      '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'

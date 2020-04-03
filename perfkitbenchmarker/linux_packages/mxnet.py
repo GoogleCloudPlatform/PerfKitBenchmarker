@@ -14,6 +14,8 @@
 """Module containing MXNet installation and cleanup functions."""
 import posixpath
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import cuda_toolkit
+
 
 flags.DEFINE_string('mx_version', '1.4.0', 'mxnet pip package version')
 FLAGS = flags.FLAGS
@@ -33,10 +35,10 @@ def GetEnvironmentVars(vm):
   lib_name = 'lib' if long_bit == '32' else 'lib64'
   return ' '.join([
       'PATH=%s${PATH:+:${PATH}}' %
-      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
-      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
+      posixpath.join(cuda_toolkit.CUDA_HOME, 'bin'),
+      'CUDA_HOME=%s' % cuda_toolkit.CUDA_HOME,
       'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
+      posixpath.join(cuda_toolkit.CUDA_HOME, lib_name),
   ])
 
 
@@ -68,6 +70,17 @@ def Install(vm):
     elif FLAGS.cuda_toolkit_version == '9.0':
       vm.RemoteCommand('sudo pip install mxnet-cu90=={}'.format(
           FLAGS.mx_version), should_log=True)
+    elif FLAGS.cuda_toolkit_version == '10.0':
+      vm.RemoteCommand('sudo pip install mxnet-cu100=={}'.format(
+          FLAGS.mx_version), should_log=True)
+    elif FLAGS.cuda_toolkit_version == '10.1':
+      vm.RemoteCommand('sudo pip install mxnet-cu101=={}'.format(
+          FLAGS.mx_version), should_log=True)
+    elif FLAGS.cuda_toolkit_version == '10.2':
+      vm.RemoteCommand('sudo pip install mxnet-cu102=={}'.format(
+          FLAGS.mx_version), should_log=True)
+    else:
+      raise cuda_toolkit.UnsupportedCudaVersionError()
   elif FLAGS.mx_device == 'cpu':
     vm.RemoteCommand('sudo pip install mxnet=={}'.format(
         FLAGS.mx_version), should_log=True)

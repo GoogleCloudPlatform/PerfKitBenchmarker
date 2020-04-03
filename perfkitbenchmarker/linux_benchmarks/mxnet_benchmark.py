@@ -29,6 +29,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import mxnet
 from perfkitbenchmarker.linux_packages import mxnet_cnn
+from perfkitbenchmarker.linux_packages import nvidia_driver
 from six.moves import range
 
 
@@ -293,7 +294,7 @@ def Run(benchmark_spec):
             precision=benchmark_spec.precision,
             key_value_store=benchmark_spec.key_value_store)
     if benchmark_spec.device == GPU:
-      num_gpus = cuda_toolkit.QueryNumberOfGpus(vm)
+      num_gpus = nvidia_driver.QueryNumberOfGpus(vm)
       mx_benchmark_cmd = '{env} {cmd} --gpus {gpus}'.format(
           env=mxnet.GetEnvironmentVars(vm),
           cmd=mx_benchmark_cmd,

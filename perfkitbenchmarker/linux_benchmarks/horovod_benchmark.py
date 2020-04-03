@@ -22,6 +22,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
+from perfkitbenchmarker.linux_packages import nvidia_driver
 
 FLAGS = flags.FLAGS
 MACHINEFILE = 'HOSTFILE'
@@ -117,7 +118,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   Args:
     benchmark_spec: benchmark specification to update
   """
-  gpus_per_node = cuda_toolkit.QueryNumberOfGpus(benchmark_spec.vms[0])
+  gpus_per_node = nvidia_driver.QueryNumberOfGpus(benchmark_spec.vms[0])
   num_vms = len(benchmark_spec.vms)
   total_gpus = gpus_per_node * num_vms
 

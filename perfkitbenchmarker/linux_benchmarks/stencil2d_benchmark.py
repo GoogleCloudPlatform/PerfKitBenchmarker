@@ -22,6 +22,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import nvidia_driver
 
 flags.DEFINE_integer(
     'stencil2d_iterations', 5, 'number of iterations to run', lower_bound=1)
@@ -88,7 +89,7 @@ def _InstallAndAuthenticateVm(vm):
     vm: vm to operate on.
   """
   vm.Install('shoc_benchmark_suite')
-  cuda_toolkit.SetAndConfirmGpuClocks(vm)
+  nvidia_driver.SetAndConfirmGpuClocks(vm)
   vm.AuthenticateVm()  # Configure ssh between vms for MPI
 
 
@@ -102,7 +103,7 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(_InstallAndAuthenticateVm, benchmark_spec.vms)
 
   master_vm = benchmark_spec.vms[0]
-  benchmark_spec.num_gpus = cuda_toolkit.QueryNumberOfGpus(master_vm)
+  benchmark_spec.num_gpus = nvidia_driver.QueryNumberOfGpus(master_vm)
   hpc_util.CreateMachineFile(benchmark_spec.vms,
                              lambda _: benchmark_spec.num_gpus,
                              MACHINEFILE)

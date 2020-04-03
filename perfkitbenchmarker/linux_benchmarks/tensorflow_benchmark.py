@@ -32,8 +32,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
 from six.moves import range
 
@@ -145,10 +145,10 @@ flags.register_validator('tf_local_parameter_device',
                          LocalParameterDeviceValidator)
 
 
-NVIDIA_TESLA_P4 = cuda_toolkit.NVIDIA_TESLA_P4
-NVIDIA_TESLA_K80 = cuda_toolkit.NVIDIA_TESLA_K80
-NVIDIA_TESLA_P100 = cuda_toolkit.NVIDIA_TESLA_P100
-NVIDIA_TESLA_V100 = cuda_toolkit.NVIDIA_TESLA_V100
+NVIDIA_TESLA_P4 = nvidia_driver.NVIDIA_TESLA_P4
+NVIDIA_TESLA_K80 = nvidia_driver.NVIDIA_TESLA_K80
+NVIDIA_TESLA_P100 = nvidia_driver.NVIDIA_TESLA_P100
+NVIDIA_TESLA_V100 = nvidia_driver.NVIDIA_TESLA_V100
 
 DEFAULT_BATCH_SIZE = 64
 DEFAULT_BATCH_SIZES = {
@@ -305,8 +305,8 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(_PrepareVm, vms)
   benchmark_spec.tensorflow_version = tensorflow.GetTensorFlowVersion(vms[0])
 
-  if cuda_toolkit.CheckNvidiaGpuExists(vms[0]):
-    benchmark_spec.gpu_type = cuda_toolkit.GetGpuType(vms[0])
+  if nvidia_driver.CheckNvidiaGpuExists(vms[0]):
+    benchmark_spec.gpu_type = nvidia_driver.GetGpuType(vms[0])
 
 
 def _GetMetadataFromBenchmarkArgs(tf_cnn_benchmark_args):
@@ -353,8 +353,8 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size):
   """
   vm = benchmark_spec.vms[0]
   metadata = {}
-  if cuda_toolkit.CheckNvidiaGpuExists(vm):
-    metadata.update(cuda_toolkit.GetMetadata(vm))
+  if nvidia_driver.CheckNvidiaGpuExists(vm):
+    metadata.update(nvidia_driver.GetMetadata(vm))
 
   metadata['command_line'] = benchmark_spec.tf_cnn_benchmark_cmd
   metadata['cnn_benchmarks_branch'] = benchmark_spec.cnn_benchmarks_branch
@@ -463,8 +463,8 @@ def _GetTfCnnBenchmarkCommand(vm, model, batch_size, benchmark_spec,
     A string that runs the tf_cnn_benchmarks.py script
     with the desired arguments.
   """
-  num_gpus = (cuda_toolkit.QueryNumberOfGpus(vm) if
-              cuda_toolkit.CheckNvidiaGpuExists(vm) else 0)
+  num_gpus = (nvidia_driver.QueryNumberOfGpus(vm) if
+              nvidia_driver.CheckNvidiaGpuExists(vm) else 0)
   benchmark_spec.num_gpus = num_gpus
 
   if benchmark_spec.benchmark_args is not None:

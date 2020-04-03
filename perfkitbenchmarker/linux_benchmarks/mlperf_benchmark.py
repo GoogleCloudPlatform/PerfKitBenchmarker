@@ -20,8 +20,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
+from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -138,7 +138,7 @@ def Prepare(benchmark_spec, vm=None):
   if vm is None:
     vm = benchmark_spec.vms[0]
 
-  if (bool(benchmark_spec.tpus) and cuda_toolkit.CheckNvidiaGpuExists(vm)):
+  if (bool(benchmark_spec.tpus) and nvidia_driver.CheckNvidiaGpuExists(vm)):
     raise errors.Config.InvalidValue(
         'Invalid configuration. GPUs and TPUs can not both present in the config.'
     )
@@ -277,7 +277,7 @@ def Prepare(benchmark_spec, vm=None):
   else:
     benchmark_spec.model_dir = '/tmp'
 
-    has_gpu = cuda_toolkit.CheckNvidiaGpuExists(vm)
+    has_gpu = nvidia_driver.CheckNvidiaGpuExists(vm)
     if has_gpu:
       vm.Install('cuda_toolkit')
 
@@ -499,7 +499,7 @@ def Run(benchmark_spec):
         'chmod 755 {run_script} && sudo {common_env} {env} {run_script} '
         .format(run_script=run_script, common_env=common_env, env=env))
 
-  if cuda_toolkit.CheckNvidiaGpuExists(vm):
+  if nvidia_driver.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mlperf_benchmark_cmd)
 

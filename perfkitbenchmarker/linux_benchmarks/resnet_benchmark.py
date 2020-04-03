@@ -34,7 +34,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
-from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
 from six.moves import range
 
@@ -144,7 +144,7 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
 
-  if (bool(benchmark_spec.tpus) and cuda_toolkit.CheckNvidiaGpuExists(vm)):
+  if (bool(benchmark_spec.tpus) and nvidia_driver.CheckNvidiaGpuExists(vm)):
     raise errors.Config.InvalidValue(
         'Invalid configuration. GPUs and TPUs can not both present in the config.'
     )
@@ -336,11 +336,11 @@ def Run(benchmark_spec):
       resnet_benchmark_cmd = '{cmd} --dtype=fp32'.format(
           cmd=resnet_benchmark_cmd)
 
-    if cuda_toolkit.CheckNvidiaGpuExists(vm):
+    if nvidia_driver.CheckNvidiaGpuExists(vm):
       resnet_benchmark_cmd = '{env} {cmd} --num_gpus={num_gpus}'.format(
           env=tensorflow.GetEnvironmentVars(vm),
           cmd=resnet_benchmark_cmd,
-          num_gpus=cuda_toolkit.QueryNumberOfGpus(vm))
+          num_gpus=nvidia_driver.QueryNumberOfGpus(vm))
 
   samples = []
   metadata = _CreateMetadataDict(benchmark_spec)

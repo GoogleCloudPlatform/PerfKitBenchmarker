@@ -39,7 +39,6 @@ flags.DEFINE_integer('nccl_num_runs', 10, 'The number of consecutive run.',
                      lower_bound=1)
 flags.DEFINE_integer('nccl_seconds_between_runs', 10,
                      'Sleep between consecutive run.')
-flags.DEFINE_boolean('nccl_install_nccl', False, 'Install NCCL')
 flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
 flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
@@ -142,8 +141,7 @@ def _PrepareVm(vm):
   vm.AuthenticateVm()
   vm.Install('cuda_toolkit')
   vm.Install('openmpi')
-  if FLAGS.nccl_install_nccl:
-    vm.Install('nccl')
+  vm.Install('nccl')
 
   env = ''
   if FLAGS.aws_efa:

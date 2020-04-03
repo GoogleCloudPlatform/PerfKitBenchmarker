@@ -21,7 +21,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
-from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -318,7 +318,7 @@ def Run(benchmark_spec):
                                model_dir=benchmark_spec.model_dir,
                                batch_size=benchmark_spec.batch_size))
 
-  if cuda_toolkit.CheckNvidiaGpuExists(vm):
+  if nvidia_driver.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
         env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)
   samples = []

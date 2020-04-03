@@ -67,17 +67,17 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(testMetadata, stencil_sp_stddev_results.metadata)
 
   @mock.patch(('perfkitbenchmarker.linux_packages.'
-               'cuda_toolkit.GetPeerToPeerTopology'))
+               'nvidia_driver.GetPeerToPeerTopology'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
-               'cuda_toolkit.GetGpuType'))
+               'nvidia_driver.GetGpuType'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
-               'cuda_toolkit.GetDriverVersion'))
+               'nvidia_driver.GetDriverVersion'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
-               'cuda_toolkit.QueryNumberOfGpus'))
+               'nvidia_driver.QueryNumberOfGpus'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
-               'cuda_toolkit.QueryGpuClockSpeed'))
+               'nvidia_driver.QueryGpuClockSpeed'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
-               'cuda_toolkit.QueryAutoboostPolicy'))
+               'nvidia_driver.QueryAutoboostPolicy'))
   @mock.patch(('perfkitbenchmarker.linux_benchmarks.'
                'stencil2d_benchmark._RunSingleIteration'))
   def testRun(self,
