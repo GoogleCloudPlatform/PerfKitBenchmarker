@@ -359,6 +359,9 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
       config_values['use_spot_instance'] = flag_values.aws_spot_instances
     if flag_values['aws_spot_price'].present:
       config_values['spot_price'] = flag_values.aws_spot_price
+    if flag_values['aws_spot_block_duration_minutes'].present:
+      config_values['spot_block_duration_minutes'] = (
+          flag_values.aws_spot_block_duration_minutes)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -375,6 +378,9 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
             'default': False
         }),
         'spot_price': (option_decoders.FloatDecoder, {
+            'default': None
+        }),
+        'spot_block_duration_minutes': (option_decoders.IntDecoder, {
             'default': None
         }),
         'boot_disk_size': (option_decoders.IntDecoder, {
@@ -506,6 +512,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.use_spot_instance = vm_spec.use_spot_instance
     self.spot_price = vm_spec.spot_price
+    self.spot_block_duration_minutes = vm_spec.spot_block_duration_minutes
     self.boot_disk_size = vm_spec.boot_disk_size
     self.client_token = str(uuid.uuid4())
     self.host = None
@@ -515,6 +522,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.use_spot_instance,
         'spot_price':
             self.spot_price,
+        'spot_block_duration_minutes':
+            self.spot_block_duration_minutes,
         'placement_group_strategy':
             self.placement_group.strategy if self.placement_group else 'none',
         'aws_credit_specification':
@@ -747,6 +756,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       spot_options['InstanceInterruptionBehavior'] = 'terminate'
       if self.spot_price:
         spot_options['MaxPrice'] = str(self.spot_price)
+      if self.spot_block_duration_minutes:
+        spot_options['BlockDurationMinutes'] = self.spot_block_duration_minutes
       instance_market_options['MarketType'] = 'spot'
       instance_market_options['SpotOptions'] = spot_options
       create_cmd.append(
