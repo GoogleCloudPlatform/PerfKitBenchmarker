@@ -20,7 +20,7 @@
     -   Windows Server with Desktop Experience is now referred to as
         `windows201X_desktop`.
     -   See
-        [the microsoft documenation](https://docs.microsoft.com/en-us/windows-server/administration/server-core/what-is-server-core)
+        [the microsoft documentation](https://docs.microsoft.com/en-us/windows-server/administration/server-core/what-is-server-core)
         for more information on the differences.
 
 ### New features:
@@ -47,6 +47,8 @@
 -   Add large_scale_boot benchmark for linux and windows.
 -   Replace Boto connection library with Python client library for GCS.
 -   Enabled OpenMPI version selection
+-   Adds support for running network benchmarks across a VPN.
+    -   Includes GCP implementation with static routes.
 
 ### Enhancements:
 

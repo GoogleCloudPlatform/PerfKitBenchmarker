@@ -20,6 +20,8 @@ others in the
 same project.
 """
 
+import abc
+
 from enum import Enum
 
 from perfkitbenchmarker import context
@@ -100,6 +102,71 @@ class BaseNetworkSpec(object):
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
+
+
+class BaseVpnGateway(object):
+  """An object representing the Base VPN Gateway."""
+  CLOUD = None
+
+  def __init__(self, zone=None, cidr=None):
+    """Initializes the BaseVpnGateway.
+
+    Args:
+      zone: The zone in which to create the VpnGateway.
+      cidr: The cidr for the VpnGateway.
+    """
+    self.zone = zone
+    self.cidr = cidr
+    # Set to True if we need target Gateway up front (AWS)
+    self.require_target_to_init = False
+
+  @abc.abstractmethod
+  def IsTunnelConfigured(self, tunnel_config):
+    """Returns True if the tunnel_config is complete.
+
+    Args:
+     tunnel_config: The tunnel_config of the tunnel to check.
+    Returns:
+       boolean.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def IsTunnelReady(self, tunnel_id):
+    """Returns True if the tunnel is ready.
+
+    Args:
+      tunnel_id: The id of the tunnel to check.
+
+    Returns:
+      boolean.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def ConfigureTunnel(self, tunnel_config):
+    """Updates the tunnel_config object with new information.
+
+    Each provider may require different information to setup a VPN tunnel,
+    and all information needed to configure the tunnel may not be available
+    up front. Incremental updates to tunnel_config are made by calling this
+    function on each endpoint until either both endpoint tunnels are configured
+    or no more updates can be made.
+
+    Args:
+      tunnel_config: The tunnel_config object of the tunnel to configure.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def Create(self):
+    """Creates the actual VPN Gateway."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def Delete(self):
+    """Deletes the actual VPN Gateway."""
+    raise NotImplementedError()
 
 
 class BaseNetwork(object):

@@ -49,6 +49,8 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import vpn_service
+
 import six
 from six.moves import range
 import six.moves._thread
@@ -158,6 +160,12 @@ class BenchmarkSpec(object):
         self.config.vm_groups if self.config.relational_db is None else
         relational_db.VmsToBoot(self.config.relational_db.vm_groups))
     self.vpc_peering = self.config.vpc_peering
+
+    self.vpn_service = None
+    self.vpns = {}  # dict of vpn's
+    self.vpn_gateways = {}  # dict of vpn gw's
+    self.vpn_gateways_lock = threading.Lock()
+    self.vpns_lock = threading.Lock()
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -525,6 +533,12 @@ class BenchmarkSpec(object):
                           'service'.format(name, spark_service.PKB_MANAGED))
         self.vms_to_boot[name] = spec
 
+  def ConstructVPNService(self):
+    """Create the VPNService object."""
+    if self.config.vpn_service is None:
+      return
+    self.vpn_service = vpn_service.VPNService(self.config.vpn_service)
+
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
@@ -625,6 +639,8 @@ class BenchmarkSpec(object):
           if network.__class__.__name__ == 'AwsNetwork':
             self.edw_service.cluster_subnet_group.subnet_id = network.subnet.id
       self.edw_service.Create()
+    if self.vpn_service:
+      self.vpn_service.Create()
 
   def Delete(self):
     if self.deleted:
@@ -685,6 +701,9 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
+
+    if self.vpn_service:
+      self.vpn_service.Delete()
 
     self.deleted = True
 
