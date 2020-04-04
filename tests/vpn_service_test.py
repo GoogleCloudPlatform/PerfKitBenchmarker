@@ -119,11 +119,12 @@ class VpnServiceTestCase(BaseVPNServiceTest):
 
   @flagsaver.flagsaver(use_vpn=True, vpn_service_gateway_count=1)
   def testGetVPNGatewayPairs(self):
-    vpn_gateways = {'vpngw-us-west1-0-None': None,
-                    'vpngw-us-west1-1-None': None,
-                    'vpngw-us-central1-0-None': None,
-                    'vpngw-us-central1-1-None': None,
-                   }
+    vpn_gateways = {
+        'vpngw-us-west1-0-None': None,
+        'vpngw-us-west1-1-None': None,
+        'vpngw-us-central1-0-None': None,
+        'vpngw-us-central1-1-None': None,
+    }
     spec = self._CreateBenchmarkSpecFromYaml(DEFAULT_CFG)
     spec.ConstructVPNService()
     pairs = spec.vpn_service.GetVpnGatewayPairs(vpn_gateways)

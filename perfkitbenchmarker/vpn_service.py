@@ -252,12 +252,13 @@ class VPNService(resource.BaseResource):
     self.shared_key = spec.shared_key
     self.spec = spec
     self.vpns = {}
-    self.vpn_properties = {'tunnel_count': self.tunnel_count,
-                           'gateway_count': self.gateway_count,
-                           'routing': self.routing,
-                           'ike_version': self.ike_version,
-                           'shared_key': self.shared_key,
-                          }
+    self.vpn_properties = {
+        'tunnel_count': self.tunnel_count,
+        'gateway_count': self.gateway_count,
+        'routing': self.routing,
+        'ike_version': self.ike_version,
+        'shared_key': self.shared_key,
+    }
 
   def GetResourceMetadata(self):
     """Returns a dictionary of metadata about the resource."""
@@ -312,13 +313,14 @@ class VPNService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for VPNs created."""
-    basic_data = {'vpn_service_name': self.name,
-                  'vpn_service_routing_type': self.routing,
-                  'vpn_service_ike_version': self.ike_version,
-                  'vpn_service_tunnel_count': self.tunnel_count,
-                  'vpn_service_gateway_count': self.gateway_count,
-                  # 'vpn_service_psk': self.psk,
-                 }
+    basic_data = {
+        'vpn_service_name': self.name,
+        'vpn_service_routing_type': self.routing,
+        'vpn_service_ike_version': self.ike_version,
+        'vpn_service_tunnel_count': self.tunnel_count,
+        'vpn_service_gateway_count': self.gateway_count,
+        # 'vpn_service_psk': self.psk,
+    }
     return basic_data
 
   def GetVpnGatewayPairs(self, vpn_gateways):
