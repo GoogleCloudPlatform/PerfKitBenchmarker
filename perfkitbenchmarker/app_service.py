@@ -151,14 +151,12 @@ class BaseAppService(resource.BaseResource):
 
   def GetLifeCycleMetrics(self):
     """Export internal lifecycle metrics."""
+    if self.builder:
+      self.metadata.update(self.builder.GetResourceMetadata())
+
     for s in self.samples:
       s.metadata.update(self.metadata)
     return self.samples
-
-  def _PostCreate(self):
-    """Method called after _CreateResource."""
-    if self.builder:
-      self.metadata.update(self.builder.GetResourceMetadata())
 
   def Create(self):
     super(BaseAppService, self).Create()
