@@ -702,7 +702,7 @@ class BenchmarkSpec(object):
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
 
-    if self.vpn_service:
+    if hasattr(self, 'vpn_service') and self.vpn_service:
       self.vpn_service.Delete()
 
     self.deleted = True
