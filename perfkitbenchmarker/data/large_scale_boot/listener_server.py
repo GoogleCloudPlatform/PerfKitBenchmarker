@@ -37,8 +37,10 @@ import time
 from http import server
 
 
-# Amount of time in seconds to attempt calling a client VM.
+# Amount of time in seconds to attempt calling a client VM if VM calling in.
 MAX_TIME_SECONDS = 30
+# Amount of time in seconds to attempt calling a client VM if VM not calling in.
+MAX_TIME_SECONDS_NO_CALLING = 600
 # entry to stop processing from the timing queue
 _STOP_QUEUE_ENTRY = 'stop'
 
@@ -78,6 +80,34 @@ def WriteResultsToFile(results_path, queue):
         return
       writer.write('{}\n'.format(result))
       writer.flush()
+
+
+def ActAsClient(pool, queue, port, name_constructor, vms_count):
+  """Use as a client."""
+  store_results = functools.partial(StoreResult, queue=queue)
+  all_jobs = []
+  for vm_id in range(1, vms_count + 1):
+    host_name = name_constructor(str(vm_id), 1)
+    job = pool.apply_async(
+        ConfirmIPAccessible,
+        args=(host_name, port, MAX_TIME_SECONDS_NO_CALLING,),
+        callback=store_results)
+    all_jobs.append(job)
+  logging.info([async_job.get() for async_job in all_jobs])
+  queue.put(_STOP_QUEUE_ENTRY)
+
+
+def ActAsServer(pool, queue, port, host_name, listening_server):
+  """Use as a server."""
+  handler = functools.partial(RequestHandler, pool, host_name, queue, port)
+  listener = server.HTTPServer(listening_server, handler)
+  logging.info('Starting httpserver...\n')
+  try:
+    listener.serve_forever()
+  except KeyboardInterrupt:
+    logging.info('^C received, shutting down server')
+    listener.server_close()
+  queue.put(_STOP_QUEUE_ENTRY)
 
 
 class RequestHandler(server.BaseHTTPRequestHandler):
@@ -133,14 +163,20 @@ class RequestHandler(server.BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
-  if len(sys.argv) != 4:
+  if len(sys.argv) != 7:
     raise ValueError('Got unexpected number of command-line arguments. '
-                     'There should be 3 command-line arguments, first being '
-                     'the server port, second being the results file path, '
-                     'and third being the port to access the boot VMs.')
+                     'There should be at most 6 command-line arguments, first '
+                     'being the server port, second being the results file '
+                     'path, third being the port to access the boot VMs, '
+                     'forth being whether to use the listening server, fifth '
+                     'being the launched vm naming pattern and sixth being the '
+                     'number of launched vms.')
   server_address = ('', int(sys.argv[1]))
   results_file_path = sys.argv[2]
   clients_port = sys.argv[3]
+  use_listening_server = sys.argv[4] == 'True'
+  vms_name_constructor = functools.partial(sys.argv[5].replace, 'VM_ID')
+  num_vms = int(sys.argv[6])
   hostname = socket.gethostname()
   process_pool = multiprocessing.Pool()
   multiprocessing_manager = multiprocessing.Manager()
@@ -149,15 +185,11 @@ if __name__ == '__main__':
   # Start the worker to move results from queue to file first.
   process_pool.apply_async(WriteResultsToFile,
                            args=(results_file_path, timing_queue,))
+  if use_listening_server:
+    ActAsServer(process_pool, timing_queue, clients_port, hostname,
+                server_address)
 
   # The start the server to listen and put results on queue.
-  handler = functools.partial(
-      RequestHandler, process_pool, hostname, timing_queue, clients_port)
-  listener = server.HTTPServer(server_address, handler)
-  logging.info('Starting httpserver...\n')
-  try:
-    listener.serve_forever()
-  except KeyboardInterrupt:
-    logging.info('^C received, shutting down server')
-    listener.server_close()
-  timing_queue.add(_STOP_QUEUE_ENTRY)
+  else:
+    ActAsClient(process_pool, timing_queue, clients_port,
+                vms_name_constructor, num_vms)

@@ -87,6 +87,9 @@ flags.DEFINE_string('boot_machine_type', 'n1-standard-2', 'Machine type to boot'
 flags.DEFINE_string('launcher_machine_type', 'n1-standard-16', 'Machine type '
                     'to launcher the VMs. Defaults to n1-standard-16. Set '
                     'machine type on boot VMs with boot_machine_type flag.')
+flags.DEFINE_boolean('vms_contact_launcher', True, 'Whether launched vms '
+                     'attempt to contact the launcher before launcher attempts '
+                     'to connect to them. Default to True.')
 
 # remote tmp directory used for this benchmark.
 _REMOTE_DIR = vm_util.VM_TMP_DIR
@@ -120,6 +123,8 @@ _RESULTS_FILE_PATH = posixpath.join(_REMOTE_DIR, _RESULTS_FILE)
 _TIMEOUT_SECONDS = 60 * 10
 # Seconds to deplay between polling for launcher server task complete.
 _POLLING_DELAY = 3
+# Naming pattern for booted vms.
+_BOOT_VM_NAME_PREFIX = 'booter-{launcher_name}'
 # sha256sum for preprovisioned service account credentials.
 # If not using service account credentials from preprovisioned data bucket,
 # use --gcp_service_account_key_file flag to specify the same credentials.
@@ -133,16 +138,24 @@ _SSH_PORT = linux_virtual_machine.DEFAULT_SSH_PORT
 _RDP_PORT = windows_virtual_machine.RDP_PORT
 
 
-def _GetServerStartCommand(client_port):
+def _GetServerStartCommand(client_port, launcher_vm):
   # command to start the listener server
+  vms_name_pattern = '{name_pattern}-VM_ID.{zone}.c.{project}.internal'.format(
+      name_pattern=_BOOT_VM_NAME_PREFIX.format(
+          launcher_name=launcher_vm.name),
+      zone=launcher_vm.zone,
+      project=FLAGS.project)
   return (
-      'python3 {server_path} {port} {results_path} {client_port} '
-      ' > {server_log} 2>&1 &'.format(
+      'python3 {server_path} {port} {results_path} {client_port} {use_server} '
+      '{vms_name_pattern} {vms_count} > {server_log} 2>&1 &'.format(
           server_path=posixpath.join(
               _REMOTE_DIR, _LISTENER_SERVER.split('/')[-1]),
           port=_PORT,
           results_path=_RESULTS_FILE_PATH,
           client_port=client_port,
+          use_server=FLAGS.vms_contact_launcher,
+          vms_name_pattern=vms_name_pattern,
+          vms_count=FLAGS.boots_per_launcher,
           server_log=_LISTENER_SERVER_LOG))
 
 
@@ -204,10 +217,13 @@ def _BuildContext(launcher_vm, booter_template_vm):
   """Returns the context variables for Jinja2 template during rendering."""
   return {
       'os_type': 'linux' if _IsLinux() else 'windows',
+      'contact_launcher': FLAGS.vms_contact_launcher,
       'cloud': FLAGS.cloud,
       'start_time_file': _START_TIME_FILE_PATH,
       'vm_count': FLAGS.boots_per_launcher,
       'launcher_vm_name': launcher_vm.name,
+      'boot_vm_name_prefix': _BOOT_VM_NAME_PREFIX.format(
+          launcher_name=launcher_vm.name),
       'project': FLAGS.project,
       'image_family': booter_template_vm.image_family,
       'image_project': booter_template_vm.image_project,
@@ -232,7 +248,7 @@ def _Install(launcher_vm, booter_template_vm):
   launcher_vm.InstallPackages('netcat')
   launcher_vm.PushDataFile(_LISTENER_SERVER, _REMOTE_DIR)
   client_port = _SSH_PORT if _IsLinux() else _RDP_PORT
-  launcher_vm.RemoteCommand(_GetServerStartCommand(client_port))
+  launcher_vm.RemoteCommand(_GetServerStartCommand(client_port, launcher_vm))
   # Render clean up script on launcher server VM(s).
   launcher_vm.RenderTemplate(data.ResourcePath(_CLEAN_UP_TEMPLATE),
                              _CLEAN_UP_SCRIPT_PATH, context)
@@ -325,7 +341,8 @@ def _ParseResult(launcher_vms):
       'expected_boots_per_launcher': FLAGS.boots_per_launcher,
       'boot_os_type': FLAGS.boot_os_type,
       'boot_machine_type': FLAGS.boot_machine_type,
-      'launcher_machine_type': FLAGS.launcher_machine_type
+      'launcher_machine_type': FLAGS.launcher_machine_type,
+      'vms_contact_launcher': FLAGS.vms_contact_launcher,
   }
   for vm in launcher_vms:
     start_time_str, _ = vm.RemoteCommand(get_starttime_cmd)

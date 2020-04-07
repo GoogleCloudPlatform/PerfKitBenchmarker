@@ -5,21 +5,30 @@ uses to spin up vms. The vms are spun up with a startup script to curl a
 listening server. The time taken to boot is the time between executing this
 script and the time the vms call back on the server. #}
 
-{% if os_type == 'linux' %}
-export START_UP_SCRIPT="startup-script=#! /bin/bash
-curl -H 'X-Header: {{ launcher_vm_name }}' http://{{ server_ip }}:{{ server_port }}
-# Sleep 10min before final cleanup and VM termination.
-sleep {{ timeout }}
-{{ gcloud_path }} --quiet compute instances delete booter-{{ launcher_vm_name }}-$i --zone {{ zone }} --project {{ project }}
-/sbin/shutdown -hP now"
+{% if contact_launcher %}
+  LINUX_PING="curl -H 'X-Header: {{ launcher_vm_name }}' http://{{ server_ip }}:{{ server_port }}"
+  WINDOWS_PING="Invoke-WebRequest -Uri '{{ server_ip }}:{{ server_port }}' -Headers @{'X-Header'='{{ launcher_vm_name }}'}"
+{% else %}
+  LINUX_PING=""
+  WINDOWS_PING=""
 {% endif %}
-
-{% if os_type == 'windows' %}
-export START_UP_SCRIPT="windows-startup-script-ps1=Invoke-WebRequest -Uri '{{ server_ip }}:{{ server_port }}' -Headers @{'X-Header'='{{ launcher_vm_name }}'}
-# Sleep 10min before final cleanup and VM termination.
-Start-Sleep -Seconds {{ timeout }}
-{{ gcloud_path }} --quiet compute instances delete booter-{{ launcher_vm_name }}-$i --zone {{ zone }} --project {{ project }}
+export LINUX_SLEEP="# Sleep 10min before final cleanup and VM termination.
+sleep {{ timeout }}"
+export WINDOWS_SLEEP="# Sleep 10min before final cleanup and VM termination.
+Start-Sleep -Seconds {{ timeout }}"
+export GCP_DELETE_VM="{{ gcloud_path }} --quiet compute instances delete {{ boot_vm_name_prefix }}-$i --zone {{ zone }} --project {{ project }}
 /sbin/shutdown -hP now"
+
+{% if os_type == 'linux' %}
+  export START_UP_SCRIPT="startup-script=#! /bin/bash
+  ${LINUX_PING}
+  ${LINUX_SLEEP}
+  ${GCP_DELETE_VM}"
+{% elif os_type == 'windows' %}
+  export START_UP_SCRIPT="windows-startup-script-ps1=
+  ${WINDOWS_PING}
+  ${WINDOWS_SLEEP}
+  ${GCP_DELETE_VM}"
 {% endif %}
 
 gcloud_args=(
@@ -47,7 +56,7 @@ echo $(date +%s%N) > {{start_time_file}}
 # Launch some VMs
 {% if cloud == 'GCP' %}
 for i in {1..{{vm_count}}}; do
-{{ gcloud_path }} compute instances create booter-{{ launcher_vm_name }}-$i  \
+{{ gcloud_path }} compute instances create {{ boot_vm_name_prefix }}-$i  \
 "${gcloud_args[@]}" &
 done
 {% endif %}
