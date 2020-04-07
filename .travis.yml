@@ -7,3 +7,6 @@ install:
   - pip install tox
 script:
   - tox -r -e $TOX_ENV
+branches:
+  only:
+    - "master"
