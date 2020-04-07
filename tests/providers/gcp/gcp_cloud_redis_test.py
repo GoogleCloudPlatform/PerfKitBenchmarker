@@ -13,9 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.gcp_cloud_redis."""
 import unittest
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case

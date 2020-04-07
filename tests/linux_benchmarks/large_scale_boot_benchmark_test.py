@@ -16,10 +16,10 @@
 
 import copy
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import large_scale_boot_benchmark
 from tests import pkb_common_test_case

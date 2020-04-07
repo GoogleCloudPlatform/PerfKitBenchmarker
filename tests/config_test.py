@@ -14,16 +14,14 @@
 """Tests for perfkitbenchmarker.configs."""
 
 import unittest
-import yaml
-
+from absl import flags
 import mock
-
-from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import windows_benchmarks
+import yaml
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -121,7 +119,6 @@ class ConfigsTestCase(unittest.TestCase):
     with self.assertRaises(errors.Config.ParseError):
       configs.LoadMinimalConfig(BAD_REF_CONFIG, CONFIG_NAME)
 
-
   def testConfigOverrideFlag(self):
     p = mock.patch(configs.__name__ + '.FLAGS')
     self.addCleanup(p.stop)
@@ -139,7 +136,7 @@ class ConfigsTestCase(unittest.TestCase):
     p = mock.patch(configs.__name__ + '.FLAGS')
     self.addCleanup(p.stop)
     mock_flags = p.start()
-    mock_flags.configure_mock(benchmark_config_file="test_import.yml")
+    mock_flags.configure_mock(benchmark_config_file='test_import.yml')
     config = configs.GetUserConfig()
     self.assertEqual(config['flags']['num_vms'], 3)
 

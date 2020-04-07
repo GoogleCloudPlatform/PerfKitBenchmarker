@@ -1,11 +1,11 @@
 """Tests for perfkitbenchmarker.providers.openstack.os_virtual_machine_test."""
 
 import unittest
+from absl import flags
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.openstack import os_virtual_machine
