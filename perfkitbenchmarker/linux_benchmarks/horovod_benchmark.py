@@ -158,7 +158,7 @@ def _CopyAndUpdateRunScripts(model, vm):
                      '{}/utils/__init__.py'.format(resnet_base_dir))
     vm.RemoteCommand(
         'mkdir -p {base}/imagenet && '
-        '{gsutil_path} -m rsync gs://pkb-sgpyc-us-central1/perfzero_dataset/imagenet '
+        '{gsutil_path} -m rsync gs://mlcompass-data/imagenet/imagenet-2012-tfrecord '
         '{base}/imagenet'.format(gsutil_path=google_cloud_sdk.GSUTIL_PATH,
                                  base=resnet_base_dir))
 
@@ -374,7 +374,6 @@ def Run(benchmark_spec):
         '--results_dir /tmp/models '
         '--data_dir {data_dir} '
         '--iter_unit epoch '
-        '--data_format NHWC '
         '--num_iter {num_epochs} ').format(
             precision=benchmark_spec.precision,
             batch_size=benchmark_spec.batch_size,
