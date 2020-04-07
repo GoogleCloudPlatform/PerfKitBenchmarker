@@ -191,7 +191,6 @@ def _PrepareHorovod(vm):
   logging.info('Installing Horovod on %s', vm)
   vm.AuthenticateVm()
 
-  vm.Install('cuda_toolkit')
   vm.Install('nccl')
   vm.InstallPackages('wget git unzip')
 

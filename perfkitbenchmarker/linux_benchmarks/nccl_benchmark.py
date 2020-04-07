@@ -139,9 +139,8 @@ def _PrepareVm(vm):
     vm: virtual machine on which to install NCCL
   """
   vm.AuthenticateVm()
-  vm.Install('cuda_toolkit')
-  vm.Install('openmpi')
   vm.Install('nccl')
+  vm.Install('openmpi')
 
   env = ''
   if FLAGS.aws_efa:
