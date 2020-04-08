@@ -586,6 +586,30 @@ class GceFirewall(network.BaseFirewall):
     for firewall_rule in six.itervalues(self.firewall_rules):
       firewall_rule.Delete()
 
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+    if vm.is_static:
+      return
+    with self._lock:
+      firewall_name = ('perfkit-firewall-%s-%d-%d' %
+                       (FLAGS.run_uri, -1, -1))
+
+      key = (vm.project, -1, -1)
+      if key in self.firewall_rules:
+        return
+
+      allow = 'ICMP'
+
+      firewall_rule = GceFirewallRule(
+          firewall_name, vm.project, allow,
+          vm.network.network_resource.name)
+      self.firewall_rules[key] = firewall_rule
+      firewall_rule.Create()
+
 
 class GceNetworkSpec(network.BaseNetworkSpec):
 
