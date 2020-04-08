@@ -103,7 +103,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
   Returns:
     A list of samples, with one sample for each metric.
   """
-  if not sending_vm.IsReachable(receiving_vm) and ip_type == 'internal':
+  if ip_type == 'internal' and not sending_vm.IsReachable(receiving_vm):
     logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
