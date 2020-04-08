@@ -69,7 +69,6 @@ class AwsFirewall(network.BaseFirewall):
     Args:
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
     """
-    print("ALLOWING ICMP")
     entry = (-1, -1, vm.region, vm.group_id)
     with self._lock:
       if entry in self.firewall_set:
