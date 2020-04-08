@@ -69,7 +69,8 @@ class AwsFirewall(network.BaseFirewall):
     Args:
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
     """
-    entry = (-1, -1, vm.region, vm.group_id)
+    source = '0.0.0.0/0'
+    entry = (-1, -1, vm.region, vm.group_id, source)
     with self._lock:
       if entry in self.firewall_set:
         return
@@ -80,7 +81,7 @@ class AwsFirewall(network.BaseFirewall):
           '--group-id=%s' % vm.group_id,
           '--protocol=icmp',
           '--port=-1',
-          '--cidr=0.0.0.0/0']
+          '--cidr=%s' % source]
       util.IssueRetryableCommand(
           authorize_cmd)
       self.firewall_set.add(entry)
