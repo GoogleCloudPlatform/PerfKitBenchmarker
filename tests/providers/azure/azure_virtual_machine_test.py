@@ -44,7 +44,12 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
        'standardEv3Family Cores quota', 1),
       ('',
        'The operation could not be completed as it results in exceeding quota '
-       'limit of standardEv3Family Cores', 1)
+       'limit of standardEv3Family Cores', 1),
+      ('',
+       "Message: CloudError(\"The template deployment "
+       "'vm_deploy_1b8VMWdAAXLz1KUCR869IQPHsv82PZYA' is not valid according to"
+       " the validation procedure.",
+       1),
   ])
   def testQuotaExceeded(self, _, stderror, retcode):
     spec = azure_virtual_machine.AzureVmSpec(
