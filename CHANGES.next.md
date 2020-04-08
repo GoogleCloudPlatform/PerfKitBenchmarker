@@ -49,6 +49,7 @@
 -   Enabled OpenMPI version selection
 -   Adds support for running network benchmarks across a VPN.
     -   Includes GCP implementation with static routes.
+-   Add a directory for PKB tutorials.
 
 ### Enhancements:
 
