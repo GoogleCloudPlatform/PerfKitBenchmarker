@@ -327,7 +327,7 @@ def Run(benchmark_spec):
     master_vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
     python_interpreter = 'anaconda3/envs/tensorflow_p36/bin/python'
   else:
-    python_interpreter = 'python3'
+    python_interpreter = '/opt/conda/bin/python'
 
   nccl_params = [
       'TF_CPP_MIN_LOG_LEVEL=0',
