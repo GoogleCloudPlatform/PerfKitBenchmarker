@@ -360,7 +360,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['aws_spot_price'].present:
       config_values['spot_price'] = flag_values.aws_spot_price
     if flag_values['aws_spot_block_duration_minutes'].present:
-      config_values['spot_block_duration_minutes'] = (
+      config_values['spot_block_duration_minutes'] = int(
           flag_values.aws_spot_block_duration_minutes)
 
   @classmethod
@@ -1015,6 +1015,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['efa'] = FLAGS.aws_efa
     if FLAGS.aws_efa:
       result['efa_version'] = FLAGS.aws_efa_version
+    result['preemptible'] = self.use_spot_instance
     return result
 
 
