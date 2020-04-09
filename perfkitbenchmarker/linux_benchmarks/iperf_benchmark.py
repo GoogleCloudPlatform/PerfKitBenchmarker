@@ -24,10 +24,10 @@ import logging
 import re
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import flag_util
 
 flag_util.DEFINE_integerlist('iperf_sending_thread_count',
                              flag_util.IntegerList([1]),
@@ -88,13 +88,15 @@ def Prepare(benchmark_spec):
 
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
-def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_type):
+def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
+              ip_type):
   """Run iperf using sending 'vm' to connect to 'ip_address'.
 
   Args:
     sending_vm: The VM sending traffic.
     receiving_vm: The VM receiving traffic.
     receiving_ip_address: The IP address of the iperf server (ie the receiver).
+    thread_count: The number of threads the server will use.
     ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
   Returns:
     A Sample.
@@ -131,7 +133,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
     # If there is no sum you have try and figure out an estimate
     # which happens when threads start at different times.  The code
     # below will tend to overestimate a bit.
-    thread_values = re.findall('\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
+    thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
 
     if len(thread_values) != thread_count:
       raise ValueError('Only %s out of %s iperf threads reported a'
