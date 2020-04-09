@@ -17,5 +17,5 @@
 import sys
 
 from perfkitbenchmarker.pkb import Main
-
+print('test')
 sys.exit(Main())
