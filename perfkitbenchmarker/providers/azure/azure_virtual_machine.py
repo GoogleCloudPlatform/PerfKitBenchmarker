@@ -797,11 +797,6 @@ class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'RedHat:RHEL:7.6:latest'
 
 
-class VersionlessRhelBasedAzureVirutalMachine(
-    linux_virtual_machine.VersionlessRhelMixin, Rhel7BasedAzureVirtualMachine):
-  pass
-
-
 class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel8Mixin):
   IMAGE_URN = 'RedHat:RHEL:8:latest'
@@ -848,12 +843,6 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         '--version', '1.4',
         '--protected-settings=%s' % config
     ] + self.resource_group.args)
-
-
-class VersionlessWindowsAzureVirtualMachine(
-    BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.VersionlessWindowsMixin):
-  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:

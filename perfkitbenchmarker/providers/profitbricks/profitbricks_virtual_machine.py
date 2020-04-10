@@ -27,7 +27,6 @@ import yaml
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -379,8 +378,3 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                            .format(disk_spec.mount_point))
         self.scratch_disks.append(profitbricks_disk.ProfitBricksDisk(
                                   disk_spec))
-
-
-class VersionlessRhelBasedProfitBricksVirtualMachine(
-    ProfitBricksVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
-    pass

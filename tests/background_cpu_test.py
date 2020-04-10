@@ -125,7 +125,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
   def testWindowsVMCausesError(self):
     """windows vm with background_cpu_threads raises exception."""
     FLAGS['background_cpu_threads'].parse(1)
-    FLAGS['os_type'].parse(os_types.WINDOWS)
+    FLAGS['os_type'].parse(os_types.WINDOWS2019_CORE)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
@@ -153,7 +153,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def testBackgroundWorkloadWindows(self):
     """Test that nothing happens with the vanilla config."""
-    FLAGS['os_type'].parse(os_types.WINDOWS)
+    FLAGS['os_type'].parse(os_types.WINDOWS2019_CORE)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     for vm in spec.vms:

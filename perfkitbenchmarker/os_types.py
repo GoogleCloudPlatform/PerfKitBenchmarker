@@ -55,7 +55,6 @@ LINUX_OS_TYPES = [
     DEBIAN9,
     DEBIAN10,
     JUJU,
-    RHEL,  # deprecated
     RHEL7,
     RHEL8,
     UBUNTU_CONTAINER,
@@ -65,7 +64,6 @@ LINUX_OS_TYPES = [
     UBUNTU1804,
 ]
 WINDOWS_OS_TYPES = [
-    WINDOWS,  # deprecated
     WINDOWS2012_CORE,
     WINDOWS2016_CORE,
     WINDOWS2019_CORE,

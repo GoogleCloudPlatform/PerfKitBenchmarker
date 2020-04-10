@@ -161,7 +161,7 @@ class TestBackgroundNetworkWorkload(pkb_common_test_case.PkbCommonTestCase):
   def testWindowsVMCausesError(self):
     """windows vm with background_network_mbits_per_sec raises exception."""
     FLAGS['background_network_mbits_per_sec'].parse(200)
-    FLAGS['os_type'].parse(os_types.WINDOWS)
+    FLAGS['os_type'].parse(os_types.WINDOWS2019_CORE)
     spec = self.makeSpec()
     with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
       spec.Prepare()
@@ -186,7 +186,7 @@ class TestBackgroundNetworkWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def testBackgroundWorkloadWindows(self):
     """Test that nothing happens with the vanilla config."""
-    FLAGS.os_type = os_types.WINDOWS
+    FLAGS.os_type = os_types.WINDOWS2019_CORE
     # background_network_mbits_per_sec defaults to None.
     spec = self.makeSpec()
 

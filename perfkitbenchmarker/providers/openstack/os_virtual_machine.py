@@ -412,12 +412,6 @@ class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
   DEFAULT_IMAGE = 'rhel-7.2'
 
 
-class VersionlessRhel7BasedOpenStackVirtualMachine(
-    linux_virtual_machine.VersionlessRhelMixin,
-    Rhel7BasedOpenStackVirtualMachine):
-  pass
-
-
 class CentOs7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                           linux_virtual_machine.CentOs7Mixin):
   DEFAULT_IMAGE = 'centos7'

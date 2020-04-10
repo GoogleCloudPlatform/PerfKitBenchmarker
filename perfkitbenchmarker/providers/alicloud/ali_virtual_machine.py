@@ -27,7 +27,6 @@ import six
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import disk
 from perfkitbenchmarker.providers.alicloud import ali_disk
@@ -445,13 +444,3 @@ class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,
 class CentOs7BasedAliVirtualMachine(AliVirtualMachine,
                                     linux_virtual_machine.CentOs7Mixin):
   IMAGE_NAME_FILTER = 'centos_7_05_64*alibase*.vhd'
-
-
-class VersionlessRhelBasedAliVirtualMachine(
-    AliVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
-  pass
-
-
-class VersionlessWindowsAliVirtualMachine(
-    AliVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
-  pass

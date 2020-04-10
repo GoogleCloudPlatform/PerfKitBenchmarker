@@ -36,7 +36,6 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import windows_virtual_machine
 
 FLAGS = flags.FLAGS
 
@@ -308,11 +307,6 @@ class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
-class VersionlessRhelBasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
-  pass
-
-
 class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
                                      linux_virtual_machine.Rhel7Mixin):
   pass
@@ -320,9 +314,4 @@ class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
 
 class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.CentOs7Mixin):
-  pass
-
-
-class VersionlessWindowsDesktopStaticVirtualMachine(
-    StaticVirtualMachine, windows_virtual_machine.VersionlessWindowsMixin):
   pass

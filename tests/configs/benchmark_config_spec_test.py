@@ -256,13 +256,13 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testValidInput(self):
     result = self._spec_class(
         _COMPONENT, cloud=providers.AWS, disk_count=0,
-        disk_spec=_GCP_AWS_DISK_CONFIG, os_type=os_types.WINDOWS,
+        disk_spec=_GCP_AWS_DISK_CONFIG, os_type=os_types.AMAZONLINUX2,
         static_vms=[{}], vm_count=0, vm_spec=_GCP_AWS_VM_CONFIG)
     self.assertIsInstance(result, benchmark_config_spec._VmGroupSpec)
     self.assertEqual(result.cloud, 'AWS')
     self.assertEqual(result.disk_count, 0)
     self.assertIsInstance(result.disk_spec, aws_disk.AwsDiskSpec)
-    self.assertEqual(result.os_type, 'windows')
+    self.assertEqual(result.os_type, 'amazonlinux2')
     self.assertIsInstance(result.static_vms, list)
     self.assertEqual(len(result.static_vms), 1)
     self.assertIsInstance(result.static_vms[0],
@@ -298,7 +298,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def createNonPresentFlags(self):
     FLAGS.cloud = providers.AWS
     FLAGS.num_vms = 3
-    FLAGS.os_type = os_types.WINDOWS
+    FLAGS.os_type = os_types.WINDOWS2019_CORE
 
   def createPresentFlags(self):
     self.createNonPresentFlags()
@@ -311,7 +311,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = self._spec_class(
         _COMPONENT, flag_values=FLAGS, vm_count=2, **self._kwargs)
     self.assertEqual(result.cloud, 'AWS')
-    self.assertEqual(result.os_type, 'windows')
+    self.assertEqual(result.os_type, 'windows2019_core')
     self.assertEqual(result.vm_count, 2)
 
   def testPresentFlagsAndNonPresentConfigValues(self):
@@ -319,7 +319,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = self._spec_class(
         _COMPONENT, flag_values=FLAGS, vm_spec=_GCP_AWS_VM_CONFIG)
     self.assertEqual(result.cloud, 'AWS')
-    self.assertEqual(result.os_type, 'windows')
+    self.assertEqual(result.os_type, 'windows2019_core')
     self.assertEqual(result.vm_count, 1)
 
   def testNonPresentFlagsAndPresentConfigValues(self):
@@ -471,8 +471,9 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMismatchedOsTypes(self):
     self._kwargs['vm_groups'] = {
         os_type + '_group': {'os_type': os_type, 'vm_spec': _GCP_AWS_VM_CONFIG}
-        for os_type in (os_types.UBUNTU1804, os_types.RHEL, os_types.WINDOWS)}
-    expected_os_types = os_types.JUJU, os_types.WINDOWS
+        for os_type in (os_types.UBUNTU1804, os_types.RHEL8,
+                        os_types.WINDOWS2019_CORE)}
+    expected_os_types = os_types.JUJU, os_types.WINDOWS2019_CORE
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._spec_class(
           _COMPONENT,
@@ -481,8 +482,9 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
           **self._kwargs)
     self.assertEqual(str(cm.exception), (
         "VM groups in test_component may only have the following OS types: "
-        "'juju', 'windows'. The following VM group options are invalid:{sep}"
-        "test_component.vm_groups['rhel_group'].os_type: 'rhel'{sep}"
+        "'juju', 'windows2019_core'. The following VM group options are "
+        "invalid:{sep}"
+        "test_component.vm_groups['rhel8_group'].os_type: 'rhel8'{sep}"
         "test_component.vm_groups['ubuntu1804_group'].os_type: 'ubuntu1804'"
         .format(sep=os.linesep)))
 

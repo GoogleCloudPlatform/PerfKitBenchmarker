@@ -822,11 +822,6 @@ class Rhel7BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel7Mixin):
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
-class VersionlessRhelBasedGceVirtualMachine(
-    linux_vm.VersionlessRhelMixin, Rhel7BasedGceVirtualMachine):
-  pass
-
-
 class Rhel8BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel8Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-8'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
@@ -944,12 +939,6 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = self.RemoteCommand('netsh int tcp show global')
     if 'Receive-Side Scaling State          : enabled' in stdout:
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
-
-
-class VersionlessWindowsGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.VersionlessWindowsMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
 
 
 class Windows2012CoreGceVirtualMachine(

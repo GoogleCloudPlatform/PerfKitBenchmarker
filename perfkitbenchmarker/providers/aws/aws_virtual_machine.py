@@ -1096,12 +1096,6 @@ class AmazonLinux1BasedAwsVirtualMachine(
       r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
 
 
-class VersionlessRhelBaseAwsVirtualMachine(
-    linux_virtual_machine.VersionlessRhelMixin,
-    AmazonLinux1BasedAwsVirtualMachine):
-  ALTERNATIVE_OS = AmazonLinux1BasedAwsVirtualMachine.OS_TYPE
-
-
 class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.Rhel7Mixin):
   """Class with configuration for AWS RHEL 7 virtual machines."""
@@ -1232,12 +1226,6 @@ class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
     if registry_query_result[2] != '0':
       raise AwsUnexpectedWindowsAdapterOutputError(
           'InterruptModeration failed to disable')
-
-
-class VersionlessWindowsAwsVirtualMachine(
-    BaseWindowsAwsVirtualMachine,
-    windows_virtual_machine.VersionlessWindowsMixin):
-  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
 
 
 class Windows2012CoreAwsVirtualMachine(

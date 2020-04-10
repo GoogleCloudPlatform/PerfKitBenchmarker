@@ -5,12 +5,6 @@
         April 2019.
     -   `debian` os_type alias referred to Ubuntu 14.04 on all clouds.
     -   Ubuntu 16.04 is now the default.
--   Deprecate versionless `windows` os_type.
-    -   It will stop working in April 2020, and you will have to specify
-        `windows2012_core`.
--   Deprecate versionless `rhel` os_type.
-    -   It will stop working in April 2020, and you will have to specify `rhel7`
-        on most providers or `amazonlinux1` on AWS.
 -   Remove the `Runtime` metric for Horovod.
 -   Change `windows201X` os_types to `windows201X_core` and `windows201X_base`
     to `windows201X_desktop`.
@@ -22,6 +16,11 @@
     -   See
         [the microsoft documentation](https://docs.microsoft.com/en-us/windows-server/administration/server-core/what-is-server-core)
         for more information on the differences.
+-   Remove deprecated versionless `windows` os_type.
+    -   You will have to specify `windows2012_core`.
+-   Removed deprecated versionless `rhel` os_type.
+    -   You will have to specify `rhel7` on most providers or `amazonlinux1` on
+        AWS.
 
 ### New features:
 

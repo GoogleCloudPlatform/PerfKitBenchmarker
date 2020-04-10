@@ -208,8 +208,3 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 class CentOs7BasedCloudStackVirtualMachine(CloudStackVirtualMachine,
                                            linux_vm.CentOs7Mixin):
   DEFAULT_IMAGE = 'CentOS 7 HVM base (64bit)'
-
-
-class VersionlessRhelBasedCloudStackVirtualMachine(
-    linux_vm.VersionlessRhelMixin, CentOs7BasedCloudStackVirtualMachine):
-  ALTERNATIVE_OS = CentOs7BasedCloudStackVirtualMachine.OS_TYPE

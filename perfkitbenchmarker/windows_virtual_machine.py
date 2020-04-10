@@ -694,17 +694,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       self.os_metadata['high_cpu_priority'] = [executable_name]
 
 
-class VersionlessWindowsMixin(BaseWindowsMixin,
-                              virtual_machine.DeprecatedOsMixin):
-  """Deprecated class with a versionless windows server version.
-
-  By convention it resolves to Windows 2012 Core.
-  """
-  OS_TYPE = os_types.WINDOWS
-  ALTERNATIVE_OS = os_types.WINDOWS2012_CORE
-  END_OF_LIFE = '2020-04-01'
-
-
 class Windows2012CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2012 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2012_CORE

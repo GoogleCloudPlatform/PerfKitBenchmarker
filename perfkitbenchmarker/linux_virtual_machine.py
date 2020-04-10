@@ -1494,13 +1494,6 @@ class AmazonLinux2Mixin(BaseRhelMixin):
   OS_TYPE = os_types.AMAZONLINUX2
 
 
-class VersionlessRhelMixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
-  """Class holding RHEL 7 specific VM methods and attributes."""
-  OS_TYPE = os_types.RHEL
-  END_OF_LIFE = '2020-04-01'
-  ALTERNATIVE_OS = os_types.RHEL7
-
-
 class Rhel7Mixin(BaseRhelMixin):
   """Class holding RHEL 7 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL7

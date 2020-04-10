@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
@@ -158,8 +157,3 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.remote_disk_counter += 1
         disks.append(data_disk)
       self._CreateScratchDiskFromDisks(disk_spec, disks)
-
-
-class VerionlessRhelBasedDigitalOceanVirtualMachine(
-    DigitalOceanVirtualMachine, linux_virtual_machine.VersionlessRhelMixin):
-  pass
