@@ -598,9 +598,16 @@ class GceFirewall(network.BaseFirewall):
     if vm.is_static:
       return
     with self._lock:
-      firewall_name = ('perfkit-firewall-icmp-%s-%d-%d' %
-                       (FLAGS.run_uri, -1, -1))
-      key = (vm.project, -1, -1)
+      if vm.cidr:  # Allow multiple networks per zone.
+        cidr_string = network.BaseNetwork.FormatCidrString(vm.cidr)
+        firewall_name = ('perfkit-firewall-icmp-%s-%s' %
+                         (cidr_string, FLAGS.run_uri))
+        key = (vm.project, vm.cidr)
+      else:
+        firewall_name = ('perfkit-firewall-icmp-%s' %
+                         (FLAGS.run_uri))
+        key = (vm.project)
+
       if key in self.firewall_icmp_rules:
         return
 
