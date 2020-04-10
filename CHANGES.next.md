@@ -90,3 +90,9 @@
 -   Change default ior script to use 1GB sizes rather than 4GB.
 -   Remove nfs_gce_ip_range from filestore options.
 -   Upgrade YCSB to version 0.17.0.
+-   Do not pass a default `--boot-disk-size` or `--boot-disk-type` to GCE.
+    -   This allows GCE to set the preferred options for both.
+    -   Fixes an issue where CentOS and RHEL images grew beyond the default 10GB
+        (to 20GB).
+    -   The current defaults leave other Linux OSes at 10GB and Windows OSes at
+        50GB.

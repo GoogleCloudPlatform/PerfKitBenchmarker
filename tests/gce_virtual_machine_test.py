@@ -62,7 +62,8 @@ _FAKE_DISK_METADATA = {
     'kind': 'compute#disk',
     'name': 'fakedisk',
     'sizeGb': '10',
-    'sourceImage': ''
+    'sourceImage': '',
+    'type': 'pd-standard'
 }
 
 
@@ -282,11 +283,15 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn(
           '--image-family ubuntu-1604-lts --image-project ubuntu-os-cloud',
           command_string)
+      self.assertNotIn('--boot-disk-size', command_string)
+      self.assertNotIn('--boot-disk-type', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       self.assertDictContainsSubset({'image': fake_image,
                                      'image_family': 'ubuntu-1604-lts',
-                                     'image_project': 'ubuntu-os-cloud'},
+                                     'image_project': 'ubuntu-os-cloud',
+                                     'boot_disk_size': '10',
+                                     'boot_disk_type': 'pd-standard'},
                                     vm.GetResourceMetadata())
 
   def testCreateUbuntuInCustomProject(self):
@@ -312,10 +317,42 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
           command_string)
       self.assertNotIn('--image-family', command_string)
       vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 2)
+      self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
       self.assertDictContainsSubset({'image': fake_image,
                                      'image_project': 'fake-project'},
+                                    vm_metadata)
+      self.assertNotIn('image_family', vm_metadata)
+
+  def testCreateUbuntuInCustomDisk(self):
+    """Test simulating passing --image and --image_project."""
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
+    fake_image = 'fake-ubuntu1604'
+    fake_image_project = 'fake-project'
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                         machine_type='fake-machine-type',
+                                         image=fake_image,
+                                         image_project=fake_image_project,
+                                         boot_disk_size=20,
+                                         boot_disk_type='fake-disk-type')
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
+      vm = vm_class(spec)
+      vm._Create()
+      vm.created = True
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn('--boot-disk-size 20', command_string)
+      self.assertIn('--boot-disk-type fake-disk-type', command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 2)
+      vm_metadata = vm.GetResourceMetadata()
+      self.assertDictContainsSubset({'image': fake_image,
+                                     'image_project': 'fake-project',
+                                     'boot_disk_size': 20,
+                                     'boot_disk_type': 'fake-disk-type'},
                                     vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
 
@@ -347,7 +384,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
                                          image=fake_image)
-    with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(spec)
       vm._Create()
       vm.created = True
@@ -358,7 +396,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--image ' + fake_image, command_string)
       self.assertIn('--image-project rhel-cloud', command_string)
       vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 2)
+      self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
       self.assertDictContainsSubset({'image': fake_image,
                                      'image_project': 'rhel-cloud'},
@@ -371,7 +409,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
                                          image=fake_image)
-    with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(spec)
       vm._Create()
       vm.created = True
@@ -382,7 +421,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--image ' + fake_image, command_string)
       self.assertIn('--image-project centos-cloud', command_string)
       vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 2)
+      self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
       self.assertDictContainsSubset({'image': fake_image,
                                      'image_project': 'centos-cloud'},

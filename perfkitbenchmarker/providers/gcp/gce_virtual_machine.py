@@ -324,13 +324,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
   CLOUD = providers.GCP
+
   # Subclasses should override the default image OR
   # both the image family and image_project.
   DEFAULT_IMAGE = None
   DEFAULT_IMAGE_FAMILY = None
   DEFAULT_IMAGE_PROJECT = None
-  BOOT_DISK_SIZE_GB = 10
-  BOOT_DISK_TYPE = gce_disk.PD_STANDARD
+
+  # Subclasses may override these, but are recommended to leave them up to GCE.
+  BOOT_DISK_SIZE_GB = None
+  BOOT_DISK_TYPE = None
 
   NVME_START_INDEX = 1
 
@@ -415,8 +418,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
     cmd.flags['boot-disk-auto-delete'] = True
-    cmd.flags['boot-disk-size'] = self.boot_disk_size
-    cmd.flags['boot-disk-type'] = self.boot_disk_type
+    if self.boot_disk_size:
+      cmd.flags['boot-disk-size'] = self.boot_disk_size
+    if self.boot_disk_type:
+      cmd.flags['boot-disk-type'] = self.boot_disk_type
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
@@ -593,13 +598,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, _, _ = getinstance_cmd.Issue()
       response = json.loads(stdout)
       self._ParseDescribeResponse(response)
-    if not self.image:
+    if not all((self.image, self.boot_disk_size, self.boot_disk_type)):
       getdisk_cmd = util.GcloudCommand(
           self, 'compute', 'disks', 'describe', self.name)
       stdout, _, _ = getdisk_cmd.Issue()
       response = json.loads(stdout)
-      self.image = response['sourceImage'].split('/')[-1]
-      self.backfill_image = True
+      if not self.image:
+        self.image = response['sourceImage'].split('/')[-1]
+        self.backfill_image = True
+      if not self.boot_disk_size:
+        self.boot_disk_size = response['sizeGb']
+      if not self.boot_disk_type:
+        self.boot_disk_type = response['type'].split('/')[-1]
 
   def _Delete(self):
     """Delete a GCE VM instance."""
@@ -860,7 +870,6 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
   """Class supporting Windows GCE virtual machines."""
 
   DEFAULT_IMAGE_PROJECT = 'windows-cloud'
-  BOOT_DISK_SIZE_GB = 50
 
   NVME_START_INDEX = 0
 
