@@ -71,11 +71,16 @@ class AwsFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
     """
     source = '0.0.0.0/0'
-    # type, code, region, group_id, cidr
-    entry = (-1, -1, vm.region, vm.group_id, source)
+
+    # region, group_id, source
+    entry = (vm.region, vm.group_id, source)
     with self._lock:
       if entry in self.firewall_icmp_set:
         return
+      # When defining ICMP firewall rules using the aws cli,
+      # port specifies the type of ICMP traffic allowed,
+      # with -1 meaning all ICMP types
+      # https://docs.aws.amazon.com/cli/latest/reference/ec2/authorize-security-group-ingress.html
       authorize_cmd = util.AWS_PREFIX + [
           'ec2',
           'authorize-security-group-ingress',
