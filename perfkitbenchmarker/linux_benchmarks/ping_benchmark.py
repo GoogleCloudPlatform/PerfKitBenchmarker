@@ -114,7 +114,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
     logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
-  logging.info('Ping results (ip_type = %s):' % ip_type)
+  logging.info('Ping results (ip_type = %s):', ip_type)
   ping_cmd = 'ping -c 100 %s' % receiving_ip
   stdout, _ = sending_vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
