@@ -543,6 +543,7 @@ class GceFirewall(network.BaseFirewall):
     """Initialize GCE firewall class."""
     self._lock = threading.Lock()
     self.firewall_rules = {}
+    self.firewall_icmp_rules = {}
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
@@ -585,6 +586,8 @@ class GceFirewall(network.BaseFirewall):
     """Closes all ports on the firewall."""
     for firewall_rule in six.itervalues(self.firewall_rules):
       firewall_rule.Delete()
+    for firewall_rule in six.itervalues(self.firewall_icmp_rules):
+      firewall_rule.Delete()
 
   def AllowIcmp(self, vm):
     """Opens the ICMP protocol on the firewall.
@@ -595,19 +598,17 @@ class GceFirewall(network.BaseFirewall):
     if vm.is_static:
       return
     with self._lock:
-      firewall_name = ('perfkit-firewall-%s-%d-%d' %
+      firewall_name = ('perfkit-firewall-icmp-%s-%d-%d' %
                        (FLAGS.run_uri, -1, -1))
-
       key = (vm.project, -1, -1)
-      if key in self.firewall_rules:
+      if key in self.firewall_icmp_rules:
         return
 
       allow = 'ICMP'
-
       firewall_rule = GceFirewallRule(
           firewall_name, vm.project, allow,
           vm.network.network_resource.name)
-      self.firewall_rules[key] = firewall_rule
+      self.firewall_icmp_rules[key] = firewall_rule
       firewall_rule.Create()
 
 

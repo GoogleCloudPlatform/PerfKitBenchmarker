@@ -62,6 +62,7 @@ class AwsFirewall(network.BaseFirewall):
 
   def __init__(self):
     self.firewall_set = set()
+    self.firewall_icmp_set = set()
     self._lock = threading.Lock()
 
   def AllowIcmp(self, vm):
@@ -70,9 +71,10 @@ class AwsFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
     """
     source = '0.0.0.0/0'
+    # type, code, region, group_id, cidr
     entry = (-1, -1, vm.region, vm.group_id, source)
     with self._lock:
-      if entry in self.firewall_set:
+      if entry in self.firewall_icmp_set:
         return
       authorize_cmd = util.AWS_PREFIX + [
           'ec2',
@@ -84,7 +86,7 @@ class AwsFirewall(network.BaseFirewall):
           '--cidr=%s' % source]
       util.IssueRetryableCommand(
           authorize_cmd)
-      self.firewall_set.add(entry)
+      self.firewall_icmp_set.add(entry)
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
