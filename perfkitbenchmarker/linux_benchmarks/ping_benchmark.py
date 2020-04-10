@@ -22,6 +22,7 @@ import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 import re
 
 flags.DEFINE_boolean('ping_also_run_using_external_ip', False,
@@ -79,16 +80,19 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   results = []
   for sending_vm, receiving_vm in vms, reversed(vms):
+    ip_type = vm_util.IpAddressSubset.INTERNAL
     results = results + _RunPing(sending_vm,
                                  receiving_vm,
                                  receiving_vm.internal_ip,
-                                 'internal')
+                                 ip_type)
+
   if FLAGS.ping_also_run_using_external_ip:
     for sending_vm, receiving_vm in vms, reversed(vms):
+      ip_type = vm_util.IpAddressSubset.EXTERNAL
       results = results + _RunPing(sending_vm,
                                    receiving_vm,
                                    receiving_vm.ip_address,
-                                   'external')
+                                   ip_type)
   return results
 
 
@@ -103,11 +107,11 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
   Returns:
     A list of samples, with one sample for each metric.
   """
-  if ip_type == 'internal' and not sending_vm.IsReachable(receiving_vm):
+  if ip_type == vm_util.IpAddressSubset.INTERNAL and not sending_vm.IsReachable(receiving_vm):
     logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
-  logging.info('Ping results (ip_type = %s):', ip_type)
+  logging.info('Ping results (ip_type = %s):' % ip_type)
   ping_cmd = 'ping -c 100 %s' % receiving_ip
   stdout, _ = sending_vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
