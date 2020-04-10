@@ -43,7 +43,7 @@ flags.DEFINE_string(
     'aws_subnet', None,
     'The static AWS subnet id to use.  Default creates a new one')
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
-flags.DEFINE_string('aws_efa_version', '1.7.0',
+flags.DEFINE_string('aws_efa_version', '1.8.3',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
 flags.DEFINE_multi_enum('aws_endpoint', [], ['s3'],
                         'List of AWS endpoints to create')
