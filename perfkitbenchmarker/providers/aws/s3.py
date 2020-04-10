@@ -28,10 +28,10 @@ FLAGS = flags.FLAGS
 AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
 
-# S3 endpoints for a given region can be formed by prefixing the region with
-# 's3.' and suffixing it with '.amazonaws.com'.
-AWS_S3_ENDPOINT_PREFIX = 's3.'
-AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
+# S3 access point hostnames for a given region can be formed by following the
+# `AccessPointName-AccountId` with '.s3-accesspoint.', followed by the region,
+# and suffixed with '.amazonaws.com'.
+AWS_S3_ARN_FORMAT_STRING = '%s.s3-accesspoint.%s.amazonaws.com'
 
 
 class S3Service(object_storage_service.ObjectStorageService):
@@ -118,7 +118,7 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   def PrepareVM(self, vm):
     vm.Install('awscli')
-    vm.Install('boto')
+    vm.Install('boto3')
 
     vm.PushFile(
         object_storage_service.FindCredentialFile('~/' +
@@ -139,16 +139,20 @@ class S3Service(object_storage_service.ObjectStorageService):
         'time aws s3 sync s3://%s/ %s' % (bucket, dest))
 
   def Metadata(self, vm):
-    return {object_storage_service.BOTO_LIB_VERSION:
-            linux_packages.GetPipPackageVersion(vm, 'boto')}
+    return {
+        object_storage_service.BOTO_LIB_VERSION:
+            linux_packages.GetPipPackageVersion(vm, 'boto3')
+    }
 
   def APIScriptArgs(self):
-    if FLAGS.s3_custom_endpoint:
-      return ['--host=' + FLAGS.s3_custom_endpoint]
+    if FLAGS.s3_access_point_name:
+      return [
+          '--access_point_hostname=' + AWS_S3_ARN_FORMAT_STRING %
+          (FLAGS.s3_access_point_name, self.region), '--region=' + self.region
+      ]
     else:
-      return ['--host=%s%s%s' % (AWS_S3_ENDPOINT_PREFIX, self.region,
-                                 AWS_S3_ENDPOINT_SUFFIX)]
+      return ['--region=' + self.region]
 
   @classmethod
   def APIScriptFiles(cls):
-    return ['boto_service.py', 's3.py']
+    return ['s3.py']

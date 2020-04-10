@@ -32,10 +32,11 @@ flags.DEFINE_string('aws_emr_loguri', None,
 flags.DEFINE_integer('aws_emr_job_wait_time', 18000,
                      'The time to wait for an EMR job to finish, in seconds')
 
-flags.DEFINE_string('s3_custom_endpoint', None,
-                    'If given, a custom endpoint to use for S3 transfers. If '
-                    'this flag is not given, use the standard endpoint for the '
-                    'storage region.')
+flags.DEFINE_string(
+    's3_access_point_name', None,
+    'If given, an access point to use for S3 transfers in place of bucket '
+    'names. This flag represents the *AccessPointName-AccountId* part '
+    'of "*AccessPointName-AccountId*.s3-accesspoint.*Region*.amazonaws.com".')
 flags.DEFINE_boolean('aws_spot_instances', False,
                      'Whether to use AWS spot instances for any AWS VMs.')
 flags.DEFINE_float('aws_spot_price', None,

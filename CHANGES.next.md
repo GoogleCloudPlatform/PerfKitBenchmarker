@@ -50,6 +50,7 @@
 -   Adds support for running network benchmarks across a VPN.
     -   Includes GCP implementation with static routes.
 -   Add a directory for PKB tutorials.
+-   Update Boto client library for S3 to boto3.
 
 ### Enhancements:
 

@@ -19,27 +19,46 @@ import time
 
 from absl import flags
 
-import boto_service
+import boto3
+
+import object_storage_interface
 
 FLAGS = flags.FLAGS
 
 
-class S3Service(boto_service.BotoService):
+class S3Service(object_storage_interface.ObjectStorageServiceBase):
+  """An interface to AWS S3, using the boto library."""
 
   def __init__(self):
-    if FLAGS.host is not None:
-      logging.info('Will use user-specified host endpoint: %s', FLAGS.host)
-    super(S3Service, self).__init__('s3', host_to_connect=FLAGS.host)
+    self.client = boto3.client('s3', region_name=FLAGS.region)
 
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
-    stream.seek(0)
+  def ListObjects(self, bucket, prefix):
+    bucket_name = FLAGS.access_point_hostname or bucket
+    return self.client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+    bucket_name = FLAGS.access_point_hostname or bucket
+    for object_name in objects_to_delete:
+      response = self.client.delete_object(Bucket=bucket_name, Key=object_name)
+      if response['ResponseMetadata']['DeleteMarker']:
+        if objects_deleted is not None:
+          objects_deleted.append(object_name)
+      else:
+        logging.exception(
+            'Encountered error while deleting object %s. '
+            'Response metadata: %s', object_name, response)
+
+  def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
     start_time = time.time()
-    object_uri = self._StorageURI(bucket, object)
-    # We need to access the raw key object so we can set its storage
-    # class
-    key = object_uri.new_key()
-    if FLAGS.object_storage_class is not None:
-      key._set_storage_class(FLAGS.object_storage_class)
-    key.set_contents_from_file(stream, size=size)
+    bucket_name = FLAGS.access_point_hostname or bucket
+    stream.seek(0)
+    self.client.upload_fileobj(stream, bucket_name, object_name)
+    latency = time.time() - start_time
+    return start_time, latency
+
+  def ReadObject(self, bucket, object_name):
+    start_time = time.time()
+    bucket_name = FLAGS.access_point_hostname or bucket
+    self.client.get_object(Bucket=bucket_name, Key=object_name)
     latency = time.time() - start_time
     return start_time, latency
