@@ -103,7 +103,9 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
     sending_vm: The VM issuing the ping request.
     receiving_vm: The VM receiving the ping.  Needed for metadata.
     receiving_ip: The IP address to be pinged.
-    ip_type: The type of 'receiving_ip' (either 'internal' or 'external')
+    ip_type: The type of 'receiving_ip',
+        (either 'vm_util.IpAddressSubset.INTERNAL 
+         or vm_util.IpAddressSubset.EXTERNAL')
   Returns:
     A list of samples, with one sample for each metric.
   """
