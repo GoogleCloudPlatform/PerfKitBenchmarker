@@ -12,53 +12,82 @@ script and the time the vms call back on the server. #}
   LINUX_PING=""
   WINDOWS_PING=""
 {% endif %}
+
+{% if cloud == 'GCP' %}
+  LINUX_START_UP_SCRIPT_PARAM="startup-script="
+  WINDOWS_START_UP_SCRIPT_PARAM="windows-startup-script-ps1="
+  WINDOWS_START_UP_SCRIPT_CLOSING_PARAM=""
+  DELETE_VM="{{ gcloud_path }} --quiet compute instances delete {{ boot_vm_name_prefix }}-$i --zone {{ zone }} --project {{ project }}
+/sbin/shutdown -hP now"
+{% elif cloud == 'AWS' %}
+  LINUX_START_UP_SCRIPT_PARAM=""
+  WINDOWS_START_UP_SCRIPT_PARAM="<powershell>"
+  WINDOWS_START_UP_SCRIPT_CLOSING_PARAM="</powershell>"
+  INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"
+  DELETE_VM="aws ec2 terminate-instances --region {{ region }} --instance-ids ${INSTANCE_ID}"
+{% endif %}
+
 export LINUX_SLEEP="# Sleep 10min before final cleanup and VM termination.
 sleep {{ timeout }}"
 export WINDOWS_SLEEP="# Sleep 10min before final cleanup and VM termination.
 Start-Sleep -Seconds {{ timeout }}"
-export GCP_DELETE_VM="{{ gcloud_path }} --quiet compute instances delete {{ boot_vm_name_prefix }}-$i --zone {{ zone }} --project {{ project }}
-/sbin/shutdown -hP now"
 
 {% if os_type == 'linux' %}
-  export START_UP_SCRIPT="startup-script=#! /bin/bash
+  export START_UP_SCRIPT="${LINUX_START_UP_SCRIPT_PARAM}#! /bin/bash
   ${LINUX_PING}
   ${LINUX_SLEEP}
-  ${GCP_DELETE_VM}"
+  ${DELETE_VM}"
 {% elif os_type == 'windows' %}
-  export START_UP_SCRIPT="windows-startup-script-ps1=
+  export START_UP_SCRIPT="${WINDOWS_START_UP_SCRIPT_PARAM}
   ${WINDOWS_PING}
   ${WINDOWS_SLEEP}
-  ${GCP_DELETE_VM}"
+  ${DELETE_VM}
+  ${WINDOWS_START_UP_SCRIPT_CLOSING_PARAM}"
 {% endif %}
-
-gcloud_args=(
---format json
---quiet
---async
---project {{ project }}
---scopes compute-rw
---network-interface no-address,network-tier=PREMIUM
---image-family {{ image_family }}
---image-project {{ image_project }}
---boot-disk-auto-delete
---boot-disk-size {{ boot_disk_size }}
---boot-disk-type pd-ssd
---machine-type {{ boot_machine_type }}
---tags perfkitbenchmarker
---no-restart-on-failure
---zone {{ zone }}
---metadata "${START_UP_SCRIPT}"
-)
 
 # Launcher VM record the system nanoseconds as start time.
 echo $(date +%s%N) > {{start_time_file}}
 
 # Launch some VMs
 {% if cloud == 'GCP' %}
-for i in {1..{{vm_count}}}; do
-{{ gcloud_path }} compute instances create {{ boot_vm_name_prefix }}-$i  \
-"${gcloud_args[@]}" &
-done
+  gcloud_args=(
+    --format json
+    --quiet
+    --async
+    --project {{ project }}
+    --scopes compute-rw
+    --network-interface no-address,network-tier=PREMIUM
+    --image-family {{ image_family }}
+    --image-project {{ image_project }}
+    --boot-disk-auto-delete
+    --boot-disk-size {{ boot_disk_size }}
+    --boot-disk-type pd-ssd
+    --machine-type {{ boot_machine_type }}
+    --tags perfkitbenchmarker
+    --no-restart-on-failure
+    --zone {{ zone }}
+    --metadata "${START_UP_SCRIPT}"
+  )
+  for i in {1..{{vm_count}}}; do
+    {{ gcloud_path }} compute instances create {{ boot_vm_name_prefix }}-$i  \
+    "${gcloud_args[@]}" &
+  done
+{% elif cloud == 'AWS' %}
+  aws_args=(
+    --output text
+    --region {{ region }}
+    --subnet-id {{ subnet_id }}
+    --image-id {{ image }}
+    --key-name {{ key_name }}
+    --instance-type {{ boot_machine_type }}
+    --no-associate-public-ip-address
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=launcher_id,Value={{launcher_vm_name}}}]'
+    --placement AvailabilityZone={{ zone }},GroupName={{ group_name }}
+    --user-data "${START_UP_SCRIPT}"
+    --count {{vm_count}}
+  )
+  aws ec2 run-instances "${aws_args[@]}" &
 {% endif %}
 
 wait
+echo [completed]

@@ -9,4 +9,12 @@ for i in {1..{{vm_count}}}; do
 --zone {{ zone }}  \
 --project {{ project }} &
 done
+{% elif cloud == 'AWS' %}
+INSTANCES="`aws ec2 describe-instances --region {{ region }}  \
+  --filter Name=tag:launcher_id,Values={{ launcher_vm_name }}  \
+  --query "Reservations[*].Instances[*].{Instance:InstanceId}"  \
+  --output text`"
+for i in ${INSTANCES}; do
+aws ec2 terminate-instances --region {{ region }} --instance-ids "${i}"
+done
 {% endif %}

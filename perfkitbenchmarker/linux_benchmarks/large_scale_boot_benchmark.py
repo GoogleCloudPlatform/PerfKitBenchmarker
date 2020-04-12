@@ -44,6 +44,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 
+from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
@@ -60,6 +61,9 @@ large_scale_boot:
           machine_type: n1-standard-2
           zone: us-central1-a
           boot_disk_type: pd-ssd
+        AWS:
+          machine_type: m5.large
+          zone: us-east-1
       vm_count: 1
       os_type: debian9
     clients:
@@ -67,6 +71,8 @@ large_scale_boot:
         GCP:
           machine_type: n1-standard-2
           boot_disk_type: pd-ssd
+        AWS:
+          machine_type: m5.large
       os_type: debian9
       vm_count: 1
 """
@@ -91,6 +97,8 @@ flags.DEFINE_boolean('vms_contact_launcher', True, 'Whether launched vms '
                      'attempt to contact the launcher before launcher attempts '
                      'to connect to them. Default to True.')
 
+# Tag for undefined hostname, should be synced with listener_server.py script.
+UNDEFINED_HOSTNAME = 'UNDEFINED'
 # remote tmp directory used for this benchmark.
 _REMOTE_DIR = vm_util.VM_TMP_DIR
 # boot script to use on the launcher server vms.
@@ -139,15 +147,22 @@ _RDP_PORT = windows_virtual_machine.RDP_PORT
 
 
 def _GetServerStartCommand(client_port, launcher_vm):
-  # command to start the listener server
-  vms_name_pattern = '{name_pattern}-VM_ID.{zone}.c.{project}.internal'.format(
-      name_pattern=_BOOT_VM_NAME_PREFIX.format(
-          launcher_name=launcher_vm.name),
-      zone=launcher_vm.zone,
-      project=FLAGS.project)
+  """Returns the command to start the listener server."""
+  cloud = FLAGS.cloud
+  if cloud == 'GCP':
+    vms_name_pattern = '{name_pattern}-VM_ID.{zone}.c.{project}.internal'.format(
+        name_pattern=_BOOT_VM_NAME_PREFIX.format(
+            launcher_name=launcher_vm.name),
+        zone=launcher_vm.zone,
+        project=FLAGS.project)
+  elif cloud == 'AWS':
+    # AWS do not have a defined vm name pattern till after vm is launched.
+    vms_name_pattern = UNDEFINED_HOSTNAME
   return (
-      'python3 {server_path} {port} {results_path} {client_port} {use_server} '
-      '{vms_name_pattern} {vms_count} > {server_log} 2>&1 &'.format(
+      'python3 {server_path} {server_name} {port} {results_path} {client_port} '
+      '{use_server} {vms_name_pattern} {vms_count} > {server_log} 2>&1 &'
+      .format(
+          server_name=launcher_vm.name,
           server_path=posixpath.join(
               _REMOTE_DIR, _LISTENER_SERVER.split('/')[-1]),
           port=_PORT,
@@ -177,9 +192,9 @@ def CheckPrerequisites(_):
   data.ResourcePath(_BOOT_TEMPLATE)
   data.ResourcePath(_LISTENER_SERVER)
   data.ResourcePath(_CLEAN_UP_TEMPLATE)
-  if FLAGS.cloud != 'GCP':
+  if FLAGS.cloud == 'Azure':
     raise errors.Benchmarks.PrepareException(
-        'Booting VMs on non-GCP clouds is not yet supported.')
+        'Booting VMs on Azure is not yet supported.')
 
 
 def GetConfig(user_config):
@@ -215,30 +230,44 @@ def GetConfig(user_config):
 
 def _BuildContext(launcher_vm, booter_template_vm):
   """Returns the context variables for Jinja2 template during rendering."""
-  return {
-      'os_type': 'linux' if _IsLinux() else 'windows',
-      'contact_launcher': FLAGS.vms_contact_launcher,
-      'cloud': FLAGS.cloud,
-      'start_time_file': _START_TIME_FILE_PATH,
-      'vm_count': FLAGS.boots_per_launcher,
-      'launcher_vm_name': launcher_vm.name,
-      'boot_vm_name_prefix': _BOOT_VM_NAME_PREFIX.format(
-          launcher_name=launcher_vm.name),
-      'project': FLAGS.project,
-      'image_family': booter_template_vm.image_family,
-      'image_project': booter_template_vm.image_project,
-      'boot_disk_size': booter_template_vm.boot_disk_size,
+  context = {
       'boot_machine_type': booter_template_vm.machine_type,
+      'cloud': FLAGS.cloud,
+      'contact_launcher': FLAGS.vms_contact_launcher,
+      'launcher_vm_name': launcher_vm.name,
+      'os_type': 'linux' if _IsLinux() else 'windows',
       'server_ip': launcher_vm.internal_ip,
       'server_port': _PORT,
+      'start_time_file': _START_TIME_FILE_PATH,
       'timeout': _TIMEOUT_SECONDS,
+      'vm_count': FLAGS.boots_per_launcher,
       'zone': launcher_vm.zone,
-      'gcloud_path': FLAGS.gcloud_path,
   }
+  cloud = FLAGS.cloud
+  if cloud == 'GCP':
+    context.update({
+        'boot_disk_size': booter_template_vm.boot_disk_size,
+        'boot_vm_name_prefix': _BOOT_VM_NAME_PREFIX.format(
+            launcher_name=launcher_vm.name),
+        'image_family': booter_template_vm.image_family,
+        'image_project': booter_template_vm.image_project,
+        'gcloud_path': FLAGS.gcloud_path,
+        'project': FLAGS.project,
+    })
+  elif cloud == 'AWS':
+    context.update({
+        'group_name': booter_template_vm.placement_group.name,
+        'image': booter_template_vm.image,
+        'key_name': 'perfkit-key-{0}'.format(FLAGS.run_uri),
+        'region': aws_util.GetRegionFromZone(launcher_vm.zone),
+        'subnet_id': booter_template_vm.network.subnet.id,
+    })
+  return context
 
 
 def _Install(launcher_vm, booter_template_vm):
   """Installs benchmark scripts and packages on the launcher vm."""
+  launcher_vm.InstallCli()
   # Render boot script on launcher server VM(s)
   context = _BuildContext(launcher_vm, booter_template_vm)
   launcher_vm.RenderTemplate(data.ResourcePath(_BOOT_TEMPLATE), _BOOT_PATH,

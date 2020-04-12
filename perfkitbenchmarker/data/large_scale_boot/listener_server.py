@@ -29,7 +29,7 @@ then record the system time in nanoseconds.
 import functools
 import logging
 import multiprocessing
-import socket
+import os
 import subprocess
 import sys
 import threading
@@ -43,6 +43,8 @@ MAX_TIME_SECONDS = 30
 MAX_TIME_SECONDS_NO_CALLING = 600
 # entry to stop processing from the timing queue
 _STOP_QUEUE_ENTRY = 'stop'
+# Tag for undefined hostname, should be synced with large_scale_boot_benchmark.
+UNDEFINED_HOSTNAME = 'UNDEFINED'
 
 
 def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
@@ -55,7 +57,8 @@ def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
     p = subprocess.Popen(netcat_command, shell=True, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     _, stderr = p.communicate()
-    if 'open' in stderr.decode('utf-8'):
+    # different versions of netcat uses different stderr strings.
+    if any(word in stderr.decode('utf-8') for word in ['open', 'succeeded']):
       # return the system time in nanoseconds
       return 'Pass:%s:%d' % (client_host, time.time() * 1e9)
 
@@ -82,12 +85,48 @@ def WriteResultsToFile(results_path, queue):
       writer.flush()
 
 
-def ActAsClient(pool, queue, port, name_constructor, vms_count):
+def BuildHostNames(name_pattern, count):
+  # Some clouds do not assign hostname during create.
+  # Therefore we pull vm name from boot logs.
+  if name_pattern == UNDEFINED_HOSTNAME:
+    return WaitForHostNames()
+  else:
+    return [name_pattern.replace('VM_ID', str(vm_id))
+            for vm_id in range(1, count + 1)]
+
+
+def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
+  """Wait for boot logs to complete and grep the newly created ips.
+
+  After boot_script.sh completes, it will print out [completed].
+  In the boot_script.sh output, it will print out the private ips of format:
+    PRIVATEIPADDRESSES True ip-10-0-0-143.ec2.internal 10.0.0.143
+
+  Args:
+    timeout: Amount of time in seconds to wait for boot.
+  Returns:
+    hosts to netcat.
+  """
+  start_time = time.time()
+  while time.time() <= (start_time + timeout):
+    if os.system('grep completed log') != 0:
+      time.sleep(1)
+      continue
+    with open('log', 'r') as f:
+      hostnames = []
+      for line in f:
+        if 'PRIVATEIPADDRESSES' in line:
+          hostnames.append(line.split()[2])
+    return hostnames
+  raise ValueError('Boot did not complete successfully before timeout of %s '
+                   'seconds.' % MAX_TIME_SECONDS_NO_CALLING)
+
+
+def ActAsClient(pool, queue, port, name_pattern, vms_count):
   """Use as a client."""
   store_results = functools.partial(StoreResult, queue=queue)
   all_jobs = []
-  for vm_id in range(1, vms_count + 1):
-    host_name = name_constructor(str(vm_id), 1)
+  for host_name in BuildHostNames(name_pattern, vms_count):
     job = pool.apply_async(
         ConfirmIPAccessible,
         args=(host_name, port, MAX_TIME_SECONDS_NO_CALLING,),
@@ -163,21 +202,23 @@ class RequestHandler(server.BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
-  if len(sys.argv) != 7:
+  if len(sys.argv) != 8:
     raise ValueError('Got unexpected number of command-line arguments. '
-                     'There should be at most 6 command-line arguments, first '
-                     'being the server port, second being the results file '
-                     'path, third being the port to access the boot VMs, '
-                     'forth being whether to use the listening server, fifth '
-                     'being the launched vm naming pattern and sixth being the '
-                     'number of launched vms.')
-  server_address = ('', int(sys.argv[1]))
-  results_file_path = sys.argv[2]
-  clients_port = sys.argv[3]
-  use_listening_server = sys.argv[4] == 'True'
-  vms_name_constructor = functools.partial(sys.argv[5].replace, 'VM_ID')
-  num_vms = int(sys.argv[6])
-  hostname = socket.gethostname()
+                     'There should be at most 7 command-line arguments: '
+                     '1. name of the server vm, '
+                     '2. server port, '
+                     '3. results file, '
+                     '4. port to access the boot VMs, '
+                     '5. whether to use the listening server, '
+                     '6. launched vm naming pattern, '
+                     '7. number of launched vms.')
+  hostname = sys.argv[1]
+  server_address = ('', int(sys.argv[2]))
+  results_file_path = sys.argv[3]
+  clients_port = sys.argv[4]
+  use_listening_server = sys.argv[5] == 'True'
+  vms_name_pattern = sys.argv[6]
+  num_vms = int(sys.argv[7])
   process_pool = multiprocessing.Pool()
   multiprocessing_manager = multiprocessing.Manager()
   timing_queue = multiprocessing_manager.Queue()
@@ -192,4 +233,4 @@ if __name__ == '__main__':
   # The start the server to listen and put results on queue.
   else:
     ActAsClient(process_pool, timing_queue, clients_port,
-                vms_name_constructor, num_vms)
+                vms_name_pattern, num_vms)
