@@ -726,7 +726,7 @@ class AzureVirtualMachine(
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.os_disk.disk_type
-    result['boot_disk_size'] = self.os_disk.disk_size or 'default'
+    result['boot_disk_size'] = self.os_disk.disk_size
     if self.network.placement_group:
       result['placement_group_strategy'] = self.network.placement_group.strategy
     else:
