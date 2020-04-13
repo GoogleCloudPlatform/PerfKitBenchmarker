@@ -16,8 +16,4 @@
 
 from absl import flags
 
-flags.DEFINE_string(
-    'access_point_hostname', None,
-    'If given, an access point hostname to use for S3 transfers in place of '
-    'bucket names.')
-flags.DEFINE_string('region', None, 'The S3 region to use.')
+flags.DEFINE_string('host', None, 'The hostname of the storage endpoint.')
