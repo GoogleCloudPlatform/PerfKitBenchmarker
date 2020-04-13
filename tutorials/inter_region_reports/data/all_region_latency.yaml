@@ -1,0 +1,15 @@
+# ping benchmark for latency.
+ping:
+  flag_matrix: inter_region
+  flag_matrix_filters:
+    inter_region: "zones < extra_zones"
+  flag_matrix_defs:
+    inter_region:
+      gce_network_tier: [premium]
+      zones: [asia-east1-a,asia-east2-a,asia-northeast1-a,asia-northeast2-a,asia-south1-a,asia-southeast1-a,australia-southeast1-a,europe-north1-a,europe-west1-c,europe-west2-a,europe-west3-a,europe-west4-a,europe-west6-a,northamerica-northeast1-a,southamerica-east1-a,us-central1-a,us-east1-b,us-east4-a,us-west1-a,us-west2-a]
+      extra_zones: [asia-east1-a,asia-east2-a,asia-northeast1-a,asia-northeast2-a,asia-south1-a,asia-southeast1-a,australia-southeast1-a,europe-north1-a,europe-west1-c,europe-west2-a,europe-west3-a,europe-west4-a,europe-west6-a,northamerica-northeast1-a,southamerica-east1-a,us-central1-a,us-east1-b,us-east4-a,us-west1-a,us-west2-a]
+      machine_type: [n1-standard-2]
+      gcp_min_cpu_platform: [skylake]
+  flags:
+    cloud: GCP
+    ping_also_run_using_external_ip: True

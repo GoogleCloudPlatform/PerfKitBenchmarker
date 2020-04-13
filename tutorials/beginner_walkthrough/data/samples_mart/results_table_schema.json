@@ -1,0 +1,72 @@
+[
+  {
+    "name": "test",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "test_version",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "official",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "product_name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "product_version",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "owner",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "labels",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "metric",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "value",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "unit",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "timestamp",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "sample_uri",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "run_uri",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "log_uri",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  }
+]
