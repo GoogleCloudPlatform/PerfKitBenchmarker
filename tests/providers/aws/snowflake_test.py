@@ -16,7 +16,7 @@
 import copy
 import unittest
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import snowflake
 from tests import pkb_common_test_case

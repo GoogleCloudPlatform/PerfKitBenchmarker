@@ -7,10 +7,10 @@ from __future__ import print_function
 import datetime
 import unittest
 
-from freezegun import freeze_time
+from absl import flags
+import freezegun
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_capacity_reservation
 from perfkitbenchmarker.providers.aws import util
@@ -67,7 +67,7 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
         util.__name__ + '.GetZonesInRegion',
         return_val=['us-west-1a', 'us-west-1b'])
 
-  @freeze_time(FAKE_DATETIME_NOW)
+  @freezegun.freeze_time(FAKE_DATETIME_NOW)
   def test_create(self):
     vm_group = [FakeAwsVirtualMachine()]
     capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(

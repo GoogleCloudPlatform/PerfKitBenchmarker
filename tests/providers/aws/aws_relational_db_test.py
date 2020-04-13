@@ -17,11 +17,9 @@ import contextlib
 import json
 import os
 import unittest
+from absl import flags
 import mock
 
-from mock import patch, Mock
-
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -65,7 +63,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
 
   def setUp(self):
     flag_values = {'run_uri': '123', 'project': None}
-    p = patch(aws_relational_db.__name__ + '.FLAGS')
+    p = mock.patch(aws_relational_db.__name__ + '.FLAGS')
     flags_mock = p.start()
     flags_mock.configure_mock(**flag_values)
     FLAGS['use_managed_db'].parse(True)
@@ -75,11 +73,11 @@ class AwsRelationalDbTestCase(unittest.TestCase):
   def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
     """A context manager that patches a few critical objects with mocks."""
     retval = (stdout, stderr, return_code)
-    with patch(
+    with mock.patch(
         vm_util.__name__ + '.IssueCommand',
-        return_value=retval) as issue_command, patch(
-            builtins.__name__ + '.open'), patch(vm_util.__name__ +
-                                                '.NamedTemporaryFile'):
+        return_value=retval) as issue_command, mock.patch(
+            builtins.__name__ + '.open'), mock.patch(vm_util.__name__ +
+                                                     '.NamedTemporaryFile'):
       yield issue_command
 
   def VmGroupSpec(self):
@@ -137,7 +135,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = Mock(spec=benchmark_config_spec._RelationalDbSpec)
+    mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
@@ -212,7 +210,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = Mock(spec=benchmark_config_spec._RelationalDbSpec)
+    mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 

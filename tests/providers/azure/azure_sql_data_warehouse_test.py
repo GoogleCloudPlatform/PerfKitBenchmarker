@@ -14,9 +14,8 @@
 """Tests for perfkitbenchmarker.providers.azure.azure_sql_data_warehouse."""
 import copy
 import unittest
-
+from absl import flags
 import mock
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.azure import azure_sql_data_warehouse
