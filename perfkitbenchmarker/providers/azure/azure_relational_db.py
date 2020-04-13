@@ -111,7 +111,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     elif engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
     elif engine == relational_db.SQLSERVER:
-      return DEFAULT_MYSQL_VERSION
+      return DEFALUT_SQLSERVER_VERSION
     else:
       raise relational_db.RelationalDbEngineNotFoundException(
           'Unsupported engine {0}'.format(engine))
@@ -186,7 +186,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         raise Exception('Invalid MySQL flags: {0}.  Error {1}'.format(
             name_and_value, stderr))
 
-  def _CreateMySqlOrPostgresInstanceS(self):
+  def _CreateMySqlOrPostgresInstance(self):
     """Creates a managed MySql or Postgres instance."""
     if not self.spec.high_availability:
       raise Exception('Azure databases can only be used in high '

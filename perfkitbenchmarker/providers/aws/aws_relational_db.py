@@ -34,6 +34,7 @@ DEFAULT_POSTGRES_VERSION = '9.6.9'
 DEFAULT_MYSQL_AURORA_VERSION = '5.7.12'
 DEFAULT_MYSQL56_AURORA_VERSION = '5.6.10a'
 DEFAULT_POSTGRES_AURORA_VERSION = '9.6.9'
+DEFAULT_SQLSERVER_VERSION = '14.00.3223.3.v1'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
@@ -46,14 +47,26 @@ _MAP_ENGINE_TO_DEFAULT_VERSION = {
     relational_db.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
     relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
     relational_db.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
+    relational_db.SQLSERVER_EXPRESS: DEFAULT_SQLSERVER_VERSION,
+    relational_db.SQLSERVER_STANDARD: DEFAULT_SQLSERVER_VERSION,
+    relational_db.SQLSERVER_ENTERPRISE: DEFAULT_SQLSERVER_VERSION,
 }
 
-_AURORA_ENGINES = set([
+_AURORA_ENGINES = (
     relational_db.AURORA_MYSQL56, relational_db.AURORA_MYSQL,
-    relational_db.AURORA_POSTGRES
-])
+    relational_db.AURORA_POSTGRES)
 
-_RDS_ENGINES = set([relational_db.MYSQL, relational_db.POSTGRES])
+_SQL_SERVER_ENGINES = (
+    relational_db.SQLSERVER_EXPRESS,
+    relational_db.SQLSERVER_STANDARD,
+    relational_db.SQLSERVER_ENTERPRISE)
+
+_RDS_ENGINES = (
+    relational_db.MYSQL,
+    relational_db.POSTGRES,
+    relational_db.SQLSERVER_EXPRESS,
+    relational_db.SQLSERVER_STANDARD,
+    relational_db.SQLSERVER_ENTERPRISE)
 
 
 class AwsRelationalDbCrossRegionException(Exception):
@@ -304,6 +317,9 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
           '--vpc-security-group-ids=%s' % self.security_group_id,
           '--availability-zone=%s' % self.spec.db_spec.zone, '--tags'
       ] + util.MakeFormattedDefaultTags()
+
+      if self.spec.engine in _SQL_SERVER_ENGINES:
+        cmd = cmd + ['--license-model=license-included']
 
       if self.spec.db_disk_spec.disk_type == aws_disk.IO1:
         cmd.append('--iops=%s' % self.spec.db_disk_spec.iops)
