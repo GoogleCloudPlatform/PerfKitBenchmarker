@@ -1,0 +1,17 @@
+# iperf benchmark for throughput - simple 1:1 zone test.
+iperf:
+  flag_matrix: inter_region
+  flag_matrix_filters:
+    # For each zone:extra_zone pair where zone != extra_zone.
+    inter_region: "zones < extra_zones"
+  flag_matrix_defs:
+    inter_region:
+      gce_network_tier: [premium]
+      zones: [us-central1-a,us-east1-b]
+      extra_zones: [us-central1-a,us-east1-b]
+      machine_type: [n1-standard-2]
+      gcp_min_cpu_platform: [skylake]
+  flags:
+    cloud: GCP
+    iperf_runtime_in_seconds: 60
+    iperf_sending_thread_count: 1,4,32
