@@ -5,9 +5,9 @@ from __future__ import division
 from __future__ import print_function
 
 import unittest
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.azure import azure_disk
 from tests import pkb_common_test_case
 

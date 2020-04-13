@@ -14,8 +14,8 @@
 
 from collections import namedtuple
 import unittest
+from absl import flags
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import iperf3

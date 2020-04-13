@@ -14,9 +14,9 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_dpb_emr."""
 
 import unittest
-
+from absl import flags
 import mock
-from perfkitbenchmarker import flags
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.aws import s3

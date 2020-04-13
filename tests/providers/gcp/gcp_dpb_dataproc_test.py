@@ -14,9 +14,9 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_dpb_dataproc."""
 
 import unittest
-
+from absl import flags
 import mock
-from perfkitbenchmarker import flags
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
 from perfkitbenchmarker.providers.gcp import gcs

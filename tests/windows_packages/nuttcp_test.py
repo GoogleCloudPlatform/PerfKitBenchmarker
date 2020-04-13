@@ -14,7 +14,7 @@
 
 import collections
 import unittest
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import nuttcp

@@ -14,8 +14,8 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_vpc_endpoint."""
 
 import unittest
+from absl import flags
 import mock
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from tests import pkb_common_test_case
 

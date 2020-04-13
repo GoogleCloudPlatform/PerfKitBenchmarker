@@ -14,9 +14,9 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_disk."""
 
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.aws import aws_disk
 from tests import pkb_common_test_case
 

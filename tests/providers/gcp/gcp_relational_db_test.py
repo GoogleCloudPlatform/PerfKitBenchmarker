@@ -18,10 +18,10 @@ import contextlib
 import json
 import os
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util

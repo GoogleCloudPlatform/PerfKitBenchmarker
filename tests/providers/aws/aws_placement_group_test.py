@@ -8,11 +8,11 @@ from __future__ import print_function
 import json
 import unittest
 import uuid
+from absl import flags
 import mock
 
 from parameterized import parameterized
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util

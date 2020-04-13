@@ -18,12 +18,12 @@
 import os
 
 import unittest
+from absl import flags as flgs
 import contextlib2
 import mock
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network

@@ -16,9 +16,9 @@
 
 import os
 import unittest
+from absl import flags
 import parameterized
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import ntttcp

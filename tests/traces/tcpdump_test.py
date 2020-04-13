@@ -14,10 +14,10 @@
 """Tests for tcpdump utility."""
 
 import unittest
+from absl import flags
 from absl.testing import flagsaver
 import mock
 
-from perfkitbenchmarker import flags
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import tcpdump
 

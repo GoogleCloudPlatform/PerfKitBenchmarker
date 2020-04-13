@@ -15,10 +15,10 @@
 
 import contextlib
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_tpu

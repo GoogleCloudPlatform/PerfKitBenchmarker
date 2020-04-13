@@ -17,9 +17,9 @@
 
 import json
 import unittest
+from absl import flags as flgs
 import contextlib2
 import mock
-from perfkitbenchmarker import flags as flgs
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
