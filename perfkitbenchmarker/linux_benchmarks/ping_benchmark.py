@@ -120,7 +120,13 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
   assert len(stats) == len(METRICS), stats
   results = []
-  metadata = {'ip_type': ip_type,
+
+  if ip_type == vm_util.IpAddressSubset.INTERNAL:
+    ip_string = 'internal'
+  else:
+    ip_string = 'external'
+
+  metadata = {'ip_type': ip_string,
               'receiving_zone': receiving_vm.zone,
               'sending_zone': sending_vm.zone}
   for i, metric in enumerate(METRICS):
