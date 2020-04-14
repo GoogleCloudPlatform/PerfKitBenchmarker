@@ -229,8 +229,8 @@ def Prepare(benchmark_spec, vm=None):
 
     run_script = posixpath.join(run_path, 'run_and_time.sh')
     data_dir = data_dir.replace('/', r'\/')
-    checkpoint = FLAGS.mlperf_gcs_resnet_checkpoint.replace('/', r'\/'),
-    decode_dir = FLAGS.mlperf_transformer_decode_dir.replace('/', r'\/'),
+    checkpoint = FLAGS.mlperf_gcs_resnet_checkpoint.replace('/', r'\/')
+    decode_dir = FLAGS.mlperf_transformer_decode_dir.replace('/', r'\/')
     tpu = benchmark_spec.tpu_groups['train'].GetName()
     vm_util.ReplaceText(vm, '--model_dir=.*', r'--model_dir=gs:\/\/{} \\\\'
                         .format(bucket), run_script)
