@@ -21,6 +21,11 @@
 -   Removed deprecated versionless `rhel` os_type.
     -   You will have to specify `rhel7` on most providers or `amazonlinux1` on
         AWS.
+-   Deprecate Amazon Linux 1 `amazonlinux1` os_type.
+    -   AL1 is EOL on 2021-01-01:
+        https://aws.amazon.com/blogs/aws/update-on-amazon-linux-ami-end-of-life/
+        at which point it will be removed from PKB.
+    -   You can use the recommended `amazonlinux2` instead.
 
 ### New features:
 

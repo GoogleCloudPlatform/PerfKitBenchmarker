@@ -15,7 +15,7 @@
 
 from perfkitbenchmarker import flags
 
-AMAZONLINUX1 = 'amazonlinux1'
+AMAZONLINUX1 = 'amazonlinux1'  # deprecated (b/148486659)
 AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
 CENTOS8 = 'centos8'
