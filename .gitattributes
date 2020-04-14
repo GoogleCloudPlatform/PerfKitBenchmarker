@@ -4,3 +4,4 @@
 # Don't let git change end of line characters in the data directory.
 perfkitbenchmarker/data/* -text
 tests/data/* -text
+*.png -text
