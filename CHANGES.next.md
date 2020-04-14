@@ -49,7 +49,7 @@
 -   Add AWS and Azure VPC peering support
 -   Add Snowflake Warehouse support
 -   Add large_scale_boot benchmark for linux and windows.
--   Replace Boto connection library with Python client library for GCS.
+-   Add Python client library for GCS alongside Boto connection library.
 -   Enabled OpenMPI version selection
 -   Adds support for running network benchmarks across a VPN.
     -   Includes GCP implementation with static routes.

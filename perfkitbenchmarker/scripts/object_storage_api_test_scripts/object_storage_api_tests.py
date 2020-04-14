@@ -44,10 +44,12 @@ import yaml
 try:
   # imports when running on the VM
   from providers import azure_flags
+  from providers import gcs_flags
   from providers import s3_flags
 except ImportError:
   # imports when running tests
   from perfkitbenchmarker.scripts.object_storage_api_test_scripts import azure_flags
+  from perfkitbenchmarker.scripts.object_storage_api_test_scripts import gcs_flags
   from perfkitbenchmarker.scripts.object_storage_api_test_scripts import s3_flags
 
 FLAGS = flags.FLAGS
@@ -1102,8 +1104,14 @@ def Main(argv=sys.argv):
     from providers import azure_service
     service = azure_service.AzureService()
   elif FLAGS.storage_provider == 'GCS':
-    from providers import gcs
-    service = gcs.GCSService()
+    if FLAGS.gcs_client == gcs_flags.GCS_CLIENT_BOTO:
+      from providers import gcs_boto
+      service = gcs_boto.GcsServiceBoto()
+    elif FLAGS.gcs_client == gcs_flags.GCS_CLIENT_PYTHON:
+      from providers import gcs
+      service = gcs.GcsService()
+    else:
+      raise ValueError('Invalid GCS client library %s' % FLAGS.gcs_client)
   elif FLAGS.storage_provider == 'S3':
     from providers import s3
     service = s3.S3Service()

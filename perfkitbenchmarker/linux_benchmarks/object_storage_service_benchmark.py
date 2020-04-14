@@ -216,10 +216,10 @@ API_TEST_SCRIPT = 'object_storage_api_tests.py'
 API_TEST_SCRIPTS_DIR = 'object_storage_api_test_scripts'
 
 # Files that will be sent to the remote VM as a package for API test script.
-API_TEST_SCRIPT_PACKAGE_FILES = ['__init__.py',
-                                 'object_storage_interface.py',
-                                 'azure_flags.py',
-                                 's3_flags.py']
+API_TEST_SCRIPT_PACKAGE_FILES = [
+    '__init__.py', 'object_storage_interface.py', 'azure_flags.py',
+    'gcs_flags.py', 's3_flags.py'
+]
 
 SCRIPT_DIR = '/tmp/run'
 DOWNLOAD_DIRECTORY = posixpath.join(SCRIPT_DIR, 'temp')

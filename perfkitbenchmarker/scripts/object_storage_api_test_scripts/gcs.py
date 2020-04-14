@@ -24,7 +24,7 @@ from google.cloud import storage
 FLAGS = flags.FLAGS
 
 
-class GCSService(object_storage_interface.ObjectStorageServiceBase):
+class GcsService(object_storage_interface.ObjectStorageServiceBase):
   """An interface to Google Cloud Storage, using the python library."""
 
   def __init__(self):
