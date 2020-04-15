@@ -20,6 +20,19 @@ from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_list('spec17_subset', ['intspeed', 'fpspeed', 'intrate', 'fprate'],
+                  'Specify which speccpu2017 tests to run. Accepts a list of '
+                  'benchmark suites (intspeed, fpspeed, intrate, fprate) '
+                  'or individual benchmark names. Defaults to all suites.')
+flags.DEFINE_integer('spec17_copies', None,
+                     'Number of copies to run for rate tests. If not set '
+                     'default to number of cpu cores using lscpu.')
+flags.DEFINE_integer('spec17_threads', None,
+                     'Number of threads to run for speed tests. If not set '
+                     'default to number of cpu threads using lscpu.')
+flags.DEFINE_boolean('spec17_fdo', False,
+                     'Run with feedback directed optimization on peak. '
+                     'Default to False.')
 
 LLVM_TAR = 'clang+llvm-3.9.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz'
 LLVM_TAR_URL = 'https://releases.llvm.org/3.9.0/{0}'.format(LLVM_TAR)
@@ -34,6 +47,9 @@ _LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
 _DEFAULT_RUNSPEC_CONFIG = 'pkb-crosstool-llvm-linux-x86-fdo.cfg'
 PREPROVISIONED_DATA = {
     _SPECCPU2017_TAR: None,
+    'cpu2017-gcc-x86.tgz': None,  # x86-default
+    'cpu2017-optimized.tgz': None,  # Optimized
+    'cpu2017-gcc-arm.tgz': None,  # ARM-optimized
     LLVM_TAR:
         'e189a9e605ec035bfa1cfebf37374a92109b61291dc17c6f712398ecccb3498a',
     OPENMP_TAR:
@@ -54,7 +70,7 @@ def GetSpecInstallConfig(scratch_dir):
   install_config = speccpu.SpecInstallConfigurations()
   install_config.package_name = _PACKAGE_NAME
   install_config.base_spec_dir = _SPECCPU2017_DIR
-  install_config.base_tar_file_path = _SPECCPU2017_TAR
+  install_config.base_tar_file_path = (FLAGS.runspec_tar or _SPECCPU2017_TAR)
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
   install_config.runspec_config = (FLAGS.runspec_config or

@@ -36,6 +36,10 @@ ALL_MODE = 'all'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
+    'runspec_tar', None,
+    'Used by the PKB speccpu benchmarks. Name of the .tgz file to use. '
+    'Defaults to None. ')
+flags.DEFINE_string(
     'runspec_config', None,
     'Used by the PKB speccpu benchmarks. Name of the cfg file to use as the '
     'SPEC CPU config file provided to the runspec binary via its --config '
@@ -506,7 +510,8 @@ def _GeometricMean(arr):
   return product ** (1.0 / len(arr))
 
 
-def ParseOutput(vm, log_files, is_partial_results, runspec_metric):
+def ParseOutput(vm, log_files, is_partial_results, runspec_metric,
+                results_directory=None):
   """Retrieves the SPEC CPU output from the VM and parses it.
 
   Args:
@@ -515,6 +520,8 @@ def ParseOutput(vm, log_files, is_partial_results, runspec_metric):
         SPEC files, including binaries and logs, are located.
     is_partial_results: Boolean. True if the output is partial result.
     runspec_metric: String. Indicates whether this is spec speed or rate run.
+    results_directory: Optional String. Indicates where the spec directory is.
+        Defaults to the results folder inside the speccpu directory.
 
   Returns:
     A list of samples to be published (in the same format as Run() returns).
@@ -523,9 +530,9 @@ def ParseOutput(vm, log_files, is_partial_results, runspec_metric):
   results = []
 
   for log in log_files:
-    spec_dir = speccpu_vm_state.spec_dir
-    stdout, _ = vm.RemoteCommand('cat %s/result/%s' % (spec_dir, log),
-                                 should_log=True)
+    results_dir = results_directory or '%s/result' % speccpu_vm_state.spec_dir
+    stdout, _ = vm.RemoteCommand(
+        'cat %s/%s' % (results_dir, log), should_log=True)
     results.extend(_ExtractScore(
         stdout, vm, FLAGS.runspec_keep_partial_results or is_partial_results,
         runspec_metric))

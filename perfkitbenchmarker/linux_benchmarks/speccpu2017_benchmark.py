@@ -44,19 +44,6 @@ FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE] + [
     'namd_r', 'parest_r', 'povray_r', 'blender_r']
 
 FLAGS = flags.FLAGS
-flags.DEFINE_list('spec17_subset', ['intspeed', 'fpspeed', 'intrate', 'fprate'],
-                  'Specify which speccpu2017 tests to run. Accepts a list of '
-                  'benchmark suites (intspeed, fpspeed, intrate, fprate) '
-                  'or individual benchmark names. Defaults to all suites.')
-flags.DEFINE_integer('spec17_copies', None,
-                     'Number of copies to run for rate tests. If not set '
-                     'default to number of cpu cores using lscpu.')
-flags.DEFINE_integer('spec17_threads', None,
-                     'Number of threads to run for speed tests. If not set '
-                     'default to number of cpu threads using lscpu.')
-flags.DEFINE_boolean('spec17_fdo', False,
-                     'Run with feedback directed optimization on peak. '
-                     'Default to False.')
 
 
 BENCHMARK_NAME = 'speccpu2017'
