@@ -78,14 +78,14 @@ In this lab, you will:
 *   Query and visualize result data with
     [Data Studio](https://datastudio.google.com)
 
-> > __Note:__ this lab is biased to running __networking__ benchmarks, on
-> > __Google Cloud__.
-> >
-> > __Why networking benchmarks?__ Networking benchmarks are frequently an
-> > initial step in assessing the viability of public cloud environments.
-> > Ensuring understandable, repeatable, and defensible experiments is important
-> > in gaining agreement to progress to more advanced experiments, and
-> > decisions.
+> __Note:__ this lab is biased to running __networking__ benchmarks, on
+> __Google Cloud__.
+>
+> __Why networking benchmarks?__ Networking benchmarks are frequently an
+> initial step in assessing the viability of public cloud environments.
+> Ensuring understandable, repeatable, and defensible experiments is important
+> in gaining agreement to progress to more advanced experiments, and
+> decisions.
 
 ## Prerequisites
 
@@ -188,7 +188,7 @@ gcloud compute project-info add-metadata --metadata enable-oslogin=FALSE
 
 ## Task 1. Install PerfKit Benchmarker
 
-in this lab, you use Cloud Shell and the
+In this lab, you use Cloud Shell and the
 [PKB repo in GitHub](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker).
 
 1.  Set up a virtualenv isolated Python environment within Cloud Shell.
@@ -245,7 +245,7 @@ both provisioned and de-provisioned.
 __Start a benchmark test now, and then continue working through the lab while
 the test executes.__
 
-Run the commonly used network throughput test, __iperf__, with a small machine,
+Run the commonly used network throughput test, __iperf__, with small machines:
 __n1-standard-1__.
 
 __Expected duration__: ~13-14min.
@@ -812,9 +812,9 @@ Google Cloud supports 32 Gbps network egress bandwidth using
 [__Skylake__](https://cloud.google.com/compute/docs/machine-types) or later CPU
 platforms.
 
-> > __Note:__ this experiment requires 2 VMs with 16 vCPUs. You may be
-> > restricted from running this experiment in Qwiklabs due to resource caps.
-> > Tests with many vCPUs and significant egress will be more __costly__.
+> __Note:__ this experiment requires 2 VMs with 16 vCPUs. You may be
+> restricted from running this experiment in Qwiklabs due to resource caps.
+> Tests with many vCPUs and significant egress will be more __costly__.
 
 1.  Run __netperf__ to verify max throughput between two machines in a single
     zone.
@@ -893,9 +893,9 @@ platforms.
         throughput ranging from 2 Gbps upto 6 Gbps, when using __internal__ IP
         addresses.
 
-    > > __Note__: this is not necessarily the range or limit for a single
-    > > stream. If your interest is in single-stream performance, then you
-    > > should run single-stream tests.
+    > __Note__: this is not necessarily the range or limit for a single
+    > stream. If your interest is in single-stream performance, then you
+    > should run single-stream tests.
 
 1.  Check out out this
     [Andromeda 2.2 blog post](https://cloud.google.com/blog/products/networking/google-cloud-networking-in-depth-how-andromeda-2-2-enables-high-throughput-vms)
@@ -908,9 +908,9 @@ Google Cloud supports 32 Gbps network egress bandwidth using
 [__Skylake__](https://cloud.google.com/compute/docs/machine-types) or later CPU
 platforms.
 
-> > __Note:__ this experiment requires 2 VMs with 16 vCPUs. You may be
-> > restricted from running this experiment in Qwiklabs due to resource caps.
-> > Tests with many vCPUs and significant egress will be more __costly__.
+> __Note:__ this experiment requires 2 VMs with 16 vCPUs. You may be
+> restricted from running this experiment in Qwiklabs due to resource caps.
+> Tests with many vCPUs and significant egress will be more __costly__.
 
 1.  Run __iperf__ to verify max throughput between two machines in a single
     zone.
@@ -981,9 +981,9 @@ platforms.
         It's common to see threads/streams with throughput ranging from 2 Gbps
         upto 6 Gbps, when using __internal__ IP addresses.
 
-    > > __Note__: this is not necessarily the range or limit for a single
-    > > stream. If your interest is in single-stream performance, then you
-    > > should run single-stream tests.
+    > __Note__: this is not necessarily the range or limit for a single
+    > stream. If your interest is in single-stream performance, then you
+    > should run single-stream tests.
 
 1.  Check out out this
     [Andromeda 2.2 blog post](https://cloud.google.com/blog/products/networking/google-cloud-networking-in-depth-how-andromeda-2-2-enables-high-throughput-vms)
@@ -1079,11 +1079,14 @@ PKB defines curated collections of benchmark tests called __benchmark sets__.
 These sets are defined in the `perfkitbenchmarker/benchmark_sets.py`
 [file](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/benchmark_sets.py).
 
-Sets include: * __standard_set__: commonly agreed upon set of cloud performance
-benchmarks. * __google_set__: slightly longer collection of benchmarks than
-standard_set. Includes `tensorflow` benchmarks. * __kubernetes_set__: collection
-of tests intended to run on Kubernetes clusters. Requires specialized setup at
-this time. * __cloudsuite_set__: collection of cloudsuite_XXX benchmarks.
+Sets include:
+
+*   __standard_set__: commonly agreed upon set of cloud performance benchmarks.
+*   __google_set__: slightly longer collection of benchmarks than
+    standard_set. Includes `tensorflow` benchmarks.
+*   __kubernetes_set__: collection of tests intended to run on Kubernetes
+    clusters. Requires specialized setup at this time.
+*   __cloudsuite_set__: collection of cloudsuite_XXX benchmarks.
 
 Other sets are defined as well.
 
