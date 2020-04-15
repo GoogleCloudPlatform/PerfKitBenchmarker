@@ -100,3 +100,4 @@
         (to 20GB).
     -   The current defaults leave other Linux OSes at 10GB and Windows OSes at
         50GB.
+-   Explicitly setting Netperf to Python 3.

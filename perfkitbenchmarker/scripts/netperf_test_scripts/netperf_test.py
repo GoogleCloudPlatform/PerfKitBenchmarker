@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time
 from absl import flags
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -32,10 +33,10 @@ flags.DEFINE_integer('port_start', None,
                      'Starting port for netperf command and data ports')
 
 
-def Main(argv=sys.argv):
+def Main():
   # Parse command-line flags
   try:
-    argv = FLAGS(argv)
+    FLAGS(sys.argv)
   except flags.Error as e:
     logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
@@ -59,8 +60,12 @@ def Main(argv=sys.argv):
     command_port = port_start + i * 2
     data_port = port_start + i * 2 + 1
     cmd = netperf_cmd.format(command_port=command_port, data_port=data_port)
-    processes[i] = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, shell=True)
+    processes[i] = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        universal_newlines=True)
   end_starting_processes = time.time()
   # Wait for all of the netperf processes to finish and save their return codes
   for i, process in enumerate(processes):
