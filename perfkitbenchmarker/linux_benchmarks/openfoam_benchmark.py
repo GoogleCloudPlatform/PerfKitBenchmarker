@@ -39,6 +39,7 @@ from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import openfoam
+from perfkitbenchmarker.linux_packages import openmpi
 
 
 _DEFAULT_CASE = 'motorbike'
@@ -217,11 +218,6 @@ def _GetOpenfoamVersion(vm):
   return vm.RemoteCommand('echo $WM_PROJECT_VERSION')[0].rstrip()
 
 
-def _GetOpenmpiVersion(vm):
-  """Get the installed OpenMPI version from the vm."""
-  return vm.RemoteCommand('mpirun -version')[0].split()[3].rstrip()
-
-
 def _GetWorkingDirPath():
   """Get the base directory name of the case being run."""
   case_dir_name = posixpath.basename(_CASE_PATHS[FLAGS.openfoam_case])
@@ -324,7 +320,7 @@ def Run(benchmark_spec):
   decomp_method = FLAGS.openfoam_decomp_method
   max_global_cells = FLAGS.openfoam_max_global_cells
   openfoam_version = _GetOpenfoamVersion(master_vm)
-  openmpi_version = _GetOpenmpiVersion(master_vm)
+  openmpi_version = openmpi.GetMpiVersion(master_vm)
   common_metadata = {
       'case_name': case_name,
       'decomp_method': decomp_method,

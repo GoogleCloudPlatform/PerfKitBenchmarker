@@ -28,6 +28,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import openfoam_benchmark
+from perfkitbenchmarker.linux_packages import openmpi
 from tests import pkb_common_test_case
 
 
@@ -46,8 +47,7 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.mock_vm = mock.Mock()
     self.mock_benchmark_spec = mock.Mock(vms=[self.mock_vm])
 
-  @mock.patch.object(openfoam_benchmark, '_GetOpenmpiVersion',
-                     return_value='1.10.2')
+  @mock.patch.object(openmpi, 'GetMpiVersion', return_value='1.10.2')
   @mock.patch.object(openfoam_benchmark, '_GetOpenfoamVersion',
                      return_value='7')
   @flagsaver.flagsaver(openfoam_dimensions=['80_32_32'])
