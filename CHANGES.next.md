@@ -101,4 +101,5 @@
         (to 20GB).
     -   The current defaults leave other Linux OSes at 10GB and Windows OSes at
         50GB.
+-   Remove 'default' keyword from AWS and Azure boot_disk_size
 -   Explicitly setting Netperf to Python 3.
