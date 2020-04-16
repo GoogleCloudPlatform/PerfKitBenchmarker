@@ -18,3 +18,4 @@ for i in ${INSTANCES}; do
 aws ec2 terminate-instances --region {{ region }} --instance-ids "${i}"
 done
 {% endif %}
+# Azure does not need cleanup as benchmark cleans up the resource group.

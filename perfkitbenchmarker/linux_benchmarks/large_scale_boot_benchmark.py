@@ -45,6 +45,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 
 from perfkitbenchmarker.providers.aws import util as aws_util
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
@@ -64,6 +65,10 @@ large_scale_boot:
         AWS:
           machine_type: m5.large
           zone: us-east-1
+        Azure:
+          machine_type: Standard_D2_v3
+          zone: eastus
+          boot_disk_type: StandardSSD_LRS
       vm_count: 1
       os_type: debian9
     clients:
@@ -73,6 +78,9 @@ large_scale_boot:
           boot_disk_type: pd-ssd
         AWS:
           machine_type: m5.large
+        Azure:
+          machine_type: Standard_D2_v3
+          boot_disk_type: StandardSSD_LRS
       os_type: debian9
       vm_count: 1
 """
@@ -99,6 +107,8 @@ flags.DEFINE_boolean('vms_contact_launcher', True, 'Whether launched vms '
 
 # Tag for undefined hostname, should be synced with listener_server.py script.
 UNDEFINED_HOSTNAME = 'UNDEFINED'
+# Tag for sequential hostname, should be synced with listener_server.py script.
+SEQUENTIAL_IP = 'SEQUENTIAL_IP-{}'
 # remote tmp directory used for this benchmark.
 _REMOTE_DIR = vm_util.VM_TMP_DIR
 # boot script to use on the launcher server vms.
@@ -131,8 +141,12 @@ _RESULTS_FILE_PATH = posixpath.join(_REMOTE_DIR, _RESULTS_FILE)
 _TIMEOUT_SECONDS = 60 * 10
 # Seconds to deplay between polling for launcher server task complete.
 _POLLING_DELAY = 3
-# Naming pattern for booted vms.
+# Naming pattern for GCP booted vms.
 _BOOT_VM_NAME_PREFIX = 'booter-{launcher_name}'
+# Naming pattern for Azure NICs
+_BOOT_NIC_NAME_PREFIX = 'booter-nic-{run_uri}-'
+# Number of azure private ips that are reserved
+_AZURE_RESERVED_IPS = 5
 # sha256sum for preprovisioned service account credentials.
 # If not using service account credentials from preprovisioned data bucket,
 # use --gcp_service_account_key_file flag to specify the same credentials.
@@ -144,6 +158,25 @@ BENCHMARK_DATA = {
 _SSH_PORT = linux_virtual_machine.DEFAULT_SSH_PORT
 # default windows rdp port
 _RDP_PORT = windows_virtual_machine.RDP_PORT
+
+
+def GetAzBootVMStartIdByLauncher(launcher_name):
+  """Returns the Azure boot VM id by launcher name.
+
+  We want to keep the VM id unique across all the vms in this resource group.
+  Since the ids are used later to calculate the private ip address. We have to
+  skip the first few ids that will match up to reserved reserved ips.
+  E.g.
+    Azure reserved ip: 10.0.0.0, 10.0.0.1 ... 10.0.0.4
+    Launcher VM pkb-{run_uri}-1 (id 5, ip 10.0.0.5): boot vm id 7, boot vm id 8
+    Launcher VM pkb-{run_uri}-2 (id 6, ip 10.0.0.6): boot vm id 9, boot vm id 10
+
+  Args:
+    launcher_name: indexed launcher name to calculate ids for the VMs it boots.
+  """
+  launcher_index = int(launcher_name.split('-')[-1]) - 1
+  return (launcher_index * FLAGS.boots_per_launcher +
+          _AZURE_RESERVED_IPS + int(FLAGS.num_vms))
 
 
 def _GetServerStartCommand(client_port, launcher_vm):
@@ -158,6 +191,10 @@ def _GetServerStartCommand(client_port, launcher_vm):
   elif cloud == 'AWS':
     # AWS do not have a defined vm name pattern till after vm is launched.
     vms_name_pattern = UNDEFINED_HOSTNAME
+  elif cloud == 'Azure':
+    # Azure assigns a sequential ip
+    vms_name_pattern = SEQUENTIAL_IP.format(
+        GetAzBootVMStartIdByLauncher(launcher_vm.name))
   return (
       'python3 {server_path} {server_name} {port} {results_path} {client_port} '
       '{use_server} {vms_name_pattern} {vms_count} > {server_log} 2>&1 &'
@@ -192,9 +229,10 @@ def CheckPrerequisites(_):
   data.ResourcePath(_BOOT_TEMPLATE)
   data.ResourcePath(_LISTENER_SERVER)
   data.ResourcePath(_CLEAN_UP_TEMPLATE)
-  if FLAGS.cloud == 'Azure':
+  if FLAGS.cloud == 'Azure' and FLAGS.vms_contact_launcher and not _IsLinux():
     raise errors.Benchmarks.PrepareException(
-        'Booting VMs on Azure is not yet supported.')
+        'Booting Windows VMs on Azure with a start-up script is not supported. '
+        'See https://github.com/Azure/azure-powershell/issues/9600.')
 
 
 def GetConfig(user_config):
@@ -262,6 +300,18 @@ def _BuildContext(launcher_vm, booter_template_vm):
         'region': aws_util.GetRegionFromZone(launcher_vm.zone),
         'subnet_id': booter_template_vm.network.subnet.id,
     })
+  elif cloud == 'Azure':
+    context.update({
+        'boot_vm_name_prefix': launcher_vm.name.split('-', 1)[1],
+        'location': launcher_vm.location,
+        'image': booter_template_vm.image,
+        'storage_sku': booter_template_vm.os_disk.disk_type,
+        'resource_group': launcher_vm.resource_group.name,
+        'nic': _BOOT_NIC_NAME_PREFIX.format(run_uri=FLAGS.run_uri),
+        'password': booter_template_vm.password,
+        'start_id': GetAzBootVMStartIdByLauncher(launcher_vm.name),
+    })
+
   return context
 
 
@@ -310,6 +360,18 @@ def Prepare(benchmark_spec):
         'Increase launcher server VM size or decrease boots_per_launcher. '
         'For a VM with {} CPUs, launch at most {} VMs.'.format(
             launcher_vms[0].num_cpus, launcher_vms[0].num_cpus * 50))
+
+  if FLAGS.cloud == 'Azure':
+    used_private_ips = _AZURE_RESERVED_IPS + int(FLAGS.num_vms)
+    for i in range(used_private_ips, used_private_ips + _GetExpectedBoots()):
+      nic_name_prefix = _BOOT_NIC_NAME_PREFIX.format(run_uri=FLAGS.run_uri)
+      private_ip = '10.0.{octet3}.{octet4}'.format(
+          octet3=i // 256,
+          octet4=i % 256)
+      nic = azure_virtual_machine.AzureNIC(
+          launcher_vms[0].network.subnet, nic_name_prefix + str(i),
+          '', False, private_ip)
+      nic.Create()
 
   vm_util.RunThreaded(
       lambda vm: _Install(vm, booter_template_vm), launcher_vms)

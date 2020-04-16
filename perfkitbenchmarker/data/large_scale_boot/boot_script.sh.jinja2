@@ -25,6 +25,11 @@ script and the time the vms call back on the server. #}
   WINDOWS_START_UP_SCRIPT_CLOSING_PARAM="</powershell>"
   INSTANCE_ID="`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`"
   DELETE_VM="aws ec2 terminate-instances --region {{ region }} --instance-ids ${INSTANCE_ID}"
+{% elif cloud == 'Azure' %}
+  LINUX_START_UP_SCRIPT_PARAM=""
+  WINDOWS_START_UP_SCRIPT_PARAM=""
+  WINDOWS_START_UP_SCRIPT_CLOSING_PARAM=""
+  DELETE_VM=""
 {% endif %}
 
 export LINUX_SLEEP="# Sleep 10min before final cleanup and VM termination.
@@ -87,6 +92,27 @@ echo $(date +%s%N) > {{start_time_file}}
     --count {{vm_count}}
   )
   aws ec2 run-instances "${aws_args[@]}" &
+{% elif cloud == 'Azure' %}
+  azure_args=(
+    --location {{ location }}
+    --image {{ image }}
+    --size {{ boot_machine_type }}
+    --admin-username perfkit
+    --storage-sku {{ storage_sku }}
+    --resource-group {{ resource_group }}
+    --custom-data "${START_UP_SCRIPT}"
+    --generate-ssh-keys
+    --no-wait
+  )
+  {% if os_type == 'windows' %}
+    azure_args+=( --admin-password '{{ password }}' )
+  {% endif %}
+  ((end_id={{ start_id }}+{{ vm_count }}-1))
+  for i in $(seq {{start_id}} "${end_id}"); do
+    az vm create --name {{ boot_vm_name_prefix }}-"${i}"  \
+    --nics {{ nic }}"${i}" \
+    "${azure_args[@]}" &
+  done
 {% endif %}
 
 wait

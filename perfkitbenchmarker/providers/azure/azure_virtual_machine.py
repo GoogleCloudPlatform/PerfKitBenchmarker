@@ -202,11 +202,13 @@ class AzurePublicIPAddress(resource.BaseResource):
 class AzureNIC(resource.BaseResource):
   """Class to represent an Azure NIC."""
 
-  def __init__(self, subnet, name, public_ip, accelerated_networking):
+  def __init__(self, subnet, name, public_ip, accelerated_networking,
+               private_ip=None):
     super(AzureNIC, self).__init__()
     self.subnet = subnet
     self.name = name
     self.public_ip = public_ip
+    self.private_ip = private_ip
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
     self.location = self.subnet.vnet.location
@@ -220,6 +222,8 @@ class AzureNIC(resource.BaseResource):
         self.subnet.name, '--public-ip-address', self.public_ip, '--name',
         self.name
     ] + self.resource_group.args
+    if self.private_ip:
+      cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
     vm_util.IssueCommand(cmd)

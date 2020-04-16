@@ -40,11 +40,13 @@ from http import server
 # Amount of time in seconds to attempt calling a client VM if VM calling in.
 MAX_TIME_SECONDS = 30
 # Amount of time in seconds to attempt calling a client VM if VM not calling in.
-MAX_TIME_SECONDS_NO_CALLING = 600
+MAX_TIME_SECONDS_NO_CALLING = 1200
 # entry to stop processing from the timing queue
 _STOP_QUEUE_ENTRY = 'stop'
 # Tag for undefined hostname, should be synced with large_scale_boot_benchmark.
 UNDEFINED_HOSTNAME = 'UNDEFINED'
+# Tag for sequential hostname, should be synced with large_scale_boot_benchmark.
+SEQUENTIAL_IP = 'SEQUENTIAL_IP'
 
 
 def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
@@ -90,6 +92,8 @@ def BuildHostNames(name_pattern, count):
   # Therefore we pull vm name from boot logs.
   if name_pattern == UNDEFINED_HOSTNAME:
     return WaitForHostNames()
+  elif SEQUENTIAL_IP in name_pattern:
+    return GenerateHostIPs(int(name_pattern.split('-')[-1]), count)
   else:
     return [name_pattern.replace('VM_ID', str(vm_id))
             for vm_id in range(1, count + 1)]
@@ -120,6 +124,16 @@ def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
     return hostnames
   raise ValueError('Boot did not complete successfully before timeout of %s '
                    'seconds.' % MAX_TIME_SECONDS_NO_CALLING)
+
+
+def GenerateHostIPs(boot_vm_index, count):
+  """Logic must be aligned with large_scale_boot/boot_script.sh."""
+  hostnames = []
+  for vm_id in range(boot_vm_index, boot_vm_index + count):
+    hostnames.append('10.0.{octet3}.{octet4}'.format(
+        octet3=vm_id // 256,
+        octet4=vm_id % 256))
+  return hostnames
 
 
 def ActAsClient(pool, queue, port, name_pattern, vms_count):
