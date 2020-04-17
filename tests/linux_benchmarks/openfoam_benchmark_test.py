@@ -18,12 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import unittest
 
+from absl import flags
 from absl.testing import flagsaver
 import mock
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -33,10 +32,6 @@ from tests import pkb_common_test_case
 
 
 FLAGS = flags.FLAGS
-
-
-TEST_BLOCKMESH_DICT_PATH = os.path.join(
-    os.path.dirname(__file__), '../data/openfoam_blockmesh_dict.txt')
 
 
 class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
@@ -50,10 +45,13 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
   @mock.patch.object(openmpi, 'GetMpiVersion', return_value='1.10.2')
   @mock.patch.object(openfoam_benchmark, '_GetOpenfoamVersion',
                      return_value='7')
+  @mock.patch.object(openfoam_benchmark, '_ParseRunCommands',
+                     return_value=['mpirun $(getApplication)'])
   @flagsaver.flagsaver(openfoam_dimensions=['80_32_32'])
-  def testRunReturnsCorrectlyParsedSamples(self,
-                                           mock_getopenfoamversion,
-                                           mock_getmpiversion):
+  def testRunCaseReturnsCorrectlyParsedSamples(self,
+                                               mock_getopenfoamversion,
+                                               mock_getmpiversion,
+                                               mock_parseruncommands):
     # Run with mocked output data
     self.mock_vm.RemoteCommand.return_value = None, '\n'.join(
         ['real 131.64', 'user 327.05', 'sys 137.04'])
@@ -63,16 +61,17 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     # Verify command is what we expected to run
     run_cmd = [
         'cd $HOME/OpenFOAM/run/motorBike',
-        './Allclean',
-        'time -p ./Allrun'
+        'time -p mpirun $(getApplication)'
     ]
     self.mock_vm.RemoteCommand.assert_called_with(' && '.join(run_cmd))
 
     # Verify sample equality
     expected_metadata = {
         'case_name': 'motorbike',
+        'command': '$(getApplication)',
         'decomp_method': 'scotch',
         'dimensions': '80_32_32',
+        'full_command': 'mpirun $(getApplication)',
         'max_global_cells': 200000000,
         'mpi_mapping': 'core:SPAN',
         'openfoam_version': '7',

@@ -72,6 +72,7 @@
     -   Delete the obsolete `--eks-verify-ssl`
 -   Separate NVIDIA driver functionality from CUDA toolkit
 -   Added --runspec_tar option to SpecCPU (specifying installation tarball).
+-   Add OpenFOAM support for timing individual commands.
 
 ### Bug fixes and maintenance updates:
 

@@ -28,7 +28,7 @@ cores before attempting to run.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import collections
 import logging
 import posixpath
 
@@ -114,6 +114,13 @@ _SNAPPY_HEX_MESH_DICT = 'system/snappyHexMeshDict'
 
 _SSH_CONFIG_CMD = ('echo "LogLevel ERROR\nHost *\n  IdentitiesOnly yes\n" | '
                    'tee -a $HOME/.ssh/config')
+
+_RUN_SCRIPT_EXCLUDED_PREFIXES = ['#', '.', 'cd']
+_RUN_SCRIPT_VALID_COMMANDS = [
+    'cp', 'surfaceFeatures', 'blockMesh', 'decomposePar', 'snappyHexMesh',
+    'patchSummary', 'potentialFoam', '$(getApplication)', 'reconstructParMesh',
+    'reconstructPar'
+]
 
 
 def GetConfig(user_config):
@@ -270,8 +277,77 @@ def _UseMpi(vm, num_processes, mapping):
   vm_util.ReplaceText(vm, '^mpirun.*', '& -parallel', run_script)
 
 
+def _GetBaseCommand(command):
+  """Returns a base OpenFOAM command.
+
+  Example:
+    command "mpirun -hostfile /home/perfkit/OpenFOAM/run/MACHINEFILE -mca btl
+      ^openib --map-by core:SPAN -np 16 potentialFoam -parallel"
+    returns "potentialFoam"
+
+  Args:
+    command: String, the command to parse.
+
+  Returns:
+    The base OpenFOAM command from _RUN_SCRIPT_VALID_COMMANDS.
+  """
+  for base_command in _RUN_SCRIPT_VALID_COMMANDS:
+    if base_command in command:
+      return base_command
+  raise ValueError('Unrecognized command in "%s", please add it to '
+                   '_RUN_SCRIPT_VALID_COMMANDS' % command)
+
+
+def _RunCommand(vm, command):
+  """Runs a valid OpenFOAM command, returning samples."""
+  _, output = vm.RemoteCommand('cd %s && time -p %s' %
+                               (_GetWorkingDirPath(), command))
+  results = _GetSamples(output)
+
+  for result in results:
+    result.metadata['full_command'] = command
+    result.metadata['command'] = _GetBaseCommand(command)
+  return results
+
+
+def _IsValidCommand(command):
+  if not command:
+    return False
+  for prefix in _RUN_SCRIPT_EXCLUDED_PREFIXES:
+    if command.startswith(prefix):
+      return False
+  return True
+
+
+def _ParseRunCommands(vm, remote_run_file):
+  """Parses OpenFOAM run commands from a case's Allrun file."""
+  local_destination = vm_util.GetTempDir() + _RUN_SCRIPT
+  vm.PullFile(local_destination, remote_run_file)
+  commands = []
+  for command in open(local_destination):
+    command = command.strip('\n')
+    if _IsValidCommand(command):
+      commands.append(command)
+
+  logging.info('Parsed run commands from %s:\n%s', remote_run_file, commands)
+  return commands
+
+
+def _GenerateFullRuntimeSamples(samples):
+  """Append the full runtime results to samples."""
+  assert samples, '%s should not be an empty list' % samples
+  counts = collections.Counter()
+  for s in samples:
+    counts[s.metric] += s.value
+  for metric in ('time_real', 'time_user', 'time_sys'):
+    samples.append(sample.Sample(metric, counts[metric], 'seconds'))
+
+
 def _RunCase(master_vm, dimensions):
   """Runs the case with the given dimensions.
+
+  This function automatically looks for the "Allrun" script in the working
+  directory.
 
   Args:
     master_vm: The vm to run the case commands on. If using the default NFS
@@ -286,10 +362,16 @@ def _RunCase(master_vm, dimensions):
                     dimensions=_ParseDimensions(dimensions))
   _SetDictEntry(master_vm, 'blocks', dims_entry, _BLOCK_MESH_DICT)
 
-  run_command = ' && '.join(
-      ['cd %s' % _GetWorkingDirPath(), './Allclean', 'time -p ./Allrun'])
-  _, run_output = master_vm.RemoteCommand(run_command)
-  results = _GetSamples(run_output)
+  master_vm.RemoteCommand('cd %s && ./Allclean' % _GetWorkingDirPath())
+
+  results = []
+  run_script_path = _GetPath(_RUN_SCRIPT)
+  for command in _ParseRunCommands(master_vm, run_script_path):
+    command_results = _RunCommand(master_vm, command)
+    results.extend(command_results)
+
+  _GenerateFullRuntimeSamples(results)
+
   # Update every run with run-specific metadata.
   for result in results:
     result.metadata['dimensions'] = dimensions
@@ -300,7 +382,7 @@ def Run(benchmark_spec):
   """Runs the benchmark and returns a dict of performance data.
 
   It must be possible to run the benchmark multiple times after the Prepare
-  stage.
+  stage. This method runs a single case with multiple dimensions.
 
   Args:
     benchmark_spec: The benchmark spec for the OpenFOAM benchmark.
