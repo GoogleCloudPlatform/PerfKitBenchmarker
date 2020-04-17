@@ -194,6 +194,10 @@ def _PrepareHorovod(vm):
   vm.Install('nccl')
   vm.InstallPackages('wget git unzip')
 
+  if FLAGS.cloud == 'GCP':  # temporary fix for DLVM images
+    vm.RemoteCommand(
+        'sudo /opt/conda/bin/pip install --force-reinstall pyarrow')
+
 
 def Prepare(benchmark_spec):
   """Install and set up Horovod on the target vms.
