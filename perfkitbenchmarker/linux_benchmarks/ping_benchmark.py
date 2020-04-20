@@ -80,13 +80,13 @@ def Run(benchmark_spec):
       ip_type = vm_util.IpAddressMetadata.EXTERNAL
       results = results + _RunPing(sending_vm,
                                    receiving_vm,
-                                   receiving_vm.internal_ip,
+                                   receiving_vm.ip_address,
                                    ip_type)
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
       ip_type = vm_util.IpAddressMetadata.INTERNAL
       results = results + _RunPing(sending_vm,
                                    receiving_vm,
-                                   receiving_vm.ip_address,
+                                   receiving_vm.internal_ip,
                                    ip_type)
   return results
 
@@ -105,7 +105,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
   Returns:
     A list of samples, with one sample for each metric.
   """
-  if ip_type == vm_util.IpAddressSubset.INTERNAL and not sending_vm.IsReachable(receiving_vm):
+  if ip_type == vm_util.IpAddressMetadata.INTERNAL and not sending_vm.IsReachable(receiving_vm):
     logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
