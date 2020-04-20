@@ -142,6 +142,11 @@ flags.DEFINE_enum('background_network_ip_type', IpAddressSubset.EXTERNAL,
                   'traffic')
 
 
+class IpAddressMetadata(object):
+  INTERNAL = 'internal'
+  EXTERNAL = 'external'
+
+
 def GetTempDir():
   """Returns the tmp dir of the current run."""
   return temp_dir.GetRunDirPath()
