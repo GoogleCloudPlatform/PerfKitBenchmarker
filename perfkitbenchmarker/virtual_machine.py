@@ -248,446 +248,6 @@ class BaseVmSpec(spec.BaseSpec):
     return result
 
 
-class BaseVirtualMachine(resource.BaseResource):
-  """Base class for Virtual Machines.
-
-  This class holds VM methods and attributes relating to the VM as a cloud
-  resource. For methods and attributes that interact with the VM's guest
-  OS, see BaseOsMixin and its subclasses.
-
-  Attributes:
-    image: The disk image used to boot.
-    internal_ip: Internal IP address.
-    ip_address: Public (external) IP address.
-    machine_type: The provider-specific instance type (e.g. n1-standard-8).
-    project: The provider-specific project associated with the VM (e.g.
-      artisanal-lightbulb-883).
-    ssh_public_key: Path to SSH public key file.
-    ssh_private_key: Path to SSH private key file.
-    user_name: Account name for login. the contents of 'ssh_public_key' should
-      be in .ssh/authorized_keys for this user.
-    zone: The region / zone the VM was launched in.
-    cidr: The CIDR range the VM was launched in.
-    disk_specs: list of BaseDiskSpec objects. Specifications for disks attached
-      to the VM.
-    scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
-    max_local_disks: The number of local disks on the VM that can be used as
-      scratch disks or that can be striped together.
-    background_cpu_threads: The number of threads of background CPU usage
-      while running the benchmark.
-    background_network_mbits_per_sec: Number of mbits/sec of background network
-      usage while running the benchmark.
-    background_network_ip_type: Type of IP address to use for generating
-      background network workload
-  """
-
-  is_static = False
-
-  RESOURCE_TYPE = 'BaseVirtualMachine'
-  REQUIRED_ATTRS = ['CLOUD', 'OS_TYPE']
-  CLOUD = None
-
-  _instance_counter_lock = threading.Lock()
-  _instance_counter = 0
-
-  # Supports overriding the PIP package version based on the provider image.
-  # By default, the latest PIP version is used.
-  PYTHON_PIP_PACKAGE_VERSION = None
-
-  def __init__(self, vm_spec):
-    """Initialize BaseVirtualMachine class.
-
-    Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-    """
-    super(BaseVirtualMachine, self).__init__()
-    with self._instance_counter_lock:
-      self.instance_number = self._instance_counter
-      self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
-      BaseVirtualMachine._instance_counter += 1
-    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
-    self.disable_rss = vm_spec.disable_rss
-    self.zone = vm_spec.zone
-    self.cidr = vm_spec.cidr
-    self.machine_type = vm_spec.machine_type
-    self.gpu_count = vm_spec.gpu_count
-    self.gpu_type = vm_spec.gpu_type
-    self.image = vm_spec.image
-    self.install_packages = vm_spec.install_packages
-    self.ip_address = None
-    self.internal_ip = None
-    self.user_name = DEFAULT_USERNAME
-    self.password = None
-    self.ssh_public_key = vm_util.GetPublicKeyPath()
-    self.ssh_private_key = vm_util.GetPrivateKeyPath()
-    self.disk_specs = []
-    self.scratch_disks = []
-    self.max_local_disks = 0
-    self.local_disk_counter = 0
-    self.remote_disk_counter = 0
-    self.background_cpu_threads = vm_spec.background_cpu_threads
-    self.background_network_mbits_per_sec = (
-        vm_spec.background_network_mbits_per_sec)
-    self.background_network_ip_type = vm_spec.background_network_ip_type
-    self.use_dedicated_host = None
-    self.num_vms_per_host = None
-
-    self.network = None
-    self.firewall = None
-    self.tcp_congestion_control = None
-    self.numa_node_count = None
-    self.num_disable_cpus = None
-    self.capacity_reservation_id = None
-    self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
-
-  def __repr__(self):
-    return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
-        self.ip_address, self.internal_ip)
-
-  def __str__(self):
-    if self.ip_address:
-      return self.ip_address
-    return super(BaseVirtualMachine, self).__str__()
-
-  def CreateScratchDisk(self, disk_spec):
-    """Create a VM's scratch disk.
-
-    Args:
-      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
-    """
-    pass
-
-  def DeleteScratchDisks(self):
-    """Delete a VM's scratch disks."""
-    for scratch_disk in self.scratch_disks:
-      if scratch_disk.disk_type != disk.LOCAL:
-        scratch_disk.Delete()
-
-  def GetScratchDir(self, disk_num=0):
-    """Gets the path to the scratch directory.
-
-    Args:
-      disk_num: The number of the disk to mount.
-    Returns:
-      The mounted disk directory.
-
-    """
-    if disk_num >= len(self.scratch_disks):
-      raise errors.Error(
-          'GetScratchDir(disk_num=%s) is invalid, max disk_num is %s' % (
-              disk_num, len(self.scratch_disks)))
-    return self.scratch_disks[disk_num].mount_point
-
-  def AllowIcmp(self):
-    """Opens ICMP protocol on the firewall corresponding to the VM if exists."""
-    if self.firewall and not FLAGS.skip_firewall_rules:
-      self.firewall.AllowIcmp(self)
-
-  def AllowPort(self, start_port, end_port=None, source_range=None):
-    """Opens the port on the firewall corresponding to the VM if one exists.
-
-    Args:
-      start_port: The first local port to open in a range.
-      end_port: The last local port to open in a range. If None, only start_port
-        will be opened.
-      source_range: list of CIDRs. If none, all sources are allowed.
-    """
-    if self.firewall and not FLAGS.skip_firewall_rules:
-      self.firewall.AllowPort(self, start_port, end_port, source_range)
-
-  def AllowRemoteAccessPorts(self):
-    """Allow all ports in self.remote_access_ports."""
-    for port in self.remote_access_ports:
-      self.AllowPort(port)
-
-  def AddMetadata(self, **kwargs):
-    """Add key/value metadata to the instance.
-
-    Setting the metadata on create is preferred. If that is not possible, this
-    method adds metadata in the form of key value pairs to the instance. Useful
-    for debugging / introspection.
-
-    The default implementation is a noop. Cloud providers supporting instance
-    metadata should override.
-
-    Args:
-      **kwargs: dict. (tag name, tag value) pairs to set as metadata on the
-        instance.
-    """
-    pass
-
-  def GetResourceMetadata(self):
-    """Returns a dict containing VM metadata.
-
-    Returns:
-      dict mapping string property key to value.
-    """
-    if not self.created:
-      return {}
-    result = self.metadata.copy()
-    result.update({
-        'image': self.image,
-        'zone': self.zone,
-        'cloud': self.CLOUD,
-    })
-    if self.cidr is not None:
-      result['cidr'] = self.cidr
-    if self.machine_type is not None:
-      result['machine_type'] = self.machine_type
-    if self.use_dedicated_host is not None:
-      result['dedicated_host'] = self.use_dedicated_host
-    if self.num_vms_per_host is not None:
-      result['num_vms_per_host'] = self.num_vms_per_host
-    if self.tcp_congestion_control is not None:
-      result['tcp_congestion_control'] = self.tcp_congestion_control
-    if self.numa_node_count is not None:
-      result['numa_node_count'] = self.numa_node_count
-    if self.num_disable_cpus is not None:
-      result['num_disable_cpus'] = self.num_disable_cpus
-    # Hack: Silently fail if we have no num_cpus or OS_TYPE attribute.
-    # This property is defined in BaseOsMixin and should always
-    # be available during regular PKB usage because virtual machines
-    # always have a mixin. However, in testing virtual machine objects
-    # are often instantiated without a mixin, so the line below was
-    # failing because the attribute didn't exist.
-    if getattr(self, 'num_cpus', None):
-      result['num_cpus'] = self.num_cpus
-      if self.NumCpusForBenchmark() != self.num_cpus:
-        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
-    if getattr(self, 'OS_TYPE', None):
-      result['os_type'] = self.OS_TYPE
-    return result
-
-  def SimulateMaintenanceEvent(self):
-    """Simulates a maintenance event on the VM."""
-    raise NotImplementedError()
-
-  def _InstallData(self, preprovisioned_data, module_name, filenames,
-                   install_path, fallback_url):
-    """Installs preprovisioned_data on this VM.
-
-    Args:
-      preprovisioned_data: The dict mapping filenames to sha256sum hashes.
-      module_name: The name of the module defining the preprovisioned data.
-      filenames: An iterable of preprovisioned data filenames for a particular
-      module.
-      install_path: The path to download the data file.
-      fallback_url: The dict mapping filenames to fallback url for downloading.
-
-    Raises:
-      errors.Setup.BadPreprovisionedDataError: If the module or filename are
-          not defined with preprovisioned data, or if the sha256sum hash in the
-          code does not match the sha256 of the file.
-    """
-    for filename in filenames:
-      if data.ResourceExists(filename):
-        local_tar_file_path = data.ResourcePath(filename)
-        self.PushFile(local_tar_file_path, install_path)
-        continue
-      url = fallback_url.get(filename)
-      sha256sum = preprovisioned_data.get(filename)
-      preprovisioned = self.ShouldDownloadPreprovisionedData(
-          module_name, filename)
-      if not sha256sum:
-        raise errors.Setup.BadPreprovisionedDataError(
-            'Cannot find sha256sum hash for file %s in module %s. See '
-            'README.md for information about preprovisioned data. '
-            'Cannot find file in /data directory either, fail to upload from '
-            'local directory.' % (filename, module_name))
-
-      if preprovisioned:
-        self.DownloadPreprovisionedData(install_path, module_name, filename)
-      elif url:
-        self.Install('wget')
-        file_name = os.path.basename(url)
-        self.RemoteCommand(
-            'wget -O {0} {1}'.format(
-                os.path.join(install_path, file_name), url))
-      else:
-        raise errors.Setup.BadPreprovisionedDataError(
-            'Cannot find preprovisioned file %s inside preprovisioned bucket '
-            'in module %s. See README.md for information about '
-            'preprovisioned data. '
-            'Cannot find fallback url of the file to download from web. '
-            'Cannot find file in /data directory either, fail to upload from '
-            'local directory.' % (filename, module_name))
-      self.CheckPreprovisionedData(
-          install_path, module_name, filename, sha256sum)
-
-  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
-                                         install_path):
-    """Installs preprovisioned benchmark data on this VM.
-
-    Some benchmarks require importing many bytes of data into the virtual
-    machine. This data can be staged in a particular cloud and the virtual
-    machine implementation can override how the preprovisioned data is
-    installed in the VM by overriding DownloadPreprovisionedData.
-
-    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
-    bucket that the VMs may access. For a benchmark that requires
-    preprovisioned data, follow the instructions for that benchmark to download
-    and store the data so that it may be accessed by a VM via this method.
-
-    Before installing from preprovisioned data in the cloud, this function looks
-    for files in the local data directory. If found, they are pushed to the VM.
-    Otherwise, this function attempts to download them from their preprovisioned
-    location onto the VM.
-
-    Args:
-      benchmark_name: The name of the benchmark defining the preprovisioned
-          data. The benchmark's module must define the dict BENCHMARK_DATA
-          mapping filenames to sha256sum hashes.
-      filenames: An iterable of preprovisioned data filenames for a particular
-          benchmark.
-      install_path: The path to download the data file.
-
-    Raises:
-      errors.Setup.BadPreprovisionedDataError: If the benchmark or filename are
-          not defined with preprovisioned data, or if the sha256sum hash in the
-          code does not match the sha256sum of the file.
-    """
-    benchmark_module = benchmark_lookup.BenchmarkModule(benchmark_name)
-    if not benchmark_module:
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Cannot install preprovisioned data for undefined benchmark %s.' %
-          benchmark_name)
-    try:
-      # TODO(user): Change BENCHMARK_DATA to PREPROVISIONED_DATA.
-      preprovisioned_data = benchmark_module.BENCHMARK_DATA
-    except AttributeError:
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Benchmark %s does not define a BENCHMARK_DATA dict with '
-          'preprovisioned data.' % benchmark_name)
-    fallback_url = getattr(benchmark_module, 'BENCHMARK_DATA_URL', {})
-    self._InstallData(preprovisioned_data, benchmark_name, filenames,
-                      install_path, fallback_url)
-
-  def InstallPreprovisionedPackageData(self, package_name, filenames,
-                                       install_path):
-    """Installs preprovisioned Package data on this VM.
-
-    Some benchmarks require importing many bytes of data into the virtual
-    machine. This data can be staged in a particular cloud and the virtual
-    machine implementation can override how the preprovisioned data is
-    installed in the VM by overriding DownloadPreprovisionedData.
-
-    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
-    bucket that the VMs may access. For a benchmark that requires
-    preprovisioned data, follow the instructions for that benchmark to download
-    and store the data so that it may be accessed by a VM via this method.
-
-    Before installing from preprovisioned data in the cloud, this function looks
-    for files in the local data directory. If found, they are pushed to the VM.
-    Otherwise, this function attempts to download them from their preprovisioned
-    location onto the VM.
-
-    Args:
-      package_name: The name of the package file defining the preprovisoned
-      data. The default vaule is None. If the package_name is provided, the
-      package file must define the dict PREPROVISIONED_DATA mapping filenames to
-      sha256sum hashes.
-      filenames: An iterable of preprovisioned data filenames for a particular
-      package.
-      install_path: The path to download the data file.
-
-    Raises:
-      errors.Setup.BadPreprovisionedDataError: If the package or filename are
-          not defined with preprovisioned data, or if the sha256sum hash in the
-          code does not match the sha256sum of the file.
-    """
-    package_module = package_lookup.PackageModule(package_name)
-    if not package_module:
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Cannot install preprovisioned data for undefined package %s.' %
-          package_name)
-    try:
-      preprovisioned_data = package_module.PREPROVISIONED_DATA
-    except AttributeError:
-      raise errors.Setup.BadPreprovisionedDataError(
-          'Package %s does not define a PREPROVISIONED_DATA dict with '
-          'preprovisioned data.' % package_name)
-    fallback_url = getattr(package_module, 'PACKAGE_DATA_URL', {})
-    self._InstallData(preprovisioned_data, package_name, filenames,
-                      install_path, fallback_url)
-
-  def ShouldDownloadPreprovisionedData(self, module_name, filename):
-    """Returns whether or not preprovisioned data is available.
-
-    This function should be overridden by each cloud provider VM.
-
-    Args:
-      module_name: Name of the module associated with this data file.
-      filename: The name of the file that was downloaded.
-
-    Returns:
-      A boolean indicates if preprovisioned data is available.
-    """
-    raise NotImplementedError()
-
-  def InstallCli(self):
-    """Installs the cloud specific cli along with credentials on this vm."""
-    raise NotImplementedError()
-
-  def DownloadPreprovisionedData(self, install_path, module_name, filename):
-    """Downloads preprovisioned benchmark data.
-
-    This function should be overridden by each cloud provider VM. The file
-    should be downloaded into the install path within a subdirectory with the
-    benchmark name.
-
-    The downloaded file's parent directory will be created if it does not
-    exist.
-
-    Args:
-      install_path: The install path on this VM.
-      module_name: Name of the module associated with this data file.
-      filename: The name of the file that was downloaded.
-    """
-    raise NotImplementedError()
-
-  def IsInterruptible(self):
-    """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
-
-    Caller must call UpdateInterruptibleVmStatus before calling this function
-    to make sure return value is up to date.
-
-    Returns:
-      True if this vm is a interruptible vm.
-    """
-    return False
-
-  def UpdateInterruptibleVmStatus(self):
-    """Updates the status of the discounted vm.
-    """
-    pass
-
-  def WasInterrupted(self):
-    """Returns whether this interruptible vm was terminated early.
-
-    Caller must call UpdateInterruptibleVmStatus before calling this function
-    to make sure return value is up to date.
-
-    Returns:
-      True if this vm is a interruptible vm was terminated early.
-    """
-    return False
-
-  def GetVmStatusCode(self):
-    """Returns the vm status code if any.
-
-    Caller must call UpdateInterruptibleVmStatus before calling this function
-    to make sure return value is up to date.
-
-    Returns:
-      Vm status code.
-    """
-    return None
-
-  def _PreDelete(self):
-    """See base class."""
-    self.LogVmDebugInfo()
-
-
 class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   """The base class for OS Mixin classes.
 
@@ -1194,3 +754,443 @@ class DeprecatedOsMixin(BaseOsMixin):
     if self.ALTERNATIVE_OS:
       warning += " Use '%s' instead." % self.ALTERNATIVE_OS
     logging.warning(warning)
+
+
+class BaseVirtualMachine(resource.BaseResource):
+  """Base class for Virtual Machines.
+
+  This class holds VM methods and attributes relating to the VM as a cloud
+  resource. For methods and attributes that interact with the VM's guest
+  OS, see BaseOsMixin and its subclasses.
+
+  Attributes:
+    image: The disk image used to boot.
+    internal_ip: Internal IP address.
+    ip_address: Public (external) IP address.
+    machine_type: The provider-specific instance type (e.g. n1-standard-8).
+    project: The provider-specific project associated with the VM (e.g.
+      artisanal-lightbulb-883).
+    ssh_public_key: Path to SSH public key file.
+    ssh_private_key: Path to SSH private key file.
+    user_name: Account name for login. the contents of 'ssh_public_key' should
+      be in .ssh/authorized_keys for this user.
+    zone: The region / zone the VM was launched in.
+    cidr: The CIDR range the VM was launched in.
+    disk_specs: list of BaseDiskSpec objects. Specifications for disks attached
+      to the VM.
+    scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
+    max_local_disks: The number of local disks on the VM that can be used as
+      scratch disks or that can be striped together.
+    background_cpu_threads: The number of threads of background CPU usage
+      while running the benchmark.
+    background_network_mbits_per_sec: Number of mbits/sec of background network
+      usage while running the benchmark.
+    background_network_ip_type: Type of IP address to use for generating
+      background network workload
+  """
+
+  is_static = False
+
+  RESOURCE_TYPE = 'BaseVirtualMachine'
+  REQUIRED_ATTRS = ['CLOUD', 'OS_TYPE']
+  CLOUD = None
+
+  _instance_counter_lock = threading.Lock()
+  _instance_counter = 0
+
+  # Supports overriding the PIP package version based on the provider image.
+  # By default, the latest PIP version is used.
+  PYTHON_PIP_PACKAGE_VERSION = None
+
+  def __init__(self, vm_spec):
+    """Initialize BaseVirtualMachine class.
+
+    Args:
+      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+    """
+    super(BaseVirtualMachine, self).__init__()
+    with self._instance_counter_lock:
+      self.instance_number = self._instance_counter
+      self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
+      BaseVirtualMachine._instance_counter += 1
+    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
+    self.disable_rss = vm_spec.disable_rss
+    self.zone = vm_spec.zone
+    self.cidr = vm_spec.cidr
+    self.machine_type = vm_spec.machine_type
+    self.gpu_count = vm_spec.gpu_count
+    self.gpu_type = vm_spec.gpu_type
+    self.image = vm_spec.image
+    self.install_packages = vm_spec.install_packages
+    self.ip_address = None
+    self.internal_ip = None
+    self.user_name = DEFAULT_USERNAME
+    self.password = None
+    self.ssh_public_key = vm_util.GetPublicKeyPath()
+    self.ssh_private_key = vm_util.GetPrivateKeyPath()
+    self.disk_specs = []
+    self.scratch_disks = []
+    self.max_local_disks = 0
+    self.local_disk_counter = 0
+    self.remote_disk_counter = 0
+    self.background_cpu_threads = vm_spec.background_cpu_threads
+    self.background_network_mbits_per_sec = (
+        vm_spec.background_network_mbits_per_sec)
+    self.background_network_ip_type = vm_spec.background_network_ip_type
+    self.use_dedicated_host = None
+    self.num_vms_per_host = None
+
+    self.network = None
+    self.firewall = None
+    self.tcp_congestion_control = None
+    self.numa_node_count = None
+    self.num_disable_cpus = None
+    self.capacity_reservation_id = None
+    self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
+
+  def __repr__(self):
+    return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
+        self.ip_address, self.internal_ip)
+
+  def __str__(self):
+    if self.ip_address:
+      return self.ip_address
+    return super(BaseVirtualMachine, self).__str__()
+
+  def CreateScratchDisk(self, disk_spec):
+    """Create a VM's scratch disk.
+
+    Args:
+      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+    """
+    pass
+
+  def DeleteScratchDisks(self):
+    """Delete a VM's scratch disks."""
+    for scratch_disk in self.scratch_disks:
+      if scratch_disk.disk_type != disk.LOCAL:
+        scratch_disk.Delete()
+
+  def GetScratchDir(self, disk_num=0):
+    """Gets the path to the scratch directory.
+
+    Args:
+      disk_num: The number of the disk to mount.
+    Returns:
+      The mounted disk directory.
+
+    """
+    if disk_num >= len(self.scratch_disks):
+      raise errors.Error(
+          'GetScratchDir(disk_num=%s) is invalid, max disk_num is %s' % (
+              disk_num, len(self.scratch_disks)))
+    return self.scratch_disks[disk_num].mount_point
+
+  def AllowIcmp(self):
+    """Opens ICMP protocol on the firewall corresponding to the VM if exists."""
+    if self.firewall and not FLAGS.skip_firewall_rules:
+      self.firewall.AllowIcmp(self)
+
+  def AllowPort(self, start_port, end_port=None, source_range=None):
+    """Opens the port on the firewall corresponding to the VM if one exists.
+
+    Args:
+      start_port: The first local port to open in a range.
+      end_port: The last local port to open in a range. If None, only start_port
+        will be opened.
+      source_range: list of CIDRs. If none, all sources are allowed.
+    """
+    if self.firewall and not FLAGS.skip_firewall_rules:
+      self.firewall.AllowPort(self, start_port, end_port, source_range)
+
+  def AllowRemoteAccessPorts(self):
+    """Allow all ports in self.remote_access_ports."""
+    for port in self.remote_access_ports:
+      self.AllowPort(port)
+
+  def AddMetadata(self, **kwargs):
+    """Add key/value metadata to the instance.
+
+    Setting the metadata on create is preferred. If that is not possible, this
+    method adds metadata in the form of key value pairs to the instance. Useful
+    for debugging / introspection.
+
+    The default implementation is a noop. Cloud providers supporting instance
+    metadata should override.
+
+    Args:
+      **kwargs: dict. (tag name, tag value) pairs to set as metadata on the
+        instance.
+    """
+    pass
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing VM metadata.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    if not self.created:
+      return {}
+    result = self.metadata.copy()
+    result.update({
+        'image': self.image,
+        'zone': self.zone,
+        'cloud': self.CLOUD,
+    })
+    if self.cidr is not None:
+      result['cidr'] = self.cidr
+    if self.machine_type is not None:
+      result['machine_type'] = self.machine_type
+    if self.use_dedicated_host is not None:
+      result['dedicated_host'] = self.use_dedicated_host
+    if self.num_vms_per_host is not None:
+      result['num_vms_per_host'] = self.num_vms_per_host
+    if self.tcp_congestion_control is not None:
+      result['tcp_congestion_control'] = self.tcp_congestion_control
+    if self.numa_node_count is not None:
+      result['numa_node_count'] = self.numa_node_count
+    if self.num_disable_cpus is not None:
+      result['num_disable_cpus'] = self.num_disable_cpus
+    # Hack: Silently fail if we have no num_cpus or OS_TYPE attribute.
+    # This property is defined in BaseOsMixin and should always
+    # be available during regular PKB usage because virtual machines
+    # always have a mixin. However, in testing virtual machine objects
+    # are often instantiated without a mixin, so the line below was
+    # failing because the attribute didn't exist.
+    if getattr(self, 'num_cpus', None):
+      result['num_cpus'] = self.num_cpus
+      if self.NumCpusForBenchmark() != self.num_cpus:
+        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    if getattr(self, 'OS_TYPE', None):
+      result['os_type'] = self.OS_TYPE
+    return result
+
+  def SimulateMaintenanceEvent(self):
+    """Simulates a maintenance event on the VM."""
+    raise NotImplementedError()
+
+  def _InstallData(self, preprovisioned_data, module_name, filenames,
+                   install_path, fallback_url):
+    """Installs preprovisioned_data on this VM.
+
+    Args:
+      preprovisioned_data: The dict mapping filenames to sha256sum hashes.
+      module_name: The name of the module defining the preprovisioned data.
+      filenames: An iterable of preprovisioned data filenames for a particular
+      module.
+      install_path: The path to download the data file.
+      fallback_url: The dict mapping filenames to fallback url for downloading.
+
+    Raises:
+      errors.Setup.BadPreprovisionedDataError: If the module or filename are
+          not defined with preprovisioned data, or if the sha256sum hash in the
+          code does not match the sha256 of the file.
+    """
+    for filename in filenames:
+      if data.ResourceExists(filename):
+        local_tar_file_path = data.ResourcePath(filename)
+        self.PushFile(local_tar_file_path, install_path)
+        continue
+      url = fallback_url.get(filename)
+      sha256sum = preprovisioned_data.get(filename)
+      preprovisioned = self.ShouldDownloadPreprovisionedData(
+          module_name, filename)
+      if not sha256sum:
+        raise errors.Setup.BadPreprovisionedDataError(
+            'Cannot find sha256sum hash for file %s in module %s. See '
+            'README.md for information about preprovisioned data. '
+            'Cannot find file in /data directory either, fail to upload from '
+            'local directory.' % (filename, module_name))
+
+      if preprovisioned:
+        self.DownloadPreprovisionedData(install_path, module_name, filename)
+      elif url:
+        self.Install('wget')
+        file_name = os.path.basename(url)
+        self.RemoteCommand(
+            'wget -O {0} {1}'.format(
+                os.path.join(install_path, file_name), url))
+      else:
+        raise errors.Setup.BadPreprovisionedDataError(
+            'Cannot find preprovisioned file %s inside preprovisioned bucket '
+            'in module %s. See README.md for information about '
+            'preprovisioned data. '
+            'Cannot find fallback url of the file to download from web. '
+            'Cannot find file in /data directory either, fail to upload from '
+            'local directory.' % (filename, module_name))
+      self.CheckPreprovisionedData(
+          install_path, module_name, filename, sha256sum)
+
+  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
+                                         install_path):
+    """Installs preprovisioned benchmark data on this VM.
+
+    Some benchmarks require importing many bytes of data into the virtual
+    machine. This data can be staged in a particular cloud and the virtual
+    machine implementation can override how the preprovisioned data is
+    installed in the VM by overriding DownloadPreprovisionedData.
+
+    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
+    bucket that the VMs may access. For a benchmark that requires
+    preprovisioned data, follow the instructions for that benchmark to download
+    and store the data so that it may be accessed by a VM via this method.
+
+    Before installing from preprovisioned data in the cloud, this function looks
+    for files in the local data directory. If found, they are pushed to the VM.
+    Otherwise, this function attempts to download them from their preprovisioned
+    location onto the VM.
+
+    Args:
+      benchmark_name: The name of the benchmark defining the preprovisioned
+          data. The benchmark's module must define the dict BENCHMARK_DATA
+          mapping filenames to sha256sum hashes.
+      filenames: An iterable of preprovisioned data filenames for a particular
+          benchmark.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreprovisionedDataError: If the benchmark or filename are
+          not defined with preprovisioned data, or if the sha256sum hash in the
+          code does not match the sha256sum of the file.
+    """
+    benchmark_module = benchmark_lookup.BenchmarkModule(benchmark_name)
+    if not benchmark_module:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot install preprovisioned data for undefined benchmark %s.' %
+          benchmark_name)
+    try:
+      # TODO(user): Change BENCHMARK_DATA to PREPROVISIONED_DATA.
+      preprovisioned_data = benchmark_module.BENCHMARK_DATA
+    except AttributeError:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Benchmark %s does not define a BENCHMARK_DATA dict with '
+          'preprovisioned data.' % benchmark_name)
+    fallback_url = getattr(benchmark_module, 'BENCHMARK_DATA_URL', {})
+    self._InstallData(preprovisioned_data, benchmark_name, filenames,
+                      install_path, fallback_url)
+
+  def InstallPreprovisionedPackageData(self, package_name, filenames,
+                                       install_path):
+    """Installs preprovisioned Package data on this VM.
+
+    Some benchmarks require importing many bytes of data into the virtual
+    machine. This data can be staged in a particular cloud and the virtual
+    machine implementation can override how the preprovisioned data is
+    installed in the VM by overriding DownloadPreprovisionedData.
+
+    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
+    bucket that the VMs may access. For a benchmark that requires
+    preprovisioned data, follow the instructions for that benchmark to download
+    and store the data so that it may be accessed by a VM via this method.
+
+    Before installing from preprovisioned data in the cloud, this function looks
+    for files in the local data directory. If found, they are pushed to the VM.
+    Otherwise, this function attempts to download them from their preprovisioned
+    location onto the VM.
+
+    Args:
+      package_name: The name of the package file defining the preprovisoned
+      data. The default vaule is None. If the package_name is provided, the
+      package file must define the dict PREPROVISIONED_DATA mapping filenames to
+      sha256sum hashes.
+      filenames: An iterable of preprovisioned data filenames for a particular
+      package.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreprovisionedDataError: If the package or filename are
+          not defined with preprovisioned data, or if the sha256sum hash in the
+          code does not match the sha256sum of the file.
+    """
+    package_module = package_lookup.PackageModule(package_name)
+    if not package_module:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot install preprovisioned data for undefined package %s.' %
+          package_name)
+    try:
+      preprovisioned_data = package_module.PREPROVISIONED_DATA
+    except AttributeError:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Package %s does not define a PREPROVISIONED_DATA dict with '
+          'preprovisioned data.' % package_name)
+    fallback_url = getattr(package_module, 'PACKAGE_DATA_URL', {})
+    self._InstallData(preprovisioned_data, package_name, filenames,
+                      install_path, fallback_url)
+
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available.
+
+    This function should be overridden by each cloud provider VM.
+
+    Args:
+      module_name: Name of the module associated with this data file.
+      filename: The name of the file that was downloaded.
+
+    Returns:
+      A boolean indicates if preprovisioned data is available.
+    """
+    raise NotImplementedError()
+
+  def InstallCli(self):
+    """Installs the cloud specific cli along with credentials on this vm."""
+    raise NotImplementedError()
+
+  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+    """Downloads preprovisioned benchmark data.
+
+    This function should be overridden by each cloud provider VM. The file
+    should be downloaded into the install path within a subdirectory with the
+    benchmark name.
+
+    The downloaded file's parent directory will be created if it does not
+    exist.
+
+    Args:
+      install_path: The install path on this VM.
+      module_name: Name of the module associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    raise NotImplementedError()
+
+  def IsInterruptible(self):
+    """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      True if this vm is a interruptible vm.
+    """
+    return False
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the status of the discounted vm.
+    """
+    pass
+
+  def WasInterrupted(self):
+    """Returns whether this interruptible vm was terminated early.
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      True if this vm is a interruptible vm was terminated early.
+    """
+    return False
+
+  def GetVmStatusCode(self):
+    """Returns the vm status code if any.
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      Vm status code.
+    """
+    return None
+
+  def _PreDelete(self):
+    """See base class."""
+    self.LogVmDebugInfo()
