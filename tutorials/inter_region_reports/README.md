@@ -246,7 +246,7 @@ other options for each VM.
           machine_type: [n1-standard-2]
       flags:
         cloud: GCP
-        ping_also_run_using_external_ip: True
+        ip_addresses: BOTH
     ```
 
 1.  Run the latency tests.

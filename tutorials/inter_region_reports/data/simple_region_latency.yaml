@@ -13,4 +13,4 @@ ping:
       gcp_min_cpu_platform: [skylake]
   flags:
     cloud: GCP
-    ping_also_run_using_external_ip: True
+    ip_addresses: BOTH
