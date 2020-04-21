@@ -103,3 +103,6 @@
     -   The current defaults leave other Linux OSes at 10GB and Windows OSes at
         50GB.
 -   Explicitly setting Netperf to Python 3.
+-   Update PKB cloud datastore ycsb benchmark:
+    - change private_keyfile_dir from a constant value to a FLAG
+    - delete all db entries as part of Cleanup

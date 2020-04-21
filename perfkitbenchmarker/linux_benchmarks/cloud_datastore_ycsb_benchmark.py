@@ -26,12 +26,15 @@ to test Datastore.
 """
 
 import logging
-import posixpath
+import concurrent.futures
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
+
+from google.cloud import datastore
+from google.oauth2 import service_account
 
 
 BENCHMARK_NAME = 'cloud_datastore_ycsb'
@@ -45,23 +48,29 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'lib')
-PRIVATE_KEYFILE_DIR = '/tmp/key.p12'
+_THREAD_POOL_WORKERS = 100
+_BATCH_SIZE = 500
+# the name of the database entity created when running datastore YCSB
+# https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
+_YCSB_COLLECTIONS = ['usertable']
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('google_datastore_keyfile',
-                    None,
+flags.DEFINE_string('google_datastore_keyfile', None,
                     'The path to Google API P12 private key file')
-flags.DEFINE_string('google_datastore_serviceAccount',
-                    None,
-                    'The service account email associated with'
-                    'datastore private key file')
-flags.DEFINE_string('google_datastore_datasetId',
-                    None,
+flags.DEFINE_string(
+    'private_keyfile_dir', '/tmp/key.p12',
+    'The directory path where the private key file is copied to on a VM.')
+flags.DEFINE_string(
+    'google_datastore_serviceAccount', None,
+    'The service account email associated with'
+    'datastore private key file')
+flags.DEFINE_string('google_datastore_datasetId', None,
                     'The project ID that has Cloud Datastore service')
-flags.DEFINE_string('google_datastore_debug',
-                    'false',
+flags.DEFINE_string('google_datastore_debug', 'false',
                     'The logging level when running YCSB')
+# the JSON keyfile is needed to validate credentials in the Cleanup phase
+flags.DEFINE_string('google_datastore_deletion_keyfile', None,
+                    'The path to Google API JSON private key file')
 
 
 def GetConfig(user_config):
@@ -71,11 +80,8 @@ def GetConfig(user_config):
   return config
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(_):
   """Verifies that the required resources are present.
-
-  Args:
-    benchmark_config: Unused.
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
@@ -120,7 +126,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   run_kwargs = {
       'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
-      'googledatastore.privateKeyFile': PRIVATE_KEYFILE_DIR,
+      'googledatastore.privateKeyFile': FLAGS.private_keyfile_dir,
       'googledatastore.serviceAccountEmail':
           FLAGS.google_datastore_serviceAccount,
       'googledatastore.debug': FLAGS.google_datastore_debug,
@@ -133,14 +139,41 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
-  # TODO(buggay): support automatic cleanup.
-  logging.warning(
-      'For now, we can only manually delete all the entries via GCP portal.')
+def Cleanup(_):
+  """Deletes all entries in a datastore database."""
+  if FLAGS.google_datastore_deletion_keyfile:
+    dataset_id = FLAGS.google_datastore_datasetId
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=_THREAD_POOL_WORKERS)
+    credentials_path = FLAGS.google_datastore_deletion_keyfile
+
+    logging.info('Attempting to delete all data in %s', dataset_id)
+
+    credentials = service_account.Credentials.from_service_account_file(
+        credentials_path,
+        scopes=datastore.client.Client.SCOPE,
+    )
+
+    db = datastore.Client(project=dataset_id, credentials=credentials)
+
+    for kind in _YCSB_COLLECTIONS:
+      while True:
+        futures = []
+        for entity in db.query(kind=kind).fetch(limit=_BATCH_SIZE):
+          futures.append(executor.submit(db.delete(entity.key)))
+        if not futures:
+          logging.info('Deleted all data in %s', dataset_id)
+          break
+        logging.info('Enqueued %d deletes', len(futures))
+        concurrent.futures.wait(
+            futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+        logging.info('Finished %d deletes', len(futures))
+  else:
+    logging.warning('Manually delete all the entries via GCP portal.')
 
 
 def _Install(vm):
   vm.Install('ycsb')
 
   # Copy private key file to VM
-  vm.RemoteCopy(FLAGS.google_datastore_keyfile, PRIVATE_KEYFILE_DIR)
+  vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile_dir)

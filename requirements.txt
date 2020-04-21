@@ -23,4 +23,5 @@ numpy==1.16.4
 contextlib2>=0.5.1
 pywinrm
 timeout-decorator
+google-cloud-datastore
 google-cloud-monitoring
