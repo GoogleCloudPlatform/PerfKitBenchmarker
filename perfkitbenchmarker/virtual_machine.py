@@ -793,7 +793,6 @@ class BaseVirtualMachine(resource.BaseResource):
 
   RESOURCE_TYPE = 'BaseVirtualMachine'
   REQUIRED_ATTRS = ['CLOUD', 'OS_TYPE']
-  CLOUD = None
 
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
@@ -847,6 +846,12 @@ class BaseVirtualMachine(resource.BaseResource):
     self.num_disable_cpus = None
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def CLOUD(cls):
+    return NotImplementedError
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(

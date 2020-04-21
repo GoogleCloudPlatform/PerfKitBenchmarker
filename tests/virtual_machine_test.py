@@ -132,6 +132,8 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
 class TestVM(virtual_machine.BaseVirtualMachine):
 
+  CLOUD = 'TestCloud'
+
   def __init__(self, _):
     pass
 
