@@ -1009,7 +1009,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     result = super(AwsVirtualMachine, self).GetResourceMetadata()
     result['boot_disk_type'] = self.DEFAULT_ROOT_DISK_TYPE
-    result['boot_disk_size'] = self.boot_disk_size or 'default'
+    result['boot_disk_size'] = self.boot_disk_size
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
     result['efa'] = FLAGS.aws_efa
