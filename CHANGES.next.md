@@ -76,6 +76,17 @@
     -   Delete the obsolete `--eks-verify-ssl`
 -   Separate NVIDIA driver functionality from CUDA toolkit
 -   Added --runspec_tar option to SpecCPU (specifying installation tarball).
+-   Added generic support for using `PreprovisionedData`
+    -   Added the `preprovision_ignore_checksum` flag that can be used when
+        downloading content that is not registered in `PREPROVISIONED_DATA`
+    -   Make `ShouldDownloadPreprovisionedData` in virtual_machine.py return
+        False instead of throwing a `NotImplemented` error
+-   Implemented `PreprovisionedData` in the Maven package and make Maven more
+    robust
+    -   Added `maven_mirror_url` to specify a custom Maven mirror
+    -   Added sha256 checksums for a few Maven versions
+    -   Made retrieving JAVA_HOME more robust
+    -   Fixed a java lib issue on CentOS
 -   Add OpenFOAM support for timing individual commands.
 
 ### Bug fixes and maintenance updates:

@@ -16,10 +16,14 @@
 import posixpath
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from six.moves.urllib.parse import urlparse
 
-flags.DEFINE_string('maven_version', '3.6.3', 'The version of maven')
+flags.DEFINE_string('maven_version', '3.6.3',
+                    'The version of maven')
+flags.DEFINE_string('maven_mirror_url', '',
+                    'If specified, this URL will be used as a Maven mirror')
 FLAGS = flags.FLAGS
 MVN_URL = 'https://archive.apache.org/dist/maven/maven-{0}/{1}/binaries/apache-maven-{1}-bin.tar.gz'
 MVN_DIR = posixpath.join(INSTALL_DIR, 'maven')
@@ -31,6 +35,18 @@ export M2_HOME={maven_home}
 export MAVEN_HOME={maven_home}
 export PATH={maven_home}/bin:$PATH
 '''
+
+PACKAGE_NAME = 'maven'
+PREPROVISIONED_DATA = {
+    'apache-maven-{0}-bin.tar.gz'.format('3.6.1'):
+        '2528c35a99c30f8940cc599ba15d34359d58bec57af58c1075519b8cd33b69e7',
+    'apache-maven-{0}-bin.tar.gz'.format('3.6.3'):
+        '26ad91d751b3a9a53087aefa743f4e16a17741d3915b219cf74112bf87a438c5'
+}
+PACKAGE_DATA_URL = {
+    'apache-maven-{0}-bin.tar.gz'.format('3.6.1'): MVN_URL.format('3', '3.6.1'),
+    'apache-maven-{0}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3')
+}
 
 
 def GetRunCommand(arguments):
@@ -52,6 +68,16 @@ def GetRunCommand(arguments):
   return command
 
 
+def _GetJavaHome(vm):
+  out, _ = vm.RemoteCommand("java -XshowSettings:properties 2>&1 > /dev/null "
+                            "| awk '/java.home/{print $3}'")
+  out = out.strip()
+  if '/jre' in out:
+    return out[:out.index('/jre')]
+  else:
+    return out
+
+
 def AptInstall(vm):
   _Install(vm)
 
@@ -70,22 +96,48 @@ def _Install(vm):
   maven_full_ver = FLAGS.maven_version
   maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
   maven_url = MVN_URL.format(maven_major_ver, maven_full_ver)
-  vm.RemoteCommand(
-      ('mkdir {0} && curl -L {1} | '
-       'tar -C {0} --strip-components=1 -xzf -').format(MVN_DIR, maven_url))
+  maven_tar = maven_url.split('/')[-1]
+  if maven_tar not in PREPROVISIONED_DATA:
+    PREPROVISIONED_DATA[maven_tar] = ''  # will only work with preprovision_ignore_checksum
+    PACKAGE_DATA_URL[maven_tar] = maven_url
+  maven_remote_path = posixpath.join(INSTALL_DIR, maven_tar)
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME,
+      [maven_tar],
+      INSTALL_DIR
+  )
+  vm.RemoteCommand(('mkdir -p {0} && '
+                    'tar -C {0} --strip-components=1 -xzf {1}').format(
+                        MVN_DIR, maven_remote_path))
 
-  # Get JAVA_HOME
-  out, _ = vm.RemoteCommand('readlink -f `which java`')
-  out = out.strip()
-  java_home = out[:out.index('/jre')]
+  java_home = _GetJavaHome(vm)
 
   # Set env variables for maven
   maven_env = MVN_ENV.format(java_home=java_home, maven_home=MVN_DIR)
   cmd = 'echo "{0}" | sudo tee -a {1}'.format(maven_env, MVN_ENV_PATH)
   vm.RemoteCommand(cmd)
 
+  # On CentOS, the mvn command looks for tools.jar in $JAVA_HOME/../lib
+  java_lib = posixpath.join(java_home, 'lib')
+  java_lib_sym = posixpath.join(java_home, '..', 'lib')
+  vm.RemoteCommand('sudo ln -sf {0} {1}'.format(java_lib, java_lib_sym))
+
+  if FLAGS.maven_mirror_url != '':
+    settings_local_path = data.ResourcePath(posixpath.join(
+        'maven', 'settings.xml.j2'))
+    settings_remote_path = '~/.m2/settings.xml'
+    context = {
+        'maven_mirror_url': FLAGS.maven_mirror_url
+    }
+    vm.RemoteCommand('mkdir -p ~/.m2')
+    vm.RenderTemplate(settings_local_path, settings_remote_path, context)
+
 
 def Uninstall(vm):
+  java_home = _GetJavaHome(vm)
+  java_lib_sym = posixpath.join(java_home, '..', 'lib')
+  vm.RemoteCommand('sudo rm -f {0}'.format(java_lib_sym))
   vm.Uninstall('openjdk')
+  vm.Uninstall('curl')
   vm.RemoteCommand('rm -rf {0}'.format(MVN_DIR), ignore_failure=True)
   vm.RemoteCommand('sudo rm -f {0}'.format(MVN_ENV_PATH), ignore_failure=True)
