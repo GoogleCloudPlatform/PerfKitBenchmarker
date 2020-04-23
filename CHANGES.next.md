@@ -26,6 +26,10 @@
         https://aws.amazon.com/blogs/aws/update-on-amazon-linux-ami-end-of-life/
         at which point it will be removed from PKB.
     -   You can use the recommended `amazonlinux2` instead.
+-   Remove `ping_also_run_using_external_ip` from ping benchmark
+    -   You should now use the `ip_addresses` flag to specify whether to
+        test with internal IPs, external IPs or both. This brings ping
+        into alignment with how other network benchmarks function.
 
 ### New features:
 

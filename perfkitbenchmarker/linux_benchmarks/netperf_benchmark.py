@@ -498,7 +498,8 @@ def Run(benchmark_spec):
         external_ip_results = RunNetperf(client_vm, netperf_benchmark,
                                          server_vm.ip_address, num_streams)
         for external_ip_result in external_ip_results:
-          external_ip_result.metadata['ip_type'] = 'external'
+          external_ip_result.metadata[
+              'ip_type'] = vm_util.IpAddressMetadata.EXTERNAL
           external_ip_result.metadata.update(metadata)
         results.extend(external_ip_results)
 
@@ -507,7 +508,8 @@ def Run(benchmark_spec):
                                          server_vm.internal_ip, num_streams)
         for internal_ip_result in internal_ip_results:
           internal_ip_result.metadata.update(metadata)
-          internal_ip_result.metadata['ip_type'] = 'internal'
+          internal_ip_result.metadata[
+              'ip_type'] = vm_util.IpAddressMetadata.INTERNAL
         results.extend(internal_ip_results)
 
   return results

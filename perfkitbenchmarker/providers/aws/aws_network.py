@@ -62,7 +62,37 @@ class AwsFirewall(network.BaseFirewall):
 
   def __init__(self):
     self.firewall_set = set()
+    self.firewall_icmp_set = set()
     self._lock = threading.Lock()
+
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+    source = '0.0.0.0/0'
+
+    # region, group_id, source
+    entry = (vm.region, vm.group_id, source)
+    with self._lock:
+      if entry in self.firewall_icmp_set:
+        return
+      # When defining ICMP firewall rules using the aws cli,
+      # port specifies the type of ICMP traffic allowed,
+      # with -1 meaning all ICMP types
+      # https://docs.aws.amazon.com/cli/latest/reference/ec2/authorize-security-group-ingress.html
+      authorize_cmd = util.AWS_PREFIX + [
+          'ec2',
+          'authorize-security-group-ingress',
+          '--region=%s' % vm.region,
+          '--group-id=%s' % vm.group_id,
+          '--protocol=icmp',
+          '--port=-1',
+          '--cidr=%s' % source]
+      util.IssueRetryableCommand(
+          authorize_cmd)
+      self.firewall_icmp_set.add(entry)
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.

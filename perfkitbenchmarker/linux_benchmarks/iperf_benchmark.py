@@ -181,7 +181,7 @@ def Run(benchmark_spec):
                                  receiving_vm,
                                  receiving_vm.ip_address,
                                  thread_count,
-                                 'external'))
+                                 vm_util.IpAddressMetadata.EXTERNAL))
 
       # Send using internal IP addresses
       if vm_util.ShouldRunOnInternalIpAddress(sending_vm,
@@ -190,7 +190,7 @@ def Run(benchmark_spec):
                                  receiving_vm,
                                  receiving_vm.internal_ip,
                                  thread_count,
-                                 'internal'))
+                                 vm_util.IpAddressMetadata.INTERNAL))
 
   return results
 
