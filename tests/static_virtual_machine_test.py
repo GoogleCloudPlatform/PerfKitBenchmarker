@@ -12,22 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for PerfKitBenchmarker' StaticVirtualMachine."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+import io
 import unittest
 
+from absl import flags
 import mock
-
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine as svm
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
-from six import StringIO
-from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -87,17 +80,17 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(vm1.ssh_private_key, vm2.ssh_private_key)
 
   def testReadFromFile_WrongFormat(self):
-    fp = StringIO('{}')
+    fp = io.StringIO('{}')
     self.assertRaises(ValueError,
                       svm.StaticVirtualMachine.ReadStaticVirtualMachineFile, fp)
 
   def testReadFromFile_MissingKey(self):
-    fp = StringIO('[{"ip_address": "10.10.10.3"}]')
+    fp = io.StringIO('[{"ip_address": "10.10.10.3"}]')
     self.assertRaises(ValueError,
                       svm.StaticVirtualMachine.ReadStaticVirtualMachineFile, fp)
 
   def testReadFromFile_Empty(self):
-    fp = StringIO('[]')
+    fp = io.StringIO('[]')
     svm.StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual([], list(svm.StaticVirtualMachine.vm_pool))
 
@@ -114,7 +107,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '   "internal_ip": "10.10.10.2", '
          '   "zone": "rackspace_dallas" '
          '}] ')
-    fp = StringIO(s)
+    fp = io.StringIO(s)
     svm.StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
 
     vm_pool = svm.StaticVirtualMachine.vm_pool
@@ -143,7 +136,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '  "keyfile_path": "perfkitbenchmarker.pem", '
          '  "scratch_disk_mountpoints": "/tmp/google-pkb" '
          '}]')
-    fp = StringIO(s)
+    fp = io.StringIO(s)
     self.assertRaises(ValueError,
                       svm.StaticVirtualMachine.ReadStaticVirtualMachineFile, fp)
 
@@ -154,7 +147,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '  "user_name": "perfkitbenchmarker", '
          '  "keyfile_path": "perfkitbenchmarker.pem"'
          '}]')
-    fp = StringIO(s)
+    fp = io.StringIO(s)
     svm.StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
 
     vm_pool = svm.StaticVirtualMachine.vm_pool
@@ -180,7 +173,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
          '   "internal_ip": "10.10.10.2", '
          '   "zone": "rackspace_dallas" '
          '}] ')
-    fp = StringIO(s)
+    fp = io.StringIO(s)
     svm.StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(2, len(svm.StaticVirtualMachine.vm_pool))
     vm0 = svm.StaticVirtualMachine.GetStaticVirtualMachine()
@@ -206,7 +199,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
                                        (None, '/test_scratch_disk_1'),
                                        ('/test_local_disk_0',
                                         None), ('/test_local_disk_1', None))
-    fp = StringIO(s)
+    fp = io.StringIO(s)
     svm.StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(1, len(svm.StaticVirtualMachine.vm_pool))
     vm = svm.StaticVirtualMachine.GetStaticVirtualMachine()

@@ -18,6 +18,7 @@
 import json
 import unittest
 from absl import flags as flgs
+import builtins
 import contextlib2
 import mock
 from perfkitbenchmarker import os_types
@@ -28,7 +29,6 @@ from perfkitbenchmarker.providers.azure import util as azure_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
 from tests import pkb_common_test_case
-from six.moves import builtins
 
 FLAGS = flgs.FLAGS
 FLAGS.kubernetes_anti_affinity = False
