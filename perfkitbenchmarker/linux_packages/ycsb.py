@@ -1098,11 +1098,11 @@ class YCSBExecutor(object):
         parameters['hdrhistogram.output.path'] = hdr_files_dir
       if FLAGS.ycsb_requestdistribution:
         parameters['requestdistribution'] = FLAGS.ycsb_requestdistribution
-      if FLAGS.ycsb_readproportion is not None:
+      if FLAGS.ycsb_readproportion:
         parameters['readproportion'] = FLAGS.ycsb_readproportion
-      if FLAGS.ycsb_updateproportion is not None:
+      if FLAGS.ycsb_updateproportion:
         parameters['updateproportion'] = FLAGS.ycsb_updateproportion
-      if FLAGS.ycsb_scanproportion is not None:
+      if FLAGS.ycsb_scanproportion:
         parameters['scanproportion'] = FLAGS.ycsb_scanproportion
       parameters.update(kwargs)
       remote_path = posixpath.join(INSTALL_DIR,

@@ -111,4 +111,3 @@
     - change private_keyfile_dir from a constant value to a FLAG
     - delete all db entries as part of Cleanup
 -   Remove 'default' keyword from AWS and Azure boot_disk_size
--   Check ycsb proportion explicitly against none.
