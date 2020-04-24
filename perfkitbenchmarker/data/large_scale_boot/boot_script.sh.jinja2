@@ -73,10 +73,9 @@ echo $(date +%s%N) > {{start_time_file}}
     --zone {{ zone }}
     --metadata "${START_UP_SCRIPT}"
   )
-  for i in {1..{{vm_count}}}; do
-    {{ gcloud_path }} compute instances create {{ boot_vm_name_prefix }}-$i  \
-    "${gcloud_args[@]}" &
-  done
+  VM_NAMES=`seq -f '{{ boot_vm_name_prefix }}-%g' -s ' ' 1 {{ vm_count }}`
+  {{ gcloud_path }} compute instances create $VM_NAMES  \
+  "${gcloud_args[@]}" &
 {% elif cloud == 'AWS' %}
   aws_args=(
     --output text
