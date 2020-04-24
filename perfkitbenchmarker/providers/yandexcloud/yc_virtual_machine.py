@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,10 +55,6 @@ import yaml
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu-1804-lts'
-_INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
-                               'to fulfill the request.')
-STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
-                    'potential stockout scenario.')
 _YC_VM_CREATE_TIMEOUT = 600
 
 
@@ -118,8 +114,8 @@ class YcVmSpec(virtual_machine.BaseVmSpec):
       config_values['core_fraction'] = flag_values.yc_core_fraction
     if flag_values['yc_folder_id'].present:
       config_values['folder_id'] = flag_values.yc_folder_id
-    if flag_values['image_family'].present:
-      config_values['image_family'] = flag_values.image_family
+    if flag_values['yc_image_family'].present:
+      config_values['image_family'] = flag_values.yc_image_family
     if flag_values['yc_image_folder_id'].present:
       config_values['image_folder_id'] = flag_values.yc_image_folder_id
 
@@ -273,10 +269,6 @@ class YcVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd = self._GenerateCreateCommand(tf.name)
       _, stderr, retcode = create_cmd.Issue(timeout=_YC_VM_CREATE_TIMEOUT)
 
-    if (retcode and
-        _INSUFFICIENT_HOST_CAPACITY in stderr):
-      logging.error(STOCKOUT_MESSAGE)
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
     util.CheckYcResponseKnownFailures(stderr, retcode)
 
   def _CreateDependencies(self):
@@ -317,7 +309,6 @@ class YcVirtualMachine(virtual_machine.BaseVirtualMachine):
       response = json.loads(stdout)
       self.image = response['source_image_id']
       self.backfill_image = True
-    self.InstallPackages('git')
 
   def _Delete(self):
     """Delete a YC VM instance."""

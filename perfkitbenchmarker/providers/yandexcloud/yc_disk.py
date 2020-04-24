@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -106,8 +106,6 @@ class YcDisk(disk.BaseDisk):
     cmd.flags['device-name'] = self.device_name
     cmd.flags['disk-name'] = self.name
     cmd.IssueRetryable()
-
-    time.sleep(1)
 
     vm.RemoteCommand('sudo udevadm trigger')
 

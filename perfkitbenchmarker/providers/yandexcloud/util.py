@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,8 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.yandexcloud import \
-    yc_machine_types
+from perfkitbenchmarker.providers.yandexcloud import yc_machine_types
 import six
 
 if six.PY2:
@@ -172,11 +171,11 @@ _LIMIT_EXCEEDED_REGEX = re.compile('The limit .* has exceeded.')
 
 
 def CheckYcResponseKnownFailures(stderr, retcode):
-  """Checks gcloud responses for quota exceeded errors.
+  """Checks yandex cloud responses for quota exceeded errors.
 
   Args:
-      stderr: The stderr from a gcloud command.
-      retcode: The return code from a gcloud command.
+      stderr: The stderr from a yc command.
+      retcode: The return code from a yc command.
   """
   if retcode and _LIMIT_EXCEEDED_REGEX.search(stderr):
     message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr

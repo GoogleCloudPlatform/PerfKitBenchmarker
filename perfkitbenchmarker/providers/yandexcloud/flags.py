@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,3 @@ flags.DEFINE_integer('yc_boot_disk_size', None,
                      'The boot disk size in GB for YC VMs.')
 flags.DEFINE_enum('yc_boot_disk_type', None, ['network-hdd', 'network-ssd'],
                   'The boot disk type for YC VMs.')
-
-flags.DEFINE_string('yc_preprovisioned_data_bucket', None,
-                    'YC bucket where pre-provisioned data has been copied.')
