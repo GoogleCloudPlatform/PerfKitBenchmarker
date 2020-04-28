@@ -16,7 +16,9 @@
 
 import unittest
 import mock
+import posixpath
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import maven
 from tests import pkb_common_test_case
 
@@ -28,7 +30,7 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(MavenTest, self).setUp()
     self.vm = mock.Mock()
-    self.vm.RemoteCommand.return_value = ('/jre/java', '')
+    self.vm.RemoteCommand.return_value = ('/home/jre/java', '')
 
   def assertCallArgsEqual(self, call_args_singles, mock_method):
     """Compare the list of single arguments to all mocked calls in mock_method.
@@ -87,16 +89,25 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     maven_full_ver = maven.FLAGS.maven_version
     maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
     maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
+    maven_tar = maven_url.split('/')[-1]
+    maven_remote_path = posixpath.join(INSTALL_DIR, maven_tar)
+    java_lib = posixpath.join('/home', 'lib')
+    java_lib_sym = posixpath.join('/home', '..', 'lib')
     self.assertRemoteCommandsEqual([
-        'mkdir {0} && curl -L {1} | '
-        'tar -C {0} --strip-components=1 -xzf -'.format(maven.MVN_DIR,
-                                                        maven_url),
-        'readlink -f `which java`', 'echo "{0}" | sudo tee -a {1}'.format(
-            maven.MVN_ENV.format(java_home='', maven_home=maven.MVN_DIR),
-            maven.MVN_ENV_PATH)
+        'mkdir -p {0} && '
+        'tar -C {0} --strip-components=1 -xzf {1}'.format(maven.MVN_DIR,
+                                                          maven_remote_path),
+        'java -XshowSettings:properties 2>&1 > /dev/null '
+        '| awk \'/java.home/{print $3}\'',
+        'echo "{0}" | sudo tee -a {1}'.format(
+            maven.MVN_ENV.format(java_home='/home', maven_home=maven.MVN_DIR),
+            maven.MVN_ENV_PATH),
+        'sudo ln -sf {0} {1}'.format(java_lib, java_lib_sym)
     ])
     self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
-    self.assertOnlyKnownMethodsCalled('RemoteCommand', 'Install')
+    self.assertOnlyKnownMethodsCalled('RemoteCommand',
+                                      'InstallPreprovisionedPackageData',
+                                      'Install')
 
 
 if __name__ == '__main__':
