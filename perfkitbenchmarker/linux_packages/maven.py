@@ -138,6 +138,5 @@ def Uninstall(vm):
   java_lib_sym = posixpath.join(java_home, '..', 'lib')
   vm.RemoteCommand('sudo rm -f {0}'.format(java_lib_sym))
   vm.Uninstall('openjdk')
-  vm.Uninstall('curl')
   vm.RemoteCommand('rm -rf {0}'.format(MVN_DIR), ignore_failure=True)
   vm.RemoteCommand('sudo rm -f {0}'.format(MVN_ENV_PATH), ignore_failure=True)
