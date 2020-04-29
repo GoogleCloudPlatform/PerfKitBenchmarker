@@ -113,3 +113,5 @@
 -   Remove 'default' keyword from AWS and Azure boot_disk_size
 -   Check ycsb proportion explicitly against none.
 -   Fix issue in calculating Geometric means.
+-   Add support to PKB cloud datastore ycsb benchmark to use GCS files for
+    datastore keyfiles.
