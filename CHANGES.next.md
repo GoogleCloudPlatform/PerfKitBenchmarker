@@ -112,3 +112,4 @@
     - delete all db entries as part of Cleanup
 -   Remove 'default' keyword from AWS and Azure boot_disk_size
 -   Check ycsb proportion explicitly against none.
+-   Fix issue in calculating Geometric means.

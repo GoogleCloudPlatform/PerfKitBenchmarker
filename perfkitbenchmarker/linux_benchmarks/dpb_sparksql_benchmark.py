@@ -180,7 +180,8 @@ def Prepare(benchmark_spec):
           job_arguments=[FLAGS.dpb_sparksql_data, table])
       logging.info(stats)
       if not stats['success']:
-        logging.warning('Creates table %s from %s failed', table, table_dir)
+        raise errors.Benchmarks.PrepareException(
+            'Creates table {} from {} failed'.format(table, table_dir))
 
 
 def Run(benchmark_spec):
