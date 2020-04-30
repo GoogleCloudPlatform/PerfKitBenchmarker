@@ -168,20 +168,17 @@ def Prepare(benchmark_spec):
   if FLAGS.dpb_sparksql_data:
     stdout = storage_service.List(FLAGS.dpb_sparksql_data)
 
-    for table_dir in stdout.split('\n'):
-      # The directory name is the table name.
-      if not table_dir:
-        continue
-      table = re.split(' |/', table_dir.rstrip('/')).pop()
-      stats = dpb_service_instance.SubmitJob(
-          pyspark_file=os.path.join(benchmark_spec.base_dir,
-                                    SPARK_TABLE_SCRIPT),
-          job_type=BaseDpbService.PYSPARK_JOB_TYPE,
-          job_arguments=[FLAGS.dpb_sparksql_data, table])
-      logging.info(stats)
-      if not stats['success']:
-        raise errors.Benchmarks.PrepareException(
-            'Creates table {} from {} failed'.format(table, table_dir))
+    table_subdirs = [re.split(' |/', line.rstrip('/')).pop()
+                     for line in stdout.split('\n') if line]
+    stats = dpb_service_instance.SubmitJob(
+        pyspark_file=os.path.join(benchmark_spec.base_dir,
+                                  SPARK_TABLE_SCRIPT),
+        job_type=BaseDpbService.PYSPARK_JOB_TYPE,
+        job_arguments=[FLAGS.dpb_sparksql_data + ','.join(table_subdirs)])
+    logging.info(stats)
+    if not stats['success']:
+      raise errors.Benchmarks.PrepareException(
+          'Creating tables from {}/* failed'.format(FLAGS.sparksql_data))
 
 
 def Run(benchmark_spec):
