@@ -115,3 +115,6 @@
 -   Fix issue in calculating Geometric means.
 -   Add support to PKB cloud datastore ycsb benchmark to use GCS files for
     datastore keyfiles.
+-   Add SSH keys to dpb EMR clusters for debuggability.
+    - Security groups of the clusters will have to be manually edited to allow
+    SSH.

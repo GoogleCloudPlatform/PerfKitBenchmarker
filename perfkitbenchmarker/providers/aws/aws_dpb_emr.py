@@ -27,6 +27,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
@@ -117,15 +118,15 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
     if self.dpb_service_zone:
-      region = util.GetRegionFromZone(self.dpb_service_zone)
-      self.cmd_prefix += ['--region', region]
-      self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
-          aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
-      self.storage_service = s3.S3Service()
-      self.storage_service.PrepareService(region)
+      self.region = util.GetRegionFromZone(self.dpb_service_zone)
     else:
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
+    self.cmd_prefix += ['--region', self.region]
+    self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
+        aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
+    self.storage_service = s3.S3Service()
+    self.storage_service.PrepareService(self.region)
     self.bucket_to_delete = None
     self.dpb_version = FLAGS.dpb_emr_release_label
 
@@ -147,6 +148,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     # TODO(saksena): Deprecate the use of FLAGS.run_uri and plumb as argument.
     log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
     self.storage_service.DeleteBucket(log_bucket_name)
+
+  def _CreateDependencies(self):
+    """Set up the ssh key."""
+    aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
 
   def _Create(self):
     """Creates the cluster."""
@@ -202,8 +207,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              'Name=Hadoop', 'Name=Hive',
                              '--log-uri', logs_bucket]
 
+    ec2_attributes = [
+        'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
+    ]
     if self.network:
-      cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
+      ec2_attributes.append('SubnetId=' + self.network.subnet.id)
+    cmd += ['--ec2-attributes', ','.join(ec2_attributes)]
 
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
@@ -264,6 +273,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     if self.network:
       self._DeleteSecurityGroups()
     self._DeleteLogBucket()
+    aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
