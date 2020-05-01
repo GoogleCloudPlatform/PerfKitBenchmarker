@@ -117,11 +117,6 @@ def _Install(vm):
   cmd = 'echo "{0}" | sudo tee -a {1}'.format(maven_env, MVN_ENV_PATH)
   vm.RemoteCommand(cmd)
 
-  # On CentOS, the mvn command looks for tools.jar in $JAVA_HOME/../lib
-  java_lib = posixpath.join(java_home, 'lib')
-  java_lib_sym = posixpath.join(java_home, '..', 'lib')
-  vm.RemoteCommand('sudo ln -sf {0} {1}'.format(java_lib, java_lib_sym))
-
   if FLAGS.maven_mirror_url != '':
     settings_local_path = data.ResourcePath(posixpath.join(
         'maven', 'settings.xml.j2'))
@@ -134,9 +129,6 @@ def _Install(vm):
 
 
 def Uninstall(vm):
-  java_home = _GetJavaHome(vm)
-  java_lib_sym = posixpath.join(java_home, '..', 'lib')
-  vm.RemoteCommand('sudo rm -f {0}'.format(java_lib_sym))
   vm.Uninstall('openjdk')
   vm.RemoteCommand('rm -rf {0}'.format(MVN_DIR), ignore_failure=True)
   vm.RemoteCommand('sudo rm -f {0}'.format(MVN_ENV_PATH), ignore_failure=True)
