@@ -91,8 +91,6 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
     maven_tar = maven_url.split('/')[-1]
     maven_remote_path = posixpath.join(INSTALL_DIR, maven_tar)
-    java_lib = posixpath.join('/home', 'lib')
-    java_lib_sym = posixpath.join('/home', '..', 'lib')
     self.assertRemoteCommandsEqual([
         'mkdir -p {0} && '
         'tar -C {0} --strip-components=1 -xzf {1}'.format(maven.MVN_DIR,
@@ -101,8 +99,7 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
         '| awk \'/java.home/{print $3}\'',
         'echo "{0}" | sudo tee -a {1}'.format(
             maven.MVN_ENV.format(java_home='/home', maven_home=maven.MVN_DIR),
-            maven.MVN_ENV_PATH),
-        'sudo ln -sf {0} {1}'.format(java_lib, java_lib_sym)
+            maven.MVN_ENV_PATH)
     ])
     self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand',
