@@ -30,7 +30,7 @@ if six.PY2:
 else:
   import functools
 
-_PERFKITBENCHMARKER = 'perfkitbenchmarker'
+_PERFKITBENCHMARKER = 'pkb'
 _RUNS = 'runs'
 _VERSIONS = 'versions'
 
