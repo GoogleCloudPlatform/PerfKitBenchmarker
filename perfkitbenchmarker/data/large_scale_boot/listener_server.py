@@ -88,12 +88,29 @@ def WriteResultsToFile(results_path, queue):
 
 
 def BuildHostNames(name_pattern, count):
-  # Some clouds do not assign hostname during create.
-  # Therefore we pull vm name from boot logs.
+  """Derieve host names from either name pattern or boot logs.
+
+  See large_scale_boot benchmark for name_pattern. For example, SEQUENTIAL_IP
+  name pattern is in the form of 'SEQUENTIAL_IP_{public_dns}_{start_index}'.
+
+  Args:
+    name_pattern: Name pattern to build host names with.
+    count: count of vms.
+
+  Returns:
+    hostnames or host ips to access.
+  """
   if name_pattern == UNDEFINED_HOSTNAME:
     return WaitForHostNames()
   elif SEQUENTIAL_IP in name_pattern:
-    return GenerateHostIPs(int(name_pattern.split('-')[-1]), count)
+    public_dns = name_pattern.split('_')[-2]
+    start_vm_index = int(name_pattern.split('_')[-1])
+    if public_dns:
+      return [public_dns.replace('VMID', str(vm_id))
+              for vm_id in range(start_vm_index, count + start_vm_index)]
+    else:
+      return GenerateHostIPs(start_vm_index, count)
+
   else:
     return [name_pattern.replace('VM_ID', str(vm_id))
             for vm_id in range(1, count + 1)]
@@ -103,8 +120,13 @@ def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
   """Wait for boot logs to complete and grep the newly created ips.
 
   After boot_script.sh completes, it will print out [completed].
-  In the boot_script.sh output, it will print out the private ips of format:
+  In boot_script.sh output, outputs will be of the following formats:
+
+  GCP:
+    networkInterfaces[0].accessConfigs[0].natIP: 34.94.81.165
+  AWS:
     PRIVATEIPADDRESSES True ip-10-0-0-143.ec2.internal 10.0.0.143
+    ASSOCIATION amazon ec2-100-24-107-67.compute-1.amazonaws.com 100.24.107.67
 
   Args:
     timeout: Amount of time in seconds to wait for boot.
@@ -119,9 +141,16 @@ def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
     with open('log', 'r') as f:
       hostnames = []
       for line in f:
+        # look for GCP public ip
+        if 'natIP' in line:
+          hostnames.append(line.split()[1])
+        # look for amazon public ip if set
+        if 'ASSOCIATION' in line:
+          hostnames.append(line.split()[3])
+        # look for amazon private ip if public ip is not set
         if 'PRIVATEIPADDRESSES' in line:
           hostnames.append(line.split()[2])
-    return hostnames
+    return set(hostnames)
   raise ValueError('Boot did not complete successfully before timeout of %s '
                    'seconds.' % MAX_TIME_SECONDS_NO_CALLING)
 
