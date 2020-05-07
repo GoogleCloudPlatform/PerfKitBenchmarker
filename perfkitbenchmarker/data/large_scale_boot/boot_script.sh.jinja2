@@ -60,7 +60,6 @@ echo $(date +%s%N) > {{start_time_file}}
     --quiet
     --project {{ project }}
     --scopes compute-rw
-    --network-interface {{ use_public_ip }}address,network-tier=PREMIUM
     --image-family {{ image_family }}
     --image-project {{ image_project }}
     --boot-disk-auto-delete
@@ -72,6 +71,9 @@ echo $(date +%s%N) > {{start_time_file}}
     --zone {{ zone }}
     --metadata "${START_UP_SCRIPT}"
   )
+  {% if os_type == 'linux' %}
+    gcloud_args+=( --network-interface {{ use_public_ip }}address,network-tier=PREMIUM )
+  {% endif %}
   {% if use_public_ip != '' %}
     gcloud_args+=( --async )
   {% endif %}
