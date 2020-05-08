@@ -77,6 +77,7 @@
 -   Separate NVIDIA driver functionality from CUDA toolkit
 -   Added --runspec_tar option to SpecCPU (specifying installation tarball).
 -   Add OpenFOAM support for timing individual commands.
+-   Added --gce_subnet_name to specify existing GCE subnet to use.
 
 ### Bug fixes and maintenance updates:
 
