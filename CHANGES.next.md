@@ -59,6 +59,7 @@
     -   Includes GCP implementation with static routes.
 -   Add a directory for PKB tutorials.
 -   Add two new tutorials: one for beginners and one for network dashboard.
+-   Update Boto client library for S3 to boto3.
 
 ### Enhancements:
 

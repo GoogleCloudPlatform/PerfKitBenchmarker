@@ -11,11 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Package for installing the boto library."""
 
 
 def Install(vm):
   """Installs the boto package on the VM."""
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install boto')
+  vm.RemoteCommand('sudo pip install boto3')
