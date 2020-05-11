@@ -64,41 +64,33 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
 class OpenStackVirtualMachineTest(BaseOpenStackNetworkTest):
 
-  @mock.patch.object(os_virtual_machine.OpenStackVirtualMachine,
-                     '_CheckNetworkExists')
-  def test_CheckFloatingIPNetworkExistsWithTrue(self,
-                                                mock_CheckNetworkExists,
-                                                flags=FLAGS):
-    mock_CheckNetworkExists.return_value = _network_true
-    flags.ignore_package_requirements = True
+  def setUp(self):
+    super(OpenStackVirtualMachineTest, self).setUp()
+    self.mock_check_network_exists = mock.patch.object(
+        os_virtual_machine.OpenStackVirtualMachine,
+        '_CheckNetworkExists').start()
+    FLAGS.ignore_package_requirements = True
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
-    openstackVM = os_virtual_machine.OpenStackVirtualMachine(spec)
-    network = openstackVM._CheckFloatingIPNetworkExists('External')
+    self.openstack_vm = os_virtual_machine.OpenStackVirtualMachine(spec)
+
+  def tearDown(self):
+    super(OpenStackVirtualMachineTest, self).tearDown()
+    mock.patch.stopall()
+
+  def test_CheckFloatingIPNetworkExistsWithTrue(self):
+    self.mock_check_network_exists.return_value = _network_true
+    network = self.openstack_vm._CheckFloatingIPNetworkExists('External')
     self.assertEqual(_network_true, network)
 
-  @mock.patch.object(os_virtual_machine.OpenStackVirtualMachine,
-                     '_CheckNetworkExists')
-  def test_CheckFloatingIPNetworkExistsWithExternal(self,
-                                                    mock_CheckNetworkExists,
-                                                    flags=FLAGS):
-    mock_CheckNetworkExists.return_value = _network_external
-    flags.ignore_package_requirements = True
-    spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
-    openstackVM = os_virtual_machine.OpenStackVirtualMachine(spec)
-    network = openstackVM._CheckFloatingIPNetworkExists('External')
+  def test_CheckFloatingIPNetworkExistsWithExternal(self):
+    self.mock_check_network_exists.return_value = _network_external
+    network = self.openstack_vm._CheckFloatingIPNetworkExists('External')
     self.assertEqual(_network_external, network)
 
-  @mock.patch.object(os_virtual_machine.OpenStackVirtualMachine,
-                     '_CheckNetworkExists')
-  def test_CheckFloatingIPNetworkExistsWithFail(self,
-                                                mock_CheckNetworkExists,
-                                                flags=FLAGS):
-    mock_CheckNetworkExists.return_value = _network_fail
-    flags.ignore_package_requirements = True
-    spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
-    openstackVM = os_virtual_machine.OpenStackVirtualMachine(spec)
+  def test_CheckFloatingIPNetworkExistsWithFail(self):
+    self.mock_check_network_exists.return_value = _network_fail
     with self.assertRaises(errors.Config.InvalidValue):
-      openstackVM._CheckFloatingIPNetworkExists('External')
+      self.openstack_vm._CheckFloatingIPNetworkExists('External')
 
 
 if __name__ == '__main__':
