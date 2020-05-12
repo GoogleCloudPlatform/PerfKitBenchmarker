@@ -88,6 +88,7 @@
     version in Google Cloud Dataproc and release label in AWS EMR.
 -   Support delete timing on provider implementations of
       object_storage_api script
+-   Enable support for AWS's m6g family.
 
 ### Bug fixes and maintenance updates:
 
