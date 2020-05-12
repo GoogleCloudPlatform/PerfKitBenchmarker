@@ -79,6 +79,7 @@
 -   Added --runspec_tar option to SpecCPU (specifying installation tarball).
 -   Add OpenFOAM support for timing individual commands.
 -   Added --gce_subnet_name to specify existing GCE subnet to use.
+-   Run a Full Sweep (Create/Stat/Delete) on Mdtest when not dropping caches.
 
 ### Bug fixes and maintenance updates:
 
