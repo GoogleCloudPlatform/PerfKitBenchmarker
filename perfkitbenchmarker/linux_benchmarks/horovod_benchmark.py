@@ -150,6 +150,8 @@ def _CopyAndUpdateRunScripts(model, vm):
   resnet_base_dir = 'DeepLearningExamples/TensorFlow/Classification/RN50v1.5'
   bert_base_dir = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT'
 
+  vm.Install('tcmalloc')
+
   if model.startswith('resnet'):
     vm.Install('google_cloud_sdk')
     vm.RemoteCommand('sed -i "/from utils import dali_utils/d" '
