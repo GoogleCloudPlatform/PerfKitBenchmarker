@@ -210,7 +210,8 @@ def _GetServerStartCommand(client_port, launcher_vm):
         GetAzBootVMStartIdByLauncher(launcher_vm.name))
   return (
       'python3 {server_path} {server_name} {port} {results_path} {client_port} '
-      '{use_server} {vms_name_pattern} {vms_count} > {server_log} 2>&1 &'
+      '{use_server} {vms_name_pattern} {vms_count} {use_public_ip} '
+      '> {server_log} 2>&1 &'
       .format(
           server_name=launcher_vm.name,
           server_path=posixpath.join(
@@ -221,7 +222,8 @@ def _GetServerStartCommand(client_port, launcher_vm):
           use_server=FLAGS.vms_contact_launcher,
           vms_name_pattern=vms_name_pattern,
           vms_count=FLAGS.boots_per_launcher,
-          server_log=_LISTENER_SERVER_LOG))
+          server_log=_LISTENER_SERVER_LOG,
+          use_public_ip=FLAGS.use_public_ip))
 
 
 def _IsLinux():

@@ -87,7 +87,7 @@ def WriteResultsToFile(results_path, queue):
       writer.flush()
 
 
-def BuildHostNames(name_pattern, count):
+def BuildHostNames(name_pattern, count, use_public_ip):
   """Derieve host names from either name pattern or boot logs.
 
   See large_scale_boot benchmark for name_pattern. For example, SEQUENTIAL_IP
@@ -96,12 +96,13 @@ def BuildHostNames(name_pattern, count):
   Args:
     name_pattern: Name pattern to build host names with.
     count: count of vms.
+    use_public_ip: hostnames should be public ip.
 
   Returns:
     hostnames or host ips to access.
   """
   if name_pattern == UNDEFINED_HOSTNAME:
-    return WaitForHostNames()
+    return WaitForHostNames(use_public_ip)
   elif SEQUENTIAL_IP in name_pattern:
     public_dns = name_pattern.split('_')[-2]
     start_vm_index = int(name_pattern.split('_')[-1])
@@ -116,7 +117,7 @@ def BuildHostNames(name_pattern, count):
             for vm_id in range(1, count + 1)]
 
 
-def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
+def WaitForHostNames(use_public_ip, timeout=MAX_TIME_SECONDS_NO_CALLING):
   """Wait for boot logs to complete and grep the newly created ips.
 
   After boot_script.sh completes, it will print out [completed].
@@ -129,6 +130,7 @@ def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
     ASSOCIATION amazon ec2-100-24-107-67.compute-1.amazonaws.com 100.24.107.67
 
   Args:
+    use_public_ip: whether to use public_ip hostname.
     timeout: Amount of time in seconds to wait for boot.
   Returns:
     hosts to netcat.
@@ -145,10 +147,10 @@ def WaitForHostNames(timeout=MAX_TIME_SECONDS_NO_CALLING):
         if 'natIP' in line:
           hostnames.append(line.split()[1])
         # look for amazon public ip if set
-        if 'ASSOCIATION' in line:
+        if use_public_ip and 'ASSOCIATION' in line:
           hostnames.append(line.split()[3])
         # look for amazon private ip if public ip is not set
-        if 'PRIVATEIPADDRESSES' in line:
+        if not use_public_ip and 'PRIVATEIPADDRESSES' in line:
           hostnames.append(line.split()[2])
     return set(hostnames)
   raise ValueError('Boot did not complete successfully before timeout of %s '
@@ -165,11 +167,11 @@ def GenerateHostIPs(boot_vm_index, count):
   return hostnames
 
 
-def ActAsClient(pool, queue, port, name_pattern, vms_count):
+def ActAsClient(pool, queue, port, name_pattern, vms_count, use_public_ip):
   """Use as a client."""
   store_results = functools.partial(StoreResult, queue=queue)
   all_jobs = []
-  for host_name in BuildHostNames(name_pattern, vms_count):
+  for host_name in BuildHostNames(name_pattern, vms_count, use_public_ip):
     job = pool.apply_async(
         ConfirmIPAccessible,
         args=(host_name, port, MAX_TIME_SECONDS_NO_CALLING,),
@@ -245,7 +247,7 @@ class RequestHandler(server.BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
-  if len(sys.argv) != 8:
+  if len(sys.argv) != 9:
     raise ValueError('Got unexpected number of command-line arguments. '
                      'There should be at most 7 command-line arguments: '
                      '1. name of the server vm, '
@@ -254,7 +256,8 @@ if __name__ == '__main__':
                      '4. port to access the boot VMs, '
                      '5. whether to use the listening server, '
                      '6. launched vm naming pattern, '
-                     '7. number of launched vms.')
+                     '7. number of launched vms.'
+                     '8. whether to use public ip address.')
   hostname = sys.argv[1]
   server_address = ('', int(sys.argv[2]))
   results_file_path = sys.argv[3]
@@ -262,6 +265,7 @@ if __name__ == '__main__':
   use_listening_server = sys.argv[5] == 'True'
   vms_name_pattern = sys.argv[6]
   num_vms = int(sys.argv[7])
+  using_public_ip = sys.argv[8] == 'True'
   process_pool = multiprocessing.Pool()
   multiprocessing_manager = multiprocessing.Manager()
   timing_queue = multiprocessing_manager.Queue()
@@ -276,4 +280,4 @@ if __name__ == '__main__':
   # The start the server to listen and put results on queue.
   else:
     ActAsClient(process_pool, timing_queue, clients_port,
-                vms_name_pattern, num_vms)
+                vms_name_pattern, num_vms, using_public_ip)
