@@ -44,6 +44,7 @@ import threading
 import time
 import uuid
 
+import enum
 import numpy as np
 
 from perfkitbenchmarker import configs
@@ -297,6 +298,13 @@ STORAGE_TO_API_SCRIPT_DICT = {
     providers.AZURE: 'AZURE'}
 
 _SECONDS_PER_HOUR = 60 * 60
+
+
+class MultistreamOperationType(enum.Enum):
+  """MultiStream Operations supported by object_storage_api_tests script."""
+  download = 1
+  upload = 2
+  delete = 3
 
 
 def GetConfig(user_config):
@@ -696,7 +704,9 @@ def OneByteRWBenchmark(results, metadata, vm, command_builder,
   _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
   logging.info('OneByteRW raw result is %s', raw_result)
 
-  for up_and_down in ['upload', 'download']:
+  for up_and_down in ([
+      MultistreamOperationType.upload, MultistreamOperationType.download
+  ]):
     search_string = 'One byte %s - (.*)' % up_and_down
     result_string = re.findall(search_string, raw_result)
     sample_name = ONE_BYTE_LATENCY % up_and_down
@@ -736,7 +746,9 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
   _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
   logging.info('SingleStreamThroughput raw result is %s', raw_result)
 
-  for up_and_down in ['upload', 'download']:
+  for up_and_down in [
+      MultistreamOperationType.upload, MultistreamOperationType.download
+  ]:
     search_string = 'Single stream %s throughput in Bps: (.*)' % up_and_down
     result_string = re.findall(search_string, raw_result)
     sample_name = SINGLE_STREAM_THROUGHPUT % up_and_down
@@ -985,16 +997,18 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
       '--start_time=%s' % start_time,
       '--objects_written_file=%s' % objects_written_file]
 
-  if operation == 'upload':
+  if operation == MultistreamOperationType.upload:
     cmd_args += [
         '--object_sizes="%s"' % size_distribution,
         '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
         '--scenario=MultiStreamWrite']
-  elif operation == 'download':
+  elif operation == MultistreamOperationType.download:
     cmd_args += ['--scenario=MultiStreamRead']
+  elif operation == MultistreamOperationType.delete:
+    cmd_args += ['--scenario=MultiStreamDelete']
   else:
     raise Exception('Value of operation must be \'upload\' or \'download\'.'
-                    'Value is: \'' + operation + '\'')
+                    'Value is: \'' + operation.name + '\'')
 
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
                                     streams_per_vm)
@@ -1002,13 +1016,18 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   if FLAGS.object_storage_worker_output:
     with open(FLAGS.object_storage_worker_output, 'w') as out_file:
       out_file.write(json.dumps(output))
-  _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
-                             list(six.iterkeys(size_distribution)), results,
-                             metadata=metadata)
+  _ProcessMultiStreamResults(
+      start_times,
+      latencies,
+      sizes,
+      operation.name,
+      list(six.iterkeys(size_distribution)),
+      results,
+      metadata=metadata)
 
   # Write the objects written file if the flag is set and this is an upload
   objects_written_path_local = _ColdObjectsWrittenFilename()
-  if operation == 'upload' and objects_written_path_local is not None:
+  if operation == MultistreamOperationType.upload and objects_written_path_local is not None:
     # Get the objects written from all the VMs
     # Note these are JSON lists with the following format:
     # [[object1_name, object1_size],[object2_name, object2_size],...]
@@ -1052,13 +1071,13 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'upload')
+                     bucket_name, MultistreamOperationType.upload)
 
   logging.info('Finished multi-stream write test. Starting '
                'multi-stream read test.')
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'download')
+                     bucket_name, MultistreamOperationType.download)
 
   logging.info('Finished multi-stream read test.')
 
@@ -1084,7 +1103,7 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
   logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'upload')
+                     bucket_name, MultistreamOperationType.upload)
 
   logging.info('Finished multi-stream write test.')
 
@@ -1137,9 +1156,33 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
                     '%s' % e)
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'download')
+                     bucket_name, MultistreamOperationType.download)
 
   logging.info('Finished multi-stream read test.')
+
+
+def MultiStreamDelete(results, metadata, vms, command_builder, service,
+                      bucket_name):
+  """A benchmark for multi-stream delete.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vms: the VMs to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: The provider's ObjectStorageService
+    bucket_name: the primary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+  logging.info('Starting multi-stream delete test on %s VMs.', len(vms))
+
+  _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                     bucket_name, MultistreamOperationType.delete)
+
+  logging.info('Finished multi-stream delete test.')
 
 
 def CheckPrerequisites(benchmark_config):
@@ -1526,7 +1569,8 @@ def Run(benchmark_spec):
   keep_bucket = (FLAGS.object_storage_objects_written_file_prefix is not None or
                  FLAGS.object_storage_dont_delete_bucket)
   if not keep_bucket:
-    service.EmptyBucket(bucket_name)
+    MultiStreamDelete(results, metadata, vms, command_builder, service,
+                      bucket_name)
 
   return results
 
