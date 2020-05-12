@@ -35,15 +35,22 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
     return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix)
 
   def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+    start_times = []
+    latencies = []
     for object_name in objects_to_delete:
+      start_time = time.time()
       response = self.client.delete_object(Bucket=bucket, Key=object_name)
       if response['ResponseMetadata']['DeleteMarker']:
+        latency = time.time() - start_time
+        start_times.append(start_time)
+        latencies.append(latency)
         if objects_deleted is not None:
           objects_deleted.append(object_name)
       else:
         logging.exception(
             'Encountered error while deleting object %s. '
             'Response metadata: %s', object_name, response)
+    return start_times, latencies
 
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
     start_time = time.time()

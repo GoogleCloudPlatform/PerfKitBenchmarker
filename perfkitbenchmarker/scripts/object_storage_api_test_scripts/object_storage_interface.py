@@ -59,6 +59,9 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
       objects_to_delete: a list of names of objects to delete.
       objects_deleted: if given, a list to record the objects that
         have been successfully deleted.
+
+    Returns:
+      A tuple of (start_times, latencies).
     """
 
     pass

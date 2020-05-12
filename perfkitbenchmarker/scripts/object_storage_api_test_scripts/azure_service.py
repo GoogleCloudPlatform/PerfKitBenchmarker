@@ -39,14 +39,21 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
             for obj in self.blobService.list_blobs(bucket, prefix=prefix)]
 
   def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+    start_times = []
+    latencies = []
     for object_name in objects_to_delete:
       try:
+        start_time = time.time()
         self.blobService.delete_blob(bucket, object_name)
+        latency = time.time() - start_time
+        start_times.append(start_time)
+        latencies.append(latency)
         if objects_deleted is not None:
           objects_deleted.append(object_name)
       except:
         logging.exception('Caught exception while deleting object %s.',
                           object_name)
+    return start_times, latencies
 
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
     stream.seek(0)

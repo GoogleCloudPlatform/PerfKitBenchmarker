@@ -35,9 +35,15 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
     return [obj.name for obj in self.client.list_blobs(bucket, prefix=prefix)]
 
   def DeleteObjects(self, bucket_name, objects_to_delete, objects_deleted=None):
+    start_times = []
+    latencies = []
     bucket = storage.bucket.Bucket(self.client, bucket_name)
     for object_name in objects_to_delete:
+      start_time = time.time()
       obj = storage.blob.Blob(object_name, bucket)
+      latency = time.time() - start_time
+      start_times.append(start_time)
+      latencies.append(latency)
       try:
         obj.delete(client=self.client)
         if objects_deleted is not None:
@@ -45,6 +51,7 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
       except Exception as e:  # pylint: disable=broad-except
         logging.exception('Caught exception while deleting object %s: %s',
                           object_name, e)
+    return start_times, latencies
 
   def WriteObjectFromBuffer(self, bucket_name, object_name, stream, size):
     stream.seek(0)
