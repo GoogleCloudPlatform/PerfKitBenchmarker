@@ -131,6 +131,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # Initialize applications on the dataproc cluster
     if self.spec.applications:
       logging.info('Include the requested applications')
+      cmd.flags['optional-components'] = ','.join(self.spec.applications)
 
     for role in ['worker', 'master']:
       # Set machine type
@@ -155,7 +156,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                        self.spec.worker_group.vm_spec.num_local_ssds)
     # Set zone
     cmd.flags['zone'] = self.dpb_service_zone
-    if self.dpb_version != 'latest':
+    if self.dpb_version:
       cmd.flags['image-version'] = self.dpb_version
 
     if FLAGS.gcp_dataproc_image:
@@ -163,7 +164,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     # TODO(saksena): Retrieve the cluster create time and hold in a var
-    cmd.Issue()
+    cmd.Issue(timeout=900)  # 15 min
 
   def _PostCreate(self):
     """Get the cluster's data and tag it."""

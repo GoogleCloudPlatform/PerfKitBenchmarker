@@ -35,8 +35,8 @@ GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
                        'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('dpb_emr_release_label', 'emr-5.23.0',
-                    'The emr version to use for the cluster.')
+flags.DEFINE_string('dpb_emr_release_label', None,
+                    'DEPRECATED use dpb_service.version.')
 
 SPARK_SAMPLE_LOCATION = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
 
@@ -128,7 +128,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
     self.bucket_to_delete = None
-    self.dpb_version = FLAGS.dpb_emr_release_label
+    self.dpb_version = FLAGS.dpb_emr_release_label or self.dpb_version
+    if not self.dpb_version:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service.version must be provided.')
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):

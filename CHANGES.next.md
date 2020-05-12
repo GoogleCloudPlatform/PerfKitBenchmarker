@@ -27,9 +27,12 @@
         at which point it will be removed from PKB.
     -   You can use the recommended `amazonlinux2` instead.
 -   Remove `ping_also_run_using_external_ip` from ping benchmark
-    -   You should now use the `ip_addresses` flag to specify whether to
-        test with internal IPs, external IPs or both. This brings ping
-        into alignment with how other network benchmarks function.
+    -   You should now use the `ip_addresses` flag to specify whether to test
+        with internal IPs, external IPs or both. This brings ping into alignment
+        with how other network benchmarks function.
+-   The flag `--emr-release-label` is now deprecated in favor of setting
+    `dpb_service.version`.
+-   In EMR DPB benchmarks setting: `dpb_service.version` is now Required.
 
 ### New features:
 
@@ -80,6 +83,8 @@
 -   Add OpenFOAM support for timing individual commands.
 -   Added --gce_subnet_name to specify existing GCE subnet to use.
 -   Run a Full Sweep (Create/Stat/Delete) on Mdtest when not dropping caches.
+-   Added `version` field to `dpb_service` configs. This corresponds to image
+    version in Google Cloud Dataproc and release label in AWS EMR.
 
 ### Bug fixes and maintenance updates:
 
