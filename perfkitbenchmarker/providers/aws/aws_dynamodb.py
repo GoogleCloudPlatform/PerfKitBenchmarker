@@ -274,3 +274,20 @@ class AwsDynamoDBInstance(resource.BaseResource):
         'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
         'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
     }
+
+
+def AddTagsToExistingInstance(table_name, region):
+  """Add tags to an existing DynamoDB table."""
+  cmd = util.AWS_PREFIX + [
+      'dynamodb',
+      'describe-table',
+      '--table-name', table_name,
+      '--region', region
+  ]
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  resource_arn = json.loads(stdout)['Table']['TableArn']
+  cmd = util.AWS_PREFIX + [
+      'dynamodb', 'tag-resource', '--resource-arn', resource_arn, '--region',
+      region, '--tags'
+  ] + util.MakeFormattedDefaultTags()
+  vm_util.IssueCommand(cmd)
