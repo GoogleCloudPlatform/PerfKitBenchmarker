@@ -61,9 +61,15 @@ dpb_sparksql_benchmark:
           disk_type: gp2
     worker_count: 2
 """
+
+BENCHMARK_NAMES = {
+    'tpcds_2_4': 'TPC-DS',
+    'tpch': 'TPC-H'
+}
+
 flags.DEFINE_string('dpb_sparksql_data', None,
                     'The dataset to run Spark SQL query')
-flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', ['tpcds_2_4', 'tpch'],
+flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
 flags.DEFINE_list('dpb_sparksql_order', [],
                   'The names (numbers) of the queries to run in order. '
@@ -195,6 +201,8 @@ def Run(benchmark_spec):
   """
   dpb_service_instance = benchmark_spec.dpb_service
   metadata = benchmark_spec.dpb_service.GetMetadata()
+
+  metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
 
   results = []
   unit = 'seconds'
