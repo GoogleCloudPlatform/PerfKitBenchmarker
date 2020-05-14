@@ -38,6 +38,7 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
 
   """
 
+  # 'if not numbers' will fail if numbers is an np.Array or pd.Series.
   if not len(numbers):
     raise ValueError("Can't compute percentiles of empty list.")
 
@@ -79,9 +80,9 @@ def GeoMean(iterable):
     ValueError, if numbers is empty.
   """
   arr = np.fromiter(iterable, dtype='float')
-  if not arr:
+  if not arr.size:
     raise ValueError("Can't compute geomean of empty list.")
-  return arr.prod() / len(arr)
+  return arr.prod() ** (1 / len(arr))
 
 
 class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):

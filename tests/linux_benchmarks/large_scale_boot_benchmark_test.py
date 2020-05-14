@@ -81,6 +81,7 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         'boot_machine_type': 'n1-standard-2',
         'launcher_machine_type': 'n1-standard-16',
         'vms_contact_launcher': True,
+        'use_public_ip': False,
     }
 
     metadata1 = copy.deepcopy(common_metadata)

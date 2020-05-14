@@ -31,11 +31,6 @@ flags.DEFINE_string('aws_emr_loguri', None,
                     'cluster.  If not set, a bucket will be created.')
 flags.DEFINE_integer('aws_emr_job_wait_time', 18000,
                      'The time to wait for an EMR job to finish, in seconds')
-
-flags.DEFINE_string('s3_custom_endpoint', None,
-                    'If given, a custom endpoint to use for S3 transfers. If '
-                    'this flag is not given, use the standard endpoint for the '
-                    'storage region.')
 flags.DEFINE_boolean('aws_spot_instances', False,
                      'Whether to use AWS spot instances for any AWS VMs.')
 flags.DEFINE_float('aws_spot_price', None,

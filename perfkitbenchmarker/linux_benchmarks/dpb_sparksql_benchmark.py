@@ -61,9 +61,15 @@ dpb_sparksql_benchmark:
           disk_type: gp2
     worker_count: 2
 """
+
+BENCHMARK_NAMES = {
+    'tpcds_2_4': 'TPC-DS',
+    'tpch': 'TPC-H'
+}
+
 flags.DEFINE_string('dpb_sparksql_data', None,
                     'The dataset to run Spark SQL query')
-flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', ['tpcds_2_4', 'tpch'],
+flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
 flags.DEFINE_list('dpb_sparksql_order', [],
                   'The names (numbers) of the queries to run in order. '
@@ -168,19 +174,17 @@ def Prepare(benchmark_spec):
   if FLAGS.dpb_sparksql_data:
     stdout = storage_service.List(FLAGS.dpb_sparksql_data)
 
-    for table_dir in stdout.split('\n'):
-      # The directory name is the table name.
-      if not table_dir:
-        continue
-      table = re.split(' |/', table_dir.rstrip('/')).pop()
-      stats = dpb_service_instance.SubmitJob(
-          pyspark_file=os.path.join(benchmark_spec.base_dir,
-                                    SPARK_TABLE_SCRIPT),
-          job_type=BaseDpbService.PYSPARK_JOB_TYPE,
-          job_arguments=[FLAGS.dpb_sparksql_data, table])
-      logging.info(stats)
-      if not stats['success']:
-        logging.warning('Creates table %s from %s failed', table, table_dir)
+    table_subdirs = [re.split(' |/', line.rstrip('/')).pop()
+                     for line in stdout.split('\n') if line]
+    stats = dpb_service_instance.SubmitJob(
+        pyspark_file=os.path.join(benchmark_spec.base_dir,
+                                  SPARK_TABLE_SCRIPT),
+        job_type=BaseDpbService.PYSPARK_JOB_TYPE,
+        job_arguments=[FLAGS.dpb_sparksql_data + ','.join(table_subdirs)])
+    logging.info(stats)
+    if not stats['success']:
+      raise errors.Benchmarks.PrepareException(
+          'Creating tables from {}/* failed'.format(FLAGS.sparksql_data))
 
 
 def Run(benchmark_spec):
@@ -197,6 +201,8 @@ def Run(benchmark_spec):
   """
   dpb_service_instance = benchmark_spec.dpb_service
   metadata = benchmark_spec.dpb_service.GetMetadata()
+
+  metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
 
   results = []
   unit = 'seconds'

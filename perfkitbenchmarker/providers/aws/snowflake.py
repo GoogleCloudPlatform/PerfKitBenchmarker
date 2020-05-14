@@ -18,8 +18,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 
 # https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file
-DEFAULT_CONFIG_LOCATION = '~/.snowsql/'
-DEFAULT_CONFIG_FILE = 'config'
+DEFAULT_CONFIG_LOCATION = '~/.snowsql/config'
+DEFAULT_CONFIG_FILE = 'snowsql_config'
 
 FLAGS = flags.FLAGS
 
@@ -36,10 +36,8 @@ class Snowflake(edw_service.EdwService):
     # A snowflake account can host multiple "virtual warehouses", however
     # the current benchmarking is limited to a single "virtual warehouse" as
     # identified by the connection (FLAGS.snowflake_connection) expected to be
-    #  defined in config file (FLAGS.snowflake_snowsql_config_override_file)
-    self.snowsql_config_file = (
-        FLAGS.snowflake_snowsql_config_override_file if
-        FLAGS.snowflake_snowsql_config_override_file else DEFAULT_CONFIG_FILE)
+    # defined in the config file (either the preprovisioned snowsql_config file
+    # or FLAGS.snowflake_snowsql_config_override_file)
     self.named_connection = FLAGS.snowflake_connection
 
   def IsUserManaged(self, edw_service_spec):
@@ -73,12 +71,13 @@ class Snowflake(edw_service.EdwService):
     """
     vm.Install('snowsql')
     if FLAGS.snowflake_snowsql_config_override_file:
-      vm.PushFile(self.snowsql_config_file,
-                  DEFAULT_CONFIG_LOCATION + DEFAULT_CONFIG_FILE)
+      vm.PushFile(FLAGS.snowflake_snowsql_config_override_file,
+                  DEFAULT_CONFIG_LOCATION)
     else:
       vm.InstallPreprovisionedBenchmarkData(benchmark_name,
-                                            [self.snowsql_config_file],
-                                            DEFAULT_CONFIG_LOCATION)
+                                            [DEFAULT_CONFIG_FILE], '~/.snowsql')
+      vm.RemoteCommand('mv ~/.snowsql/snowsql_config %s' %
+                       DEFAULT_CONFIG_LOCATION)
 
   def RunCommandHelper(self):
     """Snowflake specific run script command components."""

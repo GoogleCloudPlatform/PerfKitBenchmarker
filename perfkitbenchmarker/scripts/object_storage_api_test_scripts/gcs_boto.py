@@ -54,15 +54,22 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
     return [obj.name for obj in bucket_uri.list_bucket(prefix=prefix)]
 
   def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+    start_times = []
+    latencies = []
     for object_name in objects_to_delete:
       try:
+        start_time = time.time()
         object_uri = self._StorageURI(bucket, object_name)
         object_uri.delete_key()
+        latency = time.time() - start_time
+        start_times.append(start_time)
+        latencies.append(latency)
         if objects_deleted is not None:
           objects_deleted.append(object_name)
       except:  # pylint:disable=bare-except
         logging.exception('Caught exception while deleting object %s.',
                           object_name)
+    return start_times, latencies
 
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
     start_time = time.time()

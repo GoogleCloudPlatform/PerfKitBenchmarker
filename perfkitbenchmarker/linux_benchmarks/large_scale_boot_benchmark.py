@@ -104,11 +104,15 @@ flags.DEFINE_string('launcher_machine_type', 'n1-standard-16', 'Machine type '
 flags.DEFINE_boolean('vms_contact_launcher', True, 'Whether launched vms '
                      'attempt to contact the launcher before launcher attempts '
                      'to connect to them. Default to True.')
+flags.DEFINE_boolean('use_public_ip', False, 'Whether launcher should contact '
+                     'boot vms using public ip instead of internal ip. Only '
+                     'applicable for vms_contact_launcher=False mode. '
+                     'Defaults to False.')
 
 # Tag for undefined hostname, should be synced with listener_server.py script.
 UNDEFINED_HOSTNAME = 'UNDEFINED'
 # Tag for sequential hostname, should be synced with listener_server.py script.
-SEQUENTIAL_IP = 'SEQUENTIAL_IP-{}'
+SEQUENTIAL_IP = 'SEQUENTIAL_IP_{}_{}'
 # remote tmp directory used for this benchmark.
 _REMOTE_DIR = vm_util.VM_TMP_DIR
 # boot script to use on the launcher server vms.
@@ -182,7 +186,9 @@ def GetAzBootVMStartIdByLauncher(launcher_name):
 def _GetServerStartCommand(client_port, launcher_vm):
   """Returns the command to start the listener server."""
   cloud = FLAGS.cloud
-  if cloud == 'GCP':
+  if cloud == 'GCP' and FLAGS.use_public_ip:
+    vms_name_pattern = UNDEFINED_HOSTNAME
+  elif cloud == 'GCP':
     vms_name_pattern = '{name_pattern}-VM_ID.{zone}.c.{project}.internal'.format(
         name_pattern=_BOOT_VM_NAME_PREFIX.format(
             launcher_name=launcher_vm.name),
@@ -192,12 +198,20 @@ def _GetServerStartCommand(client_port, launcher_vm):
     # AWS do not have a defined vm name pattern till after vm is launched.
     vms_name_pattern = UNDEFINED_HOSTNAME
   elif cloud == 'Azure':
+    if FLAGS.use_public_ip:
+      public_dns = 'booter-{}-VMID.{}.cloudapp.azure.com'.format(
+          FLAGS.run_uri,
+          launcher_vm.zone)
+    else:
+      public_dns = ''
     # Azure assigns a sequential ip
     vms_name_pattern = SEQUENTIAL_IP.format(
+        public_dns,
         GetAzBootVMStartIdByLauncher(launcher_vm.name))
   return (
       'python3 {server_path} {server_name} {port} {results_path} {client_port} '
-      '{use_server} {vms_name_pattern} {vms_count} > {server_log} 2>&1 &'
+      '{use_server} {vms_name_pattern} {vms_count} {use_public_ip} '
+      '> {server_log} 2>&1 &'
       .format(
           server_name=launcher_vm.name,
           server_path=posixpath.join(
@@ -208,7 +222,8 @@ def _GetServerStartCommand(client_port, launcher_vm):
           use_server=FLAGS.vms_contact_launcher,
           vms_name_pattern=vms_name_pattern,
           vms_count=FLAGS.boots_per_launcher,
-          server_log=_LISTENER_SERVER_LOG))
+          server_log=_LISTENER_SERVER_LOG,
+          use_public_ip=FLAGS.use_public_ip))
 
 
 def _IsLinux():
@@ -233,6 +248,11 @@ def CheckPrerequisites(_):
     raise errors.Benchmarks.PrepareException(
         'Booting Windows VMs on Azure with a start-up script is not supported. '
         'See https://github.com/Azure/azure-powershell/issues/9600.')
+  if FLAGS.vms_contact_launcher and FLAGS.use_public_ip:
+    raise errors.Benchmarks.PrepareException(
+        'After VMs contact launcher server, launcher will check connectivity '
+        'of the VMs using the client address of the curl request. This option '
+        'is only applicable when launcher makes the initial contact.')
 
 
 def GetConfig(user_config):
@@ -280,6 +300,7 @@ def _BuildContext(launcher_vm, booter_template_vm):
       'timeout': _TIMEOUT_SECONDS,
       'vm_count': FLAGS.boots_per_launcher,
       'zone': launcher_vm.zone,
+      'use_public_ip': '' if FLAGS.use_public_ip else 'no-',
   }
   cloud = FLAGS.cloud
   if cloud == 'GCP':
@@ -327,6 +348,7 @@ def _Install(launcher_vm, booter_template_vm):
   launcher_vm.InstallPackages('netcat')
   launcher_vm.PushDataFile(_LISTENER_SERVER, _REMOTE_DIR)
   client_port = _SSH_PORT if _IsLinux() else _RDP_PORT
+  launcher_vm.RemoteCommand('touch log')
   launcher_vm.RemoteCommand(_GetServerStartCommand(client_port, launcher_vm))
   # Render clean up script on launcher server VM(s).
   launcher_vm.RenderTemplate(data.ResourcePath(_CLEAN_UP_TEMPLATE),
@@ -368,9 +390,16 @@ def Prepare(benchmark_spec):
       private_ip = '10.0.{octet3}.{octet4}'.format(
           octet3=i // 256,
           octet4=i % 256)
+      public_ip_name = ''
+      if FLAGS.use_public_ip:
+        public_ip = azure_virtual_machine.AzurePublicIPAddress(
+            launcher_vms[0].location, launcher_vms[0].availability_zone,
+            '{}-public-ip'.format(i), 'booter-{}-{}'.format(FLAGS.run_uri, i))
+        public_ip.Create()
+        public_ip_name = public_ip.name
       nic = azure_virtual_machine.AzureNIC(
           launcher_vms[0].network.subnet, nic_name_prefix + str(i),
-          '', False, private_ip)
+          public_ip_name, False, private_ip)
       nic.Create()
 
   vm_util.RunThreaded(
@@ -434,6 +463,7 @@ def _ParseResult(launcher_vms):
       'boot_machine_type': FLAGS.boot_machine_type,
       'launcher_machine_type': FLAGS.launcher_machine_type,
       'vms_contact_launcher': FLAGS.vms_contact_launcher,
+      'use_public_ip': FLAGS.use_public_ip,
   }
   for vm in launcher_vms:
     start_time_str, _ = vm.RemoteCommand(get_starttime_cmd)

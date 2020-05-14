@@ -737,7 +737,8 @@ class GceNetwork(network.BaseNetwork):
     if subnet_region is None:
       self.subnet_resource = None
     else:
-      self.subnet_resource = GceSubnetResource(name, name, subnet_region,
+      self.subnet_resource = GceSubnetResource(FLAGS.gce_subnet_name or name,
+                                               name, subnet_region,
                                                self.cidr, self.project)
 
     # Stage FW rules.

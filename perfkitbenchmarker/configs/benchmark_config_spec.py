@@ -105,6 +105,7 @@ class _DpbServiceSpec(spec.BaseSpec):
       worker_count: the number of workers part of the dpb service
       applications: An enumerated list of applications that need
         to be enabled on the dpb service
+      version: string. The version of software to install inside the service.
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -131,14 +132,19 @@ class _DpbServiceSpec(spec.BaseSpec):
                 dpb_service.DATAPROC,
             'valid_values': [
                 dpb_service.DATAPROC, dpb_service.DATAFLOW, dpb_service.EMR,
-                dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER]
+                dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER
+            ]
         }),
         'worker_group': (_VmGroupSpecDecoder, {}),
         'worker_count': (option_decoders.IntDecoder, {
             'default': dpb_service.DEFAULT_WORKER_COUNT,
             'min': 2
         }),
-        'applications': (_DpbApplicationListDecoder, {})
+        'applications': (_DpbApplicationListDecoder, {}),
+        'version': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        })
     })
     return result
 

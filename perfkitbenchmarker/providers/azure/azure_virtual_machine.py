@@ -145,13 +145,14 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
 class AzurePublicIPAddress(resource.BaseResource):
   """Class to represent an Azure Public IP Address."""
 
-  def __init__(self, location, availability_zone, name):
+  def __init__(self, location, availability_zone, name, dns_name=None):
     super(AzurePublicIPAddress, self).__init__()
     self.location = location
     self.availability_zone = availability_zone
     self.name = name
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
+    self.dns_name = dns_name
 
   def _Create(self):
     cmd = [
@@ -162,6 +163,9 @@ class AzurePublicIPAddress(resource.BaseResource):
     if self.availability_zone:
       # Availability Zones require Standard IPs.
       cmd += ['--zone', self.availability_zone, '--sku', 'Standard']
+
+    if self.dns_name:
+      cmd += ['--dns-name', self.dns_name]
 
     _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
 

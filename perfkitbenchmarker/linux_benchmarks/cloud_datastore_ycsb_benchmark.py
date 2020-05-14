@@ -58,8 +58,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('google_datastore_keyfile', None,
                     'The path to Google API P12 private key file')
 flags.DEFINE_string(
-    'private_keyfile_dir', '/tmp/key.p12',
-    'The directory path where the private key file is copied to on a VM.')
+    'private_keyfile', '/tmp/key.p12',
+    'The path where the private key file is copied to on a VM.')
 flags.DEFINE_string(
     'google_datastore_serviceAccount', None,
     'The service account email associated with'
@@ -126,7 +126,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   run_kwargs = {
       'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
-      'googledatastore.privateKeyFile': FLAGS.private_keyfile_dir,
+      'googledatastore.privateKeyFile': FLAGS.private_keyfile,
       'googledatastore.serviceAccountEmail':
           FLAGS.google_datastore_serviceAccount,
       'googledatastore.debug': FLAGS.google_datastore_debug,
@@ -145,7 +145,16 @@ def Cleanup(_):
     dataset_id = FLAGS.google_datastore_datasetId
     executor = concurrent.futures.ThreadPoolExecutor(
         max_workers=_THREAD_POOL_WORKERS)
-    credentials_path = FLAGS.google_datastore_deletion_keyfile
+    if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
+      # Copy private keyfile to local disk
+      cp_cmd = [
+          'gsutil', 'cp', FLAGS.google_datastore_deletion_keyfile,
+          FLAGS.private_keyfile
+      ]
+      vm_util.IssueCommand(cp_cmd)
+      credentials_path = FLAGS.private_keyfile
+    else:
+      credentials_path = FLAGS.google_datastore_deletion_keyfile
 
     logging.info('Attempting to delete all data in %s', dataset_id)
 
@@ -173,7 +182,15 @@ def Cleanup(_):
 
 
 def _Install(vm):
+  """Installs YCSB benchmark & copies datastore keyfile to client vm."""
   vm.Install('ycsb')
 
   # Copy private key file to VM
-  vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile_dir)
+  if FLAGS.google_datastore_keyfile.startswith('gs://'):
+    vm.Install('google_cloud_sdk')
+    vm.RemoteCommand('{cmd} {datastore_keyfile} {private_keyfile}'.format(
+        cmd='gsutil cp',
+        datastore_keyfile=FLAGS.google_datastore_keyfile,
+        private_keyfile=FLAGS.private_keyfile))
+  else:
+    vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)

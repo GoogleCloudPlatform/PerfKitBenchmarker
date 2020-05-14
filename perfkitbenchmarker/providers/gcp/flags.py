@@ -45,6 +45,9 @@ flags.DEFINE_string(
     'gce_network_name', None, 'The name of an already created '
     'network to use instead of creating a new one.')
 flags.DEFINE_string(
+    'gce_subnet_name', None, 'The name of an already created '
+    'subnet to use instead of creating a new one.')
+flags.DEFINE_string(
     'gce_subnet_region', None, 'Region to create subnet in '
     'instead of automatically creating one in every region.')
 flags.DEFINE_string(

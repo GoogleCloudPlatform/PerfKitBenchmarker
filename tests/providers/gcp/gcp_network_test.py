@@ -14,8 +14,10 @@
 """Tests for perfkitbenchmarker.providers.gcp.gce_network."""
 
 import contextlib
+import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 import mock
 
 from perfkitbenchmarker import benchmark_spec
@@ -154,107 +156,115 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
 
   def testLoadDefaultConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 1)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['10.0.0.0/8'], spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 1)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['10.0.0.0/8'], spec.networks[k].all_nets)
 
   def testLoadDefaultConfigWithFlags(self):
     FLAGS.gce_subnet_region = 'us-north1-b'
     FLAGS.gce_subnet_addr = '1.2.3.4/33'
 
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 1)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['1.2.3.4/33'], spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 1)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['1.2.3.4/33'], spec.networks[k].all_nets)
 
   def testLoadCustomConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_MULTI_MULTI)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                  spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                  spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 2)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['192.168.1.0/24', '10.0.1.0/24'],
-                            spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
+                                    spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
+                                    spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 2)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['192.168.1.0/24', '10.0.1.0/24'],
+                              spec.networks[k].all_nets)
 
   def testLoadCustomConfigWithFlags(self):
     FLAGS.gce_subnet_region = 'us-north1-b'
     FLAGS.gce_subnet_addr = '1.2.3.4/33'
 
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_MULTI_MULTI)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                  spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                  spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 2)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['192.168.1.0/24', '10.0.1.0/24'],
-                            spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
+                                    spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
+                                    spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 2)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['192.168.1.0/24', '10.0.1.0/24'],
+                              spec.networks[k].all_nets)
 
   def testLoadMixedConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_MULTI)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                  spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 2)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['10.0.0.0/8', '192.168.1.0/24'],
-                            spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
+                                    spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 2)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['10.0.0.0/8', '192.168.1.0/24'],
+                              spec.networks[k].all_nets)
 
   def testLoadMixedConfigWithFlags(self):
     FLAGS.gce_subnet_region = 'us-north1-b'
     FLAGS.gce_subnet_addr = '1.2.3.4/33'
 
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_MULTI)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                  spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 2)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['1.2.3.4/33', '192.168.1.0/24'],
-                            spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
+                                    spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 2)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['1.2.3.4/33', '192.168.1.0/24'],
+                              spec.networks[k].all_nets)
 
   def testLoadSameZoneCidrConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_SAME_ZONE_AND_CIDR)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                  spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                  spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 1)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['10.0.1.0/24'], spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
+                                    spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
+                                    spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 1)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['10.0.1.0/24'], spec.networks[k].all_nets)
 
   def testLoadSameZoneDiffCidrConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_SAME_ZONE_DIFF_CIDR)
-    spec.ConstructVirtualMachines()
+    with PatchCriticalObjects([('', '', 0)]):
+      spec.ConstructVirtualMachines()
 
-    self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                  spec.custom_subnets['vm_1'])
-    self.assertDictContainsSubset({'cidr': '10.0.2.0/24'},
-                                  spec.custom_subnets['vm_2'])
-    self.assertLen(spec.networks, 2)
-    for k in spec.networks.keys():
-      self.assertItemsEqual(['10.0.1.0/24', '10.0.2.0/24'],
-                            spec.networks[k].all_nets)
+      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
+                                    spec.custom_subnets['vm_1'])
+      self.assertDictContainsSubset({'cidr': '10.0.2.0/24'},
+                                    spec.custom_subnets['vm_2'])
+      self.assertLen(spec.networks, 2)
+      for k in spec.networks.keys():
+        self.assertItemsEqual(['10.0.1.0/24', '10.0.2.0/24'],
+                              spec.networks[k].all_nets)
 
 
 class TestGceNetworkNames(BaseGceNetworkTest):
@@ -331,6 +341,14 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertEqual(expected_netname,
                      net_name)  # pkb-network-multi-1-2-3-4-56-uri45678 (multi)
     self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
+
+  @flagsaver.flagsaver(
+      gce_network_name='my-network', gce_subnet_name='my-subnet')
+  def testSpecifyNetworkName(self):
+    vm = mock.Mock(zone='us-north1-b', project=_PROJECT, cidr='1.2.3.4/56')
+    net = gce_network.GceNetwork.GetNetwork(vm)
+    self.assertEqual('my-network', net.network_resource.name)
+    self.assertEqual('my-subnet', net.subnet_resource.name)
 
   ########
   # FireWall Names
@@ -531,3 +549,7 @@ class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
                                          'network_name')
         fr._Create()
       self.assertEqual(issue_command.call_count, 1)
+
+
+if __name__ == '__main__':
+  unittest.main()

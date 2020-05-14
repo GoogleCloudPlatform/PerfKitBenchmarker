@@ -27,9 +27,12 @@
         at which point it will be removed from PKB.
     -   You can use the recommended `amazonlinux2` instead.
 -   Remove `ping_also_run_using_external_ip` from ping benchmark
-    -   You should now use the `ip_addresses` flag to specify whether to
-        test with internal IPs, external IPs or both. This brings ping
-        into alignment with how other network benchmarks function.
+    -   You should now use the `ip_addresses` flag to specify whether to test
+        with internal IPs, external IPs or both. This brings ping into alignment
+        with how other network benchmarks function.
+-   The flag `--emr-release-label` is now deprecated in favor of setting
+    `dpb_service.version`.
+-   In EMR DPB benchmarks setting: `dpb_service.version` is now Required.
 
 ### New features:
 
@@ -59,6 +62,7 @@
     -   Includes GCP implementation with static routes.
 -   Add a directory for PKB tutorials.
 -   Add two new tutorials: one for beginners and one for network dashboard.
+-   Update Boto client library for S3 to boto3.
 
 ### Enhancements:
 
@@ -88,6 +92,13 @@
     -   Made retrieving JAVA_HOME more robust
     -   Fixed a java lib issue on CentOS
 -   Add OpenFOAM support for timing individual commands.
+-   Added --gce_subnet_name to specify existing GCE subnet to use.
+-   Run a Full Sweep (Create/Stat/Delete) on Mdtest when not dropping caches.
+-   Added `version` field to `dpb_service` configs. This corresponds to image
+    version in Google Cloud Dataproc and release label in AWS EMR.
+-   Support delete timing on provider implementations of
+      object_storage_api script
+-   Enable support for AWS's m6g family.
 
 ### Bug fixes and maintenance updates:
 
@@ -122,3 +133,10 @@
     - change private_keyfile_dir from a constant value to a FLAG
     - delete all db entries as part of Cleanup
 -   Remove 'default' keyword from AWS and Azure boot_disk_size
+-   Check ycsb proportion explicitly against none.
+-   Fix issue in calculating Geometric means.
+-   Add support to PKB cloud datastore ycsb benchmark to use GCS files for
+    datastore keyfiles.
+-   Add SSH keys to dpb EMR clusters for debuggability.
+    - Security groups of the clusters will have to be manually edited to allow
+    SSH.

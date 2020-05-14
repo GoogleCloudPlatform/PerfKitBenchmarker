@@ -16,4 +16,4 @@
 
 from absl import flags
 
-flags.DEFINE_string('host', None, 'The hostname of the storage endpoint.')
+flags.DEFINE_string('region', None, 'The S3 region to use.')

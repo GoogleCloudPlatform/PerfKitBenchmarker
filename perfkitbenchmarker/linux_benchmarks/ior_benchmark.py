@@ -50,7 +50,8 @@ flags.DEFINE_boolean(
     'mdtest_drop_caches', True,
     'Whether to drop caches between the create/stat/delete phases. '
     'If this is set, mdtest will be run 3 times with the -C, -T, and -r '
-    'options and the client page caches will be dropped between runs.')
+    'options and the client page caches will be dropped between runs. '
+    'When False, a Full Sweep (Create, Stat, Delete) is run.')
 
 
 BENCHMARK_NAME = 'ior'
@@ -110,7 +111,7 @@ def Run(benchmark_spec):
     results += ior.RunIOR(master_vm, FLAGS.ior_num_procs, remote_script_path)
 
   # Run mdtest benchmark.
-  phase_args = ('-C', '-T', '-r') if FLAGS.mdtest_drop_caches else ('',)
+  phase_args = ('-C', '-T', '-r') if FLAGS.mdtest_drop_caches else ('-C -T -r',)
   mdtest_args = (' '.join(args) for args in
                  itertools.product(FLAGS.mdtest_args, phase_args))
   for args in mdtest_args:

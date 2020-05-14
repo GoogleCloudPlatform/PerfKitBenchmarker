@@ -18,29 +18,52 @@ import logging
 import time
 
 from absl import flags
-
-import boto_service
+import boto3
+import object_storage_interface
+import six
 
 FLAGS = flags.FLAGS
 
 
-class S3Service(boto_service.BotoService):
-  """An interface to S3, using the boto library."""
+class S3Service(object_storage_interface.ObjectStorageServiceBase):
+  """An interface to AWS S3, using the boto library."""
 
   def __init__(self):
-    if FLAGS.host is not None:
-      logging.info('Will use user-specified host endpoint: %s', FLAGS.host)
-    super(S3Service, self).__init__('s3', host_to_connect=FLAGS.host)
+    self.client = boto3.client('s3', region_name=FLAGS.region)
+
+  def ListObjects(self, bucket, prefix):
+    return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix)
+
+  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+    start_times = []
+    latencies = []
+    for object_name in objects_to_delete:
+      start_time = time.time()
+      response = self.client.delete_object(Bucket=bucket, Key=object_name)
+      if response['ResponseMetadata']['DeleteMarker']:
+        latency = time.time() - start_time
+        start_times.append(start_time)
+        latencies.append(latency)
+        if objects_deleted is not None:
+          objects_deleted.append(object_name)
+      else:
+        logging.exception(
+            'Encountered error while deleting object %s. '
+            'Response metadata: %s', object_name, response)
+    return start_times, latencies
 
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
-    stream.seek(0)
     start_time = time.time()
-    object_uri = self._StorageURI(bucket, object_name)
-    # We need to access the raw key object so we can set its storage
-    # class
-    key = object_uri.new_key()
-    if FLAGS.object_storage_class is not None:
-      key._set_storage_class(FLAGS.object_storage_class)  # pylint:disable=protected-access
-    key.set_contents_from_file(stream, size=size)
+    stream.seek(0)
+    obj = six.BytesIO(stream.read(size))
+    self.client.put_object(Body=obj, Bucket=bucket, Key=object_name)
+    latency = time.time() - start_time
+    return start_time, latency
+
+  def ReadObject(self, bucket, object_name):
+    start_time = time.time()
+    s3_response_object = self.client.get_object(
+        Bucket=bucket, Key=object_name)
+    s3_response_object['Body'].read()
     latency = time.time() - start_time
     return start_time, latency

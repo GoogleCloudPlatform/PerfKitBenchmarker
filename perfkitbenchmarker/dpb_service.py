@@ -129,7 +129,7 @@ class BaseDpbService(resource.BaseResource):
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
     self.dpb_service_zone = FLAGS.dpb_service_zone
-    self.dpb_version = 'latest'
+    self.dpb_version = dpb_service_spec.version
     self.dpb_service_type = 'unknown'
     self.storage_service = None
 
@@ -175,11 +175,12 @@ class BaseDpbService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
+    pretty_version = self.dpb_version or 'default'
     basic_data = {
         'dpb_service': self.dpb_service_type,
-        'dpb_version': self.dpb_version,
-        'dpb_service_version': '{}_{}'.format(self.dpb_service_type,
-                                              self.dpb_version),
+        'dpb_version': pretty_version,
+        'dpb_service_version':
+            '{}_{}'.format(self.dpb_service_type, pretty_version),
         'dpb_cluster_id': self.cluster_id,
         'dpb_cluster_shape': self.spec.worker_group.vm_spec.machine_type,
         'dpb_cluster_size': self.spec.worker_count,

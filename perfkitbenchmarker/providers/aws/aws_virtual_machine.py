@@ -111,7 +111,7 @@ AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
 USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
     ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
-ARM_PROCESSOR_PREFIXES = ['a1']
+ARM_PROCESSOR_PREFIXES = ['a1', 'm6g']
 
 # Processor architectures
 ARM = 'arm64'
@@ -137,6 +137,7 @@ WINDOWS_IMAGE_PROJECT = '801119661308'  # alias amazon
 # Machine type to host architecture.
 _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
     'a1': 'cortex-a72',
+    'm6g': 'graviton2',
 }
 
 # Parameters for use with Elastic Fiber Adapter
