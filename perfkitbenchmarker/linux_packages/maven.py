@@ -14,6 +14,7 @@
 """Module containing maven installation functions."""
 
 import posixpath
+import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import data
@@ -22,7 +23,7 @@ from six.moves.urllib.parse import urlparse
 
 flags.DEFINE_string('maven_version', '3.6.3',
                     'The version of maven')
-flags.DEFINE_string('maven_mirror_url', '',
+flags.DEFINE_string('maven_mirror_url', None,
                     'If specified, this URL will be used as a Maven mirror')
 FLAGS = flags.FLAGS
 MVN_URL = 'https://archive.apache.org/dist/maven/maven-{0}/{1}/binaries/apache-maven-{1}-bin.tar.gz'
@@ -117,8 +118,8 @@ def _Install(vm):
   cmd = 'echo "{0}" | sudo tee -a {1}'.format(maven_env, MVN_ENV_PATH)
   vm.RemoteCommand(cmd)
 
-  if FLAGS.maven_mirror_url != '':
-    settings_local_path = data.ResourcePath(posixpath.join(
+  if FLAGS.maven_mirror_url:
+    settings_local_path = data.ResourcePath(os.path.join(
         'maven', 'settings.xml.j2'))
     settings_remote_path = '~/.m2/settings.xml'
     context = {
