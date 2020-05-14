@@ -697,9 +697,10 @@ class _AwsRegionalNetwork(network.BaseNetwork):
       if self._reference_count:
         return
 
-    self.internet_gateway.Detach()
-    self.internet_gateway.Delete()
-    self.vpc.Delete()
+    if self.created:
+      self.internet_gateway.Detach()
+      self.internet_gateway.Delete()
+      self.vpc.Delete()
 
 
 class AwsNetworkSpec(network.BaseNetworkSpec):
