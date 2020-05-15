@@ -1,3 +1,4 @@
+# Lint as: python3
 # Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,17 +16,86 @@
 
 import subprocess
 
+from absl import flags
 from absl.testing import absltest
 from absl.testing import flagsaver
 
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
+
+
+class TestVmSpec(virtual_machine.BaseVmSpec):
+  CLOUD = 'test_vm_spec_cloud'
+
+
+def CreateTestVmSpec() -> TestVmSpec:
+  return TestVmSpec('test_component_name')
+
+
+class TestOsMixin(virtual_machine.BaseOsMixin):
+  """Test class that provides dummy implementations of abstract functions."""
+  OS_TYPE = 'test_os_type'
+  BASE_OS_TYPE = 'debian'
+
+  def Install(self, pkg):
+    pass
+
+  def PackageCleanup(self):
+    pass
+
+  def RemoteCommand(self, command, should_log, ignore_failure, suppress_warning,
+                    timeout, **kwargs):
+    pass
+
+  def RemoteCopy(self, file_path, remote_path, copy_to):
+    pass
+
+  def SetReadAhead(self, num_sectors, devices):
+    pass
+
+  def Uninstall(self, package_name):
+    pass
+
+  def VMLastBootTime(self):
+    pass
+
+  def WaitForBootCompletion(self):
+    pass
+
+  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
+    pass
+
+  def _GetNumCpus(self):
+    pass
+
+  def _GetTotalFreeMemoryKb(self):
+    pass
+
+  def _GetTotalMemoryKb(self):
+    pass
+
+  def _Reboot(self):
+    pass
+
+  def _TestReachable(self, ip):
+    pass
+
+
+class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
+  """Test class that has dummy methods for a base virtual machine."""
+  CLOUD = 'test_vm_cloud'
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
+    pass
 
 
 class PkbCommonTestCase(absltest.TestCase):
@@ -41,7 +111,7 @@ class PkbCommonTestCase(absltest.TestCase):
 
   # TODO(user): Extend MockIssueCommand to support multiple calls to
   # vm_util.IssueCommand
-  def MockIssueCommand(self, stdout, stderr, retcode):
+  def MockIssueCommand(self, stdout: str, stderr: str, retcode: int) -> None:
     """Mocks function calls inside vm_util.IssueCommand.
 
     Mocks subproccess.Popen and _ReadIssueCommandOutput in IssueCommand.
