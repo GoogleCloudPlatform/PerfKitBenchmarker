@@ -48,6 +48,7 @@ flags.DEFINE_string('snowflake_snowsql_config_override_file', None,
 flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
+flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
 
 FLAGS = flags.FLAGS
 
