@@ -130,3 +130,4 @@
 -   Add SSH keys to dpb EMR clusters for debuggability.
     - Security groups of the clusters will have to be manually edited to allow
     SSH.
+-   Cast sample values to floats, ensuring they conform to the specification
