@@ -1005,8 +1005,14 @@ class BaseVirtualMachine(resource.BaseResource):
         continue
       url = fallback_url.get(filename)
       sha256sum = preprovisioned_data.get(filename)
-      preprovisioned = self.ShouldDownloadPreprovisionedData(
-          module_name, filename)
+      try:
+        preprovisioned = self.ShouldDownloadPreprovisionedData(
+            module_name, filename)
+      except NotImplementedError:
+        logging.info('The provider does not implement '
+                     'ShouldDownloadPreprovisionedData. Attempting to '
+                     'download the data via URL')
+        preprovisioned = False
       if not FLAGS.preprovision_ignore_checksum and not sha256sum:
         raise errors.Setup.BadPreprovisionedDataError(
             'Cannot find sha256sum hash for file %s in module %s. Might want '
@@ -1143,7 +1149,7 @@ class BaseVirtualMachine(resource.BaseResource):
     Returns:
       A boolean indicates if preprovisioned data is available.
     """
-    return False
+    raise NotImplementedError()
 
   def InstallCli(self):
     """Installs the cloud specific cli along with credentials on this vm."""
