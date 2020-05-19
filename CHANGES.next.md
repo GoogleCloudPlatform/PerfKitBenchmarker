@@ -84,8 +84,9 @@
 -   Added generic support for using `PreprovisionedData`
     -   Added the `preprovision_ignore_checksum` flag that can be used when
         downloading content that is not registered in `PREPROVISIONED_DATA`
-    -   Make `ShouldDownloadPreprovisionedData` in virtual_machine.py return
-        False instead of throwing a `NotImplemented` error
+    -   Allow `_InstallData` in virtual_machine.py to catch the
+        `NotImplemented` error, in order to proceed to downloading resources
+        via their URL
 -   Implemented `PreprovisionedData` in the Maven package and make Maven more
     robust
     -   Added `maven_mirror_url` to specify a custom Maven mirror
