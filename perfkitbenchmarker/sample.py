@@ -101,7 +101,7 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
     if timestamp is None:
       timestamp = time.time()
 
-    return super(Sample, cls).__new__(cls, metric, value, unit,
+    return super(Sample, cls).__new__(cls, metric, float(value or 0.0), unit,
                                       metadata=metadata or {},
                                       timestamp=timestamp,
                                       **kwargs)

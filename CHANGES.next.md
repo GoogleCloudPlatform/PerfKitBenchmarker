@@ -63,6 +63,7 @@
 -   Add a directory for PKB tutorials.
 -   Add two new tutorials: one for beginners and one for network dashboard.
 -   Update Boto client library for S3 to boto3.
+-   Add MultiStreamDelete to Object Storage API Tests.
 
 ### Enhancements:
 
@@ -140,3 +141,4 @@
 -   Add SSH keys to dpb EMR clusters for debuggability.
     - Security groups of the clusters will have to be manually edited to allow
     SSH.
+-   Cast sample values to floats, ensuring they conform to the specification
