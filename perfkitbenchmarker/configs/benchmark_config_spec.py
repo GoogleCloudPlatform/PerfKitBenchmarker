@@ -607,20 +607,25 @@ class _RelationalDbSpec(spec.BaseSpec):
           flag_values.managed_db_backup_start_time)
 
     cloud = config_values['cloud']
+    has_unmanaged_dbs = ('vm_groups' in config_values
+                         and 'servers' in config_values['vm_groups'])
+
     if flag_values['managed_db_zone'].present:
       config_values['db_spec'][cloud]['zone'] = flag_values.managed_db_zone[0]
       config_values['zones'] = flag_values.managed_db_zone
-      config_values['vm_groups']['servers']['vm_spec'][cloud]['zone'] = (
-          flag_values.managed_db_zone[0])
+      if has_unmanaged_dbs:
+        config_values['vm_groups']['servers']['vm_spec'][cloud]['zone'] = (
+            flag_values.managed_db_zone[0])
     if flag_values['client_vm_zone'].present:
       config_values['vm_groups']['clients']['vm_spec'][cloud]['zone'] = (
           flag_values.client_vm_zone)
     if has_db_machine_type:
       config_values['db_spec'][cloud]['machine_type'] = (
           flag_values.managed_db_machine_type)
-      config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'machine_type'] = (
-              flag_values.managed_db_machine_type)
+      if has_unmanaged_dbs:
+        config_values['vm_groups']['servers']['vm_spec'][cloud][
+            'machine_type'] = (
+                flag_values.managed_db_machine_type)
     if has_custom_machine_type:
       config_values['db_spec'][cloud]['machine_type'] = {
           'cpus': flag_values.managed_db_cpus,
@@ -629,10 +634,11 @@ class _RelationalDbSpec(spec.BaseSpec):
       # tox and pylint have contradictory closing brace rules, so avoid having
       # opening and closing brackets on different lines.
       config_values_vm_groups = config_values['vm_groups']
-      config_values_vm_groups['servers']['vm_spec'][cloud]['machine_type'] = {
-          'cpus': flag_values.managed_db_cpus,
-          'memory': flag_values.managed_db_memory
-      }
+      if has_unmanaged_dbs:
+        config_values_vm_groups['servers']['vm_spec'][cloud]['machine_type'] = {
+            'cpus': flag_values.managed_db_cpus,
+            'memory': flag_values.managed_db_memory
+        }
     if has_client_machine_type:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'machine_type'] = (
@@ -648,13 +654,15 @@ class _RelationalDbSpec(spec.BaseSpec):
     if flag_values['managed_db_disk_size'].present:
       config_values['db_disk_spec'][cloud]['disk_size'] = (
           flag_values.managed_db_disk_size)
-      config_values['vm_groups']['servers']['disk_spec'][cloud]['disk_size'] = (
-          flag_values.managed_db_disk_size)
+      if has_unmanaged_dbs:
+        config_values['vm_groups']['servers']['disk_spec'][cloud][
+            'disk_size'] = flag_values.managed_db_disk_size
     if flag_values['managed_db_disk_type'].present:
       config_values['db_disk_spec'][cloud]['disk_type'] = (
           flag_values.managed_db_disk_type)
-      config_values['vm_groups']['servers']['disk_spec'][cloud]['disk_type'] = (
-          flag_values.managed_db_disk_type)
+      if has_unmanaged_dbs:
+        config_values['vm_groups']['servers']['disk_spec'][cloud][
+            'disk_type'] = flag_values.managed_db_disk_type
     if flag_values['client_vm_disk_size'].present:
       config_values['vm_groups']['clients']['disk_spec'][cloud]['disk_size'] = (
           flag_values.client_vm_disk_size)

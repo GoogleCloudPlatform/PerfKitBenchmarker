@@ -287,12 +287,21 @@ def AddMetricsForSysbenchOutput(
   results.append(qps_sample)
 
 
+def _GetCommonSysbenchOptions(benchmark_spec):
+  db = benchmark_spec.relational_db
+  return [
+      '--db-ps-mode=%s' % DISABLE,
+      '--mysql-ignore-errors=2013',
+      '--db-driver=mysql',
+      db.MakeSysbenchConnectionString(),
+  ]
+
+
 def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
   """Returns the sysbench command as a string."""
   if duration <= 0:
     raise ValueError('Duration must be greater than zero.')
 
-  db = benchmark_spec.relational_db
   run_cmd_tokens = ['nice',  # run with a niceness of lower priority
                     '-15',   # to encourage cpu time for ssh commands
                     'sysbench',
@@ -302,17 +311,15 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
                      if _IsValidFlag('table_size') else ''),
                     ('--scale=%d' % FLAGS.sysbench_scale
                      if _IsValidFlag('scale') else ''),
-                    '--db-ps-mode=%s' % DISABLE,
                     '--rand-type=%s' % UNIFORM,
                     '--threads=%d' % sysbench_thread_count,
                     '--percentile=%d' % FLAGS.sysbench_latency_percentile,
                     '--report-interval=%d' % FLAGS.sysbench_report_interval,
                     '--max-requests=0',
-                    '--time=%d' % duration,
-                    '--db-driver=mysql',
-                    db.MakeSysbenchConnectionString(),
-                    'run']
-  run_cmd = ' '.join(run_cmd_tokens)
+                    '--time=%d' % duration]
+  run_cmd = ' '.join(run_cmd_tokens +
+                     _GetCommonSysbenchOptions(benchmark_spec) +
+                     ['run'])
   return run_cmd
 
 
@@ -705,11 +712,10 @@ def _PrepareSysbench(client_vm, benchmark_spec):
                            if _IsValidFlag('table_size') else ''),
                           ('--scale=%d' % FLAGS.sysbench_scale
                            if _IsValidFlag('scale') else ''),
-                          '--threads=%d' % num_threads,
-                          '--db-driver=mysql',
-                          db.MakeSysbenchConnectionString(),
-                          'prepare']
-  data_load_cmd = ' '.join(data_load_cmd_tokens)
+                          '--threads=%d' % num_threads]
+  data_load_cmd = ' '.join(data_load_cmd_tokens +
+                           _GetCommonSysbenchOptions(benchmark_spec) +
+                           ['prepare'])
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.
