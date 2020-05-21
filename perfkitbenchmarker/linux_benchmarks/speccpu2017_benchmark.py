@@ -23,9 +23,11 @@ memory subsystem and compiler.
 SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 """
 
+import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2017
@@ -45,6 +47,10 @@ FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE] + [
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_boolean('spec17_build_only', False,
+                     'Compile benchmarks only, but don\'t run benchmarks. '
+                     'Defaults to False. The benchmark fails if the build '
+                     'fails.')
 
 BENCHMARK_NAME = 'speccpu2017'
 BENCHMARK_CONFIG = """
@@ -167,6 +173,8 @@ def _Run(vm):
          'ulimit -s unlimited && ')
 
   cmd += 'runcpu '
+  if FLAGS.spec17_build_only:
+    cmd += '--action build '
 
   version_specific_parameters = []
   # rate runs require 2 GB minimum system main memory per copy,
@@ -183,8 +191,18 @@ def _Run(vm):
     version_specific_parameters.append('--feedback ')
     vm.RemoteCommand('cd /scratch/cpu2017; mkdir fdo_profiles')
 
-  speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
-              version_specific_parameters)
+  start_time = time.time()
+  stdout, _ = speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
+                          version_specific_parameters)
+
+  if FLAGS.spec17_build_only:
+    if 'Error' in stdout and 'Please review this file' in stdout:
+      raise errors.Benchmarks.RunError('Error during SPEC compilation.')
+    return [
+        sample.Sample('compilation_time',
+                      time.time() - start_time, 's',
+                      {'spec17_subset': FLAGS.spec17_subset})
+    ]
 
   partial_results = True
   # Do not allow partial results if any benchmark subset is a full suite.

@@ -86,9 +86,10 @@
 -   Run a Full Sweep (Create/Stat/Delete) on Mdtest when not dropping caches.
 -   Added `version` field to `dpb_service` configs. This corresponds to image
     version in Google Cloud Dataproc and release label in AWS EMR.
--   Support delete timing on provider implementations of
-      object_storage_api script
+-   Support delete timing on provider implementations of object_storage_api
+    script
 -   Enable support for AWS's m6g family.
+-   Add SPEC CPU 2017 flag allowing to build but not run a suite.
 
 ### Bug fixes and maintenance updates:
 

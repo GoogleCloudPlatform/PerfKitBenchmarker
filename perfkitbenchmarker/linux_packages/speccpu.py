@@ -550,7 +550,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     version_specific_parameters: List. List of parameters for specific versions.
 
   Returns:
-    A list of sample.Sample objects.
+    A Tuple of (stdout, stderr) the run output.
   """
   speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   runspec_flags = [
@@ -571,7 +571,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   cmd = ' && '.join((
       'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
       '. ./shrc', 'rm -rf result', runspec_cmd))
-  vm.RobustRemoteCommand(cmd)
+  return vm.RobustRemoteCommand(cmd)
 
 
 def Uninstall(vm):
