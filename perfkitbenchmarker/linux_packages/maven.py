@@ -13,11 +13,11 @@
 # limitations under the License
 """Module containing maven installation functions."""
 
-import posixpath
 import os
+import posixpath
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from six.moves.urllib.parse import urlparse
 
@@ -98,8 +98,9 @@ def _Install(vm):
   maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
   maven_url = MVN_URL.format(maven_major_ver, maven_full_ver)
   maven_tar = maven_url.split('/')[-1]
+  # will only work with preprovision_ignore_checksum
   if maven_tar not in PREPROVISIONED_DATA:
-    PREPROVISIONED_DATA[maven_tar] = ''  # will only work with preprovision_ignore_checksum
+    PREPROVISIONED_DATA[maven_tar] = ''
     PACKAGE_DATA_URL[maven_tar] = maven_url
   maven_remote_path = posixpath.join(INSTALL_DIR, maven_tar)
   vm.InstallPreprovisionedPackageData(
