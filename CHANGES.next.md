@@ -81,6 +81,18 @@
     -   Delete the obsolete `--eks-verify-ssl`
 -   Separate NVIDIA driver functionality from CUDA toolkit
 -   Added --runspec_tar option to SpecCPU (specifying installation tarball).
+-   Added generic support for using `PreprovisionedData`
+    -   Added the `preprovision_ignore_checksum` flag that can be used when
+        downloading content that is not registered in `PREPROVISIONED_DATA`
+    -   Allow `_InstallData` in virtual_machine.py to catch the
+        `NotImplemented` error, in order to proceed to downloading resources
+        via their URL
+-   Implemented `PreprovisionedData` in the Maven package and make Maven more
+    robust
+    -   Added `maven_mirror_url` to specify a custom Maven mirror
+    -   Added sha256 checksums for a few Maven versions
+    -   Made retrieving JAVA_HOME more robust
+    -   Fixed a java lib issue on CentOS
 -   Add OpenFOAM support for timing individual commands.
 -   Added --gce_subnet_name to specify existing GCE subnet to use.
 -   Run a Full Sweep (Create/Stat/Delete) on Mdtest when not dropping caches.

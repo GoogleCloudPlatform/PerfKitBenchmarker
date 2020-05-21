@@ -105,6 +105,10 @@ flags.DEFINE_bool(
     'If set, this run will not create firewall rules. This is useful if the '
     'user project already has all of the firewall rules in place and/or '
     'creating new ones is expensive')
+flags.DEFINE_bool(
+    'preprovision_ignore_checksum', False,
+    'Ignore checksum verification for preprovisioned data. '
+    'Not recommended, please use with caution')
 
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.
@@ -715,7 +719,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     actual_sha256 = self.GetSha256sum(install_path, filename)
     if actual_sha256 != expected_sha256:
       raise errors.Setup.BadPreprovisionedDataError(
-          'Invalid sha256sum for %s/%s: %s (actual) != %s (expected)' % (
+          'Invalid sha256sum for %s/%s: %s (actual) != %s (expected). Might '
+          'want to run using --preprovision_ignore_checksum '
+          '(not recommended).' % (
               module_name, filename, actual_sha256, expected_sha256))
 
   def TestConnectRemoteAccessPort(self, port=None):
@@ -999,12 +1005,19 @@ class BaseVirtualMachine(resource.BaseResource):
         continue
       url = fallback_url.get(filename)
       sha256sum = preprovisioned_data.get(filename)
-      preprovisioned = self.ShouldDownloadPreprovisionedData(
-          module_name, filename)
-      if not sha256sum:
+      try:
+        preprovisioned = self.ShouldDownloadPreprovisionedData(
+            module_name, filename)
+      except NotImplementedError:
+        logging.info('The provider does not implement '
+                     'ShouldDownloadPreprovisionedData. Attempting to '
+                     'download the data via URL')
+        preprovisioned = False
+      if not FLAGS.preprovision_ignore_checksum and not sha256sum:
         raise errors.Setup.BadPreprovisionedDataError(
-            'Cannot find sha256sum hash for file %s in module %s. See '
-            'README.md for information about preprovisioned data. '
+            'Cannot find sha256sum hash for file %s in module %s. Might want '
+            'to run using --preprovision_ignore_checksum (not recommended). '
+            'See README.md for information about preprovisioned data. '
             'Cannot find file in /data directory either, fail to upload from '
             'local directory.' % (filename, module_name))
 
@@ -1024,8 +1037,9 @@ class BaseVirtualMachine(resource.BaseResource):
             'Cannot find fallback url of the file to download from web. '
             'Cannot find file in /data directory either, fail to upload from '
             'local directory.' % (filename, module_name))
-      self.CheckPreprovisionedData(
-          install_path, module_name, filename, sha256sum)
+      if not FLAGS.preprovision_ignore_checksum:
+        self.CheckPreprovisionedData(
+            install_path, module_name, filename, sha256sum)
 
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
