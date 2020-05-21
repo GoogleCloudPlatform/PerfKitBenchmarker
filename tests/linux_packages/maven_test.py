@@ -14,9 +14,10 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.linux_packages.maven."""
 
-import unittest
-import mock
 import posixpath
+import unittest
+
+import mock
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import maven
