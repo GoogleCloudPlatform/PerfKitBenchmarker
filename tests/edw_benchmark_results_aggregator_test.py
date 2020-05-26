@@ -15,7 +15,6 @@
 
 import unittest
 
-
 from perfkitbenchmarker import edw_benchmark_results_aggregator as agg
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -350,7 +349,7 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertTrue(b_p.aggregated_query_status(Q1_NAME))
     self.assertFalse(b_p.aggregated_query_status(Q2_NAME))
 
-  def test_aggregated_query_execution_time(self):
+  def test_aggregated_query_execution_time_passing(self):
     b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
     s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
     q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, METADATA_EMPTY)
@@ -370,6 +369,294 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
         b_p.aggregated_query_execution_time(Q1_NAME), (1.0 + 3.0) / 2)
     self.assertEqual(
         b_p.aggregated_query_execution_time(Q2_NAME), (2.0 + 4.0) / 2)
+
+  def test_aggregated_query_execution_time_missing_query(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    with self.assertRaises(agg.EdwPerformanceAggregationError):
+      b_p.aggregated_query_execution_time(QFAIL_NAME)
+
+  def test_aggregated_query_execution_time_failing_query(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, QFAIL_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    with self.assertRaises(agg.EdwPerformanceAggregationError):
+      b_p.aggregated_query_execution_time(Q2_NAME)
+
+  def test_aggregated_query_metadata_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_aggregated_query_metadata_q1 = b_p.aggregated_query_metadata(Q1_NAME)
+    expected_aggregated_query_metadata_q1 = {
+        'suite_seq_1' + '_runtime': 1.0,
+        'suite_seq_1' + '_job_id': 'q1_s1_job_id',
+        'suite_seq_2' + '_runtime': 3.0,
+        'suite_seq_2' + '_job_id': 'q1_s2_job_id'
+    }
+    self.assertDictEqual(actual_aggregated_query_metadata_q1,
+                         expected_aggregated_query_metadata_q1)
+    actual_aggregated_query_metadata_q2 = b_p.aggregated_query_metadata(Q2_NAME)
+    expected_aggregated_query_metadata_q2 = {
+        'suite_seq_1' + '_runtime': 2.0,
+        'suite_seq_1' + '_job_id': 'q2_s1_job_id',
+        'suite_seq_2' + '_runtime': 4.0
+    }
+    self.assertDictEqual(actual_aggregated_query_metadata_q2,
+                         expected_aggregated_query_metadata_q2)
+
+  def test_aggregated_query_metadata_missing_query(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    with self.assertRaises(agg.EdwPerformanceAggregationError):
+      b_p.aggregated_query_metadata(QFAIL_NAME)
+
+  def test_aggregated_query_metadata_failing_query(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, QFAIL_PERFORMANCE, METADATA_EMPTY)
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    with self.assertRaises(agg.EdwPerformanceAggregationError):
+      b_p.aggregated_query_metadata(Q2_NAME)
+
+  def test_get_aggregated_query_performance_sample_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_sample_q1 = b_p.get_aggregated_query_performance_sample(
+        Q1_NAME, {'benchmark_name': 'b_name'})
+    self.assertEqual(actual_sample_q1.metric, 'edw_aggregated_query_time')
+    self.assertEqual(actual_sample_q1.value, (1.0 + 3.0) / 2)
+    self.assertEqual(actual_sample_q1.unit, 'seconds')
+    expected_metadata_q1 = {
+        'suite_seq_1' + '_runtime': 1.0,
+        'suite_seq_1' + '_job_id': 'q1_s1_job_id',
+        'suite_seq_2' + '_runtime': 3.0,
+        'suite_seq_2' + '_job_id': 'q1_s2_job_id',
+        'query': Q1_NAME,
+        'aggregation_method': 'mean',
+        'execution_status': agg.EdwQueryExecutionStatus.SUCCESSFUL,
+        'benchmark_name': 'b_name'
+    }
+    self.assertDictEqual(actual_sample_q1.metadata, expected_metadata_q1)
+    actual_sample_q2 = b_p.get_aggregated_query_performance_sample(Q2_NAME, {})
+    self.assertEqual(actual_sample_q2.metric, 'edw_aggregated_query_time')
+    self.assertEqual(actual_sample_q2.value, (2.0 + 4.0) / 2)
+    self.assertEqual(actual_sample_q2.unit, 'seconds')
+    expected_metadata_q2 = {
+        'suite_seq_1' + '_runtime': 2.0,
+        'suite_seq_1' + '_job_id': 'q2_s1_job_id',
+        'suite_seq_2' + '_runtime': 4.0,
+        'query': Q2_NAME,
+        'aggregation_method': 'mean',
+        'execution_status': agg.EdwQueryExecutionStatus.SUCCESSFUL
+    }
+    self.assertDictEqual(actual_sample_q2.metadata, expected_metadata_q2)
+
+  def test_get_all_query_performance_samples_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_sample_list = b_p.get_all_query_performance_samples(
+        {}, [Q1_NAME, Q2_NAME])
+    self.assertEqual(len(actual_sample_list), 6)
+    # 4 raw query samples and 2 aggregated samples
+    self.assertSameElements([x.metric for x in actual_sample_list], [
+        'edw_raw_query_time', 'edw_raw_query_time', 'edw_raw_query_time',
+        'edw_raw_query_time', 'edw_aggregated_query_time',
+        'edw_aggregated_query_time'
+    ])
+
+  def test_get_aggregated_wall_time_performance_sample_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_sample = b_p.get_aggregated_wall_time_performance_sample(
+        [Q1_NAME, Q2_NAME], {'benchmark_name': 'b_name'})
+    self.assertEqual(actual_sample.metric, 'edw_aggregated_wall_time')
+    self.assertEqual(actual_sample.value, (1.0 + 3.0) / 2 + (2.0 + 4.0) / 2)
+    self.assertEqual(actual_sample.unit, 'seconds')
+    expected_metadata = {
+        'benchmark_name': 'b_name',
+        'aggregation_method': 'mean'
+    }
+    self.assertDictEqual(actual_sample.metadata, expected_metadata)
+
+  def test_get_wall_time_performance_samples_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_sample_list = b_p.get_wall_time_performance_samples(
+        {'benchmark_name': 'b_name'}, [Q1_NAME, Q2_NAME])
+    self.assertEqual(len(actual_sample_list), 3)
+    self.assertSameElements(
+        [x.metric for x in actual_sample_list],
+        ['edw_raw_wall_time', 'edw_raw_wall_time', 'edw_aggregated_wall_time'])
+    raw_samples = list(
+        filter(lambda x: x.metric == 'edw_raw_wall_time', actual_sample_list))
+    actual_raw_samples_values = [x.value for x in raw_samples]
+    expected_raw_samples_values = [(1.0 + 2.0), (3.0 + 4.0)]
+    self.assertSameElements(actual_raw_samples_values,
+                            expected_raw_samples_values)
+    aggregated_sample = list(
+        filter(lambda x: x.metric == 'edw_aggregated_wall_time',
+               actual_sample_list))[0]
+    self.assertEqual(aggregated_sample.value, (1.0 + 3.0) / 2 + (2.0 + 4.0) / 2)
+
+  def test_get_aggregated_geomean_performance_sample_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_sample = b_p.get_aggregated_geomean_performance_sample(
+        [Q1_NAME, Q2_NAME], {'benchmark_name': 'b_name'})
+    self.assertEqual(actual_sample.metric, 'edw_aggregated_geomean')
+    self.assertEqual(actual_sample.value,
+                     agg.geometric_mean([(1.0 + 3.0) / 2, (2.0 + 4.0) / 2]))
+    self.assertEqual(actual_sample.unit, 'seconds')
+    expected_metadata = {
+        'benchmark_name': 'b_name',
+        'intra_query_aggregation_method': 'mean',
+        'inter_query_aggregation_method': 'geomean'
+    }
+    self.assertDictEqual(actual_sample.metadata, expected_metadata)
+
+  def test_get_queries_geomean_performance_samples_passing(self):
+    b_p = agg.EdwBenchmarkPerformance(total_iterations=2)
+    s1_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_1', 2)
+    q11_p = agg.EdwQueryPerformance(Q1_NAME, 1.0, {'job_id': 'q1_s1_job_id'})
+    s1_p.add_query_performance(q11_p)
+    q12_p = agg.EdwQueryPerformance(Q2_NAME, 2.0, {'job_id': 'q2_s1_job_id'})
+    s1_p.add_query_performance(q12_p)
+    b_p.add_suite_performance('suite_seq_1', s1_p)
+    s2_p = agg.EdwSuitePerformance('suite_name', 'suite_seq_2', 2)
+    q21_p = agg.EdwQueryPerformance(Q1_NAME, 3.0, {'job_id': 'q1_s2_job_id'})
+    s2_p.add_query_performance(q21_p)
+    q22_p = agg.EdwQueryPerformance(Q2_NAME, 4.0, {})
+    s2_p.add_query_performance(q22_p)
+    b_p.add_suite_performance('suite_seq_2', s2_p)
+    actual_sample_list = b_p.get_queries_geomean_performance_samples(
+        {'benchmark_name': 'b_name'}, [Q1_NAME, Q2_NAME])
+    self.assertEqual(len(actual_sample_list), 3)
+    self.assertSameElements([x.metric for x in actual_sample_list], [
+        'edw_raw_geomean_time', 'edw_raw_geomean_time', 'edw_aggregated_geomean'
+    ])
+    raw_samples = list(
+        filter(lambda x: x.metric == 'edw_raw_geomean_time',
+               actual_sample_list))
+    actual_raw_samples_values = [x.value for x in raw_samples]
+    expected_raw_samples_values = [
+        agg.geometric_mean([1.0, 2.0]),
+        agg.geometric_mean([3.0, 4.0])
+    ]
+    self.assertSameElements(actual_raw_samples_values,
+                            expected_raw_samples_values)
+
+    aggregated_sample = list(
+        filter(lambda x: x.metric == 'edw_aggregated_geomean',
+               actual_sample_list))[0]
+    self.assertEqual(aggregated_sample.value,
+                     agg.geometric_mean([(1.0 + 3.0) / 2, (2.0 + 4.0) / 2]))
 
   def test_geometric_mean_valid_values(self):
     performance_iterable = [1.0, 2.0, 3.0]

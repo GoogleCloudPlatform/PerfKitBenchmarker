@@ -297,7 +297,13 @@ class EdwBenchmarkPerformance(object):
 
     Returns:
       A float value set to the query's aggregated execution time
+
+    Raises:
+      EdwPerformanceAggregationError: If the query failed in one or more suites
     """
+    if not self.aggregated_query_status(query_name):
+      raise EdwPerformanceAggregationError('Cannot aggregate invalid / failed'
+                                           ' query' + query_name)
     query_performances = [x.get_query_performance(query_name)
                           .get_performance_value()
                           for x in self.suite_performances.values()]
@@ -312,9 +318,14 @@ class EdwBenchmarkPerformance(object):
     Returns:
       A dictionary set to the query's aggregated metadata, accumulated from the
        raw query runs.
-    """
-    result = {}
 
+    Raises:
+      EdwPerformanceAggregationError: If the query failed in one or more suites
+    """
+    if not self.aggregated_query_status(query_name):
+      raise EdwPerformanceAggregationError('Cannot aggregate invalid / failed'
+                                           ' query' + query_name)
+    result = {}
     for s_idx, s_performance in self.suite_performances.items():
       q_performance = s_performance.get_query_performance(query_name)
       result[s_idx + '_runtime'] = q_performance.get_performance_value()
