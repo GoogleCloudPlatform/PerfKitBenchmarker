@@ -69,13 +69,6 @@ class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
     snowflake_local = snowflake.Snowflake(spec)
     self.assertTrue(snowflake_local._Exists())
 
-  def testInstallAndAuthenticateRunner(self):
-    kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
-    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    snowflake_local = snowflake.Snowflake(spec)
-    snowflake_local.InstallAndAuthenticateRunner(
-        vm=FakeRemoteVMCreateLambdaRole(), benchmark_name='fake_benchmark')
-
   def testRunCommandHelper(self):
     kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)

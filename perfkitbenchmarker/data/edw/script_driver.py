@@ -31,6 +31,7 @@ FLAGS = flags.FLAGS
 DRIVER_NAME = './script_runner.sh'
 JOB_ID_KEY = 'INFO:googleapiclient.model:jobId:'
 API_LOG_FILE = 'apilog.out'
+SNOWFLAKE_OUTPUT_FILE = 'snowflake.out'
 
 
 def default_logfile_names(script, suffix):
@@ -71,6 +72,13 @@ def execute_script(script, logfile_suffix):
           job_id = line.strip().split()[1]
           break
         line = fp.readline()
+  except IOError:
+    pass
+
+  try:
+    with open(SNOWFLAKE_OUTPUT_FILE) as fp:
+      line = fp.readline()
+      execution_time = float(line.split(':')[1].strip()) / 1000
   except IOError:
     pass
 

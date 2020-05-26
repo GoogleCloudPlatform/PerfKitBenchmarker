@@ -70,6 +70,9 @@ class Snowflake(edw_service.EdwService):
         vm preparation.
     """
     vm.Install('snowsql')
+    vm.Install('openjdk')
+    vm.InstallPreprovisionedBenchmarkData(benchmark_name,
+                                          ['snowflake-1.0-SNAPSHOT.jar'], '~/')
     if FLAGS.snowflake_snowsql_config_override_file:
       vm.PushFile(FLAGS.snowflake_snowsql_config_override_file,
                   DEFAULT_CONFIG_LOCATION)
