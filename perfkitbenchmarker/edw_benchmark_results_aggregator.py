@@ -21,7 +21,7 @@ from perfkitbenchmarker import sample
 
 
 class EdwPerformanceAggregationError(Exception):
-  """Error encountered during aggregation of peformance results."""
+  """Error encountered during aggregation of performance results."""
 
 
 def geometric_mean(iterable: List[float]):
