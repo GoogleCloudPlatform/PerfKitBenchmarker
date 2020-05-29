@@ -64,4 +64,4 @@ def GetPipPackageVersion(vm, package_name):
     The version string of the package.
   """
   version, _ = vm.RemoteCommand('pip show %s |grep Version' % package_name)
-  return version
+  return version.strip()
