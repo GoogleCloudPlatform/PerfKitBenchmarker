@@ -439,6 +439,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.gce_shielded_secure_boot:
       cmd.flags['shielded-secure-boot'] = True
 
+    if self.network.placement_group:
+      self.metadata.update(self.network.placement_group.GetResourceMetadata())
+      cmd.flags['resource-policies'] = self.network.placement_group.name
+      cmd.flags['maintenance-policy'] = 'TERMINATE'
+
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
         FLAGS.gcp_instance_metadata_from_file)

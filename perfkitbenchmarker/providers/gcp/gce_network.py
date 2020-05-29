@@ -32,10 +32,12 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
+from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
 import six
 
@@ -771,6 +773,22 @@ class GceNetwork(network.BaseNetwork):
             vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
 
+    # Add GCE Placement Group
+    no_placement_group = (
+        not FLAGS.placement_group_style or
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
+    if no_placement_group:
+      self.placement_group = None
+    else:
+      placement_group_spec = gce_placement_group.GcePlacementGroupSpec(
+          'GcePlacementGroupSpec',
+          flag_values=FLAGS,
+          zone=network_spec.zone,
+          project=self.project,
+          num_vms=self._GetNumberVms())
+      self.placement_group = gce_placement_group.GcePlacementGroup(
+          placement_group_spec)
+
   def _GetNetworksFromSpec(self, network_spec):
     """Returns a list of distinct CIDR networks for this benchmark.
 
@@ -875,6 +893,19 @@ class GceNetwork(network.BaseNetwork):
       return (cls.CLOUD, spec.project, spec.cidr)
     return (cls.CLOUD, spec.project)
 
+  def _GetNumberVms(self):
+    """Counts the number of VMs to be used in this benchmark.
+
+    Cannot do a len(benchmark_spec.vms) as that hasn't been populated yet.  Go
+    through all the group_specs and sum up the vm_counts.
+
+    Returns:
+      Count of the number of VMs in the benchmark.
+    """
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    return sum((group_spec.vm_count - len(group_spec.static_vms))
+               for group_spec in benchmark_spec.config.vm_groups.values())
+
   def Create(self):
     """Creates the actual network."""
     if not FLAGS.gce_network_name:
@@ -891,9 +922,13 @@ class GceNetwork(network.BaseNetwork):
         vm_util.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Create(),
             list(self.vpn_gateway.keys()))
+    if self.placement_group:
+      self.placement_group.Create()
 
   def Delete(self):
     """Deletes the actual network."""
+    if self.placement_group:
+      self.placement_group.Delete()
     if not FLAGS.gce_network_name:
       if getattr(self, 'vpn_gateway', False):
         vm_util.RunThreaded(
