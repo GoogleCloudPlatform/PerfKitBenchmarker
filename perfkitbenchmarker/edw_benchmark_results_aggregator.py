@@ -75,6 +75,14 @@ class EdwQueryPerformance(object):
                              else EdwQueryExecutionStatus.SUCCESSFUL)
     self.metadata = metadata
 
+  def get_query_name(self) -> str:
+    """Gets the query name that was executed.
+
+    Returns:
+      A string name of the query that was executed.
+    """
+    return self.name
+
   def get_performance_sample(self, metadata: Dict[str, str]) -> sample.Sample:
     """Method to generate a sample for the query performance.
 
@@ -117,7 +125,11 @@ class EdwSuitePerformance(object):
   """Class that represents the performance of a suite of edw queries.
 
   Attributes:
-    name: A string name of the suite comrised of suite_name and sequence (tpc_1)
+    name: A string name of the suite comprised of suite_name and the sequence
+      index at which it was executed. For eg. the name - tpc_1, indicates the
+      suite was tpc and the current instance represents its '1' execution
+    sequence: A string value for the sequence index at which the current Suite
+      was executed
     performance: A dictionary of query name to its execution performance which
       is a EdwQueryPerformance instance
     total_count: An integer count of the total number of queries in the suite
@@ -127,18 +139,31 @@ class EdwSuitePerformance(object):
   def __init__(self, suite_name: Text, suite_sequence: Text,
                total_suite_queries: int):
     self.name = suite_name + '_' + suite_sequence
+    self.sequence = suite_sequence
     self.performance = {}
     self.total_count = total_suite_queries
     self.successful_count = 0
 
+  def get_suite_sequence(self) -> str:
+    """Gets the sequence index at which the current Suite was executed."""
+    return self.sequence
+
   def add_query_performance(self, query_performance: EdwQueryPerformance):
     """Updates the suite's performance map, with a member query performance.
 
-    The method also increaments the success and failure query counts.
+    The method also increments the success and failure query counts.
 
     Args:
       query_performance: An instance of EdwQueryPerformance to be added
+
+    Raises:
+      EdwPerformanceAggregationError: if a duplicate query performance is
+       submitted for the current suite.
     """
+    # make sure a query_performance value has not been submitted for the current
+    # query already
+    if query_performance.get_query_name() in self.performance:
+      raise EdwPerformanceAggregationError('Duplicate query performance.')
     self.performance[query_performance.name] = query_performance
     if query_performance.is_successful():
       self.successful_count += 1
@@ -272,23 +297,24 @@ class EdwBenchmarkPerformance(object):
     return set(edw_suite_performance.get_all_queries_in_suite()) == set(
         self.expected_suite_queries)
 
-  def add_suite_performance(self, sequence_idx: Text,
-                            edw_suite_performance: EdwSuitePerformance):
+  def add_suite_performance(self, edw_suite_performance: EdwSuitePerformance):
     """Add a suite's execution performance to the benchmark results.
 
     Args:
-      sequence_idx: String iteration index for the suite's run. It serves as the
-        key in the benchmark's suite_performances map
       edw_suite_performance: An instance of EdwSuitePerformance encapsulating
         the suite performance details.
 
     Raises:
-      EdwPerformanceAggregationError: If suite contains unexpected queries
+      EdwPerformanceAggregationError: If suite contains unexpected queries or if
+       a duplicate suite performance is submitted for the current benchmark.
     """
     if not self.validate_suite_query_coverage(edw_suite_performance):
       raise EdwPerformanceAggregationError('Attempting to aggregate an invalid'
                                            ' suite.')
-    self.suite_performances[sequence_idx] = edw_suite_performance
+    if edw_suite_performance.get_suite_sequence() in self.suite_performances:
+      raise EdwPerformanceAggregationError('Duplicate suite performance.')
+    self.suite_performances[
+        edw_suite_performance.get_suite_sequence()] = edw_suite_performance
 
   def is_successful(self) -> bool:
     """Check a benchmark's success, only if all the suite sequences succeed."""
