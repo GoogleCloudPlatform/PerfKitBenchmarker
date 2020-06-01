@@ -123,7 +123,8 @@ def YumInstall(vm):
   """Installs the OpenMPI package on the VM."""
   if not FLAGS.openmpi_version:
     return
-  vm.RobustRemoteCommand('sudo yum {}'.format(REMOVE_MPI_CMD))
+  vm.RobustRemoteCommand(
+      'sudo yum {}'.format(REMOVE_MPI_CMD), ignore_failure=True)
   _Install(vm)
 
 
@@ -131,7 +132,8 @@ def AptInstall(vm):
   """Installs the OpenMPI package on the VM."""
   if not FLAGS.openmpi_version:
     return
-  vm.RobustRemoteCommand('sudo apt-get {}'.format(REMOVE_MPI_CMD))
+  vm.RobustRemoteCommand(
+      'sudo apt-get {}'.format(REMOVE_MPI_CMD), ignore_failure=True)
   _Install(vm)
 
 
