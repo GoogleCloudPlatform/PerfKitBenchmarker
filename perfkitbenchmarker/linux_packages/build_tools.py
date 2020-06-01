@@ -14,6 +14,8 @@
 
 
 """Module containing build tools installation and cleanup functions."""
+import logging
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 
 
@@ -27,10 +29,12 @@ def AptInstall(vm):
   vm.InstallPackages('build-essential git libtool autoconf automake')
 
 
-def _GetVersion(vm, pkg):
+def GetVersion(vm, pkg):
   """Get version of package."""
-  _, err = vm.RemoteCommand('{pkg} -v'.format(pkg=pkg), ignore_failure=True)
-  return err
+  # TODO(user): Add gcc version to all samples similar to lscpu/proccpu.
+  out, _ = vm.RemoteCommand(
+      '{pkg} -dumpversion'.format(pkg=pkg), ignore_failure=True)
+  return out.rstrip()
 
 
 def Reinstall(vm, version='4.7'):
@@ -39,13 +43,18 @@ def Reinstall(vm, version='4.7'):
   Args:
     vm: VirtualMachine object.
     version: string. GCC version.
+  Raises:
+    Error: If this is ran on a non debian based system.
   """
   # TODO(user): Make this work on yum based systems.
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
-    return
+    raise errors.Error('Updating GCC only works on Debian based systems.')
+  vm.RemoteCommand('sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y')
+  vm.RemoteCommand('sudo apt-get update')
   for pkg in ('gcc', 'gfortran', 'g++'):
-    version_string = _GetVersion(vm, pkg)
+    version_string = GetVersion(vm, pkg)
     if version in version_string:
+      logging.info('Have expected version of %s: %s', pkg, version_string)
       continue
     else:
       new_pkg = pkg + '-' + version
@@ -53,3 +62,5 @@ def Reinstall(vm, version='4.7'):
       vm.RemoteCommand('sudo rm /usr/bin/{pkg}'.format(pkg=pkg))
       vm.RemoteCommand('sudo ln -s /usr/bin/{new_pkg} /usr/bin/{pkg}'.format(
           new_pkg=new_pkg, pkg=pkg))
+      logging.info('Updated version of %s: Old: %s New: %s', pkg,
+                   version_string, GetVersion(vm, pkg))

@@ -104,6 +104,8 @@
     script
 -   Enable support for AWS's m6g family.
 -   Add SPEC CPU 2017 flag allowing to build but not run a suite.
+-   Enable support for specifying newer versions of GCC than what the OS
+    supports by default.
 
 ### Bug fixes and maintenance updates:
 

@@ -441,7 +441,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec17_copies': FLAGS.spec17_copies,
       'spec17_threads': FLAGS.spec17_threads,
       'spec17_fdo': FLAGS.spec17_fdo,
-      'spec17_subset': FLAGS.spec17_subset
+      'spec17_subset': FLAGS.spec17_subset,
+      'gcc_version': build_tools.GetVersion(vm, 'gcc')
   }
 
   missing_results = []

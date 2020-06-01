@@ -29,6 +29,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import build_tools
 from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2017
 
@@ -199,9 +200,12 @@ def _Run(vm):
     if 'Error' in stdout and 'Please review this file' in stdout:
       raise errors.Benchmarks.RunError('Error during SPEC compilation.')
     return [
-        sample.Sample('compilation_time',
-                      time.time() - start_time, 's',
-                      {'spec17_subset': FLAGS.spec17_subset})
+        sample.Sample(
+            'compilation_time',
+            time.time() - start_time, 's', {
+                'spec17_subset': FLAGS.spec17_subset,
+                'gcc_version': build_tools.GetVersion(vm, 'gcc')
+            })
     ]
 
   partial_results = True
