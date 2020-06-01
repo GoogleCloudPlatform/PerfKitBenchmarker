@@ -48,8 +48,8 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-_THREAD_POOL_WORKERS = 100
-_BATCH_SIZE = 500
+_CLEANUP_THREAD_POOL_WORKERS = 5
+_CLEANUP_KIND_BATCH_SIZE = 200
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
 _YCSB_COLLECTIONS = ['usertable']
@@ -144,7 +144,7 @@ def Cleanup(_):
   if FLAGS.google_datastore_deletion_keyfile:
     dataset_id = FLAGS.google_datastore_datasetId
     executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=_THREAD_POOL_WORKERS)
+        max_workers=_CLEANUP_THREAD_POOL_WORKERS)
     if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
       # Copy private keyfile to local disk
       cp_cmd = [
@@ -163,22 +163,44 @@ def Cleanup(_):
         scopes=datastore.client.Client.SCOPE,
     )
 
-    db = datastore.Client(project=dataset_id, credentials=credentials)
-
+    futures = []
     for kind in _YCSB_COLLECTIONS:
-      while True:
-        futures = []
-        for entity in db.query(kind=kind).fetch(limit=_BATCH_SIZE):
-          futures.append(executor.submit(db.delete(entity.key)))
-        if not futures:
-          logging.info('Deleted all data in %s', dataset_id)
-          break
-        logging.info('Enqueued %d deletes', len(futures))
-        concurrent.futures.wait(
-            futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
-        logging.info('Finished %d deletes', len(futures))
+      client = datastore.Client(project=dataset_id, credentials=credentials)
+      futures.append(executor.submit(_ProcessDeleteKind(client, kind)))
+    concurrent.futures.wait(
+        futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+    logging.info('Deleted all data for %s', dataset_id)
+
   else:
     logging.warning('Manually delete all the entries via GCP portal.')
+
+
+def _ProcessDeleteKind(client, kind):
+  """Deletes all kind entries in a datastore database.
+
+  Args:
+    client: Cloud Datastore client to delete entities.
+    kind: Kind for which entities will be deleted.
+  Raises:
+    ValueError: In case of delete failures.
+  """
+  total_count = 0
+  while True:
+    entities = list(
+        client.query(kind=kind).fetch(limit=_CLEANUP_KIND_BATCH_SIZE))
+    count_entities = len(entities)
+    total_count += count_entities
+    if count_entities >= 1:
+      logging.info('Deleting %d entities for %s', count_entities, kind)
+      try:
+        client.delete_multi(entity.key for entity in entities)
+        logging.info('Finished %d deletes for %s', count_entities, kind)
+      except ValueError as error:
+        logging.error('Delete entities for %s failed due to %s', kind, error)
+        raise error
+    else:
+      logging.info('Deleted all data for %s - %d records', kind, total_count)
+      break
 
 
 def _Install(vm):

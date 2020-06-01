@@ -148,3 +148,4 @@
     - Security groups of the clusters will have to be manually edited to allow
     SSH.
 -   Cast sample values to floats, ensuring they conform to the specification
+-   Improve database deletion performance of Cloud datastore YCSB benchmark.
