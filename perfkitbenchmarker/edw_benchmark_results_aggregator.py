@@ -62,7 +62,7 @@ class EdwQueryPerformance(object):
     performance: A Float variable set to the query's completion time in secs.
     -1.0 is used as a sentinel value implying the query failed. For a successful
     query the value is expected to be positive.
-    execution_status: An EdwQueryExecutionStatus enum indicating suceess/failure
+    execution_status: An EdwQueryExecutionStatus enum indicating success/failure
     metadata: A dictionary of query execution attributes (job_id, etc.)
   """
 
@@ -122,7 +122,6 @@ class EdwSuitePerformance(object):
       is a EdwQueryPerformance instance
     total_count: An integer count of the total number of queries in the suite
     successful_count: An integer count of the successful queries in the suite
-    failure_count: An integer count of the failed queries in the suite
   """
 
   def __init__(self, suite_name: Text, suite_sequence: Text,
@@ -131,7 +130,6 @@ class EdwSuitePerformance(object):
     self.performance = {}
     self.total_count = total_suite_queries
     self.successful_count = 0
-    self.failure_count = 0
 
   def add_query_performance(self, query_performance: EdwQueryPerformance):
     """Updates the suite's performance map, with a member query performance.
@@ -144,8 +142,6 @@ class EdwSuitePerformance(object):
     self.performance[query_performance.name] = query_performance
     if query_performance.is_successful():
       self.successful_count += 1
-    else:
-      self.failure_count += 1
 
   def has_query_performance(self, query_name: Text) -> bool:
     """Makes sure query was executed as part of the suite.
@@ -179,6 +175,14 @@ class EdwSuitePerformance(object):
       An EdwQueryPerformance instance for the requested query
     """
     return self.performance[query_name]
+
+  def get_all_queries_in_suite(self) -> List[Text]:
+    """Gets a list of names of all queries in the Suite.
+
+    Returns:
+      A list of all queries in the Suite.
+    """
+    return self.performance.keys()
 
   def get_all_query_performance_samples(self, metadata: Dict[str, str]) -> List[
       sample.Sample]:
@@ -243,13 +247,30 @@ class EdwBenchmarkPerformance(object):
 
   Attributes:
     total_iterations: An integer variable set to total of number of iterations.
+    expected_suite_queries: A list of query names that are executed in a
+       benchmark's suite
     suite_performances: A dictionary of suite's execution sequence index (String
       value) to its execution performance (an instance of EdwSuitePerformance)
   """
 
-  def __init__(self, total_iterations: Dict[str, EdwSuitePerformance]):
+  def __init__(self, total_iterations: int, expected_suite_queries: List[Text]):
     self.total_iterations = total_iterations
+    self.expected_suite_queries = expected_suite_queries
     self.suite_performances = {}
+
+  def validate_suite_query_coverage(self, edw_suite_performance:
+                                    EdwSuitePerformance):
+    """Validates that the suite has the performance of the expected queries.
+
+    Args:
+      edw_suite_performance: An instance of EdwSuitePerformance encapsulating
+        the suite performance details.
+
+    Returns:
+      A boolean value indicating if the suite has expected query coverage
+    """
+    return set(edw_suite_performance.get_all_queries_in_suite()) == set(
+        self.expected_suite_queries)
 
   def add_suite_performance(self, sequence_idx: Text,
                             edw_suite_performance: EdwSuitePerformance):
@@ -260,7 +281,13 @@ class EdwBenchmarkPerformance(object):
         key in the benchmark's suite_performances map
       edw_suite_performance: An instance of EdwSuitePerformance encapsulating
         the suite performance details.
+
+    Raises:
+      EdwPerformanceAggregationError: If suite contains unexpected queries
     """
+    if not self.validate_suite_query_coverage(edw_suite_performance):
+      raise EdwPerformanceAggregationError('Attempting to aggregate an invalid'
+                                           ' suite.')
     self.suite_performances[sequence_idx] = edw_suite_performance
 
   def is_successful(self) -> bool:
@@ -358,10 +385,8 @@ class EdwBenchmarkPerformance(object):
     return sample.Sample('edw_aggregated_query_time', perf, 'seconds',
                          query_metadata)
 
-  def get_all_query_performance_samples(self,
-                                        metadata: Dict[str, str],
-                                        suite_queries: List[Text]) -> List[
-                                            sample.Sample]:
+  def get_all_query_performance_samples(self, metadata: Dict[str, str]) -> List[
+      sample.Sample]:
     """Generates samples for all query performances.
 
     Benchmark relies on suite runs to generate the raw query performance samples
@@ -370,7 +395,6 @@ class EdwBenchmarkPerformance(object):
     Args:
       metadata: A dictionary of execution attributes to be merged with the query
         execution attributes, for eg. tpc suite, scale of dataset, etc.
-      suite_queries: A String list of query names that comprise the suite
 
     Returns:
       A list of samples (raw and aggregated)
@@ -383,20 +407,17 @@ class EdwBenchmarkPerformance(object):
       results.extend(performance.get_all_query_performance_samples(
           iteration_metadata))
     # Aggregated query performance samples
-    for query in suite_queries:
+    for query in self.expected_suite_queries:
       results.append(self.get_aggregated_query_performance_sample(
           query_name=query, metadata=metadata))
     return results
 
   def get_aggregated_wall_time_performance_sample(self,
-                                                  suite_queries: List[Text],
-                                                  metadata:
-                                                  Dict[str,
-                                                       str]) -> sample.Sample:
+                                                  metadata: Dict[str, str]
+                                                  ) -> sample.Sample:
     """Get the wall time performance aggregated across all iterations.
 
     Args:
-      suite_queries: A String list of query names that comprise the suite
       metadata: A dictionary of execution attributes to be merged with the query
         execution attributes, for eg. tpc suite, scale of dataset, etc.
 
@@ -404,16 +425,15 @@ class EdwBenchmarkPerformance(object):
       A sample of aggregated wall time
     """
     wall_time = 0
-    for query in suite_queries:
+    for query in self.expected_suite_queries:
       wall_time += self.aggregated_query_execution_time(query_name=query)
     wall_time_metadata = copy.copy(metadata)
     wall_time_metadata['aggregation_method'] = 'mean'
     return sample.Sample('edw_aggregated_wall_time', wall_time, 'seconds',
                          wall_time_metadata)
 
-  def get_wall_time_performance_samples(self, metadata: Dict[str, str],
-                                        suite_queries: List[Text]) -> List[
-                                            sample.Sample]:
+  def get_wall_time_performance_samples(self, metadata: Dict[str, str]) -> List[
+      sample.Sample]:
     """Generates samples for all wall time performances.
 
     Benchmark relies on suite runs to generate the raw wall time performance
@@ -423,7 +443,6 @@ class EdwBenchmarkPerformance(object):
     Args:
       metadata: A dictionary of execution attributes to be merged with the query
         execution attributes, for eg. tpc suite, scale of dataset, etc.
-      suite_queries: A String list of query names that comprise the suite
 
     Returns:
       A list of samples (raw and aggregated)
@@ -437,18 +456,16 @@ class EdwBenchmarkPerformance(object):
           iteration_metadata))
 
     results.append(self.get_aggregated_wall_time_performance_sample(
-        suite_queries=suite_queries, metadata=metadata))
+        metadata=metadata))
     return results
 
   def get_aggregated_geomean_performance_sample(self,
-                                                suite_queries: List[Text],
                                                 metadata:
                                                 Dict[str,
                                                      str]) -> sample.Sample:
     """Get the geomean performance aggregated across all iterations.
 
     Args:
-      suite_queries: A String list of query names that comprise the suite
       metadata: A dictionary of execution attributes to be merged with the query
         execution attributes, for eg. tpc suite, scale of dataset, etc.
 
@@ -463,7 +480,7 @@ class EdwBenchmarkPerformance(object):
       raise EdwPerformanceAggregationError('Benchmark contains a failed query.')
     aggregated_geo_mean = geometric_mean(
         [self.aggregated_query_execution_time(query_name=query)
-         for query in suite_queries])
+         for query in self.expected_suite_queries])
 
     geomean_metadata = copy.copy(metadata)
     geomean_metadata['intra_query_aggregation_method'] = 'mean'
@@ -471,9 +488,7 @@ class EdwBenchmarkPerformance(object):
     return sample.Sample('edw_aggregated_geomean', aggregated_geo_mean,
                          'seconds', geomean_metadata)
 
-  def get_queries_geomean_performance_samples(self, metadata: Dict[str, str],
-                                              suite_queries:
-                                              List[Text]
+  def get_queries_geomean_performance_samples(self, metadata: Dict[str, str]
                                               ) -> List[sample.Sample]:
     """Generates samples for all geomean performances.
 
@@ -484,7 +499,6 @@ class EdwBenchmarkPerformance(object):
     Args:
       metadata: A dictionary of execution attributes to be merged with the query
         execution attributes, for eg. tpc suite, scale of dataset, etc.
-      suite_queries: A String list of query names that comprise the suite
 
     Returns:
       A list of samples (raw and aggregated)
@@ -504,5 +518,5 @@ class EdwBenchmarkPerformance(object):
           iteration_metadata))
 
     results.append(self.get_aggregated_geomean_performance_sample(
-        suite_queries=suite_queries, metadata=metadata))
+        metadata=metadata))
     return results
