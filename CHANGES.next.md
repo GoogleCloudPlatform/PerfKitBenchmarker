@@ -106,6 +106,7 @@
 -   Add SPEC CPU 2017 flag allowing to build but not run a suite.
 -   Enable support for specifying newer versions of GCC than what the OS
     supports by default.
+-   Sort AWS AMIs by CreationDate instead of name to get latest image.
 
 ### Bug fixes and maintenance updates:
 

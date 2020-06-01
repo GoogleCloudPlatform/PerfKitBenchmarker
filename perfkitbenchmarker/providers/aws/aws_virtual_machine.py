@@ -593,7 +593,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--region=%s' % region,
         'ec2',
         'describe-images',
-        '--query', 'Images[*].{Name:Name,ImageId:ImageId}',
+        '--query', ('Images[*].{Name:Name,ImageId:ImageId,'
+                    'CreationDate:CreationDate}'),
         '--filters',
         'Name=name,Values=%s' % cls.IMAGE_NAME_FILTER,
         'Name=block-device-mapping.volume-type,Values=%s' %
@@ -633,11 +634,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not images:
       raise AwsImageNotFoundError('No AMIs with given filters found.')
 
-    # We want to return the latest version of the image, and since the wildcard
-    # portion of the image name is the image's creation date, we can just take
-    # the image with the 'largest' name.
-    # TODO(deitz): Investigate sorting by CreationDate instead of by Name.
-    return max(images, key=lambda image: image['Name'])['ImageId']
+    return max(images, key=lambda image: image['CreationDate'])['ImageId']
 
   @vm_util.Retry()
   def _PostCreate(self):
