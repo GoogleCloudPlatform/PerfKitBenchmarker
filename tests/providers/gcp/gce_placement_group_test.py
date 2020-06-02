@@ -7,7 +7,6 @@ from absl import flags
 import mock
 
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import pkb
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -20,7 +19,6 @@ _REGION = 'us-east1'
 _RUN_URI = 'be67a2dd-e312-496d-864a-1d5bc1857dec'
 _PLACEMENT_GROUP_NAME = 'perfkit-{}'.format(_RUN_URI)
 _STRATEGY = placement_group.PLACEMENT_GROUP_CLUSTER
-_CURRENT_USER = 'joe'
 
 # The GcePlacementGroup._Create()
 _CREATE_RESPONSE = (json.dumps({
@@ -75,7 +73,6 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GcePlacementGroupTest, self).setUp()
-    mock.patch.object(pkb, 'GetCurrentUser', return_value=_CURRENT_USER).start()
     self.mock_cmd = mock.patch.object(vm_util, 'IssueCommand').start()
     # Register a fake benchmark
     _BenchmarkSpec(2)
@@ -90,7 +87,7 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_cmd.assert_called_with([
         'gcloud', 'compute', 'resource-policies', 'create',
         'group-placement', _PLACEMENT_GROUP_NAME, '--collocation', 'COLLOCATED',
-        '--description', 'PKB: cluster_boot joe', '--format', 'json',
+        '--format', 'json',
         '--project', 'myproject', '--quiet', '--region', 'us-east1',
         '--vm-count', '2'
     ])

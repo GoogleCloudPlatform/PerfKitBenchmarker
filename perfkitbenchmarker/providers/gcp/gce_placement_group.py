@@ -23,7 +23,6 @@ import logging
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import pkb
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import option_decoders
@@ -97,20 +96,12 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     })
 
   def _Create(self):
-    """Creates the GCE placement group.
-
-    Using the rest API as there is gcloud does not support creation.
-    """
-    logging.info('Creating placement group %s in %s for %s vms', self.name,
-                 self.region, self.num_vms)
-    description = 'PKB: {} {}'.format(context.GetThreadBenchmarkSpec().name,
-                                      pkb.GetCurrentUser())
+    """Creates the GCE placement group."""
 
     cmd = gcp_util.GcloudCommand(self, 'compute', 'resource-policies',
                                  'create', 'group-placement', self.name)
 
     placement_policy = {
-        'description': description,
         'format': 'json',
         'region': self.region,
         'vm-count': self.num_vms
@@ -125,10 +116,7 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
 
     cmd.flags.update(placement_policy)
 
-    stdout, _, _ = cmd.Issue()
-    res = json.loads(stdout)
-
-    logging.info('Created placement group %s', res['selfLink'])
+    cmd.Issue()
 
   def _Exists(self):
     """See base class."""
