@@ -66,6 +66,7 @@
 -   Add MultiStreamDelete to Object Storage API Tests.
 -   Add GCE Placement Group support. By default, placement groups are not
       created.
+-   Add ICMP ping support for Azure using EXTERNAL ip address.
 
 ### Enhancements:
 

@@ -413,6 +413,15 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
   def _Delete(self):
     pass
 
+  def _GetRulePriority(self, rule, rule_name):
+    # Azure priorities are between 100 and 4096, but we reserve 4095
+    # for the special DenyAll rule created by DisallowAllPorts.
+    rule_priority = 100 + len(self.rules)
+    if rule_priority >= 4095:
+      raise ValueError('Too many firewall rules!')
+    self.rules[rule] = rule_name
+    return rule_priority
+
   def AttachToSubnet(self):
     vm_util.IssueRetryableCommand([
         azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'update', '--name',
@@ -444,12 +453,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         return
       port_range = '%s-%s' % (start_port, end_port)
       rule_name = 'allow-%s-%s' % (port_range, source_range_str)
-      # Azure priorities are between 100 and 4096, but we reserve 4095
-      # for the special DenyAll rule created by DisallowAllPorts.
-      rule_priority = 100 + len(self.rules)
-      if rule_priority >= 4095:
-        raise ValueError('Too many firewall rules!')
-      self.rules[rule] = rule_name
+      rule_priority = self._GetRulePriority(rule, rule_name)
 
     network_cmd = [
         azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
@@ -459,6 +463,25 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     ] + ['--source-address-prefixes'] + source_range
     network_cmd.extend(self.resource_group.args + self.args)
     vm_util.IssueRetryableCommand(network_cmd)
+
+  def AllowIcmp(self):
+    source_address = '0.0.0.0/0'
+    # '*' in Azure represents all ports
+    rule = ('*', source_address)
+    rule_name = 'allow-icmp'
+    with self.rules_lock:
+      if rule in self.rules:
+        return
+      rule_priority = self._GetRulePriority(rule, rule_name)
+      network_cmd = [
+          azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
+          rule_name, '--access', 'Allow', '--source-address-prefixes',
+          source_address, '--source-port-ranges', '*',
+          '--destination-port-ranges', '*', '--priority',
+          str(rule_priority), '--protocol', 'Icmp'
+      ]
+      network_cmd.extend(self.resource_group.args + self.args)
+      vm_util.IssueRetryableCommand(network_cmd)
 
 
 class AzureFirewall(network.BaseFirewall):
@@ -486,6 +509,15 @@ class AzureFirewall(network.BaseFirewall):
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
     pass
+
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+
+    vm.network.nsg.AllowIcmp()
 
 
 class AzureNetwork(network.BaseNetwork):
