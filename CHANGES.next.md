@@ -150,3 +150,5 @@
     SSH.
 -   Cast sample values to floats, ensuring they conform to the specification
 -   Improve database deletion performance of Cloud datastore YCSB benchmark.
+-   After installing the python package tries to set default version of python
+    if not set.
