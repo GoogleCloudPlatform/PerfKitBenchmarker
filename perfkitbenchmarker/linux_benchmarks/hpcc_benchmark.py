@@ -142,7 +142,7 @@ def CreateHpccinf(vm, benchmark_spec):
   for i in reversed(list(range(sqrt_cpus))):
     if total_cpus % i == 0:
       num_rows = i
-      num_columns = total_cpus / i
+      num_columns = total_cpus // i
       break
 
   file_path = data.ResourcePath(HPCCINF_FILE)

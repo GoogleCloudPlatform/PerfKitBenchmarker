@@ -147,6 +147,18 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertContainsSubDict(results['StarRandomAccess_GUPs'],
                                {'RandomAccess_N': 268435456.0})
 
+  def testCreateHpccConfig(self):
+    vm = mock.Mock(total_free_memory_kb=526536216)
+    vm.NumCpusForBenchmark.return_value = 128
+    spec = mock.Mock(vms=[None])
+    hpcc_benchmark.CreateHpccinf(vm, spec)
+    expected_command = ('sed -i '
+                        '-e "s/problem_size/231936/" '
+                        '-e "s/block_size/192/" '
+                        '-e "s/rows/8/" '
+                        '-e "s/columns/16/" hpccinf.txt')
+    vm.RemoteCommand.assert_called_with(expected_command)
+
 
 if __name__ == '__main__':
   unittest.main()
