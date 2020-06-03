@@ -417,8 +417,9 @@ class DebianBasedKubernetesVirtualMachine(
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
     self.Install('python')
 
-    # Needed for the MKL math library.
-    self.InstallPackages('cpio')
+    # cpio is needed for the MKL math library.
+    # software-properties-common is needed for add-apt-repository
+    self.InstallPackages('cpio software-properties-common')
 
     # Don't assume the relevant CLI is installed in the Kubernetes environment.
     if FLAGS.container_cluster_cloud == 'GCP':
