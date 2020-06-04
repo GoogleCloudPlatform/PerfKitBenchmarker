@@ -144,6 +144,19 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--disk-type foo', command_string)
       self.assertIn('--local-ssd-count 2', command_string)
 
+  def testCreateQuotaExceeded(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects(
+        stderr="""
+        message=Insufficient regional quota to satisfy request: resource "CPUS":
+        request requires '6400.0' and is short '5820.0'""",
+        return_code=1) as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      with self.assertRaises(
+          errors.Benchmarks.QuotaFailure):
+        cluster._Create()
+      self.assertEqual(issue_command.call_count, 1)
+
   def testCreateResourcesExhausted(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects(

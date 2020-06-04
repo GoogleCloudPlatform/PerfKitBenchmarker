@@ -273,7 +273,8 @@ class GcloudCommand(object):
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())
 
 
-_QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
+_QUOTA_EXCEEDED_REGEX = re.compile(
+    r"(Quota '.*' exceeded|Insufficient \w+ quota)")
 
 _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
@@ -287,14 +288,15 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       stderr: The stderr from a gcloud command.
       retcode: The return code from a gcloud command.
   """
-  if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
-    message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
-    logging.error(message)
-    raise errors.Benchmarks.QuotaFailure(message)
-  if retcode and _NOT_ENOUGH_RESOURCES_STDERR in stderr:
-    message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
-    logging.error(message)
-    raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+  if retcode:
+    if _QUOTA_EXCEEDED_REGEX.search(stderr):
+      message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
+      logging.error(message)
+      raise errors.Benchmarks.QuotaFailure(message)
+    if _NOT_ENOUGH_RESOURCES_STDERR in stderr:
+      message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
+      logging.error(message)
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
 
 
 def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):

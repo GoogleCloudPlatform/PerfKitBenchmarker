@@ -150,6 +150,7 @@ class AksCluster(container_service.KubernetesCluster):
     if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
       cmd += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
 
+    # TODO(pclay): expose quota and capacity errors
     vm_util.IssueCommand(cmd, timeout=1800)
 
   def _Exists(self):

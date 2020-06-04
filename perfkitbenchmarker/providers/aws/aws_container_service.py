@@ -22,6 +22,7 @@ import os
 import uuid
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -57,7 +58,16 @@ class EcrRepository(resource.BaseResource):
         '--region', self.region,
         '--repository-name', self.name
     ]
-    vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(create_cmd,
+                                              raise_on_failure=False)
+    if retcode:
+      if 'InsufficientInstanceCapacity' in stderr:
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+      if 'InstanceLimitExceeded' in stderr or 'VpcLimitExceeded' in stderr:
+        raise errors.Benchmarks.QuotaFailure(stderr)
+      raise errors.Resource.CreationError(
+          'Failed to create EKS Cluster: {} return code: {}'.format(
+              retcode, stderr))
 
   def _Exists(self):
     """Returns True if the repository exists."""

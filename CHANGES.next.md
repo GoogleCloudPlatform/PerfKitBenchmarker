@@ -155,3 +155,4 @@
     if not set.
 -   Add check in Prepare stage of PKB cloud datastore ycsb benchmark to ensure
     db is empty before running.
+-   Categorize k8s cluster creation errors better.
