@@ -87,3 +87,5 @@ flags.DEFINE_boolean('teardown_athena', True,
 flags.DEFINE_string('athena_output_location', None,
                     'Athena Query Output Location.')
 flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
+flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI'],
+                  'The Runtime Interface used when interacting with Redshift.')

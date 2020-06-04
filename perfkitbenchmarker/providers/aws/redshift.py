@@ -17,8 +17,10 @@ Clusters can be created (based on new configuration or restored from a snapshot)
 and deleted.
 """
 
+import copy
 import json
 import os
+from typing import Dict
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
@@ -60,6 +62,102 @@ def GetDefaultRegion():
   default_region_cmd = cmd_prefix + ['configure', 'get', 'region']
   stdout, _, _ = vm_util.IssueCommand(default_region_cmd)
   return stdout
+
+
+def GetRedshiftClientInterface(host: str, database: str, user: str,
+                               password: str) -> edw_service.EdwClientInterface:
+  """Builds and Returns the requested Redshift client Interface.
+
+  Args:
+    host: Host endpoint to be used for interacting with the cluster.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+
+  Returns:
+    A concrete Client Interface object (subclass of GenericClientInterface)
+
+  Raises:
+    RuntimeError: if an unsupported redshift_client_interface is requested
+  """
+  if FLAGS.redshift_client_interface == 'CLI':
+    return CliClientInterface(host, database, user, password)
+  raise RuntimeError('Unknown Redshift Client Interface requested.')
+
+
+class CliClientInterface(edw_service.EdwClientInterface):
+  """Command Line Client Interface class for Redshift.
+
+  Uses the native Redshift client that ships with pgbench.
+  https://docs.aws.amazon.com/cli/latest/reference/redshift/index.html
+
+  Attributes:
+    host: Host endpoint to be used for interacting with the cluster.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+  """
+
+  def __init__(self, host: str, database: str, user: str, password: str):
+    self.host = host
+    self.database = database
+    self.user = user
+    self.password = password
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the redshift tool dependencies.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand('sudo pip install absl-py')
+    self.client_vm.Install('pgbench')
+
+    # Push the framework to execute a sql query and gather performance details
+    service_specific_dir = os.path.join('edw', Redshift.SERVICE_TYPE)
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir, 'script_runner.sh')))
+    runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)
+    self.client_vm.PushFile(
+        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir,
+                         'provider_specific_script_driver.py')))
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = ('python script_driver.py --script={} --host={} '
+                     '--database={} --user={} --password={}').format(
+                         query_name, self.host, self.database, self.user,
+                         self.password)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    details['job_id'] = performance[query_name]['job_id']
+    return float(performance[query_name]['execution_time']), details
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.redshift_client_interface}
 
 
 class Redshift(edw_service.EdwService):
@@ -284,6 +382,8 @@ class Redshift(edw_service.EdwService):
                                                           self.
                                                           cluster_identifier)
     AddTags(self.arn, self.region)
+    self.client_interface = GetRedshiftClientInterface(self.endpoint, self.db,
+                                                       self.user, self.password)
 
   def _Delete(self):
     """Delete a redshift cluster and disallow creation of a snapshot."""
@@ -313,6 +413,7 @@ class Redshift(edw_service.EdwService):
     basic_data['region'] = self.region
     if self.snapshot is not None:
       basic_data['snapshot'] = self.snapshot
+    basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 
   def RunCommandHelper(self):
