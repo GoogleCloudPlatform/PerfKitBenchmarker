@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.bigquery."""
+
 import copy
+import json
 import unittest
 from absl import flags
 import mock
@@ -21,6 +23,10 @@ from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 
+BENCHMARK_NAME = 'BENCHMARK_NAME'
+DATASET_ID = 'DATASET_ID'
+PROJECT_ID = 'PROJECT_ID'
+QUERY_NAME = 'QUERY_NAME'
 _TEST_RUN_URI = 'fakeru'
 _GCP_ZONE_US_CENTRAL_1_C = 'us-central1-c'
 
@@ -37,6 +43,80 @@ class FakeRemoteVM(object):
   def Install(self, package_name):
     if package_name != 'google_cloud_sdk':
       raise RuntimeError
+
+
+class FakeRemoteVMForCliClientInterfacePrepare(object):
+  """Class to setup a Fake VM that prepares a Client VM (CLI Client)."""
+
+  def __init__(self):
+    self.valid_install_package_list = ['pip', 'google_cloud_sdk']
+    self.valid_remote_command_list = [
+        'sudo pip install absl-py',
+        '/tmp/pkb/google-cloud-sdk/bin/gcloud auth activate-service-account '
+        'SERVICE_ACCOUNT --key-file=SERVICE_ACCOUNT_KEY_FILE',
+        'chmod 755 script_runner.sh'
+    ]
+
+  def Install(self, package_name):
+    if package_name not in self.valid_install_package_list:
+      raise RuntimeError
+
+  def RemoteCommand(self, command):
+    if command not in self.valid_remote_command_list:
+      raise RuntimeError
+
+  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
+                                         install_path):
+    if benchmark_name != 'BENCHMARK_NAME':
+      raise RuntimeError
+
+  def PushFile(self, source_path):
+    pass
+
+
+class FakeRemoteVMForCliClientInterfaceExecuteQuery(object):
+  """Class to setup a Fake VM that executes script on Client VM (CLI Client)."""
+
+  def RemoteCommand(self, command):
+    expected_command = ('python script_driver.py --script={} --bq_project_id={}'
+                        ' --bq_dataset_id={}').format(QUERY_NAME, PROJECT_ID,
+                                                      DATASET_ID)
+    if command != expected_command:
+      raise RuntimeError
+    response_object = {QUERY_NAME: {'job_id': 'JOB_ID', 'execution_time': 1.0}}
+    response = json.dumps(response_object)
+    return response, None
+
+
+class FakeRemoteVMForJavaClientInterfacePrepare(object):
+  """Class to setup a Fake VM that prepares a Client VM (JAVA Client)."""
+
+  def __init__(self):
+    self.valid_install_package_list = ['openjdk']
+
+  def Install(self, package_name):
+    if package_name != 'openjdk':
+      raise RuntimeError
+
+  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
+                                         install_path):
+    if benchmark_name != 'BENCHMARK_NAME':
+      raise RuntimeError
+
+
+class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
+  """Class to setup a Fake VM that executes script on Client VM (JAVA Client)."""
+
+  def RemoteCommand(self, command):
+    expected_command = ('java -jar bq-java-client-1.0.jar  --project {} '
+                        '--credentials_file {} --dataset {} --query_file '
+                        '{}').format(PROJECT_ID, 'SERVICE_ACCOUNT_KEY_FILE',
+                                     DATASET_ID, QUERY_NAME)
+    if command != expected_command:
+      raise RuntimeError
+    response_object = {'performance': 1.0, 'details': {'job_id': 'JOB_ID'}}
+    response = json.dumps(response_object)
+    return response, None
 
 
 class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -56,6 +136,67 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       bigquery_local.InstallAndAuthenticateRunner(
           vm=FakeRemoteVM(), benchmark_name='fake_benchmark_name')
       mock_issue.assert_called_once()
+
+  def testGetBigQueryClientInterfaceGeneric(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertEqual(interface.project_id, PROJECT_ID)
+    self.assertEqual(interface.dataset_id, DATASET_ID)
+
+  def testGetBigQueryClientInterfaceCli(self):
+    FLAGS.bq_client_interface = 'CLI'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.CliClientInterface)
+
+  def testGetBigQueryClientInterfaceJava(self):
+    FLAGS.bq_client_interface = 'JAVA'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.JavaClientInterface)
+
+  def testGenericClientInterfaceGetMetada(self):
+    FLAGS.bq_client_interface = 'CLI'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertDictEqual(interface.GetMetadata(), {'client': 'CLI'})
+    FLAGS.bq_client_interface = 'JAVA'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertDictEqual(interface.GetMetadata(), {'client': 'JAVA'})
+
+  def testCliClientInterfacePrepare(self):
+    FLAGS.bq_client_interface = 'CLI'
+    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
+    FLAGS.gcp_service_account = 'SERVICE_ACCOUNT'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.CliClientInterface)
+    interface.SetClientVm(FakeRemoteVMForCliClientInterfacePrepare())
+    interface.Prepare(BENCHMARK_NAME)
+
+  def testCliClientInterfaceExecuteQuery(self):
+    FLAGS.bq_client_interface = 'CLI'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.CliClientInterface)
+    interface.SetClientVm(FakeRemoteVMForCliClientInterfaceExecuteQuery())
+    performance, details = interface.ExecuteQuery(QUERY_NAME)
+    self.assertEqual(performance, 1.0)
+    self.assertDictEqual(details, {'client': 'CLI', 'job_id': 'JOB_ID'})
+
+  def testJavaClientInterfacePrepare(self):
+    FLAGS.bq_client_interface = 'JAVA'
+    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.JavaClientInterface)
+    interface.SetClientVm(FakeRemoteVMForJavaClientInterfacePrepare())
+    interface.Prepare(BENCHMARK_NAME)
+
+  def testJavaClientInterfaceExecuteQuery(self):
+    FLAGS.bq_client_interface = 'JAVA'
+    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
+
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.JavaClientInterface)
+
+    interface.SetClientVm(FakeRemoteVMForJavaClientInterfaceExecuteQuery())
+    performance, details = interface.ExecuteQuery(QUERY_NAME)
+    self.assertEqual(performance, 1.0)
+    self.assertDictEqual(details, {'client': 'JAVA', 'job_id': 'JOB_ID'})
 
 
 if __name__ == '__main__':

@@ -19,10 +19,12 @@ directory as a subclass of BaseEdwService.
 """
 import json
 import os
+from typing import Dict, Text
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import virtual_machine
 
 
 flags.DEFINE_integer('edw_service_cluster_concurrency', 5,
@@ -71,6 +73,62 @@ DEFAULT_NUMBER_OF_NODES = 1
 EDW_SERVICE_LIFECYCLE_STAGES = ['create', 'load', 'query', 'delete']
 
 
+class EdwExecutionError(Exception):
+  """Encapsulates errors encountered during execution of a query."""
+
+
+class EdwClientInterface(object):
+  """Defines the interface for EDW service clients.
+
+  Attributes:
+    client_vm: An instance of virtual_machine.BaseVirtualMachine used to
+    interface with the edw service.
+  """
+
+  def __init__(self):
+    self.client_vm = None
+
+  def SetClientVm(self, client_vm: virtual_machine.BaseVirtualMachine) -> None:
+    """Sets the client vm to used to interface with the edw service.
+
+    Args:
+      client_vm: Client vm to interface with the EDW service
+    """
+    self.client_vm = client_vm
+
+  def Prepare(self, benchmark_name: Text) -> None:
+    """Prepares the client vm to execute query.
+
+    The default implementation raises an Error, to ensure client specific
+    installation and authentication of runner utilities.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    raise NotImplementedError
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    raise NotImplementedError
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Returns the client interface metadata."""
+    raise NotImplementedError
+
+
 class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
@@ -114,6 +172,11 @@ class EdwService(resource.BaseResource):
     self.spec = edw_service_spec
     # resource workflow management
     self.supports_wait_on_delete = True
+    self.client_interface = None
+
+  def GetClientInterface(self) -> EdwClientInterface:
+    """Gets the active Client Interface."""
+    return self.client_interface
 
   def IsUserManaged(self, edw_service_spec):
     """Indicates if the edw service instance is user managed.
