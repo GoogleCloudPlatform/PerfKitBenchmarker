@@ -25,10 +25,11 @@ By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Datastore.
 """
 
-import logging
 import concurrent.futures
+import logging
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
@@ -96,6 +97,27 @@ def CheckPrerequisites(_):
     raise ValueError('"google_datastore_datasetId" must be set ')
 
 
+def GetDatastoreDeleteCredentials():
+  """Returns credentials to datastore db."""
+  if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
+    # Copy private keyfile to local disk
+    cp_cmd = [
+        'gsutil', 'cp', FLAGS.google_datastore_deletion_keyfile,
+        FLAGS.private_keyfile
+    ]
+    vm_util.IssueCommand(cp_cmd)
+    credentials_path = FLAGS.private_keyfile
+  else:
+    credentials_path = FLAGS.google_datastore_deletion_keyfile
+
+  credentials = service_account.Credentials.from_service_account_file(
+      credentials_path,
+      scopes=datastore.client.Client.SCOPE,
+  )
+
+  return credentials
+
+
 def Prepare(benchmark_spec):
   """Prepare the virtual machines to run cloud datastore.
 
@@ -104,6 +126,22 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
+
+  # Check that the database is empty before running
+  if FLAGS.google_datastore_deletion_keyfile:
+    dataset_id = FLAGS.google_datastore_datasetId
+    credentials = GetDatastoreDeleteCredentials()
+
+    client = datastore.Client(project=dataset_id, credentials=credentials)
+
+    for kind in _YCSB_COLLECTIONS:
+      if list(client.query(kind=kind).fetch(limit=1)):
+        raise errors.Benchmarks.PrepareException(
+            'Database is non-empty. Stopping test.')
+
+  else:
+    logging.warning('Test could be executed on a non-empty database.')
+
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
@@ -145,23 +183,10 @@ def Cleanup(_):
     dataset_id = FLAGS.google_datastore_datasetId
     executor = concurrent.futures.ThreadPoolExecutor(
         max_workers=_CLEANUP_THREAD_POOL_WORKERS)
-    if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
-      # Copy private keyfile to local disk
-      cp_cmd = [
-          'gsutil', 'cp', FLAGS.google_datastore_deletion_keyfile,
-          FLAGS.private_keyfile
-      ]
-      vm_util.IssueCommand(cp_cmd)
-      credentials_path = FLAGS.private_keyfile
-    else:
-      credentials_path = FLAGS.google_datastore_deletion_keyfile
 
     logging.info('Attempting to delete all data in %s', dataset_id)
 
-    credentials = service_account.Credentials.from_service_account_file(
-        credentials_path,
-        scopes=datastore.client.Client.SCOPE,
-    )
+    credentials = GetDatastoreDeleteCredentials()
 
     futures = []
     for kind in _YCSB_COLLECTIONS:

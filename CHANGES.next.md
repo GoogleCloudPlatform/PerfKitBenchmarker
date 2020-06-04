@@ -153,3 +153,5 @@
 -   Improve database deletion performance of Cloud datastore YCSB benchmark.
 -   After installing the python package tries to set default version of python
     if not set.
+-   Add check in Prepare stage of PKB cloud datastore ycsb benchmark to ensure
+    db is empty before running.
