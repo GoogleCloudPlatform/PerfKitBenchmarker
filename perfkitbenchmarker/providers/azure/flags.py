@@ -89,3 +89,5 @@ flags.DEFINE_boolean('bootstrap_azure_service_principal', True,
                      'principal. This is useful, because service principals '
                      "usually lack the 'User Authentication Admin' role that "
                      'allows creation of new service principals.')
+flags.DEFINE_enum('sqldatawarehouse_client_interface', 'CLI', ['CLI'],
+                  'The Runtime Interface used when interacting with Synapse.')

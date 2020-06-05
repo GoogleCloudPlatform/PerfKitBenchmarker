@@ -16,7 +16,12 @@
 Clusters can be paused and unpaused.
 """
 
+import copy
 import json
+import os
+from typing import Dict
+
+from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -32,9 +37,122 @@ READY_STATUSES = ['Online']
 PAUSING_STATUSES = ['Pausing']
 
 
-class Azuresqldatawarehouse(edw_service.EdwService):
-  """Object representing an Azure SQL data warehouse.
+def GetSqlDataWarehouseClientInterface(
+    server_name: str, database: str, user: str, password: str,
+    resource_group: str) -> edw_service.EdwClientInterface:
+  """Builds and Returns the requested SqlDataWarehouse client Interface.
+
+  Args:
+    server_name: Name of the SqlDataWarehouse server to use.
+    database: Name of the database to run queries against.
+    user: SqlDataWarehouse username for authentication.
+    password: SqlDataWarehouse password for authentication.
+    resource_group: Azure resource group used to whitelist the VM's IP address.
+
+  Returns:
+    A concrete Client Interface object.
+
+  Raises:
+    RuntimeError: if an unsupported sqldatawarehouse_client_interface is
+      requested.
   """
+  if FLAGS.sqldatawarehouse_client_interface == 'CLI':
+    return CliClientInterface(server_name, database, user, password,
+                              resource_group)
+  raise RuntimeError('Unknown SqlDataWarehouse Client Interface requested.')
+
+
+class CliClientInterface(edw_service.EdwClientInterface):
+  """Command Line Client Interface class for Azure SqlDataWarehouse.
+
+  Uses the native SqlDataWarehouse client that ships with the Azure CLI.
+  https://docs.microsoft.com/en-us/cli/azure/sql/server?view=azure-cli-latest
+
+  Attributes:
+    server_name: Name of the SqlDataWarehouse server to use.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+    resource_group: Azure resource group used to whitelist the VM's IP address.
+  """
+
+  def __init__(self, server_name: str, database: str, user: str, password: str,
+               resource_group: str):
+    self.server_name = server_name
+    self.database = database
+    self.user = user
+    self.password = password
+    self.resource_group = resource_group
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the sql server tool dependencies.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand('sudo pip install absl-py')
+    self.client_vm.Install('mssql_tools')
+    self.whitelist_ip = self.client_vm.ip_address
+
+    cmd = [
+        azure.AZURE_PATH, 'sql', 'server', 'firewall-rule', 'create', '--name',
+        self.whitelist_ip, '--resource-group', self.resource_group, '--server',
+        self.server_name, '--end-ip-address', self.whitelist_ip,
+        '--start-ip-address', self.whitelist_ip
+    ]
+    vm_util.IssueCommand(cmd)
+
+    # Push the framework to execute a sql query and gather performance details
+    service_specific_dir = os.path.join('edw',
+                                        Azuresqldatawarehouse.SERVICE_TYPE)
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir, 'script_runner.sh')))
+    runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)
+    self.client_vm.PushFile(
+        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir,
+                         'provider_specific_script_driver.py')))
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = (
+        'python script_driver.py --script={} --server={} --database={} '
+        '--user={} --password={}').format(query_name, self.server_name,
+                                          self.database, self.user,
+                                          self.password)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    details['job_id'] = performance[query_name]['job_id']
+    return float(performance[query_name]['execution_time']), details
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.sqldatawarehouse_client_interface}
+
+
+class Azuresqldatawarehouse(edw_service.EdwService):
+  """Object representing an Azure SQL data warehouse."""
 
   CLOUD = providers.AZURE
   SERVICE_TYPE = 'azuresqldatawarehouse'
@@ -44,6 +162,9 @@ class Azuresqldatawarehouse(edw_service.EdwService):
     self.whitelist_ip = None
     self.resource_group = edw_service_spec.resource_group
     self.server_name = edw_service_spec.server_name
+    self.client_interface = GetSqlDataWarehouseClientInterface(
+        self.server_name, self.db, self.user, self.password,
+        self.resource_group)
 
   def WhitelistIPAddress(self, ip_address):
     """To whitelist the IP address on the cluster."""
@@ -135,18 +256,12 @@ class Azuresqldatawarehouse(edw_service.EdwService):
 
   def _DeleteDependencies(self):
     """Delete dependencies of the cluster."""
-    if self.whitelist_ip is not None:
-      cmd = [azure.AZURE_PATH,
-             'sql',
-             'server',
-             'firewall-rule',
-             'delete',
-             '--name',
-             self.whitelist_ip,
-             '--resource-group',
-             self.resource_group,
-             '--server',
-             self.server_name]
+    if self.client_interface.whitelist_ip is not None:
+      cmd = [
+          azure.AZURE_PATH, 'sql', 'server', 'firewall-rule', 'delete',
+          '--name', self.client_interface.whitelist_ip, '--resource-group',
+          self.resource_group, '--server', self.server_name
+      ]
       vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def GetMetadata(self):
@@ -154,6 +269,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
     basic_data = super(Azuresqldatawarehouse, self).GetMetadata()
     basic_data['resource_group'] = self.resource_group
     basic_data['server_name'] = self.server_name
+    basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 
   def RunCommandHelper(self):

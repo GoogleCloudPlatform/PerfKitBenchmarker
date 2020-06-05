@@ -75,7 +75,7 @@ def GetRedshiftClientInterface(host: str, database: str, user: str,
     password: Redshift password for authentication.
 
   Returns:
-    A concrete Client Interface object (subclass of GenericClientInterface)
+    A concrete Client Interface object.
 
   Raises:
     RuntimeError: if an unsupported redshift_client_interface is requested
