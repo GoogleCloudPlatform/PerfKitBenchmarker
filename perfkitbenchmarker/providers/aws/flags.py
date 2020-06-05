@@ -89,3 +89,7 @@ flags.DEFINE_string('athena_output_location', None,
 flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
 flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI'],
                   'The Runtime Interface used when interacting with Redshift.')
+flags.DEFINE_enum('athena_client_interface', 'CLI', ['CLI'],
+                  'The Runtime Interface used when interacting with Athena.')
+flags.DEFINE_string('athena_database', '',
+                    'Name of the database to run queries against.')

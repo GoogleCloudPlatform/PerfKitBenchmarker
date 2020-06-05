@@ -14,10 +14,12 @@
 """Module containing class for AWS's Athena EDW service."""
 
 import datetime
+import json
 import logging
+import os
+from typing import Dict
 
 from perfkitbenchmarker import data
-
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -45,6 +47,84 @@ FLAGS = flags.FLAGS
 
 class AthenaQueryError(RuntimeError):
   pass
+
+
+def GetAthenaClientInterface(database: str) -> edw_service.EdwClientInterface:
+  """Builds and Returns the requested Athena client Interface.
+
+  Args:
+    database: Name of the Athena database to execute queries against.
+
+  Returns:
+    A concrete Client Interface object (subclass of EdwClientInterface)
+
+  Raises:
+    RuntimeError: if an unsupported athena_client_interface is requested
+  """
+  if FLAGS.athena_client_interface == 'CLI':
+    return CliClientInterface(database)
+  raise RuntimeError('Unknown Athena Client Interface requested.')
+
+
+class CliClientInterface(edw_service.EdwClientInterface):
+  """Command Line Client Interface class for Athena.
+
+  Uses the native Athena client available with the awscli
+  https://docs.aws.amazon.com/cli/latest/reference/athena/index.html.
+
+  Attributes:
+    database: String name of the Athena database to execute queries against.
+  """
+
+  def __init__(self, database: str):
+    super(CliClientInterface, self).__init__()
+    self.database = database
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the bq tool dependencies and authenticates using a service account.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand('sudo pip install absl-py')
+    for pkg in ('aws_credentials', 'awscli'):
+      self.client_vm.Install(pkg)
+
+    # Push the framework to execute a sql query and gather performance details.
+    self.client_vm.PushDataFile(
+        os.path.join('edw', Athena.SERVICE_TYPE, 'runner.py'))
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, run_metadata)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      run_metadata: A dictionary of query execution attributes eg. script name
+    """
+    stdout, _ = self.client_vm.RemoteCommand(
+        'python runner.py --database=%s --script=%s' %
+        (self.database, query_name))
+    script_performance = json.loads(str(stdout))
+    logging.info('Query execution output: %s', script_performance)
+    execution_time = script_performance['execution_time']
+    run_metadata = {'script': query_name}
+    run_metadata.update(self.GetMetadata())
+    return execution_time, run_metadata
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.athena_client_interface}
 
 
 def ReadScript(script_uri):
@@ -111,10 +191,9 @@ class Athena(edw_service.EdwService):
     super(Athena, self).__init__(edw_service_spec)
     self.output_location = FLAGS.athena_output_location
     self.region = util.GetRegionFromZone(FLAGS.zones[0])
+    self.db = FLAGS.athena_database
+    self.client_interface = GetAthenaClientInterface(self.db)
     if FLAGS.provision_athena:
-      self.db = '_'.join(
-          [FLAGS.edw_tpc_dsb_type,
-           str(FLAGS.edw_tpc_dataset_size_in_GB)])
       self.data_bucket = 'pkb' + self.db.replace('_', '')
       self.tables = (
           TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES)
@@ -227,6 +306,8 @@ class Athena(edw_service.EdwService):
   def GetMetadata(self):
     """Return a dictionary of the metadata for the Athena data warehouse."""
     basic_data = super(Athena, self).GetMetadata()
+    basic_data.update({'database': self.db})
+    basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 
   def RunCommandHelper(self):
@@ -247,10 +328,3 @@ class Athena(edw_service.EdwService):
     """
     for pkg in ('aws_credentials', 'awscli'):
       vm.Install(pkg)
-
-  @classmethod
-  def RunScriptOnClientVm(cls, vm, database, script):
-    """A function to execute a script against AWS Athena Database."""
-    stdout, _ = vm.RemoteCommand('python runner.py --database=%s --script=%s' %
-                                 (database, script))
-    return stdout

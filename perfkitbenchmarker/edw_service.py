@@ -51,6 +51,13 @@ flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
 flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
+flags.DEFINE_string(
+    'local_query_dir', '',
+    'Optional local directory containing all query files. '
+    'Can be absolute or relative to the executable.')
+flags.DEFINE_list(
+    'queries_to_execute', [], 'List of all queries to execute, as strings. '
+    'E.g., "1","5","6","21"')
 
 FLAGS = flags.FLAGS
 
@@ -82,7 +89,7 @@ class EdwClientInterface(object):
 
   Attributes:
     client_vm: An instance of virtual_machine.BaseVirtualMachine used to
-    interface with the edw service.
+      interface with the edw service.
   """
 
   def __init__(self):
@@ -305,21 +312,6 @@ class EdwService(resource.BaseResource):
     all_script_performance = json.loads(stdout)
     script_performance = all_script_performance[script_name]
     return script_performance['execution_time'], script_performance['job_id']
-
-  @classmethod
-  def RunScriptOnClientVm(cls, vm, database, script):
-    """A function to execute the script on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      database: The database within which the query executes.
-      script: Named query to execute (expected to be on the client vm).
-
-    Returns:
-      A dictionary with the execution performance results that includes
-      execution status and the latency of executing the script.
-    """
-    raise NotImplementedError
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""

@@ -42,6 +42,7 @@ class AthenaTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = 'AWS'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
+    FLAGS.athena_database = 'test_database'
 
   def testInstallAndAuthenticateRunner(self):
     kwargs = copy.copy(_BASE_ATHENA_SPEC)
