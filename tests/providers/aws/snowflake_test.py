@@ -69,13 +69,6 @@ class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
     snowflake_local = snowflake.Snowflake(spec)
     self.assertTrue(snowflake_local._Exists())
 
-  def testRunCommandHelper(self):
-    kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
-    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    snowflake_local = snowflake.Snowflake(spec)
-    self.assertEqual('--connection fake_connection',
-                     snowflake_local.RunCommandHelper())
-
 
 if __name__ == '__main__':
   unittest.main()

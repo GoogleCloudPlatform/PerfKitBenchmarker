@@ -58,6 +58,20 @@ flags.DEFINE_string(
 flags.DEFINE_list(
     'queries_to_execute', [], 'List of all queries to execute, as strings. '
     'E.g., "1","5","6","21"')
+flags.DEFINE_string('snowflake_warehouse', None,
+                    'A virtual warehouse, often referred to simply as a - '
+                    'warehouse, is a cluster of compute in Snowflake. '
+                    'https://docs.snowflake.com/en/user-guide/warehouses.html')  # pylint: disable=line-too-long
+flags.DEFINE_string(
+    'snowflake_database', None,
+    'The hosted snowflake database to use during the benchmark.')
+flags.DEFINE_string(
+    'snowflake_schema', None,
+    'The schema of the hosted snowflake database to use during the benchmark.')
+flags.DEFINE_enum(
+    'snowflake_client_interface', 'JDBC', ['JDBC'],
+    'The Runtime Interface used when interacting with Snowflake.')
+
 
 FLAGS = flags.FLAGS
 

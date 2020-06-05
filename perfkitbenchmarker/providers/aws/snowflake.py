@@ -13,15 +13,95 @@
 # limitations under the License.
 """Module containing class for Snowflake EDW service resource hosted on AWS."""
 
+import copy
+import json
+from typing import Dict
+
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 
-# https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file
-DEFAULT_CONFIG_LOCATION = '~/.snowsql/config'
-DEFAULT_CONFIG_FILE = 'snowsql_config'
 
 FLAGS = flags.FLAGS
+
+
+def GetSnowflakeClientInterface(warehouse: str, database: str,
+                                schema: str) -> edw_service.EdwClientInterface:
+  """Builds and Returns the requested Snowflake client Interface.
+
+  Args:
+    warehouse: String name of the Snowflake virtual warehouse to use during the
+      benchmark
+    database: String name of the Snowflake database to use during the  benchmark
+    schema: String name of the Snowflake schema to use during the  benchmark
+
+  Returns:
+    A concrete Client Interface object (subclass of EdwClientInterface)
+
+  Raises:
+    RuntimeError: if an unsupported snowflake_client_interface is requested
+  """
+  if FLAGS.snowflake_client_interface == 'JDBC':
+    return JdbcClientInterface(warehouse, database, schema)
+  raise RuntimeError('Unknown Snowflake Client Interface requested.')
+
+
+class JdbcClientInterface(edw_service.EdwClientInterface):
+  """Jdbc Client Interface class for Snowflake.
+
+  Attributes:
+    warehouse: String name of the virtual warehouse used during benchmark
+    database: String name of the database to benchmark
+    schema: String name of the schema to benchmark
+  """
+
+  def __init__(self, warehouse: str, database: str, schema: str):
+    self.warehouse = warehouse
+    self.database = database
+    self.schema = schema
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs a java client application that uses the JDBC driver for connecting
+     to a database server.
+    https://docs.snowflake.com/en/user-guide/jdbc.html
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['snowflake-jdbc-client-1.0.jar'], '')
+
+  def ExecuteQuery(self, query_name: str) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = ('java -jar snowflake-jdbc-client-1.0.jar --warehouse {} '
+                     '--database {} --schema {} --query_file {}').format(
+                         self.warehouse, self.database, self.schema, query_name)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['performance'], details
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.snowflake_client_interface}
 
 
 class Snowflake(edw_service.EdwService):
@@ -31,14 +111,12 @@ class Snowflake(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super(Snowflake, self).__init__(edw_service_spec)
-    # As per Snowflake architecture,
-    # https://docs.snowflake.net/manuals/user-guide/intro-key-concepts.html#snowflake-architecture  # pylint: disable=line-too-long
-    # A snowflake account can host multiple "virtual warehouses", however
-    # the current benchmarking is limited to a single "virtual warehouse" as
-    # identified by the connection (FLAGS.snowflake_connection) expected to be
-    # defined in the config file (either the preprovisioned snowsql_config file
-    # or FLAGS.snowflake_snowsql_config_override_file)
-    self.named_connection = FLAGS.snowflake_connection
+    self.warehouse = FLAGS.snowflake_warehouse
+    self.database = FLAGS.snowflake_database
+    self.schema = FLAGS.snowflake_schema
+    self.client_interface = GetSnowflakeClientInterface(self.warehouse,
+                                                        self.database,
+                                                        self.schema)
 
   def IsUserManaged(self, edw_service_spec):
     # TODO(saksena): Remove the assertion after implementing provisioning of
@@ -57,35 +135,6 @@ class Snowflake(edw_service.EdwService):
     """
     return True
 
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of snowsql client.
-
-    SnowSQL is a cli client to submit queries to a Snowflake Warehouse instance.
-    https://docs.snowflake.net/manuals/user-guide/snowsql.html
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    vm.Install('snowsql')
-    vm.Install('openjdk')
-    vm.InstallPreprovisionedBenchmarkData(benchmark_name,
-                                          ['snowflake-1.0-SNAPSHOT.jar'], '~/')
-    if FLAGS.snowflake_snowsql_config_override_file:
-      vm.PushFile(FLAGS.snowflake_snowsql_config_override_file,
-                  DEFAULT_CONFIG_LOCATION)
-    else:
-      vm.InstallPreprovisionedBenchmarkData(benchmark_name,
-                                            [DEFAULT_CONFIG_FILE], '~/.snowsql')
-      vm.RemoteCommand('mv ~/.snowsql/snowsql_config %s' %
-                       DEFAULT_CONFIG_LOCATION)
-
-  def RunCommandHelper(self):
-    """Snowflake specific run script command components."""
-    return '--connection {}'.format(FLAGS.snowflake_connection)
-
   def _Delete(self):
     """Delete a Snowflake cluster."""
     raise NotImplementedError
@@ -93,5 +142,8 @@ class Snowflake(edw_service.EdwService):
   def GetMetadata(self):
     """Return a metadata dictionary of the benchmarked Snowflake cluster."""
     basic_data = super(Snowflake, self).GetMetadata()
-    basic_data['snowflake_connection'] = self.named_connection
+    basic_data['warehouse'] = self.warehouse
+    basic_data['database'] = self.database
+    basic_data['schema'] = self.schema
+    basic_data.update(self.client_interface.GetMetadata())
     return basic_data
