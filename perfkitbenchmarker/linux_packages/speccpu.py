@@ -15,6 +15,7 @@
 """Module to install, uninstall, and parse results for SPEC CPU 2006 and 2017.
 """
 
+import hashlib
 import itertools
 import logging
 import os
@@ -125,6 +126,10 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
   if not examine_members:
     return
 
+  # Copy the cfg to the VM.
+  local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
+  vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
+
   scratch_dir = vm.GetScratchDir()
   cfg_member = '{0}/config/{1}'.format(speccpu_vm_state.base_spec_dir,
                                        runspec_config)
@@ -182,6 +187,17 @@ def _CheckIsoAndCfgFile(runspec_config, spec_iso):
         'https://www.spec.org/cpu2006/docs/runspec.html#about_config to learn '
         'more about config files.', runspec_config)
     raise
+
+
+def _GenerateMd5sum(file_name):
+  """Generates md5sum from file_name."""
+  # https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
+  hash_md5 = hashlib.md5()
+  file_name_path = data.ResourcePath(file_name)
+  with open(file_name_path, 'rb') as f:
+    for chunk in iter(lambda: f.read(4096), b''):
+      hash_md5.update(chunk)
+  return hash_md5.hexdigest()
 
 
 class SpecInstallConfigurations(object):
@@ -433,6 +449,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
 
   metadata = {
       'runspec_config': speccpu_vm_state.runspec_config,
+      'runspec_config_md5sum': _GenerateMd5sum(speccpu_vm_state.runspec_config),
       'runspec_iterations': str(FLAGS.runspec_iterations),
       'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
       'runspec_define': FLAGS.runspec_define,
@@ -570,8 +587,8 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
       cmd=cmd, flags=fl, subset=benchmark_subset)
 
   cmd = ' && '.join((
-      'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
-      '. ./shrc', 'rm -rf result', runspec_cmd))
+      'cd {0}'.format(speccpu_vm_state.spec_dir), 'rm -rf result', '. ./shrc',
+      '. ./shrc', runspec_cmd))
   return vm.RobustRemoteCommand(cmd)
 
 

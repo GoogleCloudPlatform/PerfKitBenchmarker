@@ -52,6 +52,10 @@ flags.DEFINE_boolean('spec17_build_only', False,
                      'Compile benchmarks only, but don\'t run benchmarks. '
                      'Defaults to False. The benchmark fails if the build '
                      'fails.')
+flags.DEFINE_boolean('spec17_rebuild', True,
+                     'Rebuild spec binaries, defaults to True. Set to False '
+                     'when using run_stage_iterations > 1 to avoid recompiling')
+
 
 BENCHMARK_NAME = 'speccpu2017'
 BENCHMARK_CONFIG = """
@@ -176,6 +180,8 @@ def _Run(vm):
   cmd += 'runcpu '
   if FLAGS.spec17_build_only:
     cmd += '--action build '
+  if FLAGS.spec17_rebuild:
+    cmd += '--rebuild '
 
   version_specific_parameters = []
   # rate runs require 2 GB minimum system main memory per copy,

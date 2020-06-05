@@ -87,9 +87,8 @@
 -   Added generic support for using `PreprovisionedData`
     -   Added the `preprovision_ignore_checksum` flag that can be used when
         downloading content that is not registered in `PREPROVISIONED_DATA`
-    -   Allow `_InstallData` in virtual_machine.py to catch the
-        `NotImplemented` error, in order to proceed to downloading resources
-        via their URL
+    -   Allow `_InstallData` in virtual_machine.py to catch the `NotImplemented`
+        error, in order to proceed to downloading resources via their URL
 -   Implemented `PreprovisionedData` in the Maven package and make Maven more
     robust
     -   Added `maven_mirror_url` to specify a custom Maven mirror
@@ -108,6 +107,7 @@
 -   Enable support for specifying newer versions of GCC than what the OS
     supports by default.
 -   Sort AWS AMIs by CreationDate instead of name to get latest image.
+-   Add Spec17 configs compatible with v1.1.
 
 ### Bug fixes and maintenance updates:
 

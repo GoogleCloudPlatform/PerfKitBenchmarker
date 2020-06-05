@@ -47,6 +47,7 @@ TEST_OUTPUT_SPECINT = """
 """
 
 GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
+                 'runspec_config_md5sum': 'abcd',
                  'runspec_define': '',
                  'runspec_iterations': '3',
                  'runspec_enable_32bit': 'False',
@@ -417,6 +418,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
   def setUp(self):
     super(Speccpu2006BenchmarkTestCase, self).setUp()
     mock.patch.object(build_tools, 'GetVersion').start().return_value = '7'
+    mock.patch.object(speccpu, '_GenerateMd5sum').start().return_value = 'abcd'
     self.addCleanup(mock.patch.stopall)
 
   def testParseResultsC(self):
