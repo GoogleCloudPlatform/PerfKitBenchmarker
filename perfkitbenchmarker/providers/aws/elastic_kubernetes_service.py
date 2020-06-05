@@ -81,7 +81,7 @@ class EksCluster(container_service.KubernetesCluster):
         'node-type': self.vm_config.machine_type,
         'node-volume-size': self.vm_config.boot_disk_size,
         'region': self.region,
-        'tags': ' '.join('{}={}'.format(k, v) for k, v in tags.items()),
+        'tags': ','.join('{}={}'.format(k, v) for k, v in tags.items()),
         'ssh-public-key':
             aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
         'version': self.cluster_version,
