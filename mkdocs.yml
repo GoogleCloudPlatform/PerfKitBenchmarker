@@ -1,0 +1,37 @@
+site_name: PerfKit Benchmarker
+site_description: Documentation for PerfKit Benchmarker
+copyright: "Copyright &copy PerfKit Benchmarker Authors"
+docs_dir: docs
+pages:
+  - Home: index.md
+  - Documentation:
+    - 'Getting Started': 'documentation/getting-started.md'
+    - 'Cloud Provider Clients':
+      - 'Google Cloud Platform': 'documentation/providers/gcp.md'
+      - 'Amazon Web Services': 'documentation/providers/aws.md'
+      - 'Microsoft Azure': 'documentation/providers/azure.md'
+      - 'AliCloud': 'documentation/providers/alicloud.md'
+      - 'Digital Ocean': 'documentation/providers/digitalocean.md'
+      - 'Rackspace Public Cloud': 'documentation/providers/rackspace.md'
+      - 'ProfitBricks': 'documentation/providers/profitbricks.md'
+      - 'Kubernetes': 'documentation/providers/kubernetes.md'
+      - 'OpenStack': 'documentation/providers/openstack.md'
+      - 'CloudStack': 'documentation/providers/cloudstack.md'
+      - 'Apache Mesos': 'documentation/providers/mesos.md'
+      - 'Pre-provisioned Machines': 'documentation/providers/staticvm.md'
+      - 'Configuring Docker-based Cloud Provider': 'documentation/providers/image-prereqs-docker-based-clouds.md'
+    - 'Benchmarks':
+      - 'Benchmark Sets': 'documentation/benchmarks/benchmark-sets.md'
+      - 'Configuring Object Storage Benchmark': 'documentation/benchmarks/object-storage.md'
+      - 'Linux Benchmarks': 'documentation/benchmarks/linux-benchmarks.md'
+      - 'Windows Benchmarks': 'documentation/benchmarks/windows-benchmarks.md'
+      - 'Juju Support': 'documentation/benchmarks/juju.md'
+    - 'Configurations': 'documentation/configurations.md'
+  - Community: 'community.md'
+  - Media: 'media.md'
+  - Developer Guide:
+    - 'Contributing': 'contributing/contributing.md'
+    - 'Licensing': 'contributing/license.md'
+theme: yeti
+markdown_extensions:
+  - footnotes
