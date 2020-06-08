@@ -50,7 +50,8 @@ cloud_datastore_ycsb:
       vm_count: 1"""
 
 _CLEANUP_THREAD_POOL_WORKERS = 5
-_CLEANUP_KIND_BATCH_SIZE = 200
+_CLEANUP_KIND_READ_BATCH_SIZE = 5000
+_CLEANUP_KIND_DELETE_BATCH_SIZE = 1000
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
 _YCSB_COLLECTIONS = ['usertable']
@@ -211,14 +212,18 @@ def _ProcessDeleteKind(client, kind):
   """
   total_count = 0
   while True:
-    entities = list(
-        client.query(kind=kind).fetch(limit=_CLEANUP_KIND_BATCH_SIZE))
+    query = client.query(kind=kind)
+    query.keys_only()
+    entities = list(query.fetch(limit=_CLEANUP_KIND_READ_BATCH_SIZE))
     count_entities = len(entities)
     total_count += count_entities
     if count_entities >= 1:
       logging.info('Deleting %d entities for %s', count_entities, kind)
       try:
-        client.delete_multi(entity.key for entity in entities)
+        while entities:
+          chunk = entities[:_CLEANUP_KIND_DELETE_BATCH_SIZE]
+          entities = entities[_CLEANUP_KIND_DELETE_BATCH_SIZE:]
+          client.delete_multi(entity.key for entity in chunk)
         logging.info('Finished %d deletes for %s', count_entities, kind)
       except ValueError as error:
         logging.error('Delete entities for %s failed due to %s', kind, error)

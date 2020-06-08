@@ -139,16 +139,16 @@
         50GB.
 -   Explicitly setting Netperf to Python 3.
 -   Update PKB cloud datastore ycsb benchmark:
-    - change private_keyfile_dir from a constant value to a FLAG
-    - delete all db entries as part of Cleanup
+    -   change private_keyfile_dir from a constant value to a FLAG
+    -   delete all db entries as part of Cleanup
 -   Remove 'default' keyword from AWS and Azure boot_disk_size
 -   Check ycsb proportion explicitly against none.
 -   Fix issue in calculating Geometric means.
 -   Add support to PKB cloud datastore ycsb benchmark to use GCS files for
     datastore keyfiles.
 -   Add SSH keys to dpb EMR clusters for debuggability.
-    - Security groups of the clusters will have to be manually edited to allow
-    SSH.
+    -   Security groups of the clusters will have to be manually edited to allow
+        SSH.
 -   Cast sample values to floats, ensuring they conform to the specification
 -   Improve database deletion performance of Cloud datastore YCSB benchmark.
 -   After installing the python package tries to set default version of python
@@ -156,3 +156,4 @@
 -   Add check in Prepare stage of PKB cloud datastore ycsb benchmark to ensure
     db is empty before running.
 -   Categorize k8s cluster creation errors better.
+-   Improve database deletion performance of Cloud datastore YCSB benchmark.
