@@ -191,10 +191,9 @@ class Athena(edw_service.EdwService):
     super(Athena, self).__init__(edw_service_spec)
     self.output_location = FLAGS.athena_output_location
     self.region = util.GetRegionFromZone(FLAGS.zones[0])
-    self.db = FLAGS.athena_database
-    self.client_interface = GetAthenaClientInterface(self.db)
+    self.client_interface = GetAthenaClientInterface(self.cluster_identifier)
     if FLAGS.provision_athena:
-      self.data_bucket = 'pkb' + self.db.replace('_', '')
+      self.data_bucket = 'pkb' + self.cluster_identifier.replace('_', '')
       self.tables = (
           TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES)
       self.athena_db_create_time = 0
@@ -250,17 +249,19 @@ class Athena(edw_service.EdwService):
           script_contents = PrepareQueryString(drop_script_contents,
                                                {'{table}': table + suffix})
           script_command = self.BuildAthenaCommand(
-              script_contents, database=self.db)
+              script_contents, database=self.cluster_identifier)
           RunScriptCommand(script_command)
 
       drop_database_query_string = PrepareQueryString(
-          'drop database database_name', {'database_name': self.db})
+          'drop database database_name',
+          {'database_name': self.cluster_identifier})
       script_command = self.BuildAthenaCommand(drop_database_query_string)
       RunScriptCommand(script_command)
 
     def _CreateDatabase():
       create_database_query_string = PrepareQueryString(
-          'create database database_name', {'database_name': self.db})
+          'create database database_name',
+          {'database_name': self.cluster_identifier})
       script_command = self.BuildAthenaCommand(create_database_query_string)
       return RunScriptCommand(script_command)
 
@@ -270,7 +271,7 @@ class Athena(edw_service.EdwService):
       script_contents = PrepareQueryString(template_script_contents,
                                            {'{bucket}': self.data_bucket})
       script_command = self.BuildAthenaCommand(
-          script_contents, database=self.db)
+          script_contents, database=self.cluster_identifier)
       return RunScriptCommand(script_command)
 
     def _CreateAllTables():
@@ -306,7 +307,7 @@ class Athena(edw_service.EdwService):
   def GetMetadata(self):
     """Return a dictionary of the metadata for the Athena data warehouse."""
     basic_data = super(Athena, self).GetMetadata()
-    basic_data.update({'database': self.db})
+    basic_data.update({'database': self.cluster_identifier})
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 

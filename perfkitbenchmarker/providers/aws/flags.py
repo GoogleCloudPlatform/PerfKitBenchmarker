@@ -91,5 +91,3 @@ flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI'],
                   'The Runtime Interface used when interacting with Redshift.')
 flags.DEFINE_enum('athena_client_interface', 'CLI', ['CLI'],
                   'The Runtime Interface used when interacting with Athena.')
-flags.DEFINE_string('athena_database', '',
-                    'Name of the database to run queries against.')

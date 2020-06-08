@@ -92,6 +92,8 @@ TYPE_2_MODULE = dict([
 DEFAULT_NUMBER_OF_NODES = 1
 # The order of stages is important to the successful lifecycle completion.
 EDW_SERVICE_LIFECYCLE_STAGES = ['create', 'load', 'query', 'delete']
+SAMPLE_QUERY_PATH = '/tmp/sample.sql'
+SAMPLE_QUERY = 'select * from INFORMATION_SCHEMA.TABLES;'
 
 
 class EdwExecutionError(Exception):
@@ -144,6 +146,14 @@ class EdwClientInterface(object):
       performance_details: A dictionary of query execution attributes eg. job_id
     """
     raise NotImplementedError
+
+  def WarmUpQuery(self):
+    """Executes a service-agnostic query that can detect cold start issues."""
+    with open(SAMPLE_QUERY_PATH, 'w+') as f:
+      f.write(SAMPLE_QUERY)
+    self.client_vm.PushFile(SAMPLE_QUERY_PATH)
+    query_name = os.path.basename(SAMPLE_QUERY_PATH)
+    self.ExecuteQuery(query_name)
 
   def GetMetadata(self) -> Dict[str, str]:
     """Returns the client interface metadata."""
