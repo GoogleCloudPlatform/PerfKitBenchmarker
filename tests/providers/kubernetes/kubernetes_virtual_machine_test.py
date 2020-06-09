@@ -176,6 +176,12 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     yield issue_command, temp_file
 
 
+class TestKubernetesVirtualMachine(
+    pkb_common_test_case.TestOsMixin,
+    kubernetes_virtual_machine.KubernetesVirtualMachine):
+  pass
+
+
 class BaseKubernetesVirtualMachineTestCase(
     pkb_common_test_case.PkbCommonTestCase):
 
@@ -216,7 +222,7 @@ class KubernetesResourcesTestCase(
   def testCreatePodResourceBody(self):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects():
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
+      kub_vm = TestKubernetesVirtualMachine(spec)
 
       expected = {
           'limits': {
@@ -236,7 +242,7 @@ class KubernetesResourcesTestCase(
   def testGetMetadata(self):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects():
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
+      kub_vm = TestKubernetesVirtualMachine(spec)
       subset_of_expected_metadata = {
           'pod_cpu_limit': 2,
           'pod_memory_limit_mb': 5120,
@@ -309,8 +315,8 @@ class KubernetesVirtualMachineTestCase(
   def testCreate(self):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (issue_command, _):
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
-      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name
       kub_vm._Create()
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command[:4])
@@ -322,7 +328,7 @@ class KubernetesVirtualMachineTestCase(
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (_, temp_file):
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
+      kub_vm = TestKubernetesVirtualMachine(spec)
       # Need to set the name explicitly on the instance because the test
       # running is currently using a single PKB instance, so the BaseVm
       # instance counter is at an unpredictable number at this stage, and it is
@@ -397,7 +403,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
   def testCreate(self):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (issue_command, _):
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
+      kub_vm = TestKubernetesVirtualMachine(spec)
       kub_vm._WaitForPodBootCompletion = lambda: None
       kub_vm._Create()
       command = issue_command.call_args[0][0]
@@ -410,7 +416,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (_, temp_file):
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
+      kub_vm = TestKubernetesVirtualMachine(spec)
       # Need to set the name explicitly on the instance because the test
       # running is currently using a single PKB instance, so the BaseVm
       # instance counter is at an unpredictable number at this stage, and it is

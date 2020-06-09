@@ -108,6 +108,8 @@
     supports by default.
 -   Sort AWS AMIs by CreationDate instead of name to get latest image.
 -   Add Spec17 configs compatible with v1.1.
+-   Better support for pytyping.
+    -   Make BaseVirtualMachine inherit from BaseOsMixin.
 
 ### Bug fixes and maintenance updates:
 

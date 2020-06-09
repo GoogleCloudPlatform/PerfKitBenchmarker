@@ -26,10 +26,6 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import logging
 import os
@@ -50,8 +46,6 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
-import six
-from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -185,8 +179,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # Serializing calls to ssh with the -t option fixes the problem.
   _pseudo_tty_lock = threading.Lock()
 
-  def __init__(self):
-    super(BaseLinuxMixin, self).__init__()
+  def __init__(self, *args, **kwargs):
+    super(BaseLinuxMixin, self).__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
     # primary_remote_access_port.
     self.ssh_port = DEFAULT_SSH_PORT
@@ -273,7 +267,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     stderr_file = file_base + '.stderr'
     status_file = file_base + '.status'
 
-    if not isinstance(command, six.string_types):
+    if not isinstance(command, str):
       command = ' '.join(command)
 
     start_command = ['nohup', 'python', execute_path,
@@ -2254,7 +2248,7 @@ class JujuMixin(BaseDebianMixin):
 
     # Find the already-deployed machines belonging to this vm_group
     machines = []
-    for machine_id, unit in six.iteritems(self.machines):
+    for machine_id, unit in self.machines.items():
       if unit.vm_group == vm_group:
         machines.append(machine_id)
 

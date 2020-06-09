@@ -265,8 +265,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     remote_access_ports: A list of ports which must be opened on the firewall
         in order to access the VM.
   """
-  OS_TYPE = None
-  BASE_OS_TYPE = None
   # Represents whether the VM type can be (cleanly) rebooted. Should be false
   # for a class if rebooting causes issues, e.g. for KubernetesVirtualMachine
   # needing to reboot often indicates a design problem since restarting a
@@ -292,8 +290,21 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._total_memory_kb = None
     self._num_cpus = None
     self.os_metadata = {}
-    if self.OS_TYPE:
-      assert self.BASE_OS_TYPE in os_types.BASE_OS_TYPES
+    assert type(
+        self).BASE_OS_TYPE in os_types.BASE_OS_TYPES, '%s is not in %s' % (
+            type(self).BASE_OS_TYPE, os_types.BASE_OS_TYPES)
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def OS_TYPE(cls):
+    raise NotImplementedError()
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def BASE_OS_TYPE(cls):
+    raise NotImplementedError()
 
   def GetOSResourceMetadata(self):
     """Returns a dict containing VM OS metadata.
@@ -325,6 +336,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           return code is non-zero.
       timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
+      kwargs: Additional command arguments.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -762,7 +774,7 @@ class DeprecatedOsMixin(BaseOsMixin):
     logging.warning(warning)
 
 
-class BaseVirtualMachine(resource.BaseResource):
+class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   """Base class for Virtual Machines.
 
   This class holds VM methods and attributes relating to the VM as a cloud
@@ -857,7 +869,7 @@ class BaseVirtualMachine(resource.BaseResource):
   @classmethod
   @abc.abstractmethod
   def CLOUD(cls):
-    return NotImplementedError
+    raise NotImplementedError()
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -948,6 +960,7 @@ class BaseVirtualMachine(resource.BaseResource):
         'image': self.image,
         'zone': self.zone,
         'cloud': self.CLOUD,
+        'os_type': type(self).OS_TYPE,
     })
     if self.cidr is not None:
       result['cidr'] = self.cidr
@@ -963,18 +976,10 @@ class BaseVirtualMachine(resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
-    # Hack: Silently fail if we have no num_cpus or OS_TYPE attribute.
-    # This property is defined in BaseOsMixin and should always
-    # be available during regular PKB usage because virtual machines
-    # always have a mixin. However, in testing virtual machine objects
-    # are often instantiated without a mixin, so the line below was
-    # failing because the attribute didn't exist.
-    if getattr(self, 'num_cpus', None):
+    if self.num_cpus is not None:
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
-    if getattr(self, 'OS_TYPE', None):
-      result['os_type'] = self.OS_TYPE
     return result
 
   def SimulateMaintenanceEvent(self):

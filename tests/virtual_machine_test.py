@@ -26,7 +26,6 @@ _COMPONENT = 'test_component'
 
 
 class TestVmSpec(virtual_machine.BaseVmSpec):
-
   CLOUD = 'test_cloud'
 
   @classmethod
@@ -130,47 +129,16 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         'Value must be at least 1.'))
 
 
-class TestVM(virtual_machine.BaseVirtualMachine):
-
-  CLOUD = 'TestCloud'
-
-  def __init__(self, _):
-    pass
-
-  def __str__(self):
-    return ''
-
-  def __repr__(self):
-    pass
-
-  def Uninstall(self):
-    pass
-
-  def _Create(self):
-    pass
-
-  def _Delete(self):
-    pass
-
-  def SimulateMaintenanceEvent(self):
-    pass
-
-  def RemoteCommand(self):
-    pass
-
-  def CheckPreprovisionedData(self):
-    pass
-
-  def Install(self, pkg):
-    del pkg
+def CreateTestVm():
+  vm_spec = pkb_common_test_case.CreateTestVmSpec()
+  return pkb_common_test_case.TestVirtualMachine(vm_spec)
 
 
-class TestInstallData(
-    pkb_common_test_case.PkbCommonTestCase):
+class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(TestInstallData, self).setUp()
-    self.vm = TestVM(None)
+    self.vm = CreateTestVm()
     self.preprovisioned_data = {
         'fake_pkg': 'fake_checksum'
     }

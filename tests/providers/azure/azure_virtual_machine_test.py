@@ -1,10 +1,5 @@
 # Lint as: python3
 """Tests for perfkitbenchmarker.tests.providers.azure.azure_virtual_machine."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import unittest
 import mock
 
@@ -18,6 +13,11 @@ from perfkitbenchmarker.providers.azure import util
 from tests import pkb_common_test_case
 
 _COMPONENT = 'test_component'
+
+
+class TestAzureVirtualMachine(pkb_common_test_case.TestOsMixin,
+                              azure_virtual_machine.AzureVirtualMachine):
+  IMAGE_URN = 'test_image_urn'
 
 
 class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
@@ -54,7 +54,7 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
   def testQuotaExceeded(self, _, stderror, retcode):
     spec = azure_virtual_machine.AzureVmSpec(
         _COMPONENT, machine_type='test_machine_type', zone='testing')
-    vm = azure_virtual_machine.AzureVirtualMachine(spec)
+    vm = TestAzureVirtualMachine(spec)
 
     self.mock_cmd.side_effect = [(_, stderror, retcode)]
     with self.assertRaises(errors.Benchmarks.QuotaFailure):

@@ -25,6 +25,7 @@ import mock
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -96,6 +97,10 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     pass
+
+
+class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
+  pass
 
 
 class PkbCommonTestCase(absltest.TestCase):

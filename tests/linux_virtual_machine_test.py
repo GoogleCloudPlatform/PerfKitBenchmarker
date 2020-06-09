@@ -24,7 +24,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -32,36 +31,14 @@ FLAGS = flags.FLAGS
 
 # Need to provide implementations for all of the abstract methods in
 # order to instantiate linux_virtual_machine.BaseLinuxMixin.
-class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
-
-  def Install(self):
-    pass
-
-  def Uninstall(self):
-    pass
+class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxMixin,
+                              pkb_common_test_case.TestVirtualMachine):
+  pass
 
 
-class LinuxVMResource(virtual_machine.BaseVirtualMachine,
-                      linux_virtual_machine.BaseLinuxMixin):
-
-  CLOUD = 'fake_cloud'
-  OS_TYPE = 'fake_os_type'
-  BASE_OS_TYPE = 'debian'
-
-  def __init__(self, _):
-    super(LinuxVMResource, self).__init__(virtual_machine.BaseVmSpec('test'))
-
-  def Install(self):
-    pass
-
-  def Uninstall(self):
-    pass
-
-  def _Create(self):
-    pass
-
-  def _Delete(self):
-    pass
+def CreateTestLinuxVm():
+  vm_spec = pkb_common_test_case.CreateTestVmSpec()
+  return TestLinuxVirtualMachine(vm_spec=vm_spec)
 
 
 class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
@@ -76,7 +53,7 @@ class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
     """
     FLAGS['set_files'].parse(set_files)
 
-    vm = LinuxVM()
+    vm = CreateTestLinuxVm()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.SetFiles()
@@ -107,7 +84,7 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
 
   def runTest(self, sysctl, calls):
     FLAGS['sysctl'].parse(sysctl)
-    vm = LinuxVM()
+    vm = CreateTestLinuxVm()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.DoSysctls()
@@ -132,11 +109,11 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(TestDiskOperations, self).setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
-    patcher = mock.patch.object(LinuxVM, 'RemoteHostCommand')
+    patcher = mock.patch.object(TestLinuxVirtualMachine, 'RemoteHostCommand')
     self.remote_command = patcher.start()
     self.addCleanup(patcher.stop)
     self.remote_command.side_effect = [('', None, 0), ('', None, 0)]
-    self.vm = LinuxVM()
+    self.vm = CreateTestLinuxVm()
 
   def assertRemoteHostCalled(self, *calls):
     self.assertEqual([mock.call(call) for call in calls],
@@ -178,7 +155,7 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(LogDmesgTestCase, self).setUp()
-    self.vm = LinuxVMResource(None)
+    self.vm = CreateTestLinuxVm()
 
   def testPreDeleteDoesNotCallDmesg(self):
     FLAGS.log_dmesg = False
@@ -225,7 +202,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     return '\n'.join(['%s:%s' % entry for entry in data.items()])
 
   def CreateVm(self, os_type, remote_command_text):
-    vm = LinuxVMResource(None)
+    vm = CreateTestLinuxVm()
     vm.OS_TYPE = os_type  # pylint: disable=invalid-name
     vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
     vm.RemoteCommand.return_value = remote_command_text, ''
@@ -307,7 +284,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 class TestPartitionTable(unittest.TestCase):
 
   def CreateVm(self, remote_command_text):
-    vm = LinuxVMResource(None)
+    vm = CreateTestLinuxVm()
     vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
     vm.RemoteCommand.return_value = remote_command_text, ''
     vm.name = 'pkb-test'

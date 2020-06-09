@@ -31,6 +31,11 @@ _network_external = {'router:external': 'External'}
 _network_fail = {'router:external': 'Fail'}
 
 
+class TestOpenStackVirtualMachine(pkb_common_test_case.TestOsMixin,
+                                  os_virtual_machine.OpenStackVirtualMachine):
+  pass
+
+
 class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string,
@@ -61,6 +66,10 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
                              if b.BENCHMARK_NAME == benchmark_name))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, _URI)
 
+  def _CreateTestOpenStackVm(self):
+    spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
+    return TestOpenStackVirtualMachine(spec)
+
 
 class OpenStackVirtualMachineTest(BaseOpenStackNetworkTest):
 
@@ -70,8 +79,7 @@ class OpenStackVirtualMachineTest(BaseOpenStackNetworkTest):
         os_virtual_machine.OpenStackVirtualMachine,
         '_CheckNetworkExists').start()
     FLAGS.ignore_package_requirements = True
-    spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_DEFAULT)
-    self.openstack_vm = os_virtual_machine.OpenStackVirtualMachine(spec)
+    self.openstack_vm = self._CreateTestOpenStackVm()
 
   def tearDown(self):
     super(OpenStackVirtualMachineTest, self).tearDown()

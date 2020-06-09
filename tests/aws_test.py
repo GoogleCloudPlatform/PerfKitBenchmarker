@@ -257,6 +257,19 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(cidr, spec.cidr_block)
 
 
+class TestAwsVirtualMachine(pkb_common_test_case.TestOsMixin,
+                            aws_virtual_machine.AwsVirtualMachine):
+  pass
+
+
+def CreateTestAwsVm():
+  vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
+                                          zone='us-east-1a',
+                                          machine_type='c3.large',
+                                          spot_price=123.45)
+  return TestAwsVirtualMachine(vm_spec=vm_spec)
+
+
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def open_json_data(self, filename):
@@ -286,10 +299,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
                                              _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
-    self.vm = aws_virtual_machine.AwsVirtualMachine(
-        aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS', zone='us-east-1a',
-                                      machine_type='c3.large',
-                                      spot_price=123.45))
+    self.vm = CreateTestAwsVm()
     self.vm.id = 'i-foo'
     self.vm.image = 'ami-12345'
     self.vm.client_token = '00000000-1111-2222-3333-444444444444'
@@ -478,9 +488,7 @@ def CreateVm():
   """Returns the AWS run-instances command line."""
   vm_util.IssueCommand.side_effect = [('', '', 0)]
   util.IssueRetryableCommand.side_effect = [('', '', 0)]
-  vm_spec = aws_virtual_machine.AwsVmSpec(
-      'test_vm_spec.AWS', zone='us-west-1a', machine_type='c5n.18xlarge')
-  vm = aws_virtual_machine.AwsVirtualMachine(vm_spec)
+  vm = CreateTestAwsVm()
   vm.network.regional_network = mock.Mock()
   vm.network.subnet = mock.Mock(id='subnet-1234')
   vm.network.placement_group = mock.Mock()

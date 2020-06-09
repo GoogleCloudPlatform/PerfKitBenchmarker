@@ -28,6 +28,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import abc
 import collections
 import itertools
 import json
@@ -462,8 +463,6 @@ class AzureVirtualMachine(
                        virtual_machine.BaseVirtualMachine)):
   """Object representing an Azure Virtual Machine."""
   CLOUD = providers.AZURE
-  # Subclasses should override IMAGE_URN.
-  IMAGE_URN = None
 
   _lock = threading.Lock()
   # TODO(buggay): remove host groups & hosts as globals -> create new spec
@@ -498,7 +497,7 @@ class AzureVirtualMachine(
     self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
                         self.public_ip.name, vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
-    self.image = vm_spec.image or self.IMAGE_URN
+    self.image = vm_spec.image or type(self).IMAGE_URN
     self.host = None
     if self.use_dedicated_host:
       self.host_series_sku = _GetSkuType(self.machine_type)
@@ -519,6 +518,12 @@ class AzureVirtualMachine(
         self.storage_account,
         None,
         is_image=True)
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def IMAGE_URN(cls):
+    raise NotImplementedError()
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
