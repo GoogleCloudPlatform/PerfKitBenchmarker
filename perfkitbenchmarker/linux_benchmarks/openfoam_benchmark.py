@@ -41,7 +41,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import openfoam
 from perfkitbenchmarker.linux_packages import openmpi
 
-
 _DEFAULT_CASE = 'motorbike'
 _CASE_PATHS = {
     'motorbike': 'tutorials/incompressible/simpleFoam/motorBike',
@@ -49,20 +48,19 @@ _CASE_PATHS = {
 assert _DEFAULT_CASE in _CASE_PATHS
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum(
-    'openfoam_case', _DEFAULT_CASE,
-    sorted(list(_CASE_PATHS.keys())),
-    'Name of the OpenFOAM case to run.')
+flags.DEFINE_enum('openfoam_case', _DEFAULT_CASE,
+                  sorted(list(_CASE_PATHS.keys())),
+                  'Name of the OpenFOAM case to run.')
 flags.DEFINE_list('openfoam_dimensions', ['20_8_8'], 'Dimensions of the case.')
 flags.DEFINE_integer(
-    'openfoam_num_threads', None,
-    'The number of threads to run OpenFOAM with.')
+    'openfoam_num_threads_per_vm', None,
+    'The number of threads per VM to run OpenFOAM with. If None, defaults to '
+    'half the total number of vCPUs available.')
 flags.DEFINE_string(
     'openfoam_mpi_mapping', 'core:SPAN',
     'Mpirun process mapping to use as arguments to "mpirun --map-by".')
 flags.DEFINE_enum(
-    'openfoam_decomp_method', 'scotch',
-    ['scotch', 'hierarchical', 'simple'],
+    'openfoam_decomp_method', 'scotch', ['scotch', 'hierarchical', 'simple'],
     'Decomposition method to use in decomposePar. See: '
     'https://cfd.direct/openfoam/user-guide/v7-running-applications-parallel/')
 flags.DEFINE_integer(
@@ -247,9 +245,7 @@ def _SetDictEntry(vm, key, value, dict_file_name):
       file should be in the working directory. Example: system/snappyHexMeshDict
   """
   vm.RemoteCommand('foamDictionary -entry {key} -set "{value}" {file}'.format(
-      key=key,
-      value=value,
-      file=_GetPath(dict_file_name)))
+      key=key, value=value, file=_GetPath(dict_file_name)))
 
 
 def _UseMpi(vm, num_processes, mapping):
@@ -396,7 +392,10 @@ def Run(benchmark_spec):
 
   # Run configuration metadata:
   num_cpus_available = num_vms * master_vm.NumCpusForBenchmark()
-  num_cpus_to_use = FLAGS.openfoam_num_threads or num_cpus_available // 2
+  if FLAGS.openfoam_num_threads_per_vm is None:
+    num_cpus_to_use = num_cpus_available // 2
+  else:
+    num_cpus_to_use = num_vms * FLAGS.openfoam_num_threads_per_vm
   case_name = FLAGS.openfoam_case
   mpi_mapping = FLAGS.openfoam_mpi_mapping
   decomp_method = FLAGS.openfoam_decomp_method
@@ -427,8 +426,7 @@ def Run(benchmark_spec):
   _SetDictEntry(master_vm, 'numberOfSubdomains', num_cpus_to_use,
                 _DECOMPOSE_DICT)
   _SetDictEntry(master_vm, 'hierarchicalCoeffs.n',
-                '({} 1 1)'.format(num_cpus_to_use),
-                _DECOMPOSE_DICT)
+                '({} 1 1)'.format(num_cpus_to_use), _DECOMPOSE_DICT)
   _SetDictEntry(master_vm, 'castellatedMeshControls.maxGlobalCells',
                 max_global_cells, _SNAPPY_HEX_MESH_DICT)
   _UseMpi(master_vm, num_cpus_to_use, mpi_mapping)
