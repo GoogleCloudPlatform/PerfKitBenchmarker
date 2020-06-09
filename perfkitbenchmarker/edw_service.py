@@ -17,11 +17,9 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
-import json
 import os
 from typing import Dict, Text
 
-from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
@@ -243,59 +241,6 @@ class EdwService(resource.BaseResource):
                   'edw_cluster_node_count': self.node_count}
     return basic_data
 
-  def RunCommandHelper(self):
-    """Returns EDW instance specific launch command components.
-
-    Returns:
-      A string with additional command components needed when invoking script
-      runner.
-    """
-    raise NotImplementedError
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of runner utilities.
-
-    The default implementation raises an Error, to ensure client specific
-    implementation.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    raise NotImplementedError
-
-  def PrepareClientVm(self, vm, benchmark_name):
-    """Prepare phase to install the runtime environment on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    vm.Install('pip')
-    vm.RemoteCommand('sudo pip install absl-py')
-    self.InstallAndAuthenticateRunner(vm, benchmark_name)
-
-  def PushDataDefinitionDataManipulationScripts(self, vm):
-    """Method to push the database bootstrap and teardown scripts to the vm.
-
-    Args:
-      vm: Client vm on which the scripts will be run.
-    """
-    raise NotImplementedError
-
-  def PushScriptExecutionFramework(self, vm):
-    """Method to push the runner to execute sql scripts on the vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-    """
-    # Push generic runner
-    vm.PushFile(data.ResourcePath(os.path.join('edw', 'script_driver.py')))
-
   def GenerateLifecycleStageScriptName(self, lifecycle_stage):
     """Computes the default name for script implementing an edw lifecycle stage.
 
@@ -307,35 +252,6 @@ class EdwService(resource.BaseResource):
     """
     return os.path.basename(
         os.path.normpath('database_%s.sql' % lifecycle_stage))
-
-  def GenerateScriptExecutionCommand(self, script):
-    """Method to generate the command for running the sql script on the vm.
-
-    Args:
-      script: Script to execute on the client vm.
-
-    Returns:
-      base command components to run the sql script on the vm.
-    """
-    return ['python', 'script_driver.py', '--script={}'.format(script)]
-
-  def GetScriptExecutionResults(self, script_name, client_vm):
-    """A function to trigger single/multi script execution and return performance.
-
-    Args:
-      script_name: Script to execute on the client vm.
-      client_vm: Client vm on which the script will be executed.
-
-    Returns:
-      A tuple of script execution performance results.
-      - latency of executing the script.
-      - reference job_id executed on the edw_service.
-    """
-    script_execution_command = self.GenerateScriptExecutionCommand(script_name)
-    stdout, _ = client_vm.RemoteCommand(script_execution_command)
-    all_script_performance = json.loads(stdout)
-    script_performance = all_script_performance[script_name]
-    return script_performance['execution_time'], script_performance['job_id']
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""

@@ -13,14 +13,10 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.bigquery."""
 
-import copy
 import json
 import unittest
 from absl import flags
-import mock
-from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import bigquery
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 
 BENCHMARK_NAME = 'BENCHMARK_NAME'
@@ -126,16 +122,6 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = 'GCP'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_GCP_ZONE_US_CENTRAL_1_C]
-
-  def testInstallAndAuthenticateRunner(self):
-    kwargs = copy.copy(_BASE_BIGQUERY_SPEC)
-    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    bigquery_local = bigquery.Bigquery(spec)
-    with mock.patch(util.__name__ +
-                    '.AuthenticateServiceAccount') as mock_issue:
-      bigquery_local.InstallAndAuthenticateRunner(
-          vm=FakeRemoteVM(), benchmark_name='fake_benchmark_name')
-      mock_issue.assert_called_once()
 
   def testGetBigQueryClientInterfaceGeneric(self):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)

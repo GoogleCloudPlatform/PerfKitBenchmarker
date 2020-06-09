@@ -248,11 +248,6 @@ class Bigquery(edw_service.EdwService):
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 
-  def RunCommandHelper(self):
-    """Bigquery specific run script command components."""
-    bq = self.cluster_identifier.split('.')
-    return '--bq_project_id={} --bq_dataset_id={}'.format(bq[0], bq[1])
-
   def FormatProjectAndDatasetForCommand(self, dataset=None):
     """Returns the project and dataset in the format needed for bq commands.
 
@@ -264,21 +259,6 @@ class Bigquery(edw_service.EdwService):
     """
     return ((self.cluster_identifier.split('.')[0] + ':' +
              dataset) if dataset else self.cluster_identifier.replace('.', ':'))
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of bigquery runner.
-
-    Native Bigquery client that ships with the google_cloud_sdk
-    https://cloud.google.com/bigquery/docs/bq-command-line-tool used as client.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    vm.Install('google_cloud_sdk')
-    gcp_util.AuthenticateServiceAccount(vm, benchmark=benchmark_name)
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""

@@ -310,22 +310,3 @@ class Athena(edw_service.EdwService):
     basic_data.update({'database': self.cluster_identifier})
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
-
-  def RunCommandHelper(self):
-    """Athena data warehouse specific run script command components."""
-    raise NotImplementedError
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of Athena query runner.
-
-    Athena APIs are included in the default AWS cli
-    https://docs.aws.amazon.com/cli/latest/reference/athena/index.html.
-
-    Args:
-      vm: Client vm on which the query will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    for pkg in ('aws_credentials', 'awscli'):
-      vm.Install(pkg)

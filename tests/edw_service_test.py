@@ -14,10 +14,8 @@
 """Tests for edw_service.py."""
 
 import copy
-import json
 import unittest
 
-import mock
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -73,13 +71,6 @@ class FakeEdwService(edw_service.EdwService):
   def _Delete(self):
     pass
 
-  def GenerateScriptExecutionCommand(self, script):
-    return ' '.join(
-        super(FakeEdwService, self).GenerateScriptExecutionCommand(script))
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    pass
-
 
 class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
@@ -87,23 +78,6 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super(EdwServiceTest, self).setUp()
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
-
-  def testGetScriptExecutionResultsMocked(self):
-    kwargs = copy.copy(_BASE_REDSHIFT_SPEC)
-    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    edw_local = FakeEdwService(spec)
-    client_vm = ClientVm()
-    with mock.patch.object(
-        client_vm,
-        'RemoteCommand',
-        return_value=(json.dumps(
-            {'test.sql': {
-                'execution_time': 1.0,
-                'job_id': 'test_job_id'
-            }}), '')):
-      performance, _ = edw_local.GetScriptExecutionResults(
-          'test.sql', client_vm)
-      self.assertEqual(performance, 1.0)
 
   def testIsUserManaged(self):
     kwargs = copy.copy({
@@ -137,13 +111,6 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual('pkb-' + FLAGS.run_uri,
                      edw_local.GetClusterIdentifier(spec))
     self.assertEqual('pkb-' + FLAGS.run_uri, edw_local.cluster_identifier)
-
-  def testPrepareClientVm(self):
-    kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
-    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    edw_local = FakeEdwService(spec)
-    edw_local.PrepareClientVm(
-        vm=PreparedClientVm(), benchmark_name='fake_benchmark_name')
 
 
 if __name__ == '__main__':
