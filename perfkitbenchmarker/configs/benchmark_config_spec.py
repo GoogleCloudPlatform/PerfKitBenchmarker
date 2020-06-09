@@ -639,6 +639,12 @@ class _RelationalDbSpec(spec.BaseSpec):
             'cpus': flag_values.managed_db_cpus,
             'memory': flag_values.managed_db_memory
         }
+    if flag_values['managed_db_azure_compute_units'].present:
+      config_values['db_spec'][cloud]['machine_type']['compute_units'] = (
+          flag_values.managed_db_azure_compute_units)
+    if flag_values['managed_db_tier'].present:
+      config_values['db_spec'][cloud]['machine_type']['tier'] = (
+          flag_values.managed_db_tier)
     if has_client_machine_type:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'machine_type'] = (

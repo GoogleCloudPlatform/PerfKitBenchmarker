@@ -59,6 +59,10 @@ flags.DEFINE_string('managed_db_memory', None,
 flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
 flags.DEFINE_string('managed_db_disk_type', None, 'Disk type of the database.')
+flags.DEFINE_integer('managed_db_azure_compute_units', None,
+                     'Number of Dtus in the database.')
+flags.DEFINE_string('managed_db_tier', None,
+                    'Tier in azure. (Basic, Standard, Premium).')
 flags.DEFINE_string('client_vm_machine_type', None,
                     'Machine type of the client vm.')
 flags.DEFINE_integer('client_vm_cpus', None, 'Number of Cpus in the client vm.')
