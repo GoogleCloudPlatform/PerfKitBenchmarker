@@ -96,8 +96,18 @@ class CliClientInterface(edw_service.EdwClientInterface):
       self.client_vm.Install(pkg)
 
     # Push the framework to execute a sql query and gather performance details.
-    self.client_vm.PushDataFile(
-        os.path.join('edw', Athena.SERVICE_TYPE, 'runner.py'))
+    service_specific_dir = os.path.join('edw', Athena.SERVICE_TYPE)
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir, 'script_runner.sh')))
+    runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)
+    self.client_vm.PushFile(
+        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir,
+                         'provider_specific_script_driver.py')))
 
   def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -113,11 +123,10 @@ class CliClientInterface(edw_service.EdwClientInterface):
       run_metadata: A dictionary of query execution attributes eg. script name
     """
     stdout, _ = self.client_vm.RemoteCommand(
-        'python runner.py --database=%s --script=%s' %
-        (self.database, query_name))
+        'python script_driver.py --script={} --database={}'.format(
+            query_name, self.database))
     script_performance = json.loads(str(stdout))
-    logging.info('Query execution output: %s', script_performance)
-    execution_time = script_performance['execution_time']
+    execution_time = script_performance[query_name]['execution_time']
     run_metadata = {'script': query_name}
     run_metadata.update(self.GetMetadata())
     return execution_time, run_metadata
