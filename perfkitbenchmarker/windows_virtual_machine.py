@@ -205,9 +205,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
           command timed out.
     """
     logging.info('Running command on %s: %s', self, command)
-    s = winrm.Session('https://%s:%s' % (self.ip_address, self.winrm_port),
-                      auth=(self.user_name, self.password),
-                      server_cert_validation='ignore')
+    s = winrm.Session(
+        'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
+        auth=(self.user_name, self.password),
+        server_cert_validation='ignore')
     encoded_command = six.ensure_str(
         base64.b64encode(command.encode('utf_16_le')))
 
@@ -309,7 +310,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     drive, remote_path = ntpath.splitdrive(remote_path)
     remote_drive = (drive or self.system_drive).rstrip(':')
-    network_drive = '\\\\%s\\%s$' % (self.ip_address, remote_drive)
+    network_drive = '\\\\%s\\%s$' % (self.GetConnectionIp(), remote_drive)
 
     if vm_util.RunningOnWindows():
       self._PsDriveRemoteCopy(local_path, remote_path, copy_to, network_drive)

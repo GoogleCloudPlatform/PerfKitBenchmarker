@@ -109,6 +109,18 @@ flags.DEFINE_bool(
     'preprovision_ignore_checksum', False,
     'Ignore checksum verification for preprovisioned data. '
     'Not recommended, please use with caution')
+flags.DEFINE_boolean(
+    'connect_via_internal_ip', False,
+    'Whether to use internal IP addresses for running commands on and pushing '
+    'data to VMs. By default, PKB interacts with VMs using external IP '
+    'addresses.')
+
+# Deprecated. Use connect_via_internal_ip.
+flags.DEFINE_boolean(
+    'ssh_via_internal_ip', False,
+    'Whether to use internal IP addresses for running commands on and pushing '
+    'data to VMs. By default, PKB interacts with VMs using external IP '
+    'addresses.')
 
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.
@@ -879,6 +891,12 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     if self.ip_address:
       return self.ip_address
     return super(BaseVirtualMachine, self).__str__()
+
+  def GetConnectionIp(self):
+    """Gets the IP to use for connecting to the VM."""
+    if FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip:
+      return self.internal_ip
+    return self.ip_address
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.

@@ -65,7 +65,7 @@
 -   Update Boto client library for S3 to boto3.
 -   Add MultiStreamDelete to Object Storage API Tests.
 -   Add GCE Placement Group support. By default, placement groups are not
-      created.
+    created.
 -   Add ICMP ping support for Azure using EXTERNAL ip address.
 
 ### Enhancements:
@@ -110,6 +110,9 @@
 -   Add Spec17 configs compatible with v1.1.
 -   Better support for pytyping.
     -   Make BaseVirtualMachine inherit from BaseOsMixin.
+-   Add connect_via_internal_ip flag for testing windows tests over the internal
+    IP, similar to the ssh_via_internal_ip flag for linux.
+    -   Deprecate `--ssh_via_internal_ip` in favor of this new flag.
 
 ### Bug fixes and maintenance updates:
 

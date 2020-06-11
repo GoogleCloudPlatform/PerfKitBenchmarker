@@ -133,13 +133,6 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'scp_connect_timeout', 30, 'timeout for SCP connection.', lower_bound=0)
 
-flags.DEFINE_boolean(
-    'ssh_via_internal_ip', False,
-    'Whether to use internal IP addresses for running commands on and pushing '
-    'data to VMs. By default, PKB interacts with VMs using external IP '
-    'addresses.'
-)
-
 flags.DEFINE_string(
     'append_kernel_command_line', None,
     'String to append to the kernel command line. The presence of any '
@@ -755,8 +748,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         file_path = file_path.split(':', 1)[1]
       # Replace the last instance of '\' with '/' to make scp happy.
       file_path = '/'.join(file_path.rsplit('\\', 1))
-    remote_ip = '[%s]' % (
-        self.internal_ip if FLAGS.ssh_via_internal_ip else self.ip_address)
+    remote_ip = '[%s]' % self.GetConnectionIp()
     remote_location = '%s@%s:%s' % (
         self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
@@ -851,8 +843,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Multi-line commands passed to ssh won't work on Windows unless the
       # newlines are escaped.
       command = command.replace('\n', '\\n')
-    ip_address = (
-        self.internal_ip if FLAGS.ssh_via_internal_ip else self.ip_address)
+    ip_address = self.GetConnectionIp()
     user_host = '%s@%s' % (self.user_name, ip_address)
     ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_private_key = (self.ssh_private_key if self.is_static else
