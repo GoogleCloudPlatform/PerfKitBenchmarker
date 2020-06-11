@@ -116,7 +116,7 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
 
 
 class FakeBenchmarkSpec(object):
-  """Fake."""
+  """Fake BenchmarkSpec to use for setting client interface attributes."""
 
   def __init__(self, client_vm):
     self.name = BENCHMARK_NAME
