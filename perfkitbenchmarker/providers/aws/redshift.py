@@ -22,6 +22,7 @@ import json
 import os
 from typing import Dict
 
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
@@ -64,12 +65,11 @@ def GetDefaultRegion():
   return stdout
 
 
-def GetRedshiftClientInterface(host: str, database: str, user: str,
+def GetRedshiftClientInterface(database: str, user: str,
                                password: str) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested Redshift client Interface.
 
   Args:
-    host: Host endpoint to be used for interacting with the cluster.
     database: Name of the database to run queries against.
     user: Redshift username for authentication.
     password: Redshift password for authentication.
@@ -81,7 +81,7 @@ def GetRedshiftClientInterface(host: str, database: str, user: str,
     RuntimeError: if an unsupported redshift_client_interface is requested
   """
   if FLAGS.redshift_client_interface == 'CLI':
-    return CliClientInterface(host, database, user, password)
+    return CliClientInterface(database, user, password)
   raise RuntimeError('Unknown Redshift Client Interface requested.')
 
 
@@ -98,11 +98,15 @@ class CliClientInterface(edw_service.EdwClientInterface):
     password: Redshift password for authentication.
   """
 
-  def __init__(self, host: str, database: str, user: str, password: str):
-    self.host = host
+  def __init__(self, database: str, user: str, password: str):
     self.database = database
     self.user = user
     self.password = password
+
+  def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
+    """Sets any attributes that were unknown during initialization."""
+    super(CliClientInterface, self).SetProvisionedAttributes(bm_spec)
+    self.host = bm_spec.edw_service.endpoint
 
   def Prepare(self, benchmark_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -196,6 +200,8 @@ class Redshift(edw_service.EdwService):
 
     if self.db is None:
       self.db = DEFAULT_DATABASE_NAME
+    self.client_interface = GetRedshiftClientInterface(self.db, self.user,
+                                                       self.password)
 
   def _CreateDependencies(self):
     self.cluster_subnet_group.Create()
@@ -382,8 +388,6 @@ class Redshift(edw_service.EdwService):
                                                           self.
                                                           cluster_identifier)
     AddTags(self.arn, self.region)
-    self.client_interface = GetRedshiftClientInterface(self.endpoint, self.db,
-                                                       self.user, self.password)
 
   def _Delete(self):
     """Delete a redshift cluster and disallow creation of a snapshot."""

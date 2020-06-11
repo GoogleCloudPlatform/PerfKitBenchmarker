@@ -22,7 +22,6 @@ from typing import Dict, Text
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import virtual_machine
 
 
 flags.DEFINE_integer('edw_service_cluster_concurrency', 5,
@@ -109,13 +108,9 @@ class EdwClientInterface(object):
   def __init__(self):
     self.client_vm = None
 
-  def SetClientVm(self, client_vm: virtual_machine.BaseVirtualMachine) -> None:
-    """Sets the client vm to used to interface with the edw service.
-
-    Args:
-      client_vm: Client vm to interface with the EDW service
-    """
-    self.client_vm = client_vm
+  def SetProvisionedAttributes(self, benchmark_spec):
+    """Sets any attributes that were unknown during initialization."""
+    self.client_vm = benchmark_spec.vms[0]
 
   def Prepare(self, benchmark_name: Text) -> None:
     """Prepares the client vm to execute query.

@@ -115,6 +115,14 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
     return response, None
 
 
+class FakeBenchmarkSpec(object):
+  """Fake."""
+
+  def __init__(self, client_vm):
+    self.name = BENCHMARK_NAME
+    self.vms = [client_vm]
+
+
 class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
@@ -152,14 +160,16 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.gcp_service_account = 'SERVICE_ACCOUNT'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.CliClientInterface)
-    interface.SetClientVm(FakeRemoteVMForCliClientInterfacePrepare())
+    bm_spec = FakeBenchmarkSpec(FakeRemoteVMForCliClientInterfacePrepare())
+    interface.SetProvisionedAttributes(bm_spec)
     interface.Prepare(BENCHMARK_NAME)
 
   def testCliClientInterfaceExecuteQuery(self):
     FLAGS.bq_client_interface = 'CLI'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.CliClientInterface)
-    interface.SetClientVm(FakeRemoteVMForCliClientInterfaceExecuteQuery())
+    bm_spec = FakeBenchmarkSpec(FakeRemoteVMForCliClientInterfaceExecuteQuery())
+    interface.SetProvisionedAttributes(bm_spec)
     performance, details = interface.ExecuteQuery(QUERY_NAME)
     self.assertEqual(performance, 1.0)
     self.assertDictEqual(details, {'client': 'CLI', 'job_id': 'JOB_ID'})
@@ -169,7 +179,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
-    interface.SetClientVm(FakeRemoteVMForJavaClientInterfacePrepare())
+    bm_spec = FakeBenchmarkSpec(FakeRemoteVMForJavaClientInterfacePrepare())
+    interface.SetProvisionedAttributes(bm_spec)
     interface.Prepare(BENCHMARK_NAME)
 
   def testJavaClientInterfaceExecuteQuery(self):
@@ -179,7 +190,9 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
 
-    interface.SetClientVm(FakeRemoteVMForJavaClientInterfaceExecuteQuery())
+    bm_spec = FakeBenchmarkSpec(
+        FakeRemoteVMForJavaClientInterfaceExecuteQuery())
+    interface.SetProvisionedAttributes(bm_spec)
     performance, details = interface.ExecuteQuery(QUERY_NAME)
     self.assertEqual(performance, 1.0)
     self.assertDictEqual(details, {'client': 'JAVA', 'job_id': 'JOB_ID'})
