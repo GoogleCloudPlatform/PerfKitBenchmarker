@@ -159,3 +159,4 @@
     db is empty before running.
 -   Categorize k8s cluster creation errors better.
 -   Improve database deletion performance of Cloud datastore YCSB benchmark.
+-   Change deletion batch size of Cloud datastore YCSB benchmark.

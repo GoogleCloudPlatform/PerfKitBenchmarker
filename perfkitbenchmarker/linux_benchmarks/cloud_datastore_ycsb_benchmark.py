@@ -51,7 +51,7 @@ cloud_datastore_ycsb:
 
 _CLEANUP_THREAD_POOL_WORKERS = 5
 _CLEANUP_KIND_READ_BATCH_SIZE = 5000
-_CLEANUP_KIND_DELETE_BATCH_SIZE = 1000
+_CLEANUP_KIND_DELETE_BATCH_SIZE = 500
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
 _YCSB_COLLECTIONS = ['usertable']
