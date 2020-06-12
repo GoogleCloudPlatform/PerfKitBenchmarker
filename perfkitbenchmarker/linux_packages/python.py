@@ -66,9 +66,10 @@ def _SetDefaultPythonIfNeeded(vm, python_path):
   alternatives_cmd = 'sudo update-alternatives --set python {}'.format(
       python_path)
 
-  _, txt, return_code = _RunCommand(python_version_cmd)
+  stdout, stderr, return_code = _RunCommand(python_version_cmd)
   if not return_code:
-    logging.info('Default version of python: %s', txt.strip().split()[-1])
+    logging.info(
+        'Default version of python: %s', (stdout or stderr).strip().split()[-1])
     return
   logging.info('Trying to set the default python version')
   _, _, return_code = _RunCommand(alternatives_exists_cmd)
