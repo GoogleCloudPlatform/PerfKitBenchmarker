@@ -748,8 +748,18 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           '(not recommended).' % (
               module_name, filename, actual_sha256, expected_sha256))
 
-  def TestConnectRemoteAccessPort(self, port=None):
-    """Tries to connect to remote access port and throw if it fails."""
+  def TestConnectRemoteAccessPort(self, port=None, socket_timeout=0.5):
+    """Tries to connect to remote access port and throw if it fails.
+
+    Args:
+      port: Integer of the port to connect to. Defaults to
+          the default remote connection port of the VM.
+      socket_timeout: The number of seconds to wait on the socket before failing
+          and retrying. If this is too low, the connection may never succeed. If
+          this is too high it will add latency (because the current connection
+          may fail after a time that a new connection would succeed).
+          Defaults to 500ms.
+    """
     if not self.ip_address:
       raise errors.VirtualMachine.VirtualMachineError(
           'Trying to connect to a VM without an external IP address')
@@ -759,9 +769,8 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) \
         as sock:
       # Before the IP is reachable the socket times out (and throws). After that
-      # it throws immediately until the port is listened to.
-      # 250 ms fits well within the 500 ms cluster_boot polling fuzz.
-      sock.settimeout(0.25)  # seconds
+      # it throws immediately.
+      sock.settimeout(socket_timeout)  # seconds
       sock.connect((self.ip_address, port))
     logging.info('Connected to port %s on %s', port, self)
 
