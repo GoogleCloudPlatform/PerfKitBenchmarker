@@ -101,7 +101,15 @@ class GkeCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(GkeCluster, self).GetResourceMetadata()
+    result['project'] = self.project
     result['container_cluster_version'] = self.cluster_version
+    result['boot_disk_type'] = self.vm_config.boot_disk_type
+    result['boot_disk_size'] = self.vm_config.boot_disk_size
+    if self.vm_config.max_local_disks:
+      result['gce_local_ssd_count'] = self.vm_config.max_local_disks
+      # TODO(pclay): support NVME when it leaves alpha
+      # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
+      result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
     return result
 
   def _Create(self):
@@ -141,6 +149,9 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.vm_config.boot_disk_type:
       cmd.flags['disk-type'] = self.vm_config.boot_disk_type
     if self.vm_config.max_local_disks:
+      # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
+      # leaves alpha. See
+      # https://cloud.google.com/sdk/gcloud/reference/alpha/container/clusters/create
       cmd.flags['local-ssd-count'] = self.vm_config.max_local_disks
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:

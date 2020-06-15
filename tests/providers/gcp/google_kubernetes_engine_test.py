@@ -211,6 +211,78 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
           'gcloud container clusters describe pkb-{0}'.format(_RUN_URI),
           command_string)
 
+  def testGetResourceMetadata(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      metadata = cluster.GetResourceMetadata()
+      self.assertEqual(issue_command.call_count, 0)
+      self.assertContainsSubset(
+          {
+              'project': 'fakeproject',
+              'gce_local_ssd_count': 2,
+              'gce_local_ssd_interface': 'SCSI',
+              'machine_type': 'fake-machine-type',
+              'boot_disk_type': 'foo',
+              'boot_disk_size': 200,
+              'cloud': 'GCP',
+              'cluster_type': 'Kubernetes',
+              'zone': 'us-central1-a',
+              'size': 2,
+              'container_cluster_version': 'latest'
+          }, metadata)
+
+
+class GoogleKubernetesEngineAutoscalingTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'min_vm_count': 1,
+            'vm_count': 2,
+            'max_vm_count': 3,
+        })
+    return kubernetes_engine_spec
+
+  def testCreate(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud container clusters create', command_string)
+      self.assertIn('--enable-autoscaling', command_string)
+      self.assertIn('--min-nodes 1', command_string)
+      self.assertIn('--num-nodes 2', command_string)
+      self.assertIn('--max-nodes 3', command_string)
+
+  def testGetResourceMetadata(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      metadata = cluster.GetResourceMetadata()
+      self.assertEqual(issue_command.call_count, 0)
+      self.assertContainsSubset(
+          {
+              'project': 'fakeproject',
+              'cloud': 'GCP',
+              'cluster_type': 'Kubernetes',
+              'min_size': 1,
+              'size': 2,
+              'max_size': 3
+          }, metadata)
+
 
 class GoogleKubernetesEngineVersionFlagTestCase(
     pkb_common_test_case.PkbCommonTestCase):

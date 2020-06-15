@@ -58,6 +58,20 @@ class EksCluster(container_service.KubernetesCluster):
           'container_cluster.vm_spec.AWS.zone must either be a comma separated '
           'list of zones or a region.')
     self.cluster_version = FLAGS.container_cluster_version
+    # TODO(user) support setting boot disk type if EKS does.
+    self.boot_disk_type = self.vm_config.DEFAULT_ROOT_DISK_TYPE
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the cluster.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(EksCluster, self).GetResourceMetadata()
+    result['container_cluster_version'] = self.cluster_version
+    result['boot_disk_type'] = self.boot_disk_type
+    result['boot_disk_size'] = self.vm_config.boot_disk_size
+    return result
 
   def _CreateDependencies(self):
     """Set up the ssh key."""

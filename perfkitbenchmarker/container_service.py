@@ -430,7 +430,8 @@ class BaseContainerCluster(resource.BaseResource):
         'cluster_type': self.CLUSTER_TYPE,
         'zone': self.zone,
         'size': self.num_nodes,
-    } or self.vm_config.GetResourceMetadata()
+        'machine_type': self.vm_config.machine_type,
+    }
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       metadata.update({
