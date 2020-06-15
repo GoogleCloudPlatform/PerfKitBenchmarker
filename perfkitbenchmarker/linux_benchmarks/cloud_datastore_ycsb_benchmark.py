@@ -27,6 +27,7 @@ to test Datastore.
 
 import concurrent.futures
 import logging
+import time
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -49,8 +50,8 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-_CLEANUP_THREAD_POOL_WORKERS = 5
-_CLEANUP_KIND_READ_BATCH_SIZE = 5000
+_CLEANUP_THREAD_POOL_WORKERS = 20
+_CLEANUP_KIND_READ_BATCH_SIZE = 20000
 _CLEANUP_KIND_DELETE_BATCH_SIZE = 500
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
@@ -73,6 +74,83 @@ flags.DEFINE_string('google_datastore_debug', 'false',
 # the JSON keyfile is needed to validate credentials in the Cleanup phase
 flags.DEFINE_string('google_datastore_deletion_keyfile', None,
                     'The path to Google API JSON private key file')
+
+
+class _DeletionTask(object):
+  """Represents a cleanup deletion task.
+
+  Attributes:
+    kind: Datastore kind to be deleted.
+    task_id: Task id
+    query_iter: Query iterator used to read entities.
+    entities: Entities to be deleted.
+    entity_read_count: No of entities read.
+    entity_deletion_count: No of entities deleted.
+    deletion_error: Set to true if deletion fails with an error.
+  """
+
+  def __init__(self, kind, task_id):
+    self.kind = kind
+    self.task_id = task_id
+    self.query_iter = None
+    self.entities = None
+    self.entity_read_count = 0
+    self.entity_deletion_count = 0
+    self.deletion_error = False
+
+  def ReadEntities(self, query, start_cursor, current_entity_read_count):
+    """Read next batch of entities in a datastore database using a cursor.
+
+    Args:
+      query: Cloud Datastore query to get entities.
+      start_cursor: Start cursor for the query.
+      current_entity_read_count: No of entities read uptil now.
+
+    Returns:
+      The updated total read count of entities.
+
+    Raises:
+      ValueError: In case of delete failures.
+    """
+    self.query_iter = query.fetch(
+        start_cursor, limit=_CLEANUP_KIND_READ_BATCH_SIZE)
+    self.entities = list(self.query_iter.pages)
+    self.entity_read_count = len(self.entities)
+    current_entity_read_count += self.entity_read_count
+    logging.info('Task %d - Read %d entities for %s kind , Read %d in total.',
+                 self.task_id, self.entity_read_count, self.kind,
+                 current_entity_read_count)
+    return current_entity_read_count
+
+  def DeleteEntities(self, delete_client):
+    """Deletes entities in a datastore database in batches.
+
+    Args:
+      delete_client: Cloud Datastore client to delete entities.
+
+    Raises:
+      ValueError: In case of delete failures.
+    """
+    if self.entity_read_count >= 1:
+      logging.info('Task %d - Deleting %d entities for %s', self.task_id,
+                   self.entity_read_count, self.kind)
+      try:
+        while self.entities:
+          chunk = self.entities[:_CLEANUP_KIND_DELETE_BATCH_SIZE]
+          self.entities = self.entities[_CLEANUP_KIND_DELETE_BATCH_SIZE:]
+          delete_client.delete_multi(entity.key for entity in chunk)
+          self.entity_deletion_count += _CLEANUP_KIND_DELETE_BATCH_SIZE
+
+        logging.info('Task %d - Finished %d deletes for %s', self.task_id,
+                     self.entity_deletion_count, self.kind)
+      except ValueError as error:
+        logging.error('Task %d - Delete entities for %s failed due to %s',
+                      self.task_id, self.kind, error)
+        self.deletion_error = True
+        raise error
+    else:
+      logging.info('Task %d for %s - No entities to delete', self.task_id,
+                   self.kind)
 
 
 def GetConfig(user_config):
@@ -191,8 +269,11 @@ def Cleanup(_):
 
     futures = []
     for kind in _YCSB_COLLECTIONS:
-      client = datastore.Client(project=dataset_id, credentials=credentials)
-      futures.append(executor.submit(_ProcessDeleteKind(client, kind)))
+      futures.append(
+          executor.submit(
+              _ReadAndDeleteAllEntities(executor, dataset_id, credentials,
+                                        kind)))
+
     concurrent.futures.wait(
         futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
     logging.info('Deleted all data for %s', dataset_id)
@@ -201,36 +282,65 @@ def Cleanup(_):
     logging.warning('Manually delete all the entries via GCP portal.')
 
 
-def _ProcessDeleteKind(client, kind):
-  """Deletes all kind entries in a datastore database.
+def _ReadAndDeleteAllEntities(executor, dataset_id, credentials, kind):
+  """Reads and deletes all kind entries in a datastore database.
 
   Args:
-    client: Cloud Datastore client to delete entities.
+    executor: ThreadPool to submit delete tasks.
+    dataset_id: Cloud Datastore client dataset id.
+    credentials: Cloud Datastore client credentials.
     kind: Kind for which entities will be deleted.
+
   Raises:
     ValueError: In case of delete failures.
   """
-  total_count = 0
-  while True:
-    query = client.query(kind=kind)
-    query.keys_only()
-    entities = list(query.fetch(limit=_CLEANUP_KIND_READ_BATCH_SIZE))
-    count_entities = len(entities)
-    total_count += count_entities
-    if count_entities >= 1:
-      logging.info('Deleting %d entities for %s', count_entities, kind)
-      try:
-        while entities:
-          chunk = entities[:_CLEANUP_KIND_DELETE_BATCH_SIZE]
-          entities = entities[_CLEANUP_KIND_DELETE_BATCH_SIZE:]
-          client.delete_multi(entity.key for entity in chunk)
-        logging.info('Finished %d deletes for %s', count_entities, kind)
-      except ValueError as error:
-        logging.error('Delete entities for %s failed due to %s', kind, error)
-        raise error
-    else:
-      logging.info('Deleted all data for %s - %d records', kind, total_count)
-      break
+  futures = []
+  total_entity_count = 0
+  task_id = 1
+
+  query = _CreateClient(dataset_id, credentials).query(kind=kind)
+  query.keys_only()
+
+  # We use a cursor to fetch entities in larger read batches and submit delete
+  # tasks to delete them in smaller delete batches (500 at a time) due to
+  # datastore single operation restriction.
+  deletion_task = _DeletionTask(kind, task_id)
+  total_entity_count = deletion_task.ReadEntities(query, None,
+                                                  total_entity_count)
+  futures.append(
+      executor.submit(
+          deletion_task.DeleteEntities(_CreateClient(dataset_id, credentials))))
+
+  while deletion_task.query_iter.next_page_token is not None:
+    task_id += 1
+    deletion_task = _DeletionTask(kind, task_id)
+    total_entity_count = deletion_task.ReadEntities(
+        query, deletion_task.query_iter.next_page_token, total_entity_count)
+    futures.append(
+        executor.submit(
+            deletion_task.DeleteEntities(
+                _CreateClient(dataset_id, credentials))))
+    if task_id % 10 == 0:
+      # Sleep for 10 secs before fetching next batch.
+      time.sleep(10)
+
+  concurrent.futures.wait(
+      futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+  logging.info('Deleted all data for %s - %s - %d', dataset_id, kind,
+               total_entity_count)
+
+
+def _CreateClient(dataset_id, credentials):
+  """Creates a datastore client for the dataset using the credentials.
+
+  Args:
+    dataset_id: Cloud Datastore client dataset id.
+    credentials: Cloud Datastore client credentials.
+
+  Returns:
+    Datastore client.
+  """
+  return datastore.Client(project=dataset_id, credentials=credentials)
 
 
 def _Install(vm):
