@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 """A PySpark driver that creates Spark tables for Spark SQL benchmark.
 
 It takes an HCFS directory and a list of the names of the subdirectories of that

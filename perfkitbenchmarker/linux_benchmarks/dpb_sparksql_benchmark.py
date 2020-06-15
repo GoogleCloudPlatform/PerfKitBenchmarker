@@ -180,11 +180,11 @@ def Prepare(benchmark_spec):
         pyspark_file=os.path.join(benchmark_spec.base_dir,
                                   SPARK_TABLE_SCRIPT),
         job_type=BaseDpbService.PYSPARK_JOB_TYPE,
-        job_arguments=[FLAGS.dpb_sparksql_data + ','.join(table_subdirs)])
+        job_arguments=[FLAGS.dpb_sparksql_data, ','.join(table_subdirs)])
     logging.info(stats)
     if not stats['success']:
       raise errors.Benchmarks.PrepareException(
-          'Creating tables from {}/* failed'.format(FLAGS.sparksql_data))
+          'Creating tables from {}/* failed'.format(FLAGS.dpb_sparksql_data))
 
 
 def Run(benchmark_spec):
@@ -261,7 +261,7 @@ def _RunSparkSqlJob(dpb_service_instance,
   if staged_sql_runner_file and FLAGS.bigquery_tables:
     args = [
         os.path.basename(staged_sql_file),
-        '--bigquery_tables', ','.join(FLAGS.bigquery_tables)
+        '--bigquery-tables', ','.join(FLAGS.bigquery_tables)
     ]
     if FLAGS.bigquery_record_format:
       args += ['--bigquery-record-format', FLAGS.bigquery_record_format]

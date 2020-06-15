@@ -1,9 +1,9 @@
+# Lint as: python2, python3
 """Runs a Spark SQL query with preloaded temp views.
 
 Views can be BigQuery tables or HCFS directories containing Parquet.
 This is useful for Storage formats not expressible as External Hive Tables.
 """
-
 
 from __future__ import absolute_import
 from __future__ import division
@@ -26,7 +26,7 @@ def parse_args():
       'sql_script', help='The local path to the SQL file to run')
   data_sources = parser.add_mutually_exclusive_group()
   data_sources.add_argument(
-      '--bigquery_tables',
+      '--bigquery-tables',
       metavar='TABLES',
       type=comma_separated_list,
       default=[],
@@ -37,7 +37,7 @@ def parse_args():
       metavar='FORMAT',
       help='Data Format for reading from BigQuery Storage')
   data_sources.add_argument(
-      '--hcfs_dirs',
+      '--hcfs-dirs',
       metavar='DIRS',
       type=comma_separated_list,
       default=[],
