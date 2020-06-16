@@ -36,6 +36,9 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   CLOUD = providers.AZURE
   MEMORY_STORE = managed_memory_store.REDIS
 
+  # Azure redis could take up to an hour to create
+  READY_TIMEOUT = 60 * 60  # 60 minutes
+
   def __init__(self, spec):
     super(AzureRedisCache, self).__init__(spec)
     self.redis_region = FLAGS.redis_region
