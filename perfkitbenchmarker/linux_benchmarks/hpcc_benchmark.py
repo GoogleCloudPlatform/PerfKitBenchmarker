@@ -47,12 +47,14 @@ import math
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import hpcc
 from perfkitbenchmarker.linux_packages import mkl
+from perfkitbenchmarker.linux_packages import numactl
 from perfkitbenchmarker.linux_packages import openblas
 import six
 from six.moves import range
@@ -101,6 +103,9 @@ flags.DEFINE_list('hpcc_mpi_env', [],
 flags.DEFINE_integer('hpcc_timeout_hours', 4,
                      'The number of hours to wait for the HPCC binary to '
                      'complete before timing out and assuming it failed.')
+flags.DEFINE_boolean(
+    'hpcc_numa_binding', False,
+    'If True, attempt numa binding with membind and cpunodebind.')
 
 
 def GetConfig(user_config):
@@ -112,10 +117,14 @@ def CheckPrerequisites(_):
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    NotImplementedError: On certain flag combination not currently supported.
   """
   data.ResourcePath(HPCCINF_FILE)
   if FLAGS['hpcc_binary'].present:
     data.ResourcePath(FLAGS.hpcc_binary)
+  if FLAGS.hpcc_numa_binding and FLAGS.num_vms > 1:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Numa binding with with multiple hpcc vm not supported.')
 
 
 def CreateHpccinf(vm, benchmark_spec):
@@ -157,6 +166,8 @@ def PrepareHpcc(vm):
   """Builds HPCC on a single vm."""
   logging.info('Building HPCC on %s', vm)
   vm.Install('hpcc')
+  if FLAGS.hpcc_numa_binding:
+    vm.Install('numactl')
 
 
 def PrepareBinaries(vms):
@@ -211,6 +222,8 @@ def UpdateMetadata(metadata):
   elif FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_OPEN_BLAS:
     metadata['math_library_version'] = openblas.GIT_TAG
   metadata['openmpi_version'] = FLAGS.openmpi_version
+  if FLAGS.hpcc_numa_binding:
+    metadata['hpcc_numa_binding'] = FLAGS.hpcc_numa_binding
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
@@ -269,9 +282,26 @@ def Run(benchmark_spec):
   num_processes = len(vms) * master_vm.NumCpusForBenchmark()
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
-  mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
-             '"ssh -o StrictHostKeyChecking=no" %s %s ./hpcc' %
-             (num_processes, MACHINEFILE, run_as_root, mpi_env))
+  mpi_flags = ('-machinefile %s --mca orte_rsh_agent '
+               '"ssh -o StrictHostKeyChecking=no" %s %s' % (
+                   MACHINEFILE, run_as_root, mpi_env))
+  mpi_cmd = 'mpirun '
+  if FLAGS.hpcc_numa_binding:
+    numa_map = numactl.GetNuma(master_vm)
+    numa_hpcc_cmd = []
+    for node, num_cpus in numa_map.items():
+      numa_hpcc_cmd.append(
+          '-np {num_processes} {mpi_flags} '
+          'numactl --cpunodebind {node} '
+          '--membind {node} ./hpcc'.format(
+              num_processes=num_cpus,
+              mpi_flags=mpi_flags,
+              node=node))
+    mpi_cmd += ' : '.join(numa_hpcc_cmd)
+  else:
+    mpi_cmd += ('-np %s %s ./hpcc' %
+                (num_processes, mpi_flags))
+
   master_vm.RobustRemoteCommand(
       mpi_cmd, timeout=FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR)
   logging.info('HPCC Results:')
