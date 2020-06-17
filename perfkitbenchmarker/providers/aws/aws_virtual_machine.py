@@ -125,6 +125,9 @@ COREOS_IMAGE_PROJECT = '595879546273'
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
 # TODO(pclay): replace with Marketplace AMI when available
 DEBIAN_IMAGE_PROJECT = '136693071363'
+# Owns AMIs lists here:
+# https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+CENTOS_IMAGE_PROJECT = '125523088429'
 MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
 # https://access.redhat.com/articles/2962171
 RHEL_IMAGE_PROJECT = '309956199498'
@@ -1119,9 +1122,19 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
                                     linux_virtual_machine.CentOs7Mixin):
   """Class with configuration for AWS CentOS 7 virtual machines."""
   # Documentation on finding the CentOS 7 image:
-  # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
+  # https://wiki.centos.org/Cloud/AWS#x86_64
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
+  DEFAULT_USER_NAME = 'centos'
+
+
+class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.CentOs8Mixin):
+  """Class with configuration for AWS CentOS 8 virtual machines."""
+  # This describes the official AMIs listed here:
+  # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'CentOS 8*'
   DEFAULT_USER_NAME = 'centos'
 
 
