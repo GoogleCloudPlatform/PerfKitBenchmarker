@@ -165,8 +165,10 @@ sysbench:
         disk_spec:
           GCP:
             disk_size: 500
+            disk_type: pd-ssd
           AWS:
             disk_size: 500
+            disk_type: gp2
           Azure:
             disk_size: 500
       servers:
@@ -291,7 +293,9 @@ def _GetCommonSysbenchOptions(benchmark_spec):
   db = benchmark_spec.relational_db
   return [
       '--db-ps-mode=%s' % DISABLE,
-      '--mysql-ignore-errors=2013',
+      # Error 1205: Lock wait timeout exceeded
+      # Could happen when we overload the database
+      '--mysql-ignore-errors=1205,2013',
       '--db-driver=mysql',
       db.MakeSysbenchConnectionString(),
   ]
