@@ -111,7 +111,7 @@ def CheckVmPrerequisites(vm):
   available_memory = vm.total_free_memory_kb
   if 'intspeed' in FLAGS.spec17_subset or 'fpspeed' in FLAGS.spec17_subset:
     # AWS machines that advertise 16 GB have slightly less than that
-    if available_memory < 15.7 * KB_TO_GB_MULTIPLIER:
+    if available_memory < 15.6 * KB_TO_GB_MULTIPLIER:
       raise errors.Config.InvalidValue(
           'Available memory of %s GB is insufficient for spec17 speed runs.'
           % (available_memory / KB_TO_GB_MULTIPLIER))
