@@ -9,3 +9,4 @@
 ### Bug fixes and maintenance updates:
 
 -   Parallelize entity deletion processing for a kind.
+-   Move coremark installation into a package.
