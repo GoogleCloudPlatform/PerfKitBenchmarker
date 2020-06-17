@@ -596,7 +596,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
   def _RunDiskpartScript(self, script):
     """Runs the supplied Diskpart script on the VM."""
-    with vm_util.NamedTemporaryFile(prefix='diskpart') as tf:
+    with vm_util.NamedTemporaryFile(prefix='diskpart', mode='w') as tf:
       tf.write(script)
       tf.close()
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
