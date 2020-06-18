@@ -16,6 +16,7 @@
 """
 
 import json
+import time
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_memory_store
@@ -27,6 +28,8 @@ from perfkitbenchmarker.providers.azure import azure_network
 FLAGS = flags.FLAGS
 # 15min timeout for issuing az redis delete command.
 TIMEOUT = 900
+EXISTS_RETRY_TIMES = 3
+EXISTS_RETRY_POLL = 30
 REDIS_VERSION = '3.2'
 
 
@@ -126,7 +129,13 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       True if cache exists and false otherwise.
     """
-    _, _, retcode = self.DescribeCache()
+    # Retry to ensure there is no transient error in describe cache
+    for _ in range(EXISTS_RETRY_TIMES):
+      _, _, retcode = self.DescribeCache()
+
+      if retcode == 0:
+        return True
+      time.sleep(EXISTS_RETRY_POLL)
     return retcode == 0
 
   def _IsReady(self):

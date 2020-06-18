@@ -381,6 +381,13 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   Raises:
     IOError: If the results contained unexpected lines.
   """
+  if ('redis.clients.jedis.exceptions.JedisConnectionException' in
+      ycsb_result_string):
+    # This error is cause by ycsb using an old version of redis client 2.9.0
+    # https://github.com/xetorthio/jedis/issues/1977
+    raise errors.Benchmarks.KnownIntermittentError(
+        'errors.Benchmarks.KnownIntermittentError')
+
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'

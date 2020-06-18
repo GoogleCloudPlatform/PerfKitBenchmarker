@@ -16,6 +16,7 @@
 """Module containing OpenJDK installation and cleanup functions."""
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -41,13 +42,19 @@ def YumInstall(vm):
   vm.InstallPackages(_OpenJdkPackage(vm, 'java-1.{0}.0-openjdk-devel'))
 
 
+@vm_util.Retry()
+def _AddRepository(vm):
+  """Install could fail when Ubuntu keyservers are overloaded."""
+  vm.RemoteCommand(
+      'sudo add-apt-repository -y ppa:openjdk-r/ppa && sudo apt-get update')
+
+
 def AptInstall(vm):
   """Installs the OpenJDK package on the VM."""
   package_name = _OpenJdkPackage(vm, 'openjdk-{0}-jdk')
 
   if not vm.HasPackage(package_name):
-    vm.RemoteCommand(
-        'sudo add-apt-repository ppa:openjdk-r/ppa && sudo apt-get update')
+    _AddRepository(vm)
   vm.InstallPackages(package_name)
 
   # Populate the ca-certificates-java's trustAnchors parameter.
