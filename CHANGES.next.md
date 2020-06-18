@@ -5,6 +5,8 @@
 ### Enhancements:
 
 -   Enable support for AWS's c6g and r6g families.
+-   Integrate edw_benchmark with new Client Interface and results aggregation
+    framework.
 
 ### Bug fixes and maintenance updates:
 

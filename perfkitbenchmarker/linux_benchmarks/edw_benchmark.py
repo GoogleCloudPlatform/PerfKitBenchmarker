@@ -19,14 +19,13 @@ managed data warehouse solutions such as Redshift and BigQuery.
 """
 
 
-import copy
-import json
+import logging
 import os
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
+from perfkitbenchmarker import edw_benchmark_results_aggregator as results_aggregator
+from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import sample
 
 BENCHMARK_NAME = 'edw_benchmark'
 
@@ -48,10 +47,10 @@ edw_benchmark:
       vm_spec: *default_single_core
 """
 
-SERVICE_SPECIFIC_SCRIPT_LIST = ['script_runner.sh',
-                                'provider_specific_script_driver.py']
-
-flags.DEFINE_string('edw_benchmark_script', None, 'Path to the sql script.')
+flags.DEFINE_string(
+    'local_query_dir', '',
+    'Optional local directory containing all query files. '
+    'Can be absolute or relative to the executable.')
 
 FLAGS = flags.FLAGS
 
@@ -60,75 +59,81 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def _PushScripts(benchmark_spec, vm):
-  """Method to push the sql script and driver scripts on the client vm.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
-    vm: Client vm on which the script will be run.
-  """
-  service_specific_dir = os.path.join('edw',
-                                      benchmark_spec.edw_service.SERVICE_TYPE)
-
-  def _PushServiceSpecificScripts():
-    """Push service type specific scripts."""
-    for script in SERVICE_SPECIFIC_SCRIPT_LIST:
-      vm.PushFile(data.ResourcePath(os.path.join(service_specific_dir, script)))
-    runner_perms_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
-    vm.RemoteCommand(runner_perms_update_cmd)
-
-  vm.PushFile(data.ResourcePath(os.path.join('edw', 'script_driver.py')))
-  _PushServiceSpecificScripts()
-  vm.PushFile(FLAGS.edw_benchmark_script)
-
-
-def RunScriptsAndParseOutput(launch_command, vm):
-  """A function to launch the command and return the performance.
-
-  Args:
-    launch_command: Arguments to the script driver.
-    vm: Client vm on which the script will be run.
-
-  Returns:
-    json representation of the performance results.
-  """
-  stdout, _ = vm.RemoteCommand(launch_command)
-  performance = json.loads(stdout)
-  return performance
-
-
 def Prepare(benchmark_spec):
   """Install script execution environment on the client vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
+      required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  vm.Install('pip')
-  vm.RemoteCommand('sudo pip install absl-py')
   edw_service_instance = benchmark_spec.edw_service
-  edw_service_instance.InstallAndAuthenticateRunner(vm)
-  _PushScripts(benchmark_spec, vm)
+  vm = benchmark_spec.vms[0]
+
+  edw_service_instance.GetClientInterface().SetProvisionedAttributes(
+      benchmark_spec)
+  edw_service_instance.GetClientInterface().Prepare(benchmark_spec.name)
+
+  query_locations = [
+      os.path.join(FLAGS.local_query_dir, query)
+      for query in FLAGS.queries_to_execute
+  ]
+  any(vm.PushFile(query_loc) for query_loc in query_locations)
 
 
 def Run(benchmark_spec):
   """Run phase executes the sql scripts on edw cluster and collects duration."""
-  vm = benchmark_spec.vms[0]
-  edw_service_instance = benchmark_spec.edw_service
-  instance_specific_launch_command = edw_service_instance.RunCommandHelper()
-  script_name = os.path.basename(os.path.normpath(FLAGS.edw_benchmark_script))
-  launch_command = ' '.join(['python', 'script_driver.py',
-                             '--script={}'.format(script_name),
-                             instance_specific_launch_command])
-  script_performance = RunScriptsAndParseOutput(launch_command, vm)[script_name]
   results = []
-  script_metadata = copy.copy(edw_service_instance.GetMetadata())
-  script_metadata['script'] = script_name
-  script_performance_sample = sample.Sample(
-      'script_runtime', script_performance, 'seconds', script_metadata)
-  results.append(script_performance_sample)
+
+  edw_service_instance = benchmark_spec.edw_service
+
+  # Run a warm up query in case there are cold start issues.
+  edw_service_instance.GetClientInterface().WarmUpQuery()
+
+  # Default to executing just the sample query if no queries are provided.
+  queries_to_execute = FLAGS.queries_to_execute or [
+      os.path.basename(edw_service.SAMPLE_QUERY_PATH)
+  ]
+
+  # Accumulator for the entire benchmark's performance
+  benchmark_performance = results_aggregator.EdwBenchmarkPerformance(
+      total_iterations=FLAGS.edw_suite_iterations,
+      expected_suite_queries=queries_to_execute)
+
+  # Multiple iterations of the suite are performed to avoid cold start penalty
+  for i in range(1, FLAGS.edw_suite_iterations + 1):
+    iteration = str(i)
+    # Accumulator for the current suite's performance
+    suite_performance = results_aggregator.EdwSuitePerformance(
+        suite_name='edw',
+        suite_sequence=iteration,
+        total_suite_queries=len(queries_to_execute))
+
+    for query in queries_to_execute:
+      time, metadata = edw_service_instance.GetClientInterface().ExecuteQuery(
+          query)
+      edw_query_performance = results_aggregator.EdwQueryPerformance(
+          query_name=query, performance=time, metadata=metadata)
+      suite_performance.add_query_performance(edw_query_performance)
+    benchmark_performance.add_suite_performance(iteration, suite_performance)
+
+  # Execution complete, generate results only if the benchmark was successful.
+  benchmark_metadata = {}
+  benchmark_metadata.update(edw_service_instance.GetMetadata())
+  if benchmark_performance.is_successful():
+    query_samples = benchmark_performance.get_all_query_performance_samples(
+        metadata=benchmark_metadata)
+    results.extend(query_samples)
+
+    wall_time_samples = benchmark_performance.get_wall_time_performance_samples(
+        metadata=benchmark_metadata)
+    results.extend(wall_time_samples)
+
+    geomean_samples = (
+        benchmark_performance.get_queries_geomean_performance_samples(
+            metadata=benchmark_metadata))
+    results.extend(geomean_samples)
+  else:
+    logging.error('At least one query failed, so not reporting any results.')
   return results
 
 

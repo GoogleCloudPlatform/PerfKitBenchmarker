@@ -48,10 +48,6 @@ flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
 flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
-flags.DEFINE_string(
-    'local_query_dir', '',
-    'Optional local directory containing all query files. '
-    'Can be absolute or relative to the executable.')
 flags.DEFINE_list(
     'queries_to_execute', [], 'List of all queries to execute, as strings. '
     'E.g., "1","5","6","21"')
