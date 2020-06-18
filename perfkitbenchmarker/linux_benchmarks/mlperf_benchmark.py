@@ -45,9 +45,9 @@ mlperf:
           min_cpu_platform: skylake
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-east-1
+          zone: us-east-1a
           boot_disk_size: 105
-          image: ami-07728e9e2742b0662
+          image: ami-0a4a0d42e3b855a2c
         Azure:
           machine_type: Standard_ND40s_v2
           zone: eastus
@@ -315,7 +315,7 @@ def Prepare(benchmark_spec, vm=None):
           'sudo docker build --pull --network=host -t mlperf-nvidia:object_detection . ',
           should_log=True)
       _DownloadData(benchmark_spec.coco_data_dir,
-                    posixpath.join('/data', 'coco'), vm)
+                    posixpath.join('/data', 'coco2017'), vm)
 
     if 'gnmt' in benchmark_spec.benchmark:
       vm.RemoteCommand(
@@ -331,7 +331,7 @@ def Prepare(benchmark_spec, vm=None):
           'sudo docker build --pull --network=host -t mlperf-nvidia:single_stage_detector . ',
           should_log=True)
       _DownloadData(benchmark_spec.coco_data_dir,
-                    posixpath.join('/data', 'coco'), vm)
+                    posixpath.join('/data', 'coco2017'), vm)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -496,8 +496,8 @@ def Run(benchmark_spec):
     run_script = posixpath.join(run_path, 'run.sub')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     mlperf_benchmark_cmd = (
-        'chmod 755 {run_script} && sudo {common_env} {env} {run_script} '
-        .format(run_script=run_script, common_env=common_env, env=env))
+        'cd {run_path} && chmod 755 run.sub && sudo {common_env} {env} '
+        './run.sub '.format(run_path=run_path, common_env=common_env, env=env))
 
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(
