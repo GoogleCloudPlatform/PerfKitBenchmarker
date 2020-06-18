@@ -13,6 +13,7 @@
 # limitations under the License.
 """Run MLPerf benchmarks."""
 
+import json
 import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -390,8 +391,11 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
       value = regex_util.ExtractExactlyOneMatch(r'"value": "(\d+\.\d+)"',
                                                 result)
     elif 'mask' in model:
-      # TODO(user): Add support for two accuracy values
-      value = 0
+      mask_value, mask_metadata = regex_util.ExtractExactlyOneMatch(
+          r'^"value": (.*?), "metadata": (.*)$', result)
+      value = json.loads(mask_value)['accuracy']['BBOX']
+      metadata_copy.update(json.loads(mask_value)['accuracy'])
+      metadata_copy.update(json.loads(mask_metadata))
     else:
       value = regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)', result)
     metadata_copy['times'] = wall_time - start
