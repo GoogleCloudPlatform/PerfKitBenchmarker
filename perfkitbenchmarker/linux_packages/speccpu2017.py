@@ -40,11 +40,14 @@ OPENMP_TAR = 'libomp_20160808_oss.tgz'
 OPENMP_TAR_URL = 'https://www.openmprtl.org/sites/default/files/{0}'.format(
     OPENMP_TAR)
 _PACKAGE_NAME = 'speccpu2017'
+_MOUNT_DIR = 'cpu2017_mnt'
 _SPECCPU2017_DIR = 'cpu2017'
 _SPECCPU2017_TAR = 'speccpu2017.tgz'
+_SPECCPU2017_ISO = 'cpu2017-1.1.0.iso'
 _TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
 _LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
 _DEFAULT_RUNSPEC_CONFIG = 'pkb-crosstool-llvm-linux-x86-fdo.cfg'
+_DEFAULT_CLANG_FLAG = 'clang.xml'
 PREPROVISIONED_DATA = {
     _SPECCPU2017_TAR: None,
     'cpu2017-gcc-x86.tgz': None,  # x86-default
@@ -69,12 +72,15 @@ def GetSpecInstallConfig(scratch_dir):
   """
   install_config = speccpu.SpecInstallConfigurations()
   install_config.package_name = _PACKAGE_NAME
+  install_config.base_mount_dir = _MOUNT_DIR
   install_config.base_spec_dir = _SPECCPU2017_DIR
   install_config.base_tar_file_path = (FLAGS.runspec_tar or _SPECCPU2017_TAR)
+  install_config.base_iso_file_path = _SPECCPU2017_ISO
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
   install_config.runspec_config = (FLAGS.runspec_config or
                                    _DEFAULT_RUNSPEC_CONFIG)
+  install_config.base_clang_flag_file_path = _DEFAULT_CLANG_FLAG
   install_config.UpdateConfig(scratch_dir)
   return install_config
 
@@ -92,4 +98,4 @@ def Install(vm):
   # But because we may have x86 or arm architecture machines, just rerun the
   # install script to regenerate the runner scripts based on what spec detects
   # to be the vm architecture.
-  vm.RemoteCommand('echo yes | /scratch/cpu2017/install.sh')
+  vm.RemoteCommand('echo yes | {0}/cpu2017/install.sh'.format(vm.GetScratchDir()))
