@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+# Lint as: python2, python3
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -62,7 +61,7 @@ class PatternNotFoundError(Exception):
   pass
 
 
-class Plotter():
+class Plotter(object):
   """Plotter generates a per second output graph of TPS vs Thread Values.
 
   Given run configurations, and run stderr filenames for any number of PKB runs,
@@ -71,7 +70,9 @@ class Plotter():
   """
 
   def __init__(self, run_seconds, report_interval, run_uri):
-    """Args:
+    """Initialize a Plotter.
+
+    Args:
       run_seconds: (integer) length of run phase.
       report_interval: (integer) seconds between TPS reports.
       run_uri: (string) run identifier.
@@ -101,7 +102,7 @@ class Plotter():
       STDERRFileDoesNotExistError:
     """
     try:
-      f = open(filename)
+      f = open(filename, 'r')
     except:
       raise STDERRFileDoesNotExistError(
           ('Unable to open file (%s). Assume this is because run failed. Will'
@@ -122,7 +123,7 @@ class Plotter():
     Returns:
       (list): list of TPS values.
     Raises:
-      PatternNotFoundError.
+      PatternNotFoundError: if thread data is missing.
     """
     tps_values = []
     line = f.readline()
@@ -163,6 +164,6 @@ class Plotter():
                                         self.run_uri,
                                         self.max_tps,
                                         self.iterations)
-    output_gnuplot_file, output_chart = p.create_file()
+    output_gnuplot_file, _ = p.create_file()
     subprocess.Popen(['gnuplot', output_gnuplot_file])
     # TODO(samspano): Implement copy command to copy output_chart
