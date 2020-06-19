@@ -1620,6 +1620,7 @@ class BaseDebianMixin(BaseLinuxMixin):
       package.AptUninstall(self)
     elif hasattr(package, 'Uninstall'):
       package.Uninstall(self)
+    self._installed_packages.discard(package_name)
 
   def GetPathToConfig(self, package_name):
     """Returns the path to the config file for PerfKit packages.
