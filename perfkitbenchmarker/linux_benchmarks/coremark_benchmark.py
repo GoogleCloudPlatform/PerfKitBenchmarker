@@ -66,6 +66,17 @@ def CheckPrerequisites(benchmark_config):
   del benchmark_config
 
 
+def PrepareCoremark(remote_command):
+  """Prepares coremark on a VM.
+
+  Args:
+    remote_command: Function to run a remote command on the VM.
+  """
+  if FLAGS.coremark_parallelism_method == PARALLELISM_PTHREAD:
+    remote_command('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
+                   '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
+
+
 def Prepare(benchmark_spec):
   """Install Coremark on the target vm.
 
@@ -74,9 +85,7 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   vm.Install('coremark')
-  if FLAGS.coremark_parallelism_method == PARALLELISM_PTHREAD:
-    vm.RemoteCommand('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
-                     '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
+  PrepareCoremark(vm.RemoteCommand)
 
 
 def RunCoremark(remote_command, num_threads):
