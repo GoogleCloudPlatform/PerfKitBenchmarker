@@ -477,31 +477,31 @@ def Run(benchmark_spec):
     common_env = 'DGXSYSTEM=DGX1 NEXP=1'
     if 'resnet' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path, 'resnet/implementations/mxnet')
-      env = 'DATADIR=/data/imagenet LOGDIR=/tmp/resnet PULL=0 '
+      env = 'DATADIR=/data/imagenet LOGDIR=/tmp/resnet PULL=0'
     elif 'transformer' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path,
                                 'transformer/implementations/pytorch')
-      env = 'DATADIR=/data/wmt/utf8 LOGDIR=/tmp/transformer PULL=0 '
+      env = 'DATADIR=/data/wmt/utf8 LOGDIR=/tmp/transformer PULL=0'
     elif 'minigo' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path,
                                 'minigo/implementations/tensorflow')
-      env = 'LOGDIR=/tmp/minigo CONT=mlperf-nvidia:minigo '
+      env = 'LOGDIR=/tmp/minigo CONT=mlperf-nvidia:minigo'
     elif 'mask' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path,
                                 'maskrcnn/implementations/pytorch')
-      env = 'LOGDIR=/tmp/mask DATADIR=/data PULL=0 '
+      env = 'LOGDIR=/tmp/mask DATADIR=/data PULL=0'
     elif 'gnmt' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path, 'gnmt/implementations/pytorch')
-      env = 'LOGDIR=/tmp/gnmt DATADIR=/data/gnmt PULL=0 '
+      env = 'LOGDIR=/tmp/gnmt DATADIR=/data/gnmt PULL=0'
     elif 'ssd' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path, 'ssd/implementations/pytorch')
-      env = 'LOGDIR=/tmp/ssd DATADIR=/data PULL=0 '
+      env = 'LOGDIR=/tmp/ssd DATADIR=/data PULL=0'
 
     run_script = posixpath.join(run_path, 'run.sub')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     mlperf_benchmark_cmd = (
         'cd {run_path} && chmod 755 run.sub && sudo {common_env} {env} '
-        './run.sub '.format(run_path=run_path, common_env=common_env, env=env))
+        './run.sub'.format(run_path=run_path, common_env=common_env, env=env))
 
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(
