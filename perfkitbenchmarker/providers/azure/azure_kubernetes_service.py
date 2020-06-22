@@ -157,10 +157,11 @@ class AksCluster(container_service.KubernetesCluster):
         '--service-principal', self.service_principal.app_id,
         # TODO(pclay): avoid logging client secret
         '--client-secret', self.service_principal.password,
-        '--kubernetes-version', self.cluster_version,
     ] + self.resource_group.args
     if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
       cmd += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
+    if self.cluster_version:
+      cmd += ['--kubernetes-version', self.cluster_version]
 
     # TODO(pclay): expose quota and capacity errors
     vm_util.IssueCommand(cmd, timeout=1800)
