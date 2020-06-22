@@ -2,6 +2,8 @@
 
 ### New features:
 
+-   Add FairSeq Roberta Masked Multilingual LM benchmark for linux.
+
 ### Enhancements:
 
 -   Enable support for AWS's c6g and r6g families.
