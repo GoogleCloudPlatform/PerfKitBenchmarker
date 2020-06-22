@@ -415,6 +415,7 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
       FLAGS.object_storage_multistream_objects_per_stream)
   metadata['object_naming'] = FLAGS.object_storage_object_naming_scheme
 
+  min_num_records = min((len(start_time) for start_time in start_times))
   num_records = sum((len(start_time) for start_time in start_times))
   logging.info('Processing %s total operation records', num_records)
 
@@ -445,17 +446,17 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
 
   # Find the indexes in each stream where all streams are active,
   # following Python's [inclusive, exclusive) index convention.
-  active_start_indexes = []
-  for start_time in start_times:
+  active_start_indexes = np.full(num_streams, 0)
+  for index, start_time in enumerate(start_times):
     for i in range(len(start_time)):
       if start_time[i] >= last_start_time:
-        active_start_indexes.append(i)
+        active_start_indexes[index] = i
         break
-  active_stop_indexes = []
-  for stop_time in stop_times:
+  active_stop_indexes = np.full(num_streams, min_num_records)
+  for index, stop_time in enumerate(stop_times):
     for i in range(len(stop_time) - 1, -1, -1):
       if stop_time[i] <= first_stop_time:
-        active_stop_indexes.append(i + 1)
+        active_stop_indexes[index] = i + 1
         break
   active_latencies = [
       latencies[i][active_start_indexes[i]:active_stop_indexes[i]]
@@ -512,7 +513,8 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                           LATENCY_UNIT, this_size_metadata))
 
     # Build the object latency histogram if user requested it
-    if FLAGS.object_storage_latency_histogram_interval:
+    if FLAGS.object_storage_latency_histogram_interval and any(
+        size in x for x in sizes):
       histogram_interval = FLAGS.object_storage_latency_histogram_interval
       hist_latencies = [[l for l, s in zip(*w_l_s) if s == size]
                         for w_l_s in zip(latencies, sizes)]

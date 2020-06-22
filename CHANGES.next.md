@@ -14,3 +14,4 @@
 
 -   Parallelize entity deletion processing for a kind.
 -   Move coremark installation into a package.
+-   Fixed one object per stream run for object storage service benchmark.
