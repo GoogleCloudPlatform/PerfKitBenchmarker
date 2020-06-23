@@ -423,11 +423,15 @@ class AwsKeyFileManager(object):
       cat_cmd = ['cat',
                  vm_util.GetPublicKeyPath()]
       keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+      formatted_tags = util.FormatTagSpecifications('key-pair',
+                                                    util.MakeDefaultTags())
       import_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'import-key-pair',
           '--key-name=%s' % cls.GetKeyNameForRun(),
-          '--public-key-material=%s' % keyfile]
+          '--public-key-material=%s' % keyfile,
+          '--tag-specifications=%s' % formatted_tags,
+      ]
       _, stderr, retcode = vm_util.IssueCommand(
           import_cmd, raise_on_failure=False)
       if retcode:
