@@ -33,9 +33,23 @@ export DATABASE=$3
 # Output location
 export OUTPUT_BUCKET=$4
 
+# Output and Error Log files
+export SCRIPT_OUTPUT=$5
+export SCRIPT_ERROR=$6
+
 pid=""
 
-cat $SCRIPT | aws athena --output=json --region=$REGION start-query-execution --query-string script --query-execution-context Database=$DATABASE --result-configuration OutputLocation=$OUTPUT_BUCKET
+output=$( aws athena --output=json --region=$REGION start-query-execution --query-string "$( cat $SCRIPT )" --query-execution-context Database=$DATABASE --result-configuration OutputLocation=$OUTPUT_BUCKET 2>${SCRIPT_ERROR} )
+echo $output >> $SCRIPT_OUTPUT
+execution_id=$( cut -d '"' -f4 <<< $(echo $output) )
+state='RUNNING'
+while [ "$state" == 'RUNNING' ]
+do
+  output=$( aws athena --output=json --region=$REGION get-query-execution --query-execution-id=$execution_id) 2>${SCRIPT_ERROR}
+  echo $output >> $SCRIPT_OUTPUT
+  state=$( cut -d '"' -f10 <<< $(echo $output) )
+  sleep 1
+done
 
 pid=$!
 

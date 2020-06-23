@@ -33,7 +33,7 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
     Command list to execute the supplied script.
   """
   cmd_list = [
-      driver, script, FLAGS.athena_region, FLAGS.athena_query_output_bucket,
-      output, error
+      driver, script, FLAGS.athena_region, FLAGS.database,
+      FLAGS.athena_query_output_bucket, output, error
   ]
   return cmd_list

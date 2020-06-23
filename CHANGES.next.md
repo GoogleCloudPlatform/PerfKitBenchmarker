@@ -16,3 +16,5 @@
 -   Parallelize entity deletion processing for a kind.
 -   Move coremark installation into a package.
 -   Fixed one object per stream run for object storage service benchmark.
+-   Benchmarking of AWS Athena now records client observed run time rather that
+    Athena's reported run time.
