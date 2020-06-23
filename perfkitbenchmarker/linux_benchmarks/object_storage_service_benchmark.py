@@ -180,6 +180,12 @@ flags.DEFINE_boolean(
     'record_individual_latency_samples', False,
     'If set, record the latency of each download and upload '
     'in its own sample.')
+flags.DEFINE_boolean(
+    'object_storage_bulk_delete', False,
+    'If true, deletes objects with bulk delete client request and records '
+    'average latency per object. Otherwise, deletes one object per request '
+    'and records individual delete latency'
+)
 
 FLAGS = flags.FLAGS
 
@@ -305,6 +311,7 @@ class MultistreamOperationType(enum.Enum):
   download = 1
   upload = 2
   delete = 3
+  bulk_delete = 4
 
 
 def GetConfig(user_config):
@@ -1008,6 +1015,8 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
     cmd_args += ['--scenario=MultiStreamRead']
   elif operation == MultistreamOperationType.delete:
     cmd_args += ['--scenario=MultiStreamDelete']
+  elif operation == MultistreamOperationType.bulk_delete:
+    cmd_args += ['--scenario=MultiStreamDelete', '--bulk_delete=true']
   else:
     raise Exception('Value of operation must be \'upload\' or \'download\'.'
                     'Value is: \'' + operation.name + '\'')
@@ -1181,8 +1190,18 @@ def MultiStreamDelete(results, metadata, vms, command_builder, service,
   """
   logging.info('Starting multi-stream delete test on %s VMs.', len(vms))
 
-  _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, MultistreamOperationType.delete)
+  # Perform bulk delete operation if specified by flag or if individual object
+  # request sample is not wanted.
+  bulk_delete = (
+      FLAGS.object_storage_bulk_delete or
+      not FLAGS.record_individual_latency_samples)
+
+  if bulk_delete:
+    _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                       bucket_name, MultistreamOperationType.bulk_delete)
+  else:
+    _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                       bucket_name, MultistreamOperationType.delete)
 
   logging.info('Finished multi-stream delete test.')
 

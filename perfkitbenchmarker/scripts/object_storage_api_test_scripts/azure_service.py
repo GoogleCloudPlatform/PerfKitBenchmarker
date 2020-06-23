@@ -55,6 +55,12 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
                           object_name)
     return start_times, latencies
 
+  def BulkDeleteObjects(self, bucket, objects_to_delete):
+    # This version of Azure Blob APIs do not support Bulk Delete
+    # TODO(user): Update to latest version of Azure Blob Storage API
+    start_times, latencies = self.DeleteObjects(bucket, objects_to_delete)
+    return min(start_times), sum(latencies)
+
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
     stream.seek(0)
     start_time = time.time()

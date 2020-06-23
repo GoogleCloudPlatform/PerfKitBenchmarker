@@ -71,6 +71,11 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
                           object_name)
     return start_times, latencies
 
+  def BulkDeleteObjects(self, bucket, objects_to_delete):
+    # GCS Boto currently does not support Bulk delete
+    start_times, latencies = self.DeleteObjects(bucket, objects_to_delete)
+    return min(start_times), sum(latencies)
+
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
     start_time = time.time()
     stream.seek(0)

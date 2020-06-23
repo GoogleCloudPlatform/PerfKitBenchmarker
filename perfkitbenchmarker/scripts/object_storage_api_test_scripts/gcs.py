@@ -53,6 +53,13 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
                           object_name, e)
     return start_times, latencies
 
+  def BulkDeleteObjects(self, bucket_name, objects_to_delete):
+    bucket = storage.bucket.Bucket(self.client, bucket_name)
+    start_time = time.time()
+    bucket.delete_blobs(objects_to_delete)
+    latency = time.time() - start_time
+    return start_time, latency
+
   def WriteObjectFromBuffer(self, bucket_name, object_name, stream, size):
     stream.seek(0)
     start_time = time.time()

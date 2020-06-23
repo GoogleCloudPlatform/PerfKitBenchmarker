@@ -67,6 +67,20 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
     pass
 
   @abc.abstractmethod
+  def BulkDeleteObjects(self, bucket, objects_to_delete):
+    """Delete a list of objects using the bulk API request.
+
+    Args:
+      bucket: the name of the bucket.
+      objects_to_delete: a list of names of objects to delete.
+
+    Returns:
+      A tuple of (start_time, latency).
+    """
+
+    pass
+
+  @abc.abstractmethod
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
     """Write an object to a bucket.
 

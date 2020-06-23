@@ -51,6 +51,16 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
                           object_name, e)
     return start_times, latencies
 
+  def BulkDeleteObjects(self, bucket, objects_to_delete):
+    objects_to_delete_dict = {}
+    objects_to_delete_dict['Objects'] = []
+    for object_name in objects_to_delete:
+      objects_to_delete_dict['Objects'].append({'Key': object_name})
+    start_time = time.time()
+    self.client.delete_objects(Bucket=bucket, Delete=objects_to_delete_dict)
+    latency = time.time() - start_time
+    return start_time, latency
+
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
     start_time = time.time()
     stream.seek(0)

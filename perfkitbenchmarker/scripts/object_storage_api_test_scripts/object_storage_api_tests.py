@@ -124,6 +124,13 @@ flags.DEFINE_enum('object_naming_scheme', 'sequential_by_stream',
                   'approximately_sequential: object names from all '
                   'streams will roughly increase together.')
 
+flags.DEFINE_boolean(
+    'bulk_delete', False,
+    'If true, deletes objects with bulk delete client request and records '
+    'average latency per object. Otherwise, deletes one object per request '
+    'and records individual delete latency'
+)
+
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
 # If more than 5% of our upload or download operations fail for an iteration,
@@ -940,18 +947,38 @@ def ReadWorker(service, start_time, object_records,
 
 
 def DeleteWorker(service, object_records, result_queue, worker_num):
+  """Delete objects for the multi-stream delete benchmark.
+
+  Performs bulk delete operation if specified by flag. Otherwise, deletes one
+  object per request.
+
+  Args:
+    service: the ObjectStorageServiceBase object to use.
+    object_records: the bytes to delete.
+    result_queue: a mp.Queue to record results in.
+    worker_num: the thread number of this worker.
+  """
   object_names = []
   sizes = []
   for name, size in object_records:
     object_names.append(name)
     sizes.append(size)
 
-  start_times, latencies = service.DeleteObjects(FLAGS.bucket, object_names)
+  if FLAGS.bulk_delete:
+    start_time, latency = service.BulkDeleteObjects(FLAGS.bucket, object_names)
+    start_times = [start_time]
+    latencies = [latency]
+    object_size_sum = sum(sizes)
+    sizes = [object_size_sum]
+  else:
+    start_times, latencies = service.DeleteObjects(FLAGS.bucket, object_names)
 
-  result_queue.put({'start_times': start_times,
-                    'latencies': latencies,
-                    'sizes': sizes,
-                    'stream_num': worker_num + FLAGS.stream_num_start})
+  result_queue.put({
+      'start_times': start_times,
+      'latencies': latencies,
+      'sizes': sizes,
+      'stream_num': worker_num + FLAGS.stream_num_start
+  })
 
 
 def OneByteRWBenchmark(service):

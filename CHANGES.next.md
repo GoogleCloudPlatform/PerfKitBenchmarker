@@ -3,6 +3,7 @@
 ### New features:
 
 -   Add FairSeq Roberta Masked Multilingual LM benchmark for linux.
+-   Add bulk delete API operation to object storage API scripts.
 
 ### Enhancements:
 
