@@ -4,6 +4,7 @@
 
 -   Add FairSeq Roberta Masked Multilingual LM benchmark for linux.
 -   Add bulk delete API operation to object storage API scripts.
+-   Catch preemptible instance's interrupt event.
 
 ### Enhancements:
 

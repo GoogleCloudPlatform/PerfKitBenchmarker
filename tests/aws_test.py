@@ -430,7 +430,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(str(e.exception), stderr)
     self.assertEqual(self.vm.spot_status_code,
                      'InsufficientSpotInstanceCapacity')
-    self.assertTrue(self.vm.early_termination)
+    self.assertTrue(self.vm.spot_early_termination)
     self.vm.use_spot_instance = False
 
   def testDeleteCancelsSpotInstanceRequest(self):

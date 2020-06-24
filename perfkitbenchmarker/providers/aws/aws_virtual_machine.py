@@ -540,7 +540,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             FLAGS.aws_credit_specification
             if FLAGS.aws_credit_specification else 'none'
     })
-    self.early_termination = False
+    self.spot_early_termination = False
     self.spot_status_code = None
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
@@ -798,11 +798,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'InsufficientInstanceCapacity' in stderr:
       if self.use_spot_instance:
         self.spot_status_code = 'InsufficientSpotInstanceCapacity'
-        self.early_termination = True
+        self.spot_early_termination = True
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if 'SpotMaxPriceTooLow' in stderr:
       self.spot_status_code = 'SpotMaxPriceTooLow'
-      self.early_termination = True
+      self.spot_early_termination = True
       raise errors.Resource.CreationError(stderr)
     if 'InstanceLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
@@ -827,7 +827,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
-  @vm_util.Retry(max_retries=5)
   def UpdateInterruptibleVmStatus(self):
     if hasattr(self, 'spot_instance_request_id'):
       describe_cmd = util.AWS_PREFIX + [
@@ -838,8 +837,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, _, _ = vm_util.IssueCommand(describe_cmd)
       sir_response = json.loads(stdout)['SpotInstanceRequests']
       self.spot_status_code = sir_response[0]['Status']['Code']
-      self.early_termination = (self.spot_status_code in
-                                AWS_INITIATED_SPOT_TERMINAL_STATUSES)
+      self.spot_early_termination = (self.spot_status_code in
+                                     AWS_INITIATED_SPOT_TERMINAL_STATUSES)
 
   @vm_util.Retry(poll_interval=1, log_errors=False,
                  retryable_exceptions=(AwsTransitionalVmRetryableError,))
@@ -999,7 +998,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Returns: True if this vm was terminated early by AWS.
     """
-    return self.early_termination
+    return self.spot_early_termination
 
   def GetVmStatusCode(self):
     """Returns the early termination code if any.
@@ -1007,6 +1006,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns: Early termination code.
     """
     return self.spot_status_code
+
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
+
+    Returns:
+      Seconds between polls
+    """
+    return 5
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.

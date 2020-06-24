@@ -63,6 +63,8 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
     spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
+    vm0.IsInterruptible = mock.MagicMock(return_value=False)
+    vm1.IsInterruptible = mock.MagicMock(return_value=False)
     spec.ConstructVirtualMachines()
     spec.vms = [vm0, vm1]
     timer = timing_util.IntervalTimer()

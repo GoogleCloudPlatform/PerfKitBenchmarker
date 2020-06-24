@@ -1218,6 +1218,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   def UpdateInterruptibleVmStatus(self):
     """Updates the status of the discounted vm.
     """
+    # TODO(tohaowu) Set it to pure virtual function after finishing it on all
+    # the providers.
     pass
 
   def WasInterrupted(self):
@@ -1241,6 +1243,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       Vm status code.
     """
     return None
+
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
+
+    Returns:
+      Seconds between polls
+    """
+    return 5
 
   def _PreDelete(self):
     """See base class."""

@@ -66,6 +66,10 @@ NUM_LOCAL_VOLUMES = {
     'Standard_L80s_v2': 10
 }
 
+# https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events
+_SCHEDULED_EVENTS_CMD = ('curl -H Metadata:true http://169.254.169.254/metadata'
+                         '/scheduledevents?api-version=2019-01-01')
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -504,7 +508,7 @@ class AzureVirtualMachine(
       self.host_list = None
     self.low_priority = vm_spec.low_priority
     self.low_priority_status_code = None
-    self.early_termination = False
+    self.spot_early_termination = False
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     disk_spec.disk_type = (
@@ -749,11 +753,17 @@ class AzureVirtualMachine(
       result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
-  @vm_util.Retry(max_retries=5)
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
     if self.low_priority:
-      self.early_termination = True
+      stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
+          _SCHEDULED_EVENTS_CMD)
+      if return_code:
+        logging.error('Checking Interrupt Error: %s', stderr)
+      else:
+        events = json.loads(stdout).get('Events', [])
+        self.spot_early_termination = any(
+            event.get('EventType') == 'Preempt' for event in events)
 
   def IsInterruptible(self):
     """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
@@ -768,7 +778,7 @@ class AzureVirtualMachine(
 
     Returns: True if this vm was terminated early by Azure.
     """
-    return self.early_termination
+    return self.spot_early_termination
 
   def GetVmStatusCode(self):
     """Returns the early termination code if any.
@@ -776,6 +786,14 @@ class AzureVirtualMachine(
     Returns: Early termination code.
     """
     return self.low_priority_status_code
+
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
+
+    Returns:
+      Seconds between polls
+    """
+    return 5
 
 
 class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,
