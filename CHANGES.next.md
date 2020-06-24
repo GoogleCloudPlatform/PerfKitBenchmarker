@@ -11,6 +11,7 @@
 -   Enable support for AWS's c6g and r6g families.
 -   Integrate edw_benchmark with new Client Interface and results aggregation
     framework.
+-   Update default stress-ng version from 5.23 to 9.25 (default on Ubuntu 1804).
 
 ### Bug fixes and maintenance updates:
 

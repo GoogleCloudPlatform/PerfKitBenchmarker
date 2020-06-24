@@ -129,9 +129,9 @@ flags.register_validator(
 
 ALL_VERSIONS = ['0.05.23', '0.09.25']
 flags.DEFINE_enum(
-    'stress_ng_version', '0.05.23', ALL_VERSIONS,
-    'Stress-ng version to use. Default is 0.05.23 which '
-    'is the default package on Ubuntu 1604.')
+    'stress_ng_version', '0.09.25', ALL_VERSIONS,
+    'Stress-ng version to use. Default is 0.09.25 which '
+    'is the default package on Ubuntu 1804.')
 
 
 def _GeoMeanOverflow(iterable):
