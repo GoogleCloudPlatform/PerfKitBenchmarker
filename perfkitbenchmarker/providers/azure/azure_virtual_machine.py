@@ -42,6 +42,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
@@ -747,7 +748,7 @@ class AzureVirtualMachine(
     if self.network.placement_group:
       result['placement_group_strategy'] = self.network.placement_group.strategy
     else:
-      result['placement_group_strategy'] = None
+      result['placement_group_strategy'] = placement_group.PLACEMENT_GROUP_NONE
     result['preemptible'] = self.low_priority
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host

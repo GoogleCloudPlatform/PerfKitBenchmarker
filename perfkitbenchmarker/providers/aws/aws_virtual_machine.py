@@ -35,6 +35,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
@@ -535,7 +536,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'spot_block_duration_minutes':
             self.spot_block_duration_minutes,
         'placement_group_strategy':
-            self.placement_group.strategy if self.placement_group else 'none',
+            self.placement_group.strategy
+            if self.placement_group else placement_group.PLACEMENT_GROUP_NONE,
         'aws_credit_specification':
             FLAGS.aws_credit_specification
             if FLAGS.aws_credit_specification else 'none'

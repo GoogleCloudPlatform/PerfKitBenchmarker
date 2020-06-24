@@ -42,6 +42,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
@@ -452,6 +453,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.metadata.update(self.network.placement_group.GetResourceMetadata())
       cmd.flags['resource-policies'] = self.network.placement_group.name
       cmd.flags['maintenance-policy'] = 'TERMINATE'
+    else:
+      self.metadata[
+          'placement_group_style'] = placement_group.PLACEMENT_GROUP_NONE
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
