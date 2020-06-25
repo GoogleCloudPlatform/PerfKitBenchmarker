@@ -23,3 +23,4 @@
 -   Fixed one object per stream run for object storage service benchmark.
 -   Benchmarking of AWS Athena now records client observed run time rather that
     Athena's reported run time.
+-   Use sub processes instead of threads for entity deletion processing.

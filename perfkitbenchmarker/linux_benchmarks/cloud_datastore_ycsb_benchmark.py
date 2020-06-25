@@ -27,6 +27,7 @@ to test Datastore.
 
 import concurrent.futures
 import logging
+from multiprocessing import pool as pool_lib
 import time
 
 from perfkitbenchmarker import configs
@@ -51,8 +52,10 @@ cloud_datastore_ycsb:
       vm_count: 1"""
 
 _CLEANUP_THREAD_POOL_WORKERS = 20
-_CLEANUP_KIND_READ_BATCH_SIZE = 20000
-_CLEANUP_KIND_DELETE_BATCH_SIZE = 500
+_CLEANUP_KIND_READ_BATCH_SIZE = 10000
+_CLEANUP_KIND_DELETE_BATCH_SIZE = 100000
+_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE = 20000
+_CLEANUP_KIND_DELETE_OP_BATCH_SIZE = 500
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
 _YCSB_COLLECTIONS = ['usertable']
@@ -82,9 +85,6 @@ class _DeletionTask(object):
   Attributes:
     kind: Datastore kind to be deleted.
     task_id: Task id
-    query_iter: Query iterator used to read entities.
-    entities: Entities to be deleted.
-    entity_read_count: No of entities read.
     entity_deletion_count: No of entities deleted.
     deletion_error: Set to true if deletion fails with an error.
   """
@@ -92,65 +92,37 @@ class _DeletionTask(object):
   def __init__(self, kind, task_id):
     self.kind = kind
     self.task_id = task_id
-    self.query_iter = None
-    self.entities = None
-    self.entity_read_count = 0
     self.entity_deletion_count = 0
     self.deletion_error = False
 
-  def ReadEntities(self, query, start_cursor, current_entity_read_count):
-    """Read next batch of entities in a datastore database using a cursor.
-
-    Args:
-      query: Cloud Datastore query to get entities.
-      start_cursor: Start cursor for the query.
-      current_entity_read_count: No of entities read uptil now.
-
-    Returns:
-      The updated total read count of entities.
-
-    Raises:
-      ValueError: In case of delete failures.
-    """
-    self.query_iter = query.fetch(
-        start_cursor, limit=_CLEANUP_KIND_READ_BATCH_SIZE)
-    self.entities = list(self.query_iter.pages)
-    self.entity_read_count = len(self.entities)
-    current_entity_read_count += self.entity_read_count
-    logging.info('Task %d - Read %d entities for %s kind , Read %d in total.',
-                 self.task_id, self.entity_read_count, self.kind,
-                 current_entity_read_count)
-    return current_entity_read_count
-
-  def DeleteEntities(self, delete_client):
+  def DeleteEntities(self, delete_client, delete_entities):
     """Deletes entities in a datastore database in batches.
 
     Args:
       delete_client: Cloud Datastore client to delete entities.
+      delete_entities: Entities to delete.
 
+    Returns:
+      number of records deleted.
     Raises:
       ValueError: In case of delete failures.
     """
-    if self.entity_read_count >= 1:
-      logging.info('Task %d - Deleting %d entities for %s', self.task_id,
-                   self.entity_read_count, self.kind)
-      try:
-        while self.entities:
-          chunk = self.entities[:_CLEANUP_KIND_DELETE_BATCH_SIZE]
-          self.entities = self.entities[_CLEANUP_KIND_DELETE_BATCH_SIZE:]
-          delete_client.delete_multi(entity.key for entity in chunk)
-          self.entity_deletion_count += _CLEANUP_KIND_DELETE_BATCH_SIZE
+    try:
+      logging.info('Task %d - Started deletion for %s', self.task_id, self.kind)
+      while delete_entities:
+        chunk = delete_entities[:_CLEANUP_KIND_DELETE_OP_BATCH_SIZE]
+        delete_entities = delete_entities[_CLEANUP_KIND_DELETE_OP_BATCH_SIZE:]
+        delete_client.delete_multi(chunk)
+        self.entity_deletion_count += len(chunk)
 
-        logging.info('Task %d - Finished %d deletes for %s', self.task_id,
-                     self.entity_deletion_count, self.kind)
-      except ValueError as error:
-        logging.error('Task %d - Delete entities for %s failed due to %s',
-                      self.task_id, self.kind, error)
-        self.deletion_error = True
-        raise error
-    else:
-      logging.info('Task %d for %s - No entities to delete', self.task_id,
-                   self.kind)
+      logging.info('Task %d - Completed deletion for %s - %d', self.task_id,
+                   self.kind, self.entity_deletion_count)
+      return self.entity_deletion_count
+    except ValueError as error:
+      logging.exception('Task %d - Delete entities for %s failed due to %s',
+                        self.task_id, self.kind, error)
+      self.deletion_error = True
+      raise error
 
 
 def GetConfig(user_config):
@@ -214,7 +186,9 @@ def Prepare(benchmark_spec):
     client = datastore.Client(project=dataset_id, credentials=credentials)
 
     for kind in _YCSB_COLLECTIONS:
-      if list(client.query(kind=kind).fetch(limit=1)):
+      # TODO(user): Allow a small number of leftover entities until we
+      # figure out why these are not getting deleted.
+      if len(list(client.query(kind=kind).fetch(limit=200))) > 100:
         raise errors.Benchmarks.PrepareException(
             'Database is non-empty. Stopping test.')
 
@@ -271,8 +245,7 @@ def Cleanup(_):
     for kind in _YCSB_COLLECTIONS:
       futures.append(
           executor.submit(
-              _ReadAndDeleteAllEntities(executor, dataset_id, credentials,
-                                        kind)))
+              _ReadAndDeleteAllEntities(dataset_id, credentials, kind)))
 
     concurrent.futures.wait(
         futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
@@ -282,11 +255,10 @@ def Cleanup(_):
     logging.warning('Manually delete all the entries via GCP portal.')
 
 
-def _ReadAndDeleteAllEntities(executor, dataset_id, credentials, kind):
+def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
   """Reads and deletes all kind entries in a datastore database.
 
   Args:
-    executor: ThreadPool to submit delete tasks.
     dataset_id: Cloud Datastore client dataset id.
     credentials: Cloud Datastore client credentials.
     kind: Kind for which entities will be deleted.
@@ -294,38 +266,90 @@ def _ReadAndDeleteAllEntities(executor, dataset_id, credentials, kind):
   Raises:
     ValueError: In case of delete failures.
   """
-  futures = []
-  total_entity_count = 0
   task_id = 1
-
-  query = _CreateClient(dataset_id, credentials).query(kind=kind)
-  query.keys_only()
+  start_cursor = None
+  pool = pool_lib.ThreadPool(processes=_CLEANUP_THREAD_POOL_WORKERS)
 
   # We use a cursor to fetch entities in larger read batches and submit delete
   # tasks to delete them in smaller delete batches (500 at a time) due to
   # datastore single operation restriction.
-  deletion_task = _DeletionTask(kind, task_id)
-  total_entity_count = deletion_task.ReadEntities(query, None,
-                                                  total_entity_count)
-  futures.append(
-      executor.submit(
-          deletion_task.DeleteEntities(_CreateClient(dataset_id, credentials))))
+  entity_read_count = 0
+  total_entity_count = 0
+  delete_keys = []
+  while True:
+    logging.debug('Starting new query for %s', kind)
+    query = _CreateClient(dataset_id, credentials).query(kind=kind)
+    query.keys_only()
+    query_iter = query.fetch(
+        start_cursor=start_cursor, limit=_CLEANUP_KIND_READ_BATCH_SIZE)
 
-  while deletion_task.query_iter.next_page_token is not None:
-    task_id += 1
-    deletion_task = _DeletionTask(kind, task_id)
-    total_entity_count = deletion_task.ReadEntities(
-        query, deletion_task.query_iter.next_page_token, total_entity_count)
-    futures.append(
-        executor.submit(
-            deletion_task.DeleteEntities(
-                _CreateClient(dataset_id, credentials))))
-    if task_id % 10 == 0:
-      # Sleep for 10 secs before fetching next batch.
-      time.sleep(10)
+    for current_entities in query_iter.pages:
+      delete_keys.extend([entity.key for entity in current_entities])
+      entity_read_count = len(delete_keys)
+      logging.debug('next batch of entities for %s - total = %d', kind,
+                    entity_read_count)
+      if entity_read_count >= _CLEANUP_KIND_DELETE_BATCH_SIZE:
+        total_entity_count += entity_read_count
+        logging.info('Creating tasks...Read %d in total', total_entity_count)
+        while delete_keys:
+          delete_chunk = delete_keys[:
+                                     _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE]
+          delete_keys = delete_keys[_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE:]
+          logging.debug(
+              'Creating new Task %d - Read %d entities for %s kind , Read %d in total.',
+              task_id, entity_read_count, kind, total_entity_count)
+          deletion_task = _DeletionTask(kind, task_id)
+          deletion_client = _CreateClient(dataset_id, credentials)
+          pool.apply_async(deletion_task.DeleteEntities, (
+              deletion_client,
+              delete_chunk,
+          ))
+          task_id += 1
 
-  concurrent.futures.wait(
-      futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+        # Reset delete batch,
+        entity_read_count = 0
+        delete_keys = []
+
+    # Read this after the pages are retrieved otherwise it will be set to None.
+    start_cursor = query_iter.next_page_token
+    time.sleep(10)
+    if start_cursor is None:
+      logging.info('Read all existing records for %s', kind)
+      if delete_keys:
+        logging.info('Entities batch is not empty %d, submitting new tasks',
+                     len(delete_keys))
+        while delete_keys:
+          delete_chunk = delete_keys[:
+                                     _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE]
+          delete_keys = delete_keys[_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE:]
+          logging.debug(
+              'Creating new Task %d - Read %d entities for %s kind , Read %d in total.',
+              task_id, entity_read_count, kind, total_entity_count)
+          deletion_task = _DeletionTask(kind, task_id)
+          deletion_client = _CreateClient(dataset_id, credentials)
+          pool.apply_async(deletion_task.DeleteEntities, (
+              deletion_client,
+              delete_chunk,
+          ))
+          task_id += 1
+      break
+
+  logging.info('Waiting for all tasks - %d to complete...', task_id)
+  time.sleep(60)
+  pool.close()
+  pool.join()
+
+  # Rerun the query and delete any leftovers to make sure that all records
+  # are deleted as intended.
+  client = _CreateClient(dataset_id, credentials)
+  query = client.query(kind=kind)
+  query.keys_only()
+  entities = list(query.fetch(limit=_CLEANUP_KIND_DELETE_BATCH_SIZE))
+  if entities:
+    logging.info('Deleting leftover %d entities for %s', len(entities), kind)
+    total_entity_count += len(entities)
+    client.delete_multi(entity.key for entity in entities)
+
   logging.info('Deleted all data for %s - %s - %d', dataset_id, kind,
                total_entity_count)
 
