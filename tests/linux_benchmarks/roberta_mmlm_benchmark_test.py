@@ -33,13 +33,15 @@ class RobertaMmlmBenchmarkTestCase(unittest.TestCase,
 
   @mock.patch('time.time', mock.MagicMock(return_value=1550279509.59))
   def testTrainResults(self):
-    samples = roberta_mmlm_benchmark.MakeSamplesFromOutput({}, self.contents)
-    self.assertEqual(218, len(samples))
+    samples = roberta_mmlm_benchmark.MakeSamplesFromOutput(
+        {'num_accelerators': 16}, self.contents)
+    self.assertEqual(436, len(samples))
     golden = Sample(
         metric='wps',
         value=26259.0,
         unit='wps',
         metadata={
+            'num_accelerators': 16,
             'epoch': '001',
             'step': '10',
             'steps per epoch': '2183',
@@ -57,9 +59,11 @@ class RobertaMmlmBenchmarkTestCase(unittest.TestCase,
             'oom': '0.000',
             'loss_scale': '128.000',
             'wall': '28',
-            'train_wall': '27'
+            'train_wall': '27',
         },
         timestamp=1550279509.59)
+    print(samples[0])
+    print(golden)
     self.assertEqual(golden, samples[0])
 
 

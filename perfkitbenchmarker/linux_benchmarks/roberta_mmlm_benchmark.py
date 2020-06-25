@@ -81,7 +81,7 @@ flags.DEFINE_integer('robertammlm_update_freq', None, 'update frequence')
 flags.DEFINE_integer('robertammlm_num_copies', None,
                      'num of training data copies.')
 flags.DEFINE_integer('robertammlm_global_batch_size', 8192, 'global batch size')
-flags.DEFINE_integer('robertammlm_max_epoch', 3, 'max number of epoch')
+flags.DEFINE_integer('robertammlm_max_epoch', 1, 'max number of epoch')
 flags.DEFINE_enum('robertammlm_profiler', None, [NVPROF, TFPROF],
                   'profiler used to analysis GPU training')
 
@@ -116,6 +116,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.num_vms = num_vms
   benchmark_spec.global_batch_size = FLAGS.robertammlm_global_batch_size
   num_accelerators = nvidia_driver.QueryNumberOfGpus(vm) * num_vms
+  benchmark_spec.num_accelerators = num_accelerators
   if FLAGS.robertammlm_update_freq:
     benchmark_spec.update_freq = FLAGS.robertammlm_update_freq
   else:
@@ -239,6 +240,7 @@ def _CreateMetadataDict(benchmark_spec):
       'global-batch-size': benchmark_spec.global_batch_size,
       'profiler': benchmark_spec.profiler,
       'max-epoch': benchmark_spec.max_epoch,
+      'num_accelerators': benchmark_spec.num_accelerators,
   }
 
 
@@ -275,8 +277,11 @@ def MakeSamplesFromOutput(metadata, output):
   for row in results:
     metadata_copy = metadata.copy()
     metadata_copy.update(zip(METADATA_COLUMNS, row))
-    samples.append(sample.Sample('wps', float(metadata_copy['wps']), 'wps',
-                                 metadata_copy))
+    wps = float(metadata_copy['wps'])
+    samples.append(sample.Sample('wps', wps, 'wps', metadata_copy))
+    samples.append(sample.Sample('wps per accelerator',
+                                 wps / metadata['num_accelerators'],
+                                 'wps', metadata_copy))
   return samples
 
 
