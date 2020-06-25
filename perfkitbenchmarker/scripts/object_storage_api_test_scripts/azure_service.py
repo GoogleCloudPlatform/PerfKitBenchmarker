@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,29 +15,31 @@
 
 """An interface to the Azure Blob Storage API."""
 
+from __future__ import absolute_import
+
 import logging
 import time
 
 from absl import flags
-
 import azure.storage.blob
-
-import object_storage_interface
+# This is the path that we SCP object_storage_interface to.
+from providers import object_storage_interface
 
 FLAGS = flags.FLAGS
 
 
 class AzureService(object_storage_interface.ObjectStorageServiceBase):
+  """An interface to Azure Blob Storage, using the python library."""
 
   def __init__(self):
     if FLAGS.azure_key is None or FLAGS.azure_account is None:
       raise ValueError('Must specify azure account and key.')
-    self.blobService = azure.storage.blob.BlobService(FLAGS.azure_account,
-                                                      FLAGS.azure_key)
+    self.blob_service = azure.storage.blob.BlobService(FLAGS.azure_account,
+                                                       FLAGS.azure_key)
 
   def ListObjects(self, bucket, prefix):
     return [obj.name
-            for obj in self.blobService.list_blobs(bucket, prefix=prefix)]
+            for obj in self.blob_service.list_blobs(bucket, prefix=prefix)]
 
   def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
     start_times = []
@@ -44,7 +47,7 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
     for object_name in objects_to_delete:
       try:
         start_time = time.time()
-        self.blobService.delete_blob(bucket, object_name)
+        self.blob_service.delete_blob(bucket, object_name)
         latency = time.time() - start_time
         start_times.append(start_time)
         latencies.append(latency)
@@ -64,13 +67,13 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
     stream.seek(0)
     start_time = time.time()
-    self.blobService.put_block_blob_from_file(
+    self.blob_service.put_block_blob_from_file(
         bucket, object, stream, count=size)
     latency = time.time() - start_time
     return start_time, latency
 
   def ReadObject(self, bucket, object):
     start_time = time.time()
-    self.blobService.get_blob_to_bytes(bucket, object)
+    self.blob_service.get_blob_to_bytes(bucket, object)
     latency = time.time() - start_time
     return start_time, latency

@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +15,15 @@
 
 """An interface to S3, using the boto library."""
 
+from __future__ import absolute_import
+
 import logging
 import time
 
 from absl import flags
 import boto3
-import object_storage_interface
+# This is the path that we SCP object_storage_interface to.
+from providers import object_storage_interface
 import six
 
 FLAGS = flags.FLAGS

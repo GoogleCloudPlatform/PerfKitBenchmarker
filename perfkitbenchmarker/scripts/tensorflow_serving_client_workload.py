@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 """Tensorflow Serving client workload.
 
 Performs image classification requests against a Tensorflow Model Server.

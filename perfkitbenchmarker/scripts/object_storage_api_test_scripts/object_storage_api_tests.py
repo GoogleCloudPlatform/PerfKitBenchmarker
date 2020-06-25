@@ -374,7 +374,7 @@ def GenerateWritePayload(size):
   # with each item being the default object size of 30 bytes or so, it will lead
   # to out of memory error.
   for i in range(size):
-    payload_bytes[i] = ord(random.choice(string.letters))
+    payload_bytes[i] = ord(random.choice(string.ascii_letters))
 
   return payload_bytes
 
