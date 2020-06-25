@@ -15,6 +15,8 @@
 -   Integrate edw_benchmark with new Client Interface and results aggregation
     framework.
 -   Update default stress-ng version from 5.23 to 9.25 (default on Ubuntu 1804).
+-   Added two new workloads(workloadw and workloadw_uniform) for testing mostly
+    write use cases(read/write 5/95)
 
 ### Bug fixes and maintenance updates:
 

@@ -1,0 +1,20 @@
+# PKB custom mostly write workload
+#
+#   Read/update ratio: 5/95
+#   Default data size: 1 KB records (10 fields, 100 bytes each, plus key),
+#     total payloads are 1GB (1kb * 1000000) in size.
+#   Request distribution: zipfian
+
+workload=site.ycsb.workloads.CoreWorkload
+
+readallfields=true
+operationcount=1000000
+recordcount = 1000000
+
+readproportion=0.05
+updateproportion=0.95
+scanproportion=0
+insertproportion=0
+
+requestdistribution=zipfian
+
