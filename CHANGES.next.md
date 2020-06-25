@@ -1,5 +1,8 @@
 ### Breaking changes:
 
+-   Rename ycsb workloadd to workloadx to show that it is a custom PKB
+    write-only workload.
+
 ### New features:
 
 -   Add FairSeq Roberta Masked Multilingual LM benchmark for linux.
