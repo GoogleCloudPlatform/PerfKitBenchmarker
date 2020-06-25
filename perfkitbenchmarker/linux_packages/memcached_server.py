@@ -107,7 +107,7 @@ def ConfigureAndStart(vm):
           size=FLAGS.memcached_size_mb))
   # update default port
   vm.RemoteCommand(
-      'sudo sed -i "s/-p .*/-m {port}/g" /etc/memcached.conf'.format(
+      'sudo sed -i "s/-p .*/-p {port}/g" /etc/memcached.conf'.format(
           port=MEMCACHED_PORT))
 
   vm.RemoteCommand(

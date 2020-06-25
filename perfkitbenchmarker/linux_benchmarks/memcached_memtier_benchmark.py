@@ -123,7 +123,8 @@ def Run(benchmark_spec):
   server = benchmark_spec.vm_groups['server'][0]
   server_ip = server.internal_ip
   metadata = {'memcached_version': memcached_server.GetVersion(server),
-              'memcached_server_size': FLAGS.memcached_size_mb}
+              'memcached_server_size': FLAGS.memcached_size_mb,
+              'memcached_server_threads': FLAGS.memcached_num_threads}
 
   logging.info('Start benchmarking memcached using memtier.')
   samples = memtier.Run(client, server_ip, memcached_server.MEMCACHED_PORT)
