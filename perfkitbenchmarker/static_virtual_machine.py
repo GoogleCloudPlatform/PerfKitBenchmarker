@@ -315,3 +315,8 @@ class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
 class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.CentOs7Mixin):
   pass
+
+
+class Debian9BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.Debian9Mixin):
+  pass
