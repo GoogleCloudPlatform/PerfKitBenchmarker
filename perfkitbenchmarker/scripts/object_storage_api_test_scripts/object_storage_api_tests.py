@@ -35,6 +35,7 @@ import string
 import sys
 from threading import Thread
 import time
+import uuid
 from absl import flags
 import six
 from six.moves import range
@@ -113,16 +114,19 @@ flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
                     'providers, storage class is determined by the bucket, '
                     'which is passed in by the --bucket parameter.')
 
-flags.DEFINE_enum('object_naming_scheme', 'sequential_by_stream',
-                  ['sequential_by_stream',
-                   'approximately_sequential'],
-                  'How objects will be named. Only applies to the '
-                  'MultiStreamWrite benchmark. '
-                  'sequential_by_stream: object names from each stream '
-                  'will be sequential, but different streams will have '
-                  'different name prefixes. '
-                  'approximately_sequential: object names from all '
-                  'streams will roughly increase together.')
+flags.DEFINE_enum(
+    'object_naming_scheme', 'sequential_by_stream', [
+        'prefix_by_vm_and_stream', 'sequential_by_stream',
+        'approximately_sequential'
+    ], 'How objects will be named. Only applies to the '
+    'MultiStreamWrite benchmark. '
+    'prefix_by_vm_and_stream: object names from each stream will create a '
+    'directory prefix as vm_id/worker_id/ attached to each object name.'
+    'sequential_by_stream: object names from each stream '
+    'will be sequential, but different streams will have '
+    'different name prefixes. '
+    'approximately_sequential: object names from all '
+    'streams will roughly increase together.')
 
 flags.DEFINE_boolean(
     'bulk_delete', False,
@@ -130,6 +134,8 @@ flags.DEFINE_boolean(
     'average latency per object. Otherwise, deletes one object per request '
     'and records individual delete latency'
 )
+
+flags.DEFINE_integer('vm_id', 0, 'ID of VM.')
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -879,7 +885,13 @@ def WriteWorker(service, payload,
   latencies = []
   sizes = []
 
-  if naming_scheme == 'sequential_by_stream':
+  if naming_scheme == 'prefix_by_vm_and_stream':
+    # Unique prefix helps with backend sharding
+    uuid_prefix = str(uuid.uuid4())[-8:]
+    name_iterator = PrefixCounterIterator(
+        '%s_vm_%s_worker_%s/pkb_write_worker_%s' %
+        (uuid_prefix, FLAGS.vm_id, worker_num, worker_num))
+  elif naming_scheme == 'sequential_by_stream':
     name_iterator = PrefixCounterIterator(
         'pkb_write_worker_%f_%s' % (time.time(), worker_num))
   elif naming_scheme == 'approximately_sequential':

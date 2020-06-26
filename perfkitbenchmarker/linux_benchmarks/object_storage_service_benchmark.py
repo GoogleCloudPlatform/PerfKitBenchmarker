@@ -903,8 +903,10 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
 
   def RunOneProcess(vm_idx):
     logging.info('Running on VM %s.', vm_idx)
-    cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % (vm_idx * streams_per_vm)])
+    cmd = command_builder.BuildCommand(cmd_args + [
+        '--stream_num_start=%s' % (vm_idx * streams_per_vm),
+        '--vm_id=%s' % vm_idx
+    ])
     out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=False)
     output[vm_idx] = out
 

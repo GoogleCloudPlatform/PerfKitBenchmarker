@@ -61,7 +61,8 @@ class TestBuildCommands(pkb_common_test_case.PkbCommonTestCase):
                    '--object_sizes="{1000: 100.0}"',
                    '--object_naming_scheme=sequential_by_stream',
                    '--scenario=MultiStreamWrite',
-                   '--stream_num_start=0']))
+                   '--stream_num_start=0',
+                   '--vm_id=0']))
 
     self.assertEqual(
         command_builder.BuildCommand.call_args_list[1],
@@ -71,7 +72,8 @@ class TestBuildCommands(pkb_common_test_case.PkbCommonTestCase):
                    '--start_time=16.1',
                    '--objects_written_file=/tmp/pkb/pkb-objects-written',
                    '--scenario=MultiStreamRead',
-                   '--stream_num_start=0']))
+                   '--stream_num_start=0',
+                   '--vm_id=0']))
 
 
 class TestDistributionToBackendFormat(pkb_common_test_case.PkbCommonTestCase):
