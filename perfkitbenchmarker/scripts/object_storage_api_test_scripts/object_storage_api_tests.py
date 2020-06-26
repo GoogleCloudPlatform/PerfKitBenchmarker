@@ -136,6 +136,8 @@ flags.DEFINE_boolean(
 )
 
 flags.DEFINE_integer('vm_id', 0, 'ID of VM.')
+flags.DEFINE_float('delete_delay', 0,
+                   'Time to delay inbetween delete API call.')
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -977,13 +979,15 @@ def DeleteWorker(service, object_records, result_queue, worker_num):
     sizes.append(size)
 
   if FLAGS.bulk_delete:
-    start_time, latency = service.BulkDeleteObjects(FLAGS.bucket, object_names)
+    start_time, latency = service.BulkDeleteObjects(FLAGS.bucket, object_names,
+                                                    FLAGS.delete_delay)
     start_times = [start_time]
     latencies = [latency]
     object_size_sum = sum(sizes)
     sizes = [object_size_sum]
   else:
-    start_times, latencies = service.DeleteObjects(FLAGS.bucket, object_names)
+    start_times, latencies = service.DeleteObjects(
+        FLAGS.bucket, object_names, delay_time=FLAGS.delete_delay)
 
   result_queue.put({
       'start_times': start_times,

@@ -57,11 +57,16 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
     bucket_uri = self._StorageURI(bucket)
     return [obj.name for obj in bucket_uri.list_bucket(prefix=prefix)]
 
-  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+  def DeleteObjects(self,
+                    bucket,
+                    objects_to_delete,
+                    objects_deleted=None,
+                    delay_time=0):
     start_times = []
     latencies = []
     for object_name in objects_to_delete:
       try:
+        time.sleep(delay_time)
         start_time = time.time()
         object_uri = self._StorageURI(bucket, object_name)
         object_uri.delete_key()
@@ -75,9 +80,10 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
                           object_name)
     return start_times, latencies
 
-  def BulkDeleteObjects(self, bucket, objects_to_delete):
+  def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
     # GCS Boto currently does not support Bulk delete
-    start_times, latencies = self.DeleteObjects(bucket, objects_to_delete)
+    start_times, latencies = self.DeleteObjects(
+        bucket, objects_to_delete, delay_time=delay_time)
     return min(start_times), sum(latencies)
 
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):

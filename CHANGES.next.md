@@ -6,4 +6,6 @@
 
 ### Enhancements:
 
+-   Added delay_time support for delete operations in object storage service.
+
 ### Bug fixes and maintenance updates:

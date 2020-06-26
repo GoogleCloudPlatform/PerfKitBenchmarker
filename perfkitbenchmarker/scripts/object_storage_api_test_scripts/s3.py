@@ -38,11 +38,16 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
   def ListObjects(self, bucket, prefix):
     return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix)
 
-  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
+  def DeleteObjects(self,
+                    bucket,
+                    objects_to_delete,
+                    objects_deleted=None,
+                    delay_time=0):
     start_times = []
     latencies = []
     for object_name in objects_to_delete:
       try:
+        time.sleep(delay_time)
         start_time = time.time()
         self.client.delete_object(Bucket=bucket, Key=object_name)
         latency = time.time() - start_time
@@ -55,11 +60,12 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
                           object_name, e)
     return start_times, latencies
 
-  def BulkDeleteObjects(self, bucket, objects_to_delete):
+  def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
     objects_to_delete_dict = {}
     objects_to_delete_dict['Objects'] = []
     for object_name in objects_to_delete:
       objects_to_delete_dict['Objects'].append({'Key': object_name})
+    time.sleep(delay_time)
     start_time = time.time()
     self.client.delete_objects(Bucket=bucket, Delete=objects_to_delete_dict)
     latency = time.time() - start_time

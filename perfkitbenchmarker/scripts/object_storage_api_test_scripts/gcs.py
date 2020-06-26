@@ -38,11 +38,16 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
     bucket = storage.bucket.Bucket(self.client, bucket_name)
     return [obj.name for obj in self.client.list_blobs(bucket, prefix=prefix)]
 
-  def DeleteObjects(self, bucket_name, objects_to_delete, objects_deleted=None):
+  def DeleteObjects(self,
+                    bucket_name,
+                    objects_to_delete,
+                    objects_deleted=None,
+                    delay_time=0):
     start_times = []
     latencies = []
     bucket = storage.bucket.Bucket(self.client, bucket_name)
     for object_name in objects_to_delete:
+      time.sleep(delay_time)
       start_time = time.time()
       obj = storage.blob.Blob(object_name, bucket)
       latency = time.time() - start_time
@@ -57,8 +62,9 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
                           object_name, e)
     return start_times, latencies
 
-  def BulkDeleteObjects(self, bucket_name, objects_to_delete):
+  def BulkDeleteObjects(self, bucket_name, objects_to_delete, delay_time):
     bucket = storage.bucket.Bucket(self.client, bucket_name)
+    time.sleep(delay_time)
     start_time = time.time()
     bucket.delete_blobs(objects_to_delete)
     latency = time.time() - start_time

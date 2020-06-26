@@ -284,6 +284,8 @@ MULTISTREAM_DELAY_PER_VM = 5.0 * units.second
 MULTISTREAM_DELAY_PER_STREAM = 0.1 * units.second
 # And add a constant factor for PKB-side processing
 MULTISTREAM_DELAY_CONSTANT = 10.0 * units.second
+# Max number of delete operations per second
+MULTISTREAM_DELETE_OPS_PER_SEC = 3500
 
 # The multistream write benchmark writes a file in the VM's /tmp with
 # the objects it has written, which is used by the multistream read
@@ -387,6 +389,21 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
       MULTISTREAM_DELAY_CONSTANT +
       MULTISTREAM_DELAY_PER_VM * num_vms +
       MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
+
+
+def MultiThreadDeleteDelay(num_vms, threads_per_vm):
+  """Calculates delay time between delete operation.
+
+  Args:
+    num_vms: number of VMs to start threads on.
+    threads_per_vm: number of threads to start on each VM.
+
+  Returns:
+    float. Delay time in seconds based on number of vms and threads and the
+      maximum number of delete operations per second.
+  """
+
+  return (num_vms * threads_per_vm) / (MULTISTREAM_DELETE_OPS_PER_SEC)
 
 
 def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
@@ -993,12 +1010,16 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                FLAGS.object_storage_object_sizes, size_distribution)
 
   streams_per_vm = FLAGS.object_storage_streams_per_vm
+  num_vms = FLAGS.num_vms
 
   start_time = (
       time.time() +
-      MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
+      MultiThreadStartDelay(num_vms, streams_per_vm).m_as('second'))
+
+  delete_delay = MultiThreadDeleteDelay(num_vms, streams_per_vm)
 
   logging.info('Start time is %s', start_time)
+  logging.info('Delete delay is %s', delete_delay)
 
   cmd_args = [
       '--bucket=%s' % bucket_name,
@@ -1016,9 +1037,15 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   elif operation == MultistreamOperationType.download:
     cmd_args += ['--scenario=MultiStreamRead']
   elif operation == MultistreamOperationType.delete:
-    cmd_args += ['--scenario=MultiStreamDelete']
+    cmd_args += [
+        '--scenario=MultiStreamDelete',
+        '--delete_delay=%s' % delete_delay
+    ]
   elif operation == MultistreamOperationType.bulk_delete:
-    cmd_args += ['--scenario=MultiStreamDelete', '--bulk_delete=true']
+    cmd_args += [
+        '--scenario=MultiStreamDelete', '--bulk_delete=true',
+        '--delete_delay=%s' % delete_delay
+    ]
   else:
     raise Exception('Value of operation must be \'upload\' or \'download\'.'
                     'Value is: \'' + operation.name + '\'')
@@ -1192,13 +1219,7 @@ def MultiStreamDelete(results, metadata, vms, command_builder, service,
   """
   logging.info('Starting multi-stream delete test on %s VMs.', len(vms))
 
-  # Perform bulk delete operation if specified by flag or if individual object
-  # request sample is not wanted.
-  bulk_delete = (
-      FLAGS.object_storage_bulk_delete or
-      not FLAGS.record_individual_latency_samples)
-
-  if bulk_delete:
+  if FLAGS.object_storage_bulk_delete:
     _MultiStreamOneWay(results, metadata, vms, command_builder, service,
                        bucket_name, MultistreamOperationType.bulk_delete)
   else:
