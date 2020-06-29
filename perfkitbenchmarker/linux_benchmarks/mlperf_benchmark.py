@@ -15,6 +15,7 @@
 
 import json
 import posixpath
+import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -403,6 +404,19 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
     samples.append(
         sample.Sample('Eval Accuracy',
                       float(value) * 100, '%', metadata_copy))
+
+  if 'resnet' in model:
+    results = re.findall(r'Speed: (\S+) samples/sec', output)
+    results.extend(re.findall(r'(\S+) examples/sec', output))
+  elif 'transformer' in model:
+    results = re.findall(r'wps=(\S+),', output)
+  elif 'gnmt' in model:
+    results = re.findall(r'Tok/s (\S+)', output)
+  elif 'ssd' in model:
+    results = re.findall(r'avg. samples / sec: (\S+)', output)
+  for speed in results:
+    samples.append(sample.Sample('speed', float(speed), 'samples/sec',
+                                 metadata))
 
   if not use_tpu:
     if 'minigo' in model:
