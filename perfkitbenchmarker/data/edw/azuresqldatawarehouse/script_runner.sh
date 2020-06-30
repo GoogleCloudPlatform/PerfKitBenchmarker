@@ -27,18 +27,19 @@ export SQL_SERVER=$1
 export SQL_DB=$2
 export SQL_USER=$3
 export SQL_PASSWORD=$4
+export QUERY_TIMEOUT=$5
 
 # Script to execute on the cluster
-export SQL_SCRIPT=$5
+export SQL_SCRIPT=$6
 
 # Output and Error Log files
-export SCRIPT_OUTPUT=$6
-export SCRIPT_ERROR=$7
+export SCRIPT_OUTPUT=$7
+export SCRIPT_ERROR=$8
 
 
 pids=""
 
-/opt/mssql-tools/bin/sqlcmd -S ${SQL_SERVER}.database.windows.net -d $SQL_DB -U $SQL_USER -P $SQL_PASSWORD -I -b -i $SQL_SCRIPT 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
+/opt/mssql-tools/bin/sqlcmd -S ${SQL_SERVER}.database.windows.net -d $SQL_DB -U $SQL_USER -P $SQL_PASSWORD -t $QUERY_TIMEOUT -I -b -i $SQL_SCRIPT 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
 
 pid=$!
 

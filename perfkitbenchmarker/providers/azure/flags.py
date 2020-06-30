@@ -91,3 +91,4 @@ flags.DEFINE_boolean('bootstrap_azure_service_principal', True,
                      'allows creation of new service principals.')
 flags.DEFINE_enum('sqldatawarehouse_client_interface', 'CLI', ['CLI'],
                   'The Runtime Interface used when interacting with Synapse.')
+flags.DEFINE_string('query_timeout', '600', 'Query timeout in seconds.')

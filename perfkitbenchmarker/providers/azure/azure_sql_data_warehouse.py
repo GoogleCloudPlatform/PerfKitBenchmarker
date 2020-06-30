@@ -137,9 +137,9 @@ class CliClientInterface(edw_service.EdwClientInterface):
     """
     query_command = (
         'python script_driver.py --script={} --server={} --database={} '
-        '--user={} --password={}').format(query_name, self.server_name,
-                                          self.database, self.user,
-                                          self.password)
+        '--user={} --password={} --query_timeout={}').format(
+            query_name, self.server_name, self.database, self.user,
+            self.password, FLAGS.query_timeout)
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -230,7 +230,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
            self.resource_group,
            '--server',
            self.server_name]
-    stdout, stderr, _ = vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=420)
 
   def _IsDeleting(self):
     """Method to check if the cluster is pausing."""
