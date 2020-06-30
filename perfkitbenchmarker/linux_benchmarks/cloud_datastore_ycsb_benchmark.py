@@ -51,10 +51,10 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-_CLEANUP_THREAD_POOL_WORKERS = 20
-_CLEANUP_KIND_READ_BATCH_SIZE = 10000
-_CLEANUP_KIND_DELETE_BATCH_SIZE = 100000
-_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE = 20000
+_CLEANUP_THREAD_POOL_WORKERS = 30
+_CLEANUP_KIND_READ_BATCH_SIZE = 12000
+_CLEANUP_KIND_DELETE_BATCH_SIZE = 6000
+_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE = 3000
 _CLEANUP_KIND_DELETE_OP_BATCH_SIZE = 500
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
@@ -95,11 +95,12 @@ class _DeletionTask(object):
     self.entity_deletion_count = 0
     self.deletion_error = False
 
-  def DeleteEntities(self, delete_client, delete_entities):
+  def DeleteEntities(self, dataset_id, credentials, delete_entities):
     """Deletes entities in a datastore database in batches.
 
     Args:
-      delete_client: Cloud Datastore client to delete entities.
+      dataset_id: Cloud Datastore client dataset id.
+      credentials: Cloud Datastore client credentials.
       delete_entities: Entities to delete.
 
     Returns:
@@ -108,11 +109,12 @@ class _DeletionTask(object):
       ValueError: In case of delete failures.
     """
     try:
+      client = datastore.Client(project=dataset_id, credentials=credentials)
       logging.info('Task %d - Started deletion for %s', self.task_id, self.kind)
       while delete_entities:
         chunk = delete_entities[:_CLEANUP_KIND_DELETE_OP_BATCH_SIZE]
         delete_entities = delete_entities[_CLEANUP_KIND_DELETE_OP_BATCH_SIZE:]
-        delete_client.delete_multi(chunk)
+        client.delete_multi(chunk)
         self.entity_deletion_count += len(chunk)
 
       logging.info('Task %d - Completed deletion for %s - %d', self.task_id,
@@ -277,7 +279,6 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
   total_entity_count = 0
   delete_keys = []
   while True:
-    logging.debug('Starting new query for %s', kind)
     query = _CreateClient(dataset_id, credentials).query(kind=kind)
     query.keys_only()
     query_iter = query.fetch(
@@ -286,8 +287,8 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
     for current_entities in query_iter.pages:
       delete_keys.extend([entity.key for entity in current_entities])
       entity_read_count = len(delete_keys)
-      logging.debug('next batch of entities for %s - total = %d', kind,
-                    entity_read_count)
+      # logging.debug('next batch of entities for %s - total = %d', kind,
+      #              entity_read_count)
       if entity_read_count >= _CLEANUP_KIND_DELETE_BATCH_SIZE:
         total_entity_count += entity_read_count
         logging.info('Creating tasks...Read %d in total', total_entity_count)
@@ -295,13 +296,14 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
           delete_chunk = delete_keys[:
                                      _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE]
           delete_keys = delete_keys[_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE:]
-          logging.debug(
-              'Creating new Task %d - Read %d entities for %s kind , Read %d in total.',
-              task_id, entity_read_count, kind, total_entity_count)
+          # logging.debug(
+          #    'Creating new Task %d - Read %d entities for %s kind , Read %d '
+          #    + 'in total.',
+          #    task_id, entity_read_count, kind, total_entity_count)
           deletion_task = _DeletionTask(kind, task_id)
-          deletion_client = _CreateClient(dataset_id, credentials)
           pool.apply_async(deletion_task.DeleteEntities, (
-              deletion_client,
+              dataset_id,
+              credentials,
               delete_chunk,
           ))
           task_id += 1
@@ -312,7 +314,6 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
 
     # Read this after the pages are retrieved otherwise it will be set to None.
     start_cursor = query_iter.next_page_token
-    time.sleep(10)
     if start_cursor is None:
       logging.info('Read all existing records for %s', kind)
       if delete_keys:
@@ -326,9 +327,9 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
               'Creating new Task %d - Read %d entities for %s kind , Read %d in total.',
               task_id, entity_read_count, kind, total_entity_count)
           deletion_task = _DeletionTask(kind, task_id)
-          deletion_client = _CreateClient(dataset_id, credentials)
           pool.apply_async(deletion_task.DeleteEntities, (
-              deletion_client,
+              dataset_id,
+              credentials,
               delete_chunk,
           ))
           task_id += 1
