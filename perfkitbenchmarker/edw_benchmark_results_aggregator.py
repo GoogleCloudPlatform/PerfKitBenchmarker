@@ -296,6 +296,19 @@ class EdwBenchmarkPerformance(object):
         (lambda x, y: x and y),
         [x.is_successful() for x in self.suite_performances.values()])
 
+  def get_consistently_failing_queries(self) -> List[str]:
+    """Returns a list of any queries that failed on every attempt."""
+    if self.total_iterations == 1:
+      # If a query is only attempted once, a failure can't be called consistent
+      # with certainty, as it may be a passing issue.
+      return []
+    failing_queries = []
+    for query in self.expected_suite_queries:
+      if all(not suite_performance.is_query_successful(query)
+             for suite_performance in self.suite_performances.values()):
+        failing_queries.append(query)
+    return failing_queries
+
   def aggregated_query_status(self, query_name: Text) -> bool:
     """Get the status of query aggregated across all iterations.
 
