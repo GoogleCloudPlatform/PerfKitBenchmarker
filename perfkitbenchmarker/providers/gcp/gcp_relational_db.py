@@ -67,6 +67,7 @@ CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 IS_READY_TIMEOUT = 600  # 10 minutes
+DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
 CREATION_TIMEOUT = 1200  # 20 minutes
 
 
@@ -294,11 +295,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                                self.replica_instance_id, '--quiet')
-      cmd.Issue(raise_on_failure=False)
+      cmd.Issue(raise_on_failure=False, timeout=DELETE_INSTANCE_TIMEOUT)
 
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                              self.instance_id, '--quiet', '--async')
-    cmd.Issue(raise_on_failure=False)
+    cmd.Issue(raise_on_failure=False, timeout=DELETE_INSTANCE_TIMEOUT)
 
   def _Exists(self):
     """Returns true if the underlying resource exists.
