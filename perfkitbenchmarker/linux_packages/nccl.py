@@ -20,7 +20,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
-flags.DEFINE_string('nccl_version', '2.5.7-1',
+flags.DEFINE_string('nccl_version', '2.7.6-1',
                     'NCCL version to install. '
                     'Input "None" to bypass installation.')
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
@@ -62,8 +62,7 @@ def AptInstall(vm):
                          build='./nccl/build/pkg/deb/',
                          nccl=FLAGS.nccl_version,
                          cuda=FLAGS.cuda_toolkit_version))
-  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
-  vm.RemoteCommand('sudo ldconfig')  # Refresh LD cache
+
   if FLAGS.nccl_net_plugin:
     vm.Install('google_cloud_sdk')
     vm.RemoteCommand('sudo {gsutil_path} cp {nccl_net_plugin_path} '
@@ -72,3 +71,6 @@ def AptInstall(vm):
                          nccl_net_plugin_path=FLAGS.nccl_net_plugin))
   else:
     vm.RemoteCommand('sudo rm -rf /usr/lib/x86_64-linux-gnu/libnccl-net.so')
+
+  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
+  vm.RemoteCommand('sudo ldconfig')  # Refresh LD cache
