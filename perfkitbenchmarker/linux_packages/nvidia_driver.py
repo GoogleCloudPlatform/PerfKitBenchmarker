@@ -29,6 +29,7 @@ NVIDIA_TESLA_P4 = 'p4'
 NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
+NVIDIA_TESLA_A100 = 'a100'
 
 """Default GPU clocks and autoboost configurations.
 
@@ -60,6 +61,11 @@ GPU_DEFAULTS = {
     NVIDIA_TESLA_T4: {
         'base_clock': [5001, 585],
         'max_clock': [5001, 1590],
+        'autoboost_enabled': None,
+    },
+    NVIDIA_TESLA_A100: {
+        'base_clock': [1215, 1410],
+        'max_clock': [1215, 1410],
         'autoboost_enabled': None,
     },
 }
@@ -190,7 +196,15 @@ def GetGpuType(vm):
   """
   stdout, _ = vm.RemoteCommand('nvidia-smi -L', should_log=True)
   try:
-    gpu_types = [line.split(' ')[3] for line in stdout.splitlines() if line]
+    gpu_types = []
+    for line in stdout.splitlines():
+      if not line:
+        continue
+      splitted = line.split(' ')
+      if splitted[2] == 'Tesla':
+        gpu_types.append(splitted[3])
+      else:
+        gpu_types.append(splitted[2])
   except:
     raise NvidiaSmiParseOutputError('Unable to parse gpu type from {}'
                                     .format(stdout))
@@ -208,6 +222,8 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_V100
   if 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
+  if 'A100' in gpu_types[0]:
+    return NVIDIA_TESLA_A100
   raise UnsupportedClockSpeedError(
       'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
