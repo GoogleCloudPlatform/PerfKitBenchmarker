@@ -178,7 +178,7 @@ def _InstallCuda10Point1(vm):
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(CUDA_10_1_TOOLKIT)
-  vm.RemoteCommand('wget %s' % CUDA_PIN)
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN)
   vm.RemoteCommand('sudo mv cuda-ubuntu1604.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
   vm.RemoteCommand('wget -q %s' % CUDA_10_1_TOOLKIT)
@@ -197,7 +197,7 @@ def _InstallCuda10Point2(vm):
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(CUDA_10_2_TOOLKIT)
-  vm.RemoteCommand('wget %s' % CUDA_PIN)
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN)
   vm.RemoteCommand('sudo mv cuda-ubuntu1604.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
   vm.RemoteCommand('wget -q %s' % CUDA_10_2_TOOLKIT)
@@ -216,7 +216,7 @@ def _InstallCuda11Point0(vm):
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(CUDA_11_0_TOOLKIT)
-  vm.RemoteCommand('wget %s' % CUDA_PIN)
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN)
   vm.RemoteCommand('sudo mv cuda-ubuntu1604.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
   vm.RemoteCommand('wget -q %s' % CUDA_11_0_TOOLKIT)
@@ -224,8 +224,8 @@ def _InstallCuda11Point0(vm):
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-ubuntu1604-11-0-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y cuda-toolkit-11-0 cuda-tools-11-0 '
-                   'cuda-libraries-11-0 cuda-libraries-dev-11-0')
+  vm.InstallPackages('cuda-toolkit-11-0 cuda-tools-11-0 '
+                     'cuda-libraries-11-0 cuda-libraries-dev-11-0')
 
 
 def AptInstall(vm):
@@ -256,7 +256,7 @@ def AptInstall(vm):
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
   # This library provides advanced profiling support
-  if (version_to_install == '9.0' or version_to_install == '10.0'):
+  if version_to_install in ('9.0', '10.0'):
     # cupti is part of cuda>=10.1, and installed as cuda-cupti-10-1/2
     vm.RemoteCommand('sudo apt-get install -y libcupti-dev')
 
