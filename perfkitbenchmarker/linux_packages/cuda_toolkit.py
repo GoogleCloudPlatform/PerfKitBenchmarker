@@ -37,7 +37,7 @@ CUDA_HOME = '/usr/local/cuda'
 
 flags.DEFINE_enum(
     'cuda_toolkit_version',
-    '9.0', ['9.0', '10.0', '10.1', '10.2', 'None', ''],
+    '9.0', ['9.0', '10.0', '10.1', '10.2', '11.0', 'None', ''],
     'Version of CUDA Toolkit to install. '
     'Input "None" or empty string to skip installation',
     module_name=__name__)
@@ -45,6 +45,8 @@ flags.DEFINE_enum(
 FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-ubuntu1604.pin'
+
+CUDA_11_0_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.0.1/local_installers/cuda-repo-ubuntu1604-11-0-local_11.0.1-450.36.06-1_amd64.deb'
 
 CUDA_10_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-ubuntu1604-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb'
 
@@ -207,6 +209,25 @@ def _InstallCuda10Point2(vm):
                    'cuda-libraries-10-2 cuda-libraries-dev-10-2')
 
 
+def _InstallCuda11Point0(vm):
+  """Installs CUDA Toolkit 11.0 from NVIDIA.
+
+  Args:
+    vm: VM to install CUDA on
+  """
+  basename = posixpath.basename(CUDA_11_0_TOOLKIT)
+  vm.RemoteCommand('wget %s' % CUDA_PIN)
+  vm.RemoteCommand('sudo mv cuda-ubuntu1604.pin '
+                   '/etc/apt/preferences.d/cuda-repository-pin-600')
+  vm.RemoteCommand('wget -q %s' % CUDA_11_0_TOOLKIT)
+  vm.RemoteCommand('sudo dpkg -i %s' % basename)
+  vm.RemoteCommand('sudo apt-key add '
+                   '/var/cuda-repo-ubuntu1604-11-0-local/7fa2af80.pub')
+  vm.RemoteCommand('sudo apt-get update')
+  vm.RemoteCommand('sudo apt-get install -y cuda-toolkit-11-0 cuda-tools-11-0 '
+                   'cuda-libraries-11-0 cuda-libraries-dev-11-0')
+
+
 def AptInstall(vm):
   """Installs CUDA toolkit on the VM if not already installed."""
   version_to_install = FLAGS.cuda_toolkit_version
@@ -228,13 +249,15 @@ def AptInstall(vm):
     _InstallCuda10Point1(vm)
   elif version_to_install == '10.2':
     _InstallCuda10Point2(vm)
+  elif version_to_install == '11.0':
+    _InstallCuda11Point0(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
   # This library provides advanced profiling support
-  if (version_to_install != '10.1' and version_to_install != '10.2'):
-    # cupti is part of cuda10.1/2, and installed as cuda-cupti-10-1/2
+  if (version_to_install == '9.0' or version_to_install == '10.0'):
+    # cupti is part of cuda>=10.1, and installed as cuda-cupti-10-1/2
     vm.RemoteCommand('sudo apt-get install -y libcupti-dev')
 
 
