@@ -11,3 +11,4 @@
 ### Bug fixes and maintenance updates:
 
 -   Tuned entity cleanup parameters.
+-   Fix wrong unit in MLPerf benchmark.

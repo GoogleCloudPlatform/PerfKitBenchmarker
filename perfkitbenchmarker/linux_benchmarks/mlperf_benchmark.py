@@ -389,21 +389,23 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
     metadata_copy = metadata.copy()
     epoch = regex_util.ExtractExactlyOneMatch(r'"epoch_num": (\d+)', result)
     if ('transformer' in model and (not use_tpu)):
-      value = regex_util.ExtractExactlyOneMatch(r'"value": "(\d+\.\d+)"',
-                                                result)
+      value = float(regex_util.ExtractExactlyOneMatch(r'"value": "(\d+\.\d+)"',
+                                                      result))
     elif 'mask' in model:
       mask_value, mask_metadata = regex_util.ExtractExactlyOneMatch(
           r'^"value": (.*?), "metadata": (.*)$', result)
-      value = json.loads(mask_value)['accuracy']['BBOX']
       metadata_copy.update(json.loads(mask_value)['accuracy'])
       metadata_copy.update(json.loads(mask_metadata))
+      value = float(json.loads(mask_value)['accuracy']['BBOX']) * 100
     else:
-      value = regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)', result)
+      value = float(regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)',
+                                                      result))
+      if 'ssd' in model or 'minigo' in model or 'resnet' in model:
+        value *= 100
     metadata_copy['times'] = wall_time - start
     metadata_copy['epoch'] = int(epoch)
     samples.append(
-        sample.Sample('Eval Accuracy',
-                      float(value) * 100, '%', metadata_copy))
+        sample.Sample('Eval Accuracy', value, '%', metadata_copy))
 
   if 'resnet' in model:
     results = re.findall(r'Speed: (\S+) samples/sec', output)
