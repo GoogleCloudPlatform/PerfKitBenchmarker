@@ -62,8 +62,8 @@ flags.DEFINE_list('memtier_clients', [50],
                   'Comma separated list of number of clients per thread. '
                   'Specify more than 1 value to vary the number of clients. '
                   'Defaults to [50].')
-flags.DEFINE_integer('memtier_threads', 4,
-                     'Number of threads. Defaults to 4.')
+flags.DEFINE_list('memtier_threads', [4],
+                  'Number of threads. Defaults to 4.')
 flags.DEFINE_integer('memtier_ratio', 9,
                      'Set:Get ratio. Defaults to 9x Get versus Sets (9 Gets to '
                      '1 Set in 10 total requests).')
@@ -72,9 +72,9 @@ flags.DEFINE_integer('memtier_data_size', 32,
 flags.DEFINE_string('memtier_key_pattern', 'R:R',
                     'Set:Get key pattern. G for Gaussian distribution, R for '
                     'uniform Random, S for Sequential. Defaults to R:R.')
-flags.DEFINE_integer('memtier_pipeline', 1,
-                     'Number of pipelines to use for memtier. Defaults to 1, '
-                     'i.e. no pipelining.')
+flags.DEFINE_list('memtier_pipeline', [1],
+                  'Number of pipelines to use for memtier. Defaults to 1, '
+                  'i.e. no pipelining.')
 
 
 def YumInstall(vm):
@@ -137,7 +137,7 @@ def Load(client_vm, server_ip, server_port):
   client_vm.RemoteCommand(' '.join(cmd))
 
 
-def Run(vm, server_ip, server_port):
+def Run(vm, server_ip, server_port, threads, pipeline):
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
   samples = []
@@ -151,11 +151,11 @@ def Run(vm, server_ip, server_port):
         '-P', FLAGS.memtier_protocol,
         '--run-count', str(FLAGS.memtier_run_count),
         '--clients', str(client_count),
-        '--threads', str(FLAGS.memtier_threads),
+        '--threads', str(threads),
         '--ratio', memtier_ratio,
         '--data-size', str(FLAGS.memtier_data_size),
         '--key-pattern', FLAGS.memtier_key_pattern,
-        '--pipeline', str(FLAGS.memtier_pipeline),
+        '--pipeline', str(pipeline),
         '--key-minimum', '1',
         '--key-maximum', str(FLAGS.memtier_requests),
         '--random-data']
@@ -167,23 +167,23 @@ def Run(vm, server_ip, server_port):
     vm.RemoteCommand(' '.join(cmd))
 
     results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
-    metadata = GetMetadata()
+    metadata = GetMetadata(threads, pipeline)
     metadata['memtier_clients'] = client_count
     samples.extend(ParseResults(results, metadata))
 
   return samples
 
 
-def GetMetadata():
+def GetMetadata(threads, pipeline):
   """Metadata for memtier test."""
   meta = {'memtier_protocol': FLAGS.memtier_protocol,
           'memtier_run_count': FLAGS.memtier_run_count,
           'memtier_requests': FLAGS.memtier_requests,
-          'memtier_threads': FLAGS.memtier_threads,
+          'memtier_threads': threads,
           'memtier_ratio': FLAGS.memtier_ratio,
           'memtier_data_size': FLAGS.memtier_data_size,
           'memtier_key_pattern': FLAGS.memtier_key_pattern,
-          'memtier_pipeline': FLAGS.memtier_pipeline,
+          'memtier_pipeline': pipeline,
           'memtier_version': GIT_TAG}
   if FLAGS.memtier_run_duration:
     meta['memtier_run_duration'] = FLAGS.memtier_run_duration

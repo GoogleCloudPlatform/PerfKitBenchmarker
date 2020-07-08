@@ -122,15 +122,25 @@ def Run(benchmark_spec):
   client = benchmark_spec.vm_groups['client'][0]
   server = benchmark_spec.vm_groups['server'][0]
   server_ip = server.internal_ip
+  samples = []
   metadata = {'memcached_version': memcached_server.GetVersion(server),
               'memcached_server_size': FLAGS.memcached_size_mb,
               'memcached_server_threads': FLAGS.memcached_num_threads}
 
-  logging.info('Start benchmarking memcached using memtier.')
-  samples = memtier.Run(client, server_ip, memcached_server.MEMCACHED_PORT)
-  for sample in samples:
-    sample.metadata.update(metadata)
-
+  for pipeline in FLAGS.memtier_pipeline:
+    for client_thread in FLAGS.memtier_threads:
+      logging.info(
+          'Start benchmarking memcached using memtier:\n'
+          '\tmemtier threads: %s'
+          '\tmemtier pipeline, %s'
+          '\tmemtier connection, %s',
+          client_thread, pipeline, FLAGS.memtier_pipeline)
+      tmp_samples = memtier.Run(
+          client, server_ip, memcached_server.MEMCACHED_PORT,
+          client_thread, pipeline)
+      for sample in tmp_samples:
+        sample.metadata.update(metadata)
+      samples.extend(tmp_samples)
   return samples
 
 
