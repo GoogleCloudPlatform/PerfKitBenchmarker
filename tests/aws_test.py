@@ -335,6 +335,16 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
 
+  def testInstanceRequestLimitExceededCreate(self):
+    stderr = (
+        'An error occurred (RequestLimitExceeded) when calling the RunInstances'
+        ' operation (reached max retries: 4): Request limit exceeded.'
+    )
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Resource.RetryableCreationError) as e:
+      self.vm._Create()
+    self.assertEqual(str(e.exception), stderr)
+
   def testInstanceStockedOutDuringCreate(self):
     stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
               'the RunInstances operation (reached max retries: 4): '

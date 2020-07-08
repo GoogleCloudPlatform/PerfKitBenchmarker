@@ -808,6 +808,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(stderr)
     if 'InstanceLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
+    if 'RequestLimitExceeded' in stderr:
+      raise errors.Resource.RetryableCreationError(stderr)
     if retcode:
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
