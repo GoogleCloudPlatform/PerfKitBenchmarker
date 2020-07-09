@@ -1,338 +1,1431 @@
-:::NVLOGv0.2.3 None 1582159752.469244242 (resnet_v1_5.py:93) Model HParams:
-:::NVLOGv0.2.3 None 1582159752.469933271 (resnet_v1_5.py:94) Name: "resnet50_v1.5"
-:::NVLOGv0.2.3 None 1582159752.470527649 (resnet_v1_5.py:95) Number of classes: 1001
-:::NVLOGv0.2.3 None 1582159752.471081972 (resnet_v1_5.py:96) Compute_format: "NHWC"
-:::NVLOGv0.2.3 None 1582159752.471639395 (resnet_v1_5.py:97) Input_format: "NHWC"
-:::NVLOGv0.2.3 None 1582159752.472204924 (resnet_v1_5.py:98) dtype: "<dtype: 'float16'>"
-:::NVLOGv0.2.3 None 1582159752.472712755 (runner.py:174) Deterministic Run - Seed: 1
-:::NVLOGv0.2.3 None 1582159752.473762512 (runner.py:343) TF Loss Auto Scaling is activated
-:::NVLOGv0.2.3 None 1582159752.782484293 (runner.py:379) Starting Model Training...
-:::NVLOGv0.2.3 None 1582159752.783164024 (runner.py:380) Training Epochs: 10.0
-:::NVLOGv0.2.3 None 1582159752.783694506 (runner.py:381) Total Steps: 780.0
-:::NVLOGv0.2.3 None 1582159752.784229755 (runner.py:382) Steps per Epoch: 78.0
-:::NVLOGv0.2.3 None 1582159752.784712553 (runner.py:383) Decay Steps: 780.0
-:::NVLOGv0.2.3 None 1582159752.785205364 (runner.py:384) Weight Decay Factor: 0.0001
-:::NVLOGv0.2.3 None 1582159752.785724401 (runner.py:385) Init Learning Rate: 0.1
-:::NVLOGv0.2.3 None 1582159752.786204100 (runner.py:386) Momentum: 0.9
-:::NVLOGv0.2.3 None 1582159752.786676168 (runner.py:387) Num GPUs: 64
-:::NVLOGv0.2.3 None 1582159752.787189245 (runner.py:388) Per-GPU Batch Size: 256
-:::NVLOGv0.2.3 resnet 1582159762.104167223 (learning_rate.py:52) Using step learning rate schedule
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Bootstrap : Using [0]eth0:10.128.0.73<0>
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_ENABLE_FAST_SOCKET set by environment to 1.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_DYNAMIC_CHUNK_SIZE set by environment to 131072.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_INLINE_THRESHOLD set by environment to 4096.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_ENABLE_THREAD_SPIN set by environment to 0.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_SOCK_NOTSENT_LOWAT set by environment to 1.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_MIN_ZCOPY_SIZE set by environment to 0.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket : Using [0]eth0:10.128.0.73<0>
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket plugin initialized
-NCCL version 2.4.8+cuda10.0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Setting affinity for GPU 0 to ff,ffff0000,00ffffff
-pkb-fde62675-0:27016:27812 [0] NCCL INFO CUDA Dev 0[0], FastSocket NIC distance :  PHB
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_MAX_NRINGS set by environment to 2.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Limiting to 2 rings per user request.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Channel 00 :    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Channel 01 :    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_BUFFSIZE set by environment to 8388608.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 63 -> 0 [receive] via NET/FastSocket/0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_NSOCKS_PERTHREAD set by environment to 1.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NCCL_SOCKET_NTHREADS set by environment to 6.
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 0[0] -> 1[1] via P2P/IPC
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 32 -> 0 [receive] via NET/FastSocket/0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 00 : 0 -> 32 [send] via NET/FastSocket/0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 63 -> 0 [receive] via NET/FastSocket/0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 0[0] -> 1[1] via P2P/IPC
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 0 -> 56 [send] via NET/FastSocket/0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Ring 01 : 56 -> 0 [receive] via NET/FastSocket/0
-pkb-fde62675-0:27016:27812 [0] NCCL INFO NET/FastSocket: Using 6 threads and 1 sockets per thread
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Trees [0] -1->0->1/32/-1 [1] 56->0->1/-1/-1
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Using 256 threads, Min Comp Cap 7, Trees enabled up to size 9150000
-pkb-fde62675-0:27016:27812 [0] NCCL INFO comm 0x7fc09872bf40 rank 0 nranks 64 cudaDev 0 nvmlDev 0 - Init COMPLETE
-pkb-fde62675-0:27016:27812 [0] NCCL INFO Launch mode Parallel
-pkb-fde62675-0:27016:28876 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 1 started
-pkb-fde62675-0:27016:28877 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 1 started
-pkb-fde62675-0:27016:28879 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 2 started
-pkb-fde62675-0:27016:28881 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 3 started
-pkb-fde62675-0:27016:28882 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 3 started
-pkb-fde62675-0:27016:28880 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 2 started
-pkb-fde62675-0:27016:28884 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 4 started
-pkb-fde62675-0:27016:28885 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 5 started
-pkb-fde62675-0:27016:28891 [0] NCCL INFO Comm 0x7fc098d2b1a0 thread 0 started
-pkb-fde62675-0:27016:28886 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 4 started
-pkb-fde62675-0:27016:28887 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 5 started
-pkb-fde62675-0:27016:28895 [0] NCCL INFO Comm 0x7fc098d38ff0 thread 0 started
-pkb-fde62675-0:27016:28936 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 1 started
-pkb-fde62675-0:27016:28942 [0] NCCL INFO Comm 0x7fc098d2e660 thread 1 started
-pkb-fde62675-0:27016:28943 [0] NCCL INFO Comm 0x7fc098d31b20 thread 1 started
-pkb-fde62675-0:27016:28944 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 1 started
-pkb-fde62675-0:27016:28979 [0] NCCL INFO Comm 0x7fc098d2e660 thread 2 started
-pkb-fde62675-0:27016:28980 [0] NCCL INFO Comm 0x7fc098d31b20 thread 2 started
-pkb-fde62675-0:27016:28981 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 2 started
-pkb-fde62675-0:27016:28982 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 3 started
-pkb-fde62675-0:27016:28983 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 4 started
-pkb-fde62675-0:27016:28984 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 5 started
-pkb-fde62675-0:27016:28985 [0] NCCL INFO Comm 0x7fc098d3c4b0 thread 0 started
-pkb-fde62675-0:27016:28986 [0] NCCL INFO Comm 0x7fc098d2e660 thread 3 started
-pkb-fde62675-0:27016:28987 [0] NCCL INFO Comm 0x7fc098d2e660 thread 4 started
-pkb-fde62675-0:27016:28988 [0] NCCL INFO Comm 0x7fc098d2e660 thread 5 started
-pkb-fde62675-0:27016:28989 [0] NCCL INFO Comm 0x7fc098d2e660 thread 0 started
-pkb-fde62675-0:27016:28990 [0] NCCL INFO Comm 0x7fc098d31b20 thread 3 started
-pkb-fde62675-0:27016:28991 [0] NCCL INFO Comm 0x7fc098d31b20 thread 4 started
-pkb-fde62675-0:27016:28992 [0] NCCL INFO Comm 0x7fc098d31b20 thread 5 started
-pkb-fde62675-0:27016:28993 [0] NCCL INFO Comm 0x7fc098d31b20 thread 0 started
-pkb-fde62675-0:27016:28994 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 2 started
-pkb-fde62675-0:27016:28995 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 3 started
-pkb-fde62675-0:27016:28996 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 4 started
-pkb-fde62675-0:27016:28997 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 5 started
-pkb-fde62675-0:27016:28998 [0] NCCL INFO Comm 0x7fc098d3ff00 thread 0 started
-:::NVLOGv0.2.3 resnet 1582159815.362699032 (benchmark_hooks.py:59) iteration: 50
-:::NVLOGv0.2.3 resnet 1582159815.363994360 (benchmark_hooks.py:60) total_ips: 37510.67235662921
-:::NVLOGv0.2.3 resnet 1582159819.848632336 (benchmark_hooks.py:59) iteration: 60
-:::NVLOGv0.2.3 resnet 1582159819.850585699 (benchmark_hooks.py:60) total_ips: 36883.09533536929
-:::NVLOGv0.2.3 resnet 1582159824.346121311 (benchmark_hooks.py:59) iteration: 70
-:::NVLOGv0.2.3 resnet 1582159824.347266436 (benchmark_hooks.py:60) total_ips: 35312.341755363566
-:::NVLOGv0.2.3 resnet 1582159828.817882299 (benchmark_hooks.py:59) iteration: 80
-:::NVLOGv0.2.3 resnet 1582159828.819027424 (benchmark_hooks.py:60) total_ips: 36688.191104647565
-:::NVLOGv0.2.3 resnet 1582159833.305439472 (benchmark_hooks.py:59) iteration: 90
-:::NVLOGv0.2.3 resnet 1582159833.307281256 (benchmark_hooks.py:60) total_ips: 37406.17181277611
-:::NVLOGv0.2.3 resnet 1582159839.979021311 (benchmark_hooks.py:59) iteration: 100
-:::NVLOGv0.2.3 resnet 1582159839.980183363 (benchmark_hooks.py:60) total_ips: 6152.398243688215
-:::NVLOGv0.2.3 resnet 1582159844.448809624 (benchmark_hooks.py:59) iteration: 110
-:::NVLOGv0.2.3 resnet 1582159844.450631618 (benchmark_hooks.py:60) total_ips: 36347.491827305785
-:::NVLOGv0.2.3 resnet 1582159848.928247929 (benchmark_hooks.py:59) iteration: 120
-:::NVLOGv0.2.3 resnet 1582159848.929651022 (benchmark_hooks.py:60) total_ips: 36875.77231290984
-:::NVLOGv0.2.3 resnet 1582159853.449352503 (benchmark_hooks.py:59) iteration: 130
-:::NVLOGv0.2.3 resnet 1582159853.450479269 (benchmark_hooks.py:60) total_ips: 35871.30119333536
-:::NVLOGv0.2.3 resnet 1582159858.047381401 (benchmark_hooks.py:59) iteration: 140
-:::NVLOGv0.2.3 resnet 1582159858.048593760 (benchmark_hooks.py:60) total_ips: 37066.82097053025
-:::NVLOGv0.2.3 resnet 1582159862.541098356 (benchmark_hooks.py:59) iteration: 150
-:::NVLOGv0.2.3 resnet 1582159862.542908192 (benchmark_hooks.py:60) total_ips: 36023.53957875413
-:::NVLOGv0.2.3 resnet 1582159867.034475803 (benchmark_hooks.py:59) iteration: 160
-:::NVLOGv0.2.3 resnet 1582159867.036347628 (benchmark_hooks.py:60) total_ips: 35892.791268667315
-:::NVLOGv0.2.3 resnet 1582159871.564660549 (benchmark_hooks.py:59) iteration: 170
-:::NVLOGv0.2.3 resnet 1582159871.566016197 (benchmark_hooks.py:60) total_ips: 37491.435463719994
-:::NVLOGv0.2.3 resnet 1582159876.045536518 (benchmark_hooks.py:59) iteration: 180
-:::NVLOGv0.2.3 resnet 1582159876.046773911 (benchmark_hooks.py:60) total_ips: 37198.847398577964
-:::NVLOGv0.2.3 resnet 1582159880.568768978 (benchmark_hooks.py:59) iteration: 190
-:::NVLOGv0.2.3 resnet 1582159880.570594072 (benchmark_hooks.py:60) total_ips: 37138.71715668313
-:::NVLOGv0.2.3 resnet 1582159885.051631689 (benchmark_hooks.py:59) iteration: 200
-:::NVLOGv0.2.3 resnet 1582159885.052983046 (benchmark_hooks.py:60) total_ips: 36457.541779536296
-:::NVLOGv0.2.3 resnet 1582159889.597553492 (benchmark_hooks.py:59) iteration: 210
-:::NVLOGv0.2.3 resnet 1582159889.598702431 (benchmark_hooks.py:60) total_ips: 36733.689805361275
-:::NVLOGv0.2.3 resnet 1582159894.078658104 (benchmark_hooks.py:59) iteration: 220
-:::NVLOGv0.2.3 resnet 1582159894.079894066 (benchmark_hooks.py:60) total_ips: 34946.98754673534
-:::NVLOGv0.2.3 resnet 1582159898.580398083 (benchmark_hooks.py:59) iteration: 230
-:::NVLOGv0.2.3 resnet 1582159898.581535578 (benchmark_hooks.py:60) total_ips: 36250.109055000146
-:::NVLOGv0.2.3 resnet 1582159903.041210890 (benchmark_hooks.py:59) iteration: 240
-:::NVLOGv0.2.3 resnet 1582159903.043050766 (benchmark_hooks.py:60) total_ips: 37413.258906949595
-:::NVLOGv0.2.3 resnet 1582159907.534811735 (benchmark_hooks.py:59) iteration: 250
-:::NVLOGv0.2.3 resnet 1582159907.536144257 (benchmark_hooks.py:60) total_ips: 36413.28370943547
-:::NVLOGv0.2.3 resnet 1582159912.040065527 (benchmark_hooks.py:59) iteration: 260
-:::NVLOGv0.2.3 resnet 1582159912.041195869 (benchmark_hooks.py:60) total_ips: 36464.8350638166
-:::NVLOGv0.2.3 resnet 1582159916.543462753 (benchmark_hooks.py:59) iteration: 270
-:::NVLOGv0.2.3 resnet 1582159916.545404196 (benchmark_hooks.py:60) total_ips: 37645.390396408104
-:::NVLOGv0.2.3 resnet 1582159921.036260366 (benchmark_hooks.py:59) iteration: 280
-:::NVLOGv0.2.3 resnet 1582159921.038029432 (benchmark_hooks.py:60) total_ips: 35304.450149551856
-:::NVLOGv0.2.3 resnet 1582159925.531387091 (benchmark_hooks.py:59) iteration: 290
-:::NVLOGv0.2.3 resnet 1582159925.532652140 (benchmark_hooks.py:60) total_ips: 36287.320851639066
-:::NVLOGv0.2.3 resnet 1582159930.006504059 (benchmark_hooks.py:59) iteration: 300
-:::NVLOGv0.2.3 resnet 1582159930.007672548 (benchmark_hooks.py:60) total_ips: 36994.266564239
-:::NVLOGv0.2.3 resnet 1582159934.576426744 (benchmark_hooks.py:59) iteration: 310
-:::NVLOGv0.2.3 resnet 1582159934.577636480 (benchmark_hooks.py:60) total_ips: 36744.04080373389
-:::NVLOGv0.2.3 resnet 1582159939.056905508 (benchmark_hooks.py:59) iteration: 320
-:::NVLOGv0.2.3 resnet 1582159939.058114052 (benchmark_hooks.py:60) total_ips: 37060.82386321043
-:::NVLOGv0.2.3 resnet 1582159943.542388916 (benchmark_hooks.py:59) iteration: 330
-:::NVLOGv0.2.3 resnet 1582159943.543546677 (benchmark_hooks.py:60) total_ips: 35284.02093849433
-:::NVLOGv0.2.3 resnet 1582159948.029252052 (benchmark_hooks.py:59) iteration: 340
-:::NVLOGv0.2.3 resnet 1582159948.031070232 (benchmark_hooks.py:60) total_ips: 36013.892462704476
-:::NVLOGv0.2.3 resnet 1582159952.541968822 (benchmark_hooks.py:59) iteration: 350
-:::NVLOGv0.2.3 resnet 1582159952.543198824 (benchmark_hooks.py:60) total_ips: 35844.22703046678
-:::NVLOGv0.2.3 resnet 1582159956.996303082 (benchmark_hooks.py:59) iteration: 360
-:::NVLOGv0.2.3 resnet 1582159956.997462988 (benchmark_hooks.py:60) total_ips: 36596.47853987886
-:::NVLOGv0.2.3 resnet 1582159961.503876448 (benchmark_hooks.py:59) iteration: 370
-:::NVLOGv0.2.3 resnet 1582159961.505698681 (benchmark_hooks.py:60) total_ips: 36955.29339994515
-:::NVLOGv0.2.3 resnet 1582159965.937754631 (benchmark_hooks.py:59) iteration: 380
-:::NVLOGv0.2.3 resnet 1582159965.938937426 (benchmark_hooks.py:60) total_ips: 38333.803808865036
-:::NVLOGv0.2.3 resnet 1582159970.447065592 (benchmark_hooks.py:59) iteration: 390
-:::NVLOGv0.2.3 resnet 1582159970.448903799 (benchmark_hooks.py:60) total_ips: 35038.34348545454
-:::NVLOGv0.2.3 resnet 1582159974.901950121 (benchmark_hooks.py:59) iteration: 400
-:::NVLOGv0.2.3 resnet 1582159974.903898001 (benchmark_hooks.py:60) total_ips: 36290.67442760689
-:::NVLOGv0.2.3 resnet 1582159979.451853991 (benchmark_hooks.py:59) iteration: 410
-:::NVLOGv0.2.3 resnet 1582159979.453080416 (benchmark_hooks.py:60) total_ips: 35940.75417372508
-:::NVLOGv0.2.3 resnet 1582159983.948755264 (benchmark_hooks.py:59) iteration: 420
-:::NVLOGv0.2.3 resnet 1582159983.950186014 (benchmark_hooks.py:60) total_ips: 36152.8092482873
-:::NVLOGv0.2.3 resnet 1582159988.434495926 (benchmark_hooks.py:59) iteration: 430
-:::NVLOGv0.2.3 resnet 1582159988.435680866 (benchmark_hooks.py:60) total_ips: 36511.488155194136
-:::NVLOGv0.2.3 resnet 1582159992.928598166 (benchmark_hooks.py:59) iteration: 440
-:::NVLOGv0.2.3 resnet 1582159992.929788113 (benchmark_hooks.py:60) total_ips: 35283.912239328616
-:::NVLOGv0.2.3 resnet 1582159997.373732567 (benchmark_hooks.py:59) iteration: 450
-:::NVLOGv0.2.3 resnet 1582159997.374869347 (benchmark_hooks.py:60) total_ips: 35465.20659001403
-:::NVLOGv0.2.3 resnet 1582160001.839509964 (benchmark_hooks.py:59) iteration: 460
-:::NVLOGv0.2.3 resnet 1582160001.841399908 (benchmark_hooks.py:60) total_ips: 35710.6916899777
-:::NVLOGv0.2.3 resnet 1582160006.320781708 (benchmark_hooks.py:59) iteration: 470
-:::NVLOGv0.2.3 resnet 1582160006.321911097 (benchmark_hooks.py:60) total_ips: 35986.97961891844
-:::NVLOGv0.2.3 resnet 1582160010.787042618 (benchmark_hooks.py:59) iteration: 480
-:::NVLOGv0.2.3 resnet 1582160010.788214684 (benchmark_hooks.py:60) total_ips: 36531.79078692267
-:::NVLOGv0.2.3 resnet 1582160015.457456112 (benchmark_hooks.py:59) iteration: 490
-:::NVLOGv0.2.3 resnet 1582160015.458606720 (benchmark_hooks.py:60) total_ips: 36050.1478245679
-:::NVLOGv0.2.3 resnet 1582160019.978160381 (benchmark_hooks.py:59) iteration: 500
-:::NVLOGv0.2.3 resnet 1582160019.979422569 (benchmark_hooks.py:60) total_ips: 35381.685274629766
-:::NVLOGv0.2.3 resnet 1582160024.450509071 (benchmark_hooks.py:59) iteration: 510
-:::NVLOGv0.2.3 resnet 1582160024.451734543 (benchmark_hooks.py:60) total_ips: 35363.69601604759
-:::NVLOGv0.2.3 resnet 1582160028.936058998 (benchmark_hooks.py:59) iteration: 520
-:::NVLOGv0.2.3 resnet 1582160028.937254906 (benchmark_hooks.py:60) total_ips: 37620.968449497355
-:::NVLOGv0.2.3 resnet 1582160033.397711515 (benchmark_hooks.py:59) iteration: 530
-:::NVLOGv0.2.3 resnet 1582160033.398849249 (benchmark_hooks.py:60) total_ips: 37106.00981329682
-:::NVLOGv0.2.3 resnet 1582160037.839997053 (benchmark_hooks.py:59) iteration: 540
-:::NVLOGv0.2.3 resnet 1582160037.841424942 (benchmark_hooks.py:60) total_ips: 36560.983800147376
-:::NVLOGv0.2.3 resnet 1582160042.314376116 (benchmark_hooks.py:59) iteration: 550
-:::NVLOGv0.2.3 resnet 1582160042.315502167 (benchmark_hooks.py:60) total_ips: 37047.89670501951
-:::NVLOGv0.2.3 resnet 1582160046.796023369 (benchmark_hooks.py:59) iteration: 560
-:::NVLOGv0.2.3 resnet 1582160046.797188044 (benchmark_hooks.py:60) total_ips: 36350.06817593948
-:::NVLOGv0.2.3 resnet 1582160051.269979000 (benchmark_hooks.py:59) iteration: 570
-:::NVLOGv0.2.3 resnet 1582160051.271843672 (benchmark_hooks.py:60) total_ips: 36497.79760032589
-:::NVLOGv0.2.3 resnet 1582160055.767156124 (benchmark_hooks.py:59) iteration: 580
-:::NVLOGv0.2.3 resnet 1582160055.768342257 (benchmark_hooks.py:60) total_ips: 35896.18481870252
-:::NVLOGv0.2.3 resnet 1582160060.304273605 (benchmark_hooks.py:59) iteration: 590
-:::NVLOGv0.2.3 resnet 1582160060.305403471 (benchmark_hooks.py:60) total_ips: 36411.02636004591
-:::NVLOGv0.2.3 resnet 1582160064.787214756 (benchmark_hooks.py:59) iteration: 600
-:::NVLOGv0.2.3 resnet 1582160064.789097309 (benchmark_hooks.py:60) total_ips: 35445.212557356484
-:::NVLOGv0.2.3 resnet 1582160069.283154488 (benchmark_hooks.py:59) iteration: 610
-:::NVLOGv0.2.3 resnet 1582160069.284336329 (benchmark_hooks.py:60) total_ips: 37360.29293476252
-:::NVLOGv0.2.3 resnet 1582160073.759320021 (benchmark_hooks.py:59) iteration: 620
-:::NVLOGv0.2.3 resnet 1582160073.760699511 (benchmark_hooks.py:60) total_ips: 36664.584119504405
-:::NVLOGv0.2.3 resnet 1582160078.252969503 (benchmark_hooks.py:59) iteration: 630
-:::NVLOGv0.2.3 resnet 1582160078.254781485 (benchmark_hooks.py:60) total_ips: 35855.8599815919
-:::NVLOGv0.2.3 resnet 1582160082.672213554 (benchmark_hooks.py:59) iteration: 640
-:::NVLOGv0.2.3 resnet 1582160082.673584461 (benchmark_hooks.py:60) total_ips: 36299.08984093145
-:::NVLOGv0.2.3 resnet 1582160087.138610840 (benchmark_hooks.py:59) iteration: 650
-:::NVLOGv0.2.3 resnet 1582160087.139968157 (benchmark_hooks.py:60) total_ips: 36010.5521027713
-:::NVLOGv0.2.3 resnet 1582160091.669317245 (benchmark_hooks.py:59) iteration: 660
-:::NVLOGv0.2.3 resnet 1582160091.670458317 (benchmark_hooks.py:60) total_ips: 36617.18800873875
-:::NVLOGv0.2.3 resnet 1582160096.111882210 (benchmark_hooks.py:59) iteration: 670
-:::NVLOGv0.2.3 resnet 1582160096.113028526 (benchmark_hooks.py:60) total_ips: 36237.3781150303
-:::NVLOGv0.2.3 resnet 1582160100.616281986 (benchmark_hooks.py:59) iteration: 680
-:::NVLOGv0.2.3 resnet 1582160100.617408276 (benchmark_hooks.py:60) total_ips: 37336.056808612135
-:::NVLOGv0.2.3 resnet 1582160105.077036381 (benchmark_hooks.py:59) iteration: 690
-:::NVLOGv0.2.3 resnet 1582160105.078839302 (benchmark_hooks.py:60) total_ips: 37373.70329665548
-:::NVLOGv0.2.3 resnet 1582160109.566270351 (benchmark_hooks.py:59) iteration: 700
-:::NVLOGv0.2.3 resnet 1582160109.567404747 (benchmark_hooks.py:60) total_ips: 33662.61918725121
-:::NVLOGv0.2.3 resnet 1582160114.049432755 (benchmark_hooks.py:59) iteration: 710
-:::NVLOGv0.2.3 resnet 1582160114.050585270 (benchmark_hooks.py:60) total_ips: 37773.14652706473
-:::NVLOGv0.2.3 resnet 1582160118.559016466 (benchmark_hooks.py:59) iteration: 720
-:::NVLOGv0.2.3 resnet 1582160118.560217381 (benchmark_hooks.py:60) total_ips: 36825.3620729107
-:::NVLOGv0.2.3 resnet 1582160123.027698755 (benchmark_hooks.py:59) iteration: 730
-:::NVLOGv0.2.3 resnet 1582160123.029191256 (benchmark_hooks.py:60) total_ips: 37004.34650160334
-:::NVLOGv0.2.3 resnet 1582160127.502898693 (benchmark_hooks.py:59) iteration: 740
-:::NVLOGv0.2.3 resnet 1582160127.504770041 (benchmark_hooks.py:60) total_ips: 36890.30244480638
-:::NVLOGv0.2.3 resnet 1582160131.992484331 (benchmark_hooks.py:59) iteration: 750
-:::NVLOGv0.2.3 resnet 1582160131.994381905 (benchmark_hooks.py:60) total_ips: 37098.1574060028
-:::NVLOGv0.2.3 resnet 1582160136.489326239 (benchmark_hooks.py:59) iteration: 760
-:::NVLOGv0.2.3 resnet 1582160136.490505457 (benchmark_hooks.py:60) total_ips: 36185.93389381938
-:::NVLOGv0.2.3 resnet 1582160140.979393721 (benchmark_hooks.py:59) iteration: 770
-:::NVLOGv0.2.3 resnet 1582160140.980606794 (benchmark_hooks.py:60) total_ips: 36461.352495143845
-:::NVLOGv0.2.3 resnet 1582160145.751477242 (benchmark_hooks.py:66) Average total_ips: 36517.134955740126
-:::NVLOGv0.2.3 resnet 1582160146.086755276 (runner.py:502) Ending Model Training ...
-2020-02-20 00:49:09.072060: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
-WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/horovod/tensorflow/__init__.py:117: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+DLL 2020-06-20 01:15:38.036441 - PARAMETER arch : resnet50  mode : training_benchmark  data_dir : gs://mlcompass-data/imagenet/imagenet-2012-tfrec
+ord  data_idx_dir : None  export_dir : None  to_predict : None  batch_size : 256  num_iter : 2  run_iter : -1  iter_unit : epoch  warmup_steps : 50  data_
+format : NCHW  model_dir : None  results_dir : /tmp/models  log_filename : log.json  display_every : 10  lr_init : 0.1  lr_warmup_epochs : 5  weight_decay
+ : 0.0001  weight_init : fan_out  momentum : 0.9  precision : fp16  loss_scale : 256.0  label_smoothing : 0.0  mixup : 0.0  use_static_loss_scaling : Fals
+e  use_xla : False  use_dali : False  use_tf_amp : False  use_cosine_lr : False  seed : None  gpu_memory_fraction : 0.7  gpu_id : 0  name : False
+Model HParams:
+Name resnet50
+Number of classes 1001
+Compute_format NCHW
+Input_format NHWC
+dtype <dtype: 'float16'>
+Starting Model Training...
+Training Epochs 2.0
+Total Steps 1250.0
+Steps per Epoch 625.0
+Decay Steps 1250.0
+Weight Decay Factor 0.0001
+Init Learning Rate 0.1
+Momentum 0.9
+Num GPUs 8
+Per-GPU Batch Size 256
+Using step learning rate schedule
+Using step learning rate schedule
+Using step learning rate schedule
+Using step learning rate schedule
+Using step learning rate schedule
+Using step learning rate schedule
+Using step learning rate schedule
+Using step learning rate schedule
+DLL 2020-06-20 01:16:39.766736 - (0, 50) total_ips : 6724.377181720827
+DLL 2020-06-20 01:16:40.069014 - (0, 51) total_ips : 6785.26456177047
+DLL 2020-06-20 01:16:40.385334 - (0, 52) total_ips : 6482.876541392991
+DLL 2020-06-20 01:16:40.696350 - (0, 53) total_ips : 6593.020702549653
+DLL 2020-06-20 01:16:40.999412 - (0, 54) total_ips : 6764.772037259294
+DLL 2020-06-20 01:16:41.303378 - (0, 55) total_ips : 6744.3870349752915
+DLL 2020-06-20 01:16:41.604852 - (0, 56) total_ips : 6800.1059146330845
+DLL 2020-06-20 01:16:41.908635 - (0, 57) total_ips : 6748.758534809011
+DLL 2020-06-20 01:16:42.211822 - (0, 58) total_ips : 6761.790000346357
+DLL 2020-06-20 01:16:42.514663 - (0, 59) total_ips : 6769.618126007274
+DLL 2020-06-20 01:16:42.830642 - (0, 60) total_ips : 6490.086556805311
+DLL 2020-06-20 01:16:43.132806 - (0, 61) total_ips : 6789.887805537397
+DLL 2020-06-20 01:16:43.436117 - (0, 62) total_ips : 6759.209467057062
+DLL 2020-06-20 01:16:43.748785 - (0, 63) total_ips : 6557.171945777348
+DLL 2020-06-20 01:16:44.051706 - (0, 64) total_ips : 6769.073994658774
+DLL 2020-06-20 01:16:44.364181 - (0, 65) total_ips : 6560.507272366231
+DLL 2020-06-20 01:16:44.668006 - (0, 66) total_ips : 6747.740661692101
+DLL 2020-06-20 01:16:44.978114 - (0, 67) total_ips : 6611.212048352264
+DLL 2020-06-20 01:16:45.289151 - (0, 68) total_ips : 6590.835363668798
+DLL 2020-06-20 01:16:45.607098 - (0, 69) total_ips : 6447.854245858029
+DLL 2020-06-20 01:16:45.911921 - (0, 70) total_ips : 6730.504769762488
+DLL 2020-06-20 01:16:46.215243 - (0, 71) total_ips : 6758.58192384224
+DLL 2020-06-20 01:16:46.539757 - (0, 72) total_ips : 6318.223610918032
+DLL 2020-06-20 01:16:46.843175 - (0, 73) total_ips : 6763.744002544888
+DLL 2020-06-20 01:16:47.155861 - (0, 74) total_ips : 6559.044519376435
+DLL 2020-06-20 01:16:47.459401 - (0, 75) total_ips : 6757.486661532302
+DLL 2020-06-20 01:16:47.762386 - (0, 76) total_ips : 6768.305958124432
+DLL 2020-06-20 01:16:48.072199 - (0, 77) total_ips : 6617.175817158106
+DLL 2020-06-20 01:16:48.375700 - (0, 78) total_ips : 6754.760681488984
+DLL 2020-06-20 01:16:48.689355 - (0, 79) total_ips : 6535.992433713195
+DLL 2020-06-20 01:16:48.990249 - (0, 80) total_ips : 6813.260968918127
+DLL 2020-06-20 01:16:49.292393 - (0, 81) total_ips : 6784.985866743126
+DLL 2020-06-20 01:16:49.594119 - (0, 82) total_ips : 6794.377623151999
+DLL 2020-06-20 01:16:49.897442 - (0, 83) total_ips : 6758.518112415704
+DLL 2020-06-20 01:16:50.202201 - (0, 84) total_ips : 6726.4887007441475
+DLL 2020-06-20 01:16:50.506126 - (0, 85) total_ips : 6745.615781248773
+DLL 2020-06-20 01:16:50.818651 - (0, 86) total_ips : 6559.500307359602
+DLL 2020-06-20 01:16:51.119793 - (0, 87) total_ips : 6813.936543443738
+DLL 2020-06-20 01:16:51.434721 - (0, 88) total_ips : 6509.316268034316
+DLL 2020-06-20 01:16:51.746608 - (0, 89) total_ips : 6574.028480530702
+DLL 2020-06-20 01:16:52.058993 - (0, 90) total_ips : 6565.170391543935
+DLL 2020-06-20 01:16:52.360148 - (0, 91) total_ips : 6810.176647337986
+DLL 2020-06-20 01:16:52.663187 - (0, 92) total_ips : 6765.203585348931
+DLL 2020-06-20 01:16:52.968105 - (0, 93) total_ips : 6724.261376143485
+DLL 2020-06-20 01:16:53.286292 - (0, 94) total_ips : 6442.631337677455
+DLL 2020-06-20 01:16:53.602320 - (0, 95) total_ips : 6488.272748216089
+DLL 2020-06-20 01:16:53.905962 - (0, 96) total_ips : 6772.569694924555
+DLL 2020-06-20 01:16:54.208330 - (0, 97) total_ips : 6780.422814283674
+DLL 2020-06-20 01:16:54.511704 - (0, 98) total_ips : 6757.795000452359
+DLL 2020-06-20 01:16:54.817883 - (0, 99) total_ips : 6695.7894871407125
+DLL 2020-06-20 01:16:57.804934 - (0, 100) total_ips : 685.7015288546438
+DLL 2020-06-20 01:16:58.107467 - (0, 101) total_ips : 6781.643311267167
+DLL 2020-06-20 01:16:58.410223 - (0, 102) total_ips : 6771.598008394008
+DLL 2020-06-20 01:16:58.712473 - (0, 103) total_ips : 6782.955300063171
+DLL 2020-06-20 01:16:59.025500 - (0, 104) total_ips : 6548.973268702073
+DLL 2020-06-20 01:16:59.327553 - (0, 105) total_ips : 6787.82748514213
+DLL 2020-06-20 01:16:59.630738 - (0, 106) total_ips : 6762.018884990487
+DLL 2020-06-20 01:16:59.944072 - (0, 107) total_ips : 6543.056988251353
+DLL 2020-06-20 01:17:00.246656 - (0, 108) total_ips : 6775.705551940241
+DLL 2020-06-20 01:17:00.549795 - (0, 109) total_ips : 6763.392518323894
+DLL 2020-06-20 01:17:00.851130 - (0, 110) total_ips : 6803.946312573615
+DLL 2020-06-20 01:17:01.158630 - (0, 111) total_ips : 6666.54346945396
+DLL 2020-06-20 01:17:01.475195 - (0, 112) total_ips : 6475.584893001264
+DLL 2020-06-20 01:17:01.787202 - (0, 113) total_ips : 6570.106470189157
+DLL 2020-06-20 01:17:02.098137 - (0, 114) total_ips : 6592.924557641327
+DLL 2020-06-20 01:17:02.402763 - (0, 115) total_ips : 6732.709847780031
+DLL 2020-06-20 01:17:02.718143 - (0, 116) total_ips : 6502.811667601595
+DLL 2020-06-20 01:17:03.019580 - (0, 117) total_ips : 6803.191895032048
+DLL 2020-06-20 01:17:03.331241 - (0, 118) total_ips : 6579.048437176885
+DLL 2020-06-20 01:17:03.633892 - (0, 119) total_ips : 6775.5505606633305
+DLL 2020-06-20 01:17:03.936131 - (0, 120) total_ips : 6783.357030778039
+DLL 2020-06-20 01:17:04.251826 - (0, 121) total_ips : 6493.545406027326
+DLL 2020-06-20 01:17:04.571789 - (0, 122) total_ips : 6410.341543210061
+DLL 2020-06-20 01:17:04.895774 - (0, 123) total_ips : 6327.45265570882
+DLL 2020-06-20 01:17:05.202722 - (0, 124) total_ips : 6683.380113719473
+DLL 2020-06-20 01:17:05.518327 - (0, 125) total_ips : 6497.037428212484
+DLL 2020-06-20 01:17:05.836425 - (0, 126) total_ips : 6445.077313005049
+DLL 2020-06-20 01:17:06.143701 - (0, 127) total_ips : 6671.933774145166
+DLL 2020-06-20 01:17:06.445958 - (0, 128) total_ips : 6782.6821503556
+DLL 2020-06-20 01:17:06.748991 - (0, 129) total_ips : 6766.509220325204
+DLL 2020-06-20 01:17:07.051645 - (0, 130) total_ips : 6776.261441043315
+DLL 2020-06-20 01:17:07.354675 - (0, 131) total_ips : 6765.075713508281
+DLL 2020-06-20 01:17:07.657801 - (0, 132) total_ips : 6763.578906921737
+DLL 2020-06-20 01:17:07.972055 - (0, 133) total_ips : 6524.425456542363
+DLL 2020-06-20 01:17:08.274482 - (0, 134) total_ips : 6778.758721701031
+DLL 2020-06-20 01:17:08.580389 - (0, 135) total_ips : 6703.360830068119
+DLL 2020-06-20 01:17:08.883373 - (0, 136) total_ips : 6766.130800780435
+DLL 2020-06-20 01:17:09.192027 - (0, 137) total_ips : 6641.549659299052
+DLL 2020-06-20 01:17:09.504393 - (0, 138) total_ips : 6562.968372975034
+DLL 2020-06-20 01:17:09.808214 - (0, 139) total_ips : 6747.385538648125
+DLL 2020-06-20 01:17:10.119426 - (0, 140) total_ips : 6588.5605089874325
+DLL 2020-06-20 01:17:10.429758 - (0, 141) total_ips : 6605.746652691189
+DLL 2020-06-20 01:17:10.747571 - (0, 142) total_ips : 6450.546379706531
+DLL 2020-06-20 01:17:11.073624 - (0, 143) total_ips : 6288.040255476456
+DLL 2020-06-20 01:17:11.373829 - (0, 144) total_ips : 6837.399660594946
+DLL 2020-06-20 01:17:11.675814 - (0, 145) total_ips : 6791.015072373481
+DLL 2020-06-20 01:17:11.988036 - (0, 146) total_ips : 6565.913090802913
+DLL 2020-06-20 01:17:12.301648 - (0, 147) total_ips : 6538.5795052411795
+DLL 2020-06-20 01:17:12.610479 - (0, 148) total_ips : 6638.608549418209
+DLL 2020-06-20 01:17:12.920383 - (0, 149) total_ips : 6614.974438589236
+DLL 2020-06-20 01:17:13.223242 - (0, 150) total_ips : 6770.7546824184465
+DLL 2020-06-20 01:17:13.524698 - (0, 151) total_ips : 6800.8434946942725
+DLL 2020-06-20 01:17:13.827259 - (0, 152) total_ips : 6776.352316204835
+DLL 2020-06-20 01:17:14.140668 - (0, 153) total_ips : 6541.054063479928
+DLL 2020-06-20 01:17:14.442097 - (0, 154) total_ips : 6802.8578492826855
+DLL 2020-06-20 01:17:14.747955 - (0, 155) total_ips : 6709.57593595001
+DLL 2020-06-20 01:17:15.056242 - (0, 156) total_ips : 6652.319998389182
+DLL 2020-06-20 01:17:15.365700 - (0, 157) total_ips : 6629.519407892198
+DLL 2020-06-20 01:17:15.672895 - (0, 158) total_ips : 6673.400657245628
+DLL 2020-06-20 01:17:15.975857 - (0, 159) total_ips : 6767.623405282883
+DLL 2020-06-20 01:17:16.283684 - (0, 160) total_ips : 6660.418122368087
+DLL 2020-06-20 01:17:16.586837 - (0, 161) total_ips : 6762.971850391531
+DLL 2020-06-20 01:17:16.899812 - (0, 162) total_ips : 6550.17678901636
+DLL 2020-06-20 01:17:17.210749 - (0, 163) total_ips : 6592.828415537089
+DLL 2020-06-20 01:17:17.520736 - (0, 164) total_ips : 6614.123835204655
+DLL 2020-06-20 01:17:17.823576 - (0, 165) total_ips : 6770.519869538419
+DLL 2020-06-20 01:17:18.130671 - (0, 166) total_ips : 6676.09248362635
+DLL 2020-06-20 01:17:18.446021 - (0, 167) total_ips : 6501.3105591472395
+DLL 2020-06-20 01:17:18.749486 - (0, 168) total_ips : 6758.773365351856
+DLL 2020-06-20 01:17:19.056142 - (0, 169) total_ips : 6685.668892645553
+DLL 2020-06-20 01:17:19.356191 - (0, 170) total_ips : 6837.220065443599
+DLL 2020-06-20 01:17:19.661614 - (0, 171) total_ips : 6715.230314609763
+DLL 2020-06-20 01:17:19.965215 - (0, 172) total_ips : 6752.2173554531055
+DLL 2020-06-20 01:17:20.269638 - (0, 173) total_ips : 6734.768520558449
+DLL 2020-06-20 01:17:20.577885 - (0, 174) total_ips : 6651.104403002699
+DLL 2020-06-20 01:17:20.879175 - (0, 175) total_ips : 6808.14176894148
+DLL 2020-06-20 01:17:21.184542 - (0, 176) total_ips : 6713.703008215165
+DLL 2020-06-20 01:17:21.490351 - (0, 177) total_ips : 6707.527396046199
+DLL 2020-06-20 01:17:21.791177 - (0, 178) total_ips : 6816.980992461584
+DLL 2020-06-20 01:17:22.101031 - (0, 179) total_ips : 6616.40618727268
+DLL 2020-06-20 01:17:22.405066 - (0, 180) total_ips : 6744.964278114505
+DLL 2020-06-20 01:17:22.708532 - (0, 181) total_ips : 6755.387515256753
+DLL 2020-06-20 01:17:23.013925 - (0, 182) total_ips : 6717.446406256109
+DLL 2020-06-20 01:17:23.317495 - (0, 183) total_ips : 6753.018907024608
+DLL 2020-06-20 01:17:23.630225 - (0, 184) total_ips : 6555.875790011944
+DLL 2020-06-20 01:17:23.944158 - (0, 185) total_ips : 6530.804566276007
+DLL 2020-06-20 01:17:24.252593 - (0, 186) total_ips : 6650.342307105701
+DLL 2020-06-20 01:17:24.566914 - (0, 187) total_ips : 6522.3893478472155
+DLL 2020-06-20 01:17:24.870202 - (0, 188) total_ips : 6765.272851281001
+DLL 2020-06-20 01:17:25.182794 - (0, 189) total_ips : 6558.428554958752
+DLL 2020-06-20 01:17:25.481124 - (0, 190) total_ips : 6877.042186451724
+DLL 2020-06-20 01:17:25.791215 - (0, 191) total_ips : 6611.069579151037
+DLL 2020-06-20 01:17:26.104361 - (0, 192) total_ips : 6551.245845952268
+DLL 2020-06-20 01:17:26.405178 - (0, 193) total_ips : 6815.244836559822
+DLL 2020-06-20 01:17:26.706325 - (0, 194) total_ips : 6811.051425019188
+DLL 2020-06-20 01:17:27.012371 - (0, 195) total_ips : 6698.791940488696
+DLL 2020-06-20 01:17:27.316301 - (0, 196) total_ips : 6745.843572198745
+DLL 2020-06-20 01:17:27.618490 - (0, 197) total_ips : 6785.977482075087
+DLL 2020-06-20 01:17:27.922589 - (0, 198) total_ips : 6741.412357832812
+DLL 2020-06-20 01:17:28.234147 - (0, 199) total_ips : 6579.779159788741
+DLL 2020-06-20 01:17:28.560104 - (0, 200) total_ips : 6289.3846182006955
+DLL 2020-06-20 01:17:28.859862 - (0, 201) total_ips : 6851.81430245367
+DLL 2020-06-20 01:17:29.172276 - (0, 202) total_ips : 6561.780197786853
+DLL 2020-06-20 01:17:29.476751 - (0, 203) total_ips : 6733.195369971915
+DLL 2020-06-20 01:17:29.779501 - (0, 204) total_ips : 6771.800864968159
+DLL 2020-06-20 01:17:30.081855 - (0, 205) total_ips : 6780.128461917331
+DLL 2020-06-20 01:17:30.383916 - (0, 206) total_ips : 6786.937212846767
+DLL 2020-06-20 01:17:30.693617 - (0, 207) total_ips : 6621.276730621441
+DLL 2020-06-20 01:17:30.996257 - (0, 208) total_ips : 6775.24059938068
+DLL 2020-06-20 01:17:31.300462 - (0, 209) total_ips : 6739.428934573691
+DLL 2020-06-20 01:17:31.614530 - (0, 210) total_ips : 6528.456834335537
+DLL 2020-06-20 01:17:31.918898 - (0, 211) total_ips : 6737.187749362159
+DLL 2020-06-20 01:17:32.221136 - (0, 212) total_ips : 6783.223115252497
+DLL 2020-06-20 01:17:32.523366 - (0, 213) total_ips : 6782.912451595378
+DLL 2020-06-20 01:17:32.832381 - (0, 214) total_ips : 6634.030124441142
+DLL 2020-06-20 01:17:33.142667 - (0, 215) total_ips : 6606.874579952636
+DLL 2020-06-20 01:17:33.446419 - (0, 216) total_ips : 6751.548656714541
+DLL 2020-06-20 01:17:33.761827 - (0, 217) total_ips : 6499.716697967442
+DLL 2020-06-20 01:17:34.066315 - (0, 218) total_ips : 6733.126759326901
+DLL 2020-06-20 01:17:34.378298 - (0, 219) total_ips : 6571.141828351901
+DLL 2020-06-20 01:17:34.680133 - (0, 220) total_ips : 6794.640966539105
+DLL 2020-06-20 01:17:34.996584 - (0, 221) total_ips : 6478.47613014068
+DLL 2020-06-20 01:17:35.309711 - (0, 222) total_ips : 6549.722295759957
+DLL 2020-06-20 01:17:35.611292 - (0, 223) total_ips : 6800.132830800482
+DLL 2020-06-20 01:17:35.917942 - (0, 224) total_ips : 6685.169389006665
+DLL 2020-06-20 01:17:36.224842 - (0, 225) total_ips : 6682.413055620816
+DLL 2020-06-20 01:17:36.533033 - (0, 226) total_ips : 6652.350909148639
+DLL 2020-06-20 01:17:36.835013 - (0, 227) total_ips : 6793.9262248340065
+DLL 2020-06-20 01:17:37.148827 - (0, 228) total_ips : 6532.6670763240345
+DLL 2020-06-20 01:17:37.460486 - (0, 229) total_ips : 6583.990274935424
+DLL 2020-06-20 01:17:37.772752 - (0, 230) total_ips : 6567.835856375093
+DLL 2020-06-20 01:17:38.074239 - (0, 231) total_ips : 6801.171957738985
+DLL 2020-06-20 01:17:38.389715 - (0, 232) total_ips : 6498.305504386579
+DLL 2020-06-20 01:17:38.707421 - (0, 233) total_ips : 6452.882027797936
+DLL 2020-06-20 01:17:39.021089 - (0, 234) total_ips : 6539.759292391134
+DLL 2020-06-20 01:17:39.325444 - (0, 235) total_ips : 6735.576497599011
+DLL 2020-06-20 01:17:39.629274 - (0, 236) total_ips : 6747.507442345292
+DLL 2020-06-20 01:17:39.946465 - (0, 237) total_ips : 6462.7909628578545
+DLL 2020-06-20 01:17:40.252307 - (0, 238) total_ips : 6703.7479558875975
+DLL 2020-06-20 01:17:40.564177 - (0, 239) total_ips : 6574.722862222916
+DLL 2020-06-20 01:17:40.877445 - (0, 240) total_ips : 6544.462757228296
+DLL 2020-06-20 01:17:41.189260 - (0, 241) total_ips : 6580.615910502942
+DLL 2020-06-20 01:17:41.499995 - (0, 242) total_ips : 6597.826458176835
+DLL 2020-06-20 01:17:41.806187 - (0, 243) total_ips : 6695.904314097207
+DLL 2020-06-20 01:17:42.109482 - (0, 244) total_ips : 6759.587112776582
+DLL 2020-06-20 01:17:42.418549 - (0, 245) total_ips : 6634.90123036259
+DLL 2020-06-20 01:17:42.734553 - (0, 246) total_ips : 6487.988513378274
+DLL 2020-06-20 01:17:43.046482 - (0, 247) total_ips : 6572.876533045216
+DLL 2020-06-20 01:17:43.350473 - (0, 248) total_ips : 6743.576942914676
+DLL 2020-06-20 01:17:43.655081 - (0, 249) total_ips : 6730.779007018399
+DLL 2020-06-20 01:17:43.956929 - (0, 250) total_ips : 6795.662287030708
+DLL 2020-06-20 01:17:44.260039 - (0, 251) total_ips : 6765.5392719310685
+DLL 2020-06-20 01:17:44.572689 - (0, 252) total_ips : 6559.059544344238
+DLL 2020-06-20 01:17:44.875716 - (0, 253) total_ips : 6766.109482628925
+DLL 2020-06-20 01:17:45.179290 - (0, 254) total_ips : 6752.939274183214
+DLL 2020-06-20 01:17:45.482824 - (0, 255) total_ips : 6754.139274714716
+DLL 2020-06-20 01:17:45.785001 - (0, 256) total_ips : 6784.224931545149
+DLL 2020-06-20 01:17:46.094189 - (0, 257) total_ips : 6630.2818562769335
+DLL 2020-06-20 01:17:46.399105 - (0, 258) total_ips : 6723.11932571061
+DLL 2020-06-20 01:17:46.709405 - (0, 259) total_ips : 6606.422346643697
+DLL 2020-06-20 01:17:47.021537 - (0, 260) total_ips : 6567.6199284055165
+DLL 2020-06-20 01:17:47.325426 - (0, 261) total_ips : 6746.33099055585
+DLL 2020-06-20 01:17:47.641631 - (0, 262) total_ips : 6484.564951074755
+DLL 2020-06-20 01:17:47.958684 - (0, 263) total_ips : 6467.160346895401
+DLL 2020-06-20 01:17:48.258993 - (0, 264) total_ips : 6830.4187277353685
+DLL 2020-06-20 01:17:48.560548 - (0, 265) total_ips : 6798.211551824293
+DLL 2020-06-20 01:17:48.864387 - (0, 266) total_ips : 6747.030452981323
+DLL 2020-06-20 01:17:49.177395 - (0, 267) total_ips : 6549.312806405719
+DLL 2020-06-20 01:17:49.489556 - (0, 268) total_ips : 6571.900963223086
+DLL 2020-06-20 01:17:49.792294 - (0, 269) total_ips : 6771.66206705179
+DLL 2020-06-20 01:17:50.104906 - (0, 270) total_ips : 6560.086413568103
+DLL 2020-06-20 01:17:50.408719 - (0, 271) total_ips : 6748.392701310251
+DLL 2020-06-20 01:17:50.721787 - (0, 272) total_ips : 6552.92007054932
+DLL 2020-06-20 01:17:51.032590 - (0, 273) total_ips : 6595.962067170288
+DLL 2020-06-20 01:17:51.344066 - (0, 274) total_ips : 6581.84117643453
+DLL 2020-06-20 01:17:51.648418 - (0, 275) total_ips : 6736.368820177578
+DLL 2020-06-20 01:17:51.958761 - (0, 276) total_ips : 6610.769396291323
+DLL 2020-06-20 01:17:52.260941 - (0, 277) total_ips : 6784.214215366876
+DLL 2020-06-20 01:17:52.566493 - (0, 278) total_ips : 6709.544491101779
+DLL 2020-06-20 01:17:52.869737 - (0, 279) total_ips : 6760.475544442792
+DLL 2020-06-20 01:17:53.181231 - (0, 280) total_ips : 6583.818699107231
+DLL 2020-06-20 01:17:53.490121 - (0, 281) total_ips : 6640.101876480797
+DLL 2020-06-20 01:17:53.797172 - (0, 282) total_ips : 6676.315603266834
+DLL 2020-06-20 01:17:54.123411 - (0, 283) total_ips : 6283.514165811424
+DLL 2020-06-20 01:17:54.425095 - (0, 284) total_ips : 6800.181280438762
+DLL 2020-06-20 01:17:54.731663 - (0, 285) total_ips : 6693.676330621815
+DLL 2020-06-20 01:17:55.036155 - (0, 286) total_ips : 6733.406488419471
+DLL 2020-06-20 01:17:55.346765 - (0, 287) total_ips : 6602.639224894983
+DLL 2020-06-20 01:17:55.663056 - (0, 288) total_ips : 6481.247692688433
+DLL 2020-06-20 01:17:55.966007 - (0, 289) total_ips : 6772.729889806294
+DLL 2020-06-20 01:17:56.279793 - (0, 290) total_ips : 6533.506794822746
+DLL 2020-06-20 01:17:56.590176 - (0, 291) total_ips : 6604.674970628579
+DLL 2020-06-20 01:17:56.898529 - (0, 292) total_ips : 6648.015905828087
+DLL 2020-06-20 01:17:57.207779 - (0, 293) total_ips : 6631.157097090451
+DLL 2020-06-20 01:17:57.507257 - (0, 294) total_ips : 6858.110749352108
+DLL 2020-06-20 01:17:57.815479 - (0, 295) total_ips : 6651.125002613238
+DLL 2020-06-20 01:17:58.118973 - (0, 296) total_ips : 6757.518557357137
+DLL 2020-06-20 01:17:58.426540 - (0, 297) total_ips : 6666.274441510951
+DLL 2020-06-20 01:17:58.729780 - (0, 298) total_ips : 6762.439434375497
+DLL 2020-06-20 01:17:59.035517 - (0, 299) total_ips : 6705.150353408608
+DLL 2020-06-20 01:17:59.345255 - (0, 300) total_ips : 6618.588120352892
+DLL 2020-06-20 01:17:59.647181 - (0, 301) total_ips : 6795.070958800515
+DLL 2020-06-20 01:17:59.953268 - (0, 302) total_ips : 6697.580191853217
+DLL 2020-06-20 01:18:00.266443 - (0, 303) total_ips : 6547.201253657581
+DLL 2020-06-20 01:18:00.581173 - (0, 304) total_ips : 6518.142878172782
+DLL 2020-06-20 01:18:00.884321 - (0, 305) total_ips : 6765.5446005581025
+DLL 2020-06-20 01:18:01.187671 - (0, 306) total_ips : 6758.682961065284
+DLL 2020-06-20 01:18:01.489938 - (0, 307) total_ips : 6782.542906029877
+DLL 2020-06-20 01:18:01.794445 - (0, 308) total_ips : 6732.124147897822
+DLL 2020-06-20 01:18:02.095548 - (0, 309) total_ips : 6808.891887607247
+DLL 2020-06-20 01:18:02.407795 - (0, 310) total_ips : 6565.170391543935
+DLL 2020-06-20 01:18:02.719194 - (0, 311) total_ips : 6583.263662100499
+DLL 2020-06-20 01:18:03.027770 - (0, 312) total_ips : 6645.655141254128
+DLL 2020-06-20 01:18:03.333209 - (0, 313) total_ips : 6712.087234356772
+DLL 2020-06-20 01:18:03.649289 - (0, 314) total_ips : 6487.5279097992625
+DLL 2020-06-20 01:18:03.963194 - (0, 315) total_ips : 6534.948235056042
+DLL 2020-06-20 01:18:04.286189 - (0, 316) total_ips : 6349.946510718481
+DLL 2020-06-20 01:18:04.599276 - (0, 317) total_ips : 6555.315448912794
+DLL 2020-06-20 01:18:04.901051 - (0, 318) total_ips : 6799.874444389032
+DLL 2020-06-20 01:18:05.213942 - (0, 319) total_ips : 6552.66513337712
+DLL 2020-06-20 01:18:05.517544 - (0, 320) total_ips : 6757.0188906919975
+DLL 2020-06-20 01:18:05.830212 - (0, 321) total_ips : 6561.4644261272015
+DLL 2020-06-20 01:18:06.141830 - (0, 322) total_ips : 6579.063553931499
+DLL 2020-06-20 01:18:06.444012 - (0, 323) total_ips : 6784.803655449407
+DLL 2020-06-20 01:18:06.746762 - (0, 324) total_ips : 6771.3417858820785
+DLL 2020-06-20 01:18:07.060559 - (0, 325) total_ips : 6532.79624973572
+DLL 2020-06-20 01:18:07.371682 - (0, 326) total_ips : 6588.782869954538
+DLL 2020-06-20 01:18:07.686732 - (0, 327) total_ips : 6508.024168515924
+DLL 2020-06-20 01:18:07.995791 - (0, 328) total_ips : 6635.218984749695
+DLL 2020-06-20 01:18:08.298416 - (0, 329) total_ips : 6774.465820233173
+DLL 2020-06-20 01:18:08.602544 - (0, 330) total_ips : 6740.4919042858555
+DLL 2020-06-20 01:18:08.906331 - (0, 331) total_ips : 6748.567660208995
+DLL 2020-06-20 01:18:09.216816 - (0, 332) total_ips : 6603.85239854668
+DLL 2020-06-20 01:18:09.520791 - (0, 333) total_ips : 6745.176135243774
+DLL 2020-06-20 01:18:09.824134 - (0, 334) total_ips : 6758.975454267196
+DLL 2020-06-20 01:18:10.128137 - (0, 335) total_ips : 6745.483351721918
+DLL 2020-06-20 01:18:10.432104 - (0, 336) total_ips : 6744.5035348063
+DLL 2020-06-20 01:18:10.735168 - (0, 337) total_ips : 6765.443358079765
+DLL 2020-06-20 01:18:11.038877 - (0, 338) total_ips : 6749.957049829835
+DLL 2020-06-20 01:18:11.353100 - (0, 339) total_ips : 6527.18192435554
+DLL 2020-06-20 01:18:11.656677 - (0, 340) total_ips : 6756.604329765703
+DLL 2020-06-20 01:18:11.971746 - (0, 341) total_ips : 6511.151733730524
+DLL 2020-06-20 01:18:12.283141 - (0, 342) total_ips : 6583.187982486594
+DLL 2020-06-20 01:18:12.583860 - (0, 343) total_ips : 6818.8695926904975
+DLL 2020-06-20 01:18:12.887794 - (0, 344) total_ips : 6747.814871228874
+DLL 2020-06-20 01:18:13.199630 - (0, 345) total_ips : 6575.487858219461
+DLL 2020-06-20 01:18:13.506871 - (0, 346) total_ips : 6674.033222797863
+DLL 2020-06-20 01:18:13.809141 - (0, 347) total_ips : 6789.989780948044
+DLL 2020-06-20 01:18:14.113389 - (0, 348) total_ips : 6739.021816082143
+DLL 2020-06-20 01:18:14.415601 - (0, 349) total_ips : 6784.439262220179
+DLL 2020-06-20 01:18:14.719815 - (0, 350) total_ips : 6738.805058770829
+DLL 2020-06-20 01:18:15.027914 - (0, 351) total_ips : 6656.113863031786
+DLL 2020-06-20 01:18:15.328248 - (0, 352) total_ips : 6833.3148447934755
+DLL 2020-06-20 01:18:15.631884 - (0, 353) total_ips : 6751.999748468408
+DLL 2020-06-20 01:18:15.943402 - (0, 354) total_ips : 6580.817569001432
+DLL 2020-06-20 01:18:16.251276 - (0, 355) total_ips : 6660.898438747959
+DLL 2020-06-20 01:18:16.562856 - (0, 356) total_ips : 6579.386061246202
+DLL 2020-06-20 01:18:16.875508 - (0, 357) total_ips : 6557.757635952359
+DLL 2020-06-20 01:18:17.183553 - (0, 358) total_ips : 6656.629667716185
+DLL 2020-06-20 01:18:17.485507 - (0, 359) total_ips : 6790.048820743717
+DLL 2020-06-20 01:18:17.796276 - (0, 360) total_ips : 6597.988628944421
+DLL 2020-06-20 01:18:18.099628 - (0, 361) total_ips : 6758.544700363658
+DLL 2020-06-20 01:18:18.402035 - (0, 362) total_ips : 6779.416769989763
+DLL 2020-06-20 01:18:18.712776 - (0, 363) total_ips : 6601.436643401356
+DLL 2020-06-20 01:18:19.025040 - (0, 364) total_ips : 6568.026688259505
+DLL 2020-06-20 01:18:19.336450 - (0, 365) total_ips : 6586.625591573962
+DLL 2020-06-20 01:18:19.639496 - (0, 366) total_ips : 6765.3261337323775
+DLL 2020-06-20 01:18:19.945732 - (0, 367) total_ips : 6699.748068835561
+DLL 2020-06-20 01:18:20.247990 - (0, 368) total_ips : 6783.432025781976
+DLL 2020-06-20 01:18:20.564636 - (0, 369) total_ips : 6474.081688610127
+DLL 2020-06-20 01:18:20.863090 - (0, 370) total_ips : 6876.365050508447
+DLL 2020-06-20 01:18:21.167657 - (0, 371) total_ips : 6730.953053791616
+DLL 2020-06-20 01:18:21.470760 - (0, 372) total_ips : 6763.546953861078
+DLL 2020-06-20 01:18:21.791160 - (0, 373) total_ips : 6398.5139483452
+DLL 2020-06-20 01:18:22.105860 - (0, 374) total_ips : 6516.847272462431
+DLL 2020-06-20 01:18:22.418702 - (0, 375) total_ips : 6552.635142072739
+DLL 2020-06-20 01:18:22.732333 - (0, 376) total_ips : 6536.793212032661
+DLL 2020-06-20 01:18:23.048318 - (0, 377) total_ips : 6487.728803318359
+DLL 2020-06-20 01:18:23.363083 - (0, 378) total_ips : 6513.788325291512
+DLL 2020-06-20 01:18:23.667441 - (0, 379) total_ips : 6735.893404263327
+DLL 2020-06-20 01:18:23.990563 - (0, 380) total_ips : 6349.70242805895
+DLL 2020-06-20 01:18:24.290649 - (0, 381) total_ips : 6836.632365453016
+DLL 2020-06-20 01:18:24.600673 - (0, 382) total_ips : 6612.708345778766
+DLL 2020-06-20 01:18:24.912409 - (0, 383) total_ips : 6580.026130333003
+DLL 2020-06-20 01:18:25.224043 - (0, 384) total_ips : 6577.9652506193215
+DLL 2020-06-20 01:18:25.535432 - (0, 385) total_ips : 6583.394844219904
+DLL 2020-06-20 01:18:25.849857 - (0, 386) total_ips : 6520.696036085002
+DLL 2020-06-20 01:18:26.166525 - (0, 387) total_ips : 6473.8084536975975
+DLL 2020-06-20 01:18:26.470363 - (0, 388) total_ips : 6747.4279394345
+DLL 2020-06-20 01:18:26.775138 - (0, 389) total_ips : 6727.321035059869
+DLL 2020-06-20 01:18:27.094197 - (0, 390) total_ips : 6425.268170594787
+DLL 2020-06-20 01:18:27.419281 - (0, 391) total_ips : 6306.075749834088
+DLL 2020-06-20 01:18:27.720216 - (0, 392) total_ips : 6813.477138190901
+DLL 2020-06-20 01:18:28.023683 - (0, 393) total_ips : 6755.5203339564605
+DLL 2020-06-20 01:18:28.328295 - (0, 394) total_ips : 6730.5944217913075
+DLL 2020-06-20 01:18:28.631074 - (0, 395) total_ips : 6772.099833652625
+DLL 2020-06-20 01:18:28.945223 - (0, 396) total_ips : 6527.127367336456
+DLL 2020-06-20 01:18:29.278998 - (0, 397) total_ips : 6142.705350987846
+DLL 2020-06-20 01:18:29.584068 - (0, 398) total_ips : 6720.762770915697
+DLL 2020-06-20 01:18:29.887503 - (0, 399) total_ips : 6760.512789193172
+DLL 2020-06-20 01:18:30.202682 - (0, 400) total_ips : 6504.288844113195
+DLL 2020-06-20 01:18:30.507949 - (0, 401) total_ips : 6717.724833952062
+DLL 2020-06-20 01:18:30.810468 - (0, 402) total_ips : 6777.801302389292
+DLL 2020-06-20 01:18:31.126524 - (0, 403) total_ips : 6486.327707779273
+DLL 2020-06-20 01:18:31.431059 - (0, 404) total_ips : 6731.775942220704
+DLL 2020-06-20 01:18:31.734165 - (0, 405) total_ips : 6766.322670189277
+DLL 2020-06-20 01:18:32.036857 - (0, 406) total_ips : 6772.772609721329
+DLL 2020-06-20 01:18:32.341527 - (0, 407) total_ips : 6729.560931585149
+DLL 2020-06-20 01:18:32.666723 - (0, 408) total_ips : 6304.4836243644095
+DLL 2020-06-20 01:18:32.994999 - (0, 409) total_ips : 6244.7091077485875
+DLL 2020-06-20 01:18:33.292050 - (0, 410) total_ips : 6906.202437690947
+DLL 2020-06-20 01:18:33.616780 - (0, 411) total_ips : 6314.56830665365
+DLL 2020-06-20 01:18:33.942953 - (0, 412) total_ips : 6285.031335400068
+DLL 2020-06-20 01:18:34.268400 - (0, 413) total_ips : 6298.73737731484
+DLL 2020-06-20 01:18:34.593434 - (0, 414) total_ips : 6308.558106742497
+DLL 2020-06-20 01:18:34.895784 - (0, 415) total_ips : 6780.321126031264
+DLL 2020-06-20 01:18:35.200781 - (0, 416) total_ips : 6723.7455633899835
+DLL 2020-06-20 01:18:35.504847 - (0, 417) total_ips : 6742.497122839186
+DLL 2020-06-20 01:18:35.825316 - (0, 418) total_ips : 6396.912920149684
+DLL 2020-06-20 01:18:36.127923 - (0, 419) total_ips : 6774.567332929538
+DLL 2020-06-20 01:18:36.452335 - (0, 420) total_ips : 6318.911485279178
+DLL 2020-06-20 01:18:36.779622 - (0, 421) total_ips : 6263.7249481907975
+DLL 2020-06-20 01:18:37.098698 - (0, 422) total_ips : 6424.672269661778
+DLL 2020-06-20 01:18:37.425486 - (0, 423) total_ips : 6272.919034182192
+DLL 2020-06-20 01:18:37.736076 - (0, 424) total_ips : 6600.305500424528
+DLL 2020-06-20 01:18:38.041312 - (0, 425) total_ips : 6716.101872860643
+DLL 2020-06-20 01:18:38.364810 - (0, 426) total_ips : 6338.808259552192
+DLL 2020-06-20 01:18:38.668987 - (0, 427) total_ips : 6744.1752274115515
+DLL 2020-06-20 01:18:38.971998 - (0, 428) total_ips : 6766.296021009549
+DLL 2020-06-20 01:18:39.276081 - (0, 429) total_ips : 6741.750978699358
+DLL 2020-06-20 01:18:39.578694 - (0, 430) total_ips : 6774.7383085581605
+DLL 2020-06-20 01:18:39.889729 - (0, 431) total_ips : 6590.69377132497
+DLL 2020-06-20 01:18:40.192044 - (0, 432) total_ips : 6781.691497794157
+DLL 2020-06-20 01:18:40.498170 - (0, 433) total_ips : 6696.650785322763
+DLL 2020-06-20 01:18:40.803165 - (0, 434) total_ips : 6723.666619441486
+DLL 2020-06-20 01:18:41.107800 - (0, 435) total_ips : 6729.497666985256
+DLL 2020-06-20 01:18:41.415778 - (0, 436) total_ips : 6664.216061891566
+DLL 2020-06-20 01:18:41.717905 - (0, 437) total_ips : 6788.712625837136
+DLL 2020-06-20 01:18:42.026814 - (0, 438) total_ips : 6639.357694834556
+DLL 2020-06-20 01:18:42.329466 - (0, 439) total_ips : 6773.664511011034
+DLL 2020-06-20 01:18:42.631626 - (0, 440) total_ips : 6784.482129980294
+DLL 2020-06-20 01:18:42.944185 - (0, 441) total_ips : 6559.8709948398855
+DLL 2020-06-20 01:18:43.247396 - (0, 442) total_ips : 6760.911865844857
+DLL 2020-06-20 01:18:43.559029 - (0, 443) total_ips : 6578.307801289175
+DLL 2020-06-20 01:18:43.868408 - (0, 444) total_ips : 6627.11040510546
+DLL 2020-06-20 01:18:44.170377 - (0, 445) total_ips : 6790.687589627481
+DLL 2020-06-20 01:18:44.473271 - (0, 446) total_ips : 6768.321957107895
+DLL 2020-06-20 01:18:44.774624 - (0, 447) total_ips : 6803.073358914351
+DLL 2020-06-20 01:18:45.078950 - (0, 448) total_ips : 6736.2737316260655
+DLL 2020-06-20 01:18:45.390288 - (0, 449) total_ips : 6584.489914308995
+DLL 2020-06-20 01:18:45.695430 - (0, 450) total_ips : 6720.3105855477015
+DLL 2020-06-20 01:18:45.999218 - (0, 451) total_ips : 6755.589401744355
+DLL 2020-06-20 01:18:46.301340 - (0, 452) total_ips : 6785.902430777738
+DLL 2020-06-20 01:18:46.609549 - (0, 453) total_ips : 6651.573075713907
+DLL 2020-06-20 01:18:46.911845 - (0, 454) total_ips : 6784.889400721463
+DLL 2020-06-20 01:18:47.224493 - (0, 455) total_ips : 6556.751514781427
+DLL 2020-06-20 01:18:47.534351 - (0, 456) total_ips : 6615.871119692725
+DLL 2020-06-20 01:18:47.837315 - (0, 457) total_ips : 6766.909005256802
+DLL 2020-06-20 01:18:48.140899 - (0, 458) total_ips : 6752.811865543338
+DLL 2020-06-20 01:18:48.445125 - (0, 459) total_ips : 6739.201576624286
+DLL 2020-06-20 01:18:48.762073 - (0, 460) total_ips : 6470.28773942695
+DLL 2020-06-20 01:18:49.073301 - (0, 461) total_ips : 6587.67121518535
+DLL 2020-06-20 01:18:49.372459 - (0, 462) total_ips : 6862.844796262238
+DLL 2020-06-20 01:18:49.675430 - (0, 463) total_ips : 6766.493229910491
+DLL 2020-06-20 01:18:49.979315 - (0, 464) total_ips : 6746.103166687348
+DLL 2020-06-20 01:18:50.282684 - (0, 465) total_ips : 6758.01829792624
+DLL 2020-06-20 01:18:50.594769 - (0, 466) total_ips : 6568.503816490358
+DLL 2020-06-20 01:18:50.905769 - (0, 467) total_ips : 6591.750803831379
+DLL 2020-06-20 01:18:51.209247 - (0, 468) total_ips : 6756.003838131522
+DLL 2020-06-20 01:18:51.522269 - (0, 469) total_ips : 6548.80850573959
+DLL 2020-06-20 01:18:51.825775 - (0, 470) total_ips : 6754.681007563885
+DLL 2020-06-20 01:18:52.137438 - (0, 471) total_ips : 6577.975325129818
+DLL 2020-06-20 01:18:52.453418 - (0, 472) total_ips : 6490.165014646427
+DLL 2020-06-20 01:18:52.764292 - (0, 473) total_ips : 6603.096016204228
+DLL 2020-06-20 01:18:53.065709 - (0, 474) total_ips : 6802.437644770675
+DLL 2020-06-20 01:18:53.374629 - (0, 475) total_ips : 6636.859491438077
+DLL 2020-06-20 01:18:53.688227 - (0, 476) total_ips : 6540.102854749985
+DLL 2020-06-20 01:18:53.998198 - (0, 477) total_ips : 6614.0016107795955
+DLL 2020-06-20 01:18:54.309535 - (0, 478) total_ips : 6588.176466302256
+DLL 2020-06-20 01:18:54.611843 - (0, 479) total_ips : 6781.5630019105365
+DLL 2020-06-20 01:18:54.923195 - (0, 480) total_ips : 6584.500008815172
+DLL 2020-06-20 01:18:55.225434 - (0, 481) total_ips : 6792.561647117805
+DLL 2020-06-20 01:18:55.533504 - (0, 482) total_ips : 6655.902406216149
+DLL 2020-06-20 01:18:55.835677 - (0, 483) total_ips : 6785.328879258932
+DLL 2020-06-20 01:18:56.139882 - (0, 484) total_ips : 6738.958373474505
+DLL 2020-06-20 01:18:56.442861 - (0, 485) total_ips : 6766.343989684201
+DLL 2020-06-20 01:18:56.757537 - (0, 486) total_ips : 6515.9030905641575
+DLL 2020-06-20 01:18:57.056080 - (0, 487) total_ips : 6873.99337402811
+DLL 2020-06-20 01:18:57.363003 - (0, 488) total_ips : 6684.118593818816
+DLL 2020-06-20 01:18:57.674011 - (0, 489) total_ips : 6594.44296262404
+DLL 2020-06-20 01:18:57.985395 - (0, 490) total_ips : 6583.7127302688305
+DLL 2020-06-20 01:18:58.293654 - (0, 491) total_ips : 6650.599752400699
+DLL 2020-06-20 01:18:58.595456 - (0, 492) total_ips : 6792.94302899557
+DLL 2020-06-20 01:18:58.898969 - (0, 493) total_ips : 6755.743481129783
+DLL 2020-06-20 01:18:59.201803 - (0, 494) total_ips : 6770.108986186193
+DLL 2020-06-20 01:18:59.511530 - (0, 495) total_ips : 6623.038009896853
+DLL 2020-06-20 01:18:59.833429 - (0, 496) total_ips : 6371.490066259551
+DLL 2020-06-20 01:19:00.134176 - (0, 497) total_ips : 6823.625487348791
+DLL 2020-06-20 01:19:00.437539 - (0, 498) total_ips : 6761.06086654005
+DLL 2020-06-20 01:19:00.739913 - (0, 499) total_ips : 6779.700358640198
+DLL 2020-06-20 01:19:01.042530 - (0, 500) total_ips : 6774.887919312758
+DLL 2020-06-20 01:19:01.348913 - (0, 501) total_ips : 6691.1631511178375
+DLL 2020-06-20 01:19:01.649104 - (0, 502) total_ips : 6830.983630961848
+DLL 2020-06-20 01:19:01.955687 - (0, 503) total_ips : 6686.381855247682
+DLL 2020-06-20 01:19:02.259605 - (0, 504) total_ips : 6745.324443153129
+DLL 2020-06-20 01:19:02.562778 - (0, 505) total_ips : 6762.061469889704
+DLL 2020-06-20 01:19:02.867201 - (0, 506) total_ips : 6736.918273265289
+DLL 2020-06-20 01:19:03.168732 - (0, 507) total_ips : 6799.4438440026315
+DLL 2020-06-20 01:19:03.477454 - (0, 508) total_ips : 6640.830822966781
+DLL 2020-06-20 01:19:03.780432 - (0, 509) total_ips : 6769.767510700491
+DLL 2020-06-20 01:19:04.084276 - (0, 510) total_ips : 6753.645417549863
+DLL 2020-06-20 01:19:04.397761 - (0, 511) total_ips : 6539.385895982625
+DLL 2020-06-20 01:19:04.698973 - (0, 512) total_ips : 6809.491021946705
+DLL 2020-06-20 01:19:05.011688 - (0, 513) total_ips : 6555.325454163884
+DLL 2020-06-20 01:19:05.317529 - (0, 514) total_ips : 6703.659017621627
+DLL 2020-06-20 01:19:05.621654 - (0, 515) total_ips : 6744.180522438507
+DLL 2020-06-20 01:19:05.929402 - (0, 516) total_ips : 6663.7714533959115
+DLL 2020-06-20 01:19:06.232656 - (0, 517) total_ips : 6762.428786910232
+DLL 2020-06-20 01:19:06.536742 - (0, 518) total_ips : 6741.978508700672
+DLL 2020-06-20 01:19:06.839788 - (0, 519) total_ips : 6765.549929193531
+DLL 2020-06-20 01:19:07.143815 - (0, 520) total_ips : 6742.957592047174
+DLL 2020-06-20 01:19:07.448398 - (0, 521) total_ips : 6730.8422957126795
+DLL 2020-06-20 01:19:07.749355 - (0, 522) total_ips : 6812.153316647792
+DLL 2020-06-20 01:19:08.052284 - (0, 523) total_ips : 6767.474115199201
+DLL 2020-06-20 01:19:08.365717 - (0, 524) total_ips : 6540.745263824759
+DLL 2020-06-20 01:19:08.669494 - (0, 525) total_ips : 6748.853976158058
+DLL 2020-06-20 01:19:08.979954 - (0, 526) total_ips : 6604.781615346585
+DLL 2020-06-20 01:19:09.283231 - (0, 527) total_ips : 6761.502585763111
+DLL 2020-06-20 01:19:09.596219 - (0, 528) total_ips : 6550.2517115427145
+DLL 2020-06-20 01:19:09.905325 - (0, 529) total_ips : 6631.832879627071
+DLL 2020-06-20 01:19:10.209839 - (0, 530) total_ips : 6732.292987859835
+DLL 2020-06-20 01:19:10.522664 - (0, 531) total_ips : 6554.450110259051
+DLL 2020-06-20 01:19:10.831326 - (0, 532) total_ips : 6644.955977411619
+DLL 2020-06-20 01:19:11.152808 - (0, 533) total_ips : 6377.848125871021
+DLL 2020-06-20 01:19:11.452167 - (0, 534) total_ips : 6854.1542890655855
+DLL 2020-06-20 01:19:11.761876 - (0, 535) total_ips : 6620.470428468702
+DLL 2020-06-20 01:19:12.074617 - (0, 536) total_ips : 6555.790732071417
+DLL 2020-06-20 01:19:12.391406 - (0, 537) total_ips : 6471.257747864619
+DLL 2020-06-20 01:19:12.704241 - (0, 538) total_ips : 6556.791553505811
+DLL 2020-06-20 01:19:13.008769 - (0, 539) total_ips : 6734.620676462126
+DLL 2020-06-20 01:19:13.317480 - (0, 540) total_ips : 6643.059722257668
+DLL 2020-06-20 01:19:13.630866 - (0, 541) total_ips : 6541.422668981693
+DLL 2020-06-20 01:19:13.941931 - (0, 542) total_ips : 6590.319592271698
+DLL 2020-06-20 01:19:14.251717 - (0, 543) total_ips : 6617.4459946043135
+DLL 2020-06-20 01:19:14.561166 - (0, 544) total_ips : 6624.600972335333
+DLL 2020-06-20 01:19:14.873562 - (0, 545) total_ips : 6562.191247696722
+DLL 2020-06-20 01:19:15.179409 - (0, 546) total_ips : 6702.518724280157
+DLL 2020-06-20 01:19:15.482494 - (0, 547) total_ips : 6764.569601572479
+DLL 2020-06-20 01:19:15.785565 - (0, 548) total_ips : 6764.084870619158
+DLL 2020-06-20 01:19:16.093135 - (0, 549) total_ips : 6665.100285305709
+DLL 2020-06-20 01:19:16.395601 - (0, 550) total_ips : 6778.031272291134
+DLL 2020-06-20 01:19:16.695964 - (0, 551) total_ips : 6825.713023861571
+DLL 2020-06-20 01:19:17.001770 - (0, 552) total_ips : 6703.481148169132
+DLL 2020-06-20 01:19:17.303117 - (0, 553) total_ips : 6803.240388270776
+DLL 2020-06-20 01:19:17.606622 - (0, 554) total_ips : 6754.463241758155
+DLL 2020-06-20 01:19:17.909054 - (0, 555) total_ips : 6782.923163661575
+DLL 2020-06-20 01:19:18.212041 - (0, 556) total_ips : 6766.391959038991
+DLL 2020-06-20 01:19:18.522143 - (0, 557) total_ips : 6610.698170461883
+DLL 2020-06-20 01:19:18.830890 - (0, 558) total_ips : 6639.747727859481
+DLL 2020-06-20 01:19:19.132542 - (0, 559) total_ips : 6796.156931499913
+DLL 2020-06-20 01:19:19.436369 - (0, 560) total_ips : 6747.321938467726
+DLL 2020-06-20 01:19:19.738461 - (0, 561) total_ips : 6790.596329571731
+DLL 2020-06-20 01:19:20.049100 - (0, 562) total_ips : 6599.991081108285
+DLL 2020-06-20 01:19:20.354528 - (0, 563) total_ips : 6711.87220623029
+DLL 2020-06-20 01:19:20.657947 - (0, 564) total_ips : 6758.730821856911
+DLL 2020-06-20 01:19:20.959127 - (0, 565) total_ips : 6806.679782501549
+DLL 2020-06-20 01:19:21.268706 - (0, 566) total_ips : 6622.450812701942
+DLL 2020-06-20 01:19:21.574831 - (0, 567) total_ips : 6697.094570868118
+DLL 2020-06-20 01:19:21.882748 - (0, 568) total_ips : 6657.578957240036
+DLL 2020-06-20 01:19:22.189102 - (0, 569) total_ips : 6693.32165980057
+DLL 2020-06-20 01:19:22.491128 - (0, 570) total_ips : 6788.546309065347
+DLL 2020-06-20 01:19:22.794567 - (0, 571) total_ips : 6755.950702419734
+DLL 2020-06-20 01:19:23.109785 - (0, 572) total_ips : 6503.210439132818
+DLL 2020-06-20 01:19:23.412632 - (0, 573) total_ips : 6771.28307095397
+DLL 2020-06-20 01:19:23.716042 - (0, 574) total_ips : 6756.492725899824
+DLL 2020-06-20 01:19:24.020156 - (0, 575) total_ips : 6742.904661352893
+DLL 2020-06-20 01:19:24.329293 - (0, 576) total_ips : 6631.9199222384095
+DLL 2020-06-20 01:19:24.644186 - (0, 577) total_ips : 6512.143908104535
+DLL 2020-06-20 01:19:24.952799 - (0, 578) total_ips : 6644.935415996238
+DLL 2020-06-20 01:19:25.254590 - (0, 579) total_ips : 6793.7757720564105
+DLL 2020-06-20 01:19:25.564499 - (0, 580) total_ips : 6615.92717033331
+DLL 2020-06-20 01:19:25.885829 - (0, 581) total_ips : 6380.102982628014
+DLL 2020-06-20 01:19:26.190910 - (0, 582) total_ips : 6723.477161528268
+DLL 2020-06-20 01:19:26.490624 - (0, 583) total_ips : 6840.192762718356
+DLL 2020-06-20 01:19:26.794756 - (0, 584) total_ips : 6740.5024827837315
+DLL 2020-06-20 01:19:27.108418 - (0, 585) total_ips : 6537.619064725205
+DLL 2020-06-20 01:19:27.423960 - (0, 586) total_ips : 6496.796647960187
+DLL 2020-06-20 01:19:27.737337 - (0, 587) total_ips : 6541.686695752897
+DLL 2020-06-20 01:19:28.061459 - (0, 588) total_ips : 6324.955409829306
+DLL 2020-06-20 01:19:28.363580 - (0, 589) total_ips : 6788.782374005483
+DLL 2020-06-20 01:19:28.666310 - (0, 590) total_ips : 6772.516298314664
+DLL 2020-06-20 01:19:28.968797 - (0, 591) total_ips : 6777.271896119963
+DLL 2020-06-20 01:19:29.283669 - (0, 592) total_ips : 6513.521606630346
+DLL 2020-06-20 01:19:29.583275 - (0, 593) total_ips : 6847.504820393125
+DLL 2020-06-20 01:19:29.890344 - (0, 594) total_ips : 6676.071729069112
+DLL 2020-06-20 01:19:30.200243 - (0, 595) total_ips : 6615.020285703285
+DLL 2020-06-20 01:19:30.525726 - (0, 596) total_ips : 6302.198663835669
+DLL 2020-06-20 01:19:30.837715 - (0, 597) total_ips : 6576.97306253455
+DLL 2020-06-20 01:19:31.136996 - (0, 598) total_ips : 6854.373061071413
+DLL 2020-06-20 01:19:31.444845 - (0, 599) total_ips : 6659.6177489855445
+DLL 2020-06-20 01:19:31.758094 - (0, 600) total_ips : 6546.1784140599875
+DLL 2020-06-20 01:19:32.070244 - (0, 601) total_ips : 6570.704525635887
+DLL 2020-06-20 01:19:32.374318 - (0, 602) total_ips : 6741.761561149578
+DLL 2020-06-20 01:19:32.684223 - (0, 603) total_ips : 6615.2087749602815
+DLL 2020-06-20 01:19:32.991824 - (0, 604) total_ips : 6664.598679483897
+DLL 2020-06-20 01:19:33.298745 - (0, 605) total_ips : 6681.248797910519
+DLL 2020-06-20 01:19:33.615445 - (0, 606) total_ips : 6474.7209532309025
+DLL 2020-06-20 01:19:34.794767 - (0, 607) total_ips : 1739.267552613244
+DLL 2020-06-20 01:19:35.748903 - (0, 608) total_ips : 2157.0247075376155
+DLL 2020-06-20 01:19:36.053114 - (0, 609) total_ips : 6748.63128387599
+DLL 2020-06-20 01:19:36.364386 - (0, 610) total_ips : 6590.8303066946155
+DLL 2020-06-20 01:19:36.673677 - (0, 611) total_ips : 6630.128329079162
+DLL 2020-06-20 01:19:36.986161 - (0, 612) total_ips : 6562.251405661761
+DLL 2020-06-20 01:19:37.297122 - (0, 613) total_ips : 6592.484350980707
+DLL 2020-06-20 01:19:37.598478 - (0, 614) total_ips : 6802.976377890396
+DLL 2020-06-20 01:19:37.899698 - (0, 615) total_ips : 6806.043394205232
+DLL 2020-06-20 01:19:38.205002 - (0, 616) total_ips : 6714.390472527851
+DLL 2020-06-20 01:19:38.511915 - (0, 617) total_ips : 6679.664188406845
+DLL 2020-06-20 01:19:38.821956 - (0, 618) total_ips : 6620.092860803588
+DLL 2020-06-20 01:19:39.125668 - (0, 619) total_ips : 6782.9070955749685
+DLL 2020-06-20 01:19:39.445477 - (0, 620) total_ips : 6409.963645752416
+DLL 2020-06-20 01:19:39.757882 - (0, 621) total_ips : 6561.920550502728
+DLL 2020-06-20 01:19:40.074345 - (0, 622) total_ips : 6478.231837999229
+DLL 2020-06-20 01:19:40.377917 - (0, 623) total_ips : 6758.374541111529
+DLL 2020-06-20 01:19:40.680530 - (0, 624) total_ips : 6777.533915148417
+DLL 2020-06-20 01:19:40.994582 - (0, 625) total_ips : 6527.370401075391
+DLL 2020-06-20 01:19:41.303009 - (0, 626) total_ips : 6646.8738887294
+DLL 2020-06-20 01:19:41.612158 - (0, 627) total_ips : 6631.643441841434
+DLL 2020-06-20 01:19:41.921537 - (0, 628) total_ips : 6626.936574565177
+DLL 2020-06-20 01:19:42.224209 - (0, 629) total_ips : 6773.044961849095
+DLL 2020-06-20 01:19:42.533936 - (0, 630) total_ips : 6622.30275332621
+DLL 2020-06-20 01:19:42.838937 - (0, 631) total_ips : 6721.409606915828
+DLL 2020-06-20 01:19:43.141779 - (0, 632) total_ips : 6769.922237511802
+DLL 2020-06-20 01:19:43.470898 - (0, 633) total_ips : 6228.765362289941
+DLL 2020-06-20 01:19:43.767974 - (0, 634) total_ips : 6904.6536369474925
+DLL 2020-06-20 01:19:44.077119 - (0, 635) total_ips : 6632.058171082153
+DLL 2020-06-20 01:19:44.381225 - (0, 636) total_ips : 6741.026159932259
+DLL 2020-06-20 01:19:44.697563 - (0, 637) total_ips : 6480.744040348409
+DLL 2020-06-20 01:19:45.007258 - (0, 638) total_ips : 6621.429848153039
+DLL 2020-06-20 01:19:45.309495 - (0, 639) total_ips : 6782.644660936249
+DLL 2020-06-20 01:19:45.611136 - (0, 640) total_ips : 6796.060147568194
+DLL 2020-06-20 01:19:45.917717 - (0, 641) total_ips : 6686.714970182006
+DLL 2020-06-20 01:19:46.220275 - (0, 642) total_ips : 6775.9995203912595
+DLL 2020-06-20 01:19:46.522022 - (0, 643) total_ips : 6794.501230771178
+DLL 2020-06-20 01:19:46.831959 - (0, 644) total_ips : 6614.877652324311
+DLL 2020-06-20 01:19:47.144932 - (0, 645) total_ips : 6550.121846919666
+DLL 2020-06-20 01:19:47.462375 - (0, 646) total_ips : 6458.009904362084
+DLL 2020-06-20 01:19:47.766761 - (0, 647) total_ips : 6735.386367913285
+DLL 2020-06-20 01:19:48.075619 - (0, 648) total_ips : 6637.972421680603
+DLL 2020-06-20 01:19:48.376446 - (0, 649) total_ips : 6814.860946423995
+DLL 2020-06-20 01:19:48.680066 - (0, 650) total_ips : 6752.158971714605
+DLL 2020-06-20 01:19:48.982511 - (0, 651) total_ips : 6778.132891870203
+DLL 2020-06-20 01:19:49.290662 - (0, 652) total_ips : 6655.293898156958
+DLL 2020-06-20 01:19:49.594250 - (0, 653) total_ips : 6752.811865543338
+DLL 2020-06-20 01:19:49.900008 - (0, 654) total_ips : 6707.784049876932
+DLL 2020-06-20 01:19:50.217834 - (0, 655) total_ips : 6453.328028391855
+DLL 2020-06-20 01:19:50.548077 - (0, 656) total_ips : 6207.838118006192
+DLL 2020-06-20 01:19:50.848701 - (0, 657) total_ips : 6823.598384884065
+DLL 2020-06-20 01:19:51.153233 - (0, 658) total_ips : 6734.045202328633
+DLL 2020-06-20 01:19:51.471465 - (0, 659) total_ips : 6442.4670501676255
+DLL 2020-06-20 01:19:51.775573 - (0, 660) total_ips : 6741.417648522252
+DLL 2020-06-20 01:19:52.077204 - (0, 661) total_ips : 6796.748448762887
+DLL 2020-06-20 01:19:52.394200 - (0, 662) total_ips : 6466.85361612043
+DLL 2020-06-20 01:19:52.710607 - (0, 663) total_ips : 6479.663652355477
+DLL 2020-06-20 01:19:53.012640 - (0, 664) total_ips : 6787.966946537439
+DLL 2020-06-20 01:19:53.331145 - (0, 665) total_ips : 6436.090477585526
+DLL 2020-06-20 01:19:53.634177 - (0, 666) total_ips : 6765.422044259902
+DLL 2020-06-20 01:19:53.942415 - (0, 667) total_ips : 6651.063204164418
+DLL 2020-06-20 01:19:54.252336 - (0, 668) total_ips : 6614.510909020906
+DLL 2020-06-20 01:19:54.554663 - (0, 669) total_ips : 6780.813539627407
+DLL 2020-06-20 01:19:54.859036 - (0, 670) total_ips : 6736.411082617731
+DLL 2020-06-20 01:19:55.161918 - (0, 671) total_ips : 6768.412619442905
+DLL 2020-06-20 01:19:55.476467 - (0, 672) total_ips : 6517.183487045956
+DLL 2020-06-20 01:19:55.778582 - (0, 673) total_ips : 6787.055187317039
+DLL 2020-06-20 01:19:56.082045 - (0, 674) total_ips : 6755.4672058498545
+DLL 2020-06-20 01:19:56.386350 - (0, 675) total_ips : 6738.255297885709
+DLL 2020-06-20 01:19:56.689290 - (0, 676) total_ips : 6768.769959355552
+DLL 2020-06-20 01:19:57.019610 - (0, 677) total_ips : 6206.178620816217
+DLL 2020-06-20 01:19:57.319362 - (0, 678) total_ips : 6843.94771470958
+DLL 2020-06-20 01:19:57.629696 - (0, 679) total_ips : 6606.188632347037
+DLL 2020-06-20 01:19:57.932144 - (0, 680) total_ips : 6778.662432666615
+DLL 2020-06-20 01:19:58.235393 - (0, 681) total_ips : 6761.215195612339
+DLL 2020-06-20 01:19:58.547118 - (0, 682) total_ips : 6581.185627623109
+DLL 2020-06-20 01:19:58.859992 - (0, 683) total_ips : 6552.400219686337
+DLL 2020-06-20 01:19:59.167421 - (0, 684) total_ips : 6668.561871372632
+DLL 2020-06-20 01:19:59.471102 - (0, 685) total_ips : 6752.201432515202
+DLL 2020-06-20 01:19:59.779280 - (0, 686) total_ips : 6651.990301494657
+DLL 2020-06-20 01:20:00.082720 - (0, 687) total_ips : 6756.482097152502
+DLL 2020-06-20 01:20:00.385995 - (0, 688) total_ips : 6759.853085790192
+DLL 2020-06-20 01:20:00.696075 - (0, 689) total_ips : 6611.257843328159
+DLL 2020-06-20 01:20:01.017428 - (0, 690) total_ips : 6381.415891703799
+DLL 2020-06-20 01:20:01.315456 - (0, 691) total_ips : 6883.340979589417
+DLL 2020-06-20 01:20:01.617404 - (0, 692) total_ips : 6792.835593147962
+DLL 2020-06-20 01:20:01.931915 - (0, 693) total_ips : 6518.103310068308
+DLL 2020-06-20 01:20:02.230564 - (0, 694) total_ips : 6866.202035736495
+DLL 2020-06-20 01:20:02.540243 - (0, 695) total_ips : 6619.751046144409
+DLL 2020-06-20 01:20:02.851189 - (0, 696) total_ips : 6595.450557162414
+DLL 2020-06-20 01:20:03.153802 - (0, 697) total_ips : 6774.695563841936
+DLL 2020-06-20 01:20:03.464510 - (0, 698) total_ips : 6597.861932351046
+DLL 2020-06-20 01:20:03.767154 - (0, 699) total_ips : 6773.936934876657
+DLL 2020-06-20 01:20:04.081447 - (0, 700) total_ips : 6522.433920559339
+DLL 2020-06-20 01:20:04.389661 - (0, 701) total_ips : 6658.146596607032
+DLL 2020-06-20 01:20:04.693556 - (0, 702) total_ips : 6766.861028570708
+DLL 2020-06-20 01:20:04.997993 - (0, 703) total_ips : 6736.115256672255
+DLL 2020-06-20 01:20:05.311816 - (0, 704) total_ips : 6532.229911909281
+DLL 2020-06-20 01:20:05.640478 - (0, 705) total_ips : 6239.900648983666
+DLL 2020-06-20 01:20:05.942680 - (0, 706) total_ips : 6809.42624558355
+DLL 2020-06-20 01:20:06.248243 - (0, 707) total_ips : 6710.335942754696
+DLL 2020-06-20 01:20:06.562709 - (0, 708) total_ips : 6519.325196890432
+DLL 2020-06-20 01:20:06.875675 - (0, 709) total_ips : 6550.456508526716
+DLL 2020-06-20 01:20:07.180747 - (0, 710) total_ips : 6725.0089187293315
+DLL 2020-06-20 01:20:07.483252 - (0, 711) total_ips : 6777.961744861059
+DLL 2020-06-20 01:20:07.796540 - (0, 712) total_ips : 6543.395912745931
+DLL 2020-06-20 01:20:08.098804 - (0, 713) total_ips : 6782.269789534855
+DLL 2020-06-20 01:20:08.405887 - (0, 714) total_ips : 6675.796743367674
+DLL 2020-06-20 01:20:08.716219 - (0, 715) total_ips : 6605.797451942265
+DLL 2020-06-20 01:20:09.030331 - (0, 716) total_ips : 6526.076082926622
+DLL 2020-06-20 01:20:09.338403 - (0, 717) total_ips : 6655.572354138031
+DLL 2020-06-20 01:20:09.640497 - (0, 718) total_ips : 6786.213368389119
+DLL 2020-06-20 01:20:09.951917 - (0, 719) total_ips : 6582.703674157518
+DLL 2020-06-20 01:20:10.255573 - (0, 720) total_ips : 6752.949891786888
+DLL 2020-06-20 01:20:10.570628 - (0, 721) total_ips : 6507.264929514194
+DLL 2020-06-20 01:20:10.874821 - (0, 722) total_ips : 6739.561126480322
+DLL 2020-06-20 01:20:11.189984 - (0, 723) total_ips : 6505.520337289941
+DLL 2020-06-20 01:20:11.501685 - (0, 724) total_ips : 6577.1342097807865
+DLL 2020-06-20 01:20:11.811177 - (0, 725) total_ips : 6624.667389035976
+DLL 2020-06-20 01:20:12.122325 - (0, 726) total_ips : 6588.636312176414
+DLL 2020-06-20 01:20:12.423473 - (0, 727) total_ips : 6810.209042504273
+DLL 2020-06-20 01:20:12.726509 - (0, 728) total_ips : 6766.210745045032
+DLL 2020-06-20 01:20:13.029229 - (0, 729) total_ips : 6772.404168174504
+DLL 2020-06-20 01:20:13.333774 - (0, 730) total_ips : 6732.488219623432
+DLL 2020-06-20 01:20:13.638821 - (0, 731) total_ips : 6720.904748640943
+DLL 2020-06-20 01:20:13.943501 - (0, 732) total_ips : 6728.870357416188
+DLL 2020-06-20 01:20:14.246684 - (0, 733) total_ips : 6766.621155344372
+DLL 2020-06-20 01:20:14.559949 - (0, 734) total_ips : 6545.639680747138
+DLL 2020-06-20 01:20:14.863453 - (0, 735) total_ips : 6754.39419699549
+DLL 2020-06-20 01:20:15.166462 - (0, 736) total_ips : 6767.020953503358
+DLL 2020-06-20 01:20:15.479469 - (0, 737) total_ips : 6549.257878801972
+DLL 2020-06-20 01:20:15.784094 - (0, 738) total_ips : 6729.629469577378
+DLL 2020-06-20 01:20:16.100341 - (0, 739) total_ips : 6482.710194988427
+DLL 2020-06-20 01:20:16.412417 - (0, 740) total_ips : 6571.0262139279275
+DLL 2020-06-20 01:20:16.720265 - (0, 741) total_ips : 6661.967778786861
+DLL 2020-06-20 01:20:17.036121 - (0, 742) total_ips : 6490.473960836227
+DLL 2020-06-20 01:20:17.350062 - (0, 743) total_ips : 6529.69253351719
+DLL 2020-06-20 01:20:17.667138 - (0, 744) total_ips : 6465.057634282678
+DLL 2020-06-20 01:20:17.969809 - (0, 745) total_ips : 6776.43250219506
+DLL 2020-06-20 01:20:18.283082 - (0, 746) total_ips : 6546.05369938677
+DLL 2020-06-20 01:20:18.584661 - (0, 747) total_ips : 6800.046699814838
+DLL 2020-06-20 01:20:18.885717 - (0, 748) total_ips : 6810.430417722793
+DLL 2020-06-20 01:20:19.188318 - (0, 749) total_ips : 6775.2993829619245
+DLL 2020-06-20 01:20:19.500341 - (0, 750) total_ips : 6570.18184933288
+DLL 2020-06-20 01:20:19.813463 - (0, 751) total_ips : 6549.357747857718
+DLL 2020-06-20 01:20:20.126943 - (0, 752) total_ips : 6539.390874320933
+DLL 2020-06-20 01:20:20.428942 - (0, 753) total_ips : 6793.179399823171
+DLL 2020-06-20 01:20:20.740519 - (0, 754) total_ips : 6580.247915600592
+DLL 2020-06-20 01:20:21.054479 - (0, 755) total_ips : 6529.3699163261335
+DLL 2020-06-20 01:20:21.360445 - (0, 756) total_ips : 6701.023331284266
+DLL 2020-06-20 01:20:21.675614 - (0, 757) total_ips : 6505.811037696122
+DLL 2020-06-20 01:20:21.974096 - (0, 758) total_ips : 6873.932865411531
+DLL 2020-06-20 01:20:22.276837 - (0, 759) total_ips : 6774.171984839619
+DLL 2020-06-20 01:20:22.589426 - (0, 760) total_ips : 6560.021285483761
+DLL 2020-06-20 01:20:22.902372 - (0, 761) total_ips : 6552.965061521291
+DLL 2020-06-20 01:20:23.214218 - (0, 762) total_ips : 6576.192617306313
+DLL 2020-06-20 01:20:23.516416 - (0, 763) total_ips : 6783.603449160888
+DLL 2020-06-20 01:20:23.821573 - (0, 764) total_ips : 6717.898206252777
+DLL 2020-06-20 01:20:24.138351 - (0, 765) total_ips : 6473.281565777406
+DLL 2020-06-20 01:20:24.440053 - (0, 766) total_ips : 6802.001333487481
+DLL 2020-06-20 01:20:24.741456 - (0, 767) total_ips : 6801.441213405355
+DLL 2020-06-20 01:20:25.044122 - (0, 768) total_ips : 6773.621779843787
+DLL 2020-06-20 01:20:25.347028 - (0, 769) total_ips : 6768.172636203617
+DLL 2020-06-20 01:20:25.649649 - (0, 770) total_ips : 6774.626104828476
+Ending Model Training ...
+DLL 2020-06-20 01:22:56.358483 - () train_throughput : 6638.003508038038
+2020-06-20 01:15:36.381152: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.381104: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.411703: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.419548: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.421821: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.423908: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.427994: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:36.435562: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use
+tf.compat.v1.global_variables instead.
 
-WARNING:tensorflow:From /usr/local/lib/python3.5/dist-packages/horovod/tensorflow/__init__.py:143: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
 
-WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/RN50v1.5/utils/hooks/training_hooks.py:29: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
 
-WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/RN50v1.5/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
 
-WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/RN50v1.5/main.py:34: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
 
-WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/RN50v1.5/main.py:34: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
 
-2020-02-20 00:49:13.544665: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
-2020-02-20 00:49:19.709857: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.720919: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 0 with properties:
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:152: The name tf.global_variables is deprecated. Please use tf.compat.v1.global_variables instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+WARNING:tensorflow:From /opt/conda/lib/python3.7/site-packages/horovod/tensorflow/__init__.py:178: The name tf.get_default_graph is deprecated. Please use tf.compat.v1.get_default_graph instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/hooks/training_hooks.py:40: The name tf.train.SessionRunHook is deprecated. Please use tf.estimator.SessionRunHook instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From /home/perfkit/DeepLearningExamples/TensorFlow/Classification/ConvNets/utils/optimizers.py:27: The name tf.train.Optimizer is deprecated. Please use tf.compat.v1.train.Optimizer instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.set_verbosity is deprecated. Please use tf.compat.v1.logging.set_verbosity instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+WARNING:tensorflow:From DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py:36: The name tf.logging.ERROR is deprecated. Please use tf.compat.v1.logging.ERROR instead.
+
+2020-06-20 01:15:43.237815: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:43.246114: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:43.268163: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:43.315647: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:43.441236: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:43.464251: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:43.494312: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:44.692358: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-06-20 01:15:49.259118: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259135: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259206: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259342: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259385: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259548: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259596: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.259711: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.269926: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:04.0
-2020-02-20 00:49:19.721104: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.731897: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 1 with properties:
+2020-06-20 01:15:49.270083: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.270197: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.270417: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.270466: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.270657: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.270659: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.270816: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.270891: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.271057: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.271089: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.271264: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.271322: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.271476: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.271524: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:04.0
+2020-06-20 01:15:49.271687: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.281514: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:05.0
-2020-02-20 00:49:19.732059: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.742541: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 2 with properties:
+2020-06-20 01:15:49.281623: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.281870: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.282010: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.282110: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.282316: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.282301: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.282424: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.282651: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.282747: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.282753: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.282842: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.282978: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.283117: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.283184: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 1 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:05.0
+2020-06-20 01:15:49.283327: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.293480: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:07.0
-2020-02-20 00:49:19.742696: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.753160: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 3 with properties:
+2020-06-20 01:15:49.293585: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.293713: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.293838: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.293929: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.294117: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.294110: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.294208: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.294347: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.294454: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.294548: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.294656: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.294775: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.294901: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.295097: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 2 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:49.295242: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.304698: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:06.0
-2020-02-20 00:49:19.753270: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.763586: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 4 with properties:
+2020-06-20 01:15:49.304786: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.305027: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.305137: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.305248: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.305374: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.305455: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.305557: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.305762: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.305849: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.305860: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.305943: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.306084: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.306204: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.306518: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 3 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:06.0
+2020-06-20 01:15:49.306643: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.315834: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:0b.0
-2020-02-20 00:49:19.763728: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.774377: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 5 with properties:
+2020-06-20 01:15:49.315939: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.316325: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.316429: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.316425: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.316539: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.316640: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.316749: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.316832: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.316914: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.317076: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.317173: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.317293: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.317410: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.317799: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 4 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:49.317916: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.326968: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:0a.0
-2020-02-20 00:49:19.774483: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.785155: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 6 with properties:
+2020-06-20 01:15:49.327051: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.327267: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.327368: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.327597: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.327708: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.327829: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.327945: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.328015: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.328107: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.328418: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.328519: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.328533: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.328631: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.329066: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 5 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:49.329181: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.338288: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:08.0
-2020-02-20 00:49:19.785254: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.795775: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 7 with properties:
+2020-06-20 01:15:49.338399: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.338610: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.338742: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.338921: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.339044: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.339131: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.339267: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.339337: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.339420: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.339680: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.339784: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.339786: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.339886: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.340304: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 6 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:49.340407: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.349489: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:09.0
-2020-02-20 00:49:19.795824: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
-2020-02-20 00:49:19.797097: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
-2020-02-20 00:49:19.798280: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
-2020-02-20 00:49:19.798677: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
-2020-02-20 00:49:19.800289: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
-2020-02-20 00:49:19.801436: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
-2020-02-20 00:49:19.804574: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
-2020-02-20 00:49:19.804698: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.814935: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.825379: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.836459: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.847278: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.858188: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.869065: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.879779: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.890831: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.901068: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.911867: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.922531: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.933393: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.944146: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.954619: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.965077: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:19.974738: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1746] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
-2020-02-20 00:49:27.096091: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 AVX512F FMA
-2020-02-20 00:49:27.102593: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000140000 Hz
-2020-02-20 00:49:27.102743: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55c69c167f40 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
-2020-02-20 00:49:27.102768: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
-2020-02-20 00:49:27.985102: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:27.992236: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55c69c16a140 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
-2020-02-20 00:49:27.992267: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
-2020-02-20 00:49:27.992550: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:27.998780: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1618] Found device 0 with properties:
+2020-06-20 01:15:49.349529: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.349793: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.349845: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.350097: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.350145: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.350303: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.350350: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.350394: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.350431: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.350607: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.350647: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.350730: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.350791: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.350834: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 7 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:09.0
+2020-06-20 01:15:49.350878: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:49.351236: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.351540: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.351541: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.351870: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.351881: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.351982: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.352228: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.352213: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:49.352687: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.352715: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.352717: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.352867: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.352855: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.352906: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.353088: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353089: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353082: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353196: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353231: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353251: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353283: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.353285: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:49.353648: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.353643: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:49.354700: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.354701: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.354701: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.354691: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.354745: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.354746: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.355081: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.355095: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:49.355839: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.355845: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.355839: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.355868: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.355894: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.355891: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.356068: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.356054: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:49.359638: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359673: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359642: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359650: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359675: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359662: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359652: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359672: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:49.359775: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359775: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359776: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359782: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359807: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359810: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359808: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.359806: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370172: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370235: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370324: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370437: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370543: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370638: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370739: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.370825: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381075: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381272: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381371: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381494: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381597: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381697: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381811: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.381892: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.392316: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.392521: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.392622: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.392714: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.392879: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.392972: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.393064: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.393310: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.403526: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.403713: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.403918: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.404019: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.404164: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.404269: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.404357: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.404672: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.414965: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.415184: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.415279: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.415487: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.415613: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.415707: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.415938: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.416228: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.426328: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.426533: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.426749: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.426847: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.427106: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.427303: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.427514: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.427828: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.437430: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.437755: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.437971: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.438202: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.438512: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.438728: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.438833: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.439257: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.448441: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.448643: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.449097: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.449440: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.449812: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.449895: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.450139: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.450538: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.460022: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.460372: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.460716: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.461046: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.461358: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.461489: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.461790: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.461876: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.471324: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.471750: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.471940: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.472376: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.472584: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.472914: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.473138: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.473242: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.482657: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.483209: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.483407: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.483829: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.484070: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.484468: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.484567: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.484791: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.494029: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.494561: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.494863: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.495166: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.495593: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.495898: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.496140: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.496322: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.505136: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.505741: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.506271: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.506379: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.506995: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.507237: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.507568: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.507761: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.516324: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.517120: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.517439: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.517777: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.518594: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.518812: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.519155: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.519346: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.527727: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.528900: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.529003: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.529246: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.530380: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.530599: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.530886: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.531021: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:49.539138: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.540115: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.540322: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.540532: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.541220: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.541317: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.541415: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:49.541512: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0, 1, 2, 3, 4, 5, 6, 7
+2020-06-20 01:15:55.255639: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.262492: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.262631: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55ac1554ba50 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.262656: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.304185: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.311337: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.311481: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5585b5b27340 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.311509: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.324805: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.331860: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.332011: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x563c9f273210 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.332038: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.333775: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.340644: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.340792: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x560d6b82a3c0 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.340814: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.674415: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.684379: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x55ac1554e1e0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.684415: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-06-20 01:15:55.684771: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.695596: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0b.0
+2020-06-20 01:15:55.695653: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:55.695728: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:55.695753: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:55.695765: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:55.695777: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:55.695789: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:55.695802: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:55.695874: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.708045: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.716743: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 4
+2020-06-20 01:15:55.716804: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:55.749126: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.756297: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.756434: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5604daa1a660 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.756456: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.811664: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.818004: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.818732: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.818897: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5601a256ae70 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.818923: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.824873: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.825013: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x563bc5161240 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.825039: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.852812: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX512F
+2020-06-20 01:15:55.860093: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2000165000 Hz
+2020-06-20 01:15:55.860229: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x559ecc7d7ec0 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.860255: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-06-20 01:15:55.892706: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.912172: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5585b5b29ad0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.912215: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-06-20 01:15:55.912621: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.925089: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:07.0
+2020-06-20 01:15:55.925172: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:55.925276: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:55.925297: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:55.925313: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:55.925328: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:55.925342: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:55.925358: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:55.925495: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.939600: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.952590: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.955524: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 2
+2020-06-20 01:15:55.955615: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:55.966546: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x563c9f2759a0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.966580: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-06-20 01:15:55.966913: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.972646: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.985889: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
 name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
 pciBusID: 0000:00:04.0
-2020-02-20 00:49:27.998831: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
-2020-02-20 00:49:27.998891: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
-2020-02-20 00:49:27.998907: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
-2020-02-20 00:49:27.998917: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
-2020-02-20 00:49:27.998927: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
-2020-02-20 00:49:27.998937: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
-2020-02-20 00:49:27.998948: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
-2020-02-20 00:49:27.999031: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:28.006052: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:28.013170: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1746] Adding visible gpu devices: 0
-2020-02-20 00:49:28.013256: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
-2020-02-20 00:49:28.711286: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1159] Device interconnect StreamExecutor with strength 1 edge matrix:
-2020-02-20 00:49:28.711335: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1165]      0
-2020-02-20 00:49:28.711343: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1178] 0:   N
-2020-02-20 00:49:28.711807: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:28.713016: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-02-20 00:49:28.714113: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1304] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 14816 MB memory) -> physical GPU (device: 0, name: Tesla V100-SXM2-16GB, pci bus id: 0000:00:04.0, compute capability: 7.0)
-2020-02-20 00:49:42.990599: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
-2020-02-20 00:49:43.319733: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:55.985953: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:55.986026: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:55.986044: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:55.986057: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:55.986069: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:55.986082: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:55.986095: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:55.986193: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:55.987692: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x560d6b82cb50 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:55.987733: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-06-20 01:15:55.988096: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:56.002027: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:56.003606: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:08.0
+2020-06-20 01:15:56.003707: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:56.003830: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:56.003893: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:56.003927: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:56.003959: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:56.003991: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:56.004023: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-06-20 01:15:56.004158: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:56.016433: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0
+2020-06-20 01:15:56.016528: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:56.022573: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:56.038055: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 6
+2020-06-20 01:15:56.038146: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:56.515315: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:56.522110: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x5604daa1cdf0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-06-20 01:15:56.522153: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla V100-SXM2-16GB, Compute Capability 7.0
+2020-06-20 01:15:56.522487: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-06-20 01:15:56.528186: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
+name: Tesla V100-SXM2-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:00:0a.0
+2020-06-20 01:15:56.528265: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
+2020-06-20 01:15:56.528376: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
+2020-06-20 01:15:56.528415: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
+2020-06-20 01:15:56.528439: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
+2020-06-20 01:15:56.528466: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
+2020-06-20 01:15:56.528497: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
+2020-06-20 01:15:56.528529: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7

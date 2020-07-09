@@ -37,7 +37,7 @@ class HorovodBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testExtractResNetThroughput(self):
     throughput, _ = horovod_benchmark._ExtractResNetThroughput(
         self.test_output['horovod_output_resnet.txt'])
-    self.assertEqual(36517.1, throughput)
+    self.assertEqual(6638.0, throughput)
 
   def testExtractBertThroughput(self):
     throughput, _ = horovod_benchmark._ExtractBertThroughput(

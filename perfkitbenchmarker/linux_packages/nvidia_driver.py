@@ -200,7 +200,7 @@ def GetGpuType(vm):
     for line in stdout.splitlines():
       if not line:
         continue
-      splitted = line.split(' ')
+      splitted = line.split()
       if splitted[2] == 'Tesla':
         gpu_types.append(splitted[3])
       else:

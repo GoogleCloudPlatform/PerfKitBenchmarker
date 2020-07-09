@@ -3,12 +3,18 @@
 ### New features:
 
 -   Add prefix/directory support for object storage service runs.
+-   Add MaskRCNN and ReXtNet-101 to the horovod benchmark.
 
 ### Enhancements:
 
 -   Added delay_time support for delete operations in object storage service.
+-   Added horovod_synthetic option for synthetic input data in ResNet/ReXtNet models.
+-   Added support for A100 GPUs.
+-   Added cuda_tookit 11.0 support.
 
 ### Bug fixes and maintenance updates:
 
 -   Tuned entity cleanup parameters.
 -   Fix wrong unit in MLPerf benchmark.
+-   Disabled TF_CUDNN_USE_AUTOTUNE for horovod benchmarks.
+-   Updated default NCCL version.
