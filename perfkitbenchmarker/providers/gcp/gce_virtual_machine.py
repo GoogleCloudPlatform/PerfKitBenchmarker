@@ -391,10 +391,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
-    # We don't want boot time samples to be affected from retrying, so don't
-    # retry cluster_boot when rate limited.
-    if 'cluster_boot' in FLAGS.benchmarks:
-      FLAGS.gcp_retry_on_rate_limited = False
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -548,7 +544,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     if retcode:
       if (create_cmd.rate_limited and 'already exists' in stderr and
-          FLAGS.gcp_retry_on_rate_limited):
+          FLAGS.retry_on_rate_limited):
         # Gcloud create commands may still create VMs despite being rate
         # limited.
         return

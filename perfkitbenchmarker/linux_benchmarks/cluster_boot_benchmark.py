@@ -44,6 +44,10 @@ cluster_boot:
         Kubernetes:
           image: null
       vm_count: null
+  flags:
+    # We don't want boot time samples to be affected from retrying, so don't
+    # retry cluster_boot when rate limited.
+    retry_on_rate_limited: False
 """
 
 flags.DEFINE_boolean(

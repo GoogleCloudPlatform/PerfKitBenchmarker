@@ -225,7 +225,7 @@ class GcloudCommand(object):
       IssueCommandError: if command fails without Rate Limit Exceeded.
 
     """
-    if FLAGS.gcp_retry_on_rate_limited:
+    if FLAGS.retry_on_rate_limited:
       try:
         stdout, stderr, retcode = _issue_command_function(self, **kwargs)
       except errors.VmUtil.IssueCommandError as error:

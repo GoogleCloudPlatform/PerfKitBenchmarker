@@ -115,7 +115,7 @@ class GceDisk(disk.BaseDisk):
     # limited.
     if retcode:
       if (cmd.rate_limited and 'is already being used' in stderr and
-          FLAGS.gcp_retry_on_rate_limited):
+          FLAGS.retry_on_rate_limited):
         return
       debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
                     (' '.join(cmd.GetCommand()), retcode, stdout, stderr))

@@ -121,6 +121,8 @@ flags.DEFINE_boolean(
     'Whether to use internal IP addresses for running commands on and pushing '
     'data to VMs. By default, PKB interacts with VMs using external IP '
     'addresses.')
+flags.DEFINE_boolean('retry_on_rate_limited', True,
+                     'Whether to retry commands when rate limited.')
 
 # Note: If adding a gpu type here, be sure to add it to
 # the flag definition in pkb.py too.

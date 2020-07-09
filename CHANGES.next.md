@@ -11,6 +11,7 @@
 -   Added horovod_synthetic option for synthetic input data in ResNet/ReXtNet models.
 -   Added support for A100 GPUs.
 -   Added cuda_tookit 11.0 support.
+-   Updated `retry_on_rate_limited` to false on all cluster_boot runs.
 
 ### Bug fixes and maintenance updates:
 

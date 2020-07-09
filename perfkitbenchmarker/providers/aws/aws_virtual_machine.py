@@ -808,7 +808,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(stderr)
     if 'InstanceLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
-    if 'RequestLimitExceeded' in stderr:
+    if 'RequestLimitExceeded' in stderr and FLAGS.retry_on_rate_limited:
       raise errors.Resource.RetryableCreationError(stderr)
     if retcode:
       raise errors.Resource.CreationError(
