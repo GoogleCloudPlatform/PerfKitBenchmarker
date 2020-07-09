@@ -190,7 +190,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """Creates a managed MySql or Postgres instance."""
     if not self.spec.high_availability:
       raise Exception('Azure databases can only be used in high '
-                      'availability.')
+                      'availability. Please rerurn with flag '
+                      '--managed_db_high_availability=True')
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -206,13 +207,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         self.spec.database_username,
         '--admin-password',
         self.spec.database_password,
-        '--performance-tier',
-        self.spec.db_spec.tier,
-        '--compute-units',
-        str(self.spec.db_spec.compute_units),
         # AZ command line expects 128000MB-1024000MB in increments of 128000MB
         '--storage-size',
         str(self.spec.db_disk_spec.disk_size * 1000),
+        '--sku-name',
+        self.spec.db_spec.machine_type,
         '--version',
         self.spec.engine_version,
     ]
@@ -415,7 +414,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
-        state = server_show_json['state']
+        state = server_show_json['userVisibleState']
         if state == 'Ready':
           break
       time.sleep(5)

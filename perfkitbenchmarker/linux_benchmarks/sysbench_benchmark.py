@@ -134,9 +134,7 @@ sysbench:
         machine_type: db.m4.4xlarge
         zone: us-west-1a
       Azure:
-        machine_type:
-          tier: Standard
-          compute_units: 800
+        machine_type: GP_Gen5_2
         zone: westus
     db_disk_spec:
       GCP:
@@ -160,7 +158,7 @@ sysbench:
             machine_type: m4.4xlarge
             zone: us-west-1a
           Azure:
-            machine_type: Standard_A4m_v2
+            machine_type: Standard_B4ms
             zone: westus
         disk_spec:
           GCP:
@@ -171,6 +169,7 @@ sysbench:
             disk_type: gp2
           Azure:
             disk_size: 500
+            disk_type: Premium_LRS
       servers:
         os_type: ubuntu1604
         vm_spec:
@@ -181,7 +180,7 @@ sysbench:
             machine_type: m4.4xlarge
             zone: us-west-1a
           Azure:
-            machine_type: Standard_A4m_v2
+            machine_type: Standard_B4ms
             zone: westus
         disk_spec: *default_500_gb
       replications:
@@ -194,7 +193,7 @@ sysbench:
             machine_type: m4.4xlarge
             zone: us-east-1a
           Azure:
-            machine_type: Standard_A4m_v2
+            machine_type: Standard_B4ms
             zone: eastus
         disk_spec: *default_500_gb
 """
