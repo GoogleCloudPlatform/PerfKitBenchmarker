@@ -71,6 +71,11 @@ NUM_LOCAL_VOLUMES = {
 _SCHEDULED_EVENTS_CMD = ('curl -H Metadata:true http://169.254.169.254/metadata'
                          '/scheduledevents?api-version=2019-01-01')
 
+_SCHEDULED_EVENTS_CMD_WIN = ('Invoke-RestMethod -Headers @{"Metadata"="true"} '
+                             '-Uri http://169.254.169.254/metadata/'
+                             'scheduledevents?api-version=2019-01-01 | '
+                             'ConvertTo-Json')
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -762,6 +767,8 @@ class AzureVirtualMachine(
         events = json.loads(stdout).get('Events', [])
         self.spot_early_termination = any(
             event.get('EventType') == 'Preempt' for event in events)
+        if self.spot_early_termination:
+          logging.info('Spotted early termination on %s', self)
 
   def IsInterruptible(self):
     """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
@@ -872,6 +879,16 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         '--version', '1.4',
         '--protected-settings=%s' % config
     ] + self.resource_group.args)
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    if self.low_priority:
+      stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
+      events = json.loads(stdout).get('Events', [])
+      self.spot_early_termination = any(
+          event.get('EventType') == 'Preempt' for event in events)
+      if self.spot_early_termination:
+        logging.info('Spotted early termination on %s', self)
 
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:

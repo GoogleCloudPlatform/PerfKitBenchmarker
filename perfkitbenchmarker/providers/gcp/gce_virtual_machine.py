@@ -66,16 +66,16 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 _GCE_VM_CREATE_TIMEOUT = 600
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
-_SHUTDOWN_FILE = '/tmp/SHUTDOWN'
-_SHUTDOWN_MARKER = 'SHUTDOWN'
-_CHECK_INTERRUPT_CMD = 'if [ -f {file} ]; then echo {marker}; fi'.format(
-    file=_SHUTDOWN_FILE, marker=_SHUTDOWN_MARKER)
-# GCP doesn't have an API to handle preemptible notice. We can use a shutdown
-# script to handle the preemption notice and complete cleanup actions before
-# the instance stops.
-# https://cloud.google.com/compute/docs/shutdownscript#provide_shutdown_script_contents_directly
-# The shutdown proceeds right after this script ends.
-_SHUTDOWN_SCRIPT = '#! /bin/bash\n> touch {}\n> sleep 60'.format(_SHUTDOWN_FILE)
+_SHUTDOWN_MARKER = 'TRUE'
+
+# https://cloud.google.com/compute/docs/instances/create-start-preemptible-instance#detecting_if_an_instance_was_preempted
+_SCHEDULED_EVENTS_CMD = (
+    'curl -H Metadata-Flavor:Google '
+    'http://metadata.google.internal/computeMetadata/v1/instance/preempted')
+
+_SCHEDULED_EVENTS_CMD_WIN = (
+    'Invoke-RestMethod -Headers @{"Metadata-Flavor"="Google"} -Uri '
+    'http://metadata.google.internal/computeMetadata/v1/instance/preempted')
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -482,9 +482,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         continue
       metadata[key] = value
 
-    if self.preemptible:
-      metadata['shutdown-script'] = _SHUTDOWN_SCRIPT
-      cmd.flags['preemptible'] = True
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
     # TODO(user): If GCE one day supports live migration on GPUs
@@ -500,6 +497,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
+    if self.preemptible:
+      cmd.flags['preemptible'] = True
     cmd.flags['network-tier'] = self.gce_network_tier.upper()
 
     return cmd
@@ -784,9 +783,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
     if self.preemptible:
-      stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
-          _CHECK_INTERRUPT_CMD)
-      if return_code:
+      stdout, stderr, retcode = self.RemoteCommandWithReturnCode(
+          _SCHEDULED_EVENTS_CMD)
+      if retcode:
         logging.error('Checking Interrupt Error: %s', stderr)
       else:
         self.spot_early_termination = stdout.strip() == _SHUTDOWN_MARKER
@@ -954,6 +953,12 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = self.RemoteCommand('netsh int tcp show global')
     if 'Receive-Side Scaling State          : enabled' in stdout:
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    if self.preemptible:
+      stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
+      self.spot_early_termination = stdout.strip() == _SHUTDOWN_MARKER
 
 
 class Windows2012CoreGceVirtualMachine(
