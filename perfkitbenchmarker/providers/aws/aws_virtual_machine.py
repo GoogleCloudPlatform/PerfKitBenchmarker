@@ -544,6 +544,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     })
     self.spot_early_termination = False
     self.spot_status_code = None
+    # See:
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-os.html
+    self._smp_affinity_script = 'smp_affinity.sh'
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(

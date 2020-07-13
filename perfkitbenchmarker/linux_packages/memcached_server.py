@@ -87,13 +87,16 @@ def _WaitForServerUp(vm):
         'memcached server not up yet. Expected "STAT" but got "%s".' % out)
 
 
-def ConfigureAndStart(vm):
+def ConfigureAndStart(vm, smp_affinity=False):
   """Prepare the memcached server on a VM.
 
   Args:
     vm: VirtualMachine to install and start memcached on.
+    smp_affinity: Boolean. Whether or not to set smp_affinity.
   """
   vm.Install('memcached_server')
+  if smp_affinity:
+    vm.SetSmpAffinity()
 
   for scratch_disk in vm.scratch_disks:
     vm.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)

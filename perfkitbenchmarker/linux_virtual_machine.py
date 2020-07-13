@@ -187,6 +187,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._lscpu_cache = None
     self._partition_table = {}
     self._proccpu_cache = None
+    self._smp_affinity_script = None
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -1126,6 +1127,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if time.time() < end_time:
         time.sleep(end_time - time.time())
       self.RemoteCommand('pkill -9 sysbench')
+
+  def SetSmpAffinity(self):
+    """Set SMP IRQ affinity."""
+    if self._smp_affinity_script:
+      self.PushDataFile(self._smp_affinity_script)
+      self.RemoteCommand('sudo bash %s' % self._smp_affinity_script)
+    else:
+      raise NotImplementedError()
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
