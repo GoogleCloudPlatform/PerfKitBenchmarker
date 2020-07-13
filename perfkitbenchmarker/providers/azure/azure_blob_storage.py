@@ -15,6 +15,7 @@
 """Contains classes/functions related to Azure Blob Storage."""
 
 import datetime
+import json
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
@@ -168,9 +169,13 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     return 'wget -O {dst_url} "{src_url}"'.format(src_url=src_url,
                                                   dst_url=dst_url)
 
-  def List(self, buckets):
+  def List(self, bucket):
     """See base class."""
-    raise NotImplementedError()
+    stdout, _, _ = vm_util.IssueCommand([
+        'az', 'storage', 'blob', 'list', '--container-name', bucket,
+        '--account-name', self.storage_account.name
+    ])
+    return [metadata['name'] for metadata in json.loads(str(stdout))]
 
   def EmptyBucket(self, bucket):
     # Emptying buckets on Azure is hard. We pass for now - this will
