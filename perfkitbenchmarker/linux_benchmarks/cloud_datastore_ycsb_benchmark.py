@@ -345,11 +345,13 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
   client = _CreateClient(dataset_id, credentials)
   query = client.query(kind=kind)
   query.keys_only()
-  entities = list(query.fetch(limit=_CLEANUP_KIND_DELETE_BATCH_SIZE))
+  entities = list(query.fetch(limit=20000))
   if entities:
     logging.info('Deleting leftover %d entities for %s', len(entities), kind)
     total_entity_count += len(entities)
     client.delete_multi(entity.key for entity in entities)
+    deletion_task = _DeletionTask(kind, task_id)
+    deletion_task.DeleteEntities(dataset_id, credentials, entities)
 
   logging.info('Deleted all data for %s - %s - %d', dataset_id, kind,
                total_entity_count)

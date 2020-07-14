@@ -19,3 +19,5 @@
 -   Fix wrong unit in MLPerf benchmark.
 -   Disabled TF_CUDNN_USE_AUTOTUNE for horovod benchmarks.
 -   Updated default NCCL version.
+-   Use a deletion task to cleanup leftover entities to avoid hitting batch
+    limit.
