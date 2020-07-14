@@ -24,6 +24,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
 AWS_ATHENA_CMD_PREFIX = ['aws', 'athena']
@@ -49,11 +50,13 @@ class AthenaQueryError(RuntimeError):
   pass
 
 
-def GetAthenaClientInterface(database: str) -> edw_service.EdwClientInterface:
+def GetAthenaClientInterface(
+    database: str, output_bucket: str) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested Athena client Interface.
 
   Args:
     database: Name of the Athena database to execute queries against.
+    output_bucket: String name of the S3 bucket to store query output.
 
   Returns:
     A concrete Client Interface object (subclass of EdwClientInterface)
@@ -62,7 +65,7 @@ def GetAthenaClientInterface(database: str) -> edw_service.EdwClientInterface:
     RuntimeError: if an unsupported athena_client_interface is requested
   """
   if FLAGS.athena_client_interface == 'CLI':
-    return CliClientInterface(database)
+    return CliClientInterface(database, output_bucket)
   raise RuntimeError('Unknown Athena Client Interface requested.')
 
 
@@ -74,11 +77,13 @@ class CliClientInterface(edw_service.EdwClientInterface):
 
   Attributes:
     database: String name of the Athena database to execute queries against.
+    output_bucket: String name of the S3 bucket to store query output.
   """
 
-  def __init__(self, database: str):
+  def __init__(self, database: str, output_bucket: str):
     super(CliClientInterface, self).__init__()
     self.database = database
+    self.output_bucket = 's3://%s' % output_bucket
 
   def Prepare(self, benchmark_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -123,8 +128,9 @@ class CliClientInterface(edw_service.EdwClientInterface):
       run_metadata: A dictionary of query execution attributes eg. script name
     """
     stdout, _ = self.client_vm.RemoteCommand(
-        'python script_driver.py --script={} --database={}'.format(
-            query_name, self.database))
+        'python script_driver.py --script={} --database={} '
+        '--athena_query_output_bucket={}'.format(query_name, self.database,
+                                                 self.output_bucket))
     script_performance = json.loads(str(stdout))
     execution_time = script_performance[query_name]['execution_time']
     run_metadata = {'script': query_name}
@@ -198,9 +204,14 @@ class Athena(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super(Athena, self).__init__(edw_service_spec)
-    self.output_location = FLAGS.athena_output_location
     self.region = util.GetRegionFromZone(FLAGS.zones[0])
-    self.client_interface = GetAthenaClientInterface(self.cluster_identifier)
+    self.output_bucket = '-'.join(
+        [FLAGS.athena_output_location_prefix, self.region, FLAGS.run_uri])
+    self.client_interface = GetAthenaClientInterface(self.cluster_identifier,
+                                                     self.output_bucket)
+    self.s3_service = s3.S3Service()
+    self.s3_service.PrepareService(self.region)
+    self.s3_service.MakeBucket(self.output_bucket)
     if FLAGS.provision_athena:
       self.data_bucket = 'pkb' + self.cluster_identifier.replace('_', '')
       self.tables = (
@@ -228,7 +239,8 @@ class Athena(edw_service.EdwService):
     if database:
       cmd.extend(['--query-execution-context', ('Database=%s' % database)])
     cmd.extend([
-        '--result-configuration', ('OutputLocation=%s' % self.output_location)
+        '--result-configuration',
+        ('OutputLocation=s3://%s' % self.output_bucket)
     ])
     cmd.extend(AWS_ATHENA_CMD_POSTFIX)
     return cmd
@@ -312,6 +324,11 @@ class Athena(edw_service.EdwService):
       logging.info('The current resource is requested to be long living.')
       return
     raise NotImplementedError
+
+  def Cleanup(self):
+    # Direct cleanup is used instead of _DeleteDependencies because the Athena
+    # warehouse resource isn't created/deleted each time.
+    self.s3_service.DeleteBucket(self.output_bucket)
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for the Athena data warehouse."""

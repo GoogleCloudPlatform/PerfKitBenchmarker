@@ -12,10 +12,10 @@ from absl import flags
 flags.DEFINE_string('database', None,
                     'The database within which the command or query executes.')
 flags.DEFINE_string(
-    'athena_query_output_bucket', 's3://aws-athena-cli-results-us-east-1',
+    'athena_query_output_bucket', None,
     'Specifies where to save the results of the query execution.')
 flags.DEFINE_string('athena_region', 'us-east-1', 'Region to use Athena in.')
-flags.mark_flags_as_required(['database'])
+flags.mark_flags_as_required(['database', 'athena_query_output_bucket'])
 
 FLAGS = flags.FLAGS
 

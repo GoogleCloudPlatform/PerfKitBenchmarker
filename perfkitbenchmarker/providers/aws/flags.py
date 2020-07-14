@@ -84,8 +84,11 @@ flags.DEFINE_boolean('provision_athena', False,
                      'Whether to provision the Athena database.')
 flags.DEFINE_boolean('teardown_athena', True,
                      'Whether to teardown the Athena database.')
-flags.DEFINE_string('athena_output_location', None,
-                    'Athena Query Output Location.')
+flags.DEFINE_string(
+    'athena_output_location_prefix', 'athena-cli-results',
+    'Prefix of the S3 bucket name for Athena Query Output. Suffix will be the '
+    'region and the run URI, and the bucket will be dynamically created and '
+    'deleted during the test.')
 flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
 flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI'],
                   'The Runtime Interface used when interacting with Redshift.')

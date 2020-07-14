@@ -244,6 +244,10 @@ class EdwService(resource.BaseResource):
     return os.path.basename(
         os.path.normpath('database_%s.sql' % lifecycle_stage))
 
+  def Cleanup(self):
+    """Cleans up any temporary resources created for the service."""
+    pass
+
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""
     raise NotImplementedError
