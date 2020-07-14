@@ -21,3 +21,5 @@
 -   Updated default NCCL version.
 -   Use a deletion task to cleanup leftover entities to avoid hitting batch
     limit.
+-   Updated object storage service deleteObjects API to also return back
+      object_sizes of deleted objects.

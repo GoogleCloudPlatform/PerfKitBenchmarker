@@ -973,21 +973,23 @@ def DeleteWorker(service, object_records, result_queue, worker_num):
     worker_num: the thread number of this worker.
   """
   object_names = []
-  sizes = []
+  object_sizes = []
   for name, size in object_records:
     object_names.append(name)
-    sizes.append(size)
+    object_sizes.append(size)
 
   if FLAGS.bulk_delete:
     start_time, latency = service.BulkDeleteObjects(FLAGS.bucket, object_names,
                                                     FLAGS.delete_delay)
     start_times = [start_time]
     latencies = [latency]
-    object_size_sum = sum(sizes)
-    sizes = [object_size_sum]
+    sizes = [sum(object_sizes)]
   else:
-    start_times, latencies = service.DeleteObjects(
-        FLAGS.bucket, object_names, delay_time=FLAGS.delete_delay)
+    start_times, latencies, sizes = service.DeleteObjects(
+        FLAGS.bucket,
+        object_names,
+        delay_time=FLAGS.delete_delay,
+        object_sizes=object_sizes)
 
   result_queue.put({
       'start_times': start_times,

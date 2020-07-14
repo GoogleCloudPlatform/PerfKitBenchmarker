@@ -42,10 +42,12 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
                     bucket,
                     objects_to_delete,
                     objects_deleted=None,
-                    delay_time=0):
+                    delay_time=0,
+                    object_sizes=None):
     start_times = []
     latencies = []
-    for object_name in objects_to_delete:
+    sizes = []
+    for index, object_name in enumerate(objects_to_delete):
       try:
         time.sleep(delay_time)
         start_time = time.time()
@@ -53,12 +55,14 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
         latency = time.time() - start_time
         start_times.append(start_time)
         latencies.append(latency)
-        if objects_deleted is not None:
+        if objects_deleted:
           objects_deleted.append(object_name)
+        if object_sizes:
+          sizes.append(object_sizes[index])
       except Exception as e:  # pylint: disable=broad-except
         logging.exception('Caught exception while deleting object %s: %s',
                           object_name, e)
-    return start_times, latencies
+    return start_times, latencies, sizes
 
   def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
     objects_to_delete_dict = {}

@@ -45,10 +45,12 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
                     bucket,
                     objects_to_delete,
                     objects_deleted=None,
-                    delay_time=0):
+                    delay_time=0,
+                    object_sizes=None):
     start_times = []
     latencies = []
-    for object_name in objects_to_delete:
+    sizes = []
+    for index, object_name in enumerate(objects_to_delete):
       try:
         time.sleep(delay_time)
         start_time = time.time()
@@ -58,15 +60,17 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
         latencies.append(latency)
         if objects_deleted is not None:
           objects_deleted.append(object_name)
+        if object_sizes:
+          sizes.append(object_sizes[index])
       except:
         logging.exception('Caught exception while deleting object %s.',
                           object_name)
-    return start_times, latencies
+    return start_times, latencies, sizes
 
   def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
     # This version of Azure Blob APIs do not support Bulk Delete
     # TODO(user): Update to latest version of Azure Blob Storage API
-    start_times, latencies = self.DeleteObjects(
+    start_times, latencies, _ = self.DeleteObjects(
         bucket, objects_to_delete, delay_time=delay_time)
     return min(start_times), sum(latencies)
 

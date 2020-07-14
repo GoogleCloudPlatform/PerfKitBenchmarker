@@ -56,18 +56,21 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
                     bucket,
                     objects_to_delete,
                     objects_deleted=None,
-                    delay_time=0):
+                    delay_time=0,
+                    object_sizes=None):
     """Delete a list of objects.
 
     Args:
       bucket: the name of the bucket.
       objects_to_delete: a list of names of objects to delete.
-      objects_deleted: if given, a list to record the objects that
-        have been successfully deleted.
+      objects_deleted: if given, a list to record the objects that have been
+        successfully deleted.
       delay_time: time to delay each API call by
+      object_sizes: if given, a list of sizes of the objects to delete
+
 
     Returns:
-      A tuple of (start_times, latencies).
+      A tuple of (start_times, latencies, sizes).
     """
 
     pass
