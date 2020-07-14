@@ -145,15 +145,6 @@ def _CopyAndUpdateRunScripts(model, vm):
   # MaskRCNN
   if model == 'maskrcnn':
     vm.RemoteCommand(
-        'sudo /opt/conda/bin/pip install cython scipy \'opencv-python==3.4.2.17\''
-    )
-    vm.RemoteCommand(
-        'sudo /opt/conda/bin/pip install \'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI\''
-    )
-    vm.RemoteCommand(
-        '[ -d "tensorpack" ] || git clone https://github.com/tensorpack/tensorpack.git && sudo /opt/conda/bin/pip install ./tensorpack'
-    )
-    vm.RemoteCommand(
         'wget -q -N http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz'
     )
     vm.RemoteCommand(
@@ -161,8 +152,8 @@ def _CopyAndUpdateRunScripts(model, vm):
         'wget -q -N http://images.cocodataset.org/zips/train2017.zip && '
         'wget -q -N http://images.cocodataset.org/zips/val2017.zip && '
         'wget -q -N http://images.cocodataset.org/annotations/annotations_trainval2017.zip && '
-        'unzip -o train2017.zip && unzip -o val2017.zip && '
-        'unzip -o annotations_trainval2017.zip && rm *.zip')
+        'unzip -q -o train2017.zip && unzip -q -o val2017.zip && '
+        'unzip -q -o annotations_trainval2017.zip && rm *.zip')
 
   # BERT
   bert_base_dir = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT'
@@ -196,17 +187,30 @@ def _PrepareHorovod(vm):
 
   vm.Install('google_cloud_sdk')
   vm.InstallPackages('wget git unzip')
-
-  if FLAGS.cloud == 'GCP':  # temporary fix for DLVM images
-    vm.RemoteCommand(
-        'sudo /opt/conda/bin/pip install --force-reinstall pyarrow')
-
   vm.Install('nccl')
+
+  pip = 'pip'
+  if FLAGS.cloud == 'GCP':  # temporary fix for DLVM images
+    pip = '/opt/conda/bin/pip'
+    vm.RemoteCommand(f'sudo {pip} install --force-reinstall pyarrow')
+  elif FLAGS.cloud == 'AWS':
+    vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
+    pip = 'anaconda3/envs/tensorflow_p36/bin/pip'
+
   vm.RemoteCommand(
-      'sudo /opt/conda/bin/pip install '
+      f'sudo {pip} install '
       '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
       'git+https://github.com/NVIDIA/dllogger.git '
       'nvidia-dali nvidia-dali-tf-plugin-cuda100')
+
+  vm.RemoteCommand(
+      f'sudo {pip} install cython scipy \'opencv-python==3.4.2.17\'')
+  vm.RemoteCommand(
+      f'sudo {pip} install \'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI\''
+  )
+  vm.RemoteCommand(
+      f'[ -d "tensorpack" ] || git clone https://github.com/tensorpack/tensorpack.git && sudo {pip} install ./tensorpack'
+  )
 
 
 def Prepare(benchmark_spec):
@@ -422,7 +426,9 @@ def Run(benchmark_spec):
         'batch_size': benchmark_spec.batch_size,
         'num_iter': benchmark_spec.num_steps,
     })
-    if benchmark_spec.synthetic:
+
+    # Load ImageNet training data from GCS if benchmark is not in synthetic mode
+    if not benchmark_spec.synthetic:
       run_flags['data_dir'] = 'gs://cloud-ml-nas-public/classification/imagenet'
 
     run_command += 'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
@@ -451,7 +457,9 @@ def Run(benchmark_spec):
         'batch_size': benchmark_spec.batch_size,
         'num_iter': benchmark_spec.num_steps,
     })
-    if benchmark_spec.synthetic:
+
+    # Load ImageNet training data from GCS if benchmark is not in synthetic mode
+    if not benchmark_spec.synthetic:
       run_flags['data_dir'] = 'gs://cloud-ml-nas-public/classification/imagenet'
 
     run_command += 'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
