@@ -414,7 +414,17 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
-        state = server_show_json['userVisibleState']
+        engine = self.spec.engine
+        if engine == relational_db.POSTGRES:
+          state = server_show_json['userVisibleState']
+        elif engine == relational_db.MYSQL:
+          state = server_show_json['userVisibleState']
+        elif engine == relational_db.SQLSERVER:
+          state = server_show_json['state']
+        else:
+          raise relational_db.RelationalDbEngineNotFoundException(
+              'The db engine does not contain a valid state')
+
         if state == 'Ready':
           break
       time.sleep(5)
