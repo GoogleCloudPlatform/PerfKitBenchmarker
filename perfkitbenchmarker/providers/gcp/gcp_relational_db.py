@@ -38,11 +38,27 @@ from six.moves import range
 
 FLAGS = flags.FLAGS
 
+GCP_DATABASE_VERSION_MAPPING = {
+    relational_db.MYSQL: {
+        '5.5': 'MYSQL_5_5',
+        '5.6': 'MYSQL_5_6',
+        '5.7': 'MYSQL_5_7'
+    },
+    relational_db.POSTGRES: {
+        '9.6': 'POSTGRES_9_6',
+        '10': 'POSTGRES_10',
+        '11': 'POSTGRES_11',
+        '12': 'POSTGRES_12'
+    },
+    relational_db.SQLSERVER: {
+        '2017': 'SQLSERVER_2017_STANDARD',
+    }
+}
+
+
 DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_POSTGRES_VERSION = '9.6'
-DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
-DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
-DEFAULT_GCP_SQLSERVER_VERSION = 'SQLSERVER_2017_STANDARD'
+DEFAULT_SQL_SERVER_VERSION = '2017'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
@@ -57,7 +73,7 @@ DEFAULT_PORTS = {
 DEFAULT_ENGINE_VERSIONS = {
     relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
     relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
-    relational_db.SQLSERVER: DEFAULT_GCP_SQLSERVER_VERSION,
+    relational_db.SQLSERVER: DEFAULT_SQL_SERVER_VERSION,
 }
 
 # PostgreSQL restrictions on memory.
@@ -442,19 +458,20 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Raises:
       NotImplementedError on invalid engine / version combination.
     """
-    if engine == relational_db.MYSQL:
-      if version == DEFAULT_MYSQL_VERSION:
-        return DEFAULT_GCP_MYSQL_VERSION
-      elif version == '5.6':
-        return 'MYSQL_5_6'
-    elif engine == relational_db.POSTGRES:
-      if version == DEFAULT_POSTGRES_VERSION:
-        return DEFAULT_GCP_POSTGRES_VERSION
-    elif engine == relational_db.SQLSERVER:
-      if version == DEFAULT_GCP_SQLSERVER_VERSION:
-        return DEFAULT_GCP_SQLSERVER_VERSION
-    raise NotImplementedError('Unsupported managed DB version: '
-                              '{0}, {1}'.format(engine, version))
+    if engine not in GCP_DATABASE_VERSION_MAPPING:
+      valid_databases = ', '.join(GCP_DATABASE_VERSION_MAPPING.keys())
+      raise NotImplementedError(
+          'Database {0} is not supported,supported '
+          'databases include {1}'.format(engine, valid_databases))
+
+    version_mapping = GCP_DATABASE_VERSION_MAPPING[engine]
+    if version not in version_mapping:
+      valid_versions = ', '.join(version_mapping.keys())
+      raise NotImplementedError(
+          'Version {0} is not supported,supported '
+          'versions include {1}'.format(version, valid_versions))
+
+    return version_mapping[version]
 
   @staticmethod
   def _GetDefaultPort(engine):
