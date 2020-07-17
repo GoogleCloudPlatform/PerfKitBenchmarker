@@ -22,4 +22,5 @@
 -   Use a deletion task to cleanup leftover entities to avoid hitting batch
     limit.
 -   Updated object storage service deleteObjects API to also return back
-      object_sizes of deleted objects.
+    object_sizes of deleted objects.
+-   Fixed a bug in leftover entity deletion logic.
