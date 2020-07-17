@@ -346,6 +346,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
+    if job_arguments:
+      # Escape commas in arguments
+      job_arguments = (arg.replace(',', '\\,') for arg in job_arguments)
+
     if job_type == 'hadoop':
       step_type_spec = 'Type=CUSTOM_JAR'
       jar_spec = 'Jar=' + jarfile

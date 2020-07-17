@@ -14,20 +14,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import argparse
 import os
-import sys
 from pyspark.sql import SparkSession
 
 
 def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('root_dir')
+  parser.add_argument('tables', type=lambda csv: csv.split(','))
+  args = parser.parse_args()
   spark = (SparkSession.builder
            .appName('Setup Spark tables')
            .enableHiveSupport()
            .getOrCreate())
-  root_dir = sys.argv[1]
-  tables = sys.argv[2].split(',')
-  for table in tables:
-    table_dir = os.path.join(root_dir, table)
+  for table in args.tables:
+    table_dir = os.path.join(args.root_dir, table)
     # clean up previous table
     spark.sql('drop table if exists ' + table)
     # register new table
