@@ -95,6 +95,10 @@ def main():
         print('Connection refused during wait. '
               'This will be retried with a subsequent wait.')
         return 0
+      elif e.errno in (errno.EAGAIN, errno.EACCES):
+        print('Status currently being modified and cannot be read right now. '
+              'This will be retried with a subsequent wait.')
+        return 0
       raise e
     signal.alarm(0)
     return_code_str = status.read()
