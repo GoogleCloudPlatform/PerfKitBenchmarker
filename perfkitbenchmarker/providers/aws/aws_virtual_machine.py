@@ -809,7 +809,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.spot_status_code = 'SpotMaxPriceTooLow'
       self.spot_early_termination = True
       raise errors.Resource.CreationError(stderr)
-    if 'InstanceLimitExceeded' in stderr:
+    if 'InstanceLimitExceeded' in stderr or 'VcpuLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
     if 'RequestLimitExceeded' in stderr and FLAGS.retry_on_rate_limited:
       raise errors.Resource.RetryableCreationError(stderr)

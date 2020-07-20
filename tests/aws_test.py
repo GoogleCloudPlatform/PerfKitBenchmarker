@@ -322,6 +322,20 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
 
+  def testVcpuLimitExceededDuringCreate(self):
+    stderr = (
+        'An error occurred (VcpuLimitExceeded) when calling the '
+        'RunInstances operation: You have requested more vCPU capacity '
+        'than your current vCPU limit of 1145 allows for the instance '
+        'bucket that the specified instance type belongs to. Please '
+        'visit http://aws.amazon.com/contact-us/ec2-request to request '
+        'an adjustment to this limit.'
+    )
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
+      self.vm._Create()
+    self.assertEqual(str(e.exception), stderr)
+
   def testInstanceQuotaExceededDuringCreate(self):
     stderr = (
         'An error occurred (InstanceLimitExceeded) when calling the '
