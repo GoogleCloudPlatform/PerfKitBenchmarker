@@ -289,6 +289,7 @@ class BaseRelationalDb(resource.BaseResource):
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
         'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
+        'use_managed_db': self.is_managed_db,
         'client_vm_disk_type':
             self.spec.vm_groups['clients'].disk_spec.disk_type,
         'client_vm_disk_size':
