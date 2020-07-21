@@ -127,6 +127,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.timeline = FLAGS.horovod_timelime
   benchmark_spec.synthetic = FLAGS.horovod_synthetic
   benchmark_spec.cuda_visible_devices = FLAGS.horovod_cuda_visible_devices
+  benchmark_spec.nccl_version = FLAGS.nccl_version
   benchmark_spec.nccl_net_plugin = FLAGS.nccl_net_plugin
   benchmark_spec.nccl_extra_params = FLAGS.nccl_extra_params
 
@@ -249,6 +250,7 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['synthetic'] = benchmark_spec.synthetic
   metadata['precision'] = benchmark_spec.precision
   metadata['max_seq_len'] = benchmark_spec.max_seq_len
+  metadata['nccl_version'] = benchmark_spec.nccl_version
   metadata['nccl_net_plugin'] = benchmark_spec.nccl_net_plugin
   metadata['cuda_visible_devices'] = benchmark_spec.cuda_visible_devices
   metadata['nccl_extra_params'] = benchmark_spec.nccl_extra_params

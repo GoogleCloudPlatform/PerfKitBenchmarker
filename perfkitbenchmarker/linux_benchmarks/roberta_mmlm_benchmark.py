@@ -241,6 +241,9 @@ def _CreateMetadataDict(benchmark_spec):
       'profiler': benchmark_spec.profiler,
       'max-epoch': benchmark_spec.max_epoch,
       'num_accelerators': benchmark_spec.num_accelerators,
+      'nccl_version': FLAGS.nccl_version,
+      'nccl_net_plugin': FLAGS.nccl_net_plugin,
+      'nccl_extra_params': FLAGS.nccl_extra_params,
   }
 
 
