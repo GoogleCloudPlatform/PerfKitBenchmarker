@@ -142,6 +142,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--storage-size=%d' % storage_size,
+        '--labels=%s' % util.MakeFormattedDefaultTags(),
     ]
     if self.spec.engine == relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
