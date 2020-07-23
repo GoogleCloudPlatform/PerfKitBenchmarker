@@ -39,20 +39,20 @@ robertammlm:
         GCP:
           machine_type: n1-highmem-64
           zone: us-west1-b
-          boot_disk_size: 50
+          boot_disk_size: 105
           boot_disk_type: pd-ssd
           min_cpu_platform: skylake
           gpu_type: v100
           gpu_count: 1
         AWS:
           machine_type: p3dn.24xlarge
-          boot_disk_size: 50
+          boot_disk_size: 105
           zone: us-east-1a
           image: ami-0a4a0d42e3b855a2c
         Azure:
           machine_type: Standard_ND40s_v2
           zone: eastus
-          boot_disk_size: 50
+          boot_disk_size: 105
 """
 NVPROF = 'nvprof'
 TFPROF = 'tfprof'
@@ -68,7 +68,6 @@ ENCODER_JSON = 'https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/encoder.json'
 VOCAB_BPE = 'https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/vocab.bpe'
 FAIRSEQ_DICT = 'https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/dict.txt'
 WORD_COUNT = 249997
-TIMEOUT = 21600
 METADATA_COLUMNS = ('epoch', 'step', 'steps per epoch', 'loss', 'nll_loss',
                     'ppl', 'wps', 'ups', 'wpb', 'bsz', 'num_updates', 'lr',
                     'gnorm', 'clip', 'oom', 'loss_scale', 'wall', 'train_wall')
@@ -301,11 +300,11 @@ def _Run(benchmark_spec, rank):
   """
   vm = benchmark_spec.vms[rank]
   master = benchmark_spec.vms[0]
-  env = []
+  nccl_env = []
   if FLAGS.nccl_cuda_visible_devices:
-    env.append('CUDA_VISIBLE_DEVICES={}'
-               .format(FLAGS.nccl_cuda_visible_devices))
-  env.extend(FLAGS.nccl_extra_params)
+    nccl_env.append('CUDA_VISIBLE_DEVICES={}'
+                    .format(FLAGS.nccl_cuda_visible_devices))
+  nccl_env.extend(FLAGS.nccl_extra_params)
 
   prof_cmd = ''
   if benchmark_spec.profiler:
@@ -363,20 +362,23 @@ def _Run(benchmark_spec, rank):
       'update-freq': benchmark_spec.update_freq,
       'max-epoch': benchmark_spec.max_epoch,
   })
-
+  path = ['/usr/local/cuda/bin', '/opt/conda/bin', '/opt/conda/condabin',
+          '$PATH']
+  if FLAGS.aws_efa:
+    path.insert(0, '/opt/amazon/openmpi')
+    path.insert(0, '/opt/amazon/openmpi/bin')
   roberta_benchmark_cmd = (
-      'PATH=/usr/local/cuda/bin:/opt/conda/bin:/opt/conda/condabin:$PATH '
-      'DGXSYSTEM=DGX1 NEXP=1 PULL=0 LOGDIR=/tmp/robertammlm '
-      '{env} {prof_cmd} python3 {distributed_cmd} '
+      'PATH={path} DGXSYSTEM=DGX1 NEXP=1 PULL=0 LOGDIR=/tmp/robertammlm '
+      '{nccl_env} {prof_cmd} python3 {distributed_cmd} '
       '$HOME/fairseq/train.py {data_path}/data-bin/mlm-w103 '
-      .format(env=' '.join(env), data_path=DATA_PATH,
-              distributed_cmd=distributed_cmd, prof_cmd=prof_cmd))
+      .format(path=':'.join(path), nccl_env=' '.join(nccl_env),
+              data_path=DATA_PATH, distributed_cmd=distributed_cmd,
+              prof_cmd=prof_cmd))
   roberta_benchmark_cmd += ' '.join(
       '--{}={}'.format(key, value) if value else '--{}'.format(key)
       for key, value in sorted(cmd_flags.items()))
   metadata = _CreateMetadataDict(benchmark_spec)
-  stdout, _ = vm.RemoteCommand(roberta_benchmark_cmd, should_log=True,
-                               timeout=TIMEOUT)
+  stdout, _ = vm.RobustRemoteCommand(roberta_benchmark_cmd, should_log=True)
   return MakeSamplesFromOutput(metadata, stdout) if master == vm else []
 
 

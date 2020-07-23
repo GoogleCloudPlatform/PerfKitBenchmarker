@@ -39,19 +39,19 @@ horovod:
           zone: us-central1-a
           image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
-          boot_disk_size: 50
+          boot_disk_size: 105
           gpu_type: v100
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-west-2a
           image: ami-07728e9e2742b0662
-          boot_disk_size: 50
+          boot_disk_size: 105
         Azure:
           machine_type: Standard_NC24rs_v3
           image: microsoft-dsvm:aml-workstation:ubuntu:19.11.13
           zone: eastus
-          boot_disk_size: 50
+          boot_disk_size: 105
       vm_count: null
 """
 
@@ -188,6 +188,7 @@ def _PrepareHorovod(vm):
 
   vm.Install('google_cloud_sdk')
   vm.InstallPackages('wget git unzip')
+  vm.Install('openmpi')
   vm.Install('nccl')
 
   pip = 'pip'
@@ -394,7 +395,7 @@ def Run(benchmark_spec):
     for extra_param in FLAGS.nccl_extra_params:
       nccl_params.append(extra_param)
 
-  run_command = ('mpirun -np {num_gpus} -hostfile {host_file} '
+  run_command = ('{mpi} -np {num_gpus} -hostfile {host_file} '
                  '-mca plm_rsh_no_tree_spawn 1 '
                  '--allow-run-as-root '
                  '-bind-to socket -map-by slot '
@@ -402,6 +403,7 @@ def Run(benchmark_spec):
                  '-mca pml ob1 -mca btl ^openib '
                  '-mca btl_tcp_if_exclude lo,docker0 '
                  '{python} ').format(
+                     mpi=FLAGS.nccl_mpi,
                      num_gpus=benchmark_spec.total_gpus,
                      host_file=MACHINEFILE,
                      python=python_interpreter,
