@@ -133,5 +133,6 @@ flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
                      'rules are added manually, PKB will not know about all of '
                      'them. However, they must be deleted in order to '
                      'successfully delete the PKB-created network.')
-flags.DEFINE_enum('bq_client_interface', 'CLI', ['CLI', 'JAVA'],
+flags.DEFINE_enum('bq_client_interface', 'CLI',
+                  ['CLI', 'JAVA', 'SIMBA_JDBC_1_2_4_1007'],
                   'The Runtime Interface used when interacting with BigQuery.')

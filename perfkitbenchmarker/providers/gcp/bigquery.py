@@ -53,6 +53,8 @@ def GetBigQueryClientInterface(
     return CliClientInterface(project_id, dataset_id)
   if FLAGS.bq_client_interface == 'JAVA':
     return JavaClientInterface(project_id, dataset_id)
+  if FLAGS.bq_client_interface == 'SIMBA_JDBC_1_2_4_1007':
+    return JdbcClientInterface(project_id, dataset_id)
   raise RuntimeError('Unknown BigQuery Client Interface requested.')
 
 
@@ -144,6 +146,74 @@ class CliClientInterface(GenericClientInterface):
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details['job_id'] = performance[query_name]['job_id']
     return float(performance[query_name]['execution_time']), details
+
+
+class JdbcClientInterface(GenericClientInterface):
+  """JDBC Client Interface class for BigQuery.
+
+  https://cloud.google.com/bigquery/providers/simba-drivers
+  """
+
+  def SetProvisionedAttributes(self, benchmark_spec):
+    super(JdbcClientInterface,
+          self).SetProvisionedAttributes(benchmark_spec)
+    self.project_id = re.split(r'\.',
+                               benchmark_spec.edw_service.cluster_identifier)[0]
+    self.dataset_id = re.split(r'\.',
+                               benchmark_spec.edw_service.cluster_identifier)[1]
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs
+    a) Java Execution Environment,
+    b) BigQuery Authnetication Credentials,
+    c) JDBC Application to execute a query and gather execution details,
+    d) Simba JDBC BigQuery client code dependencencies, and
+    e) The Simba JDBC interface jar
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+
+    # Push the service account file to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['bq-jdbc-client-1.0.jar'], '')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['GoogleBigQueryJDBC42.jar'], '')
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = (
+        'java -cp bq-jdbc-client-1.0.jar:GoogleBigQueryJDBC42.jar '
+        'com.google.cloud.performance.edw.App --project {} --service_account '
+        '{} --credentials_file {} --dataset {} --query_file {}'.format(
+            self.project_id, FLAGS.gcp_service_account,
+            FLAGS.gcp_service_account_key_file, self.dataset_id, query_name))
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['performance'], details
 
 
 class JavaClientInterface(GenericClientInterface):
