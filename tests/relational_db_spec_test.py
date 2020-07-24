@@ -14,9 +14,9 @@
 """Tests for RelationalDbSpec."""
 
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine

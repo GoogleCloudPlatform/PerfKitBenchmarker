@@ -18,11 +18,11 @@ from __future__ import division
 from __future__ import print_function
 
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from tests import pkb_common_test_case
 import six
 

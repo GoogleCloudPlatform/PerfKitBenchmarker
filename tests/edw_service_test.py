@@ -15,9 +15,9 @@
 
 import copy
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
 

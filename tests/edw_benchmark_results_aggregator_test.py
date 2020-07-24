@@ -15,9 +15,9 @@
 
 from typing import Dict, Text
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import edw_benchmark_results_aggregator as agg
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from tests import pkb_common_test_case
 
