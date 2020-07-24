@@ -15,8 +15,8 @@
 """Tests for pkb.py."""
 
 import unittest
+from absl import flags
 import mock
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import stages
 

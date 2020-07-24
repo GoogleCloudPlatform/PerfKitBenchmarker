@@ -15,10 +15,9 @@
 """Tests for fio_benchmark."""
 
 import unittest
-
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util

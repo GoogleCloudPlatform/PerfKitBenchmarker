@@ -14,12 +14,11 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
-
+from absl import flags
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util

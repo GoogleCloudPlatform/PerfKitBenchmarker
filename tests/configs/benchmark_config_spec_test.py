@@ -19,11 +19,10 @@ from __future__ import print_function
 
 import os
 import unittest
-
+from absl import flags
 import mock
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine

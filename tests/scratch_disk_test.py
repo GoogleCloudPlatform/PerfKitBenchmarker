@@ -16,6 +16,7 @@
 
 import abc
 import unittest
+from absl import flags
 from absl.testing import flagsaver
 import mock
 
@@ -23,7 +24,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
