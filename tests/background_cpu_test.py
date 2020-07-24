@@ -20,13 +20,13 @@ from __future__ import print_function
 
 import unittest
 
+from absl import flags
 import contextlib2
-from mock import patch
+import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -69,7 +69,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
 
-    p = patch(util.__name__ + '.GetDefaultProject')
+    p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
     self.addCleanup(p.stop)
@@ -108,7 +108,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     with contextlib2.ExitStack() as stack:
       for vm in spec.vms:
         for function_name in _MOCKED_VM_FUNCTIONS:
-          stack.enter_context(patch.object(vm, function_name))
+          stack.enter_context(mock.patch.object(vm, function_name))
 
       working, non_working = working_groups, non_working_groups
       self._CheckVmCallCounts(spec, working, (0, 0), non_working, (0, 0))

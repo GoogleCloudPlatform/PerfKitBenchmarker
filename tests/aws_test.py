@@ -17,7 +17,7 @@
 import json
 import os.path
 import unittest
-
+from absl import flags
 import mock
 
 from parameterized import parameterized
@@ -25,7 +25,6 @@ from parameterized import parameterized
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec

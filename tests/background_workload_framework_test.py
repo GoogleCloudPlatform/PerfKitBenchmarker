@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for background workload framework"""
+"""Tests for background workload framework."""
 
 import functools
 import unittest
-
+from absl import flags
 import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import timing_util
@@ -54,8 +53,7 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
     self.last_call += 1
 
   def testBackgroundWorkloadSpec(self):
-    """ Check that the benchmark spec calls the prepare, stop, and start
-    methods on the vms """
+    """Check that benchmark spec calls the prepare, stop, and start on vm."""
 
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
