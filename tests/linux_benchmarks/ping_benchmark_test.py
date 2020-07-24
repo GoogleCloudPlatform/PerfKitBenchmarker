@@ -14,11 +14,11 @@
 
 """Tests for ping_benchmark."""
 
-import unittest
 import os
+import unittest
+from absl import flags
 import mock
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 
 flags.FLAGS.mark_as_parsed()

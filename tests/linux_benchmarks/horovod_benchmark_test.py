@@ -14,7 +14,7 @@
 """Tests for the Horovod benchmark."""
 import os
 import unittest
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.linux_benchmarks import horovod_benchmark
 from tests import pkb_common_test_case
 

@@ -16,12 +16,12 @@
 import json
 import os
 import unittest
+from absl import flags
 import mock
 import parameterized
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
 
