@@ -6,7 +6,7 @@ from __future__ import print_function
 
 import json
 import unittest
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import memtier

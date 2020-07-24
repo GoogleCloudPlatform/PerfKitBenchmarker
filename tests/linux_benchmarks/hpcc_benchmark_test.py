@@ -18,10 +18,9 @@ from __future__ import print_function
 
 import os
 import unittest
-
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
 from tests import pkb_common_test_case
 import six

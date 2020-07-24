@@ -17,9 +17,9 @@
 import datetime
 import time
 import unittest
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import object_storage_service_benchmark
 from tests import pkb_common_test_case
 
