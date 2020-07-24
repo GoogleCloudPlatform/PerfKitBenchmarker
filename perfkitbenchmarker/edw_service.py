@@ -301,3 +301,13 @@ class EdwService(resource.BaseResource):
         service.
     """
     raise NotImplementedError
+
+  def RequiresWarmUpSuite(self) -> bool:
+    """Verifies if the edw_service requires a warm up suite execution.
+
+    Currently enabled for all service types, for parity.
+
+    Returns:
+      A boolean value (True) if the warm suite is recommended.
+    """
+    return True
