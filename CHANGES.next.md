@@ -24,3 +24,4 @@
 -   Updated object storage service deleteObjects API to also return back
     object_sizes of deleted objects.
 -   Fixed a bug in leftover entity deletion logic.
+-   Fixed string encoding bug in netperf_pps benchmark.

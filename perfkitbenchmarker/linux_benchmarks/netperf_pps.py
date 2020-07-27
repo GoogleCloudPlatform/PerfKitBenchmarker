@@ -111,9 +111,7 @@ def ParseNetperfAggregateOutput(stdout):
   metadata = {}
   aggregate_samples = []
 
-  stdout_ascii = stdout.encode("ascii")
-
-  for line in stdout_ascii.splitlines():
+  for line in stdout.splitlines():
     match = re.search('peak interval', line)
     if match:
       line_split = line.split()
