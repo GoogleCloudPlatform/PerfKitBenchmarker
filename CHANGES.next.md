@@ -25,3 +25,5 @@
     object_sizes of deleted objects.
 -   Fixed a bug in leftover entity deletion logic.
 -   Fixed string encoding bug in netperf_pps benchmark.
+-   Fix installing RedHat EPEL on GCP (rhel8,centos8) and AWS (rhel7,rhel8,
+    centos8, amazonlinux2)

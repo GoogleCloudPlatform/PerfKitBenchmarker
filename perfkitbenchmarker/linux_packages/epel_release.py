@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,32 +11,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module allows instalation Extra Packages for Enterprise Linux repository.
 
-"""Module allows instalation Extra Packages for Enterprise Linux repository."""
+See https://fedoraproject.org/wiki/EPEL for details.
+"""
 
-import posixpath
-import re
+import logging
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import os_types
 
-EPEL6_RPM = 'epel-release-6-8.noarch.rpm'
-EPEL7_RPM = 'epel-release-7-11.noarch.rpm'
-PACKAGE_NAME = 'epel_release'
-EPEL_BASE_URL = 'https://dl.fedoraproject.org/pub/epel/'
-EPEL_URL_PATH = 'x86_64/Packages/e'
+# Location of the EPEL RPM.
+_EPEL_URL = 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-{}.noarch.rpm'
 
-PREPROVISIONED_DATA = {
-    EPEL6_RPM:
-        'e5ed9ecf22d0c4279e92075a64c757ad2b38049bcf5c16c4f2b75d5f6860dc0d',
-    EPEL7_RPM:
-        '33b8b8250960874014d7c66d04ef12df3a71277b9eb6f2146bba7553daeaf910'
+# Dict of vm.OS_TYPE to the yum RPM to install.  Must include all OSes that
+# can install EPEL.
+_EPEL_URLS = {
+    os_types.CENTOS7: None,  # RPM already installed
+    os_types.CENTOS8: _EPEL_URL.format(8),
+    os_types.RHEL7: _EPEL_URL.format(7),
+    os_types.RHEL8: _EPEL_URL.format(8),
+    os_types.AMAZONLINUX2: _EPEL_URL.format(7),
 }
-PACKAGE_DATA_URL = {
-    EPEL6_RPM: posixpath.join(
-        EPEL_BASE_URL, '6', EPEL_URL_PATH, EPEL6_RPM),
-    EPEL7_RPM: posixpath.join(
-        EPEL_BASE_URL, '7', EPEL_URL_PATH, EPEL7_RPM)
+
+# Additional commands to run after installing the RPM.
+_EPEL_CMDS = {
+    os_types.CENTOS7: 'sudo yum install -y epel-release',
+    os_types.CENTOS8: 'sudo dnf config-manager --set-enabled PowerTools'
 }
+
+# The ids of the EPEL yum repo
+_EPEL_REPO_IDS = frozenset(['epel', 'epel/x86_64'])
 
 
 def AptInstall(vm):
@@ -46,22 +50,41 @@ def AptInstall(vm):
 
 def YumInstall(vm):
   """Installs epel-release repo."""
-  try:
-    vm.InstallPackages('epel-release')
-  except errors.VirtualMachine.RemoteCommandError:
-    stdout, _ = vm.RemoteCommand('cat /etc/redhat-release')
-    major_version = int(re.search('release ([0-9])', stdout).group(1))
-    if major_version == 6:
-      epel_rpm = EPEL6_RPM
-    elif major_version == 7:
-      epel_rpm = EPEL7_RPM
-    else:
-      raise
-    vm.InstallPreprovisionedPackageData(
-        PACKAGE_NAME,
-        PREPROVISIONED_DATA.keys(),
-        INSTALL_DIR)
-    vm.RemoteCommand('sudo rpm -ivh --force %s' % posixpath.join(
-        INSTALL_DIR, epel_rpm))
+  if vm.OS_TYPE not in _EPEL_URLS:
+    raise errors.Setup.InvalidConfigurationError(
+        'os_type {} not in {}'.format(vm.OS_TYPE, sorted(_EPEL_URLS)))
+  if IsEpelRepoInstalled(vm):
+    logging.info('EPEL repo already installed')
+    return
+  url = _EPEL_URLS[vm.OS_TYPE]
+  if url:
+    vm.InstallPackages(url)
+  if vm.OS_TYPE in _EPEL_CMDS:
+    vm.RemoteCommand(_EPEL_CMDS[vm.OS_TYPE])
   vm.InstallPackages('yum-utils')
   vm.RemoteCommand('sudo yum-config-manager --enable epel')
+  if not IsEpelRepoInstalled(vm):
+    raise ValueError('EPEL repos {} not in {}'.format(
+        sorted(_EPEL_REPO_IDS), sorted(Repolist(vm))))
+
+
+def IsEpelRepoInstalled(vm):
+  return bool(Repolist(vm).intersection(_EPEL_REPO_IDS))
+
+
+def Repolist(vm, enabled=True):
+  """Returns a frozenset of the yum repos ids."""
+  txt, _ = vm.RemoteCommand(
+      'sudo yum repolist {}'.format('enabled' if enabled else 'all'))
+  hit_repo_id = False
+  repos = set()
+  for line in txt.splitlines():
+    if hit_repo_id:
+      repo_id = line.split()[0]
+      if repo_id != 'repolist:':
+        repos.add(repo_id)
+    else:
+      hit_repo_id = line.startswith('repo id')
+  if not repos:
+    raise ValueError('Could not find repo ids in {}'.format(txt))
+  return frozenset(repos)
