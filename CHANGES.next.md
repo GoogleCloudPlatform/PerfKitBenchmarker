@@ -27,3 +27,4 @@
 -   Fixed string encoding bug in netperf_pps benchmark.
 -   Fix installing RedHat EPEL on GCP (rhel8,centos8) and AWS (rhel7,rhel8,
     centos8, amazonlinux2)
+-   Correctly install pip rhel8,centos8 all os types.
