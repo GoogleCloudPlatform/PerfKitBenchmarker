@@ -13,5 +13,5 @@
 # limitations under the License.
 
 # Requirements for running PerfKit Benchmarker on AWS.
-awscli>=1.18
+awscli>=1.18.107
 colorama==0.3.7
