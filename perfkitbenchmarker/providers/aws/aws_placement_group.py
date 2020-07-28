@@ -79,12 +79,18 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
 
   def _Create(self):
     """Creates the Placement Group."""
+    formatted_tags = util.FormatTagSpecifications('placement-group',
+                                                  util.MakeDefaultTags())
+
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-placement-group',
         '--region=%s' % self.region,
         '--group-name=%s' % self.name,
-        '--strategy=%s' % self.strategy]
+        '--strategy=%s' % self.strategy,
+        '--tag-specifications=%s' % formatted_tags
+    ]
+
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):

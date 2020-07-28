@@ -17,6 +17,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
 CLOUD = providers.AWS
@@ -59,7 +60,8 @@ EXISTS_CALL = AwsCommand(
     suppress_failure=None)
 CREATE_CALL = AwsCommand('create-placement-group',
                          '--group-name={}'.format(GROUP_NAME),
-                         '--strategy={}'.format(STRATEGY))
+                         '--strategy={}'.format(STRATEGY),
+                         '--tag-specifications=foobar')
 DELETE_CALL = AwsCommand(
     'delete-placement-group',
     '--group-name={}'.format(GROUP_NAME),
@@ -122,7 +124,9 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(exists_value, pg._Exists())
     self.assertAwsCommands(EXISTS_CALL)
 
-  def testCreate(self):
+  @mock.patch.object(util, 'FormatTagSpecifications')
+  def testCreate(self, mock_cmd):
+    mock_cmd.return_value = 'foobar'
     self.mock_cmd.side_effect = [
         AwsResponse(CREATE_RESPONSE),
         AwsResponse(EXISTS_ONE_RESPONSE),
