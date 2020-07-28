@@ -544,6 +544,9 @@ def Run(benchmark_spec):
     for item in samples:
       item.metadata['valid_run'] = valid_run
       item.metadata['nonoverlap_percentage'] = nonoverlap_percent
+  for item in samples:
+    item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
+    item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
 
   return samples
 
