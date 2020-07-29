@@ -37,6 +37,11 @@ updates/7/x86_64      CentOS-7 - Updates                                    900
 repolist: 24803
 """
 
+_REPOLIST_WITH_EPEL_REMOTE = """
+repo id               repo name                                           status
+*epel/x86_64          Extra Packages for Enterprise Linux 7 - x86_64      13421
+"""
+
 EMPTY_RES = ''
 
 
@@ -80,10 +85,12 @@ class EpelReleaseTest(pkb_common_test_case.PkbCommonTestCase):
     epel_release.YumInstall(vm)
     vm.RemoteCommand.assert_called_once()
 
-  @parameterized.expand([(_REPOLIST_NO_EPEL, ('base/7/x86_64',
-                                              'updates/7/x86_64'), False),
-                         (_REPOLIST_WITH_EPEL, ('epel/x86_64', 'base/7/x86_64',
-                                                'updates/7/x86_64'), True)])
+  @parameterized.expand([
+      (_REPOLIST_NO_EPEL, ('base/7/x86_64', 'updates/7/x86_64'), False),
+      (_REPOLIST_WITH_EPEL, ('epel/x86_64', 'base/7/x86_64',
+                             'updates/7/x86_64'), True),
+      (_REPOLIST_WITH_EPEL_REMOTE, ('epel/x86_64',), True),
+  ])
   def testRepoList(self, repo_response, repo_ids, repo_enabled):
     vm = Vm(os_types.CENTOS7, [repo_response, repo_response])
     self.assertEqual(epel_release.Repolist(vm), frozenset(repo_ids))

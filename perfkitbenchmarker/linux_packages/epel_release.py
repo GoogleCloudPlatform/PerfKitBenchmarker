@@ -81,6 +81,8 @@ def Repolist(vm, enabled=True):
   for line in txt.splitlines():
     if hit_repo_id:
       repo_id = line.split()[0]
+      if repo_id[0] == '*':  # Repo metadata is not local, still okay to use
+        repo_id = repo_id[1:]
       if repo_id != 'repolist:':
         repos.add(repo_id)
     else:
