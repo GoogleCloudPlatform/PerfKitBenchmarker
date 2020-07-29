@@ -241,7 +241,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
 
     Returns:
-      A tuple of stdout, stderr, return_code from running the command.
+      A tuple of stdout, stderr from running the command.
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection, or
