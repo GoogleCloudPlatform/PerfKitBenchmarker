@@ -349,7 +349,6 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
   if entities:
     logging.info('Deleting leftover %d entities for %s', len(entities), kind)
     total_entity_count += len(entities)
-    client.delete_multi(entity.key for entity in entities)
     deletion_task = _DeletionTask(kind, task_id)
     delete_keys = []
     delete_keys.extend([entity.key for entity in entities])
