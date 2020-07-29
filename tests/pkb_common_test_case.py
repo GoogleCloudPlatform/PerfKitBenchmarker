@@ -26,6 +26,7 @@ from perfkitbenchmarker import pkb  # pylint:disable=unused-import
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -113,6 +114,11 @@ class PkbCommonTestCase(absltest.TestCase):
     super(PkbCommonTestCase, self).setUp()
     saved_flag_values = flagsaver.save_flag_values()
     self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
+
+    p = mock.patch(
+        util.__name__ + '.GetDefaultProject',
+        return_value='test_project')
+    self.enter_context(p)
 
   # TODO(user): Extend MockIssueCommand to support multiple calls to
   # vm_util.IssueCommand

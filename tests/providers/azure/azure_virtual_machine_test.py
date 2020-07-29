@@ -24,18 +24,18 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AzureVirtualMachineTest, self).setUp()
-    mock.patch(azure_virtual_machine.__name__ +
-               '.azure_network.AzureNetwork.GetNetwork').start()
-    mock.patch(azure_virtual_machine.__name__ +
-               '.azure_network.AzureFirewall.GetFirewall').start()
-    mock.patch(azure_virtual_machine.__name__ +
-               '.azure_network.GetResourceGroup').start()
-    self.mock_cmd = mock.patch.object(vm_util, 'IssueCommand').start()
-    mock.patch.object(util, 'GetResourceTags').start()
-
-  def tearDown(self):
-    super(AzureVirtualMachineTest, self).tearDown()
-    mock.patch.stopall()
+    self.enter_context(
+        mock.patch(azure_virtual_machine.__name__ +
+                   '.azure_network.AzureNetwork.GetNetwork'))
+    self.enter_context(
+        mock.patch(azure_virtual_machine.__name__ +
+                   '.azure_network.AzureFirewall.GetFirewall'))
+    self.enter_context(
+        mock.patch(azure_virtual_machine.__name__ +
+                   '.azure_network.GetResourceGroup'))
+    self.mock_cmd = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand'))
+    self.enter_context(mock.patch.object(util, 'GetResourceTags'))
 
   @parameterized.expand([
       ('', 'Error Code: QuotaExceeded', 1),
@@ -60,9 +60,11 @@ class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AzurePublicIPAddressTest, self).setUp()
-    mock.patch(azure_virtual_machine.__name__ +
-               '.azure_network.GetResourceGroup').start()
-    self.mock_cmd = mock.patch.object(vm_util, 'IssueCommand').start()
+    self.enter_context(
+        mock.patch(azure_virtual_machine.__name__ +
+                   '.azure_network.GetResourceGroup'))
+    self.mock_cmd = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand'))
     self.ip_address = azure_virtual_machine.AzurePublicIPAddress(
         'westus2', None, 'test_ip')
 

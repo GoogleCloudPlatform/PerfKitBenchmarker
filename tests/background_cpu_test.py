@@ -31,7 +31,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 import six
 from six.moves import zip_longest
@@ -69,10 +68,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
 
-    p = mock.patch(util.__name__ + '.GetDefaultProject')
-    p.start()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
-    self.addCleanup(p.stop)
 
   def _CreateBenchmarkSpec(self, benchmark_config_yaml):
     config = configs.LoadConfig(benchmark_config_yaml, {}, NAME)

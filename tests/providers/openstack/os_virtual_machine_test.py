@@ -75,15 +75,11 @@ class OpenStackVirtualMachineTest(BaseOpenStackNetworkTest):
 
   def setUp(self):
     super(OpenStackVirtualMachineTest, self).setUp()
-    self.mock_check_network_exists = mock.patch.object(
+    self.mock_check_network_exists = self.enter_context(mock.patch.object(
         os_virtual_machine.OpenStackVirtualMachine,
-        '_CheckNetworkExists').start()
+        '_CheckNetworkExists'))
     FLAGS.ignore_package_requirements = True
     self.openstack_vm = self._CreateTestOpenStackVm()
-
-  def tearDown(self):
-    super(OpenStackVirtualMachineTest, self).tearDown()
-    mock.patch.stopall()
 
   def test_CheckFloatingIPNetworkExistsWithTrue(self):
     self.mock_check_network_exists.return_value = _network_true

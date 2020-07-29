@@ -89,12 +89,10 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AwsPlacementGroupTest, self).setUp()
-    self.mock_cmd = mock.patch.object(vm_util, 'IssueCommand').start()
-    mock.patch.object(uuid, 'uuid4').start().return_value = UUID
-
-  def tearDown(self):
-    super(AwsPlacementGroupTest, self).tearDown()
-    mock.patch.stopall()
+    self.mock_cmd = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand'))
+    uuid_call = self.enter_context(mock.patch.object(uuid, 'uuid4'))
+    uuid_call.return_value = UUID
 
   def assertAwsCommands(self, *expected_calls):
     # easier to read error message when looping through individual items

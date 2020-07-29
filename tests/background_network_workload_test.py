@@ -32,7 +32,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 import six
 from six.moves import zip_longest
@@ -101,9 +100,6 @@ class TestBackgroundNetworkWorkload(pkb_common_test_case.PkbCommonTestCase):
     super(TestBackgroundNetworkWorkload, self).setUp()
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
-    p = mock.patch(util.__name__ + '.GetDefaultProject')
-    p.start()
-    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,

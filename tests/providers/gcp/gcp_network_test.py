@@ -27,7 +27,6 @@ from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 from six.moves import builtins
 
@@ -480,10 +479,8 @@ def PatchCriticalObjects(retvals=None):
   with mock.patch(
       vm_util.__name__ + '.IssueCommand',
       side_effect=ReturnVal) as issue_command, mock.patch(
-          builtins.__name__ + '.open'), mock.patch(
-              vm_util.__name__ +
-              '.NamedTemporaryFile'), mock.patch(util.__name__ +
-                                                 '.GetDefaultProject'):
+          builtins.__name__ + '.open'), mock.patch(vm_util.__name__ +
+                                                   '.NamedTemporaryFile'):
     yield issue_command
 
 

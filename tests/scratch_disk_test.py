@@ -72,7 +72,8 @@ class ScratchDiskTestMixin(object):
     self.patches.append(
         mock.patch(vm_prefix + '.MountDisk'))
     self.patches.append(
-        mock.patch(util.__name__ + '.GetDefaultProject'))
+        mock.patch(
+            util.__name__ + '.GetDefaultProject', side_effect='test_project'))
 
     # Patch subprocess.Popen to make sure we don't issue any commands to spin up
     # resources.

@@ -23,7 +23,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.providers.gcp import util
+from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -32,12 +32,10 @@ _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'uid'
 
 
-class _DiskTypeRenamingTestCase(unittest.TestCase):
+class _DiskTypeRenamingTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    p = mock.patch(util.__name__ + '.GetDefaultProject')
-    p.start()
-    self.addCleanup(p.stop)
+    super(_DiskTypeRenamingTestCase, self).setUp()
 
     get_tmp_dir_mock = mock.patch(
         vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')
