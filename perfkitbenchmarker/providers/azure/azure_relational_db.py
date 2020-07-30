@@ -480,37 +480,5 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         self.spec.database_password,
         database_name)
 
-  def MakeMysqlConnectionString(self, use_localhost=False):
-    """Makes the connection string used to connect via mysql command.
-
-    Override implemenation in base class.  Azure postgres needs this format.
-
-    Args:
-      use_localhost: Whether to use 'localhost' instead of the endpoint or not.
-
-    Returns:
-        The connection string to use.
-    """
-    return '-h {0}{1} -u {2}{3} -p{4}'.format(
-        self.endpoint if not use_localhost else 'localhost',
-        ' -P 3306' if not self.is_managed_db else '',
-        self.spec.database_username, ('@%s' % self.endpoint) if
-        (self.is_managed_db and not use_localhost) else '',
-        self.spec.database_password)
-
-  def MakeSysbenchConnectionString(self):
-    """Makes the connection string used to connect via sysbench command.
-
-    Override implemenation in base class.  Azure postgres needs this format.
-
-    Returns:
-        The connection string to use.
-    """
-    return ('--mysql-host={0}{1} --mysql-user={2}@{0} '
-            '--mysql-password="{3}" '.format(
-                self.endpoint,
-                ' --mysql-port=3306' if not self.is_managed_db else '',
-                self.spec.database_username, self.spec.database_password))
-
   def _FailoverHA(self):
     raise NotImplementedError()
