@@ -26,6 +26,7 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
+import abc
 import collections
 import logging
 import os
@@ -1221,6 +1222,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           FLAGS.append_kernel_command_line, reboot=False)
       self._needs_reboot = True
 
+  @abc.abstractmethod
+  def InstallPackages(self, packages: str) -> None:
+    """Installs packages using the OS's package manager."""
+    pass
+
 
 class ClearMixin(BaseLinuxMixin):
   """Class holding Clear Linux specific VM methods and attributes."""
@@ -1262,7 +1268,7 @@ class ClearMixin(BaseLinuxMixin):
     return self.TryRemoteCommand('sudo swupd bundle-list --all | grep {0}'.format(package),
                                  suppress_warning=True)
 
-  def InstallPackages(self, packages):
+  def InstallPackages(self, packages: str) -> None:
     """Installs packages using the swupd bundle manager."""
     self.RemoteCommand('sudo swupd bundle-add {0}'.format(packages))
 

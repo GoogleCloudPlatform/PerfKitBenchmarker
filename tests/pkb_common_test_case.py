@@ -23,6 +23,7 @@ from absl.testing import parameterized
 
 import mock
 
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -98,6 +99,15 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
     pass
 
   def _Delete(self):
+    pass
+
+
+# Need to provide implementations for all of the abstract methods in
+# order to instantiate linux_virtual_machine.BaseLinuxMixin.
+class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxMixin,
+                              TestVirtualMachine):
+
+  def InstallPackages(self, packages):
     pass
 
 

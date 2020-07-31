@@ -29,16 +29,9 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 
 
-# Need to provide implementations for all of the abstract methods in
-# order to instantiate linux_virtual_machine.BaseLinuxMixin.
-class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxMixin,
-                              pkb_common_test_case.TestVirtualMachine):
-  pass
-
-
 def CreateTestLinuxVm():
   vm_spec = pkb_common_test_case.CreateTestVmSpec()
-  return TestLinuxVirtualMachine(vm_spec=vm_spec)
+  return pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
 
 
 class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
@@ -109,7 +102,8 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(TestDiskOperations, self).setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
-    patcher = mock.patch.object(TestLinuxVirtualMachine, 'RemoteHostCommand')
+    patcher = mock.patch.object(pkb_common_test_case.TestLinuxVirtualMachine,
+                                'RemoteHostCommand')
     self.remote_command = patcher.start()
     self.addCleanup(patcher.stop)
     self.remote_command.side_effect = [('', None, 0), ('', None, 0)]

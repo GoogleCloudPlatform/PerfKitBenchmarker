@@ -17,7 +17,6 @@ import unittest
 from absl.testing import parameterized
 import mock
 
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.linux_packages import epel_release
 from tests import pkb_common_test_case
@@ -45,16 +44,9 @@ repo id               repo name                                           status
 EMPTY_RES = ''
 
 
-# Need to provide implementations for all of the abstract methods in
-# order to instantiate linux_virtual_machine.BaseLinuxMixin.
-class EpelTestVirtualMachine(linux_virtual_machine.BaseLinuxMixin,
-                             pkb_common_test_case.TestVirtualMachine):
-  pass
-
-
 def Vm(os_type, responses):
   vm_spec = pkb_common_test_case.CreateTestVmSpec()
-  vm = EpelTestVirtualMachine(vm_spec=vm_spec)
+  vm = pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
   # pylint: disable=invalid-name
   vm.OS_TYPE = os_type
   vm.RemoteCommand = mock.Mock()
