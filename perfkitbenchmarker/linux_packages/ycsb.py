@@ -141,7 +141,8 @@ flags.DEFINE_list('ycsb_run_parameters', [],
                   'of "key=value" pairs.')
 flags.DEFINE_list('ycsb_threads_per_client', ['32'], 'Number of threads per '
                   'loader during the benchmark run. Specify a list to vary the '
-                  'number of clients.')
+                  'number of clients. For each thread count, optionally supply '
+                  'target qps per client, which cause ycsb to self-throttle.')
 flags.DEFINE_integer('ycsb_preload_threads', None, 'Number of threads per '
                      'loader during the initial data population stage. '
                      'Default value depends on the target DB.')
@@ -216,9 +217,17 @@ def _GetVersionIndexFromUrl(url):
   return _GetVersionIndex(url.split('-')[-1].replace('.tar.gz', ''))
 
 
-def _GetThreadsPerLoaderList():
-  """Returns the list of client counts per VM to use in staircase load."""
-  return [int(thread_count) for thread_count in FLAGS.ycsb_threads_per_client]
+def _GetThreadsQpsPerLoaderList():
+  """Returns the list of [client, qps] per VM to use in staircase load."""
+
+  def _FormatThreadQps(thread_qps):
+    thread_qps_pair = thread_qps.split(':')
+    if len(thread_qps_pair) == 1:
+      thread_qps_pair.append(0)
+    return [int(val) for val in thread_qps_pair]
+
+  return [_FormatThreadQps(thread_qps)
+          for thread_qps in FLAGS.ycsb_threads_per_client]
 
 
 def _GetWorkloadFileList():
@@ -234,11 +243,11 @@ def _GetWorkloadFileList():
 
 
 def CheckPrerequisites():
-  """Verifies that the specified workload files are present and the YCSB version is 0.17.0 or higher.
+  """Verifies that the workload files are present and parameters are valid.
 
   Raises:
     IOError: On missing workload file.
-    errors.Config.InvalidValue on unsupported YCSB version.
+    errors.Config.InvalidValue on unsupported YCSB version or configs.
   """
   for workload_file in _GetWorkloadFileList():
     if not os.path.exists(workload_file):
@@ -253,6 +262,12 @@ def CheckPrerequisites():
 
   if ycsb_version < 17:
     raise errors.Config.InvalidValue('must use YCSB version 0.17.0 or higher.')
+
+  if 'target' in FLAGS.ycsb_run_parameters and any([
+      ':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client]):
+    raise errors.Config.InvalidValue(
+        'YCSB target set in both ycsb_threads_per_client '
+        'and ycsb_run_parameters.')
 
 
 def _Install(vm):
@@ -1129,8 +1144,10 @@ class YCSBExecutor(object):
                                          for vm in dict.fromkeys(vms)])
 
       parameters['parameter_files'] = [remote_path]
-      for client_count in _GetThreadsPerLoaderList():
+      for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
         parameters['threads'] = client_count
+        if target_qps_per_vm:
+          parameters['target'] = target_qps_per_vm * len(vms)
         start = time.time()
         results = self._RunThreaded(vms, **parameters)
         events.record_event.send(
