@@ -161,14 +161,15 @@ class UnmanagedNfsService(BaseNfsService):
   }
   _NFS_RESTART_CMD = 'sudo systemctl restart {nfs_name}'
 
-  def __init__(self, disk_spec, server_vm):
+  def __init__(self, disk_spec, server_vm, check_export_not_same_mount=True):
     super(UnmanagedNfsService, self).__init__(disk_spec, None)
     self.server_vm = server_vm
     # Path on the server to export. Must be different from mount_point.
     self.server_directory = disk_spec.device_path or '/pkb-nfs-server-directory'
     logging.info('Exporting server directory %s', self.server_directory)
-    assert self.server_directory != disk_spec.mount_point, \
-        'export server directory must be different from mount point'
+    if check_export_not_same_mount:
+      assert self.server_directory != disk_spec.mount_point, (
+          'export server directory must be different from mount point')
 
   def GetRemoteAddress(self):
     """The NFS server's address."""
