@@ -19,6 +19,7 @@ import subprocess
 from absl import flags
 from absl.testing import absltest
 from absl.testing import flagsaver
+from absl.testing import parameterized
 
 import mock
 
@@ -104,7 +105,7 @@ class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
   pass
 
 
-class PkbCommonTestCase(absltest.TestCase):
+class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
   """Test case class for PKB.
 
   Contains common functions shared by PKB test cases.

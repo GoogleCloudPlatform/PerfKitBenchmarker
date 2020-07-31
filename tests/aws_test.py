@@ -18,9 +18,8 @@ import json
 import os.path
 import unittest
 from absl import flags
+from absl.testing import parameterized
 import mock
-
-from parameterized import parameterized
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
@@ -494,10 +493,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.assert_not_called()
     self.vm.network.is_static = False
 
-  @parameterized.expand([
-      (True, 'network-interfaces', 'associate-public-ip-address'),
-      (False, 'associate-public-ip-address', 'network-interfaces'),
-  ])
+  @parameterized.named_parameters(
+      ('use_efa', True, 'network-interfaces', 'associate-public-ip-address'),
+      ('no_efa', False, 'associate-public-ip-address', 'network-interfaces'),
+  )
   def testElasticNetwork(self, use_efa, should_find, should_not_find):
     # with EFA the "--associate-public-ip-address" flag is not used, instead
     # putting that attribute into --network-interfaces

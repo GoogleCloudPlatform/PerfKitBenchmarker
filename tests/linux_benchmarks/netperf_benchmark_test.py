@@ -17,8 +17,8 @@ import json
 import os
 import unittest
 from absl import flags
+from absl.testing import parameterized
 import mock
-import parameterized
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
@@ -33,7 +33,7 @@ FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
 
 
-class NetperfBenchmarkTestCase(unittest.TestCase):
+class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
   maxDiff = None
 
@@ -146,15 +146,16 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
       self.assertIsInstance(result[i][3], dict)
       self.assertDictContainsSubset(meta, result[i][3])
 
-  @parameterized.parameterized.expand([
-      'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
-      '10.0.0.137 () port 20157 AF_INET : histogram\nrecv_response_timed_n: no'
-      ' response received. errno 110 counter 0\n',
-      'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
-      '10.0.0.172 () port 20169 AF_INET : histogram\ncatcher: timer popped '
-      'with times_up != 0\nrecv_response_timed_n: no response received. errno '
-      '4 counter -1\n'
-  ])
+  @parameterized.named_parameters(
+      ('no_times_up',
+       'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
+       '10.0.0.137 () port 20157 AF_INET : histogram\nrecv_response_timed_n: no'
+       ' response received. errno 110 counter 0\n'),
+      ('has_times_up',
+       'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
+       '10.0.0.172 () port 20169 AF_INET : histogram\ncatcher: timer popped '
+       'with times_up != 0\nrecv_response_timed_n: no response received. errno '
+       '4 counter -1\n'))
   def testParseNetperfOutputError(self, output):
     with self.assertRaises(
         errors.Benchmarks.KnownIntermittentError) as e:

@@ -9,9 +9,8 @@ import json
 import unittest
 import uuid
 from absl import flags
+from absl.testing import parameterized
 import mock
-
-from parameterized import parameterized
 
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
@@ -109,9 +108,10 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(REGION, pg.region)
     self.assertEqual(STRATEGY, pg.strategy)
 
-  @parameterized.expand([(EXISTS_NONE_RESPONSE, False),
-                         (EXISTS_ONE_RESPONSE, True),
-                         (EXISTS_TWO_RESPONSE, None, True)])
+  @parameterized.named_parameters(
+      ('EXISTS_NONE_RESPONSE', EXISTS_NONE_RESPONSE, False),
+      ('EXISTS_ONE_RESPONSE', EXISTS_ONE_RESPONSE, True),
+      ('EXISTS_TWO_RESPONSE', EXISTS_TWO_RESPONSE, None, True))
   def testExists(self, response, exists_value, throws_exception=False):
     self.mock_cmd.side_effect = [AwsResponse(response)]
     pg = CreateAwsPlacementGroup()

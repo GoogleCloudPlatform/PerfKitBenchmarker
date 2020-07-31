@@ -1,9 +1,8 @@
 # Lint as: python3
 """Tests for perfkitbenchmarker.tests.providers.azure.azure_virtual_machine."""
 import unittest
+from absl.testing import parameterized
 import mock
-
-from parameterized import parameterized
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -37,15 +36,14 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(vm_util, 'IssueCommand'))
     self.enter_context(mock.patch.object(util, 'GetResourceTags'))
 
-  @parameterized.expand([
-      ('', 'Error Code: QuotaExceeded', 1),
-      ('',
+  @parameterized.named_parameters(
+      ('QuotaExceeded', '', 'Error Code: QuotaExceeded', 1),
+      ('CoreQuotaExceeded', '',
        'Operation could not be completed as it results in exceeding approved '
        'standardEv3Family Cores quota', 1),
-      ('',
+      ('CoreQuotaExceededDifferentWording', '',
        'The operation could not be completed as it results in exceeding quota '
-       'limit of standardEv3Family Cores', 1)
-  ])
+       'limit of standardEv3Family Cores', 1))
   def testQuotaExceeded(self, _, stderror, retcode):
     spec = azure_virtual_machine.AzureVmSpec(
         _COMPONENT, machine_type='test_machine_type', zone='testing')

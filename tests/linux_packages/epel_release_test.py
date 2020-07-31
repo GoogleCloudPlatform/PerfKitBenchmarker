@@ -14,8 +14,8 @@
 """Tests for perfkitbenchmarker.linux_packages.epel_release."""
 
 import unittest
+from absl.testing import parameterized
 import mock
-from parameterized import parameterized
 
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
@@ -85,12 +85,13 @@ class EpelReleaseTest(pkb_common_test_case.PkbCommonTestCase):
     epel_release.YumInstall(vm)
     vm.RemoteCommand.assert_called_once()
 
-  @parameterized.expand([
-      (_REPOLIST_NO_EPEL, ('base/7/x86_64', 'updates/7/x86_64'), False),
-      (_REPOLIST_WITH_EPEL, ('epel/x86_64', 'base/7/x86_64',
-                             'updates/7/x86_64'), True),
-      (_REPOLIST_WITH_EPEL_REMOTE, ('epel/x86_64',), True),
-  ])
+  @parameterized.named_parameters(
+      ('NoEpelRepo', _REPOLIST_NO_EPEL,
+       ('base/7/x86_64', 'updates/7/x86_64'), False),
+      ('HasEpelRepo', _REPOLIST_WITH_EPEL,
+       ('epel/x86_64', 'base/7/x86_64', 'updates/7/x86_64'), True),
+      ('HasRemoteEpelRepo', _REPOLIST_WITH_EPEL_REMOTE, ('epel/x86_64',), True),
+  )
   def testRepoList(self, repo_response, repo_ids, repo_enabled):
     vm = Vm(os_types.CENTOS7, [repo_response, repo_response])
     self.assertEqual(epel_release.Repolist(vm), frozenset(repo_ids))
