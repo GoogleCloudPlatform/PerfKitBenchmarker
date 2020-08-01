@@ -90,6 +90,9 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def _TestReachable(self, ip):
     pass
 
+  def _IsSmtEnabled(self):
+    return True
+
 
 class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
   """Test class that has dummy methods for a base virtual machine."""

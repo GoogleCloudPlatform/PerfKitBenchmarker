@@ -303,6 +303,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._reachable = {}
     self._total_memory_kb = None
     self._num_cpus = None
+    self._is_smt_enabled = None
     self.os_metadata = {}
     assert type(
         self).BASE_OS_TYPE in os_types.BASE_OS_TYPES, '%s is not in %s' % (
@@ -454,6 +455,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     This will be called once immediately after the VM has booted.
     """
     events.on_vm_startup.send(vm=self)
+    # Resets the cached SMT enabled status and number cpus value.
+    self._is_smt_enabled = None
+    self._num_cpus = None
 
   def PrepareVMEnvironment(self):
     """Performs any necessary setup on the VM specific to the OS.
@@ -601,7 +605,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       self._num_cpus = self._GetNumCpus()
     return self._num_cpus
 
-  def NumCpusForBenchmark(self):
+  def NumCpusForBenchmark(self, report_only_physical_cpus=False):
     """Gets the number of CPUs for benchmark configuration purposes.
 
     Many benchmarks scale their configurations based off of the number of CPUs
@@ -612,10 +616,19 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     ensure that they are not being used during benchmarking, the CPUs should be
     disabled.
 
+    Args:
+      report_only_physical_cpus: Whether to report only the physical
+      (non-SMT) CPUs.  Default is to report all vCPUs.
+
     Returns:
       The number of CPUs for benchmark configuration purposes.
     """
-    return FLAGS.num_cpus_override or self.num_cpus
+    if FLAGS.num_cpus_override:
+      return FLAGS.num_cpus_override
+    if report_only_physical_cpus and self.IsSmtEnabled():
+      # return half the number of CPUs.
+      return self.num_cpus // 2
+    return self.num_cpus
 
   @abc.abstractmethod
   def _GetNumCpus(self):
@@ -775,6 +788,16 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       sock.settimeout(socket_timeout)  # seconds
       sock.connect((self.ip_address, port))
     logging.info('Connected to port %s on %s', port, self)
+
+  def IsSmtEnabled(self):
+    """Whether simultaneous multithreading (SMT) is enabled on the vm."""
+    if self._is_smt_enabled is None:
+      self._is_smt_enabled = self._IsSmtEnabled()
+    return self._is_smt_enabled
+
+  @abc.abstractmethod
+  def _IsSmtEnabled(self):
+    """Whether SMT is enabled on the vm."""
 
 
 class DeprecatedOsMixin(BaseOsMixin):

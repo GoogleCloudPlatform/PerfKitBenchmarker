@@ -17,6 +17,7 @@
 import unittest
 
 from absl import flags
+from absl.testing import parameterized
 import mock
 
 from perfkitbenchmarker import linux_virtual_machine
@@ -32,6 +33,12 @@ FLAGS = flags.FLAGS
 def CreateTestLinuxVm():
   vm_spec = pkb_common_test_case.CreateTestVmSpec()
   return pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
+
+
+# /proc/cmdline on a GCP CentOS7 vm
+_CENTOS7_KERNEL_COMMAND_LINE = (
+    'BOOT_IMAGE=/boot/vmlinuz-3.10.0-1127.13.1.el7.x86_64 '
+    'root=UUID=1-2-3-4-5 ro crashkernel=auto console=ttyS0,38400n8')
 
 
 class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
@@ -342,6 +349,41 @@ I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
          '/dev/sdb': 402653184000,
          '/dev/sdc': 402653184000,
          '/dev/md0': 805037932544}, results)
+
+
+class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def CreateVm(self, array_of_stdout):
+    vm = CreateTestLinuxVm()
+    vm.RemoteCommand = mock.Mock(
+        side_effect=[(str(text), '') for text in array_of_stdout])
+    return vm
+
+  @parameterized.named_parameters(
+      ('has_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE, True),
+      ('no_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE + ' noht nosmt nr_cpus=1',
+       False))
+  def testIsSmtEnabled(self, proc_cmdline, is_enabled):
+    vm = self.CreateVm([proc_cmdline])
+    self.assertEqual(is_enabled, vm.IsSmtEnabled())
+
+  @parameterized.named_parameters(
+      ('hasSMT_want_real', 32, 'regular', 16),
+      ('noSMT_want_real', 32, 'nosmt', 32),
+  )
+  def testNumCpusForBenchmarkNoSmt(self, vcpus, kernel_command_line,
+                                   expected_num_cpus):
+    vm = self.CreateVm([kernel_command_line, vcpus])
+    self.assertEqual(expected_num_cpus, vm.NumCpusForBenchmark(True))
+
+  def testNumCpusForBenchmarkDefaultCall(self):
+    # shows that IsSmtEnabled is not called unless new optional parameter used
+    vm = self.CreateVm([32])
+    vm.IsSmtEnabled = mock.Mock()
+    self.assertEqual(32, vm.NumCpusForBenchmark())
+    vm.IsSmtEnabled.assert_not_called()
+    self.assertEqual(32, vm.NumCpusForBenchmark(False))
+    vm.IsSmtEnabled.assert_not_called()
 
 
 if __name__ == '__main__':

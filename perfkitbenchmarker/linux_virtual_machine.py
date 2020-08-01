@@ -1227,6 +1227,17 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Installs packages using the OS's package manager."""
     pass
 
+  def _IsSmtEnabled(self):
+    """Whether simultaneous multithreading (SMT) is enabled on the vm.
+
+    Looks for the "nosmt" attribute in the booted linux kernel command line
+    parameters.
+
+    Returns:
+      Whether SMT is enabled on the vm.
+    """
+    return not bool(re.search(r'\bnosmt\b', self.kernel_command_line))
+
 
 class ClearMixin(BaseLinuxMixin):
   """Class holding Clear Linux specific VM methods and attributes."""

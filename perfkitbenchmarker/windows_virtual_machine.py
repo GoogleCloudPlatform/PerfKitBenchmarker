@@ -694,6 +694,11 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     else:
       self.os_metadata['high_cpu_priority'] = [executable_name]
 
+  def _IsSmtEnabled(self):
+    """Whether SMT is enabled on the vm."""
+    # TODO(user): find way to do this in Windows
+    raise NotImplementedError('SMT detection currently not implemented')
+
 
 class Windows2012CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2012 Server Core VM specifics."""
