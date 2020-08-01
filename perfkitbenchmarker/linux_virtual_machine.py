@@ -164,6 +164,9 @@ flags.DEFINE_integer(
     'Sets the sysctl value net.core.wmem_max. This sets the max OS '
     'send buffer size in bytes for all types of connections')
 
+flags.DEFINE_boolean('gce_hpc_tools', False,
+                     'Whether to apply the hpc-tools environment script.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -1388,6 +1391,12 @@ class BaseRhelMixin(BaseLinuxMixin):
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
+    if FLAGS.gce_hpc_tools:
+      self.InstallGcpHpcTools()
+
+  def InstallGcpHpcTools(self):
+    """Installs the GCP HPC tools."""
+    self.Install('gce_hpc_tools')
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""

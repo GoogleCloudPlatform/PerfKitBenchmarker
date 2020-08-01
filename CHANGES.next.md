@@ -8,10 +8,12 @@
 ### Enhancements:
 
 -   Added delay_time support for delete operations in object storage service.
--   Added horovod_synthetic option for synthetic input data in ResNet/ReXtNet models.
+-   Added horovod_synthetic option for synthetic input data in ResNet/ReXtNet
+    models.
 -   Added support for A100 GPUs.
 -   Added cuda_tookit 11.0 support.
 -   Updated `retry_on_rate_limited` to false on all cluster_boot runs.
+-   Add ability to apply HPC optimized script to GCE VMs with --gce_hpc_tools
 
 ### Bug fixes and maintenance updates:
 
