@@ -427,6 +427,30 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                     vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
 
+  def testCosVm(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.COS)
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                         machine_type='fake-machine-type')
+    fake_image = 'fake_cos_image'
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
+      vm = vm_class(spec)
+      vm._Create()
+      vm.created = True
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn('--image-family cos-stable', command_string)
+      self.assertIn('--image-project cos-cloud', command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 3)
+      vm_metadata = vm.GetResourceMetadata()
+      self.assertDictContainsSubset({'image': fake_image,
+                                     'image_family': 'cos-stable',
+                                     'image_project': 'cos-cloud'},
+                                    vm_metadata)
+
 
 class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
