@@ -1373,6 +1373,9 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
   def Install(self, package_name):
     raise NotImplementedError('Only use for cluster boot for now')
 
+  def InstallPackages(self, package_name):
+    raise NotImplementedError('Only use for cluster boot for now')
+
   def Uninstall(self, package_name):
     raise NotImplementedError('Only use for cluster boot for now')
 
