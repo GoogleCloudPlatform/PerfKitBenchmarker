@@ -53,6 +53,11 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
     storage_uri = boto.storage_uri(path, 'gs')
     return storage_uri
 
+  def _CreateHeader(self):
+    # Local use of header for debugging
+    header = {}
+    return header
+
   def ListObjects(self, bucket, prefix):
     bucket_uri = self._StorageURI(bucket)
     return [obj.name for obj in bucket_uri.list_bucket(prefix=prefix)]
@@ -71,7 +76,7 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
         time.sleep(delay_time)
         start_time = time.time()
         object_uri = self._StorageURI(bucket, object_name)
-        object_uri.delete_key()
+        object_uri.delete_key(headers=self._CreateHeader())
         latency = time.time() - start_time
         start_times.append(start_time)
         latencies.append(latency)
@@ -94,13 +99,14 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
     start_time = time.time()
     stream.seek(0)
     object_uri = self._StorageURI(bucket, object_name)
-    object_uri.set_contents_from_file(stream, size=size)
+    object_uri.set_contents_from_file(
+        stream, size=size, headers=self._CreateHeader())
     latency = time.time() - start_time
     return start_time, latency
 
   def ReadObject(self, bucket, object_name):
     start_time = time.time()
     object_uri = self._StorageURI(bucket, object_name)
-    object_uri.new_key().get_contents_as_string()
+    object_uri.new_key().get_contents_as_string(headers=self._CreateHeader())
     latency = time.time() - start_time
     return start_time, latency

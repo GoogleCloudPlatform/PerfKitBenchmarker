@@ -229,6 +229,7 @@ API_TEST_SCRIPT_PACKAGE_FILES = [
 ]
 
 SCRIPT_DIR = '/tmp/run'
+REMOTE_PACKAGE_DIR = posixpath.join(SCRIPT_DIR, 'providers')
 DOWNLOAD_DIRECTORY = posixpath.join(SCRIPT_DIR, 'temp')
 
 # Various constants to name the result metrics.
@@ -1384,9 +1385,8 @@ def PrepareVM(vm, service):
   vm.RemoteCommand('sudo mkdir -p ' + DOWNLOAD_DIRECTORY)
   vm.RemoteCommand('sudo chmod 777 ' + DOWNLOAD_DIRECTORY)
 
-  remote_package_dir = posixpath.join(SCRIPT_DIR, 'providers')
-  vm.RemoteCommand('sudo mkdir -p ' + remote_package_dir)
-  vm.RemoteCommand('sudo chmod 777  ' + remote_package_dir)
+  vm.RemoteCommand('sudo mkdir -p ' + REMOTE_PACKAGE_DIR)
+  vm.RemoteCommand('sudo chmod 777  ' + REMOTE_PACKAGE_DIR)
 
   file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, SCRIPT_DIR)
@@ -1401,7 +1401,7 @@ def PrepareVM(vm, service):
     path = data.ResourcePath(
         os.path.join(API_TEST_SCRIPTS_DIR, file_name))
     logging.info('Uploading %s to %s', path, vm)
-    vm.PushFile(path, remote_package_dir)
+    vm.PushFile(path, REMOTE_PACKAGE_DIR)
 
   service.PrepareVM(vm)
 
@@ -1615,6 +1615,8 @@ def Run(benchmark_spec):
   if not keep_bucket:
     MultiStreamDelete(results, metadata, vms, command_builder, service,
                       bucket_name)
+
+  service.UpdateSampleMetadata(results)
 
   return results
 

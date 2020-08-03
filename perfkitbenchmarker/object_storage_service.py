@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+import logging
 import os
 
 from perfkitbenchmarker import errors
@@ -49,8 +50,10 @@ class AutoRegisterObjectStorageMeta(abc.ABCMeta):
   def __init__(cls, name, bases, dct):
     super(AutoRegisterObjectStorageMeta, cls).__init__(name, bases, dct)
     if cls.STORAGE_NAME in _OBJECT_STORAGE_REGISTRY:
-      raise Exception('Duplicate storage implementations for name "%s"' %
-                      cls.STORAGE_NAME)
+      logging.info(
+          "Duplicate storage implementations for name '%s'. "
+          'Replacing %s with %s', cls.STORAGE_NAME,
+          _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME].__name__, cls.__name__)
     _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME] = cls
 
 
@@ -257,6 +260,15 @@ class ObjectStorageService(
     """
 
     return {}
+
+  def UpdateSampleMetadata(self, samples):
+    """Updates metadata of samples with provider specific information.
+
+    Args:
+      samples: the samples that need the metadata to be updated with provider
+                specific information.
+    """
+    pass
 
   def APIScriptArgs(self):
     """Extra arguments for the API test script.
