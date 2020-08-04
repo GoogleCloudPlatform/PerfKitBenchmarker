@@ -64,8 +64,8 @@ nccl:
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-west-2a
-          image: ami-07728e9e2742b0662
+          zone: us-east-1a
+          image: ami-084e787069ee27fb7
           boot_disk_size: 105
         Azure:
           machine_type: Standard_NC24rs_v3

@@ -20,7 +20,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
-flags.DEFINE_string('nccl_version', '2.7.6-1',
+flags.DEFINE_string('nccl_version', '2.7.8-1',
                     'NCCL version to install. '
                     'Input "None" to bypass installation.')
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
