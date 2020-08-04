@@ -147,6 +147,7 @@ in this lab, you use Cloud Shell and the
 1.  Set up a virtualenv isolated Python environment within Cloud Shell.
 
     ```
+    sudo apt-get install python3-venv -y
     python3 -m venv $HOME/my_virtualenv
     ```
 
