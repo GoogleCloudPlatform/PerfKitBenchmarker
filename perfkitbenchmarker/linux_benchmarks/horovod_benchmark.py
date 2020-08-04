@@ -199,11 +199,14 @@ def _PrepareHorovod(vm):
     vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
     pip = 'anaconda3/envs/tensorflow_p36/bin/pip'
 
+  # 10.0 -> 110
+  cuda_version = cuda_toolkit.GetCudaToolkitVersion(vm).replace('.', '')
   vm.RemoteCommand(
       f'sudo {pip} install '
       '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
       'git+https://github.com/NVIDIA/dllogger.git '
-      'nvidia-dali nvidia-dali-tf-plugin-cuda100')
+      f'nvidia-dali-cuda{cuda_version} nvidia-dali-tf-plugin-cuda{cuda_version}'
+  )
 
   vm.RemoteCommand(
       f'sudo {pip} install cython scipy \'opencv-python==3.4.2.17\'')
