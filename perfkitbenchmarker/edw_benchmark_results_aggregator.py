@@ -17,7 +17,15 @@ import functools
 from typing import Any, Dict, List, Text
 
 import numpy as np
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+
+
+flags.DEFINE_bool('edw_generate_aggregated_metrics', True,
+                  'Whether the benchmark generates aggregated_metrics such as '
+                  'geomean. Query performance metrics are still generated.')
+
+FLAGS = flags.FLAGS
 
 
 class EdwPerformanceAggregationError(Exception):
