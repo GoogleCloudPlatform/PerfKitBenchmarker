@@ -467,3 +467,41 @@ class Bigquery(edw_service.EdwService):
       if retcode:
         logging.warning('Loading table %s failed. stderr: %s, retcode: %s',
                         table, stderr, retcode)
+
+
+class Endor(Bigquery):
+  """Class representing BigQuery Endor service."""
+
+  SERVICE_TYPE = 'endor'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the BigQuery Endor service.
+
+    Returns:
+      A dictionary set to Endor service details.
+    """
+    basic_data = super(Endor, self).GetMetadata()
+    basic_data['edw_service_type'] = 'endor'
+    basic_data.update(self.client_interface.GetMetadata())
+    basic_data.update(self.GetDataDetails())
+    return basic_data
+
+  def GetDataDetails(self) -> Dict[str, str]:
+    """Returns a dictionary with underlying data details.
+
+    cluster_identifier = <project_id>.<dataset_id>
+    Data details are extracted from the dataset_id that follows the format:
+    <dataset>_<format>_<compression>_<partitioning>_<location>
+    eg.
+    tpch100_parquet_uncompressed_unpartitoned_s3
+
+    Returns:
+      A dictionary set to underlying data's details (format, etc.)
+    """
+    data_details = {}
+    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    data_details['format'] = re.split(r'_', dataset_id)[1]
+    data_details['compression'] = re.split(r'_', dataset_id)[2]
+    data_details['partitioning'] = re.split(r'_', dataset_id)[3]
+    data_details['location'] = re.split(r'_', dataset_id)[4]
+    return data_details
