@@ -154,6 +154,7 @@ def Prepare(benchmark_spec):
   vm_util.IssueCommand(['git', 'clone', SPARK_SQL_PERF_GIT, spark_sql_perf_dir])
   vm_util.IssueCommand(['git', 'checkout', SPARK_SQL_PERF_GIT_COMMIT],
                        cwd=spark_sql_perf_dir)
+  benchmark_spec.queries = []
   query_dir = os.path.join(spark_sql_perf_dir, 'src', 'main', 'resources',
                            FLAGS.dpb_sparksql_query)
   for dir_name, _, files in os.walk(query_dir):
@@ -163,9 +164,13 @@ def Prepare(benchmark_spec):
         query_id = match.group(1)
         # if order is specified only upload those queries
         if not FLAGS.dpb_sparksql_order or query_id in FLAGS.dpb_sparksql_order:
+          benchmark_spec.queries.append(query_id)
           query = '{}.sql'.format(query_id)
           src_url = os.path.join(dir_name, filename)
           storage_service.CopyToBucket(src_url, bucket, query)
+  if not benchmark_spec.queries:
+    raise errors.Benchmarks.PrepareException('No queries were staged')
+
   for script in [SPARK_TABLE_SCRIPT, SPARK_SQL_RUNNER_SCRIPT]:
     src_url = data.ResourcePath(script)
     storage_service.CopyToBucket(src_url, bucket, script)
@@ -209,7 +214,7 @@ def Run(benchmark_spec):
   failing_queries = []
   run_times = {}
   wall_times = {}
-  for query in FLAGS.dpb_sparksql_order:
+  for query in benchmark_spec.queries:
     stats = _RunSparkSqlJob(
         dpb_service_instance,
         os.path.join(benchmark_spec.base_dir, query + '.sql'),
