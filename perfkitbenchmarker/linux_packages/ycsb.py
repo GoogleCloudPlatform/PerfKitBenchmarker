@@ -157,8 +157,8 @@ flags.DEFINE_integer('ycsb_record_count', None, 'Pre-load with a total '
 flags.DEFINE_integer('ycsb_operation_count', None, 'Number of operations '
                      '*per client VM*.')
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
-                     'each workload / client count combination. Set to 0 for '
-                     'unlimited time.')
+                     'each workload / client count combination in seconds. '
+                     'Set to 0 for unlimited time.')
 flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
                      'Defaults to None which uses the ycsb default of 10.')
 flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
@@ -179,6 +179,25 @@ flags.DEFINE_float('ycsb_scanproportion',
                    None,
                    'The scan proportion, '
                    'Default is 0 in workloada and 0 in YCSB.')
+flags.DEFINE_boolean('ycsb_dynamic_load', False,
+                     'Apply dynamic load to system under test and find out '
+                     'maximum sustained throughput (test length controlled by '
+                     'ycsb_operation_count and ycsb_timelimit) the '
+                     'system capable of handling. ')
+flags.DEFINE_integer('ycsb_dynamic_load_throughput_lower_bound', None,
+                     'Apply dynamic load to system under test. '
+                     'If not supplied, test will halt once reaching '
+                     'sustained load, otherwise, will keep running until '
+                     'reaching lower bound.')
+flags.DEFINE_float('ycsb_dynamic_load_sustain_throughput_ratio', 0.95,
+                   'To consider throughput sustainable when applying '
+                   'dynamic load, the actual overall throughput measured '
+                   'divided by target throughput applied should exceed '
+                   'this ratio. If not, we will lower target throughput and '
+                   'retry.')
+flags.DEFINE_integer('ycsb_dynamic_load_sustain_timelimit', 300,
+                     'Run duration in seconds for each throughput target '
+                     'if we have already reached sustained throughput.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -266,11 +285,21 @@ def CheckPrerequisites():
   if ycsb_version < 17:
     raise errors.Config.InvalidValue('must use YCSB version 0.17.0 or higher.')
 
-  if 'target' in FLAGS.ycsb_run_parameters and any([
-      ':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client]):
+  # Following flags are mutully exclusive.
+  run_target = 'target' in FLAGS.ycsb_run_parameters
+  per_thread_target = any([
+      ':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client])
+  dynamic_load = FLAGS.ycsb_dynamic_load
+
+  if run_target + per_thread_target + dynamic_load > 1:
     raise errors.Config.InvalidValue(
-        'YCSB target set in both ycsb_threads_per_client '
-        'and ycsb_run_parameters.')
+        'Setting YCSB target in ycsb_threads_per_client '
+        'or ycsb_run_parameters or applying ycsb_dynamic_load_* flags'
+        ' are mutally exclusive.')
+
+  if FLAGS.ycsb_dynamic_load_throughput_lower_bound and not dynamic_load:
+    raise errors.Config.InvalidValue(
+        'To apply dynamic load, set --ycsb_dynamic_load.')
 
 
 def _Install(vm):
@@ -1089,6 +1118,37 @@ class YCSBExecutor(object):
 
     return results
 
+  def _GetRunLoadTarget(self, current_load, is_sustained=False):
+    """Get load target.
+
+    If service cannot sustain current load, adjust load applied to the serivce
+    based on ycsb_dynamic_load_sustain_throughput_ratio.
+    If service is capable of handling current load and we are still above
+    ycsb_dynamic_load_throughput_lower_bound, keep reducing the load
+    (step size=2*(1-ycsb_dynamic_load_sustain_throughput_ratio)) and
+    run test for reduced duration based on ycsb_dynamic_load_sustain_timelimit.
+
+    Args:
+      current_load: float. Current client load (QPS) applied to
+          system under test.
+      is_sustained: boolean. Indicate if system is capable of sustaining
+          the load.
+
+    Returns:
+      Total client load (QPS) to apply to system under test.
+    """
+    lower_bound = FLAGS.ycsb_dynamic_load_throughput_lower_bound
+    step = (1 - FLAGS.ycsb_dynamic_load_sustain_throughput_ratio) * 2
+
+    if (not bool(lower_bound) and is_sustained) or (
+        lower_bound and current_load < lower_bound) or (
+            current_load is None):
+      return None
+    elif is_sustained:
+      return current_load * (1 - step)
+    else:
+      return current_load / FLAGS.ycsb_dynamic_load_sustain_throughput_ratio
+
   def RunStaircaseLoads(self, vms, workloads, **kwargs):
     """Run each workload in 'workloads' in succession.
 
@@ -1147,39 +1207,81 @@ class YCSBExecutor(object):
                                          for vm in dict.fromkeys(vms)])
 
       parameters['parameter_files'] = [remote_path]
+
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
-        parameters['threads'] = client_count
-        if target_qps_per_vm:
-          parameters['target'] = target_qps_per_vm * len(vms)
-        start = time.time()
-        results = self._RunThreaded(vms, **parameters)
-        events.record_event.send(
-            type(self).__name__, event='run', start_timestamp=start,
-            end_timestamp=time.time(), metadata=copy.deepcopy(parameters))
-        client_meta = workload_meta.copy()
-        client_meta.update(parameters)
-        client_meta.update(clients=len(vms) * client_count,
-                           threads_per_client_vm=client_count)
 
-        if FLAGS.ycsb_include_individual_results and len(results) > 1:
-          for i, result in enumerate(results):
-            all_results.extend(_CreateSamples(
-                result,
-                result_type='individual',
-                result_index=i,
-                include_histogram=FLAGS.ycsb_histogram,
-                **client_meta))
+        def _DoRunStairCaseLoad(client_count,
+                                target_qps_per_vm,
+                                workload_meta,
+                                is_sustained=False):
+          parameters['threads'] = client_count
+          if target_qps_per_vm:
+            parameters['target'] = int(target_qps_per_vm * len(vms))
+          else:
+            parameters.pop('target', None)
+          if is_sustained:
+            parameters['maxexecutiontime'] = (
+                FLAGS.ycsb_dynamic_load_sustain_timelimit)
+          start = time.time()
+          results = self._RunThreaded(vms, **parameters)
+          events.record_event.send(
+              type(self).__name__, event='run', start_timestamp=start,
+              end_timestamp=time.time(), metadata=copy.deepcopy(parameters))
+          client_meta = workload_meta.copy()
+          client_meta.update(parameters)
+          client_meta.update(clients=len(vms) * client_count,
+                             threads_per_client_vm=client_count)
 
-        if self.measurement_type == HDRHISTOGRAM:
-          combined_log = self.CombineHdrHistogramLogFiles(hdr_files_dir, vms)
-          parsed_hdr = ParseHdrLogs(combined_log)
-          combined = _CombineResults(results, self.measurement_type, parsed_hdr)
-        else:
-          combined = _CombineResults(results, self.measurement_type, {})
-        all_results.extend(_CreateSamples(
-            combined, result_type='combined',
-            include_histogram=FLAGS.ycsb_histogram,
-            **client_meta))
+          if FLAGS.ycsb_include_individual_results and len(results) > 1:
+            for i, result in enumerate(results):
+              all_results.extend(_CreateSamples(
+                  result,
+                  result_type='individual',
+                  result_index=i,
+                  include_histogram=FLAGS.ycsb_histogram,
+                  **client_meta))
+
+          if self.measurement_type == HDRHISTOGRAM:
+            combined_log = self.CombineHdrHistogramLogFiles(
+                parameters['hdrhistogram.output.path'], vms)
+            parsed_hdr = ParseHdrLogs(combined_log)
+            combined = _CombineResults(
+                results, self.measurement_type, parsed_hdr)
+          else:
+            combined = _CombineResults(results, self.measurement_type, {})
+          run_samples = list(_CreateSamples(
+              combined, result_type='combined',
+              include_histogram=FLAGS.ycsb_histogram,
+              **client_meta))
+
+          overall_throughput = 0
+          for s in run_samples:
+            if s.metric == 'overall Throughput':
+              overall_throughput += s.value
+          return overall_throughput, run_samples
+
+        target_throughput, run_samples = _DoRunStairCaseLoad(
+            client_count, target_qps_per_vm, workload_meta)
+
+        # Uses 5 * unthrottled throughput as starting point.
+        target_throughput *= 5
+        all_results.extend(run_samples)
+        is_sustained = False
+        while FLAGS.ycsb_dynamic_load:
+          actual_throughput, run_samples = _DoRunStairCaseLoad(
+              client_count,
+              target_throughput // len(vms),
+              workload_meta,
+              is_sustained)
+          is_sustained = FLAGS.ycsb_dynamic_load_sustain_throughput_ratio < (
+              actual_throughput / target_throughput)
+          for s in run_samples:
+            s.metadata['sustained'] = is_sustained
+          all_results.extend(run_samples)
+          target_throughput = self._GetRunLoadTarget(
+              actual_throughput, is_sustained)
+          if target_throughput is None:
+            break
 
     return all_results
 
