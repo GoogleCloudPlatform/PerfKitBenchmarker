@@ -752,6 +752,7 @@ def DoRunPhase(spec, collector, timer):
     except Exception:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
+        interrupt_checker.EndCheckInterruptThread()
         raise
       logging.exception('Run failed (consecutive_failures=%s); retrying.',
                         consecutive_failures)
