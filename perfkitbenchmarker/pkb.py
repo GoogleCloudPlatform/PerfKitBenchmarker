@@ -1001,6 +1001,8 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
+  vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(), spec.vms)
+
   interruptible_vm_count = 0
   interrupted_vm_count = 0
   vm_status_codes = []

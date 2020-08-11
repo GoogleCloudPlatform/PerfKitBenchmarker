@@ -758,17 +758,21 @@ class AzureVirtualMachine(
 
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
+    if self.spot_early_termination:
+      return
     if self.low_priority:
-      stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
-          _SCHEDULED_EVENTS_CMD)
-      if return_code:
-        logging.error('Checking Interrupt Error: %s', stderr)
-      else:
-        events = json.loads(stdout).get('Events', [])
-        self.spot_early_termination = any(
-            event.get('EventType') == 'Preempt' for event in events)
-        if self.spot_early_termination:
-          logging.info('Spotted early termination on %s', self)
+      # TODO(user) Add interrupt detection when VM is not ready.
+      if self._IsReady():
+        stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
+            _SCHEDULED_EVENTS_CMD)
+        if return_code:
+          logging.error('Checking Interrupt Error: %s', stderr)
+        else:
+          events = json.loads(stdout).get('Events', [])
+          self.spot_early_termination = any(
+              event.get('EventType') == 'Preempt' for event in events)
+          if self.spot_early_termination:
+            logging.info('Spotted early termination on %s', self)
 
   def IsInterruptible(self):
     """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
@@ -882,13 +886,17 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
 
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
+    if self.spot_early_termination:
+      return
     if self.low_priority:
-      stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
-      events = json.loads(stdout).get('Events', [])
-      self.spot_early_termination = any(
-          event.get('EventType') == 'Preempt' for event in events)
-      if self.spot_early_termination:
-        logging.info('Spotted early termination on %s', self)
+      # TODO(user) Add interrupt detection when VM is not ready.
+      if self._IsReady():
+        stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
+        events = json.loads(stdout).get('Events', [])
+        self.spot_early_termination = any(
+            event.get('EventType') == 'Preempt' for event in events)
+        if self.spot_early_termination:
+          logging.info('Spotted early termination on %s', self)
 
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:

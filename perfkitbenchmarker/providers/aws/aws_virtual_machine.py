@@ -835,6 +835,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
   def UpdateInterruptibleVmStatus(self):
+    if self.spot_early_termination:
+      return
     if hasattr(self, 'spot_instance_request_id'):
       describe_cmd = util.AWS_PREFIX + [
           '--region=%s' % self.region,

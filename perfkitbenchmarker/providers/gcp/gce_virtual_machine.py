@@ -780,15 +780,42 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
+  def UpdateInterruptibleVmStatusWhenVmIsNotReady(self):
+    """Updates the interruptible status when VM is not ready."""
+    # Drop zone since compute operations list takes 'zones', not 'zone', and
+    # the argument is deprecated in favor of --filter.
+    gcloud_command = util.GcloudCommand(self, 'compute', 'operations', 'list')
+    gcloud_command.flags.pop('zone')
+    gcloud_command.flags['filter'] = 'zone:%s targetLink.scope():%s' % (
+        self.zone, self.name)
+    gcloud_command.additional_flags.append('--log-http')
+    stdout, _, _ = gcloud_command.Issue()
+    current_spot_early_termination = any(
+        operation['operationType'] == 'compute.instances.preempted'
+        for operation in json.loads(stdout))
+    if self.spot_early_termination == current_spot_early_termination:
+      logging.debug('Spot early termination unchanged for vm %s: %s',
+                    self.name, self.spot_early_termination)
+    else:
+      logging.info('Spot early termination changed for vm %s: %s to %s',
+                   self.name, self.spot_early_termination,
+                   current_spot_early_termination)
+      self.spot_early_termination = current_spot_early_termination
+
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
+    if self.spot_early_termination:
+      return
     if self.preemptible:
-      stdout, stderr, retcode = self.RemoteCommandWithReturnCode(
-          _SCHEDULED_EVENTS_CMD)
-      if retcode:
-        logging.error('Checking Interrupt Error: %s', stderr)
+      if self._IsReady():
+        stdout, stderr, retcode = self.RemoteCommandWithReturnCode(
+            _SCHEDULED_EVENTS_CMD)
+        if retcode:
+          logging.error('Checking Interrupt Error: %s', stderr)
+        else:
+          self.spot_early_termination = stdout.strip() == _SHUTDOWN_MARKER
       else:
-        self.spot_early_termination = stdout.strip() == _SHUTDOWN_MARKER
+        self.UpdateInterruptibleVmStatusWhenVmIsNotReady()
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -956,9 +983,14 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
 
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
+    if self.spot_early_termination:
+      return
     if self.preemptible:
-      stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
-      self.spot_early_termination = stdout.strip() == _SHUTDOWN_MARKER
+      if self._IsReady():
+        stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
+        self.spot_early_termination = stdout.strip() == _SHUTDOWN_MARKER
+      else:
+        self.UpdateInterruptibleVmStatusWhenVmIsNotReady()
 
 
 class Windows2012CoreGceVirtualMachine(
