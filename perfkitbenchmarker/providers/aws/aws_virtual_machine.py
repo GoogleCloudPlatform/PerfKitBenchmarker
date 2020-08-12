@@ -158,7 +158,8 @@ _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
 # Command to install Libfabric and OpenMPI
 _EFA_INSTALL_CMD = ';'.join([
     'curl -O {url}', 'tar -xvzf {tarfile}', 'cd aws-efa-installer',
-    'sudo ./efa_installer.sh -y', 'rm -rf {tarfile} aws-efa-installer'
+    'sudo ./efa_installer.sh -y || exit 1', 'cd ..',
+    'rm -rf {tarfile} aws-efa-installer'
 ])
 
 
@@ -650,7 +651,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return max(images, key=lambda image: image['CreationDate'])['ImageId']
 
-  @vm_util.Retry()
+  @vm_util.Retry(max_retries=2)
   def _PostCreate(self):
     """Get the instance's data and tag it."""
     describe_cmd = util.AWS_PREFIX + [

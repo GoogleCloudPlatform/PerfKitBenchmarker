@@ -35,4 +35,4 @@
 -   Correctly install pip rhel8,centos8 all os types.
 -   Fixed a bug in leftover entity deletion logic.
 -   Use absl parameterized test case.
-
+-   Error out if AWS EFA install fails (centos8,rhel8)
