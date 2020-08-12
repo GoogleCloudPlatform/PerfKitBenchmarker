@@ -72,7 +72,7 @@ def _ParseOutput(output_text):
   Raises:
     ValueError: When requests / latency statistics cannot be found.
   """
-  inner_pat = r'^\s*(\d+\.\d+)%\s+(\d+\.\d+)([um]s)\n'
+  inner_pat = r'^\s*(\d+\.\d+)%\s+(\d+\.\d+)(um|ms|s|m)\s*\n'
   regex = re.compile(
       r'^\s*Latency Distribution \(HdrHistogram - Recorded Latency\)\n'
       r'((?:^' + inner_pat + ')+)', re.MULTILINE)
@@ -86,6 +86,12 @@ def _ParseOutput(output_text):
     if unit == 'us':
       unit = 'ms'
       value /= 1000.
+    if unit == 's':
+      unit = 'ms'
+      value *= 1000.
+    if unit == 'm':
+      unit = 'ms'
+      value *= 60. * 1000.
     if unit != 'ms':
       logging.warn('Expected "ms", got %s for "%s"', unit, m.group(1))
     yield variable, value, unit
@@ -146,5 +152,5 @@ def Run(vm, target, rate, connections=1, duration=60, script_path=None,
                         metadata={'connections': connections,
                                   'threads': threads,
                                   'duration': duration,
-                                  'rate': rate,
+                                  'target_rate': rate,
                                   'corrected': False})
