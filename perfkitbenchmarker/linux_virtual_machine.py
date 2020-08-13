@@ -2350,3 +2350,8 @@ class JujuMixin(BaseDebianMixin):
       for unit in self.units:
         unit.controller = self
         self.JujuAddMachine(unit)
+
+
+class BaseLinuxVirtualMachine(BaseLinuxMixin,
+                              virtual_machine.BaseVirtualMachine):
+  """Linux VM for use with pytyping."""
