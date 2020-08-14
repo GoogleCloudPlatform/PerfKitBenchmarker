@@ -24,8 +24,8 @@ TF_SERVING_BASE_DIRECTORY = posixpath.join(INSTALL_DIR, 'serving')
 
 FLAGS = flags.FLAGS
 
-# Versions supported including TF Serving 1.11.0 and above
-flags.DEFINE_string('tf_serving_branch', 'master', 'GitHub branch to pull from')
+# Versions supported including TF Serving 1.
+flags.DEFINE_string('tf_serving_branch', 'r1.15', 'GitHub branch to pull from')
 
 
 def InstallTensorFlowServingAPI(vm):
@@ -63,6 +63,13 @@ def BuildDockerImages(vm):
   vm.RemoteHostCommand('cd {0} && git clone -b {1} '
                        'https://github.com/tensorflow/serving'.format(
                            INSTALL_DIR, FLAGS.tf_serving_branch))
+
+  setup_script = posixpath.join(
+      INSTALL_DIR, '/serving/tensorflow_serving/tools/docker/Dockerfile.devel')
+  # Changes the TensorFlow git branch to tf_serving_branch
+  vm_util.ReplaceText(vm, 'ARG TF_SERVING_VERSION_GIT_BRANCH=master',
+                      'ARG TF_SERVING_VERSION_GIT_BRANCH={}'
+                      .format(FLAGS.tf_serving_branch), setup_script)
 
   # Build an optimized binary for TF Serving, and keep all the build artifacts
   vm.RemoteHostCommand(

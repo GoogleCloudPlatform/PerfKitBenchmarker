@@ -110,7 +110,8 @@ class TfServingClientWorkload(object):
       request.model_spec.name = MODEL_NAME
       request.model_spec.signature_name = 'serving_default'
       request.inputs['image_bytes'].CopyFrom(
-          tf.make_tensor_proto(data, shape=[1]))
+          # Uses version 1 of the TensorFlow protobuf
+          tf.compat.v1.make_tensor_proto(data, shape=[1]))
 
       try:
         start_time = time.time()
