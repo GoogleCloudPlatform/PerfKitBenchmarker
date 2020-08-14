@@ -65,7 +65,7 @@ def BuildDockerImages(vm):
                            INSTALL_DIR, FLAGS.tf_serving_branch))
 
   setup_script = posixpath.join(
-      INSTALL_DIR, '/serving/tensorflow_serving/tools/docker/Dockerfile.devel')
+      INSTALL_DIR, 'serving/tensorflow_serving/tools/docker/Dockerfile.devel')
   # Changes the TensorFlow git branch to tf_serving_branch
   vm_util.ReplaceText(vm, 'ARG TF_SERVING_VERSION_GIT_BRANCH=master',
                       'ARG TF_SERVING_VERSION_GIT_BRANCH={}'
