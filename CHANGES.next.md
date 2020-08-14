@@ -6,6 +6,7 @@
 -   Add MaskRCNN and ReXtNet-101 to the horovod benchmark.
 -   Add Bigtable Benchmarking tutorial.
 -   Add ycsb_skip_run_stage argument.
+-   Move PKB static website files from gh-pages branch to master branch.
 
 ### Enhancements:
 
