@@ -352,10 +352,22 @@ I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
 
 
 class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
+  os_info = 'Ubuntu 18.04.1 LTS'
+  kernel_release = '5.3.0-1026'
+  partition_table = 'Disk /dev/sda: 1 GiB, 1073741824 bytes, 2097152 sectors'
+  lscpu_output = '\n'.join([
+      'NUMA node(s): 1',
+      'Core(s) per socket: 1',
+      'Socket(s): 1',
+  ])
+  normal_boot_responses = [
+      'cubic', lscpu_output, 'Description: ' + os_info, kernel_release,
+      partition_table
+  ]
 
   def CreateVm(self, array_of_stdout):
     vm = CreateTestLinuxVm()
-    vm.RemoteCommand = mock.Mock(
+    vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=[(str(text), '') for text in array_of_stdout])
     return vm
 
@@ -384,6 +396,35 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.IsSmtEnabled.assert_not_called()
     self.assertEqual(32, vm.NumCpusForBenchmark(False))
     vm.IsSmtEnabled.assert_not_called()
+
+  def testBoot(self):
+    vm = self.CreateVm(self.normal_boot_responses)
+    vm.RecordAdditionalMetadata()
+    expected_os_metadata = {
+        '/dev/sda': 1073741824,
+        'kernel_release': self.kernel_release,
+        'os_info': self.os_info,
+    }
+    self.assertEqual(expected_os_metadata, vm.os_metadata)
+
+  def testReboot(self):
+    os_info_new = 'Ubuntu 18.04.1b LTS'
+    kernel_release_new = '5.3.0-1027'
+    additional_commands = [
+        '(reboot command)',
+        '(myhostname)',
+        '(last boot time)',
+        '(create install dir)',
+        'Description: ' + os_info_new,
+        kernel_release_new,
+        '(create install dir)',
+        '(create tmp dir)',
+    ]
+    vm = self.CreateVm(self.normal_boot_responses + additional_commands)
+    vm.RecordAdditionalMetadata()
+    vm.Reboot()
+    self.assertEqual(os_info_new, vm.os_metadata['os_info'])
+    self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
 
 
 if __name__ == '__main__':

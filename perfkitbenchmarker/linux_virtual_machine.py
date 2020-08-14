@@ -340,8 +340,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
-      self.RemoteCommand('sudo mkdir -p %s' % linux_packages.INSTALL_DIR)
-      self.RemoteCommand('sudo chmod a+rwxt %s' % linux_packages.INSTALL_DIR)
+      self._CreateInstallDir()
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
@@ -357,6 +356,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RecordAdditionalMetadata()
     self.BurnCpu()
     self.FillDisk()
+
+  def _CreateInstallDir(self):
+    self.RemoteCommand(
+        ('sudo mkdir -p {0}; '
+         'sudo chmod a+rwxt {0}').format(linux_packages.INSTALL_DIR))
 
   def SetFiles(self):
     """Apply --set_files to the VM."""
@@ -913,6 +917,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     This will be called after every call to Reboot().
     """
+    # clear out os_info and kernel_release as might have changed
+    previous_os_info = self.os_metadata.pop('os_info', None)
+    previous_kernel_release = self.os_metadata.pop('kernel_release', None)
+    if previous_os_info or previous_kernel_release:
+      self.RecordAdditionalMetadata()
+    if self.install_packages:
+      self._CreateInstallDir()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
 
