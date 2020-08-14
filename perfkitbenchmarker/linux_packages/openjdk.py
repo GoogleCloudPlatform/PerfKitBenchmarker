@@ -30,7 +30,9 @@ flags.DEFINE_string('openjdk_version', None, 'Version of openjdk to use. '
 def _OpenJdkPackage(vm, format_string):
   version = FLAGS.openjdk_version
   if version is None:
-    if vm.HasPackage(format_string.format('7')):
+    # Only install Java 7 if Java 8 is not available.
+    if (vm.HasPackage(format_string.format('7'))
+        and not vm.HasPackage(format_string.format('8'))):
       version = '7'
     else:
       version = '8'
