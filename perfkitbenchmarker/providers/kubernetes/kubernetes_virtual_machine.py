@@ -343,12 +343,19 @@ class DebianBasedKubernetesVirtualMachine(
                                       ignore_failure=False, login_shell=False,
                                       suppress_warning=False, timeout=None):
     """Runs a command in the Kubernetes container."""
+    if retries is None:
+      retries = FLAGS.ssh_retries
     cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i',
            self.name, '--', '/bin/bash', '-c', command]
-    stdout, stderr, retcode = vm_util.IssueCommand(
-        cmd, force_info_log=should_log,
-        suppress_warning=suppress_warning, timeout=timeout,
-        raise_on_failure=False)
+    for _ in range(retries):
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          cmd, force_info_log=should_log,
+          suppress_warning=suppress_warning, timeout=timeout,
+          raise_on_failure=False)
+      # Check for ephemeral connection issues.
+      if not (retcode == 1 and 'error dialing backend: ssh' in stderr):
+        break
+      logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if not ignore_failure and retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
