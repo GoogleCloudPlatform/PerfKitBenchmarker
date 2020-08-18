@@ -34,6 +34,8 @@ _CREATE_CMD = [
     'name=vol0,capacity=1024',
     '--network',
     'name=%s' % (_NET_NAME),
+    '--labels',
+    '',
     '--tier',
     'STANDARD',
 ]
