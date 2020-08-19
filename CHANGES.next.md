@@ -18,6 +18,7 @@
 -   Updated `retry_on_rate_limited` to false on all cluster_boot runs.
 -   Add ability to apply HPC optimized script to GCE VMs with --gce_hpc_tools
 -   Update the nginx benchmark.
+-   Added "os_type" and "base_os_type" to the VM's cloud tags
 
 ### Bug fixes and maintenance updates:
 

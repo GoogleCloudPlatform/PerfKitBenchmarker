@@ -735,6 +735,9 @@ class BenchmarkSpec(object):
         now_utc +
         datetime.timedelta(minutes=timeout_minutes))
 
+    spec_os_types = sorted(set([vm.OS_TYPE for vm in self.vms]))
+    spec_base_os_types = sorted(set([vm.BASE_OS_TYPE for vm in self.vms]))
+
     tags = {
         'timeout_utc': timeout_utc.strftime(time_format),
         'create_time_utc': now_utc.strftime(time_format),
@@ -742,6 +745,8 @@ class BenchmarkSpec(object):
         'perfkit_uuid': self.uuid,
         'owner': FLAGS.owner,
         'benchmark_uid': self.uid,
+        'os_type': ','.join(spec_os_types),
+        'base_os_type': ','.join(spec_base_os_types),
     }
 
     return tags
