@@ -75,7 +75,7 @@ def FormatTags(tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag' parameter.
   """
-  return [FormatTag(k, v) for k, v in six.iteritems(tags_dict)]
+  return [FormatTag(k, v) for k, v in sorted(six.iteritems(tags_dict))]
 
 
 def GetResourceTags(timeout_minutes):

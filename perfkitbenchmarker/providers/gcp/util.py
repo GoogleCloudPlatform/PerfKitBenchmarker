@@ -356,7 +356,8 @@ def FormatTags(tags_dict):
   Returns:
     A string contains formatted tags
   """
-  return ','.join('{0}={1}'.format(k, v) for k, v in six.iteritems(tags_dict))
+  return ','.join(
+      '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict)))
 
 
 def GetDefaultTags(timeout_minutes=None):
