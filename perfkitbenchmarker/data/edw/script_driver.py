@@ -32,6 +32,7 @@ DRIVER_NAME = './script_runner.sh'
 JOB_ID_KEY = 'INFO:googleapiclient.model:jobId:'
 API_LOG_FILE = 'apilog.out'
 SNOWFLAKE_OUTPUT_FILE = 'snowflake.out'
+ATHENA_ERROR_FILE = 'athena.err'
 
 
 def default_logfile_names(script, suffix):
@@ -84,6 +85,15 @@ def execute_script(script, logfile_suffix):
 
   script_execution_details = {'execution_time': execution_time,
                               'job_id': job_id}
+
+  try:
+    with open(ATHENA_ERROR_FILE) as fp:
+      line = fp.readline().strip()
+      if line:
+        script_execution_details['error_details'] = line
+  except IOError:
+    pass
+
   results = {script: script_execution_details}
   return json.dumps(results)
 

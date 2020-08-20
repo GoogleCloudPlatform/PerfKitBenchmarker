@@ -128,12 +128,16 @@ class CliClientInterface(edw_service.EdwClientInterface):
       run_metadata: A dictionary of query execution attributes eg. script name
     """
     stdout, _ = self.client_vm.RemoteCommand(
-        'python script_driver.py --script={} --database={} '
+        'python script_driver.py --script={} --database={} --query_timeout={} '
         '--athena_query_output_bucket={}'.format(query_name, self.database,
+                                                 FLAGS.athena_query_timeout,
                                                  self.output_bucket))
     script_performance = json.loads(str(stdout))
     execution_time = script_performance[query_name]['execution_time']
     run_metadata = {'script': query_name}
+    if 'error_details' in script_performance[query_name]:
+      run_metadata['error_details'] = script_performance[query_name][
+          'error_details']
     run_metadata.update(self.GetMetadata())
     return execution_time, run_metadata
 

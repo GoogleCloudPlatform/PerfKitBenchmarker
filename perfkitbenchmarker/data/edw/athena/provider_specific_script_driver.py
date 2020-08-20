@@ -11,6 +11,7 @@ from absl import flags
 
 flags.DEFINE_string('database', None,
                     'The database within which the command or query executes.')
+flags.DEFINE_string('query_timeout', '600', 'Query timeout in seconds.')
 flags.DEFINE_string(
     'athena_query_output_bucket', None,
     'Specifies where to save the results of the query execution.')
@@ -32,8 +33,9 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
   Returns:
     Command list to execute the supplied script.
   """
+  del error
   cmd_list = [
-      driver, script, FLAGS.athena_region, FLAGS.database,
-      FLAGS.athena_query_output_bucket, output, error
+      driver, script, FLAGS.athena_region, FLAGS.database, FLAGS.query_timeout,
+      FLAGS.athena_query_output_bucket, output, 'athena.err'
   ]
   return cmd_list
