@@ -17,7 +17,6 @@
 wrk2 is a fork of wrk, supporting improved latency stats and fixed throughput.
 """
 
-import logging
 import posixpath
 import re
 
@@ -72,7 +71,7 @@ def _ParseOutput(output_text):
   Raises:
     ValueError: When requests / latency statistics cannot be found.
   """
-  inner_pat = r'^\s*(\d+\.\d+)%\s+(\d+\.\d+)(um|ms|s|m)\s*\n'
+  inner_pat = r'^\s*(\d+\.\d+)%\s+(\d+\.\d+)(us|ms|s|m)\s*\n'
   regex = re.compile(
       r'^\s*Latency Distribution \(HdrHistogram - Recorded Latency\)\n'
       r'((?:^' + inner_pat + ')+)', re.MULTILINE)
@@ -82,19 +81,20 @@ def _ParseOutput(output_text):
   matches = re.findall(inner_pat, m.group(1), re.MULTILINE)
   for percentile, value, unit in matches:
     variable = 'p{} latency'.format(percentile.rstrip('0').rstrip('.'))
-    value = float(value)
-    if unit == 'us':
+    if unit == 'ms':
+      value_in_ms = float(value)
+    elif unit == 'us':
       unit = 'ms'
-      value /= 1000.
-    if unit == 's':
+      value_in_ms = float(value) / 1000.
+    elif unit == 's':
       unit = 'ms'
-      value *= 1000.
-    if unit == 'm':
+      value_in_ms = float(value) * 1000.
+    elif unit == 'm':
       unit = 'ms'
-      value *= 60. * 1000.
-    if unit != 'ms':
-      logging.warn('Expected "ms", got %s for "%s"', unit, m.group(1))
-    yield variable, value, unit
+      value_in_ms = float(value) * 60. * 1000.
+    else:
+      raise ValueError('Unknown unit {} for {}'.format(unit, m.group(1)))
+    yield variable, value_in_ms, unit
 
   # Errors, requests
   m = re.search(r'(\d+) requests in \d', output_text)

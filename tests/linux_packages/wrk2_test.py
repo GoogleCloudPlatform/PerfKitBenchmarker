@@ -32,14 +32,14 @@ class Wrk2Test(unittest.TestCase):
     wrk_output = _ReadOutputFile('wrk2_output.txt')
     result = list(wrk2._ParseOutput(wrk_output))
     self.assertEqual(
-        [('p50 latency', 53.31, 'ms'),
+        [('p50 latency', .05331, 'ms'),
          ('p75 latency', 56.99, 'ms'),
          ('p90 latency', 62.62, 'ms'),
          ('p99 latency', 223.23, 'ms'),
          ('p99.9 latency', 244.22, 'ms'),
          ('p99.99 latency', 244.22, 'ms'),
-         ('p99.999 latency', 244.22, 'ms'),
-         ('p100 latency', 244.22, 'ms'),
+         ('p99.999 latency', 36000., 'ms'),
+         ('p100 latency', 54000., 'ms'),
          ('requests', 600, ''),
          ('error_rate', 0, ''),
          ('errors', 0, '')], result)
