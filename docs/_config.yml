@@ -10,8 +10,6 @@ title: PerfKitBenchmarker
 email: liubrandon@google.com
 description: >
   PerfKitBenchmarker home page.
-baseurl: "/PerfKitBenchmarker"
-url: "http://www.perfkitbenchmarker.org" # the base hostname & protocol
 
 # See https://pmarsceill.github.io/just-the-docs/.
 theme: "just-the-docs"
@@ -24,7 +22,7 @@ search_enabled: true
 # Aux links for the upper right navigation
 aux_links:
   "PKB on GitHub":
-    - "//github.com/GoogleCloudPlatform/PerfKitBenchmarker"
+    - "https://github.com/GoogleCloudPlatform/PerfKitBenchmarker"
 
 # Color scheme supports "light" (default) and "dark"
 color_scheme: light
