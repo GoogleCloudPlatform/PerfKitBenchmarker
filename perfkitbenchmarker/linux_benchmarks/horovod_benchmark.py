@@ -45,7 +45,7 @@ horovod:
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-west-2a
-          image: ami-07728e9e2742b0662
+          image: ami-06278cf24c1b2f0fe
           boot_disk_size: 105
         Azure:
           machine_type: Standard_NC24rs_v3
@@ -188,13 +188,13 @@ def _PrepareHorovod(vm):
 
   vm.Install('google_cloud_sdk')
   vm.InstallPackages('wget git unzip')
-  vm.Install('openmpi')
   vm.Install('nccl')
 
   pip = 'pip'
   if FLAGS.cloud == 'GCP':  # temporary fix for DLVM images
     pip = '/opt/conda/bin/pip'
     vm.RemoteCommand(f'sudo {pip} install --force-reinstall pyarrow')
+    vm.Install('openmpi')
   elif FLAGS.cloud == 'AWS':
     vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
     pip = 'anaconda3/envs/tensorflow_p36/bin/pip'
@@ -205,8 +205,12 @@ def _PrepareHorovod(vm):
       f'sudo {pip} install '
       '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
       'git+https://github.com/NVIDIA/dllogger.git '
-      f'nvidia-dali-cuda{cuda_version} nvidia-dali-tf-plugin-cuda{cuda_version}'
-  )
+      f'nvidia-dali-cuda{cuda_version}')
+
+  vm.RemoteCommand(
+      f'sudo {pip} install '
+      '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
+      f'nvidia-dali-tf-plugin-cuda{cuda_version}')
 
   vm.RemoteCommand(
       f'sudo {pip} install cython scipy \'opencv-python==3.4.2.17\'')
@@ -381,7 +385,7 @@ def Run(benchmark_spec):
   nccl_params = [
       'TF_CPP_MIN_LOG_LEVEL=0',
       'NCCL_SOCKET_IFNAME=^lo,docker0',
-      'TF_CUDNN_USE_AUTOTUNE=0',
+      'NCCL_DEBUG=INFO',
   ]
 
   if benchmark_spec.timeline:
