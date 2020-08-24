@@ -79,10 +79,6 @@ flags.DEFINE_enum('horovod_max_seq_len', '128', ['128', '384'],
 
 flags.DEFINE_enum('horovod_precision', 'fp16', ['fp16', 'fp32'], 'Precision.')
 
-flags.DEFINE_string(
-    'horovod_cuda_visible_devices', None,
-    'GPU identifiers are given as integer indices or as UUID strings.')
-
 flags.DEFINE_bool('horovod_bert_finetune', True,
                   'Pretrain or finetune a BERT model.')
 
@@ -126,7 +122,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.bert_finetune = FLAGS.horovod_bert_finetune
   benchmark_spec.timeline = FLAGS.horovod_timelime
   benchmark_spec.synthetic = FLAGS.horovod_synthetic
-  benchmark_spec.cuda_visible_devices = FLAGS.horovod_cuda_visible_devices
+  benchmark_spec.cuda_visible_devices = FLAGS.nccl_cuda_visible_devices
   benchmark_spec.nccl_version = FLAGS.nccl_version
   benchmark_spec.nccl_net_plugin = FLAGS.nccl_net_plugin
   benchmark_spec.nccl_extra_params = FLAGS.nccl_extra_params
