@@ -56,106 +56,6 @@ HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3', 't3'])
-# Following dictionary based on
-# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
-NUM_LOCAL_VOLUMES = {
-    'c1.medium': 1,
-    'c1.xlarge': 4,
-    'c3.large': 2,
-    'c3.xlarge': 2,
-    'c3.2xlarge': 2,
-    'c3.4xlarge': 2,
-    'c3.8xlarge': 2,
-    'cc2.8xlarge': 4,
-    'cg1.4xlarge': 2,
-    'cr1.8xlarge': 2,
-    'g2.2xlarge': 1,
-    'hi1.4xlarge': 2,
-    'hs1.8xlarge': 24,
-    'i2.xlarge': 1,
-    'i2.2xlarge': 2,
-    'i2.4xlarge': 4,
-    'i2.8xlarge': 8,
-    'm1.small': 1,
-    'm1.medium': 1,
-    'm1.large': 2,
-    'm1.xlarge': 4,
-    'm2.xlarge': 1,
-    'm2.2xlarge': 1,
-    'm2.4xlarge': 2,
-    'm3.medium': 1,
-    'm3.large': 1,
-    'm3.xlarge': 2,
-    'm3.2xlarge': 2,
-    'r3.large': 1,
-    'r3.xlarge': 1,
-    'r3.2xlarge': 1,
-    'r3.4xlarge': 1,
-    'r3.8xlarge': 2,
-    'd2.xlarge': 3,
-    'd2.2xlarge': 6,
-    'd2.4xlarge': 12,
-    'd2.8xlarge': 24,
-    'i3.large': 1,
-    'i3.xlarge': 1,
-    'i3.2xlarge': 1,
-    'i3.4xlarge': 2,
-    'i3.8xlarge': 4,
-    'i3.16xlarge': 8,
-    'i3en.6xlarge': 2,
-    'i3.metal': 8,
-    'c5ad.large': 1,
-    'c5ad.xlarge': 1,
-    'c5ad.2xlarge': 1,
-    'c5ad.4xlarge': 2,
-    'c5ad.8xlarge': 2,
-    'c5ad.12xlarge': 2,
-    'c5ad.16xlarge': 2,
-    'c5ad.24xlarge': 2,
-    'c5d.large': 1,
-    'c5d.xlarge': 1,
-    'c5d.2xlarge': 1,
-    'c5d.4xlarge': 1,
-    'c5d.9xlarge': 1,
-    'c5d.18xlarge': 2,
-    'm5d.large': 1,
-    'm5d.xlarge': 1,
-    'm5d.2xlarge': 1,
-    'm5d.4xlarge': 2,
-    'm5d.12xlarge': 2,
-    'm5d.24xlarge': 4,
-    'm6gd.large': 1,
-    'm6gd.xlarge': 1,
-    'm6gd.2xlarge': 1,
-    'm6gd.4xlarge': 1,
-    'm6gd.8xlarge': 1,
-    'm6gd.12xlarge': 2,
-    'm6gd.16xlarge': 2,
-    'r5d.large': 1,
-    'r5d.xlarge': 1,
-    'r5d.2xlarge': 1,
-    'r5d.4xlarge': 2,
-    'r5d.12xlarge': 2,
-    'r5d.24xlarge': 4,
-    'z1d.large': 1,
-    'z1d.xlarge': 1,
-    'z1d.2xlarge': 1,
-    'z1d.3xlarge': 2,
-    'z1d.6xlarge': 1,
-    'z1d.12xlarge': 2,
-    'x1.16xlarge': 1,
-    'x1.32xlarge': 2,
-    'x1e.xlarge': 1,
-    'x1e.2xlarge': 1,
-    'x1e.4xlarge': 1,
-    'x1e.8xlarge': 1,
-    'x1e.16xlarge': 1,
-    'x1e.32xlarge': 2,
-    'f1.2xlarge': 1,
-    'f1.4xlarge': 1,
-    'f1.16xlarge': 4,
-    'p3dn.24xlarge': 2
-}
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
@@ -321,9 +221,9 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     root_block_device['Ebs'].pop('Encrypted')
     mappings.append(root_block_device)
 
-  if (machine_type in NUM_LOCAL_VOLUMES and
+  if (machine_type in aws_disk.NUM_LOCAL_VOLUMES and
       not aws_disk.LocalDriveIsNvme(machine_type)):
-    for i in range(NUM_LOCAL_VOLUMES[machine_type]):
+    for i in range(aws_disk.NUM_LOCAL_VOLUMES[machine_type]):
       od = collections.OrderedDict()
       od['VirtualName'] = 'ephemeral%s' % i
       od['DeviceName'] = '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
@@ -583,8 +483,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
-    if self.machine_type in NUM_LOCAL_VOLUMES:
-      self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
+    if self.machine_type in aws_disk.NUM_LOCAL_VOLUMES:
+      self.max_local_disks = aws_disk.NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.placement_group = getattr(vm_spec, 'placement_group',
