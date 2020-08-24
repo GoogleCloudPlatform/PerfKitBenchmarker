@@ -104,6 +104,14 @@ NUM_LOCAL_VOLUMES = {
     'i3.16xlarge': 8,
     'i3en.6xlarge': 2,
     'i3.metal': 8,
+    'c5ad.large': 1,
+    'c5ad.xlarge': 1,
+    'c5ad.2xlarge': 1,
+    'c5ad.4xlarge': 2,
+    'c5ad.8xlarge': 2,
+    'c5ad.12xlarge': 2,
+    'c5ad.16xlarge': 2,
+    'c5ad.24xlarge': 2,
     'c5d.large': 1,
     'c5d.xlarge': 1,
     'c5d.2xlarge': 1,
@@ -116,6 +124,13 @@ NUM_LOCAL_VOLUMES = {
     'm5d.4xlarge': 2,
     'm5d.12xlarge': 2,
     'm5d.24xlarge': 4,
+    'm6gd.large': 1,
+    'm6gd.xlarge': 1,
+    'm6gd.2xlarge': 1,
+    'm6gd.4xlarge': 1,
+    'm6gd.8xlarge': 1,
+    'm6gd.12xlarge': 2,
+    'm6gd.16xlarge': 2,
     'r5d.large': 1,
     'r5d.xlarge': 1,
     'r5d.2xlarge': 1,
@@ -166,7 +181,7 @@ AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
 USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
     ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
-ARM_PROCESSOR_PREFIXES = ['a1', 'm6g', 'c6g', 'r6g']
+ARM_PROCESSOR_PREFIXES = ['a1', 'm6g', 'c6g', 'r6g', 'm6gd']
 
 # Processor architectures
 ARM = 'arm64'
@@ -197,6 +212,7 @@ _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
     'm6g': 'graviton2',
+    'm6gd': 'graviton2',
     'r6g': 'graviton2',
 }
 
