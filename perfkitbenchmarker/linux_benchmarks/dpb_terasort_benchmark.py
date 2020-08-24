@@ -50,6 +50,8 @@ dpb_terasort_benchmark:
           machine_type: n1-standard-4
         AWS:
           machine_type: m5.xlarge
+        Azure:
+          machine_type: Standard_F4s_v2
       disk_spec:
         GCP:
           disk_size: 500
@@ -58,6 +60,10 @@ dpb_terasort_benchmark:
         AWS:
           disk_size: 500
           disk_type: st1
+          mount_point: /scratch_ts
+        Azure:
+          disk_size: 500
+          disk_type: Standard_LRS
           mount_point: /scratch_ts
     worker_count: 2
 """
