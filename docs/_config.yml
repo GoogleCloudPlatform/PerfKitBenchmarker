@@ -15,6 +15,7 @@ url: "http://www.perfkitbenchmarker.org" # the base hostname & protocol
 
 # See https://pmarsceill.github.io/just-the-docs/.
 theme: "just-the-docs"
+remote_theme: pmarsceill/just-the-docs
 
 # Enable or disable the site search
 # Supports true (default) or false
