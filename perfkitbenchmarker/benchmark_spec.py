@@ -224,6 +224,7 @@ class BenchmarkSpec(object):
       return
     dpb_service_spec = self.config.dpb_service
     dpb_service_cloud = dpb_service_spec.worker_group.cloud
+    dpb_service_spec.worker_group.vm_count = dpb_service_spec.worker_count
     providers.LoadProvider(dpb_service_cloud)
 
     dpb_service_type = dpb_service_spec.service_type
@@ -240,13 +241,14 @@ class BenchmarkSpec(object):
 
       base_vm_spec = dpb_service_spec.worker_group
       base_vm_spec.vm_spec.zone = self.dpb_service.dpb_service_zone
-      worker_group_spec = copy.copy(base_vm_spec)
-      worker_group_spec.vm_count = dpb_service_spec.worker_count
-      self.vms_to_boot['worker_group'] = worker_group_spec
+
+      if dpb_service_spec.worker_count:
+        self.vms_to_boot['worker_group'] = dpb_service_spec.worker_group
+      # else we have a single node cluster.
+
       master_group_spec = copy.copy(base_vm_spec)
       master_group_spec.vm_count = 1
       self.vms_to_boot['master_group'] = master_group_spec
-      logging.info(str(self.vms_to_boot))
 
   def ConstructRelationalDb(self):
     """Create the relational db and create groups for its vms."""
@@ -500,8 +502,11 @@ class BenchmarkSpec(object):
     # master group and worker group.
     if (self.config.dpb_service and self.config.dpb_service.service_type ==
         dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER):
-      for group_name in 'master_group', 'worker_group':
-        self.dpb_service.vms[group_name] = self.vm_groups[group_name]
+      self.dpb_service.vms['master_group'] = self.vm_groups['master_group']
+      if self.config.dpb_service.worker_count:
+        self.dpb_service.vms['worker_group'] = self.vm_groups['worker_group']
+      else:  # single node cluster
+        self.dpb_service.vms['worker_group'] = []
 
   def ConstructPlacementGroups(self):
     for placement_group_name, placement_group_spec in six.iteritems(

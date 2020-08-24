@@ -138,7 +138,7 @@ class _DpbServiceSpec(spec.BaseSpec):
         'worker_group': (_VmGroupSpecDecoder, {}),
         'worker_count': (option_decoders.IntDecoder, {
             'default': dpb_service.DEFAULT_WORKER_COUNT,
-            'min': 2
+            'min': 0
         }),
         'applications': (_DpbApplicationListDecoder, {}),
         'version': (option_decoders.StringDecoder, {

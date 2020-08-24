@@ -81,16 +81,20 @@ def AptInstall(vm):
   _Install(vm)
 
 
-# TODO: revisit memory fraction.
-def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
+def _RenderConfig(
+    vm,
+    master,
+    workers,
+    memory_fraction=0.9):
+  """Load Hadoop Condfiguration on VM."""
   yarn_memory_mb = int((vm.total_memory_kb / 1024) * memory_fraction)
   if vm.scratch_disks:
     scratch_dir = posixpath.join(vm.GetScratchDir(), 'hadoop')
   else:
     scratch_dir = posixpath.join('/tmp/pkb/local_scratch', 'hadoop')
   context = {
-      'master_ip': master_ip,
-      'worker_ips': worker_ips,
+      'master_ip': master.internal_ip,
+      'worker_ips': [vm.internal_ip for vm in workers],
       'scratch_dir': scratch_dir,
       'vcpus': vm.NumCpusForBenchmark(),
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
@@ -134,8 +138,13 @@ def ConfigureAndStart(master, workers, start_yarn=True):
         the only service required. Default: True.
   """
   vms = [master] + workers
-  fn = functools.partial(_RenderConfig, master_ip=master.internal_ip,
-                         worker_ips=[worker.internal_ip for worker in workers])
+  # If there are no workers set up in pseudo-distributed mode, where the master
+  # node runs the worker daemons.
+  workers = workers or [master]
+  fn = functools.partial(
+      _RenderConfig,
+      master=master,
+      workers=workers)
   vm_util.RunThreaded(fn, vms)
 
   master.RemoteCommand(

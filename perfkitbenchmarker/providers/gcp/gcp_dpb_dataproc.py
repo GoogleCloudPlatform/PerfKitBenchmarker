@@ -125,8 +125,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if self.project is not None:
       cmd.flags['project'] = self.project
 
-    # The number of worker machines in the cluster
-    cmd.flags['num-workers'] = self.spec.worker_count
+    if self.spec.worker_count:
+      # The number of worker machines in the cluster
+      cmd.flags['num-workers'] = self.spec.worker_count
+    else:
+      cmd.flags['single-node'] = True
 
     # Initialize applications on the dataproc cluster
     if self.spec.applications:
