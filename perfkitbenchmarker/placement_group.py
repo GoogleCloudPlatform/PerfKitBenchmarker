@@ -31,15 +31,19 @@ from perfkitbenchmarker.configs import spec
 FLAGS = flags.FLAGS
 
 PLACEMENT_GROUP_CLUSTER = 'cluster'
+PLACEMENT_GROUP_SUPERCLUSTER = 'supercluster'
 PLACEMENT_GROUP_SPREAD = 'spread'
 PLACEMENT_GROUP_NONE = 'none'
-PLACEMENT_GROUP_OPTIONS = frozenset(
-    [PLACEMENT_GROUP_CLUSTER, PLACEMENT_GROUP_SPREAD, PLACEMENT_GROUP_NONE])
+PLACEMENT_GROUP_OPTIONS = frozenset([
+    PLACEMENT_GROUP_CLUSTER,
+    PLACEMENT_GROUP_SPREAD,
+    PLACEMENT_GROUP_NONE
+])
 
 # Default placement group style is specified by Cloud Specific Placement Group.
 flags.DEFINE_enum(
     'placement_group_style', None,
-    PLACEMENT_GROUP_OPTIONS,
+    list(PLACEMENT_GROUP_OPTIONS) + [PLACEMENT_GROUP_SUPERCLUSTER],
     'The vm placement group option to use. Default set by cloud.')
 
 

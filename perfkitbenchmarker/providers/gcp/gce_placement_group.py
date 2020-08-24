@@ -63,7 +63,8 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
         'project': (option_decoders.StringDecoder, {'none_ok': False}),
         'num_vms': (option_decoders.IntDecoder, {'none_ok': False}),
         'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values': placement_group.PLACEMENT_GROUP_OPTIONS,
+            'valid_values': set([placement_group.PLACEMENT_GROUP_SUPERCLUSTER] +
+                                list(placement_group.PLACEMENT_GROUP_OPTIONS)),
             'default': placement_group.PLACEMENT_GROUP_NONE,
         })
     })
@@ -109,6 +110,13 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
 
     if self.style == placement_group.PLACEMENT_GROUP_CLUSTER:
       placement_policy['collocation'] = 'COLLOCATED'
+
+    elif self.style == placement_group.PLACEMENT_GROUP_SUPERCLUSTER:
+      placement_policy['collocation'] = 'CLUSTERED'
+      # Only alpha API supported for CLUSTERED.
+      cmd = gcp_util.GcloudCommand(self, 'alpha', 'compute',
+                                   'resource-policies', 'create',
+                                   'group-placement', self.name)
 
     else:
       placement_policy[
