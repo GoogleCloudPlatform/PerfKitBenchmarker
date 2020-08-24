@@ -674,7 +674,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           name = 'local-ssd-%d' % self.local_disk_counter
           disk_number = self.local_disk_counter + 1
         elif FLAGS.gce_ssd_interface == NVME:
-          name = 'nvme0n%d' % (self.local_disk_counter + 1)
+          # Device can either be /dev/nvme0n1 or /dev/nvme1n1. Find out which.
+          name, _ = self.RemoteCommand('find /dev/nvme*n%d' %
+                                       (self.local_disk_counter + 1))
+          name = name.strip().split('/')[-1]
           disk_number = self.local_disk_counter + self.NVME_START_INDEX
         else:
           raise errors.Error('Unknown Local SSD Interface.')
