@@ -37,11 +37,12 @@ robertammlm:
       vm_count: 2
       vm_spec:
         GCP:
-          machine_type: n1-highmem-64
+          machine_type: n1-highmem-96
           zone: us-west1-b
+          image_family: tf-latest-gpu-gvnic
+          image_project: deeplearning-platform-release
           boot_disk_size: 105
           boot_disk_type: pd-ssd
-          min_cpu_platform: skylake
           gpu_type: v100
           gpu_count: 1
         AWS:
