@@ -398,7 +398,7 @@ class AwsDisk(disk.BaseDisk):
       if EbsDriveIsNvme(self.machine_type):
         first_device_letter = 'a'
         return '/dev/nvme%sn1' % (
-            1 + NUM_LOCAL_VOLUMES[self.machine_type] +
+            1 + NUM_LOCAL_VOLUMES.get(self.machine_type, 0) +
             ord(self.device_letter) - ord(first_device_letter))
       else:
         return '/dev/xvdb%s' % self.device_letter
