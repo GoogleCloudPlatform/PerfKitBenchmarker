@@ -885,15 +885,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if aws_disk.LocalDriveIsNvme(self.machine_type) and \
        aws_disk.EbsDriveIsNvme(self.machine_type):
       # identify boot drive
-      cmd = 'lsblk | grep "part /$" | grep -o "nvme[0-9]*"'
+      # If this command ever fails consider 'findmnt -nM / -o source'
+      cmd = ('realpath /dev/disk/by-label/cloudimg-rootfs '
+             '| grep --only-matching "nvme[0-9]*"')
       boot_drive = self.RemoteCommand(cmd, ignore_failure=True)[0].strip()
-      if len(boot_drive) > 0:
+      if boot_drive:
         # get the boot drive index by dropping the nvme prefix
         boot_idx = int(boot_drive[4:])
         logging.info('found boot drive at nvme index %d', boot_idx)
         return boot_idx
       else:
-        # boot drive is not nvme
+        logging.warning('Failed to identify NVME boot drive index. Assuming 0.')
         return 0
 
   def CreateScratchDisk(self, disk_spec):
