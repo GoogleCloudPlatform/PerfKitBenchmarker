@@ -1,0 +1,15 @@
+ping:
+  vm_groups:
+    '0':
+      cloud: GCP
+      vm_spec:
+        GCP:
+          zone: us_west2_a
+          machine_type: n1_standard_2
+    '1':
+      cloud: GCP
+      vm_spec:
+        GCP:
+          zone: us_west2_a
+          machine_type: n1_standard_2
+

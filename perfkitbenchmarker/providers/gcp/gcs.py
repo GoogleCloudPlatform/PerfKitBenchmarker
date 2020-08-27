@@ -50,7 +50,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     self.location = location or DEFAULT_GCP_REGION
 
   def MakeBucket(self, bucket, raise_on_failure=True):
-    command = ['gsutil', 'mb']
+    command = ['/usr/bin/gsutil', 'mb']
     if self.location:
       command.extend(['-l', self.location])
     if self.location and '-' in self.location:
@@ -68,12 +68,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def Copy(self, src_url, dst_url):
     """See base class."""
-    vm_util.IssueCommand(['gsutil', 'cp', src_url, dst_url])
+    vm_util.IssueCommand(['/usr/bin/gsutil', 'cp', src_url, dst_url])
 
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""
     dst_url = self.MakeRemoteCliDownloadUrl(bucket, object_path)
-    vm_util.IssueCommand(['gsutil', 'cp', src_path, dst_url])
+    vm_util.IssueCommand(['/usr/bin/gsutil', 'cp', src_path, dst_url])
 
   def MakeRemoteCliDownloadUrl(self, bucket, object_path):
     """See base class."""
@@ -82,11 +82,11 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
-    return 'gsutil cp "%s" "%s"' % (src_url, local_path)
+    return '/usr/bin/gsutil cp "%s" "%s"' % (src_url, local_path)
 
   def List(self, buckets):
     """See base class."""
-    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', buckets])
+    stdout, _, _ = vm_util.IssueCommand(['/usr/bin/gsutil', 'ls', buckets])
     return stdout
 
   @vm_util.Retry()
@@ -105,13 +105,13 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
       return retcode and 'BucketNotFoundException' in stderr
 
-    vm_util.IssueCommand(['gsutil', 'rb', 'gs://%s' % bucket],
+    vm_util.IssueCommand(['/usr/bin/gsutil', 'rb', 'gs://%s' % bucket],
                          suppress_failure=_bucket_not_found)
 
   def EmptyBucket(self, bucket):
     # Ignore failures here and retry in DeleteBucket.  See more comments there.
     vm_util.IssueCommand(
-        ['gsutil', '-m', 'rm', '-r',
+        ['/usr/bin/gsutil', '-m', 'rm', '-r',
          'gs://%s/*' % bucket], raise_on_failure=False)
 
   def ChmodBucket(self, account, access, bucket):
@@ -123,7 +123,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       bucket: string, the name of the bucket to change
     """
     vm_util.IssueCommand([
-        'gsutil', 'acl', 'ch', '-u',
+        '/usr/bin/gsutil', 'acl', 'ch', '-u',
         '{account}:{access}'.format(account=account, access=access),
         'gs://{}'.format(bucket)])
 

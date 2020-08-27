@@ -1,0 +1,16 @@
+iperf:
+  vm_groups:
+    vm_1:
+      cloud: Kubernetes 
+      vm_spec:
+        Kubernetes:
+          machine_type: n1-standard-4
+          image: ubuntu-16-04
+          zone: us-central1-c
+    vm_2:
+      cloud: Kubernetes
+      vm_spec:
+        Kubernetes:
+          machine_type: n1-standard-4
+          image: ubuntu-16-04
+          zone: us-central1-c
