@@ -1124,6 +1124,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                   '%s %s' % (striped_device, len(devices), ' '.join(devices)))
     self.RemoteHostCommand(stripe_cmd)
 
+    # Save the RAID layout on the disk
+    cmd = ('sudo mdadm --detail --scan | ' +
+           'sudo tee -a /etc/mdadm/mdadm.conf')
+    self.RemoteHostCommand(cmd)
+
+    # Make the disk available during reboot
+    cmd = 'sudo update-initramfs -u'
+    self.RemoteHostCommand(cmd)
+
+    # Automatically mount the disk after reboot
+    cmd = ('echo \'/dev/md0  /mnt/md0  ext4 defaults,nofail'
+           ',discard 0 0\' | sudo tee -a /etc/fstab')
+    self.RemoteHostCommand(cmd)
+
   def BurnCpu(self, burn_cpu_threads=None, burn_cpu_seconds=None):
     """Burns vm cpu for some amount of time and dirty cache.
 
