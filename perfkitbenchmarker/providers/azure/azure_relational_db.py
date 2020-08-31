@@ -146,6 +146,30 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
+  def SetDbConfiguration(self, name, value):
+    """Set configuration for the database instance.
+
+    Args:
+        name: string, the name of the settings to change
+        value: value, string the value to set
+    """
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        'server',
+        'configuration',
+        'set',
+        '--name',
+        name,
+        '--value',
+        value,
+        '--resource-group',
+        self.resource_group.name,
+        '--server',
+        self.instance_id
+    ]
+    vm_util.IssueCommand(cmd)
+
   def RenameDatabase(self, new_name):
     """Renames an the database instace."""
     engine = self.spec.engine
@@ -388,6 +412,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     ]
     vm_util.IssueCommand(cmd)
     self._AssignPortsForWriterInstance()
+
+    if self.spec.engine == 'mysql':
+      # Azure will add @domainname after the database username
+      self.spec.database_username = (self.spec.database_username + '@' +
+                                     self.endpoint.split('.')[0])
 
   def _IsInstanceReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.
