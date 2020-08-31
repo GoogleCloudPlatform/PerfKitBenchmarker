@@ -18,6 +18,7 @@
 -   Updated `retry_on_rate_limited` to false on all cluster_boot runs.
 -   Add ability to apply HPC optimized script to GCE VMs with --gce_hpc_tools
 -   Update the nginx benchmark.
+-   Added `--before_run_pause` flag for debugging during benchmark development.
 
 ### Bug fixes and maintenance updates:
 
@@ -37,3 +38,4 @@
 -   Fixed a bug in leftover entity deletion logic.
 -   Use absl parameterized test case.
 -   Error out if AWS EFA install fails (centos8,rhel8)
+-   Added `cascadelake` as a `--gcp_min_cpu_platform` option.

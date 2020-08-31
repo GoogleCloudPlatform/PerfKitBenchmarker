@@ -345,6 +345,10 @@ flags.DEFINE_integer(
     'The time in seconds to sleep after the run phase. This can be useful '
     'for letting the VM sit idle after the bechmarking phase is complete.')
 flags.DEFINE_bool(
+    'before_run_pause', False,
+    'If true, wait for command line input before executing the run phase. '
+    'This is useful for debugging benchmarks during development.')
+flags.DEFINE_bool(
     'before_cleanup_pause', False,
     'If true, wait for command line input before executing the cleanup phase. '
     'This is useful for debugging benchmarks during development.')
@@ -730,6 +734,8 @@ def DoRunPhase(spec, collector, timer):
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Run function.
   """
+  if FLAGS.before_run_pause:
+    six.moves.input('Hit enter to begin Run.')
   interrupt_checker = InterruptChecker(spec.vms)
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
@@ -803,9 +809,9 @@ def DoCleanupPhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Cleanup function.
   """
-  interrupt_checker = InterruptChecker(spec.vms)
   if FLAGS.before_cleanup_pause:
-    six.moves.input('Hit enter to begin cleanup.')
+    six.moves.input('Hit enter to begin Cleanup.')
+  interrupt_checker = InterruptChecker(spec.vms)
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
