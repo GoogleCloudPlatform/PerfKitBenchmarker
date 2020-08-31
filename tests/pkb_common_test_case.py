@@ -107,7 +107,7 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
 
 # Need to provide implementations for all of the abstract methods in
 # order to instantiate linux_virtual_machine.BaseLinuxMixin.
-class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxMixin,
+class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxVirtualMachine,
                               TestVirtualMachine):
 
   def InstallPackages(self, packages):
