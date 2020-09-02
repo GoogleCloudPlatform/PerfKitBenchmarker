@@ -11,20 +11,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Executes query on Spark SQL and records the latency.
+"""Executes a series of queries using Apache Spark SQL and records latencies.
 
-The Data (TPCDS or TPCH) needs be generated first by user.
+Queries:
+This benchmark uses TPC-DS and TPC-H queries from
+https://github.com/databricks/spark-sql-perf, because spark SQL doesn't support
+all the queries that using dialect netezza.
+
+Data:
+The Data (TPCDS or TPCH) needs be generated first by user and loaded into object
+storage.
 TPCDS and TPCH tools.
 TPCDS: https://github.com/databricks/tpcds-kit
 TPCH: https://github.com/databricks/tpch-dbgen
 
-This benchmark uses queries from https://github.com/databricks/spark-sql-perf.
-Because spark SQL doesn't support all the queries that using dialect netezza.
+Spark SQL can either read from Hive tables where the data is stored in a series
+of files on a Hadoop Compatible File System (HCFS) or it can read from temporary
+views registered from Spark SQL data sources:
+https://spark.apache.org/docs/latest/sql-data-sources.html.
 
-It can optionally read the data from Google BigQuery using
+Spark SQL queries can either be run using the spark-sql CLI or a custom pyspark
+runner.
+
+The spark-sql CLI only supports Hive data. This benchmark can create and
+replace external Hive tables using `--dpb_sparksql_create_hive_tables=true`
+Alternatively you could pre-provision a Hive metastore with data before running
+the benchmark.
+
+If you do not want to use a Hive Metastore, the custom pyspark runner can
+register data as temporary views during job submission. This supports the
+entire Spark datasource API and is the default.
+
+One data soruce of note is Google BigQuery using
 https://github.com/GoogleCloudPlatform/spark-bigquery-connector.
 """
 
+import json
 import logging
 import os
 import re
@@ -67,8 +89,24 @@ BENCHMARK_NAMES = {
     'tpch': 'TPC-H'
 }
 
-flags.DEFINE_string('dpb_sparksql_data', None,
-                    'The dataset to run Spark SQL query')
+SPARK_SQL = dpb_service.BaseDpbService.SPARKSQL_JOB_TYPE
+PYSPARK = dpb_service.BaseDpbService.PYSPARK_JOB_TYPE
+
+flags.DEFINE_string(
+    'dpb_sparksql_data', None,
+    'The HCFS based dataset to run Spark SQL query '
+    'against')
+flags.DEFINE_enum(
+    'dpb_sparksql_job_type', PYSPARK, [PYSPARK, SPARK_SQL],
+    'How to trigger the query. Either with the spark-sql CLI '
+    'or with a PySpark harness inside PKB.')
+flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
+                  'Whether to load dpb_sparksql_data into external hive tables '
+                  'or not.')
+flags.DEFINE_string(
+    'dpb_sparksql_data_format', None,
+    "Format of data to load. Assumed to be 'parquet' for HCFS "
+    "and 'bigquery' for bigquery if unspecified.")
 flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
 flags.DEFINE_list('dpb_sparksql_order', [],
@@ -123,14 +161,22 @@ def CheckPrerequisites(benchmark_config):
         'Invalid backend {} for Spark SQL. Not in: {}'.format(
             dpb_service_type, SUPPORTED_DPB_BACKENDS))
 
+  if not FLAGS.dpb_sparksql_data and FLAGS.dpb_sparksql_create_hive_tables:
+    raise errors.Config.InvalidValue(
+        'You must pass dpb_sparksql_data with dpb_sparksql_create_hive_tables')
+  if FLAGS.dpb_sparksql_job_type == SPARK_SQL:
+    if FLAGS.bigquery_tables:
+      raise errors.Config.InvalidValue(
+          'spark-sql job type does not support temporary bigquery views.')
+    if FLAGS.dpb_sparksql_data and not FLAGS.dpb_sparksql_create_hive_tables:
+      raise errors.Config.InvalidValue(
+          'spark-sql job type cannot query HCFS data without '
+          '--dpb_sparksql_create_hive_tables.')
   if not (FLAGS.dpb_sparksql_data or FLAGS.bigquery_tables):
     # In the case of a static dpb_service, data could pre-exist
     logging.warning(
         'You did not specify --dpb_sparksql_data or --bigquery_tables. '
         'You will probably not have data to query!')
-  if FLAGS.dpb_sparksql_data and FLAGS.bigquery_tables:
-    raise errors.Config.InvalidValue(
-        'You cannot specify both --dpb_sparksql_data and --bigquery_tables')
 
 
 def Prepare(benchmark_spec):
@@ -175,17 +221,24 @@ def Prepare(benchmark_spec):
     src_url = data.ResourcePath(script)
     storage_service.CopyToBucket(src_url, bucket, script)
 
-  # Create external Hive tables if not reading the data from BigQuery
+  benchmark_spec.table_subdirs = []
   if FLAGS.dpb_sparksql_data:
     stdout = storage_service.List(FLAGS.dpb_sparksql_data)
+    benchmark_spec.table_subdirs = [
+        re.split(' |/', line.rstrip('/')).pop()
+        for line in stdout.split('\n')
+        if line
+    ]
 
-    table_subdirs = [re.split(' |/', line.rstrip('/')).pop()
-                     for line in stdout.split('\n') if line]
+  # Create external Hive tables
+  if FLAGS.dpb_sparksql_create_hive_tables:
+    stdout = storage_service.List(FLAGS.dpb_sparksql_data)
     stats = dpb_service_instance.SubmitJob(
-        pyspark_file=os.path.join(benchmark_spec.base_dir,
-                                  SPARK_TABLE_SCRIPT),
+        pyspark_file=os.path.join(benchmark_spec.base_dir, SPARK_TABLE_SCRIPT),
         job_type=BaseDpbService.PYSPARK_JOB_TYPE,
-        job_arguments=[FLAGS.dpb_sparksql_data, ','.join(table_subdirs)])
+        job_arguments=[
+            FLAGS.dpb_sparksql_data, ','.join(benchmark_spec.table_subdirs)
+        ])
     logging.info(stats)
     if not stats['success']:
       raise errors.Benchmarks.PrepareException(
@@ -218,7 +271,8 @@ def Run(benchmark_spec):
     stats = _RunSparkSqlJob(
         dpb_service_instance,
         os.path.join(benchmark_spec.base_dir, query + '.sql'),
-        os.path.join(benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT))
+        os.path.join(benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT),
+        benchmark_spec.table_subdirs)
     logging.info(stats)
     metadata_copy = metadata.copy()
     metadata_copy['query'] = query
@@ -261,23 +315,44 @@ def Run(benchmark_spec):
 
 def _RunSparkSqlJob(dpb_service_instance,
                     staged_sql_file,
-                    staged_sql_runner_file=None):
+                    staged_sql_runner_file=None,
+                    table_subdirs=None):
   """Run a Spark SQL script either with the spark-sql command or spark_sql_runner.py."""
-  if staged_sql_runner_file and FLAGS.bigquery_tables:
+  if FLAGS.dpb_sparksql_job_type == SPARK_SQL:
+    return dpb_service_instance.SubmitJob(
+        query_file=staged_sql_file, job_type=SPARK_SQL)
+  if FLAGS.dpb_sparksql_job_type == PYSPARK:
+    assert staged_sql_runner_file
     args = [
-        os.path.basename(staged_sql_file),
-        '--bigquery-tables', ','.join(FLAGS.bigquery_tables)
+        os.path.basename(staged_sql_file), '--table_metadata',
+        _GetTableMetadataJson(table_subdirs)
     ]
-    if FLAGS.bigquery_record_format:
-      args += ['--bigquery-record-format', FLAGS.bigquery_record_format]
     return dpb_service_instance.SubmitJob(
         pyspark_file=staged_sql_runner_file,
         job_arguments=args,
         job_files=[staged_sql_file],
         job_jars=[FLAGS.spark_bigquery_connector],
-        job_type=BaseDpbService.PYSPARK_JOB_TYPE)
-  return dpb_service_instance.SubmitJob(
-      query_file=staged_sql_file, job_type=BaseDpbService.SPARKSQL_JOB_TYPE)
+        job_type=PYSPARK)
+  raise errors.Config.UnrecognizedOption('Unsupported job type ' +
+                                         FLAGS.dpb_sparksql_job_type)
+
+
+def _GetTableMetadataJson(table_subdirs=None):
+  """Compute a JSON map of table metadata for spark_sql_runner --table_metadata."""
+  metadata = {}
+  if not FLAGS.dpb_sparksql_create_hive_tables:
+    for subdir in table_subdirs or []:
+      # Subdir is table name
+      metadata[subdir] = (FLAGS.dpb_sparksql_data_format or 'parquet', {
+          'path': os.path.join(FLAGS.dpb_sparksql_data, subdir)
+      })
+  for table in FLAGS.bigquery_tables:
+    name = table.split('.')[-1]
+    bq_options = {'table': table}
+    if FLAGS.bigquery_record_format:
+      bq_options['readDataFormat'] = FLAGS.bigquery_record_format
+    metadata[name] = (FLAGS.dpb_sparksql_data_format or 'bigquery', bq_options)
+  return json.dumps(metadata)
 
 
 def Cleanup(_):

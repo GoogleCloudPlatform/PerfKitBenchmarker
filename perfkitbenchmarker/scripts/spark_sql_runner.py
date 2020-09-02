@@ -10,6 +10,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import json
 import logging
 
 from pyspark.sql import SparkSession
@@ -18,57 +19,30 @@ from pyspark.sql import SparkSession
 def parse_args():
   """Parse argv."""
 
-  def comma_separated_list(string):
-    return string.split(',')
-
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
       'sql_script', help='The local path to the SQL file to run')
-  data_sources = parser.add_mutually_exclusive_group()
-  data_sources.add_argument(
-      '--bigquery-tables',
-      metavar='TABLES',
-      type=comma_separated_list,
-      default=[],
-      help='Comma separated list of fully qualified BigQuery '
-      'tables. Views will share the name of the tables.')
   parser.add_argument(
-      '--bigquery-record-format',
-      metavar='FORMAT',
-      help='Data Format for reading from BigQuery Storage')
-  data_sources.add_argument(
-      '--hcfs-dirs',
-      metavar='DIRS',
-      type=comma_separated_list,
+      '--table_metadata',
+      metavar='METADATA',
+      type=lambda s: json.loads(s).items(),
       default=[],
-      help='Comma separated list of HCFS directories containing parquet '
-           'tables. Views will be named the basename of the directories.')
+      help="""\
+JSON Object mappiing table names to arrays of length 2. The arrays contain  the
+format of the data and the options to pass to the dataframe reader. e.g.:
+{
+
+  "my_bq_table": ["bigquery", {"table": "bigquery_public_data:dataset.table"}],
+  "my_parquet_table": ["parquet", {"path": "gs://some/directory"}]
+}""")
   return parser.parse_args()
-
-
-def register_views(
-    spark, bigquery_tables, hcfs_dirs, bigquery_record_format=None):
-  """Pre-register BigQuery tables and Parquet directories as temporary views."""
-  temp_dfs = {}
-  for table in bigquery_tables:
-    name = table.split('.')[-1]
-    logging.info('Loading %s', table)
-    reader = spark.read.format('bigquery').option('table', table)
-    if bigquery_record_format:
-      reader.option('readDataFormat', bigquery_record_format)
-    temp_dfs[name] = reader.load()
-  for hcfs_dir in hcfs_dirs:
-    name = hcfs_dir.split('/')[-1]
-    logging.info('Loading %s', hcfs_dir)
-    temp_dfs[name] = spark.read.format('parquet').load(hcfs_dir)
-  for name, df in temp_dfs.items():
-    df.createTempView(name)
 
 
 def main(args):
   spark = (SparkSession.builder.appName('Spark SQL Query').getOrCreate())
-  register_views(
-      spark, args.bigquery_tables, args.hcfs_dirs, args.bigquery_record_format)
+  for name, (fmt, options) in args.table_metadata:
+    logging.info('Loading %s', name)
+    spark.read.format(fmt).options(**options).load().createTempView(name)
 
   logging.info('Running %s', args.sql_script)
   with open(args.sql_script) as f:
