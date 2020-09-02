@@ -34,7 +34,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('hadoop_version', '3.2.1', 'Version of hadoop.')
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
-              'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml',
+              'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml.j2',
               'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
@@ -67,7 +67,7 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs Hadoop on the VM."""
-  vm.InstallPackages('snappy snappy-devel')
+  vm.InstallPackages('snappy')
   _Install(vm)
 
 
@@ -77,18 +77,63 @@ def AptInstall(vm):
   if not vm.HasPackage(libsnappy):
     # libsnappy's name on ubuntu16.04 is libsnappy1v5. Let's try that instead.
     libsnappy = 'libsnappy1v5'
-  vm.InstallPackages('%s libsnappy-dev' % libsnappy)
+  vm.InstallPackages(libsnappy)
   _Install(vm)
+
+
+# Scheduling constants.
+# Give 90% of VM memory to YARN for scheduling.
+# This is roguhly consistent with Dataproc 2.0+
+YARN_MEMORY_FRACTION = 0.9
+# Give 80% of the memory YARN schedules to the JVM Heap space.
+# This is probably conservative on more memory mahcines, but is a traditonal
+# rule of thumb.
+HEAP_MEMORY_RATIO = 0.8
+
+# Schedule slightly more tasks than vCPUs. This was found to be optimal for
+# sorting 240 GB using standard GCE virtual machines with sufficient disk.
+# Using a grid seach.
+# TODO(pclay): Confirm results generalize to larger data sizes.
+MAP_SLOTS_PER_CORE = 1.5
+REDUCE_SLOTS_PER_CORE = 4 / 3
 
 
 def _RenderConfig(
     vm,
     master,
     workers,
-    memory_fraction=0.9):
+    memory_fraction=YARN_MEMORY_FRACTION):
   """Load Hadoop Condfiguration on VM."""
+  # Use first worker to get worker configuration
+  worker = workers[0]
+  num_workers = len(workers)
+  worker_cores = worker.NumCpusForBenchmark()
   yarn_memory_mb = int((vm.total_memory_kb / 1024) * memory_fraction)
+  # Reserve 1 GB per worker for AppMaster containers.
+  usable_memory_mb = yarn_memory_mb - 1024
+
+  # YARN generally schedules based on memory (and ignores cores). We invert this
+  # by calculating memory in terms of cores. This means that changing
+  # machine memory will not change scheduling simply change the memory given to
+  # each task.
+  maps_per_node = int(worker_cores * MAP_SLOTS_PER_CORE)
+  map_memory_mb = usable_memory_mb // maps_per_node
+  map_heap_mb = int(map_memory_mb * HEAP_MEMORY_RATIO)
+
+  reduces_per_node = int(worker_cores * REDUCE_SLOTS_PER_CORE)
+  reduce_memory_mb = usable_memory_mb // reduces_per_node
+  reduce_heap_mb = int(reduce_memory_mb * HEAP_MEMORY_RATIO)
+
+  # This property is only used for generating data like teragen.
+  # Divide 2 to avoid tiny files on large clusters.
+  num_map_tasks = maps_per_node * num_workers
+  # This determines the number of reduce tasks in Terasort and is critical to
+  # scale with the cluster.
+  num_reduce_tasks = reduces_per_node * num_workers
+
   if vm.scratch_disks:
+    # TODO(pclay): support multiple scratch disks. A current suboptimal
+    # workaround is RAID0 local_ssds with --num_striped_disks.
     scratch_dir = posixpath.join(vm.GetScratchDir(), 'hadoop')
   else:
     scratch_dir = posixpath.join('/tmp/pkb/local_scratch', 'hadoop')
@@ -96,16 +141,22 @@ def _RenderConfig(
       'master_ip': master.internal_ip,
       'worker_ips': [vm.internal_ip for vm in workers],
       'scratch_dir': scratch_dir,
-      'vcpus': vm.NumCpusForBenchmark(),
+      'worker_vcpus': worker_cores,
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
       'user': vm.user_name,
-      'yarn_memory_mb': yarn_memory_mb
+      'yarn_memory_mb': yarn_memory_mb,
+      'map_memory_mb': map_memory_mb,
+      'map_heap_mb': map_heap_mb,
+      'num_map_tasks': num_map_tasks,
+      'reduce_memory_mb': reduce_memory_mb,
+      'reduce_heap_mb': reduce_heap_mb,
+      'num_reduce_tasks': num_reduce_tasks,
   }
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
     if (file_name == 'hadoop/workers.j2' and
-        FLAGS.hadoop_version.split('.')[0] == '2'):
+        FLAGS.hadoop_version.split('.')[0] < '3'):
       file_name = 'hadoop/slaves.j2'
     remote_path = posixpath.join(HADOOP_CONF_DIR,
                                  os.path.basename(file_name))
