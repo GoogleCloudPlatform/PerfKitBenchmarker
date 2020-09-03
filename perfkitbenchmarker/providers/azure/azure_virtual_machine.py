@@ -760,7 +760,7 @@ class AzureVirtualMachine(
     """Updates the interruptible status if the VM was preempted."""
     if self.spot_early_termination:
       return
-    if self.low_priority:
+    if self.low_priority and self._Exists():
       stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
           _SCHEDULED_EVENTS_CMD)
       if return_code:

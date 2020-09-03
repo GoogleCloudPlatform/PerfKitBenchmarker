@@ -117,6 +117,12 @@ class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxVirtualMachine,
 class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
   pass
 
+  def _PreemptibleMetadataKeyValue(self):
+    return '', ''
+
+  def _MarkPreemptibleStart(self):
+    pass
+
 
 class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
   """Test case class for PKB.

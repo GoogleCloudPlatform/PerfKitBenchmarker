@@ -136,3 +136,18 @@ flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
 flags.DEFINE_enum('bq_client_interface', 'CLI',
                   ['CLI', 'JAVA', 'SIMBA_JDBC_1_2_4_1007'],
                   'The Runtime Interface used when interacting with BigQuery.')
+flags.DEFINE_string('gcp_preemptible_status_bucket', None,
+                    'The GCS bucket to store the preemptible status when '
+                    'running on GCP.')
+
+
+def _ValidatePreemptFlags(flags_dict):
+  if flags_dict['gce_preemptible_vms']:
+    return bool(flags_dict['gcp_preemptible_status_bucket'])
+  return True
+
+
+flags.register_multi_flags_validator(
+    ['gce_preemptible_vms', 'gcp_preemptible_status_bucket'],
+    _ValidatePreemptFlags, 'When gce_preemptible_vms is specified, '
+    'gcp_preemptible_status_bucket must be specified.')
