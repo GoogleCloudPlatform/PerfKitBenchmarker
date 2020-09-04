@@ -119,7 +119,7 @@ MODULE_REGEX = r'^\s+?(.*?):.*'  # Pattern that matches module names.
 FLAGS_REGEX = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'  # Pattern that matches each flag.
 FLAGNAME_REGEX = r'^\s+?(--.*?)(:.*\Z)'  # Pattern that matches flag name in each flag.
 DOCSTRING_REGEX = r'"""(.*?|$)"""'  # Pattern that matches triple quoted comments.
-CONNECTION_ERROR = 'Connection refused'
+CONNECTION_ERRORS = ('Connection refused', 'Connection timed out')
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
@@ -1009,7 +1009,7 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
-  if CONNECTION_ERROR in error_message:
+  if any(error in error_message for error in CONNECTION_ERRORS):
     vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(), spec.vms)
 
   interruptible_vm_count = 0
