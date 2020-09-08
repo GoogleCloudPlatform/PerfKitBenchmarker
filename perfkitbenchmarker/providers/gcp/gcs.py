@@ -131,7 +131,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         '{account}:{access}'.format(account=account, access=access),
         'gs://{}'.format(bucket)])
 
-  def AcquireWritePermissionsWindows(self, vm):
+  @classmethod
+  def AcquireWritePermissionsWindows(cls, vm):
     """Prepare boto file on a remote Windows instance.
 
     If the boto file specifies a service key file, copy that service key file to
@@ -152,11 +153,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       service_key_src = match.group(1)
       service_key_des = ntpath.join(vm.home_dir,
                                     posixpath.basename(service_key_src))
-      boto_src = self._PrepareGcsServiceKey(vm, boto_src, service_key_src,
-                                            service_key_des)
+      boto_src = cls._PrepareGcsServiceKey(vm, boto_src, service_key_src,
+                                           service_key_des)
     vm.PushFile(boto_src, boto_des)
 
-  def AcquireWritePermissionsLinux(self, vm):
+  @classmethod
+  def AcquireWritePermissionsLinux(cls, vm):
     """Prepare boto file on a remote Linux instance.
 
     If the boto file specifies a service key file, copy that service key file to
@@ -178,11 +180,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       service_key_src = match.group(1)
       service_key_des = posixpath.join(home_dir,
                                        posixpath.basename(service_key_src))
-      boto_src = self._PrepareGcsServiceKey(vm, boto_src, service_key_src,
-                                            service_key_des)
+      boto_src = cls._PrepareGcsServiceKey(vm, boto_src, service_key_src,
+                                           service_key_des)
     vm.PushFile(boto_src, boto_des)
 
-  def _PrepareGcsServiceKey(self, vm, boto_src, service_key_src,
+  @classmethod
+  def _PrepareGcsServiceKey(cls, vm, boto_src, service_key_src,
                             service_key_des):
     """Copy GS service key file to remote VM and update key path in boto file.
 

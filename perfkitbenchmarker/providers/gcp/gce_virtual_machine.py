@@ -47,7 +47,6 @@ from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
@@ -486,7 +485,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.preemptible:
       cmd.flags['preemptible'] = True
-      self._MarkPreemptibleStart()
+      self.preemptible_status_bucket = (
+          f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/')
       metadata.update([self._PreemptibleMetadataKeyValue()])
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
@@ -796,20 +796,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
-  def _MarkPreemptibleStart(self):
-    """Creates a file in the preemptable bucket indicating this VM started.
-
-    File name is gs://<gcs_bucket>/<run_uri>/started
-    """
-    self.storage_service = gcs.GoogleCloudStorageService()
-    # GCS doesn't allow to copy or mkdir an empty directory to a bucket.
-    started_file = posixpath.join(temp_dir.GetRunDirPath(), 'started')
-    vm_util.IssueCommand(['touch', started_file])
-    self.preemptible_status_bucket = (
-        f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/')
-    vm_util.IssueCommand(['gsutil', 'cp', started_file,
-                          self.preemptible_status_bucket])
-
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted.
 
@@ -838,8 +824,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       end_time = time.time() + _PREEMPT_DURATION
       while not self.spot_early_termination and time.time() <= end_time:
         _, _, retcode = vm_util.IssueCommand(
-            ['gsutil', 'ls', posixpath.join(self.preemptible_status_bucket,
-                                            self.name)],
+            [FLAGS.gsutil_path, 'stat',
+             posixpath.join(self.preemptible_status_bucket, self.name)],
             raise_on_failure=False)
         if retcode:
           # file does not exist, not interrupted
@@ -892,7 +878,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     if self.preemptible:
       # Prepare VM to use GCS. When an instance is interrupt, the shutdown
       # script will copy the status a GCS bucket.
-      self.storage_service.AcquireWritePermissionsLinux(self)
+      gcs.GoogleCloudStorageService.AcquireWritePermissionsLinux(self)
 
   def _PreDelete(self):
     super(BaseLinuxGceVirtualMachine, self)._PreDelete()
@@ -1055,7 +1041,7 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     if self.preemptible:
       # Prepare VM to use GCS. When an instance is interrupt, the shutdown
       # script will copy the status a GCS bucket.
-      self.storage_service.AcquireWritePermissionsWindows(self)
+      gcs.GoogleCloudStorageService.AcquireWritePermissionsWindows(self)
 
   def _PreDelete(self):
     super(BaseWindowsGceVirtualMachine, self)._PreDelete()
