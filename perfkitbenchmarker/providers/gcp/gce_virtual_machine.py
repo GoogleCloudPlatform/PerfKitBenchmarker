@@ -512,6 +512,33 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _PreemptibleMetadataKeyValue(self):
     """Returns the metadata (key, value) tuple for use with preemptible instance creation."""
 
+  def _AddShutdownScript(self):
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'add-metadata', self.name)
+    key, value = self._PreemptibleMetadataKeyValue()
+    cmd.flags['metadata'] = f'{key}={value}'
+    cmd.Issue()
+
+  def _RemoveShutdownScript(self):
+    # Remove shutdown script which copies status when it is interrupted
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'remove-metadata', self.name)
+    key, _ = self._PreemptibleMetadataKeyValue()
+    cmd.flags['keys'] = key
+    cmd.Issue(raise_on_failure=False)
+
+  def Reboot(self):
+    if self.preemptible:
+      self._RemoveShutdownScript()
+    super(GceVirtualMachine, self).Reboot()
+    if self.preemptible:
+      self._AddShutdownScript()
+
+  def _PreDelete(self):
+    super(GceVirtualMachine, self)._PreDelete()
+    if self.preemptible:
+      self._RemoveShutdownScript()
+
   def _Create(self):
     """Create a GCE VM instance."""
     num_hosts = len(self.host_list)
@@ -880,15 +907,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
       # script will copy the status a GCS bucket.
       gcs.GoogleCloudStorageService.AcquireWritePermissionsLinux(self)
 
-  def _PreDelete(self):
-    super(BaseLinuxGceVirtualMachine, self)._PreDelete()
-    if self.preemptible:
-      # Remove shutdown script which copies status when it is interrupted
-      cmd = util.GcloudCommand(
-          self, 'compute', 'instances', 'remove-metadata', self.name)
-      cmd.flags['keys'] = 'shutdown-script'
-      cmd.Issue(raise_on_failure=False)
-
 
 class Debian9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin):
@@ -1042,15 +1060,6 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
       # Prepare VM to use GCS. When an instance is interrupt, the shutdown
       # script will copy the status a GCS bucket.
       gcs.GoogleCloudStorageService.AcquireWritePermissionsWindows(self)
-
-  def _PreDelete(self):
-    super(BaseWindowsGceVirtualMachine, self)._PreDelete()
-    if self.preemptible:
-      # Remove shutdown script which copies status when it is interrupted
-      cmd = util.GcloudCommand(
-          self, 'compute', 'instances', 'remove-metadata', self.name)
-      cmd.flags['keys'] = 'windows-shutdown-script-ps1'
-      cmd.Issue(raise_on_failure=False)
 
 
 class Windows2012CoreGceVirtualMachine(
