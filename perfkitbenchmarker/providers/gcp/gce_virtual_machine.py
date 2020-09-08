@@ -434,7 +434,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
     else:
       cmd.flags['machine-type'] = self.machine_type
-    if self.gpu_count:
+    if self.gpu_count and 'a2-' not in self.machine_type:
+      # A2 machine type already has predefined GPU type and count.
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
