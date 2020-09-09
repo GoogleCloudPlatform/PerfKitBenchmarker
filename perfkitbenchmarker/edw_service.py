@@ -48,9 +48,10 @@ flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
 flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
-flags.DEFINE_list(
-    'queries_to_execute', [], 'List of all queries to execute, as strings. '
-    'E.g., "1","5","6","21"')
+flags.DEFINE_multi_string(
+    'concurrency_streams', [], 'List of all query streams to execute. Each '
+    'stream should be passed in separately and the queries should be comma '
+    'separated, e.g. --concurrency_streams=1,2,3 --concurrency_streams=3,2,1')
 flags.DEFINE_string('snowflake_warehouse', None,
                     'A virtual warehouse, often referred to simply as a - '
                     'warehouse, is a cluster of compute in Snowflake. '
@@ -108,6 +109,8 @@ class EdwClientInterface(object):
   def SetProvisionedAttributes(self, benchmark_spec):
     """Sets any attributes that were unknown during initialization."""
     self.client_vm = benchmark_spec.vms[0]
+    self.client_vm.RemoteCommand('echo "\nMaxSessions 100" | '
+                                 'sudo tee -a /etc/ssh/sshd_config')
 
   def Prepare(self, benchmark_name: Text) -> None:
     """Prepares the client vm to execute query.

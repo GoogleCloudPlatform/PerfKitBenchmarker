@@ -50,7 +50,8 @@ class FakeRemoteVMForCliClientInterfacePrepare(object):
         'sudo pip install absl-py',
         '/tmp/pkb/google-cloud-sdk/bin/gcloud auth activate-service-account '
         'SERVICE_ACCOUNT --key-file=SERVICE_ACCOUNT_KEY_FILE',
-        'chmod 755 script_runner.sh'
+        'chmod 755 script_runner.sh',
+        'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config'
     ]
 
   def Install(self, package_name):
@@ -74,6 +75,9 @@ class FakeRemoteVMForCliClientInterfaceExecuteQuery(object):
   """Class to setup a Fake VM that executes script on Client VM (CLI Client)."""
 
   def RemoteCommand(self, command):
+    if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
+      return None, None
+
     expected_command = ('python script_driver.py --script={} --bq_project_id={}'
                         ' --bq_dataset_id={}').format(QUERY_NAME, PROJECT_ID,
                                                       DATASET_ID)
@@ -94,6 +98,12 @@ class FakeRemoteVMForJavaClientInterfacePrepare(object):
     if package_name != 'openjdk':
       raise RuntimeError
 
+  def RemoteCommand(self, command):
+    if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
+      return None, None
+    else:
+      raise RuntimeError
+
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
     if benchmark_name != 'BENCHMARK_NAME':
@@ -104,6 +114,9 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
   """Class to setup a Fake VM that executes script on Client VM (JAVA Client)."""
 
   def RemoteCommand(self, command):
+    if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
+      return None, None
+
     expected_command = ('java -jar bq-java-client-1.0.jar  --project {} '
                         '--credentials_file {} --dataset {} --query_file '
                         '{}').format(PROJECT_ID, 'SERVICE_ACCOUNT_KEY_FILE',
