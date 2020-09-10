@@ -31,6 +31,13 @@ def _ValidateReplicationFlags(flag_dict):
   return (not flag_dict['bigtable_replication_cluster'] or
           flag_dict['bigtable_replication_cluster_zone'])
 
+
+def _ValidateRoutingFlags(flag_dict):
+  """Verifies correct usage of the bigtable routing flags."""
+  return (not flag_dict['bigtable_multicluster_routing'] or
+          flag_dict['bigtable_replication_cluster'])
+
+
 flags.DEFINE_integer('bigtable_node_count', 3,
                      'Number of nodes to create in the bigtable cluster.')
 flags.DEFINE_enum('bigtable_storage_type', 'ssd', ['ssd', 'hdd'],
@@ -41,10 +48,16 @@ flags.DEFINE_boolean('bigtable_replication_cluster', False,
                      'Whether to create a Bigtable replication cluster.')
 flags.DEFINE_string('bigtable_replication_cluster_zone', None,
                     'Zone in which to create a Bigtable replication cluster.')
+flags.DEFINE_boolean('bigtable_multicluster_routing', False,
+                     'Whether to use multi-cluster routing.')
 flags.register_multi_flags_validator(
     ['bigtable_replication_cluster', 'bigtable_replication_cluster_zone'],
     _ValidateReplicationFlags, message='bigtable_replication_cluster_zone must '
     'be set if bigtable_replication_cluster is True.')
+flags.register_multi_flags_validator(
+    ['bigtable_replication_cluster', 'bigtable_multicluster_routing'],
+    _ValidateRoutingFlags, message='bigtable_replication_cluster must '
+    'be set if bigtable_multicluster_routing is True.')
 
 
 class GcpBigtableInstance(resource.BaseResource):
@@ -88,6 +101,15 @@ class GcpBigtableInstance(resource.BaseResource):
       cmd.Issue()
 
     logging.info('Creating instance %s.', self.name)
+
+    if FLAGS.bigtable_multicluster_routing:
+      cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'app-profiles',
+                               'update', 'default')
+      cmd.flags['instance'] = self.name
+      cmd.flags['route-any'] = True
+      cmd.flags['force'] = True
+      cmd.flags['zone'] = []
+      cmd.Issue()
 
   def _Delete(self):
     """Deletes the instance."""

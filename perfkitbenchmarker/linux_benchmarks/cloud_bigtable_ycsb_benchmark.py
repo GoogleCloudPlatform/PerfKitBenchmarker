@@ -420,6 +420,8 @@ def Run(benchmark_spec):
         'bigtable_replication_zone'] = FLAGS.bigtable_replication_cluster_zone
     metadata['bigtable_storage_type'] = FLAGS.bigtable_storage_type
     metadata['bigtable_node_count'] = FLAGS.bigtable_node_count
+    metadata['bigtable_multicluster_routing'] = (
+        FLAGS.bigtable_multicluster_routing)
 
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
   # This leads to incorrect update latencies, since since the call returns
