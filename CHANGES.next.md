@@ -19,6 +19,7 @@
 -   Add ability to apply HPC optimized script to GCE VMs with --gce_hpc_tools
 -   Update the nginx benchmark.
 -   Added `--before_run_pause` flag for debugging during benchmark development.
+-   Report CPU vulnerabilities as a sample via the --record_cpu_vuln flag.
 
 ### Bug fixes and maintenance updates:
 

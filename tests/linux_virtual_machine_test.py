@@ -361,14 +361,15 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Socket(s): 1',
   ])
   normal_boot_responses = [
-      'cubic', lscpu_output, 'Description: ' + os_info, kernel_release,
-      partition_table
+      'cubic', 'Description: ' + os_info, kernel_release, partition_table
   ]
 
   def CreateVm(self, array_of_stdout):
     vm = CreateTestLinuxVm()
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=[(str(text), '') for text in array_of_stdout])
+    vm.CheckLsCpu = mock.Mock(
+        return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
     return vm
 
   @parameterized.named_parameters(
@@ -425,6 +426,58 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.Reboot()
     self.assertEqual(os_info_new, vm.os_metadata['os_info'])
     self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
+
+  def testCpuVulnerabilitiesEmpty(self):
+    self.assertEqual({}, self.CreateVm(['']).cpu_vulnerabilities.asdict)
+
+  def testCpuVulnerabilities(self):
+    # lines returned from running "grep . .../cpu/vulnerabilities/*"
+    cpu_vuln_lines = [
+        '.../itlb_multihit:KVM: Vulnerable',
+        '.../l1tf:Mitigation: PTE Inversion',
+        '.../mds:Vulnerable: Clear CPU buffers attempted, no microcode',
+        '.../meltdown:Mitigation: PTI',
+        '.../spec_store_bypass:Mitigation: Speculative Store Bypass disabled',
+        '.../spectre_v1:Mitigation: usercopy/swapgs barriers',
+        '.../spectre_v2:Mitigation: Full generic retpoline, IBPB: conditional',
+        '.../srbds:Not affected',
+        '.../tsx_async_abort:Not affected',
+        # Not actually seen, shows that falls into "unknowns"
+        '.../made_up:Unknown Entry',
+    ]
+    cpu_vuln = self.CreateVm(['\n'.join(cpu_vuln_lines)]).cpu_vulnerabilities
+    expected_mitigation = {
+        'l1tf': 'PTE Inversion',
+        'meltdown': 'PTI',
+        'spec_store_bypass': 'Speculative Store Bypass disabled',
+        'spectre_v1': 'usercopy/swapgs barriers',
+        'spectre_v2': 'Full generic retpoline, IBPB: conditional',
+    }
+    self.assertEqual(expected_mitigation, cpu_vuln.mitigations)
+    expected_vulnerability = {
+        'itlb_multihit': 'KVM',
+        'mds': 'Clear CPU buffers attempted, no microcode'
+    }
+    self.assertEqual(expected_vulnerability, cpu_vuln.vulnerabilities)
+    expected_notaffecteds = set(['srbds', 'tsx_async_abort'])
+    self.assertEqual(expected_notaffecteds, cpu_vuln.notaffecteds)
+    expected_unknowns = {'made_up': 'Unknown Entry'}
+    self.assertEqual(expected_unknowns, cpu_vuln.unknowns)
+    expected_asdict = {
+        'mitigations': 'l1tf,meltdown,spec_store_bypass,spectre_v1,spectre_v2',
+        'mitigation_l1tf': 'PTE Inversion',
+        'mitigation_meltdown': 'PTI',
+        'mitigation_spec_store_bypass': 'Speculative Store Bypass disabled',
+        'mitigation_spectre_v1': 'usercopy/swapgs barriers',
+        'mitigation_spectre_v2': 'Full generic retpoline, IBPB: conditional',
+        'notaffecteds': 'srbds,tsx_async_abort',
+        'unknown_made_up': 'Unknown Entry',
+        'unknowns': 'made_up',
+        'vulnerabilities': 'itlb_multihit,mds',
+        'vulnerability_itlb_multihit': 'KVM',
+        'vulnerability_mds': 'Clear CPU buffers attempted, no microcode',
+    }
+    self.assertEqual(expected_asdict, cpu_vuln.asdict)
 
 
 if __name__ == '__main__':

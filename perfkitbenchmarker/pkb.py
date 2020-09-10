@@ -71,6 +71,7 @@ import re
 import sys
 import threading
 import time
+from typing import List, Optional
 import uuid
 
 from perfkitbenchmarker import archive
@@ -372,6 +373,8 @@ flags.DEFINE_boolean('record_lscpu', True,
                      'Whether to record the lscpu output in a sample')
 flags.DEFINE_boolean('record_proccpu', True,
                      'Whether to record the /proc/cpuinfo output in a sample')
+flags.DEFINE_boolean('record_cpu_vuln', True,
+                     'Whether to record the CPU vulnerabilities on linux VMs')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -781,6 +784,8 @@ def DoRunPhase(spec, collector, timer):
 
     if FLAGS.record_proccpu:
       samples.extend(_CreateProcCpuSamples(spec.vms))
+    if FLAGS.record_cpu_vuln and run_number == 0:
+      samples.extend(_CreateCpuVulnerabilitySamples(spec.vms))
 
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
@@ -1293,6 +1298,18 @@ def _CreateProcCpuSamples(vms):
       metadata['proc_{}'.format(processor_id)] = ';'.join(sorted(values))
     samples.append(sample.Sample('proccpu_mapping', 0, '', metadata))
   return samples
+
+
+def _CreateCpuVulnerabilitySamples(vms) -> List[sample.Sample]:
+  """Returns samples of the VMs' CPU vulernabilites."""
+
+  def CreateSample(vm) -> Optional[sample.Sample]:
+    metadata = {'vm_name': vm.name}
+    metadata.update(vm.cpu_vulnerabilities.asdict)
+    return sample.Sample('cpu_vuln', 0, '', metadata)
+
+  linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
+  return vm_util.RunThreaded(CreateSample, linux_vms)
 
 
 def Main():

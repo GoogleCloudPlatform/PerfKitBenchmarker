@@ -35,6 +35,7 @@ import posixpath
 import re
 import threading
 import time
+from typing import Dict, Set
 import uuid
 
 from perfkitbenchmarker import context
@@ -166,6 +167,77 @@ flags.DEFINE_integer(
 
 flags.DEFINE_boolean('gce_hpc_tools', False,
                      'Whether to apply the hpc-tools environment script.')
+
+
+class CpuVulnerabilities:
+  """The 3 different vulnerablity statuses from vm.cpu_vulernabilities.
+
+  Example input:
+    /sys/devices/system/cpu/vulnerabilities/itlb_multihit:KVM: Vulnerable
+  Is put into vulnerability with a key of "itlb_multihit" and value "KVM"
+
+  Unparsed lines are put into the unknown dict.
+  """
+
+  def __init__(self):
+    self.mitigations: Dict[str, str] = {}
+    self.vulnerabilities: Dict[str, str] = {}
+    self.notaffecteds: Set[str] = set()
+    self.unknowns: Dict[str, str] = {}
+
+  def AddLine(self, full_line: str) -> None:
+    """Parses a line of output from the cpu/vulnerabilities/* files."""
+    if not full_line:
+      return
+    file_path, line = full_line.split(':', 1)
+    file_name = posixpath.basename(file_path)
+    if self._AddMitigation(file_name, line):
+      return
+    if self._AddVulnerability(file_name, line):
+      return
+    if self._AddNotAffected(file_name, line):
+      return
+    self.unknowns[file_name] = line
+
+  def _AddMitigation(self, file_name, line):
+    match = re.match('^Mitigation: (.*)', line) or re.match(
+        '^([^:]+): Mitigation: (.*)$', line)
+    if match:
+      self.mitigations[file_name] = ':'.join(match.groups())
+      return True
+
+  def _AddVulnerability(self, file_name, line):
+    match = re.match('^Vulnerable: (.*)', line) or re.match(
+        '^Vulnerable$', line) or re.match('^([^:]+): Vulnerable$', line)
+    if match:
+      self.vulnerabilities[file_name] = ':'.join(match.groups())
+      return True
+
+  def _AddNotAffected(self, file_name, line):
+    match = re.match('^Not affected$', line)
+    if match:
+      self.notaffecteds.add(file_name)
+      return True
+
+  @property
+  def asdict(self) -> Dict[str, str]:
+    """Returns the parsed CPU vulnerabilities as a dict."""
+    ret = {}
+    if self.mitigations:
+      ret['mitigations'] = ','.join(sorted(self.mitigations))
+      for key, value in self.mitigations.items():
+        ret[f'mitigation_{key}'] = value
+    if self.vulnerabilities:
+      ret['vulnerabilities'] = ','.join(sorted(self.vulnerabilities))
+      for key, value in self.vulnerabilities.items():
+        ret[f'vulnerability_{key}'] = value
+    if self.unknowns:
+      ret['unknowns'] = ','.join(self.unknowns)
+      for key, value in self.unknowns.items():
+        ret[f'unknown_{key}'] = value
+    if self.notaffecteds:
+      ret['notaffecteds'] = ','.join(sorted(self.notaffecteds))
+    return ret
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -629,6 +701,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
+      self.os_metadata[
+          'append_kernel_command_line'] = FLAGS.append_kernel_command_line
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -920,8 +994,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # clear out os_info and kernel_release as might have changed
     previous_os_info = self.os_metadata.pop('os_info', None)
     previous_kernel_release = self.os_metadata.pop('kernel_release', None)
-    if previous_os_info or previous_kernel_release:
+    previous_kernel_command = self.os_metadata.pop('kernel_command_line', None)
+    if previous_os_info or previous_kernel_release or previous_kernel_command:
       self.RecordAdditionalMetadata()
+    if self._lscpu_cache:
+      self._lscpu_cache = None
+      self.CheckLsCpu()
     if self.install_packages:
       self._CreateInstallDir()
     self._CreateVmTmpDir()
@@ -1265,6 +1343,28 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       Whether SMT is enabled on the vm.
     """
     return not bool(re.search(r'\bnosmt\b', self.kernel_command_line))
+
+  @property
+  def cpu_vulnerabilities(self) -> CpuVulnerabilities:
+    """Returns a CpuVulnerabilities of CPU vulnerabilities.
+
+    Output of "grep . .../cpu/vulnerabilities/*" looks like this:
+      /sys/devices/system/cpu/vulnerabilities/itlb_multihit:KVM: Vulnerable
+      /sys/devices/system/cpu/vulnerabilities/l1tf:Mitigation: PTE Inversion
+    Which gets turned into
+      CpuVulnerabilities(vulnerabilities={'itlb_multihit': 'KVM'},
+                         mitigations=    {'l1tf': 'PTE Inversion'})
+    """
+    text, _ = self.RemoteCommand(
+        'sudo grep . /sys/devices/system/cpu/vulnerabilities/*',
+        ignore_failure=True)
+    vuln = CpuVulnerabilities()
+    if not text:
+      logging.warning('No text response when getting CPU vulnerabilities')
+      return vuln
+    for line in text.splitlines():
+      vuln.AddLine(line)
+    return vuln
 
 
 class ClearMixin(BaseLinuxMixin):

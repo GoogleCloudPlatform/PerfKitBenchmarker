@@ -17,8 +17,10 @@
 import unittest
 from absl import flags
 import mock
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import stages
+from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -138,6 +140,63 @@ class TestMakeFailedRunSample(unittest.TestCase):
         'flags': '{}',
         'failed_substatus': 'QuotaExceeded'
     })
+
+
+class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase):
+  """Testing for various functions in pkb.py."""
+
+  def _MockVm(
+      self, name: str, remote_command_text: str
+  ) -> linux_virtual_machine.BaseLinuxVirtualMachine:
+    vm_spec = pkb_common_test_case.CreateTestVmSpec()
+    vm = pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
+    vm.OS_TYPE = 'debian9'
+    vm.name = name
+    vm.RemoteCommand = mock.Mock(return_value=(remote_command_text, ''))
+    return vm
+
+  def _MockVmWithVuln(
+      self, name: str,
+      cpu_vuln: linux_virtual_machine.CpuVulnerabilities) -> mock.Mock:
+    vm = mock.Mock(OS_TYPE='debian9')
+    vm.name = name
+    type(vm).cpu_vulnerabilities = mock.PropertyMock(return_value=cpu_vuln)
+    return vm
+
+  def testGatherCpuVulnerabilitiesNonLinux(self):
+    # Windows VMs do not currently have code to detect CPU vulnerabilities
+    vuln = linux_virtual_machine.CpuVulnerabilities()
+    vuln.mitigations['a'] = 'b'
+    vm = self._MockVmWithVuln('vm1', vuln)
+    vm.OS_TYPE = 'windows'
+    self.assertLen(pkb._CreateCpuVulnerabilitySamples([vm]), 0)
+
+  def testGatherCpuVulnerabilitiesEmpty(self):
+    # Even if CpuVulnerabilities is empty a sample is created
+    vm = self._MockVmWithVuln('vm1', linux_virtual_machine.CpuVulnerabilities())
+    samples = pkb._CreateCpuVulnerabilitySamples([vm])
+    self.assertEqual({'vm_name': 'vm1'}, samples[0].metadata)
+    self.assertLen(samples, 1)
+
+  def testGatherCpuVulnerabilities(self):
+    prefix = '/sys/devices/system/cpu/vulnerabilities'
+    vm0 = self._MockVm('vm0', f"""{prefix}/itlb_multihit:KVM: Vulnerable""")
+    vm1 = self._MockVm('vm1', f"""{prefix}/l1tf:Mitigation: PTE Inversion""")
+    samples = pkb._CreateCpuVulnerabilitySamples([vm0, vm1])
+    self.assertEqual('cpu_vuln', samples[0].metric)
+    expected_metadata0 = {
+        'vm_name': 'vm0',
+        'vulnerabilities': 'itlb_multihit',
+        'vulnerability_itlb_multihit': 'KVM',
+    }
+    expected_metadata1 = {
+        'vm_name': 'vm1',
+        'mitigations': 'l1tf',
+        'mitigation_l1tf': 'PTE Inversion',
+    }
+    self.assertEqual(expected_metadata0, samples[0].metadata)
+    self.assertEqual(expected_metadata1, samples[1].metadata)
+    self.assertLen(samples, 2)
 
 
 if __name__ == '__main__':
