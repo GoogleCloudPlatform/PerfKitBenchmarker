@@ -40,25 +40,23 @@ flags.DEFINE_integer('iperf_timeout', None,
                      'addition to iperf runtime before '
                      'killing iperf client command.',
                      lower_bound=1)
-
 flags.DEFINE_float('iperf_udp_per_stream_bandwidth', None,
-                   'In Mbits. iperf will attempt to send at this bandwidth. '
+                   'In Mbits. iperf will attempt to send at this bandwidth for UDP tests. '
                    'If using multiple streams, each stream will '
                    'attempt to send at this bandwidth')
-
 flags.DEFINE_float('iperf_tcp_per_stream_bandwidth', None,
-                   'In Mbits. iperf will attempt to send at this bandwidth. '
+                   'In Mbits. iperf will attempt to send at this bandwidth for TCP tests. '
                    'If using multiple streams, each stream will '
                    'attempt to send at this bandwidth')
 
 
-TESTS = ['TCP', 'UDP']
-flags.DEFINE_list('iperf_tests', ['TCP'],
+IPERF_BENCHMARKS = ['TCP', 'UDP']
+flags.DEFINE_list('iperf_benchmarks', ['TCP'],
                   'Run TCP, UDP or both')
 
 flags.register_validator(
-    'iperf_tests',
-    lambda benchmarks: benchmarks and set(benchmarks).issubset(TESTS))
+    'iperf_benchmarks',
+    lambda benchmarks: benchmarks and set(benchmarks).issubset(IPERF_BENCHMARKS))
 
 FLAGS = flags.FLAGS
 
@@ -74,9 +72,8 @@ iperf:
 """
 
 IPERF_PORT = 20000
-IPERF_RETRIES = 5
-
 IPERF_UDP_PORT = 25000
+IPERF_RETRIES = 5
 
 
 def GetConfig(user_config):
@@ -97,19 +94,18 @@ def Prepare(benchmark_spec):
             vms)))
 
   for vm in vms:
-    if not FLAGS.skip_prepare:
-      vm.Install('iperf')
+    vm.Install('iperf')
     if vm_util.ShouldRunOnExternalIpAddress():
-      if 'TCP' in FLAGS.iperf_tests:
+      if 'TCP' in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_PORT)
-      if 'UDP' in FLAGS.iperf_tests:
+      if 'UDP' in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_UDP_PORT)
-    if 'TCP' in FLAGS.iperf_tests:
+    if 'TCP' in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(('nohup iperf --server --port %s &> /dev/null'
                                       '& echo $!') % IPERF_PORT)
       # TODO store this in a better place once we have a better place
-      vm.iperf_server_pid = stdout.strip()
-    if 'UDP' in FLAGS.iperf_tests:
+      vm.iperf_tcp_server_pid = stdout.strip()
+    if 'UDP' in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(('nohup iperf --server -u --port %s &> /dev/null'
                                       '& echo $!') % IPERF_UDP_PORT)
       # TODO store this in a better place once we have a better place
@@ -144,123 +140,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
     stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                          timeout=FLAGS.iperf_runtime_in_seconds +
                                          timeout_buffer)
-    import sys
-    print("Python Version")
-    print(sys.version)
-    print("version info")
-    print(sys.version_info)
-    print("OUTPUT")
-    multi_thread = re.findall('\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+\d+\s\w+\s+\d+\s\w+\/\w+\s+\d+\/\d+\s+\d+\s+', stdout)
-    print("MultiThread: {}".format(bool(multi_thread)))
-    window_size = re.findall('TCP window size: \d+\.\d+ \S+', stdout)
-    #Write Buffer
-    buffer_size_re = re.findall('Write buffer size: \d+\.\d+ \S+', stdout)
-    #print(f"Find Buffer: {buffer_size}")
-    buffer_size = re.findall('\d+\.\d+', str(buffer_size_re))
-    buffer_size_num = float(buffer_size[0])
-    print("Buffer Size Num: {}".format(float(buffer_size[0])))
-    buffer_size_measurement = re.findall('\d+\.\d+ (\S+)', buffer_size_re[0])
-    print("Buffer Size Unit: {}".format(buffer_size_measurement[0]))
 
-
-    #print(f"type of window_size: {type(window_size)}")
-    #print(f"Window_size: {window_size[0]}")
-    #This finds the actual window size
-    window_size_num = (re.findall('\d+\.\d+', str(window_size)))
-    window_size_num = float(window_size_num[0])
-    #print(f"type of window_size: {type(str(window_size_num))}")
-    print("TCP Window_size: {}".format(window_size_num))
-    #print(f"test: {str(window_size)[0]}")
-    window_size_measurement = re.findall('\d+\.\d+ (\S+)', window_size[0])
-    #print(f"test: {str(window_size)[0]}")
-    #This is the Measurement unit for  the window size
-    window_size_measurement = window_size_measurement[0]
-    print("TCP Window measurement unit: {}".format(window_size_measurement))
-    if multi_thread:
-      #Write and Err
-      write_err = re.findall('\d+ Mbits\/sec\s+(\d+\/\d+)', str(multi_thread))
-      #print(f"write: {str(write_err)[0]}")
-      write_re = re.findall('\d+', str(write_err))
-      write = float(write_re[0])
-      print("Write: {}".format(write))
-      err = float(write_re[1])
-      print("Err: {}".format(err))
-
-      # Retry
-      retry_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+(\d+)', str(multi_thread))
-      retry = float(retry_re[0])
-      print("Retry: {}".format(retry))
-
-      # Cwnd
-      cwnd_rtt = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+\w+\-*/\d+\s+\w+)', stdout)
-      #print("cwnd_rtt all: {}".format(cwnd_rtt))
-      #print(cwnd_rtt)
-      rtt = 0
-      for i in cwnd_rtt:
-        rtt_part = re.findall('\/(-*\d+)', i)
-        #print("rtt_part: {}".format(rtt_part))
-        rtt = rtt + float(rtt_part[0])
-      #calculating average
-      rtt = round(decimal.Decimal(rtt) / len(cwnd_rtt), 2)
-      
-      cwnd_re = re.findall('-*\d+\s*', cwnd_rtt[0])
-      #print(cwnd_rtt)
-      cwnd = float(cwnd_re[0])
-      print("Cwnd: {}".format(cwnd))
-      cwnd_unit_re = re.findall('-*\d+\s*(\w+)', cwnd_rtt[0])
-      #print("cwnd_unit: {}".format(cwnd_unit_re))
-      cwnd_unit = cwnd_unit_re[0]
-      print("Cwnd Unit: {}".format(cwnd_unit))
-      #print("RTT ALL: {}".format(cwnd_re))
-      #rtt = float(cwnd_re[1])
-      print("RTT: {}".format(rtt))
-      rtt_unit = cwnd_unit_re[1]
-      print("RTT Unit: {}".format(cwnd_unit_re[1]))
-      # Netpwr
-      netpwr_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+-*\d+\w+\/\d+\s+\w+\s+(\d+\.\d+)', stdout)
-      #print("netpwr: {}".format(netpwr_re))
-      netpwr = 0
-      for i in netpwr_re:
-        netpwr = netpwr + float(i)
-      netpwr = netpwr / len(netpwr_re)
-      netpwr = round(decimal.Decimal(netpwr), 2)
-      print("Netpwr: {}".format(netpwr))
-    else:
-      
-      #Write and Err
-      write_err = re.findall('\d+ Mbits\/sec\s+(\d+\/\d+)', str(stdout))
-      write_re = re.findall('\d+', str(write_err))
-      write = float(write_re[0])
-      print("Write: {}".format(write))
-      err = float(write_re[1])
-      print("Err: {}".format(err))
-
-      # Retry
-      retry_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+(\d+)', str(stdout))
-      retry = float(retry_re[0])
-      print("Retry: {}".format(retry))
-
-      # Cwnd
-      cwnd_rtt = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+\w+\-*/\d+\s+\w+)',stdout)
-      #print(cwnd_rtt)
-      cwnd_re = re.findall('-*\d+\s*', cwnd_rtt[0])
-      #print(cwnd_rtt)
-      cwnd = float(cwnd_re[0])
-      print("Cwnd: {}".format(cwnd))
-      cwnd_unit_re = re.findall('-*\d+\s*(\w+)', cwnd_rtt[0])
-      cwnd_unit = cwnd_unit_re[0]
-      print("Cwnd Unit: {}".format(cwnd_unit))
-      rtt = float(cwnd_re[1])
-      print("RTT: {}".format(rtt))
-      rtt_unit = cwnd_unit_re[1]
-      print("RTT Unit: {}".format(rtt_unit))
-
-
-      # Netpwr
-      netpwr = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+-*\d+\w+\/\d+\s+\w+\s+(\d+\.\d+)', stdout)
-      netpwr = float(netpwr[0])
-      print("Netpwr: {}".format(netpwr))
-    # print(stdout)
     # Example output from iperf that needs to be parsed
     # STDOUT: ------------------------------------------------------------
     # Client connecting to 10.237.229.201, TCP port 5001
@@ -288,6 +168,90 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
     # [ ID] Interval        Transfer    Bandwidth       Write/Err  Rtry     Cwnd/RTT        NetPwr
     # [  3] 0.00-60.00 sec  236112 MBytes  33011 Mbits/sec  1888894/0          0       -1K/25 us  165054051.49
 
+    multi_thread = re.findall('\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+\d+\s\w+\s+\d+\s\w+\/\w+\s+\d+\/\d+\s+\d+\s+', stdout)
+    window_size = re.findall('TCP window size: \d+\.\d+ \S+', stdout)
+    buffer_size_re = re.findall('Write buffer size: \d+\.\d+ \S+', stdout)
+    buffer_size = re.findall('\d+\.\d+', str(buffer_size_re))
+    buffer_size_num = float(buffer_size[0])
+    buffer_size_measurement = re.findall('\d+\.\d+ (\S+)', buffer_size_re[0])
+    window_size_num = (re.findall('\d+\.\d+', str(window_size)))
+    window_size_num = float(window_size_num[0])
+    window_size_measurement = re.findall('\d+\.\d+ (\S+)', window_size[0])
+    window_size_measurement = window_size_measurement[0]
+
+    # Iperf output is formatted differently when running with multiple threads vs a single thread
+    if multi_thread:
+      #Write and Err
+      write_err = re.findall('\d+ Mbits\/sec\s+(\d+\/\d+)', str(multi_thread))
+      #print(f"write: {str(write_err)[0]}")
+      write_re = re.findall('\d+', str(write_err))
+      write = float(write_re[0])
+      err = float(write_re[1])
+      # Retry
+      retry_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+(\d+)', str(multi_thread))
+      retry = float(retry_re[0])
+
+      # Cwnd
+      cwnd_rtt = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+\w+\-*/\d+\s+\w+)', stdout)
+      #print("cwnd_rtt all: {}".format(cwnd_rtt))
+      #print(cwnd_rtt)
+      rtt = 0
+      for i in cwnd_rtt:
+        rtt_part = re.findall('\/(-*\d+)', i)
+        #print("rtt_part: {}".format(rtt_part))
+        rtt = rtt + float(rtt_part[0])
+      #calculating average
+      rtt = round(float(rtt) / len(cwnd_rtt), 2)
+      
+      cwnd_re = re.findall('-*\d+\s*', cwnd_rtt[0])
+      cwnd = float(cwnd_re[0])
+      cwnd_unit_re = re.findall('-*\d+\s*(\w+)', cwnd_rtt[0])
+      cwnd_unit = cwnd_unit_re[0] 
+      rtt_unit = cwnd_unit_re[1]
+      
+      # Netpwr
+      netpwr_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+-*\d+\w+\/\d+\s+\w+\s+(\d+\.\d+)', stdout)
+      #print("netpwr: {}".format(netpwr_re))
+      netpwr = 0
+      for i in netpwr_re:
+        netpwr = netpwr + float(i)
+      netpwr = netpwr / len(netpwr_re)
+      netpwr = round(float(netpwr), 2)      
+
+      # print("Write: {}".format(write))
+      # print("Err: {}".format(err))
+      # print("Retry: {}".format(retry))
+      # print("Cwnd: {}".format(cwnd))
+      # print("Cwnd Unit: {}".format(cwnd_unit))
+      # print("RTT: {}".format(rtt))
+      # print("RTT Unit: {}".format(cwnd_unit_re[1]))
+      # print("Netpwr: {}".format(netpwr))
+
+    # if single thread
+    else:
+      
+      #Write and Err
+      write_err = re.findall('\d+ Mbits\/sec\s+(\d+\/\d+)', str(stdout))
+      write_re = re.findall('\d+', str(write_err))
+      write = float(write_re[0])
+      err = float(write_re[1])
+
+      # Retry
+      retry_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+(\d+)', str(stdout))
+      retry = float(retry_re[0])
+
+      # Cwnd
+      cwnd_rtt = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+\w+\-*/\d+\s+\w+)',stdout)
+      cwnd_re = re.findall('-*\d+\s*', cwnd_rtt[0])
+      cwnd = float(cwnd_re[0])
+      cwnd_unit_re = re.findall('-*\d+\s*(\w+)', cwnd_rtt[0])
+      cwnd_unit = cwnd_unit_re[0]
+      rtt = float(cwnd_re[1])
+      rtt_unit = cwnd_unit_re[1]
+
+      # Netpwr
+      netpwr = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+-*\d+\w+\/\d+\s+\w+\s+(\d+\.\d+)', stdout)
+      netpwr = float(netpwr[0])
 
 
     thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
@@ -327,7 +291,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
     }
     return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
 
-########################## UDP TEST ##################################################
+
   elif protocol == 'UDP':
 
     iperf_cmd = ('iperf -e -u --client %s --port %s --format m --time %s -P %s' %
@@ -337,18 +301,14 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
       iperf_cmd = iperf_cmd + (' -b %dM' % FLAGS.iperf_udp_per_stream_bandwidth)
+      
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
     stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                          timeout=FLAGS.iperf_runtime_in_seconds +
                                          timeout_buffer)
-    import sys
-    print("Python Version")
-    print(sys.version)
-    print("version info")
-    print(sys.version_info)
-    print("OUTPUT")
+
     # Client connecting to 35.245.145.216, UDP port 25000 with pid 10286
     # Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
     # UDP buffer size: 0.20 MByte (default)
@@ -387,61 +347,51 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
     # [  4] 0.00-60.00 sec  1 datagrams received out-of-order
 
     multi_thread = re.findall('\[SUM\]\s\d+\.?\d+-\d+\.?\d+\ssec\s+\d+\.?\d+\s+MBytes\s+\d+\.?\d+\s+Mbits\/sec\s+\d+\/\d+\s+\d+\s+pps', stdout)
-    print("MultiThread: {}".format(bool(multi_thread)))
 
     buffer_size_re = re.findall('UDP buffer size: \d+\.\d+ \S+', stdout)
     #print(f"Find Buffer: {buffer_size}")
     buffer_size = re.findall('(\d+\.\d+)', buffer_size_re[0])
     buffer_size_num = float(buffer_size[0])
-    print("Buffer Size Num: {}".format(float(buffer_size[0])))
     buffer_size_measurement = re.findall('\d+\.\d+ (\S+)', buffer_size_re[0])
-    print("Buffer Size Unit: {}".format(buffer_size_measurement[0]))
-
     datagram_size = int(re.findall('(\d+)\sbyte\sdatagrams', stdout)[0])
     ipg_target = float(re.findall('IPG\starget:\s(\d+.?\d+)', stdout)[0])
     ipg_target_unit = str(re.findall('IPG\starget:\s\d+.?\d+\s(\S+)\s', stdout)[0])
 
-    print("datagram_size: {}".format(datagram_size))
-    print("pg_target: {}".format(ipg_target))
-    print("buffer_size_num: {}".format(buffer_size_num))
+    # print("Buffer Size Num: {}".format(float(buffer_size[0])))
+    # print("Buffer Size Unit: {}".format(buffer_size_measurement[0]))
+    # print("datagram_size: {}".format(datagram_size))
+    # print("pg_target: {}".format(ipg_target))
+    # print("buffer_size_num: {}".format(buffer_size_num))
 
     if multi_thread:
       #Write and Err
       write_err = re.findall('\d+\s+Mbits\/sec\s+(\d+\/\d+)', str(multi_thread))
-      #print(f"write: {str(write_err)[0]}")
       write_re = re.findall('\d+', str(write_err))
       write = int(write_re[0])
-      print("Write: {}".format(write))
       err = int(write_re[1])
-      print("Err: {}".format(err))
 
       # pps
       pps = re.findall('(\d+)\s+pps', str(multi_thread))
       pps = int(pps[0])
-      print("PPS: {}".format(pps))
 
-      # get server report part of stdout
-      # st = re.split('\[SUM\]\sSent\s\d+\sdatagrams', stdout)
-      # server_report = st[1]
+      # print("Write: {}".format(write))
+      # print("Err: {}".format(err))
+      # print("PPS: {}".format(pps))
 
     else:
       #Write and Err
       write_err = re.findall('\d+\s+Mbits\/sec\s+(\d+\/\d+)', str(stdout))
-      #print(f"write: {str(write_err)[0]}")
       write_re = re.findall('\d+', str(write_err))
       write = float(write_re[0])
-      print("Write: {}".format(write))
       err = float(write_re[1])
-      print("Err: {}".format(err))
 
       # pps
       pps = re.findall('(\d+)\s+pps', str(stdout))
       pps = int(pps[0])
-      print("PPS: {}".format(pps))
 
-      # get server report part of stdout
-      # st = re.split('\[SUM\]\sSent\s\d+\sdatagrams', stdout)
-      # server_report = st[1]
+      # print("Write: {}".format(write))
+      # print("Err: {}".format(err))
+      # print("PPS: {}".format(pps))
 
     # Jitter
     jitter_array = re.findall('Mbits\/sec\s+(\d+\.?\d+)\s+[a-zA-Z]+', stdout)
@@ -461,8 +411,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_t
     out_of_order_array = re.findall('(\d+)\s+datagrams\sreceived\sout-of-order', stdout)
     if out_of_order_array:
       out_of_order_sum = sum(int(x) for x in out_of_order_array)
-
-    print(stdout)
 
     thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
     if not thread_values:
@@ -518,9 +466,9 @@ def Run(benchmark_spec):
 
   logging.info('Iperf Results:')
 
-  # Send traffic in both directions
-  for protocol in FLAGS.iperf_tests:
+  for protocol in FLAGS.iperf_benchmarks:
     for thread_count in FLAGS.iperf_sending_thread_count:
+      # Send traffic in both directions
       for sending_vm, receiving_vm in vms, reversed(vms):
         # Send using external IP addresses
         if vm_util.ShouldRunOnExternalIpAddress():
@@ -553,8 +501,8 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   for vm in vms:
-    if 'TCP' in FLAGS.iperf_tests:
-      vm.RemoteCommand('kill -9 ' + vm.iperf_server_pid, ignore_failure=True)
-    if 'UDP' in FLAGS.iperf_tests:
+    if 'TCP' in FLAGS.iperf_benchmarks:
+      vm.RemoteCommand('kill -9 ' + vm.iperf_tcp_server_pid, ignore_failure=True)
+    if 'UDP' in FLAGS.iperf_benchmarks:
       vm.RemoteCommand('kill -9 ' + vm.iperf_udp_server_pid, ignore_failure=True)
     
