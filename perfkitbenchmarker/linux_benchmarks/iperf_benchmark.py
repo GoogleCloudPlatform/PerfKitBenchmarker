@@ -52,16 +52,7 @@ flags.DEFINE_float('iperf_tcp_per_stream_bandwidth', None,
 
 TCP = 'TCP'
 UDP = 'UDP'
-
 IPERF_BENCHMARKS = [TCP, UDP]
-
-class IperfBenchmarks(object):
-  TCP = 'TCP'
-  UDP = 'UDP'
-
-
-flags.DEFINE_list('iperf_benchmarks', [TCP],
-                  'Run TCP, UDP or both')
 
 flags.register_validator(
     'iperf_benchmarks',
@@ -105,16 +96,16 @@ def Prepare(benchmark_spec):
   for vm in vms:
     vm.Install('iperf')
     if vm_util.ShouldRunOnExternalIpAddress():
-      if 'TCP' in FLAGS.iperf_benchmarks:
+      if TCP in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_PORT)
-      if 'UDP' in FLAGS.iperf_benchmarks:
+      if UDP in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_UDP_PORT)
-    if 'TCP' in FLAGS.iperf_benchmarks:
+    if TCP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(('nohup iperf --server --port %s &> /dev/null'
                                     '& echo $!') % IPERF_PORT)
       # TODO store this in a better place once we have a better place
       vm.iperf_tcp_server_pid = stdout.strip()
-    if 'UDP' in FLAGS.iperf_benchmarks:
+    if UDP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(('nohup iperf --server -u --port %s &> /dev/null'
                                     '& echo $!') % IPERF_UDP_PORT)
       # TODO store this in a better place once we have a better place
@@ -138,7 +129,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     A Sample.
   """
 
-  if protocol == 'TCP':
+  if protocol == TCP:
 
     iperf_cmd = ('iperf -e --client %s --port %s --format m --time %s -P %s' %
                  (receiving_ip_address, IPERF_PORT,
@@ -287,7 +278,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
 
 
-  elif protocol == 'UDP':
+  elif protocol == UDP:
 
     iperf_cmd = ('iperf -e -u --client %s --port %s --format m --time %s -P %s' %
                  (receiving_ip_address, IPERF_UDP_PORT,
@@ -483,7 +474,7 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   for vm in vms:
-    if 'TCP' in FLAGS.iperf_benchmarks:
+    if TCP in FLAGS.iperf_benchmarks:
       vm.RemoteCommand('kill -9 ' + vm.iperf_tcp_server_pid, ignore_failure=True)
-    if 'UDP' in FLAGS.iperf_benchmarks:
+    if UDP in FLAGS.iperf_benchmarks:
       vm.RemoteCommand('kill -9 ' + vm.iperf_udp_server_pid, ignore_failure=True)
