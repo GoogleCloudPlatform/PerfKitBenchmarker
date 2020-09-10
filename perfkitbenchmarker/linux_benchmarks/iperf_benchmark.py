@@ -54,6 +54,9 @@ TCP = 'TCP'
 UDP = 'UDP'
 IPERF_BENCHMARKS = [TCP, UDP]
 
+flags.DEFINE_list('iperf_benchmarks', [TCP],
+                  'Run TCP, UDP or both')
+
 flags.register_validator(
     'iperf_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(IPERF_BENCHMARKS))
