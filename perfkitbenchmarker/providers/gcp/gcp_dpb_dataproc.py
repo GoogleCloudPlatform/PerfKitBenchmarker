@@ -136,6 +136,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       logging.info('Include the requested applications')
       cmd.flags['optional-components'] = ','.join(self.spec.applications)
 
+    # TODO(pclay): stop ignoring spec.master_group?
     for role in ['worker', 'master']:
       # Set machine type
       if self.spec.worker_group.vm_spec.machine_type:
@@ -166,8 +167,12 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    timeout = 900  # 15 min
     # TODO(saksena): Retrieve the cluster create time and hold in a var
-    cmd.Issue(timeout=900)  # 15 min
+    _, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    if retcode:
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      raise errors.Resource.CreationError(stderr)
 
   def _PostCreate(self):
     """Get the cluster's data and tag it."""
