@@ -41,11 +41,11 @@ flags.DEFINE_integer('iperf_timeout', None,
                      'killing iperf client command.',
                      lower_bound=1)
 flags.DEFINE_float('iperf_udp_per_stream_bandwidth', None,
-                   'In Mbits. iperf will attempt to send at this bandwidth for UDP tests. '
+                   'In Mbits. Iperf will attempt to send at this bandwidth for UDP tests. '
                    'If using multiple streams, each stream will '
                    'attempt to send at this bandwidth')
 flags.DEFINE_float('iperf_tcp_per_stream_bandwidth', None,
-                   'In Mbits. iperf will attempt to send at this bandwidth for TCP tests. '
+                   'In Mbits. Iperf will attempt to send at this bandwidth for TCP tests. '
                    'If using multiple streams, each stream will '
                    'attempt to send at this bandwidth')
 
