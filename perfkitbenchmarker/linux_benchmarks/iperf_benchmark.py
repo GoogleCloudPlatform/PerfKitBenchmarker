@@ -28,9 +28,10 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
-flag_util.DEFINE_integerlist('iperf_sending_thread_count', flag_util.IntegerList([1]),
+flag_util.DEFINE_integerlist('iperf_sending_thread_count',
+                             flag_util.IntegerList([1]),
                              'server for sending traffic. Iperf'
-                             'will run once for each value in the list', 
+                             'will run once for each value in the list',
                              module_name=__name__)
 flags.DEFINE_integer('iperf_runtime_in_seconds', 60,
                      'Number of seconds to run iperf.',
@@ -114,14 +115,17 @@ def Prepare(benchmark_spec):
 
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
-def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count, ip_type, protocol):
+def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
+              ip_type, protocol):
   """Run iperf using sending 'vm' to connect to 'ip_address'.
 
   Args:
     sending_vm: The VM sending traffic.
     receiving_vm: The VM receiving traffic.
     receiving_ip_address: The IP address of the iperf server (ie the receiver).
+    thread_count: The number of threads the server will use.
     ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
+    protocol: The protocol for Iperf to use. Either 'TCP' or 'UDP'
   Returns:
     A Sample.
   """
