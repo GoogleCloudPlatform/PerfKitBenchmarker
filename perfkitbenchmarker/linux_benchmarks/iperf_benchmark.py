@@ -189,11 +189,11 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       write_err = re.findall('\d+ Mbits\/sec\s+(\d+\/\d+)', str(multi_thread))
       #print(f"write: {str(write_err)[0]}")
       write_re = re.findall('\d+', str(write_err))
-      write = float(write_re[0])
-      err = float(write_re[1])
+      write = int(write_re[0])
+      err = int(write_re[1])
       # Retry
       retry_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+(\d+)', str(multi_thread))
-      retry = float(retry_re[0])
+      retry = int(retry_re[0])
 
       # Cwnd
       cwnd_rtt = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+\w+\-*/\d+\s+\w+)', stdout)
@@ -237,12 +237,12 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       #Write and Err
       write_err = re.findall('\d+ Mbits\/sec\s+(\d+\/\d+)', str(stdout))
       write_re = re.findall('\d+', str(write_err))
-      write = float(write_re[0])
-      err = float(write_re[1])
+      write = int(write_re[0])
+      err = int(write_re[1])
 
       # Retry
       retry_re = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+(\d+)', str(stdout))
-      retry = float(retry_re[0])
+      retry = int(retry_re[0])
 
       # Cwnd
       cwnd_rtt = re.findall('\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+\w+\-*/\d+\s+\w+)',stdout)
@@ -386,8 +386,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       #Write and Err
       write_err = re.findall('\d+\s+Mbits\/sec\s+(\d+\/\d+)', str(stdout))
       write_re = re.findall('\d+', str(write_err))
-      write = float(write_re[0])
-      err = float(write_re[1])
+      write = int(write_re[0])
+      err = int(write_re[1])
 
       # pps
       pps = re.findall('(\d+)\s+pps', str(stdout))
