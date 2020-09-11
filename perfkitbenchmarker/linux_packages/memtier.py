@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import json
+import logging
 import re
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -135,6 +136,23 @@ def Load(client_vm, server_ip, server_port):
       '--key-maximum', str(FLAGS.memtier_requests),
       '-n', 'allkeys']
   client_vm.RemoteCommand(' '.join(cmd))
+
+
+def RunOverAllThreadsAndPipelines(client_vm, server_ip, server_port):
+  """Runs memtier over all pipeline and thread combinations."""
+  samples = []
+  for pipeline in FLAGS.memtier_pipeline:
+    for client_thread in FLAGS.memtier_threads:
+      logging.info(
+          'Start benchmarking memcached using memtier:\n'
+          '\tmemtier threads: %s'
+          '\tmemtier pipeline, %s',
+          client_thread, pipeline)
+      tmp_samples = Run(
+          client_vm, server_ip, server_port,
+          client_thread, pipeline)
+      samples.extend(tmp_samples)
+  return samples
 
 
 def Run(vm, server_ip, server_port, threads, pipeline):
