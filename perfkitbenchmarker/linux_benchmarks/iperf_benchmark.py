@@ -146,32 +146,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                          timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
-    # Example output from iperf that needs to be parsed
-    # STDOUT: ------------------------------------------------------------
-    # Client connecting to 10.237.229.201, TCP port 5001
-    # TCP window size: 0.04 MByte (default)
-    # ------------------------------------------------------------
-    # [  6] local 10.76.234.115 port 53527 connected with 10.237.229.201 port 5001
-    # [  3] local 10.76.234.115 port 53524 connected with 10.237.229.201 port 5001
-    # [  4] local 10.76.234.115 port 53525 connected with 10.237.229.201 port 5001
-    # [  5] local 10.76.234.115 port 53526 connected with 10.237.229.201 port 5001
-    # [ ID] Interval       Transfer     Bandwidth
-    # [  4]  0.0-60.0 sec  3730 MBytes  521.1 Mbits/sec
-    # [  5]  0.0-60.0 sec  3499 MBytes   489 Mbits/sec
-    # [  6]  0.0-60.0 sec  3044 MBytes   425 Mbits/sec
-    # [  3]  0.0-60.0 sec  3738 MBytes   522 Mbits/sec
-    # [SUM]  0.0-60.0 sec  14010 MBytes  1957 Mbits/sec
-
-    # NEW OUTPUT
-    #   ------------------------------------------------------------
-    # Client connecting to 172.17.0.5, TCP port 20000 with pid 4167
-    # Write buffer size: 0.12 MByte
-    # TCP window size: 1.42 MByte (default)
-    # ------------------------------------------------------------
-    # [  3] local 172.17.0.6 port 45518 connected with 172.17.0.5 port 20000 (ct=0.08 ms)
-    # [ ID] Interval        Transfer    Bandwidth       Write/Err  Rtry     Cwnd/RTT        NetPwr
-    # [  3] 0.00-60.00 sec  236112 MBytes  33011 Mbits/sec  1888894/0          0       -1K/25 us  165054051.49
-
     multi_thread = re.findall(r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+\d+\s\w+\s+\d+\s\w+\/\w+\s+\d+\/\d+\s+\d+\s+', stdout)
     window_size = re.findall(r'TCP window size: \d+\.\d+ \S+', stdout)
     buffer_size_re = re.findall(r'Write buffer size: \d+\.\d+ \S+', stdout)
@@ -297,43 +271,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                          timeout=FLAGS.iperf_runtime_in_seconds +
                                          timeout_buffer)
-
-    # Client connecting to 35.245.145.216, UDP port 25000 with pid 10286
-    # Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
-    # UDP buffer size: 0.20 MByte (default)
-    # ------------------------------------------------------------
-    # [  3] local 10.128.0.2 port 41821 connected with 35.245.145.216 port 25000
-    # [ ID] Interval        Transfer     Bandwidth      Write/Err  PPS
-    # [  3] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
-    # [  3] Sent 5350 datagrams
-    # [  3] Server Report:
-    # [  3]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.289 ms    0/ 5350 (0%)
-
-
-    # ------------------------------------------------------------
-    # Client connecting to 35.245.176.237, UDP port 25000 with pid 10171
-    # Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
-    # UDP buffer size: 0.20 MByte (default)
-    # ------------------------------------------------------------
-    # [  5] local 10.128.0.2 port 52277 connected with 35.245.176.237 port 25000
-    # [  3] local 10.128.0.2 port 51332 connected with 35.245.176.237 port 25000
-    # [  4] local 10.128.0.2 port 53360 connected with 35.245.176.237 port 25000
-    # [ ID] Interval        Transfer     Bandwidth      Write/Err  PPS
-    # [  5] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
-    # [  5] Sent 5350 datagrams
-    # [  3] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
-    # [  3] Sent 5350 datagrams
-    # [  4] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
-    # [  4] Sent 5350 datagrams
-    # [SUM] 0.00-60.00 sec  22.5 MBytes  3.15 Mbits/sec  16050/0      267 pps
-    # [SUM] Sent 16050 datagrams
-    # [  5] Server Report:
-    # [  5]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.087 ms    0/ 5350 (0%)
-    # [  3] Server Report:
-    # [  3]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.085 ms    1/ 5350 (0.019%)
-    # [  4] Server Report:
-    # [  4]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.058 ms    0/ 5350 (0%)
-    # [  4] 0.00-60.00 sec  1 datagrams received out-of-order
 
     multi_thread = re.findall(r'\[SUM\]\s\d+\.?\d+-\d+\.?\d+\ssec\s+\d+\.?\d+\s+MBytes\s+\d+\.?\d+\s+Mbits\/sec\s+\d+\/\d+\s+\d+\s+pps', stdout)
 
