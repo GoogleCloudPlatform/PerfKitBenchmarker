@@ -32,10 +32,6 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
   def testIperfParseResults(self):
 
-    FLAGS.iperf_sending_thread_count = [1,2]
-    FLAGS.iperf_benchmarks = ['UDP', 'TCP']
-    FLAGS.iperf_runtime_in_seconds = 60
-
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
