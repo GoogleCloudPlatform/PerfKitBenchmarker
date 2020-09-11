@@ -316,10 +316,9 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
     benchmark: The module for retrieving the associated service account file.
   """
   if not FLAGS.gcp_service_account_key_file:
-    raise errors.Setup.InvalidFlagConfigurationError('Authentication requires '
-                                                     'the service account '
-                                                     'credential json to be '
-                                                     'specified.')
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Authentication requires the service account credential json to be '
+        'specified via --gcp_service_account_key_file.')
   if '/' in FLAGS.gcp_service_account_key_file:
     vm.PushFile(FLAGS.gcp_service_account_key_file, vm_util.VM_TMP_DIR)
     key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
