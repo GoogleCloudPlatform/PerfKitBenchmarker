@@ -92,9 +92,7 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   if len(vms) != 2:
-    raise ValueError(
-        'iperf benchmark requires exactly two machines, found {0}'.format(len(
-            vms)))
+    raise ValueError(f'iperf benchmark requires exactly two machines, found {len(vms)}')
 
   for vm in vms:
     vm.Install('iperf')
@@ -104,16 +102,16 @@ def Prepare(benchmark_spec):
       if UDP in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_UDP_PORT)
     if TCP in FLAGS.iperf_benchmarks:
-      stdout, _ = vm.RemoteCommand(('nohup iperf --server --port %s &> /dev/null'
-                                    '& echo $!') % IPERF_PORT)
+      stdout, _ = vm.RemoteCommand(f'nohup iperf --server --port {IPERF_PORT}'
+                                   ' &> /dev/null & echo $!')
+
       # TODO store this in a better place once we have a better place
       vm.iperf_tcp_server_pid = stdout.strip()
     if UDP in FLAGS.iperf_benchmarks:
-      stdout, _ = vm.RemoteCommand(('nohup iperf --server -u --port %s &> /dev/null'
-                                    '& echo $!') % IPERF_UDP_PORT)
+      stdout, _ = vm.RemoteCommand(f'nohup iperf --server -u --port {IPERF_UDP_PORT}'
+                                   ' &> /dev/null & echo $!')
       # TODO store this in a better place once we have a better place
       vm.iperf_udp_server_pid = stdout.strip()
-
 
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
@@ -134,12 +132,18 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
   if protocol == TCP:
 
-    iperf_cmd = ('iperf -e --client %s --port %s --format m --time %s -P %s' %
-                 (receiving_ip_address, IPERF_PORT,
-                  FLAGS.iperf_runtime_in_seconds,
-                  thread_count))
+    # iperf_cmd = ('iperf -e --client %s --port %s --format m --time %s -P %s' %
+    #              (receiving_ip_address, IPERF_PORT,
+    #               FLAGS.iperf_runtime_in_seconds,
+    #               thread_count))
+
+    iperf_cmd = ( f'iperf -e --client {receiving_ip_address} --port {IPERF_PORT} '
+                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} -P {thread_count}')
+
+
     if FLAGS.iperf_tcp_per_stream_bandwidth:
-      iperf_cmd = iperf_cmd + (' -b %dM' % FLAGS.iperf_tcp_per_stream_bandwidth)
+      iperf_cmd += f' -b {FLAGS.iperf_tcp_per_stream_bandwidth}M'
+
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
@@ -148,11 +152,18 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
     multi_thread = re.findall(r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+\d+\s\w+\s+\d+\s\w+\/\w+\s+\d+\/\d+\s+\d+\s+', stdout)
     window_size = re.findall(r'TCP window size: \d+\.\d+ \S+', stdout)
+
+    window_size_match = re.search(r'TCP window size: (?P<size>\d+\.\d+) (?P<units>\S+)', stdout) 
+
+    if window_size_match:
+       window_size_num = float(window_size_match.group('size'))
+       window_size_measurement = window_size.match.group('units')
+
     buffer_size_re = re.findall(r'Write buffer size: \d+\.\d+ \S+', stdout)
     buffer_size = re.findall(r'\d+\.\d+', str(buffer_size_re))
     buffer_size_num = float(buffer_size[0])
     # buffer_size_unit = re.findall(r'\d+\.\d+ (\S+)', buffer_size_re[0])
-    window_size_num = (re.findall(r'\d+\.\d+', str(window_size)))
+    window_size_num = re.findall(r'\d+\.\d+', str(window_size))
     window_size_num = float(window_size_num[0])
     window_size_measurement = re.findall(r'\d+\.\d+ (\S+)', window_size[0])
     window_size_measurement = window_size_measurement[0]
@@ -225,9 +236,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
 
       if len(thread_values) != thread_count:
-        raise ValueError('Only %s out of %s iperf threads reported a'
-                         ' throughput value.' %
-                         (len(thread_values), thread_count))
+        raise ValueError(f'Only {len(thread_values)} out of {thread_count}'
+                         ' iperf threads reported a throughput value.')
 
     total_throughput = 0.0
     for value in thread_values:
@@ -249,22 +259,24 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         'retry': retry,
         'cwnd': cwnd,
         'rtt': rtt,
-        'rtt_unit': rtt_unit,
+        'rtt_unit': rtt_unit
         'netpwr': netpwr
     }
     return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
 
-
   elif protocol == UDP:
 
-    iperf_cmd = ('iperf -e -u --client %s --port %s --format m --time %s -P %s' %
-                 (receiving_ip_address, IPERF_UDP_PORT,
-                  FLAGS.iperf_runtime_in_seconds,
-                  thread_count))
+    # iperf_cmd = ('iperf -e -u --client %s --port %s --format m --time %s -P %s' %
+    #              (receiving_ip_address, IPERF_UDP_PORT,
+    #               FLAGS.iperf_runtime_in_seconds,
+    #               thread_count))
+
+    iperf_cmd = ( f'iperf -e -u --client {receiving_ip_address} --port {IPERF_UDP_PORT} '
+                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} -P {thread_count}')
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
-      iperf_cmd = iperf_cmd + (' -b %dM' % FLAGS.iperf_udp_per_stream_bandwidth)
-      
+      iperf_cmd += f' -b {FLAGS.iperf_udp_per_stream_bandwidth}M'
+
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
@@ -331,9 +343,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec\s+\d+\/\d+', stdout)
 
       if len(thread_values) != thread_count:
-        raise ValueError('Only %s out of %s iperf threads reported a'
-                         ' throughput value.' %
-                         (len(thread_values), thread_count))
+        raise ValueError(f'Only {len(thread_values)} out of {thread_count} iperf threads reported a'
+                         ' throughput value.')
 
     total_throughput = 0.0
     for value in thread_values:
@@ -415,6 +426,6 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   for vm in vms:
     if TCP in FLAGS.iperf_benchmarks:
-      vm.RemoteCommand('kill -9 ' + vm.iperf_tcp_server_pid, ignore_failure=True)
+      vm.RemoteCommand(f'kill -9 {vm.iperf_tcp_server_pid}', ignore_failure=True)
     if UDP in FLAGS.iperf_benchmarks:
-      vm.RemoteCommand('kill -9 ' + vm.iperf_udp_server_pid, ignore_failure=True)
+      vm.RemoteCommand(f'kill -9 {vm.iperf_udp_server_pid}', ignore_failure=True)
