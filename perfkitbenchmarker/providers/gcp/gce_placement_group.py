@@ -105,14 +105,15 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     placement_policy = {
         'format': 'json',
         'region': self.region,
-        'vm-count': self.num_vms
     }
 
     if self.style == placement_group.PLACEMENT_GROUP_CLUSTER:
       placement_policy['collocation'] = 'COLLOCATED'
+      placement_policy['vm-count'] = self.num_vms
 
     elif self.style == placement_group.PLACEMENT_GROUP_SUPERCLUSTER:
       placement_policy['collocation'] = 'CLUSTERED'
+      placement_policy['vm-count'] = self.num_vms
       # Only alpha API supported for CLUSTERED.
       cmd = gcp_util.GcloudCommand(self, 'alpha', 'compute',
                                    'resource-policies', 'create',
