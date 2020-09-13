@@ -172,8 +172,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     match = re.findall(r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+)(\w+)\/(\d+)\s+(\w+)\s+(\d+\.\d+)', stdout)
 
     cwnd = sum(float(i[0]) for i in match)/len(match)
-    rtt = sum(float(i[2]) for i in match)/len(match)
-    netpwr = sum(float(i[4]) for i in match)/len(match)
+    rtt = round(sum(float(i[2]) for i in match)/len(match), 2)
+    netpwr = round(sum(float(i[4]) for i in match)/len(match),2)
 
     cwnd_unit = match[0][1]
     rtt_unit = match[0][3]
