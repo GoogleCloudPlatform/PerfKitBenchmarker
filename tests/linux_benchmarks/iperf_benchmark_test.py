@@ -29,7 +29,6 @@ FLAGS = flags.FLAGS
 
 class IperfBenchmarkTestCase(unittest.TestCase):
 
-
   def testIperfParseResults(self):
 
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
@@ -42,61 +41,105 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
     for vm in vm_spec.vms:
       vm.RemoteCommand.side_effect = [(i, '') for i in iperf_stdout_list]
+      vm.machine_type = 'mock_machine_1'
+      vm.zone = 'antarctica-1a'
 
     results1 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 1, 'INTERNAL', 'UDP')
     results2 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 2, 'INTERNAL', 'UDP')
     results3 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 1, 'INTERNAL', 'TCP')
     results4 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 2, 'INTERNAL', 'TCP')
 
+    expected_results1 = {
+        'receiving_machine_type': 'mock_machine_1',
+        'receiving_zone': 'antarctica-1a',
+        'sending_machine_type': 'mock_machine_1',
+        'sending_thread_count': 1,
+        'sending_zone': 'antarctica-1a',
+        'runtime_in_seconds': 60,
+        'ip_type': 'INTERNAL',
+        'buffer_size': 0.20,
+        'datagram_size_bytes': 1470,
+        'write': 5350,
+        'err': 0,
+        'pps': 89,
+        'ipg_target': 11215.21,
+        'ipg_target_unit': 'us',
+        'jitter': 0.017,
+        'jitter_unit': 'ms',
+        'lost_datagrams': 0,
+        'total_datagrams': 5350,
+        'out_of_order_datagrams': 0
+    }
+
+    expected_results2 = {
+        'receiving_machine_type': 'mock_machine_1',
+        'receiving_zone': 'antarctica-1a',
+        'sending_machine_type': 'mock_machine_1',
+        'sending_thread_count': 2,
+        'sending_zone': 'antarctica-1a',
+        'runtime_in_seconds': 60,
+        'ip_type': 'INTERNAL',
+        'buffer_size': 0.20,
+        'datagram_size_bytes': 1470,
+        'write': 10700,
+        'err': 0,
+        'pps': 178,
+        'ipg_target': 11215.21,
+        'ipg_target_unit': 'us',
+        'jitter': 0.0325,
+        'jitter_unit': 'ms',
+        'lost_datagrams': 1,
+        'total_datagrams': 10700,
+        'out_of_order_datagrams': 1
+    }
+
+    expected_results3 = {
+        'receiving_machine_type': 'mock_machine_1',
+        'receiving_zone': 'antarctica-1a',
+        'sending_machine_type': 'mock_machine_1',
+        'sending_thread_count': 1,
+        'sending_zone': 'antarctica-1a',
+        'runtime_in_seconds': 60,
+        'ip_type': 'INTERNAL',
+        'buffer_size': 0.12,
+        'tcp_window_size': 1.67,
+        'write': 112505,
+        'err': 0,
+        'retry': 0,
+        'cwnd': -1,
+        'rtt': 1346,
+        'rtt_unit': 'us',
+        'netpwr': 182579.69
+    }
+
+    expected_results4 = {
+        'receiving_machine_type': 'mock_machine_1',
+        'receiving_zone': 'antarctica-1a',
+        'sending_machine_type': 'mock_machine_1',
+        'sending_thread_count': 2,
+        'sending_zone': 'antarctica-1a',
+        'runtime_in_seconds': 60,
+        'ip_type': 'INTERNAL',
+        'buffer_size': 0.12,
+        'tcp_window_size': 0.17,
+        'write': 112760,
+        'err': 0,
+        'retry': 0,
+        'cwnd': -1,
+        'rtt': 183.5,
+        'rtt_unit': 'us',
+        'netpwr': 736102.93
+    }
+
+    self.assertEqual(expected_results1, results1.metadata)
+    self.assertEqual(expected_results2, results2.metadata)
+    self.assertEqual(expected_results3, results3.metadata)
+    self.assertEqual(expected_results4, results4.metadata)
+
     self.assertEqual(results1.value, 1.05)
-    self.assertEqual(results1.metadata['buffer_size'], 0.20)
-    self.assertEqual(results1.metadata['datagram_size_bytes'], 1470)
-    self.assertEqual(results1.metadata['write'], 5350)
-    self.assertEqual(results1.metadata['err'], 0)
-    self.assertEqual(results1.metadata['pps'], 89)
-    self.assertEqual(results1.metadata['ipg_target'], 11215.21)
-    self.assertEqual(results1.metadata['ipg_target_unit'], 'us')
-    self.assertEqual(results1.metadata['jitter'], 0.017)
-    self.assertEqual(results1.metadata['jitter_unit'], 'ms')
-    self.assertEqual(results1.metadata['lost_datagrams'], 0)
-    self.assertEqual(results1.metadata['total_datagrams'], 5350)
-    self.assertEqual(results1.metadata['out_of_order_datagrams'], 0)
-
     self.assertEqual(results2.value, 2.10)
-    self.assertEqual(results2.metadata['buffer_size'], 0.20)
-    self.assertEqual(results2.metadata['datagram_size_bytes'], 1470)
-    self.assertEqual(results2.metadata['write'], 10700)
-    self.assertEqual(results2.metadata['err'], 0)
-    self.assertEqual(results2.metadata['pps'], 178)
-    self.assertEqual(results2.metadata['ipg_target'], 11215.21)
-    self.assertEqual(results2.metadata['ipg_target_unit'], 'us')
-    self.assertEqual(results2.metadata['jitter'], 0.0325)
-    self.assertEqual(results2.metadata['jitter_unit'], 'ms')
-    self.assertEqual(results2.metadata['lost_datagrams'], 1)
-    self.assertEqual(results2.metadata['total_datagrams'], 10700)
-    self.assertEqual(results2.metadata['out_of_order_datagrams'], 1)
-
     self.assertEqual(results3.value, 1966.0)
-    self.assertEqual(results3.metadata['buffer_size'], 0.12)
-    self.assertEqual(results3.metadata['tcp_window_size'], 1.67)
-    self.assertEqual(results3.metadata['write'], 112505)
-    self.assertEqual(results3.metadata['err'], 0)
-    self.assertEqual(results3.metadata['retry'], 0)
-    self.assertEqual(results3.metadata['cwnd'], -1)
-    self.assertEqual(results3.metadata['rtt'], 1346)
-    self.assertEqual(results3.metadata['rtt_unit'], 'us')
-    self.assertEqual(results3.metadata['netpwr'], 182579.69)
-
     self.assertEqual(results4.value, 1970.0)
-    self.assertEqual(results4.metadata['buffer_size'], 0.12)
-    self.assertEqual(results4.metadata['tcp_window_size'], 0.17)
-    self.assertEqual(results4.metadata['write'], 112760)
-    self.assertEqual(results4.metadata['err'], 0)
-    self.assertEqual(results4.metadata['retry'], 0)
-    self.assertEqual(results4.metadata['cwnd'], -1)
-    self.assertEqual(results4.metadata['rtt'], 183.5)
-    self.assertEqual(results4.metadata['rtt_unit'], 'us')
-    self.assertEqual(results4.metadata['netpwr'], 736102.93)
 
 if __name__ == '__main__':
   unittest.main()
