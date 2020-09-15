@@ -198,6 +198,8 @@ flags.DEFINE_float('ycsb_dynamic_load_sustain_throughput_ratio', 0.95,
 flags.DEFINE_integer('ycsb_dynamic_load_sustain_timelimit', 300,
                      'Run duration in seconds for each throughput target '
                      'if we have already reached sustained throughput.')
+flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
+                     'Sleep duration in seconds between load and run stage.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -1337,6 +1339,10 @@ class YCSBExecutor(object):
       load_samples += list(self._LoadThreaded(
           vms, workloads[0], **(load_kwargs or {})))
       self.loaded = True
+    if FLAGS.ycsb_sleep_after_load_in_sec > 0:
+      logging.info('Sleeping %s seconds after load stage.',
+                   FLAGS.ycsb_sleep_after_load_in_sec)
+      time.sleep(FLAGS.ycsb_sleep_after_load_in_sec)
     if FLAGS.ycsb_load_samples:
       return load_samples
     else:
@@ -1346,8 +1352,14 @@ class YCSBExecutor(object):
     """Runs each workload/client count combination."""
     workloads = workloads or _GetWorkloadFileList()
     assert workloads, 'no workloads'
-    return list(self.RunStaircaseLoads(vms, workloads,
-                                       **(run_kwargs or {})))
+    samples = list(self.RunStaircaseLoads(vms, workloads,
+                                          **(run_kwargs or {})))
+    if (FLAGS.ycsb_sleep_after_load_in_sec > 0 and
+        not FLAGS.ycsb_skip_load_stage):
+      for s in samples:
+        s.metadata[
+            'sleep_after_load_in_sec'] = FLAGS.ycsb_sleep_after_load_in_sec
+    return samples
 
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):
     """Load data using YCSB, then run each workload/client count combination.
