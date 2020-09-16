@@ -137,24 +137,32 @@ def RunLoad(redis_vm, load_vm, threads, port, test_id):
     test_id: test id to differentiate between tests.
   Returns:
     A throughput, latency tuple, or None if threads was 0.
+  Raises:
+    Exception:  If an invalid combination of FLAGS is specified.
   """
   if threads == 0:
     return None
+
+  if len(FLAGS.memtier_pipeline) != 1:
+    raise Exception('Only one memtier pipeline is supported.  '
+                    'Passed in {0}'.format(FLAGS.memtier_pipeline))
+  memtier_pipeline = FLAGS.memtier_pipeline[0]
+
   base_cmd = ('memtier_benchmark -s %s  -p %d  -d %s '
               '--ratio %s --key-pattern %s --pipeline %d -c 1 -t %d '
               '--test-time %d --random-data --key-minimum %d '
               '--key-maximum %d > %s ;')
   final_cmd = (base_cmd % (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
                            FLAGS.redis_setgetratio, FLAGS.memtier_key_pattern,
-                           FLAGS.memtier_pipeline, threads, 10, START_KEY,
+                           memtier_pipeline, threads, 10, START_KEY,
                            FLAGS.memtier_requests, '/dev/null') +
                base_cmd % (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
                            FLAGS.redis_setgetratio, FLAGS.memtier_key_pattern,
-                           FLAGS.memtier_pipeline, threads, 20, START_KEY,
+                           memtier_pipeline, threads, 20, START_KEY,
                            FLAGS.memtier_requests, 'outfile-%d' % test_id) +
                base_cmd % (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
                            FLAGS.redis_setgetratio, FLAGS.memtier_key_pattern,
-                           FLAGS.memtier_pipeline, threads, 10, START_KEY,
+                           memtier_pipeline, threads, 10, START_KEY,
                            FLAGS.memtier_requests, '/dev/null'))
 
   load_vm.RemoteCommand(final_cmd)
