@@ -108,7 +108,7 @@ def Prepare(benchmark_spec):
       # TODO store this in a better place once we have a better place
       vm.iperf_tcp_server_pid = stdout.strip()
     if UDP in FLAGS.iperf_benchmarks:
-      stdout, _ = vm.RemoteCommand(f'nohup iperf --server -u --port {IPERF_UDP_PORT}'
+      stdout, _ = vm.RemoteCommand(f'nohup iperf --server --udp --port {IPERF_UDP_PORT}'
                                    ' &> /dev/null & echo $!')
       # TODO store this in a better place once we have a better place
       vm.iperf_udp_server_pid = stdout.strip()
@@ -130,13 +130,24 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     A Sample.
   """
 
+  metadata = {
+      # The meta data defining the environment
+      'receiving_machine_type': receiving_vm.machine_type,
+      'receiving_zone': receiving_vm.zone,
+      'sending_machine_type': sending_vm.machine_type,
+      'sending_thread_count': thread_count,
+      'sending_zone': sending_vm.zone,
+      'runtime_in_seconds': FLAGS.iperf_runtime_in_seconds,
+      'ip_type': ip_type,
+  }
+
   if protocol == TCP:
 
-    iperf_cmd = ( f'iperf -e --client {receiving_ip_address} --port {IPERF_PORT} '
-                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} -P {thread_count}')
+    iperf_cmd = ( f'iperf --enhancedreports --client {receiving_ip_address} --port {IPERF_PORT} '
+                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} --parallel {thread_count}')
 
     if FLAGS.iperf_tcp_per_stream_bandwidth:
-      iperf_cmd += f' -b {FLAGS.iperf_tcp_per_stream_bandwidth}M'
+      iperf_cmd += f' --bandwidth {FLAGS.iperf_tcp_per_stream_bandwidth}M'
 
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
@@ -144,16 +155,16 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                          timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
-    multi_thread = re.search((r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+(?P<transfer>\d+)\s\w+\s+(?P<throughput>\d+)'
-                              r'\s\w+\/\w+\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s*'),
-                             stdout)
-
     window_size_match = re.search(r'TCP window size: (?P<size>\d+\.?\d+) (?P<units>\S+)', stdout) 
     window_size = float(window_size_match.group('size'))
     window_size_unit = window_size_match.group('units')
 
     buffer_size = float(re.search(r'Write buffer size: (?P<buffer_size>\d+\.\d+) \S+', stdout).group('buffer_size'))
 
+
+    multi_thread = re.search((r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+(?P<transfer>\d+)\s\w+\s+(?P<throughput>\d+)'
+                              r'\s\w+\/\w+\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s*'),
+                             stdout)
     # Iperf output is formatted differently when running with multiple threads vs a single thread
     if multi_thread:
       # Write, error, retry
@@ -169,8 +180,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       err = int(match.group('err'))
       retry = int(match.group('retry'))
 
-    match = re.findall(r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(-*\d+)(\w+)\/(\d+)\s+(\w+)\s+(\d+\.\d+)', stdout)
-
+    match = re.findall((r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)\/(?P<rtt>\d+)'
+                        r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'), stdout)
     cwnd = sum(float(i[0]) for i in match)/len(match)
     rtt = round(sum(float(i[2]) for i in match)/len(match), 2)
     netpwr = round(sum(float(i[4]) for i in match)/len(match),2)
@@ -193,34 +204,28 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     for value in thread_values:
       total_throughput += float(value)
 
-    metadata = {
-        # The meta data defining the environment
-        'receiving_machine_type': receiving_vm.machine_type,
-        'receiving_zone': receiving_vm.zone,
-        'sending_machine_type': sending_vm.machine_type,
-        'sending_thread_count': thread_count,
-        'sending_zone': sending_vm.zone,
-        'runtime_in_seconds': FLAGS.iperf_runtime_in_seconds,
-        'ip_type': ip_type,
+    tcp_metadata = {
         'buffer_size': buffer_size,
         'tcp_window_size': window_size,
-        'write': write,
-        'err': err,
-        'retry': retry,
-        'cwnd': cwnd,
+        'write_packet_count': write,
+        'err_packet_count': err,
+        'retry_packet_count': retry,
+        'congestion_window': cwnd,
         'rtt': rtt,
         'rtt_unit': rtt_unit,
         'netpwr': netpwr
     }
+    metadata.update(tcp_metadata)
     return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
 
   elif protocol == UDP:
 
-    iperf_cmd = ( f'iperf -e -u --client {receiving_ip_address} --port {IPERF_UDP_PORT} '
-                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} -P {thread_count}')
+    # -e 
+    iperf_cmd = ( f'iperf --enhancedreports --udp --client {receiving_ip_address} --port {IPERF_UDP_PORT} '
+                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} --parallel {thread_count}')
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
-      iperf_cmd += f' -b {FLAGS.iperf_udp_per_stream_bandwidth}M'
+      iperf_cmd += f' --bandwidth {FLAGS.iperf_udp_per_stream_bandwidth}M'
 
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
@@ -229,10 +234,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
                                          timeout=FLAGS.iperf_runtime_in_seconds +
                                          timeout_buffer)
 
-    multi_thread = re.search((r'\[SUM\]\s\d+\.?\d+-\d+\.?\d+\ssec\s+\d+\.?\d+\s+MBytes\s+\d+\.?\d+'
-                              r'\s+Mbits\/sec\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<pps>\d+)\s+pps'),
-                             stdout)
-
     match = re.search(r'UDP buffer size: (?P<buffer_size>\d+\.\d+)\s+(?P<buffer_unit>\w+)', stdout)
     buffer_size = float(match.group('buffer_size'))
     buffer_size_unit = match.group('buffer_unit')
@@ -240,6 +241,9 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     ipg_target = float(re.findall(r'IPG\starget:\s(\d+.?\d+)', stdout)[0])
     ipg_target_unit = str(re.findall(r'IPG\starget:\s\d+.?\d+\s(\S+)\s', stdout)[0])
 
+    multi_thread = re.search((r'\[SUM\]\s\d+\.?\d+-\d+\.?\d+\ssec\s+\d+\.?\d+\s+MBytes\s+\d+\.?\d+'
+                              r'\s+Mbits\/sec\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<pps>\d+)\s+pps'),
+                             stdout)
     if multi_thread:
       # Write, Err, PPS
       write = int(multi_thread.group('write'))
@@ -254,14 +258,14 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       pps = int(match.group('pps'))
 
     # Jitter
-    jitter_array = re.findall(r'Mbits\/sec\s+(\d+\.?\d+)\s+[a-zA-Z]+', stdout)
+    jitter_array = re.findall(r'Mbits\/sec\s+(?P<jitter>\d+\.?\d+)\s+[a-zA-Z]+', stdout)
     jitter_avg = sum(float(x) for x in jitter_array) / len(jitter_array)
 
     jitter_unit = str(re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+([a-zA-Z]+)', stdout)[0])
 
     # total and lost datagrams
-    lost_datagrams_array = re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+(\d+)\/\s+\d+\s+\(', stdout)
-    total_datagrams_array = re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+\d+\/\s+(\d+)+\s+\(', stdout)
+    lost_datagrams_array = re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+(?P<lost_datagrams>\d+)\/\s+\d+\s+\(', stdout)
+    total_datagrams_array = re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+\d+\/\s+(?P<total_datagrams>\d+)+\s+\(', stdout)
 
     lost_datagrams_sum = sum(int(x) for x in lost_datagrams_array)
     total_datagrams_sum = sum(int(x) for x in total_datagrams_array)
@@ -287,20 +291,12 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     for value in thread_values:
       total_throughput += float(value)
 
-    metadata = {
-        # The meta data defining the environment
-        'receiving_machine_type': receiving_vm.machine_type,
-        'receiving_zone': receiving_vm.zone,
-        'sending_machine_type': sending_vm.machine_type,
-        'sending_thread_count': thread_count,
-        'sending_zone': sending_vm.zone,
-        'runtime_in_seconds': FLAGS.iperf_runtime_in_seconds,
-        'ip_type': ip_type,
+    udp_metadata = {
         'buffer_size': buffer_size,
         'datagram_size_bytes': datagram_size,
-        'write': write,
-        'err': err,
-        'pps': pps,
+        'write_packet_count': write,
+        'err_packet_count': err,
+        'packets_per_second': pps,
         'ipg_target': ipg_target,
         'ipg_target_unit': ipg_target_unit,
         'jitter': jitter_avg,
@@ -309,6 +305,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         'total_datagrams': total_datagrams_sum,
         'out_of_order_datagrams': out_of_order_sum
     }
+    metadata.update(udp_metadata)
     return sample.Sample('UDP Throughput', total_throughput, 'Mbits/sec', metadata)
 
 
