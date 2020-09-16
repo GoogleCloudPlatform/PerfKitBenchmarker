@@ -29,25 +29,43 @@ FLAGS = flags.FLAGS
 
 class IperfBenchmarkTestCase(unittest.TestCase):
 
-  def testIperfParseResults(self):
+def setUp(self):
+  super(IperfBenchmarkTestCase, self).setUp()
+  # Load data
 
-    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-    vm0 = mock.MagicMock()
-    vm1 = mock.MagicMock()
-    vm_spec.vms = [vm0, vm1]
-    path = os.path.join(os.path.dirname(__file__), '..', 'data', 'iperf_results.txt')
-    outfile = open(path, 'r')
-    iperf_stdout_list = outfile.read().split('#')
+  path = os.path.join(os.path.dirname(__file__), '..', 'data', 'iperf_results.txt')
+  outfile = open(path, 'r')
+  iperf_stdout_list = outfile.read().split('#')
 
-    for vm in vm_spec.vms:
-      vm.RemoteCommand.side_effect = [(i, '') for i in iperf_stdout_list]
-      vm.machine_type = 'mock_machine_1'
-      vm.zone = 'antarctica-1a'
+  self.vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+  vm0 = mock.MagicMock()
+  vm1 = mock.MagicMock()
+  self.vm_spec.vms = [vm0, vm1]
 
-    results1 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 1, 'INTERNAL', 'UDP')
-    results2 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 2, 'INTERNAL', 'UDP')
-    results3 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 1, 'INTERNAL', 'TCP')
-    results4 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 2, 'INTERNAL', 'TCP')
+  for vm in vm_spec.vms:
+    vm.machine_type = 'mock_machine_1'
+    vm.zone = 'antarctica-1a'
+
+
+  def testIperfParseResultsUDPSingleThread(self):
+
+    iperf_output = """
+           Client connecting to 10.128.0.2, UDP port 25000 with pid 10159
+           Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
+           UDP buffer size: 0.20 MByte (default)
+           ------------------------------------------------------------
+           [  3] local 10.128.0.3 port 37350 connected with 10.128.0.2 port 25000
+           [ ID] Interval        Transfer     Bandwidth      Write/Err  PPS
+           [  3] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
+           [  3] Sent 5350 datagrams
+           [  3] Server Report:
+           [  3]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.017 ms    0/ 5350 (0%)
+                   """
+
+    self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
+
+
+    results1 = iperf_benchmark._RunIperf(self.vm_spec.vms[0], self.vm_spec.vms[1], '10.128.0.2', 1, 'INTERNAL', 'UDP')
 
     expected_results1 = {
         'receiving_machine_type': 'mock_machine_1',
@@ -71,6 +89,37 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'out_of_order_datagrams': 0
     }
 
+    self.assertEqual(results1.value, 1.05)
+    self.assertEqual(expected_results1, results1.metadata)
+
+  def testIperfParseResultsUDPMultiThread(self):
+
+    iperf_output = """
+          Client connecting to 10.128.0.2, UDP port 25000 with pid 10188
+          Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
+          UDP buffer size: 0.20 MByte (default)
+          ------------------------------------------------------------
+          [  4] local 10.128.0.3 port 51681 connected with 10.128.0.2 port 25000
+          [  3] local 10.128.0.3 port 58632 connected with 10.128.0.2 port 25000
+          [ ID] Interval        Transfer     Bandwidth      Write/Err  PPS
+          [  3] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
+          [  3] Sent 5350 datagrams
+          [  3] Server Report:
+          [  3]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.026 ms    1/ 5350 (0.019%)
+          [  4] 0.00-60.00 sec  7.50 MBytes  1.05 Mbits/sec  5350/0       89 pps
+          [  4] Sent 5350 datagrams
+          [SUM] 0.00-60.00 sec  15.0 MBytes  2.10 Mbits/sec  10700/0      178 pps
+          [SUM] Sent 10700 datagrams
+          [  4] Server Report:
+          [  4]  0.0-60.0 sec  7.50 MBytes  1.05 Mbits/sec   0.039 ms    0/ 5350 (0%)
+          [  4] 0.00-60.00 sec  1 datagrams received out-of-order
+                   """
+
+    self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
+
+
+    results2 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 2, 'INTERNAL', 'UDP')
+
     expected_results2 = {
         'receiving_machine_type': 'mock_machine_1',
         'receiving_zone': 'antarctica-1a',
@@ -93,6 +142,27 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'out_of_order_datagrams': 1
     }
 
+    self.assertEqual(expected_results2, results2.metadata)
+    self.assertEqual(results2.value, 2.10)
+
+
+
+  def testIperfParseResultsTCPSingleThread(self):
+
+    iperf_output = """
+        Client connecting to 10.128.0.2, TCP port 20000 with pid 10208
+        Write buffer size: 0.12 MByte
+        TCP window size: 1.67 MByte (default)
+        ------------------------------------------------------------
+        [  3] local 10.128.0.3 port 33738 connected with 10.128.0.2 port 20000 (ct=1.62 ms)
+        [ ID] Interval        Transfer    Bandwidth       Write/Err  Rtry     Cwnd/RTT        NetPwr
+        [  3] 0.00-60.00 sec  14063 MBytes  1966 Mbits/sec  112505/0          0       -1K/1346 us  182579.69
+                   """
+
+    self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
+
+    results3 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 1, 'INTERNAL', 'TCP')
+
     expected_results3 = {
         'receiving_machine_type': 'mock_machine_1',
         'receiving_zone': 'antarctica-1a',
@@ -111,6 +181,29 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'rtt_unit': 'us',
         'netpwr': 182579.69
     }
+
+    self.assertEqual(expected_results3, results3.metadata)
+    self.assertEqual(results3.value, 1966.0)
+
+
+  def testIperfParseResultsTCPMultiThread(self):
+
+    iperf_output = """
+        Client connecting to 10.128.0.2, TCP port 20000 with pid 10561
+        Write buffer size: 0.12 MByte
+        TCP window size: 0.17 MByte (default)
+        ------------------------------------------------------------
+        [  4] local 10.128.0.2 port 54718 connected with 10.128.0.3 port 20000 (ct=0.16 ms)
+        [  3] local 10.128.0.2 port 54716 connected with 10.128.0.3 port 20000 (ct=0.30 ms)
+        [ ID] Interval        Transfer    Bandwidth       Write/Err  Rtry     Cwnd/RTT        NetPwr
+        [  4] 0.00-60.01 sec  7047 MBytes   985 Mbits/sec  56373/0          0       -1K/238 us  517366.48
+        [  3] 0.00-60.00 sec  7048 MBytes   985 Mbits/sec  56387/0          0       -1K/129 us  954839.38
+        [SUM] 0.00-60.01 sec  14095 MBytes  1970 Mbits/sec  112760/0         0
+                   """
+
+    self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
+
+    results4 = iperf_benchmark._RunIperf(vm0, vm1, '10.128.0.2', 2, 'INTERNAL', 'TCP')
 
     expected_results4 = {
         'receiving_machine_type': 'mock_machine_1',
@@ -131,14 +224,7 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'netpwr': 736102.93
     }
 
-    self.assertEqual(expected_results1, results1.metadata)
-    self.assertEqual(expected_results2, results2.metadata)
-    self.assertEqual(expected_results3, results3.metadata)
     self.assertEqual(expected_results4, results4.metadata)
-
-    self.assertEqual(results1.value, 1.05)
-    self.assertEqual(results2.value, 2.10)
-    self.assertEqual(results3.value, 1966.0)
     self.assertEqual(results4.value, 1970.0)
 
 if __name__ == '__main__':
