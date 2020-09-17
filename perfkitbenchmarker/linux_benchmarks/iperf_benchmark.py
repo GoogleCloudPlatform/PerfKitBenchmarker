@@ -143,8 +143,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
   if protocol == TCP:
 
-    iperf_cmd = ( f'iperf --enhancedreports --client {receiving_ip_address} --port {IPERF_PORT} '
-                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} --parallel {thread_count}')
+    iperf_cmd = (f'iperf --enhancedreports --client {receiving_ip_address} --port {IPERF_PORT} '
+                 f'--format m --time {FLAGS.iperf_runtime_in_seconds} --parallel {thread_count}')
 
     if FLAGS.iperf_tcp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_tcp_per_stream_bandwidth}M'
@@ -155,12 +155,11 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                          timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
-    window_size_match = re.search(r'TCP window size: (?P<size>\d+\.?\d+) (?P<units>\S+)', stdout) 
+    window_size_match = re.search(r'TCP window size: (?P<size>\d+\.?\d+) (?P<units>\S+)', stdout)
     window_size = float(window_size_match.group('size'))
     window_size_unit = window_size_match.group('units')
 
     buffer_size = float(re.search(r'Write buffer size: (?P<buffer_size>\d+\.\d+) \S+', stdout).group('buffer_size'))
-
 
     multi_thread = re.search((r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+(?P<transfer>\d+)\s\w+\s+(?P<throughput>\d+)'
                               r'\s\w+/\w+\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)\s*'),
@@ -218,9 +217,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
   elif protocol == UDP:
 
-    # -e 
-    iperf_cmd = ( f'iperf --enhancedreports --udp --client {receiving_ip_address} --port {IPERF_UDP_PORT} '
-                  f'--format m --time {FLAGS.iperf_runtime_in_seconds} --parallel {thread_count}')
+    iperf_cmd = (f'iperf --enhancedreports --udp --client {receiving_ip_address} --port {IPERF_UDP_PORT} '
+                 f'--format m --time {FLAGS.iperf_runtime_in_seconds} --parallel {thread_count}')
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_udp_per_stream_bandwidth}M'
@@ -235,7 +233,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     match = re.search(r'UDP buffer size: (?P<buffer_size>\d+\.\d+)\s+(?P<buffer_unit>\w+)', stdout)
     buffer_size = float(match.group('buffer_size'))
     buffer_size_unit = match.group('buffer_unit')
-    datagram_size = int(re.findall(r'(\d+)\sbyte\sdatagrams', stdout)[0])
+    datagram_size = int(re.findall(r'(?P<datagram_size>\d+)\sbyte\sdatagrams', stdout)[0])
     ipg_target = float(re.findall(r'IPG\starget:\s(\d+.?\d+)', stdout)[0])
     ipg_target_unit = str(re.findall(r'IPG\starget:\s\d+.?\d+\s(\S+)\s', stdout)[0])
 
@@ -259,17 +257,15 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     jitter_array = re.findall(r'Mbits/sec\s+(?P<jitter>\d+\.?\d+)\s+[a-zA-Z]+', stdout)
     jitter_avg = sum(float(x) for x in jitter_array) / len(jitter_array)
 
-    jitter_unit = str(re.findall(r'Mbits/sec\s+\d+\.?\d+\s+([a-zA-Z]+)', stdout)[0])
+    jitter_unit = str(re.search(r'Mbits/sec\s+\d+\.?\d+\s+(?P<jitter_unit>[a-zA-Z]+)',
+                                stdout).group('jitter_unit'))
 
     # total and lost datagrams
-    lost_datagrams_array = re.findall(r'Mbits/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+(?P<lost_datagrams>\d+)/\s+\d+\s+\(', stdout)
-    total_datagrams_array = re.findall(r'Mbits/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+\d+/\s+(?P<total_datagrams>\d+)+\s+\(', stdout)
-
-    lost_datagrams_sum = sum(int(x) for x in lost_datagrams_array)
-    total_datagrams_sum = sum(int(x) for x in total_datagrams_array)
+    match = re.findall(r'(?P<lost_datagrams>\d+)/\s*(?P<total_datagrams>\d+)\s+\(', stdout)
+    lost_datagrams_sum = sum(float(i[0]) for i in match)
+    total_datagrams_sum = sum(float(i[1]) for i in match)
 
     # out of order datagrams
-    out_of_order_sum = 0
     out_of_order_array = re.findall(r'(\d+)\s+datagrams\sreceived\sout-of-order', stdout)
     out_of_order_sum = sum(int(x) for x in out_of_order_array)
 
