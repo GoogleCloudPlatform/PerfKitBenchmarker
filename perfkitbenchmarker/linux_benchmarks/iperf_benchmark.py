@@ -163,7 +163,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
 
     multi_thread = re.search((r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+(?P<transfer>\d+)\s\w+\s+(?P<throughput>\d+)'
-                              r'\s\w+\/\w+\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s*'),
+                              r'\s\w+/\w+\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)\s*'),
                              stdout)
     # Iperf output is formatted differently when running with multiple threads vs a single thread
     if multi_thread:
@@ -175,12 +175,12 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     # if single thread
     else:
       # Write, error, retry
-      match = re.search(r'\d+ Mbits\/sec\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)', stdout)
+      match = re.search(r'\d+ Mbits/sec\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)', stdout)
       write = int(match.group('write'))
       err = int(match.group('err'))
       retry = int(match.group('retry'))
 
-    match = re.findall((r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)\/(?P<rtt>\d+)'
+    match = re.findall((r'\d+ Mbits/sec\s+ \d+/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)/(?P<rtt>\d+)'
                         r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'), stdout)
     cwnd = sum(float(i[0]) for i in match)/len(match)
     rtt = round(sum(float(i[2]) for i in match)/len(match), 2)
@@ -200,9 +200,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         raise ValueError(f'Only {len(thread_values)} out of {thread_count}'
                          ' iperf threads reported a throughput value.')
 
-    total_throughput = 0.0
-    for value in thread_values:
-      total_throughput += float(value)
+    total_throughput = sum(float(value) for value in thread_values)
 
     tcp_metadata = {
         'buffer_size': buffer_size,
@@ -242,7 +240,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     ipg_target_unit = str(re.findall(r'IPG\starget:\s\d+.?\d+\s(\S+)\s', stdout)[0])
 
     multi_thread = re.search((r'\[SUM\]\s\d+\.?\d+-\d+\.?\d+\ssec\s+\d+\.?\d+\s+MBytes\s+\d+\.?\d+'
-                              r'\s+Mbits\/sec\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<pps>\d+)\s+pps'),
+                              r'\s+Mbits/sec\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<pps>\d+)\s+pps'),
                              stdout)
     if multi_thread:
       # Write, Err, PPS
@@ -252,20 +250,20 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
     else:
       # Write, Err, PPS
-      match = re.search(r'\d+\s+Mbits\/sec\s+(?P<write>\d+)\/(?P<err>\d+)\s+(?P<pps>\d+)\s+pps', stdout)
+      match = re.search(r'\d+\s+Mbits/sec\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<pps>\d+)\s+pps', stdout)
       write = int(match.group('write'))
       err = int(match.group('err'))
       pps = int(match.group('pps'))
 
     # Jitter
-    jitter_array = re.findall(r'Mbits\/sec\s+(?P<jitter>\d+\.?\d+)\s+[a-zA-Z]+', stdout)
+    jitter_array = re.findall(r'Mbits/sec\s+(?P<jitter>\d+\.?\d+)\s+[a-zA-Z]+', stdout)
     jitter_avg = sum(float(x) for x in jitter_array) / len(jitter_array)
 
-    jitter_unit = str(re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+([a-zA-Z]+)', stdout)[0])
+    jitter_unit = str(re.findall(r'Mbits/sec\s+\d+\.?\d+\s+([a-zA-Z]+)', stdout)[0])
 
     # total and lost datagrams
-    lost_datagrams_array = re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+(?P<lost_datagrams>\d+)\/\s+\d+\s+\(', stdout)
-    total_datagrams_array = re.findall(r'Mbits\/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+\d+\/\s+(?P<total_datagrams>\d+)+\s+\(', stdout)
+    lost_datagrams_array = re.findall(r'Mbits/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+(?P<lost_datagrams>\d+)/\s+\d+\s+\(', stdout)
+    total_datagrams_array = re.findall(r'Mbits/sec\s+\d+\.?\d+\s+[a-zA-Z]+\s+\d+/\s+(?P<total_datagrams>\d+)+\s+\(', stdout)
 
     lost_datagrams_sum = sum(int(x) for x in lost_datagrams_array)
     total_datagrams_sum = sum(int(x) for x in total_datagrams_array)
@@ -273,30 +271,27 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     # out of order datagrams
     out_of_order_sum = 0
     out_of_order_array = re.findall(r'(\d+)\s+datagrams\sreceived\sout-of-order', stdout)
-    if out_of_order_array:
-      out_of_order_sum = sum(int(x) for x in out_of_order_array)
+    out_of_order_sum = sum(int(x) for x in out_of_order_array)
 
     thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
     if not thread_values:
       # If there is no sum you have try and figure out an estimate
       # which happens when threads start at different times.  The code
       # below will tend to overestimate a bit.
-      thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec\s+\d+\/\d+', stdout)
+      thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec\s+\d+/\d+', stdout)
 
       if len(thread_values) != thread_count:
         raise ValueError(f'Only {len(thread_values)} out of {thread_count} iperf threads reported a'
                          ' throughput value.')
 
-    total_throughput = 0.0
-    for value in thread_values:
-      total_throughput += float(value)
+    total_throughput = sum(float(value) for value in thread_values)
 
     udp_metadata = {
         'buffer_size': buffer_size,
         'datagram_size_bytes': datagram_size,
         'write_packet_count': write,
         'err_packet_count': err,
-        'packets_per_second': pps,
+        'pps': pps,
         'ipg_target': ipg_target,
         'ipg_target_unit': ipg_target_unit,
         'jitter': jitter_avg,
