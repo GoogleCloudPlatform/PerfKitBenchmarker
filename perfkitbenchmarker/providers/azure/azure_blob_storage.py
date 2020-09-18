@@ -177,6 +177,26 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     ])
     return [metadata['name'] for metadata in json.loads(str(stdout))]
 
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Each listed item is a full file name, eg. "supplier/supplier.csv", so just
+    the high level folder name is extracted, and repetitions are eliminated for
+    when there's multiple files in a folder.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    unique_folders = set([
+        obj.split('/')[0].strip()
+        for obj in self.List(bucket)
+        if obj and obj.contains('/')
+    ])
+    return list(unique_folders)
+
   def EmptyBucket(self, bucket):
     # Emptying buckets on Azure is hard. We pass for now - this will
     # increase our use of storage space, but should not affect the

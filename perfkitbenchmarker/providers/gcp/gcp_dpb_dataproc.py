@@ -342,7 +342,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
     return {dpb_service.SUCCESS: True}
 
-  def MigrateCrossCloud(self, source_location, destination_location):
+  def MigrateCrossCloud(self,
+                        source_location,
+                        destination_location,
+                        dest_cloud='AWS'):
     """Method to copy data cross cloud using a distributed job on the cluster.
 
     Currently the only supported destination cloud is AWS.
@@ -350,12 +353,18 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     Args:
       source_location: The source GCS path to migrate.
-      destination_location: The destination S3 location.
+      destination_location: The destination path.
+      dest_cloud: The cloud to copy data to.
 
     Returns:
       A dictionary with key 'success' and boolean value set to the status of
       data migration command.
     """
+    if dest_cloud == 'AWS':
+      dest_prefix = 's3a://'
+    else:
+      raise ValueError('Unsupported destination cloud.')
+
     cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
     if self.project is not None:
       cmd.flags['project'] = self.project
@@ -365,7 +374,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['properties'] = 'fs.s3a.access.key=%s,fs.s3a.secret.key=%s' % (
         s3_access_key, s3_secret_key)
     cmd.additional_flags = ['--'] + [
-        'gs://' + source_location, 's3a://' + destination_location
+        'gs://' + source_location, dest_prefix + destination_location
     ]
     _, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
     return {dpb_service.SUCCESS: retcode == 0}

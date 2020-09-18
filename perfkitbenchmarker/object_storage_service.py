@@ -153,9 +153,20 @@ class ObjectStorageService(
     """List providers, buckets, or objects.
 
     Args:
-      bucket: the name of the bucket to create.
+      bucket: the name of the bucket to list the contents of.
     """
     pass
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    return []
 
   @abc.abstractmethod
   def DeleteBucket(self, bucket):

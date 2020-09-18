@@ -80,11 +80,31 @@ class S3Service(object_storage_service.ObjectStorageService):
     return 'aws s3 cp "%s" "%s" --region=%s' % (
         src_url, local_path, self.region)
 
-  def List(self, buckets):
+  def List(self, bucket):
     """See base class."""
-    stdout, _, _ = vm_util.IssueCommand(['aws', 's3', 'ls', buckets,
-                                         '--region', self.region])
+    stdout, _, _ = vm_util.IssueCommand(
+        ['aws', 's3', 'ls', bucket, '--region', self.region])
     return stdout
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Each result that is a folder has "PRE" in front of the name (meaning
+    prefix), eg. "PRE customer/", so that part is removed from each line. When
+    there's more than one result, splitting on the newline returns a final blank
+    row, so blank values are skipped.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    return [
+        obj.split('PRE ')[1].strip().replace('/', '')
+        for obj in self.List(bucket).split('\n')
+        if obj and obj.endswith('/')
+    ]
 
   @vm_util.Retry()
   def DeleteBucket(self, bucket):

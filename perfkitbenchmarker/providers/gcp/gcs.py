@@ -88,10 +88,32 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     """See base class."""
     return 'gsutil cp "%s" "%s"' % (src_url, local_path)
 
-  def List(self, buckets):
+  def List(self, bucket):
     """See base class."""
-    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', buckets])
+    # Full URI is required by gsutil.
+    if not bucket.startswith('gs://'):
+      bucket = 'gs://' + bucket
+    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', bucket])
     return stdout
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Each folder is returned as its full uri, eg. "gs://pkbtpch1/customer/", so
+    just the folder name is extracted. When there's more than one, splitting
+    on the newline returns a final blank row, so blank values are skipped.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    return [
+        obj.split('/')[-2].strip()
+        for obj in self.List(bucket).split('\n')
+        if obj and obj.endswith('/')
+    ]
 
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
