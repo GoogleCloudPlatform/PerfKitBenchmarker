@@ -223,16 +223,16 @@ def Prepare(benchmark_spec):
 
   benchmark_spec.table_subdirs = []
   if FLAGS.dpb_sparksql_data:
-    stdout = storage_service.List(FLAGS.dpb_sparksql_data)
-    benchmark_spec.table_subdirs = [
-        re.split(' |/', line.rstrip('/')).pop()
-        for line in stdout.split('\n')
-        if line
-    ]
+    table_dir = FLAGS.dpb_sparksql_data.rstrip('/') + '/'
+    stdout = storage_service.List(table_dir)
+    for line in stdout.split('\n'):
+      # GCS will sometimes list the directory itself.
+      if line and line != table_dir:
+        benchmark_spec.table_subdirs.append(
+            re.split(' |/', line.rstrip('/')).pop())
 
   # Create external Hive tables
   if FLAGS.dpb_sparksql_create_hive_tables:
-    stdout = storage_service.List(FLAGS.dpb_sparksql_data)
     stats = dpb_service_instance.SubmitJob(
         pyspark_file=os.path.join(benchmark_spec.base_dir, SPARK_TABLE_SCRIPT),
         job_type=BaseDpbService.PYSPARK_JOB_TYPE,

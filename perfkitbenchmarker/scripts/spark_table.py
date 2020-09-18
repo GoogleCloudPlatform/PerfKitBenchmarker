@@ -15,6 +15,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import logging
 import os
 from pyspark.sql import SparkSession
 
@@ -29,6 +30,7 @@ def main():
            .enableHiveSupport()
            .getOrCreate())
   for table in args.tables:
+    logging.info('Creating table %s', table)
     table_dir = os.path.join(args.root_dir, table)
     # clean up previous table
     spark.sql('drop table if exists ' + table)
