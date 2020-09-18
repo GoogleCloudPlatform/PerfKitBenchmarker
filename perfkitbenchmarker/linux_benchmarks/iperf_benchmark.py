@@ -179,14 +179,16 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       err = int(match.group('err'))
       retry = int(match.group('retry'))
 
-    match = re.findall((r'\d+ Mbits/sec\s+ \d+/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)/(?P<rtt>\d+)'
-                        r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'), stdout)
-    cwnd = sum(float(i[0]) for i in match)/len(match)
-    rtt = round(sum(float(i[2]) for i in match)/len(match), 2)
-    netpwr = round(sum(float(i[4]) for i in match)/len(match),2)
+    r = re.compile((r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)\/(?P<rtt>\d+)'
+                    r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'))
+    match = [m.groupdict() for m in r.finditer(stdout)]
+    
+    cwnd = sum(float(i['cwnd']) for i in match)/len(match)
+    rtt = round(sum(float(i['rtt']) for i in match)/len(match), 2)
+    netpwr = round(sum(float(i['netpwr']) for i in match)/len(match),2)
 
-    cwnd_unit = match[0][1]
-    rtt_unit = match[0][3]
+    cwnd_unit = match[0]['cwnd_unit']
+    rtt_unit = match[0]['rtt_unit']
 
     thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
     if not thread_values:
