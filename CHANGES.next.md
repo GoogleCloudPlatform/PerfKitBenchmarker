@@ -40,3 +40,4 @@
 -   Use absl parameterized test case.
 -   Error out if AWS EFA install fails (centos8,rhel8)
 -   Added `cascadelake` as a `--gcp_min_cpu_platform` option.
+-   Move CoreOS from EOL Container Linux CoreOS to Fedora CoreOS on AWS and GCP.

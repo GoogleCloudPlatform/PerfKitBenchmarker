@@ -953,8 +953,13 @@ class ContainerOptimizedOsBasedGceVirtualMachine(
 
 class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin):
-  DEFAULT_IMAGE_FAMILY = 'coreos-stable'
-  DEFAULT_IMAGE_PROJECT = 'coreos-cloud'
+  DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
+  DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
+
+  def __init__(self, vm_spec):
+    super(CoreOsBasedGceVirtualMachine, self).__init__(vm_spec)
+    # Fedora CoreOS only creates the core user
+    self.user_name = 'core'
 
 
 class Ubuntu1604BasedGceVirtualMachine(

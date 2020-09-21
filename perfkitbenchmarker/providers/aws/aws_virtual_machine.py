@@ -90,8 +90,6 @@ X86 = 'x86_64'
 # These are the project numbers of projects owning common images.
 # Some numbers have corresponding owner aliases, but they are not used here.
 AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
-# https://coreos.com/os/docs/latest/booting-on-ec2.html
-COREOS_IMAGE_PROJECT = '595879546273'
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Stretch
 # Marketplace AMI exists, but not in all regions
 DEBIAN_9_IMAGE_PROJECT = '379101102735'
@@ -99,6 +97,8 @@ DEBIAN_9_IMAGE_PROJECT = '379101102735'
 DEBIAN_10_IMAGE_PROJECT = '136693071363'
 # Owns AMIs lists here:
 # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+# Also owns the AMIS listed in
+# https://builds.coreos.fedoraproject.org/streams/stable.json
 CENTOS_IMAGE_PROJECT = '125523088429'
 MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
 # https://access.redhat.com/articles/2962171
@@ -466,6 +466,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # filter)
   IMAGE_PRODUCT_CODE_FILTER = None
 
+  # CoreOS only distinguishes between stable and testing images in the
+  # description
+  IMAGE_DESCRIPTION_FILTER = None
+
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
   DEFAULT_USER_NAME = 'ec2-user'
 
@@ -591,6 +595,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if cls.IMAGE_PRODUCT_CODE_FILTER:
       describe_cmd.extend(['Name=product-code,Values=%s' %
                            cls.IMAGE_PRODUCT_CODE_FILTER])
+    if cls.IMAGE_DESCRIPTION_FILTER:
+      describe_cmd.extend(['Name=description,Values=%s' %
+                           cls.IMAGE_DESCRIPTION_FILTER])
     describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
@@ -1025,8 +1032,10 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.CoreOsMixin):
-  IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
-  IMAGE_OWNER = COREOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'fedora-coreos-*-hvm'
+  # CoreOS only distinguishes between stable and testing in the description
+  IMAGE_DESCRIPTION_FILTER = 'Fedora CoreOS stable *'
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'core'
 
 

@@ -852,6 +852,7 @@ class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
 
 class CoreOsBasedAzureVirtualMachine(AzureVirtualMachine,
                                      linux_virtual_machine.CoreOsMixin):
+  # https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
   IMAGE_URN = 'CoreOS:CoreOS:Stable:latest'
 
 
