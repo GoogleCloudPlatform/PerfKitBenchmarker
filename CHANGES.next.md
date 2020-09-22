@@ -20,6 +20,7 @@
 -   Update the nginx benchmark.
 -   Added `--before_run_pause` flag for debugging during benchmark development.
 -   Report CPU vulnerabilities as a sample via the --record_cpu_vuln flag.
+-   Add retry when calling MountDisk.
 
 ### Bug fixes and maintenance updates:
 

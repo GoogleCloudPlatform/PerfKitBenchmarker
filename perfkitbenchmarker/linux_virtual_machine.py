@@ -776,7 +776,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata['disk_filesystem_blocksize'] = block_size
     self.RemoteHostCommand(umount_cmd + fmt_cmd)
 
-  def MountDisk(self, device_path, mount_path, disk_type=None,
+  @vm_util.Retry(
+      timeout=vm_util.DEFAULT_TIMEOUT,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
+  def MountDisk(self,
+                device_path,
+                mount_path,
+                disk_type=None,
                 mount_options=disk.DEFAULT_MOUNT_OPTIONS,
                 fstab_options=disk.DEFAULT_FSTAB_OPTIONS):
     """Mounts a formatted disk in the VM."""
