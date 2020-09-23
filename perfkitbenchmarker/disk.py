@@ -36,6 +36,9 @@ flags.DEFINE_integer('nfs_rsize', 1048576, 'NFS read size.')
 flags.DEFINE_integer('nfs_wsize', 1048576, 'NFS write size.')
 flags.DEFINE_integer('nfs_timeout', 60, 'NFS timeout.')
 flags.DEFINE_integer('nfs_retries', 2, 'NFS Retries.')
+flags.DEFINE_boolean('nfs_noresvport', False,
+                     'Whether the NFS client should use a non-privileged '
+                     'source port. Suggested to use with EFS')
 flags.DEFINE_boolean('nfs_managed', True,
                      'Use a managed NFS service if using NFS disks. Otherwise '
                      'start an NFS server on the first VM.')
@@ -515,11 +518,13 @@ class NfsDisk(NetworkDisk):
         'rsize': self.nfs_rsize,
         'wsize': self.nfs_wsize,
         'timeo': self.nfs_timeout * 10,  # in decaseconds
-        'retrans': self.nfs_retries
+        'retrans': self.nfs_retries,
     }
     # the client doesn't have to specify an NFS version to use (but should)
     if self.nfs_version:
       options['nfsvers'] = self.nfs_version
+    if FLAGS.nfs_noresvport:
+      options['noresvport'] = None
     return options
 
   def Attach(self, vm):
