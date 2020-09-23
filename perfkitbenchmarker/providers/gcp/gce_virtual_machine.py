@@ -115,6 +115,20 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       self.cpus = None
       self.memory = None
 
+    # The A2 machine family, unlike other GCP offerings has a preset number of
+    # GPUs, so we set them directly from the machine_type
+    # https://cloud.google.com/blog/products/compute/announcing-google-cloud-a2-vm-family-based-on-nvidia-a100-gpu
+    if self.machine_type and self.machine_type.startswith('a2-'):
+      a2_lookup = {
+          'a2-highgpu-1g': 1,
+          'a2-highgpu-2g': 2,
+          'a2-highgpu-4g': 4,
+          'a2-highgpu-8g': 8,
+          'a2-megagpu-16g': 16
+      }
+      self.gpu_count = a2_lookup[self.machine_type]
+      self.gpu_type = virtual_machine.GPU_A100
+
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Modifies config options based on runtime flag values.

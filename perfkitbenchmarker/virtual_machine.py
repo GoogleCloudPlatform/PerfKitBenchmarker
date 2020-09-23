@@ -124,9 +124,25 @@ flags.DEFINE_boolean(
 flags.DEFINE_boolean('retry_on_rate_limited', True,
                      'Whether to retry commands when rate limited.')
 
-# Note: If adding a gpu type here, be sure to add it to
-# the flag definition in pkb.py too.
-VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'a100', 'p4', 'p4-vws', 't4']
+GPU_K80 = 'k80'
+GPU_P100 = 'p100'
+GPU_V100 = 'v100'
+GPU_A100 = 'a100'
+GPU_P4 = 'p4'
+GPU_P4_VWS = 'p4-vws'
+GPU_T4 = 't4'
+VALID_GPU_TYPES = [
+    GPU_K80, GPU_P100, GPU_V100, GPU_A100, GPU_P4, GPU_P4_VWS, GPU_T4
+]
+
+flags.DEFINE_integer(
+    'gpu_count', None,
+    'Number of gpus to attach to the VM. Requires gpu_type to be '
+    'specified.')
+flags.DEFINE_enum(
+    'gpu_type', None, VALID_GPU_TYPES,
+    'Type of gpus to attach to the VM. Requires gpu_count to be '
+    'specified.')
 
 
 def GetVmSpecClass(cloud):
@@ -872,7 +888,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """Initialize BaseVirtualMachine class.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
