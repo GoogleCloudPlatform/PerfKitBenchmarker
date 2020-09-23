@@ -887,7 +887,7 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
     """Updates the interruptible status if the VM was preempted."""
     if self.spot_early_termination:
       return
-    if self.low_priority:
+    if self.low_priority and self._Exists():
       stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
       events = json.loads(stdout).get('Events', [])
       self.spot_early_termination = any(

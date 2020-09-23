@@ -71,11 +71,8 @@ _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.')
 _GCE_VM_CREATE_TIMEOUT = 600
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
-_SHUTDOWN_SCRIPT = (
-    'touch {marker}; su "{user}" -c "gsutil cp {marker} {bucket}"')
-_WINDOWS_SHUTDOWN_SCRIPT_PS1 = (
-    'New-Item -Path \\Users\\{user} -Name {marker};'
-    'gsutil cp \\Users\\{user}\\{marker} {bucket}')
+_SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
+_WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gsutil cp - {preempt_marker}'
 _PREEMPT_DURATION = 30
 
 
@@ -486,8 +483,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.preemptible:
       cmd.flags['preemptible'] = True
-      self.preemptible_status_bucket = (
+      preemptible_status_bucket = (
           f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/')
+      self.preempt_marker = f'{preemptible_status_bucket}{self.name}'
       metadata.update([self._PreemptibleMetadataKeyValue()])
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
@@ -513,13 +511,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _PreemptibleMetadataKeyValue(self):
     """Returns the metadata (key, value) tuple for use with preemptible instance creation."""
 
-  def _AddShutdownScript(self):
-    cmd = util.GcloudCommand(
-        self, 'compute', 'instances', 'add-metadata', self.name)
-    key, value = self._PreemptibleMetadataKeyValue()
-    cmd.flags['metadata'] = f'{key}={value}'
-    cmd.Issue()
-
   def _RemoveShutdownScript(self):
     # Remove shutdown script which copies status when it is interrupted
     cmd = util.GcloudCommand(
@@ -530,10 +521,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def Reboot(self):
     if self.preemptible:
-      self._RemoveShutdownScript()
+      self._UpdateInterruptibleVmStatus()
     super(GceVirtualMachine, self).Reboot()
     if self.preemptible:
-      self._AddShutdownScript()
+      # Reboot occurred without interruption, remove preempt marker
+      vm_util.IssueCommand([FLAGS.gsutil_path, 'rm', self.preempt_marker],
+                           raise_on_failure=False)
 
   def _PreDelete(self):
     super(GceVirtualMachine, self)._PreDelete()
@@ -824,6 +817,17 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
+  def _UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    # Check to see if the VM's preempt_marker file exists in GCS.
+    _, _, retcode = vm_util.IssueCommand(
+        [FLAGS.gsutil_path, 'stat', self.preempt_marker],
+        raise_on_failure=False, suppress_warning=True)
+    # The VM is preempted if the command exits without an error
+    self.spot_early_termination = not bool(retcode)
+    if self.spot_early_termination:
+      logging.info('VM %s interrupted', self.name)
+
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted.
 
@@ -843,24 +847,25 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     3. This machine is preempted.
     4. This machine is deleted.
     """
-    if self.preemptible:
-      # https://cloud.google.com/compute/docs/instances/preemptible#preemption-process
-      # Compute Engine sends a preemption notice to the instance in the form of
-      # an ACPI G2 Soft Off signal.
-      # If the instance does not stop after 30 seconds, Compute Engine sends an
-      # ACPI G3 Mechanical Off signal to the operating system.
-      end_time = time.time() + _PREEMPT_DURATION
-      while not self.spot_early_termination and time.time() <= end_time:
-        _, _, retcode = vm_util.IssueCommand(
-            [FLAGS.gsutil_path, 'stat',
-             posixpath.join(self.preemptible_status_bucket, self.name)],
-            raise_on_failure=False)
-        if retcode:
-          # file does not exist, not interrupted
-          time.sleep(1)
-        else:
-          logging.info('VM %s interrupted', self.name)
-          self.spot_early_termination = True
+    if not self.preemptible:  # Only do checks on preemptible VMs
+      return
+    if self.spot_early_termination:  # VM already marked as preemptedor
+      return
+    if self.is_rebooting:  # Do not do check while the VM is rebooting
+      return
+    # https://cloud.google.com/compute/docs/instances/preemptible#preemption-process
+    # Compute Engine sends a preemption notice to the instance in the form of
+    # an ACPI G2 Soft Off signal.
+    # If the instance does not stop after 30 seconds, Compute Engine sends an
+    # ACPI G3 Mechanical Off signal to the operating system.
+    end_time = time.time() + _PREEMPT_DURATION
+    while time.time() <= end_time:
+      self._UpdateInterruptibleVmStatus()
+      if self.spot_early_termination:
+        # VM marked as interrupted, stop checking
+        break
+      else:
+        time.sleep(1)
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -898,8 +903,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   def _PreemptibleMetadataKeyValue(self):
     """See base class."""
     return 'shutdown-script', _SHUTDOWN_SCRIPT.format(
-        marker=self.name, bucket=self.preemptible_status_bucket,
-        user=self.user_name)
+        preempt_marker=self.preempt_marker, user=self.user_name)
 
   def OnStartup(self):
     super(BaseLinuxGceVirtualMachine, self).OnStartup()
@@ -1014,8 +1018,7 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
   def _PreemptibleMetadataKeyValue(self):
     """See base class."""
     return 'windows-shutdown-script-ps1', _WINDOWS_SHUTDOWN_SCRIPT_PS1.format(
-        marker=self.name, bucket=self.preemptible_status_bucket,
-        user=self.user_name)
+        preempt_marker=self.preempt_marker)
 
   @vm_util.Retry(
       max_retries=10,

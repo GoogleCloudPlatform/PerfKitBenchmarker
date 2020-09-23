@@ -120,7 +120,6 @@ MODULE_REGEX = r'^\s+?(.*?):.*'  # Pattern that matches module names.
 FLAGS_REGEX = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'  # Pattern that matches each flag.
 FLAGNAME_REGEX = r'^\s+?(--.*?)(:.*\Z)'  # Pattern that matches flag name in each flag.
 DOCSTRING_REGEX = r'"""(.*?|$)"""'  # Pattern that matches triple quoted comments.
-CONNECTION_ERRORS = ('Connection refused', 'Connection timed out')
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
@@ -715,7 +714,6 @@ def DoPreparePhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Prepare function.
   """
-  interrupt_checker = InterruptChecker(spec.vms)
   logging.info('Preparing benchmark %s', spec.name)
   with timer.Measure('BenchmarkSpec Prepare'):
     spec.Prepare()
@@ -726,7 +724,6 @@ def DoPreparePhase(spec, timer):
     logging.info('Sleeping for %s seconds after the prepare phase.',
                  FLAGS.after_prepare_sleep_time)
     time.sleep(FLAGS.after_prepare_sleep_time)
-  interrupt_checker.EndCheckInterruptThread()
 
 
 def DoRunPhase(spec, collector, timer):
@@ -740,7 +737,6 @@ def DoRunPhase(spec, collector, timer):
   """
   if FLAGS.before_run_pause:
     six.moves.input('Hit enter to begin Run.')
-  interrupt_checker = InterruptChecker(spec.vms)
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
   consecutive_failures = 0
@@ -762,7 +758,6 @@ def DoRunPhase(spec, collector, timer):
     except Exception:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
-        interrupt_checker.EndCheckInterruptThread()
         raise
       logging.exception('Run failed (consecutive_failures=%s); retrying.',
                         consecutive_failures)
@@ -801,7 +796,6 @@ def DoRunPhase(spec, collector, timer):
                      FLAGS.after_run_sleep_time)
         time.sleep(FLAGS.after_run_sleep_time)
       break
-  interrupt_checker.EndCheckInterruptThread()
 
 
 def DoCleanupPhase(spec, timer):
@@ -817,14 +811,12 @@ def DoCleanupPhase(spec, timer):
   """
   if FLAGS.before_cleanup_pause:
     six.moves.input('Hit enter to begin Cleanup.')
-  interrupt_checker = InterruptChecker(spec.vms)
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
     spec.StopBackgroundWorkload()
     with timer.Measure('Benchmark Cleanup'):
       spec.BenchmarkCleanup(spec)
-  interrupt_checker.EndCheckInterruptThread()
 
 
 def DoTeardownPhase(spec, timer):
@@ -910,6 +902,7 @@ def RunBenchmark(spec, collector):
     with spec.RedirectGlobalFlags():
       end_to_end_timer = timing_util.IntervalTimer()
       detailed_timer = timing_util.IntervalTimer()
+      interrupt_checker = None
       try:
         with end_to_end_timer.Measure('End to End'):
           if stages.PROVISION in FLAGS.run_stage:
@@ -917,15 +910,24 @@ def RunBenchmark(spec, collector):
 
           if stages.PREPARE in FLAGS.run_stage:
             current_run_stage = stages.PREPARE
+            interrupt_checker = InterruptChecker(spec.vms)
             DoPreparePhase(spec, detailed_timer)
+            interrupt_checker.EndCheckInterruptThread()
+            interrupt_checker = None
 
           if stages.RUN in FLAGS.run_stage:
             current_run_stage = stages.RUN
+            interrupt_checker = InterruptChecker(spec.vms)
             DoRunPhase(spec, collector, detailed_timer)
+            interrupt_checker.EndCheckInterruptThread()
+            interrupt_checker = None
 
           if stages.CLEANUP in FLAGS.run_stage:
             current_run_stage = stages.CLEANUP
+            interrupt_checker = InterruptChecker(spec.vms)
             DoCleanupPhase(spec, detailed_timer)
+            interrupt_checker.EndCheckInterruptThread()
+            interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
             current_run_stage = stages.TEARDOWN
@@ -975,6 +977,8 @@ def RunBenchmark(spec, collector):
       finally:
         # Deleting resources should happen first so any errors with publishing
         # don't prevent teardown.
+        if interrupt_checker:
+          interrupt_checker.EndCheckInterruptThread()
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
         if FLAGS.publish_after_run:
@@ -1014,8 +1018,11 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
-  if any(error in error_message for error in CONNECTION_ERRORS):
-    vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(), spec.vms)
+  # Check for preempted VMs
+  def UpdateVmStatus(vm):
+    vm.is_rebooting = False
+    vm.UpdateInterruptibleVmStatus()
+  vm_util.RunThreaded(UpdateVmStatus, spec.vms)
 
   interruptible_vm_count = 0
   interrupted_vm_count = 0
