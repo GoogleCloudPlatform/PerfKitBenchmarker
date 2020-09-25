@@ -197,7 +197,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
       cmd.append(self.gsi_indexes[0])
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to create table! {0}'.format(stderror))
+      logging.warning('Failed to create table! %s', stderror)
 
   def _Delete(self):
     """Deletes the dynamodb table."""
@@ -211,7 +211,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
 
   def _IsReady(self):
     """Check if dynamodb table is ready."""
-    logging.info('Getting table ready status for {0}'.format(self.table_name))
+    logging.info('Getting table ready status for %s', self.table_name)
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'describe-table',
@@ -223,7 +223,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
 
   def Exists(self):
     """Returns true if the dynamodb table exists."""
-    logging.info('Checking if table {0} exists'.format(self.table_name))
+    logging.info('Checking if table %s exists', self.table_name)
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'describe-table',
@@ -244,8 +244,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
         '--table-name', self.table_name]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.info(
-          'Could not find table {0}, {1}'.format(self.table_name, stderr))
+      logging.info('Could not find table %s, %s', self.table_name, stderr)
       return {}
     for table_info in json.loads(stdout)['Table']:
       if table_info[3] == self.table_name:
