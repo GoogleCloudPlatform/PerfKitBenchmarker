@@ -40,6 +40,8 @@ flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
                     'implementation in the jar file')
 flags.DEFINE_string('dpb_service_zone', None, 'The zone for provisioning the '
                     'dpb_service instance.')
+flags.DEFINE_list('dpb_job_properties', [], 'A list of strings of the form '
+                  '"key=vale" to be passed into DBP jobs.')
 
 
 FLAGS = flags.FLAGS
@@ -144,7 +146,8 @@ class BaseDpbService(resource.BaseResource):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
-                job_type=None):
+                job_type=None,
+                properties=None):
     """Submit a data processing job to the backend.
 
     Args:
@@ -164,6 +167,7 @@ class BaseDpbService(resource.BaseResource):
         executors.
       job_jars: Jars to pass to the application
       job_type: Spark or Hadoop job
+      properties: Dict of properties to pass with the job.
 
     Returns:
       dictionary, where success is true if the job succeeded,
@@ -185,7 +189,9 @@ class BaseDpbService(resource.BaseResource):
         'dpb_cluster_shape': self.spec.worker_group.vm_spec.machine_type,
         'dpb_cluster_size': self.spec.worker_count,
         'dpb_hdfs_type': self.dpb_hdfs_type,
-        'dpb_service_zone': self.dpb_service_zone
+        'dpb_service_zone': self.dpb_service_zone,
+        'dpb_job_properties': ','.join(
+            '{}={}'.format(k, v) for k, v in self.GetJobProperties().items()),
     }
     return basic_data
 
@@ -219,6 +225,10 @@ class BaseDpbService(resource.BaseResource):
       raise ValueError('start_time cannot be later than the end_time')
     return (end_time - start_time).total_seconds()
 
+  def GetJobProperties(self):
+    """Parse the dpb_job_properties_flag."""
+    return dict(pair.split('=') for pair in FLAGS.dpb_job_properties)
+
   def GetExecutionJar(self, job_category, job_type):
     """Retrieve execution jar corresponding to the job_category and job_type.
 
@@ -241,6 +251,7 @@ class BaseDpbService(resource.BaseResource):
 
     return self.JOB_JARS[job_category][job_type]
 
+  # TODO(pclay): Move these methods to Terasort benchmark.
   def GenerateDataForTerasort(self, base_dir, generate_jar,
                               generate_job_category):
     """TeraGen generates data used as input data for subsequent TeraSort run.
@@ -259,11 +270,13 @@ class BaseDpbService(resource.BaseResource):
     """
 
     generate_args = [
-        TERAGEN,
         str(FLAGS.dpb_terasort_num_records), base_dir + TERAGEN
     ]
     start_time = datetime.datetime.now()
     stats = self.SubmitJob(
+        # Not actually a class name, but the jar has a meta class that points
+        # to the actual main class. This way the main class gets the properties.
+        classname=TERAGEN,
         jarfile=generate_jar,
         job_poll_interval=5,
         job_arguments=generate_args,
@@ -290,9 +303,12 @@ class BaseDpbService(resource.BaseResource):
       Wall time for the Sort job.
       The statistics from running the Sort job.
     """
-    sort_args = [TERASORT, base_dir + TERAGEN, base_dir + TERASORT]
+    sort_args = [base_dir + TERAGEN, base_dir + TERASORT]
     start_time = datetime.datetime.now()
     stats = self.SubmitJob(
+        # Not actually a class name, but the jar has a meta class that points
+        # to the actual main class. This way the main class gets the properties.
+        classname=TERASORT,
         jarfile=sort_jar,
         job_poll_interval=5,
         job_arguments=sort_args,
@@ -316,9 +332,10 @@ class BaseDpbService(resource.BaseResource):
       Wall time for the Validate job.
       The statistics from running the Validate job.
     """
-    validate_args = [TERAVALIDATE, base_dir + TERASORT, base_dir + TERAVALIDATE]
+    validate_args = [base_dir + TERASORT, base_dir + TERAVALIDATE]
     start_time = datetime.datetime.now()
     stats = self.SubmitJob(
+        classname=TERAVALIDATE,
         jarfile=validate_jar,
         job_poll_interval=5,
         job_arguments=validate_args,
@@ -389,7 +406,8 @@ class UnmanagedDpbService(BaseDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
-                job_type=None):
+                job_type=None,
+                properties=None):
     """Submit a data processing job to the backend."""
     pass
 
@@ -436,11 +454,18 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
-                job_type=None):
+                job_type=None,
+                properties=None):
     """Submit a data processing job to the backend."""
     if job_type != self.HADOOP_JOB_TYPE:
       raise NotImplementedError
     cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'), 'jar', jarfile]
+    # Order is important
+    if classname:
+      cmd_list += [classname]
+    all_properties = self.GetJobProperties()
+    all_properties.update(properties or {})
+    cmd_list += ['-D{}={}'.format(k, v) for k, v in all_properties.items()]
     if job_arguments:
       cmd_list += job_arguments
     cmd_string = ' '.join(cmd_list)

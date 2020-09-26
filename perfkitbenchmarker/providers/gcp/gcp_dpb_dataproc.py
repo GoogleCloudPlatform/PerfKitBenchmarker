@@ -209,7 +209,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
-                job_type=None):
+                job_type=None,
+                properties=None):
     """See base class."""
     args = ['jobs', 'submit', job_type]
 
@@ -241,6 +242,13 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
     cmd.flags['driver-log-levels'] = 'root={}'.format(FLAGS.dpb_log_level)
+
+    all_properties = self.GetJobProperties()
+    all_properties.update(properties or {})
+    if all_properties:
+      # For commas: https://cloud.google.com/sdk/gcloud/reference/topic/escaping
+      cmd.flags['properties'] = '^@^' + '@'.join(
+          '{}={}'.format(k, v) for k, v in all_properties.items())
 
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments

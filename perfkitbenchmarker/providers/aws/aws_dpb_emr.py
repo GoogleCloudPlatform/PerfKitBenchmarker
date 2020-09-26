@@ -336,7 +336,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_files=None,
                 job_jars=None,
                 job_stdout_file=None,
-                job_type=None):
+                job_type=None,
+                properties=None):
     """See base class."""
     @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=job_poll_interval, fuzz=0)
@@ -350,22 +351,29 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       # Escape commas in arguments
       job_arguments = (arg.replace(',', '\\,') for arg in job_arguments)
 
+    all_properties = self.GetJobProperties()
+    all_properties.update(properties or {})
+
     if job_type == 'hadoop':
       step_type_spec = 'Type=CUSTOM_JAR'
       jar_spec = 'Jar=' + jarfile
-
-      # How will we handle a class name ????
-      step_list = [step_type_spec, jar_spec]
-
+      arg_list = []
+      # Order is important
+      if classname:
+        arg_list += [classname]
+      arg_list += ['-D{}={}'.format(k, v) for k, v in all_properties.items()]
       if job_arguments:
-        arg_spec = '[' + ','.join(job_arguments) + ']'
-        step_list.append('Args=' + arg_spec)
+        arg_list += job_arguments
+      arg_spec = 'Args=[' + ','.join(arg_list) + ']'
+      step_list = [step_type_spec, jar_spec, arg_spec]
     elif job_type == self.SPARK_JOB_TYPE:
       arg_list = []
       if job_files:
         arg_list += ['--files', ','.join(job_files)]
       if job_jars:
         arg_list += ['--jars', ','.join(job_jars)]
+      for k, v in all_properties.items():
+        arg_list += ['--conf', '{}={}'.format(k, v)]
       # jarfile must be last before args
       arg_list += ['--class', classname, jarfile]
       if job_arguments:
@@ -379,6 +387,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         arg_list += ['--files', ','.join(job_files)]
       if job_jars:
         arg_list += ['--jars', ','.join(job_jars)]
+      for k, v in all_properties.items():
+        arg_list += ['--conf', '{}={}'.format(k, v)]
       # pyspark_file must be last before args
       arg_list += [pyspark_file]
       if job_arguments:
@@ -386,11 +396,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       arg_spec = 'Args=[{}]'.format(','.join(arg_list))
       step_list = ['Type=Spark', arg_spec]
     elif job_type == self.SPARKSQL_JOB_TYPE:
+      assert not job_arguments
       jar_spec = 'Jar="command-runner.jar"'
-      arg_list = [query_file]
-      if job_arguments:
-        arg_list += job_arguments
-      arg_spec = 'Args=[{},-f,{}]'.format(job_type, ','.join(arg_list))
+      for k, v in all_properties.items():
+        arg_list += ['--conf', '{}={}'.format(k, v)]
+      arg_spec = 'Args=[spark-sql,-f,{}]'.format(','.join(arg_list))
       step_list = [jar_spec, arg_spec]
 
     step_string = ','.join(step_list)
