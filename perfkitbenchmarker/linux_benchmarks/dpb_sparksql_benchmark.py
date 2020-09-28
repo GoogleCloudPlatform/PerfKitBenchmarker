@@ -114,7 +114,7 @@ flags.DEFINE_list('dpb_sparksql_order', [],
                   'If omitted all queries are run in lexographic order.')
 flags.DEFINE_string(
     'spark_bigquery_connector',
-    'gs://spark-lib/bigquery/spark-bigquery-latest.jar',
+    None,
     'The Spark BigQuery Connector jar to pass to the Spark Job')
 flags.DEFINE_list(
     'bigquery_tables', [],
@@ -172,6 +172,11 @@ def CheckPrerequisites(benchmark_config):
       raise errors.Config.InvalidValue(
           'spark-sql job type cannot query HCFS data without '
           '--dpb_sparksql_create_hive_tables.')
+  if FLAGS.bigquery_tables and not FLAGS.spark_bigquery_connector:
+    # Remove if Dataproc ever bundles BigQuery connector
+    raise errors.Config.InvalidValue(
+        'You must provide the BigQuery connector using '
+        '--spark_bigquery_connector.')
   if not (FLAGS.dpb_sparksql_data or FLAGS.bigquery_tables):
     # In the case of a static dpb_service, data could pre-exist
     logging.warning(
@@ -327,11 +332,14 @@ def _RunSparkSqlJob(dpb_service_instance,
         os.path.basename(staged_sql_file), '--table_metadata',
         _GetTableMetadataJson(table_subdirs)
     ]
+    jars = []
+    if FLAGS.spark_bigquery_connector:
+      jars.append(FLAGS.spark_bigquery_connector)
     return dpb_service_instance.SubmitJob(
         pyspark_file=staged_sql_runner_file,
         job_arguments=args,
         job_files=[staged_sql_file],
-        job_jars=[FLAGS.spark_bigquery_connector],
+        job_jars=jars,
         job_type=PYSPARK)
   raise errors.Config.UnrecognizedOption('Unsupported job type ' +
                                          FLAGS.dpb_sparksql_job_type)
