@@ -15,6 +15,7 @@ g. Aggregated geo mean performance using the aggregated query performances
 import copy
 import enum
 import functools
+import json
 import time
 from typing import Any, Dict, List, Text
 
@@ -78,12 +79,33 @@ class EdwQueryPerformance(object):
 
   def __init__(self, query_name: Text, performance: float,
                metadata: Dict[str, str]):
+    # TODO(user): add query start and query end as attributes.
     self.name = query_name
     self.performance = performance
     self.execution_status = (EdwQueryExecutionStatus.FAILED
                              if performance == -1.0
                              else EdwQueryExecutionStatus.SUCCESSFUL)
     self.metadata = metadata
+
+  @classmethod
+  def from_json(cls, serialized_performance: str):
+    """Process the serialized query performance from client jar.
+
+    Expected Performance format:
+      {"query_wall_time_in_secs":34.754,"query_end":1601011628376,"job_id":"228e9731-e771-4112-90e4-8b385973cf80","query":"2","query_start":1601011593622}
+
+    Args:
+      serialized_performance: Stringified json performance.
+
+    Returns:
+      An instance of EdwQueryPerformance
+    """
+    results = json.loads(serialized_performance)
+    # TODO(user): Handle non BQ job attributes.
+    metadata = {'job_id': results['job_id']}
+    return cls(query_name=results['query'],
+               performance=results['query_wall_time_in_secs'],
+               metadata=metadata)
 
   def get_performance_sample(self, metadata: Dict[str, str]) -> sample.Sample:
     """Method to generate a sample for the query performance.
@@ -470,6 +492,91 @@ class EdwIterationPerformance(object):
                          geo_mean_metadata)
 
 
+class EdwSimultaneousIterationPerformance(object):
+  """Class that represents the performance of a simultaneous iteration.
+
+  Attributes:
+    id: A unique string id for the iteration.
+    start_time: The start time of the iteration in milliseconds since epoch.
+    end_time: The end time of the iteration in milliseconds since epoch.
+    wall_time: The wall time in seconds as a double value.
+    performance: A dictionary of query name to its execution performance which
+      is an EdwQueryPerformance instance.
+  """
+
+  def __init__(self, iteration_id: Text,
+               iteration_start_time: int,
+               iteration_end_time: int,
+               iteration_wall_time: float,
+               iteration_performance: Dict[str, EdwQueryPerformance]):
+    self.id = iteration_id
+    self.start_time = iteration_start_time
+    self.end_time = iteration_end_time
+    self.wall_time = iteration_wall_time
+    self.performance = iteration_performance
+
+  @classmethod
+  def from_json(cls, iteration_id: str, serialized_performance: str):
+    """Process the serialized simultaneous iteration performance from client jar.
+
+    Expected Performance format:
+      {"simultaneous_end":1601145943197,"simultaneous_start":1601145940113,
+      "stream_performance_array":[{"query_wall_time_in_secs":2.079,
+      "query_end":1601145942208,"job_id":"914682d9-4f64-4323-bad2-554267cbbd8d",
+      "query":"1","query_start":1601145940129},{"query_wall_time_in_secs":2.572,
+      "query_end":1601145943192,"job_id":"efbf93a1-614c-4645-a268-e3801ae994f1",
+      "query":"2","query_start":1601145940620}],
+      "simultaneous_wall_time_in_secs":3.084}
+
+    Args:
+      iteration_id: String identifier of the simultaneous iteration.
+      serialized_performance: Stringified json performance.
+
+    Returns:
+      An instance of EdwSimultaneousIterationPerformance
+    """
+    results = json.loads(serialized_performance)
+    # TODO(user): Rename reference to stream.
+    query_performances = results['stream_performance_array']
+    query_performance_map = {}
+    for query_perf_json in query_performances:
+      query_perf = EdwQueryPerformance.from_json(
+          serialized_performance=(json.dumps(query_perf_json)))
+      query_performance_map[query_perf.name] = query_perf
+    return cls(iteration_id=iteration_id,
+               iteration_start_time=results['simultaneous_start'],
+               iteration_end_time=results['simultaneous_end'],
+               iteration_wall_time=results['simultaneous_wall_time_in_secs'],
+               iteration_performance=query_performance_map)
+
+  def get_wall_time(self) -> float:
+    """Gets the total wall time, in seconds, for the iteration.
+
+    The wall time is the time from the start of the first stream to the end time
+    of the last stream to finish.
+
+    Returns:
+      The wall time in seconds.
+    """
+    return self.wall_time
+
+  def get_wall_time_performance_sample(self, metadata: Dict[
+      str, str]) -> sample.Sample:
+    """Gets a sample for wall time performance of the iteration.
+
+    Args:
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A sample of iteration wall time performance
+    """
+    wall_time = self.wall_time
+    wall_time_metadata = copy.copy(metadata)
+    return sample.Sample('edw_iteration_wall_time', wall_time, 'seconds',
+                         wall_time_metadata)
+
+
 class EdwBenchmarkPerformance(object):
   """Class that represents the performance of an edw benchmark.
 
@@ -502,6 +609,23 @@ class EdwBenchmarkPerformance(object):
       raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
                                            ' iteration: %s.' % iteration_id)
     self.iteration_performances[iteration_id] = iteration_performance
+
+  def add_simultaneous_iteration_performance(
+      self, performance: EdwSimultaneousIterationPerformance):
+    """Adds simultaneous iteration performance.
+
+    Args:
+      performance: An instance of EdwSimultaneousIterationPerformance
+        encapsulating the simultaneous iteration performance details.
+
+    Raises:
+      EdwPerformanceAggregationError: If the iteration has already been added.
+    """
+    iteration_id = performance.id
+    if iteration_id in self.iteration_performances:
+      raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
+                                           ' iteration: %s.' % iteration_id)
+    self.iteration_performances[iteration_id] = performance
 
   def is_successful(self) -> bool:
     """Check a benchmark's success, only if all the suite sequences succeed."""
@@ -652,6 +776,32 @@ class EdwBenchmarkPerformance(object):
     wall_time_metadata['aggregation_method'] = 'mean'
     return sample.Sample('edw_aggregated_wall_time', aggregated_wall_time,
                          'seconds', wall_time_metadata)
+
+  def get_simultaneous_wall_time_performance_samples(self,
+                                                     metadata: Dict[str, str]):
+    """Generates samples for all wall time performances.
+
+    Benchmark relies on simultaneous iterations to generate the raw wall time
+     performance samples.
+    Benchmark appends the aggregated wall time performance sample
+
+    Args:
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A list of samples (raw and aggregated)
+    """
+    results = []
+
+    for iteration, performance in self.iteration_performances.items():
+      iteration_metadata = copy.copy(metadata)
+      iteration_metadata['iteration'] = iteration
+      results.append(performance.get_wall_time_performance_sample(
+          iteration_metadata))
+    results.append(self.get_aggregated_wall_time_performance_sample(
+        metadata=metadata))
+    return results
 
   def get_wall_time_performance_samples(self, metadata: Dict[str, str]) -> List[
       sample.Sample]:

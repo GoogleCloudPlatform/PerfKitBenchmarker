@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Dict
+from typing import Any, Dict, List
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
@@ -272,6 +272,28 @@ class JavaClientInterface(GenericClientInterface):
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['performance'], details
+
+  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+
+    Args:
+      queries: List of strings (names) of queries to execute.
+
+    Returns:
+      A dictionary with performance details.
+    """
+    key_file_name = FLAGS.gcp_service_account_key_file
+    if '/' in FLAGS.gcp_service_account_key_file:
+      key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
+    cmd = ('java -cp bq-java-client-1.0.jar '
+           'com.google.cloud.performance.edw.Simultaneous --project {} '
+           '--credentials_file {} --dataset {} --query_files {}'.format(
+               self.project_id, key_file_name, self.dataset_id,
+               ' '.join(queries)))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
 
 
 class Bigquery(edw_service.EdwService):

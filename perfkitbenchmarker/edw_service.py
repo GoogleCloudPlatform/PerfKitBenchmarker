@@ -18,7 +18,7 @@ Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
 import os
-from typing import Dict, Text
+from typing import Any, Dict, List, Text
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -48,6 +48,9 @@ flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
 flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
+# TODO(user): Revisit flags for accepting query lists.
+flags.DEFINE_string('edw_simultaneous_queries',
+                    None, 'CSV list of simultaneous queries to benchmark.')
 flags.DEFINE_multi_string(
     'concurrency_streams', [], 'List of all query streams to execute. Each '
     'stream should be passed in separately and the queries should be comma '
@@ -137,6 +140,27 @@ class EdwClientInterface(object):
         secs. -1.0 is used as a sentinel value implying the query failed. For a
         successful query the value is expected to be positive.
       performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    raise NotImplementedError
+
+  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+    Response format:
+      {"simultaneous_end":1601145943197,"simultaneous_start":1601145940113,
+      "stream_performance_array":[{"query_wall_time_in_secs":2.079,
+      "query_end":1601145942208,"job_id":"914682d9-4f64-4323-bad2-554267cbbd8d",
+      "query":"1","query_start":1601145940129},{"query_wall_time_in_secs":2.572,
+      "query_end":1601145943192,"job_id":"efbf93a1-614c-4645-a268-e3801ae994f1",
+      "query":"2","query_start":1601145940620}],
+      "simultaneous_wall_time_in_secs":3.084}
+
+    Args:
+      queries: List of string names of the queries to execute simultaneously.
+
+    Returns:
+      performance_details: A dictionary of execution details.
     """
     raise NotImplementedError
 
