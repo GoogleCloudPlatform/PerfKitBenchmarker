@@ -7,6 +7,7 @@ from absl import flags
 import mock
 
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -35,6 +36,12 @@ _CREATE_RESPONSE = (json.dumps({
     'selfLink': 'https://www.googleapis.com/test',
     'status': 'READY'
 }), '', 0)
+
+_QUOTA_FAILURE_RESPONSE = (
+    '',
+    'ERROR: (gcloud.alpha.compute.resource-policies.create.group-placement) '
+    'Could not fetch resource: - Quota \'RESOURCE_POLICIES\' exceeded.  Limit: '
+    '10.0 in region europe-west4.', 1)
 # The GcePlacementGroup._Exists() response done after a Create() call.
 _EXISTS_RESPONSE = json.dumps({'status': 'ACTIVE'}), '', 0
 # The GcePlacementGroup._Exists() response done after a Delete() call.
@@ -87,7 +94,7 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
         '--format', 'json',
         '--project', 'myproject', '--quiet', '--region', 'us-east1',
         '--vm-count', '2'
-    ])
+    ], raise_on_failure=False)
 
   def testPlacementGroupDelete(self):
     self.mock_cmd.side_effect = [_EXISTS_RESPONSE, _DELETE_RESPONSE]
@@ -97,6 +104,11 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
         _PLACEMENT_GROUP_NAME, '--format', 'json', '--project', 'myproject',
         '--quiet', '--region', 'us-east1'
     ], raise_on_failure=False)
+
+  def testPlacementGroupQuotaFailure(self):
+    self.mock_cmd.return_value = _QUOTA_FAILURE_RESPONSE
+    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+      _CreateGcePlacementGroup()._Create()
 
 
 if __name__ == '__main__':

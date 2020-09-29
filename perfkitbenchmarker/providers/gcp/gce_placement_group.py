@@ -22,6 +22,7 @@ import json
 import logging
 
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
@@ -125,7 +126,14 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
 
     cmd.flags.update(placement_policy)
 
-    cmd.Issue()
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+
+    if retcode and "Quota 'RESOURCE_POLICIES' exceeded" in stderr:
+      raise errors.Benchmarks.QuotaFailure(stderr)
+    elif retcode:
+      raise errors.Resource.CreationError(
+          'Failed to create placement group: %s return code: %s' %
+          (stderr, retcode))
 
   def _Exists(self):
     """See base class."""
