@@ -41,8 +41,9 @@ def _Install(vm):
   cxx = '"g++ -std=gnu++0x \
           $(echo | gcc -Wmaybe-uninitialized -E - >/dev/null 2>&1 && \
             echo -Wno-error=maybe-uninitialized)"'
-  vm.RemoteCommand('cd {0} && CXX={2} MODE=perf DEBUG=0 CHECK_INVARIANTS=0 make\
-          -j{1} dbtest'                       .format(SILO_DIR, nthreads, cxx))
+  vm.RemoteCommand(
+      'cd {0} && CXX={2} MODE=perf DEBUG=0 CHECK_INVARIANTS=0 make -j{1} dbtest'
+      .format(SILO_DIR, nthreads, cxx))
 
 
 def YumInstall(vm):
