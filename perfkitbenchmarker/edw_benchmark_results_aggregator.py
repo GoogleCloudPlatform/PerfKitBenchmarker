@@ -579,6 +579,75 @@ class EdwSimultaneousIterationPerformance(object):
     return sample.Sample('edw_iteration_wall_time', wall_time, 'seconds',
                          wall_time_metadata)
 
+  def get_all_query_performance_samples(
+      self, metadata: Dict[str, str]) -> List[sample.Sample]:
+    """Gets a list of samples for all queries in the iteration.
+
+    Args:
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A list of samples of each query's performance
+    """
+    return [
+        query_performance.get_performance_sample(metadata)
+        for query_performance in self.performance.values()
+    ]
+
+  def has_query_performance(self, query_name: Text) -> bool:
+    """Returns whether the query was run at least once in the iteration.
+
+    Args:
+      query_name: A String name of the query to check.
+
+    Returns:
+      A boolean value indicating if the query was executed in the iteration.
+    """
+    return query_name in self.performance
+
+  def is_query_successful(self, query_name: Text) -> bool:
+    """Returns whether the query was successful in the iteration.
+
+    Args:
+      query_name: A String name of the query to check.
+
+    Returns:
+      A boolean value indicating if the query was successful in the iteration.
+    """
+    if self.has_query_performance(query_name):
+      return self.performance.get(query_name).is_successful()
+    return False
+
+  def get_aggregated_query_performance(self, query_name: Text) -> float:
+    """Gets a query's execution performance in the current iteration.
+
+    Args:
+      query_name: A String name of the query to retrieve details for
+
+    Returns:
+      A float value set to the query's average completion time in secs.
+    """
+    return self.performance[query_name].get_performance_value()
+
+  def get_aggregated_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+    """Gets the metadata of a query in the current iteration.
+
+    Args:
+      query_name: Name of the query whose aggregated performance is requested
+
+    Returns:
+      A dictionary set to the query's aggregated metadata, accumulated from the
+       raw query run in the current iteration.
+
+    Raises:
+      EdwPerformanceAggregationError: If the query failed in the iteration.
+    """
+    if not self.is_query_successful(query_name):
+      raise EdwPerformanceAggregationError('Cannot aggregate invalid / failed'
+                                           ' query' + query_name)
+    return self.performance.get(query_name).metadata
+
 
 class EdwBenchmarkPerformance(object):
   """Class that represents the performance of an edw benchmark.
@@ -674,8 +743,8 @@ class EdwBenchmarkPerformance(object):
       raise EdwPerformanceAggregationError('Cannot aggregate invalid / failed '
                                            'query ' + query_name)
     query_performances = [
-        x.get_aggregated_query_performance(query_name)
-        for x in self.iteration_performances.values()
+        iteration_performance.get_aggregated_query_performance(query_name)
+        for iteration_performance in self.iteration_performances.values()
     ]
     return sum(query_performances) / self.total_iterations
 
