@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Builds collectd from source, installs to INSTALL_DIR.
+"""Builds collectd from source, installs to linux_packages.INSTALL_DIR.
 
 https://collectd.org/
 
@@ -23,16 +23,16 @@ perfkitbenchmarker/data/build_collectd.sh.j2 for configuration details.
 import posixpath
 
 from perfkitbenchmarker import data
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 # TODO: Make collection interval configurable.
 INTERVAL = 10
 SCRIPT_NAME = 'build_collectd.sh.j2'
 COLLECTD_URL = ('https://github.com/collectd/collectd/archive/'
                 'collectd-5.5.0.tar.gz')
-BUILD_DIR = posixpath.join(INSTALL_DIR, 'collectd-build')
-CSV_DIR = posixpath.join(INSTALL_DIR, 'collectd-csv')
-PREFIX = posixpath.join(INSTALL_DIR, 'collectd')
+BUILD_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'collectd-build')
+CSV_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'collectd-csv')
+PREFIX = posixpath.join(linux_packages.INSTALL_DIR, 'collectd')
 PID_FILE = posixpath.join(PREFIX, 'var', 'run', 'collectd.pid')
 
 
@@ -45,7 +45,7 @@ def _Install(vm):
       'interval': INTERVAL}
 
   remote_path = posixpath.join(
-      INSTALL_DIR,
+      linux_packages.INSTALL_DIR,
       posixpath.splitext(posixpath.basename(SCRIPT_NAME))[0])
   vm.RenderTemplate(data.ResourcePath(SCRIPT_NAME),
                     remote_path, context=context)

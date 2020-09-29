@@ -29,10 +29,10 @@ import collections
 import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
 from six.moves import range
@@ -188,7 +188,7 @@ DEFAULT_BATCH_SIZES = {
         'vgg16': 128,
     },
 }
-DATA_DIR = posixpath.join(INSTALL_DIR, 'imagenet')
+DATA_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'imagenet')
 
 
 class TFParseOutputException(Exception):

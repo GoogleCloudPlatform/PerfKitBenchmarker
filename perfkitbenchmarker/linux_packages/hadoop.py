@@ -25,9 +25,9 @@ import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
@@ -38,7 +38,7 @@ DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
-HADOOP_DIR = posixpath.join(INSTALL_DIR, 'hadoop')
+HADOOP_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hadoop')
 HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
 HADOOP_SBIN = posixpath.join(HADOOP_DIR, 'sbin')
 HADOOP_CONF_DIR = posixpath.join(HADOOP_DIR, 'etc', 'hadoop')

@@ -20,14 +20,14 @@ import logging
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
 GIT_TAG = '4.0.0.1'
-AEROSPIKE_DIR = '%s/aerospike-server' % INSTALL_DIR
+AEROSPIKE_DIR = '%s/aerospike-server' % linux_packages.INSTALL_DIR
 AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
 
 AEROSPIKE_DEFAULT_TELNET_PORT = 3003

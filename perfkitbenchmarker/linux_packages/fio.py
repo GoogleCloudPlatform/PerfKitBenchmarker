@@ -25,15 +25,15 @@ import time
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from six import StringIO
 from six.moves import range
 import six.moves.configparser
 
-FIO_DIR = '%s/fio' % INSTALL_DIR
+FIO_DIR = '%s/fio' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/axboe/fio.git'
 GIT_TAG = 'fio-2.17'
 FIO_PATH = FIO_DIR + '/fio'

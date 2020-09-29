@@ -17,10 +17,10 @@
 import json
 import os
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import fio
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 flags.DEFINE_list(
@@ -29,7 +29,8 @@ flags.DEFINE_list(
     'cloud harmony benchmarks.')
 
 BENCHMARK = 'block-storage'
-INSTALL_PATH = os.path.join(INSTALL_DIR, BENCHMARK)
+INSTALL_PATH = os.path.join(linux_packages.INSTALL_DIR,
+                            BENCHMARK)
 STEADY_STATE_MEASUREMENT_WINDOW = '-ssmw'
 
 

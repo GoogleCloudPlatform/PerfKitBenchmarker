@@ -22,7 +22,7 @@ added after installation.
 import logging
 import re
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 # Version of python to match with pip.
 _EXPECTED_PIP_PYTHON_VERSION = 2
@@ -62,7 +62,7 @@ def Install(vm, package_name='python-pip'):
     vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
 
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
-      INSTALL_DIR))
+      linux_packages.INSTALL_DIR))
 
 
 def YumInstall(vm):
@@ -83,7 +83,7 @@ def Uninstall(vm):
   vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '
                    '--invert-match --file {0}/requirements.txt | '
                    'xargs --no-run-if-empty sudo pip uninstall -y'.format(
-                       INSTALL_DIR))
+                       linux_packages.INSTALL_DIR))
 
 
 def _MakePipSymlink(vm, as_root=False):

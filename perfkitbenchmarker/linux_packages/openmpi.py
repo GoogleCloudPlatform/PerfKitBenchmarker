@@ -21,7 +21,7 @@ import posixpath
 import re
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 FLAGS = flags.FLAGS
 
@@ -84,8 +84,9 @@ def _Install(vm):
   mpi_tar = ('openmpi-{version}.tar.gz'.format(version=version_to_install))
   mpi_url = ('{mpi_url_base}/v{major_version}/{mpi_tar}'.format(
       mpi_url_base=MPI_URL_BASE, major_version=major_version, mpi_tar=mpi_tar))
-  install_dir = posixpath.join(INSTALL_DIR, 'openmpi-{version}'
-                               .format(version=version_to_install))
+  install_dir = posixpath.join(
+      linux_packages.INSTALL_DIR,
+      'openmpi-{version}'.format(version=version_to_install))
 
   vm.Install('build_tools')
   vm.Install('wget')
@@ -114,8 +115,9 @@ def _Install(vm):
 
 def GetMpiDir():
   """Returns the installation dirtory of OpenMPI."""
-  mpi_dir = posixpath.join(INSTALL_DIR, 'openmpi-{version}'
-                           .format(version=FLAGS.openmpi_version))
+  mpi_dir = posixpath.join(
+      linux_packages.INSTALL_DIR,
+      'openmpi-{version}'.format(version=FLAGS.openmpi_version))
   return mpi_dir
 
 

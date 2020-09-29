@@ -49,10 +49,10 @@ import posixpath
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import tensorflow_serving
 
 FLAGS = flags.FLAGS
@@ -163,19 +163,20 @@ def _PrepareClient(vm):
   """
   logging.info('Installing Tensorflow Serving on client %s', vm)
   vm.Install('tensorflow_serving')
-  vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, [ILSVRC_VALIDATION_IMAGES_TAR], INSTALL_DIR)
+  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME,
+                                        [ILSVRC_VALIDATION_IMAGES_TAR],
+                                        linux_packages.INSTALL_DIR)
 
   # The image tarball does not contain a subfolder, so create one
   # using the filename of the tarball, minus the extension and extract
   # it there.
   extract_dir = posixpath.join(
-      INSTALL_DIR,
+      linux_packages.INSTALL_DIR,
       posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0])
   vm.RemoteCommand('mkdir {0}'.format(extract_dir))
 
   vm.RemoteCommand('cd {0} && tar xvf {1} --directory {2}'.format(
-      INSTALL_DIR, ILSVRC_VALIDATION_IMAGES_TAR, extract_dir))
+      linux_packages.INSTALL_DIR, ILSVRC_VALIDATION_IMAGES_TAR, extract_dir))
 
 
 def _PrepareServer(vm):
@@ -272,8 +273,9 @@ def _StartClient(vm, server_ip, client_thread_count):
   stdout, stderr = vm.RemoteCommand(
       'python {0} --server={1}:{2} --image_directory={3} '
       '--runtime={4} --num_threads={5}'.format(
-          posixpath.join(INSTALL_DIR, CLIENT_SCRIPT), server_ip, SERVER_PORT,
-          posixpath.join(INSTALL_DIR,
+          posixpath.join(linux_packages.INSTALL_DIR,
+                         CLIENT_SCRIPT), server_ip, SERVER_PORT,
+          posixpath.join(linux_packages.INSTALL_DIR,
                          posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0]),
           FLAGS.tf_serving_runtime, client_thread_count),
       should_log=True)
@@ -381,7 +383,8 @@ def Run(benchmark_spec):
   client = benchmark_spec.vm_groups['clients'][0]
 
   _StartServer(server)
-  client.PushDataFile(CLIENT_SCRIPT, remote_path=INSTALL_DIR)
+  client.PushDataFile(
+      CLIENT_SCRIPT, remote_path=linux_packages.INSTALL_DIR)
 
   samples = []
   for thread_count in FLAGS.tf_serving_client_thread_counts:

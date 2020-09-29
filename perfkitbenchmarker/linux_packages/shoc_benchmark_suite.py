@@ -18,12 +18,12 @@
 """
 
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 import os
+from perfkitbenchmarker import linux_packages
 
 
 SHOC_GIT_URL = 'https://github.com/vetter/shoc.git'
-SHOC_DIR = '%s/shoc' % INSTALL_DIR
+SHOC_DIR = '%s/shoc' % linux_packages.INSTALL_DIR
 SHOC_BIN_DIR = os.path.join(SHOC_DIR, 'bin')
 SHOC_PATCH = 'shoc_config.patch'
 APT_PACKAGES = 'wget automake git zip libopenmpi-dev'
@@ -48,7 +48,8 @@ def AptInstall(vm):
   vm.InstallPackages(APT_PACKAGES)
   vm.Install('cuda_toolkit')
 
-  vm.RemoteCommand('cd %s && git clone %s' % (INSTALL_DIR, SHOC_GIT_URL))
+  vm.RemoteCommand('cd %s && git clone %s' %
+                   (linux_packages.INSTALL_DIR, SHOC_GIT_URL))
   vm.RemoteCommand(('cd %s && ./configure '
                     'CUDA_CPPFLAGS=-gencode=arch=compute_37,code=compute_37 '
                     'NVCC=/usr/local/cuda/bin/nvcc')

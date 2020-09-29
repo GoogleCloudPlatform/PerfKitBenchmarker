@@ -19,7 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 from six.moves import range
 
 
@@ -43,16 +43,15 @@ def _GetRedisTarName():
 
 
 def GetRedisDir():
-  return '%s/redis' % INSTALL_DIR
+  return '%s/redis' % linux_packages.INSTALL_DIR
 
 
 def _Install(vm):
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand(
-      'cd %s; git clone %s' % (
-          INSTALL_DIR, REDIS_GIT))
+  vm.RemoteCommand('cd %s; git clone %s' %
+                   (linux_packages.INSTALL_DIR, REDIS_GIT))
   vm.RemoteCommand('cd %s && git checkout %s && make' % (
       GetRedisDir(), FLAGS.redis_server_version))
 

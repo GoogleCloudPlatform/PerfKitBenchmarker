@@ -37,9 +37,9 @@ import datetime
 import logging
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
-from perfkitbenchmarker import flags
 
 
 

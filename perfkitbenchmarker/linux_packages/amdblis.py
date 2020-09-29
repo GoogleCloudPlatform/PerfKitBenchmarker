@@ -13,9 +13,9 @@
 # limitations under the License.
 """Module containing AMD BLIS installation and cleanup functions."""
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
-AMDBLIS_DIR = '%s/amdblis' % INSTALL_DIR
+AMDBLIS_DIR = '%s/amdblis' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/amd/blis'
 GIT_TAG = '1.3'
 

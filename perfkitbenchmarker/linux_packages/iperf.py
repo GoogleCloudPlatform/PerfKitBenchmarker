@@ -18,12 +18,12 @@
 import posixpath
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 PACKAGE_NAME = 'iperf'
 IPERF_TAR = 'iperf-2.0.13.tar.gz'
 IPERF_URL = 'https://sourceforge.net/projects/iperf2/files/iperf-2.0.13.tar.gz'
-IPERF_DIR = '%s/iperf-2.0.13' % INSTALL_DIR
+IPERF_DIR = '%s/iperf-2.0.13' % linux_packages.INSTALL_DIR
 
 
 def _Install(vm):
@@ -32,11 +32,11 @@ def _Install(vm):
   vm.Install('wget')
 
   vm.RemoteCommand('wget -O %s/%s %s' %
-                   (INSTALL_DIR, IPERF_TAR, IPERF_URL))
+                   (linux_packages.INSTALL_DIR, IPERF_TAR, IPERF_URL))
 
   vm.RemoteCommand('cd %s; tar xvf %s; cd %s; '
                    './configure; make; sudo make install' %
-                   (INSTALL_DIR, IPERF_TAR, IPERF_DIR))
+                   (linux_packages.INSTALL_DIR, IPERF_TAR, IPERF_DIR))
 
 
 def YumInstall(vm):

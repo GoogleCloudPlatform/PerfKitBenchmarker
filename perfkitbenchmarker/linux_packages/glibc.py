@@ -16,14 +16,14 @@
 import posixpath
 import re
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 PACKAGE_NAME = 'glibc'
-GLIBC_DIR = '%s/glibc' % INSTALL_DIR
+GLIBC_DIR = '%s/glibc' % linux_packages.INSTALL_DIR
 GLIBC_VERSION = '2.31'
 GLIBC_TAR = 'glibc-{}.tar.xz'.format(GLIBC_VERSION)
 
-BINUTILS_DIR = '%s/binutils' % INSTALL_DIR
+BINUTILS_DIR = '%s/binutils' % linux_packages.INSTALL_DIR
 BINUTILS_VERSION = '2.34'
 BINUTILS_TAR = 'binutils-{}.tar.gz'.format(BINUTILS_VERSION)
 PREPROVISIONED_DATA = {
@@ -61,7 +61,8 @@ def _Install(vm):
   # bison and texinfo are required for compiling newer versions of glibc > 2.27.
   vm.InstallPackages('bison texinfo')
 
-  vm.RemoteCommand('cd {0} && mkdir binutils'.format(INSTALL_DIR))
+  vm.RemoteCommand('cd {0} && mkdir binutils'.format(
+      linux_packages.INSTALL_DIR))
   vm.InstallPreprovisionedPackageData(
       PACKAGE_NAME, [BINUTILS_TAR], BINUTILS_DIR)
   vm.RemoteCommand('cd {0} && tar xvf {1}'.format(BINUTILS_DIR, BINUTILS_TAR))
@@ -71,7 +72,7 @@ def _Install(vm):
                    'make -j 4 && sudo make install'.format(
                        BINUTILS_DIR, BINUTILS_VERSION))
 
-  vm.RemoteCommand('cd {0} && mkdir glibc'.format(INSTALL_DIR))
+  vm.RemoteCommand('cd {0} && mkdir glibc'.format(linux_packages.INSTALL_DIR))
   vm.InstallPreprovisionedPackageData(
       PACKAGE_NAME, [GLIBC_TAR], GLIBC_DIR)
   vm.RemoteCommand('cd {0} && tar xvf {1}'.format(GLIBC_DIR, GLIBC_TAR))

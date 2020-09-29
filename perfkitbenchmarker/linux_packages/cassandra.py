@@ -31,9 +31,9 @@ import time
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages.ant import ANT_HOME_DIR
 from six.moves import range
 
@@ -44,7 +44,7 @@ CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
 CASSANDRA_VERSION = 'cassandra-2.1'
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_ENV_TEMPLATE = 'cassandra/cassandra-env.sh.j2'
-CASSANDRA_DIR = posixpath.join(INSTALL_DIR, 'cassandra')
+CASSANDRA_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'cassandra')
 CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
 CASSANDRA_OUT = posixpath.join(CASSANDRA_DIR, 'cassandra.out')
 CASSANDRA_ERR = posixpath.join(CASSANDRA_DIR, 'cassandra.err')
@@ -92,7 +92,8 @@ def _Install(vm):
   vm.Install('openjdk')
   vm.Install('curl')
   vm.RemoteCommand('cd {0}; git clone {1}; cd {2}; git checkout {3}'.format(
-      INSTALL_DIR, CASSANDRA_GIT_REPRO, CASSANDRA_DIR, CASSANDRA_VERSION))
+      linux_packages.INSTALL_DIR, CASSANDRA_GIT_REPRO, CASSANDRA_DIR,
+      CASSANDRA_VERSION))
   if FLAGS.cassandra_maven_repo_url:
     # sets maven repo properties in the build.properties
     file_contents = _MAVEN_REPO_PARAMS.format(FLAGS.cassandra_maven_repo_url)

@@ -19,11 +19,11 @@ import posixpath
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
-IOR_DIR = '%s/ior' % INSTALL_DIR
+IOR_DIR = '%s/ior' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/hpc/ior'
 GIT_TAG = '945fba2aa2d571e8babc4f5f01e78e9f5e6e193e'
 _METADATA_KEYS = [

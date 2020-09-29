@@ -24,9 +24,9 @@ import re
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import amdblis
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import openblas
 
 
@@ -40,7 +40,7 @@ PACKAGE_DATA_URL = {
     HPCC_TAR: HPCC_URL
 }
 
-HPCC_DIR = '%s/hpcc-1.5.0' % INSTALL_DIR
+HPCC_DIR = '%s/hpcc-1.5.0' % linux_packages.INSTALL_DIR
 HPCC_VERSION = '1.5.0'
 
 MAKE_FLAVOR_CBLAS = 'Linux_PII_CBLAS'
@@ -264,9 +264,10 @@ def _Install(vm):
   """Installs the HPCC package on the VM."""
   vm.Install('wget')
   vm.Install('openmpi')
-  vm.InstallPreprovisionedPackageData(
-      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, HPCC_TAR))
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
+                                      linux_packages.INSTALL_DIR)
+  vm.RemoteCommand('cd %s && tar xvfz %s' %
+                   (linux_packages.INSTALL_DIR, HPCC_TAR))
 
   if FLAGS.hpcc_benchmarks:
     _LimitBenchmarksToRun(vm, set(FLAGS.hpcc_benchmarks))

@@ -22,12 +22,12 @@ from __future__ import print_function
 import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 GIT_REPO = 'https://github.com/leverich/mutilate'
-MUTILATE_DIR = '%s/mutilate_benchmark' % INSTALL_DIR
+MUTILATE_DIR = '%s/mutilate_benchmark' % linux_packages.INSTALL_DIR
 MUTILATE_BIN = '%s/mutilate' % MUTILATE_DIR
 APT_PACKAGES = 'scons libevent-dev gengetopt libzmq-dev'
 

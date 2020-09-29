@@ -39,8 +39,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
-from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
+from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
 
 BENCHMARK_NAME = 'dpb_wordcount_benchmark'
 

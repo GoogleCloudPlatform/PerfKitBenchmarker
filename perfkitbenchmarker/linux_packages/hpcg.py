@@ -23,8 +23,8 @@ There is also an older version with CUDA 8 support.
 
 import posixpath
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import cuda_toolkit
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 PACKAGE_NAME = 'hpcg'
@@ -35,7 +35,7 @@ HPCG_CUDA_8_TAR = (
     'hpcg-3.1_cuda8_ompi1.10.2_gcc485_sm_35_sm_50_sm_60_ver_3_28_17.tgz')
 HPCG_CUDA_9 = posixpath.join(HPCG_BASE_URL, HPCG_CUDA_9_TAR)
 HPCG_CUDA_8 = posixpath.join(HPCG_BASE_URL, HPCG_CUDA_8_TAR)
-HPCG_DIR = '%s/%s' % (INSTALL_DIR, 'hpcg')
+HPCG_DIR = '%s/%s' % (linux_packages.INSTALL_DIR, 'hpcg')
 PREPROVISIONED_DATA = {
     HPCG_CUDA_9_TAR:
         '384345954c20fbcd03b9d2dcfef9854a16ab942032763eab77c8f8b43a832204',
@@ -72,13 +72,13 @@ def AptInstall(vm):
   else:
     raise cuda_toolkit.UnsupportedCudaVersionException(
         'HPCG only supports CUDA 8 and CUDA 9')
-  vm.InstallPreprovisionedPackageData(
-      PACKAGE_NAME, [hpcg_tar], INSTALL_DIR)
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [hpcg_tar],
+                                      linux_packages.INSTALL_DIR)
   vm.RemoteCommand('rm -rf %s' % HPCG_DIR)
   vm.RemoteCommand('mkdir %s' % HPCG_DIR)
   vm.RemoteCommand(
-      'cd %s && tar xvf %s --directory=%s --strip-components=1' % (
-          INSTALL_DIR, hpcg_tar, HPCG_DIR))
+      'cd %s && tar xvf %s --directory=%s --strip-components=1' %
+      (linux_packages.INSTALL_DIR, hpcg_tar, HPCG_DIR))
   # Create a symlink from the hpcg binary to 'hpcg'
   vm.RemoteCommand('cd %s && ln -s %s %s' % (HPCG_DIR, hpcg_binary, 'hpcg'))
 

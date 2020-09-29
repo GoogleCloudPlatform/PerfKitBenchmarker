@@ -18,9 +18,9 @@
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker.data import ResourceNotFound
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 flags.DEFINE_integer(
     'netperf_histogram_buckets', 100,
@@ -34,7 +34,7 @@ FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.7.0.tar.gz'
 NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
               NETPERF_TAR)
-NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
+NETPERF_DIR = '%s/netperf-netperf-2.7.0' % linux_packages.INSTALL_DIR
 
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
@@ -50,7 +50,8 @@ def _Install(vm):
   vm.Install('build_tools')
 
   _CopyTar(vm)
-  vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
+  vm.RemoteCommand('cd %s && tar xvzf %s' %
+                   (linux_packages.INSTALL_DIR, NETPERF_TAR))
   # Modify netperf to print out all buckets in its histogram rather than
   # aggregating, edit runemomniaggdemo script, and apply fix to
   # allow it to compile with --enable-demo flag correctly
@@ -94,11 +95,11 @@ def _CopyTar(vm):
   """
 
   try:
-    vm.PushDataFile(NETPERF_TAR, remote_path=(INSTALL_DIR + '/'))
+    vm.PushDataFile(NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))
   except ResourceNotFound:
     vm.Install('curl')
-    vm.RemoteCommand('curl %s -L -o %s/%s' % (
-        NETPERF_URL, INSTALL_DIR, NETPERF_TAR))
+    vm.RemoteCommand('curl %s -L -o %s/%s' %
+                     (NETPERF_URL, linux_packages.INSTALL_DIR, NETPERF_TAR))
 
 
 def YumInstall(vm):

@@ -34,6 +34,7 @@ from __future__ import division
 from __future__ import print_function
 
 import datetime
+import enum
 import glob
 import json
 import logging
@@ -43,8 +44,6 @@ import re
 import threading
 import time
 import uuid
-
-import enum
 import numpy as np
 
 from perfkitbenchmarker import configs

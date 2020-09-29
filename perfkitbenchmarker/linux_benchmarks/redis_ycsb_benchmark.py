@@ -21,9 +21,8 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import math
-
 from itertools import repeat
+import math
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util

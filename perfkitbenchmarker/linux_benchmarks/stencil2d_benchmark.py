@@ -15,14 +15,14 @@
 
 import os
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import sample
-from perfkitbenchmarker import hpc_util
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import hpc_util
+from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
+from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
 
 flags.DEFINE_integer(
     'stencil2d_iterations', 5, 'number of iterations to run', lower_bound=1)

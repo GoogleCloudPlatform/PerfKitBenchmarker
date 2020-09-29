@@ -17,7 +17,7 @@
 
 import posixpath
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 ANT_TAR = 'apache-ant-1.9.6-bin.tar.gz'
 ANT_TAR_URL = 'https://archive.apache.org/dist/ant/binaries/' + ANT_TAR
@@ -27,17 +27,17 @@ PREPROVISIONED_DATA = {
     ANT_TAR:
         '90d28c0202871bd9875a5da6d982f362bb3114d346b9d8ae58860b8d3312c21c'}
 PACKAGE_DATA_URL = {ANT_TAR: ANT_TAR_URL}
-ANT_HOME_DIR = posixpath.join(INSTALL_DIR, PACKAGE_NAME)
+ANT_HOME_DIR = posixpath.join(linux_packages.INSTALL_DIR, PACKAGE_NAME)
 
 
 def _Install(vm):
   """Installs the Ant package on the VM."""
   vm.Install('wget')
-  vm.InstallPreprovisionedPackageData(
-      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
+                                      linux_packages.INSTALL_DIR)
   vm.RemoteCommand('cd {0}  && tar -zxf apache-ant-1.9.6-bin.tar.gz && '
                    'ln -s {0}/apache-ant-1.9.6/ {1}'.format(
-                       INSTALL_DIR, ANT_HOME_DIR))
+                       linux_packages.INSTALL_DIR, ANT_HOME_DIR))
 
 
 def YumInstall(vm):

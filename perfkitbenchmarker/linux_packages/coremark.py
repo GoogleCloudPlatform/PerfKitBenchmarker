@@ -15,7 +15,7 @@
 
 """Module containing coremark installation and cleanup functions."""
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 COREMARK_TAR_URL = 'https://github.com/eembc/coremark/archive/v1.01.tar.gz'
 COREMARK_TAR = 'v1.01.tar.gz'
@@ -28,8 +28,10 @@ def InstallCoremark(remote_command):
     remote_command: Function to run a remote command on the VM. This allows this
     function to be reused by the windows/cygwin version of the coremark test.
   """
-  remote_command('wget %s -P %s' % (COREMARK_TAR_URL, INSTALL_DIR))
-  remote_command('cd %s && tar xvfz %s' % (INSTALL_DIR, COREMARK_TAR))
+  remote_command('wget %s -P %s' %
+                 (COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
+  remote_command('cd %s && tar xvfz %s' %
+                 (linux_packages.INSTALL_DIR, COREMARK_TAR))
 
 
 def Install(vm):

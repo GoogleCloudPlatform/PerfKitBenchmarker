@@ -57,9 +57,9 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from perfkitbenchmarker.linux_packages import maven
 import six
 from six.moves import filter
@@ -70,9 +70,10 @@ FLAGS = flags.FLAGS
 
 YCSB_URL_TEMPLATE = ('https://github.com/brianfrankcooper/YCSB/releases/'
                      'download/{0}/ycsb-{0}.tar.gz')
-YCSB_DIR = posixpath.join(INSTALL_DIR, 'ycsb')
+YCSB_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
-HDRHISTOGRAM_DIR = posixpath.join(INSTALL_DIR, 'hdrhistogram')
+HDRHISTOGRAM_DIR = posixpath.join(linux_packages.INSTALL_DIR,
+                                  'hdrhistogram')
 HDRHISTOGRAM_TAR_URL = ('https://github.com/HdrHistogram/HdrHistogram/archive/'
                         'HdrHistogram-2.1.10.tar.gz')
 HDRHISTOGRAM_GROUPS = ['READ', 'UPDATE']
@@ -1012,7 +1013,7 @@ class YCSBExecutor(object):
         for i in range(len(vms))
     ]
 
-    remote_path = posixpath.join(INSTALL_DIR,
+    remote_path = posixpath.join(linux_packages.INSTALL_DIR,
                                  os.path.basename(workload_file))
 
     def PushWorkload(vm):
@@ -1192,7 +1193,7 @@ class YCSBExecutor(object):
       if FLAGS.ycsb_scanproportion is not None:
         parameters['scanproportion'] = FLAGS.ycsb_scanproportion
       parameters.update(kwargs)
-      remote_path = posixpath.join(INSTALL_DIR,
+      remote_path = posixpath.join(linux_packages.INSTALL_DIR,
                                    os.path.basename(workload_file))
 
       with open(workload_file) as fp:

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing go lang package installation and cleanup."""
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 PACKAGE_NAME = 'go_lang'
 
@@ -26,16 +26,16 @@ PREPROVISIONED_DATA = {
 }
 PACKAGE_DATA_URL = {GO_TAR: GO_URL}
 GO_VERSION = '1.12.9'
-GO_DIR = '%s/go-%s' % (INSTALL_DIR, GO_VERSION)
+GO_DIR = '%s/go-%s' % (linux_packages.INSTALL_DIR, GO_VERSION)
 GO_BIN = '/usr/local/go/bin/go'
 
 
 def Install(vm):
   """Install go lang package on the VM."""
   vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
-                                      INSTALL_DIR)
+                                      linux_packages.INSTALL_DIR)
   vm.RemoteCommand('cd %s && sudo tar -C /usr/local -xzf %s' %
-                   (INSTALL_DIR, GO_TAR))
+                   (linux_packages.INSTALL_DIR, GO_TAR))
   vm.RemoteCommand('export PATH=$PATH:/usr/local/go/bin')
 
 

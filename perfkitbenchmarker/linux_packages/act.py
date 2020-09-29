@@ -23,15 +23,15 @@ import logging
 import tempfile
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 from six.moves import range
 
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/act.git'
-ACT_DIR = '%s/act' % INSTALL_DIR
+ACT_DIR = '%s/act' % linux_packages.INSTALL_DIR
 flags.DEFINE_list('act_load', ['1.0'],
                   'Load multiplier for act test per device.')
 flags.DEFINE_boolean('act_parallel', False,

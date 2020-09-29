@@ -18,13 +18,13 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-import numpy
 import re
+import numpy
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import sample
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from six.moves import range

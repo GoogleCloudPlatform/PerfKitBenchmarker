@@ -19,7 +19,7 @@ import unittest
 
 import mock
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import maven
 from tests import pkb_common_test_case
 
@@ -91,7 +91,7 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
     maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
     maven_tar = maven_url.split('/')[-1]
-    maven_remote_path = posixpath.join(INSTALL_DIR, maven_tar)
+    maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
     self.assertRemoteCommandsEqual([
         'mkdir -p {0} && '
         'tar -C {0} --strip-components=1 -xzf {1}'.format(maven.MVN_DIR,

@@ -19,11 +19,11 @@ vms in the same zone.
 """
 
 import logging
+import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-import re
 
 FLAGS = flags.FLAGS
 

@@ -15,7 +15,7 @@
 """Module containing installation functions for SPEC CPU 2017."""
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
@@ -88,10 +88,10 @@ def GetSpecInstallConfig(scratch_dir):
 def Install(vm):
   """Installs SPECCPU 2017."""
   speccpu.InstallSPECCPU(vm, GetSpecInstallConfig(vm.GetScratchDir()))
-  vm.InstallPreprovisionedPackageData(
-      _PACKAGE_NAME, [LLVM_TAR, OPENMP_TAR], INSTALL_DIR)
+  vm.InstallPreprovisionedPackageData(_PACKAGE_NAME, [LLVM_TAR, OPENMP_TAR],
+                                      linux_packages.INSTALL_DIR)
   vm.RemoteCommand('cd {0} && tar xf {1} && tar xf {2}'.format(
-      INSTALL_DIR, LLVM_TAR, OPENMP_TAR))
+      linux_packages.INSTALL_DIR, LLVM_TAR, OPENMP_TAR))
   vm.RemoteCommand('sudo apt-get install -y libjemalloc1 libjemalloc-dev')
   vm.RemoteCommand('sudo apt-get update && sudo apt-get install -y libomp-dev')
   # spec17 tarball comes pre-packages with runner scripts for x86 architecture.

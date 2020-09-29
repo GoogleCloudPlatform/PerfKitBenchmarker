@@ -15,11 +15,11 @@
 
 """Module containing Silo installation and cleanup functions."""
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 GIT_REPO = 'https://github.com/stephentu/silo.git'
 GIT_TAG = '62d2d498984bf69d3b46a74e310e1fd12fd1f692'
-SILO_DIR = '%s/silo' % INSTALL_DIR
+SILO_DIR = '%s/silo' % linux_packages.INSTALL_DIR
 APT_PACKAGES = ('libjemalloc-dev libnuma-dev libdb++-dev '
                 'libmysqld-dev libaio-dev libssl-dev')
 YUM_PACKAGES = ('jemalloc-devel numactl-devel libdb-cxx-devel mysql-devel '
@@ -42,7 +42,7 @@ def _Install(vm):
           $(echo | gcc -Wmaybe-uninitialized -E - >/dev/null 2>&1 && \
             echo -Wno-error=maybe-uninitialized)"'
   vm.RemoteCommand('cd {0} && CXX={2} MODE=perf DEBUG=0 CHECK_INVARIANTS=0 make\
-          -j{1} dbtest'.format(SILO_DIR, nthreads, cxx))
+          -j{1} dbtest'                       .format(SILO_DIR, nthreads, cxx))
 
 
 def YumInstall(vm):

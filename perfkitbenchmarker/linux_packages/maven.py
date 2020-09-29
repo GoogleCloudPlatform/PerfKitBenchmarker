@@ -18,7 +18,7 @@ import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 from six.moves.urllib.parse import urlparse
 
 flags.DEFINE_string('maven_version', '3.6.3',
@@ -27,7 +27,7 @@ flags.DEFINE_string('maven_mirror_url', None,
                     'If specified, this URL will be used as a Maven mirror')
 FLAGS = flags.FLAGS
 MVN_URL = 'https://archive.apache.org/dist/maven/maven-{0}/{1}/binaries/apache-maven-{1}-bin.tar.gz'
-MVN_DIR = posixpath.join(INSTALL_DIR, 'maven')
+MVN_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'maven')
 MVN_ENV_PATH = '/etc/profile.d/maven.sh'
 
 MVN_ENV = '''
@@ -102,12 +102,9 @@ def _Install(vm):
   if maven_tar not in PREPROVISIONED_DATA:
     PREPROVISIONED_DATA[maven_tar] = ''
     PACKAGE_DATA_URL[maven_tar] = maven_url
-  maven_remote_path = posixpath.join(INSTALL_DIR, maven_tar)
-  vm.InstallPreprovisionedPackageData(
-      PACKAGE_NAME,
-      [maven_tar],
-      INSTALL_DIR
-  )
+  maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [maven_tar],
+                                      linux_packages.INSTALL_DIR)
   vm.RemoteCommand(('mkdir -p {0} && '
                     'tar -C {0} --strip-components=1 -xzf {1}').format(
                         MVN_DIR, maven_remote_path))

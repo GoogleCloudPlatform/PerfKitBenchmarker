@@ -16,11 +16,12 @@
 """
 import posixpath
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 VM_TMP_DIR = vm_util.VM_TMP_DIR
-TF_SERVING_BASE_DIRECTORY = posixpath.join(INSTALL_DIR, 'serving')
+TF_SERVING_BASE_DIRECTORY = posixpath.join(linux_packages.INSTALL_DIR,
+                                           'serving')
 
 FLAGS = flags.FLAGS
 
@@ -62,10 +63,11 @@ def BuildDockerImages(vm):
   vm.InstallPackages('git')
   vm.RemoteHostCommand('cd {0} && git clone -b {1} '
                        'https://github.com/tensorflow/serving'.format(
-                           INSTALL_DIR, FLAGS.tf_serving_branch))
+                           linux_packages.INSTALL_DIR, FLAGS.tf_serving_branch))
 
   setup_script = posixpath.join(
-      INSTALL_DIR, 'serving/tensorflow_serving/tools/docker/Dockerfile.devel')
+      linux_packages.INSTALL_DIR,
+      'serving/tensorflow_serving/tools/docker/Dockerfile.devel')
   # Changes the TensorFlow git branch to tf_serving_branch
   vm_util.ReplaceText(vm, 'ARG TF_SERVING_VERSION_GIT_BRANCH=master',
                       'ARG TF_SERVING_VERSION_GIT_BRANCH={}'
