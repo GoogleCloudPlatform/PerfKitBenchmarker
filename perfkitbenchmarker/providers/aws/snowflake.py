@@ -15,7 +15,7 @@
 
 import copy
 import json
-from typing import Dict
+from typing import Any, Dict, List
 
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import flags
@@ -98,6 +98,25 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['performance'], details
+
+  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+
+    Args:
+      queries: List of strings (names) of queries to execute.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    query_command = ('java -cp snowflake-jdbc-client-1.0.jar '
+                     'com.google.cloud.performance.edw.Simultaneous --warehouse'
+                     ' {} --database {} --schema {} --query_files {}').format(
+                         self.warehouse, self.database, self.schema,
+                         ' '.join(queries))
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    return stdout
 
   def GetMetadata(self) -> Dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""

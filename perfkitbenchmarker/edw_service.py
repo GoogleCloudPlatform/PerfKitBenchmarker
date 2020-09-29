@@ -160,7 +160,7 @@ class EdwClientInterface(object):
       queries: List of string names of the queries to execute simultaneously.
 
     Returns:
-      performance_details: A dictionary of execution details.
+      performance_details: A serialized dictionary of execution details.
     """
     raise NotImplementedError
 

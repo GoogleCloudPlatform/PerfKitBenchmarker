@@ -282,7 +282,7 @@ class JavaClientInterface(GenericClientInterface):
       queries: List of strings (names) of queries to execute.
 
     Returns:
-      A dictionary with performance details.
+      A serialized dictionary of execution details.
     """
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:

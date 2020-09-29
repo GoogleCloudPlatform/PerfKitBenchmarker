@@ -102,7 +102,10 @@ class EdwQueryPerformance(object):
     """
     results = json.loads(serialized_performance)
     # TODO(user): Handle non BQ job attributes.
-    metadata = {'job_id': results['job_id']}
+    if 'job_id' in results:
+      metadata = {'job_id': results['job_id']}
+    else:
+      metadata = {}
     return cls(query_name=results['query'],
                performance=results['query_wall_time_in_secs'],
                metadata=metadata)
