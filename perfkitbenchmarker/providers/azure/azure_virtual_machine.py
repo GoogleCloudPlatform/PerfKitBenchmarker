@@ -850,10 +850,8 @@ class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'OpenLogic:CentOS:8.0:latest'
 
 
-class CoreOsBasedAzureVirtualMachine(AzureVirtualMachine,
-                                     linux_virtual_machine.CoreOsMixin):
-  # https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
-  IMAGE_URN = 'CoreOS:CoreOS:Stable:latest'
+# TODO(pclay): Add Fedora CoreOS when available:
+#   https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
 
 
 class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,

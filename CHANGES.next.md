@@ -1,5 +1,11 @@
 ### Breaking changes:
 
+-   The core_os os_type was removed from the Azure provider as
+    [the image was deleted](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/endorsed-distros#supported-distributions-and-versions),
+    -   It will be replaced by
+        [Fedora Core OS](https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/)
+        if a public image is made avaiable.
+
 ### New features:
 
 -   Add prefix/directory support for object storage service runs.
