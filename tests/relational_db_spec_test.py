@@ -114,7 +114,7 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = benchmark_config_spec._RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertIsInstance(result.database_password, str)
-    self.assertTrue(len(result.database_password) == 10)
+    self.assertEqual(len(result.database_password), 13)
 
   def testRandomDatabasePassword(self):
     spec = _mergeDicts(self.minimal_spec, {'database_password': 'fakepassword'})

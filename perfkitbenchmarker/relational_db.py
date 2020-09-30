@@ -14,7 +14,9 @@
 
 
 from abc import abstractmethod
+import random
 import re
+import string
 import uuid
 
 from perfkitbenchmarker import flags
@@ -129,8 +131,19 @@ class UnsupportedError(Exception):
 
 
 def GenerateRandomDbPassword():
-  """Generate a random password 10 characters in length."""
-  return str(uuid.uuid4())[:10]
+  """Generate a strong random password.
+
+   # pylint: disable=line-too-long
+  Reference: https://docs.microsoft.com/en-us/sql/relational-databases/security/password-policy?view=sql-server-ver15
+  # pylint: enable=line-too-long
+
+  Returns:
+    A random database password.
+  """
+  prefix = [random.choice(string.ascii_lowercase),
+            random.choice(string.ascii_uppercase),
+            random.choice(string.digits)]
+  return ''.join(prefix) + str(uuid.uuid4())[:10]
 
 
 def GetRelationalDbClass(cloud):
