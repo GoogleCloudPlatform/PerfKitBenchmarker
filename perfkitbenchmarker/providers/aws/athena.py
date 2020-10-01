@@ -17,6 +17,7 @@ import datetime
 import json
 import logging
 import os
+import re
 from typing import Dict
 
 from perfkitbenchmarker import data
@@ -334,9 +335,29 @@ class Athena(edw_service.EdwService):
     # warehouse resource isn't created/deleted each time.
     self.s3_service.DeleteBucket(self.output_bucket)
 
+  def GetDataDetails(self) -> Dict[str, str]:
+    """Returns a dictionary with underlying data details.
+
+    cluster_identifier = <dataset_id>
+    Data details are extracted from the dataset_id that follows the format:
+    <dataset>_<format>_<compression>_<partitioning>
+    eg.
+    tpch100_parquet_uncompressed_unpartitoned
+
+    Returns:
+      A dictionary set to underlying data's details (format, etc.)
+    """
+    data_details = {}
+    parsed_id = re.split(r'_', self.cluster_identifier)
+    data_details['format'] = parsed_id[1]
+    data_details['compression'] = parsed_id[2]
+    data_details['partitioning'] = parsed_id[3]
+    return data_details
+
   def GetMetadata(self):
     """Return a dictionary of the metadata for the Athena data warehouse."""
     basic_data = super(Athena, self).GetMetadata()
     basic_data.update({'database': self.cluster_identifier})
+    basic_data.update(self.GetDataDetails())
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data

@@ -522,8 +522,9 @@ class Endor(Bigquery):
     """
     data_details = {}
     dataset_id = re.split(r'\.', self.cluster_identifier)[1]
-    data_details['format'] = re.split(r'_', dataset_id)[1]
-    data_details['compression'] = re.split(r'_', dataset_id)[2]
-    data_details['partitioning'] = re.split(r'_', dataset_id)[3]
-    data_details['location'] = re.split(r'_', dataset_id)[4]
+    parsed_id = re.split(r'_', dataset_id)
+    data_details['format'] = parsed_id[1]
+    data_details['compression'] = parsed_id[2]
+    data_details['partitioning'] = parsed_id[3]
+    data_details['location'] = parsed_id[4]
     return data_details
