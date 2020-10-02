@@ -27,6 +27,7 @@ then record the system time in nanoseconds.
 """
 
 import functools
+from http import server
 import logging
 import multiprocessing
 import os
@@ -34,7 +35,6 @@ import subprocess
 import sys
 import threading
 import time
-from http import server
 
 
 # Amount of time in seconds to attempt calling a client VM if VM calling in.
@@ -47,6 +47,8 @@ _STOP_QUEUE_ENTRY = 'stop'
 UNDEFINED_HOSTNAME = 'UNDEFINED'
 # Tag for sequential hostname, should be synced with large_scale_boot_benchmark.
 SEQUENTIAL_IP = 'SEQUENTIAL_IP'
+# Multiplier for nanoseconds
+NANO = 1e9
 
 
 def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
@@ -62,11 +64,37 @@ def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
     # different versions of netcat uses different stderr strings.
     if any(word in stderr.decode('utf-8') for word in ['open', 'succeeded']):
       # return the system time in nanoseconds
-      return 'Pass:%s:%d' % (client_host, time.time() * 1e9)
+      return 'Pass:%s:%d' % (client_host, time.time() * NANO)
 
   logging.warning('Could not netcat to port %s on client vm %s.',
                   port, client_host)
-  return 'Fail:%s:%d' % (client_host, time.time() * 1e9)
+  return 'Fail:%s:%d' % (client_host, time.time() * NANO)
+
+
+def WaitForRunningStatus(client_host, timeout=MAX_TIME_SECONDS):
+  """Wait for the VM to report running status.
+
+  Status command generated from data/large_scale_boot/vm_status.sh.jinja2.
+
+  Args:
+    client_host: client host to check for running status.
+    timeout: Max timeout to wait before declaring failure.
+
+  Returns:
+    host status string.
+  """
+  with open('/tmp/pkb/vm_status.sh', 'r') as reader:
+    command = reader.read()
+  start_time = time.time()
+  while time.time() <= (start_time + timeout):
+    p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
+                         universal_newlines=True, stderr=subprocess.PIPE)
+    status, _ = p.communicate()
+    if 'running' in status.lower():
+      return 'Running:%s:%d' % (client_host, time.time() * NANO)
+
+  logging.warning('Client vm %s not running yet.', client_host)
+  return 'Fail:%s:%d' % (client_host, time.time() * NANO)
 
 
 def StoreResult(result_str, queue):
@@ -177,6 +205,12 @@ def ActAsClient(pool, queue, port, name_pattern, vms_count, use_public_ip):
         args=(host_name, port, MAX_TIME_SECONDS_NO_CALLING,),
         callback=store_results)
     all_jobs.append(job)
+    if vms_count == 1:
+      status_job = pool.apply_async(
+          WaitForRunningStatus,
+          args=(host_name, MAX_TIME_SECONDS_NO_CALLING,),
+          callback=store_results)
+      all_jobs.append(status_job)
   logging.info([async_job.get() for async_job in all_jobs])
   queue.put(_STOP_QUEUE_ENTRY)
 

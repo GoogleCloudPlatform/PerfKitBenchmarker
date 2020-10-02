@@ -27,6 +27,7 @@
 -   Added `--before_run_pause` flag for debugging during benchmark development.
 -   Report CPU vulnerabilities as a sample via the --record_cpu_vuln flag.
 -   Add retry when calling MountDisk.
+-   Measure time to running status of a VM in large_scale_boot benchmark.
 
 ### Bug fixes and maintenance updates:
 

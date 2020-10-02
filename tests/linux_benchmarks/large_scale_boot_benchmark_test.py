@@ -34,18 +34,20 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       large_scale_boot_benchmark, '_GetExpectedBoots', return_value=4)
   def testWaitForResponsesSuccess(self, mock_func):
     vm1 = mock.Mock()
-    vm1.RemoteCommand.side_effect = [('', ''), ('2 results', '')]
+    vm1.RemoteCommand.side_effect = [('', ''), ('2', '')]
     vm2 = mock.Mock()
-    vm2.RemoteCommand.side_effect = [('', ''), ('2 results', '')]
+    vm2.RemoteCommand.side_effect = [('', ''), ('2', '')]
     large_scale_boot_benchmark._WaitForResponses([vm1, vm2])
-    vm1.RemoteCommand.assert_called_with('wc -l /tmp/pkb/results')
-    vm2.RemoteCommand.assert_called_with('wc -l /tmp/pkb/results')
+    vm1.RemoteCommand.assert_called_with(
+        'grep -c Pass /tmp/pkb/results', ignore_failure=True)
+    vm2.RemoteCommand.assert_called_with(
+        'grep -c Pass /tmp/pkb/results', ignore_failure=True)
 
   @mock.patch.object(
       large_scale_boot_benchmark, '_GetExpectedBoots', return_value=4)
   def testWaitForResponsesDeadServer(self, mock_func):
     vm1 = mock.Mock()
-    vm1.RemoteCommand.side_effect = [('Error: Failed', ''), ('2 results', '')]
+    vm1.RemoteCommand.side_effect = [('Error: Failed', ''), ('2', '')]
     with self.assertRaises(errors.Benchmarks.RunError):
       large_scale_boot_benchmark._WaitForResponses([vm1])
 
@@ -54,7 +56,7 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testWaitForResponsesTwice(self, mock_func):
     vm1 = mock.Mock()
     vm1.RemoteCommand.side_effect = [
-        ('', ''), ('2 results', ''), ('', ''), ('5 results', '')]
+        ('', ''), ('2', ''), ('', ''), ('5', '')]
     large_scale_boot_benchmark._WaitForResponses([vm1])
     self.assertEqual(vm1.RemoteCommand.call_count, 4)
 
