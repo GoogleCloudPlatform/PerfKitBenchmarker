@@ -92,7 +92,7 @@ class EdwQueryPerformance(object):
     """Process the serialized query performance from client jar.
 
     Expected Performance format:
-      {"query_wall_time_in_secs":34.754,"query_end":1601011628376,"job_id":"228e9731-e771-4112-90e4-8b385973cf80","query":"2","query_start":1601011593622}
+      {"query_wall_time_in_secs":1.998,"query_end":1601695222108,"query":"1","query_start":1601695220110,"details":{"job_id":"b66b5a8e-633f-4ee4-8632-4e3d0856172f"}}
 
     Args:
       serialized_performance: Stringified json performance.
@@ -101,9 +101,8 @@ class EdwQueryPerformance(object):
       An instance of EdwQueryPerformance
     """
     results = json.loads(serialized_performance)
-    # TODO(user): Handle non BQ job attributes.
-    if 'job_id' in results:
-      metadata = {'job_id': results['job_id']}
+    if 'details' in results:
+      metadata = results['details']
     else:
       metadata = {}
     return cls(query_name=results['query'],
@@ -539,8 +538,7 @@ class EdwSimultaneousIterationPerformance(object):
       An instance of EdwSimultaneousIterationPerformance
     """
     results = json.loads(serialized_performance)
-    # TODO(user): Rename reference to stream.
-    query_performances = results['stream_performance_array']
+    query_performances = results['all_queries_performance_array']
     query_performance_map = {}
     for query_perf_json in query_performances:
       query_perf = EdwQueryPerformance.from_json(
