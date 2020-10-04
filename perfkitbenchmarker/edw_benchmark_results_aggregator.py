@@ -523,7 +523,7 @@ class EdwSimultaneousIterationPerformance(object):
 
     Expected Performance format:
       {"simultaneous_end":1601145943197,"simultaneous_start":1601145940113,
-      "stream_performance_array":[{"query_wall_time_in_secs":2.079,
+      "all_queries_performance_array":[{"query_wall_time_in_secs":2.079,
       "query_end":1601145942208,"job_id":"914682d9-4f64-4323-bad2-554267cbbd8d",
       "query":"1","query_start":1601145940129},{"query_wall_time_in_secs":2.572,
       "query_end":1601145943192,"job_id":"efbf93a1-614c-4645-a268-e3801ae994f1",
