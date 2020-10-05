@@ -56,8 +56,8 @@ class GcpSpannerInstance(resource.BaseResource):
     ddl:         The schema of the database.
   """
 
-  def __init__(self, name, description, database, ddl):
-    super(GcpSpannerInstance, self).__init__()
+  def __init__(self, name, description, database, ddl, **kwargs):
+    super(GcpSpannerInstance, self).__init__(**kwargs)
     self._name = name
     self._description = description
     self._database = database
@@ -69,7 +69,9 @@ class GcpSpannerInstance(resource.BaseResource):
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
-    self.project = FLAGS.cloud_spanner_project or util.GetDefaultProject()
+    self.project = (
+        FLAGS.cloud_spanner_project or FLAGS.project or
+        util.GetDefaultProject())
     self.zone = None
 
   def _Create(self):

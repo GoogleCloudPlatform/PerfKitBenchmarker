@@ -141,9 +141,9 @@ class _GetIndexes():
 class AwsDynamoDBInstance(resource.BaseResource):
   """Class for working with DynamoDB."""
 
-  def __init__(self, table_name):
-    super(AwsDynamoDBInstance, self).__init__()
-    self.zone = FLAGS.zones[0]
+  def __init__(self, table_name, **kwargs):
+    super(AwsDynamoDBInstance, self).__init__(**kwargs)
+    self.zone = FLAGS.zones[0] if FLAGS.zones else FLAGS.zone[0]
     self.region = util.GetRegionFromZone(self.zone)
     self.primary_key = ('{{\"AttributeName\": \"{0}\",\"KeyType\": \"HASH\"}}'
                         .format(FLAGS.aws_dynamodb_primarykey))
