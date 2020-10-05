@@ -396,6 +396,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       step_list = ['Type=Spark', arg_spec]
     elif job_type == self.SPARKSQL_JOB_TYPE:
       assert not job_arguments
+      arg_list = [query_file]
       jar_spec = 'Jar="command-runner.jar"'
       for k, v in all_properties.items():
         arg_list += ['--conf', '{}={}'.format(k, v)]
