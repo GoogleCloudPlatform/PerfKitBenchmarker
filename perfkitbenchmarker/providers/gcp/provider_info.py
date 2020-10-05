@@ -14,8 +14,8 @@
 
 """ Provider info for Google Cloud Platform."""
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 
 
 class GCPProviderInfo(provider_info.BaseProviderInfo):

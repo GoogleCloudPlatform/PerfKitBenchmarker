@@ -23,7 +23,7 @@ Installing Tomcat via this module makes some changes to the default settings:
 https://tomcat.apache.org/
 """
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_packages
 
 

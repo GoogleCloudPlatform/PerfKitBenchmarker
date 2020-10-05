@@ -18,10 +18,9 @@ Clusters can be created and deleted.
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util

@@ -74,6 +74,7 @@ import time
 from typing import List, Optional
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import archive
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_lookup
@@ -86,7 +87,6 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types

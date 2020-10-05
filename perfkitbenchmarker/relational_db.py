@@ -19,7 +19,7 @@ import re
 import string
 import uuid
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 import six

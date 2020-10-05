@@ -20,9 +20,9 @@ import os
 import time
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util

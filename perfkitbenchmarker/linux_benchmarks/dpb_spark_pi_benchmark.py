@@ -26,9 +26,8 @@ completion.
 """
 import inspect
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 BENCHMARK_NAME = 'dpb_spark_pi_benchmark'

@@ -19,9 +19,9 @@ private ip since they can't be connected to vnets.
 """
 
 import json
+from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure

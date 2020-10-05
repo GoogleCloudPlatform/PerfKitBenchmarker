@@ -20,10 +20,9 @@ at https://cloud.google.com/dataproc/
 import datetime
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials

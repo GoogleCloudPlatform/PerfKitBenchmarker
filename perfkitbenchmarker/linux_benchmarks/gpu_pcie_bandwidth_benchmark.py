@@ -19,10 +19,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import re
+from absl import flags
 import numpy
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit

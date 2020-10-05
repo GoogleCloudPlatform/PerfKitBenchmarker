@@ -16,10 +16,9 @@
 """Module containing aerospike server installation and cleanup functions."""
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 

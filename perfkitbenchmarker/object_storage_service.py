@@ -22,8 +22,8 @@ import abc
 import logging
 import os
 
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 import six
 
 flags.DEFINE_string('object_storage_credential_file', None,

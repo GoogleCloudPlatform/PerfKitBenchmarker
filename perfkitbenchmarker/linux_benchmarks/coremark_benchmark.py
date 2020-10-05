@@ -21,10 +21,9 @@ Coremark homepage: http://www.eembc.org/coremark/
 """
 
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample

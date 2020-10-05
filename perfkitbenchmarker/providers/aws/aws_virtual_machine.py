@@ -30,10 +30,9 @@ import posixpath
 import re
 import threading
 import uuid
-
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers

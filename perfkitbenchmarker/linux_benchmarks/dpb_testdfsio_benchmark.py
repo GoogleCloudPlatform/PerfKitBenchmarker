@@ -22,12 +22,10 @@ parameter values. Each file is accessed in a separate map task.
 
 import copy
 import datetime
-
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
 

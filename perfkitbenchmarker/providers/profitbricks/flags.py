@@ -14,7 +14,7 @@
 
 import os
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 
 # Locations

@@ -14,7 +14,7 @@
 
 import time
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

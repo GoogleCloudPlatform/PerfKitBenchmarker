@@ -20,9 +20,9 @@ import collections
 import json
 import logging
 import re
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import six

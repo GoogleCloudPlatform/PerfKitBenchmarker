@@ -21,11 +21,10 @@ managed data warehouse solutions such as Redshift and BigQuery.
 
 import logging
 import os
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import edw_benchmark_results_aggregator as results_aggregator
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import flags
 
 BENCHMARK_NAME = 'edw_benchmark'
 

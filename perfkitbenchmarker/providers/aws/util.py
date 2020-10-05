@@ -22,11 +22,9 @@ import collections
 import json
 import re
 import string
-
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 import six
 

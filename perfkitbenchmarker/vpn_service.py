@@ -30,7 +30,7 @@ from enum import Enum
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 

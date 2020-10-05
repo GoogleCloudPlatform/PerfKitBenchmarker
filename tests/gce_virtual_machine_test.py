@@ -14,6 +14,7 @@
 
 """Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine."""
 
+import builtins
 import contextlib
 import copy
 import json
@@ -21,7 +22,6 @@ import re
 import unittest
 
 from absl import flags
-import builtins
 import mock
 
 from perfkitbenchmarker import benchmark_spec

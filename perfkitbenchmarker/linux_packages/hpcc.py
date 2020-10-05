@@ -21,9 +21,8 @@ http://icl.cs.utk.edu/hpcc/
 import os
 import posixpath
 import re
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import amdblis

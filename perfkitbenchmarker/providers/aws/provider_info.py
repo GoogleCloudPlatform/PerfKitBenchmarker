@@ -17,8 +17,8 @@
 AWS provider info
 """
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 
 
 class AWSProviderInfo(provider_info.BaseProviderInfo):

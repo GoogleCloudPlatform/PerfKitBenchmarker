@@ -28,8 +28,8 @@ import datetime
 import json
 import logging
 import time
+from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker.providers.gcp import gce_network

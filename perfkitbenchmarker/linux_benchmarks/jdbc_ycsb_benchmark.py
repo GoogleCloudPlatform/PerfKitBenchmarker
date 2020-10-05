@@ -26,10 +26,9 @@ Tested against Azure SQL database.
 """
 
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
@@ -80,85 +79,85 @@ flags.DEFINE_integer('jdbc_ycsb_fetch_size',
 
 
 def GetConfig(user_config):
-    config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-    if FLAGS['ycsb_client_vms'].present:
-        config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
-    return config
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites(benchmark_config):
-    # Before YCSB Cloud Datastore supports Application Default Credential,
-    # we should always make sure valid credential flags are set.
-    if not FLAGS.jdbc_ycsb_db_driver:
-        raise ValueError('"jdbc_ycsb_db_driver" must be set')
-    if not FLAGS.jdbc_ycsb_db_driver_path:
-        raise ValueError('"jdbc_ycsb_db_driver_path" must be set')
-    if not FLAGS.jdbc_ycsb_db_url:
-        raise ValueError('"jdbc_ycsb_db_url" must be set')
-    if not FLAGS.jdbc_ycsb_db_user:
-        raise ValueError('"jdbc_ycsb_db_user" must be set ')
-    if not FLAGS.jdbc_ycsb_db_passwd:
-        raise ValueError('"jdbc_ycsb_db_passwd" must be set ')
+  # Before YCSB Cloud Datastore supports Application Default Credential,
+  # we should always make sure valid credential flags are set.
+  if not FLAGS.jdbc_ycsb_db_driver:
+    raise ValueError('"jdbc_ycsb_db_driver" must be set')
+  if not FLAGS.jdbc_ycsb_db_driver_path:
+    raise ValueError('"jdbc_ycsb_db_driver_path" must be set')
+  if not FLAGS.jdbc_ycsb_db_url:
+    raise ValueError('"jdbc_ycsb_db_url" must be set')
+  if not FLAGS.jdbc_ycsb_db_user:
+    raise ValueError('"jdbc_ycsb_db_user" must be set ')
+  if not FLAGS.jdbc_ycsb_db_passwd:
+    raise ValueError('"jdbc_ycsb_db_passwd" must be set ')
 
 
 def Prepare(benchmark_spec):
-    benchmark_spec.always_call_cleanup = True
-    vms = benchmark_spec.vms
+  benchmark_spec.always_call_cleanup = True
+  vms = benchmark_spec.vms
 
-    # Install required packages and copy credential files.
-    vm_util.RunThreaded(_Install, vms)
+  # Install required packages and copy credential files.
+  vm_util.RunThreaded(_Install, vms)
 
-    # Create benchmark table.
-    ExecuteSql(vms[0], DROP_TABLE_SQL)
-    ExecuteSql(vms[0], CREATE_TABLE_SQL)
-    benchmark_spec.executor = ycsb.YCSBExecutor('jdbc')
+  # Create benchmark table.
+  ExecuteSql(vms[0], DROP_TABLE_SQL)
+  ExecuteSql(vms[0], CREATE_TABLE_SQL)
+  benchmark_spec.executor = ycsb.YCSBExecutor('jdbc')
 
 
 def ExecuteSql(vm, sql):
-    db_args = (
-        ' -p db.driver={0}'
-        ' -p db.url="{1}"'
-        ' -p db.user={2}'
-        ' -p db.passwd={3}').format(
-        FLAGS.jdbc_ycsb_db_driver,
-        FLAGS.jdbc_ycsb_db_url,
-        FLAGS.jdbc_ycsb_db_user,
-        FLAGS.jdbc_ycsb_db_passwd)
+  db_args = (
+      ' -p db.driver={0}'
+      ' -p db.url="{1}"'
+      ' -p db.user={2}'
+      ' -p db.passwd={3}').format(
+      FLAGS.jdbc_ycsb_db_driver,
+      FLAGS.jdbc_ycsb_db_url,
+      FLAGS.jdbc_ycsb_db_user,
+      FLAGS.jdbc_ycsb_db_passwd)
 
-    exec_cmd = 'java -cp "{0}/*" com.yahoo.ycsb.db.JdbcDBCli -c "{1}" ' \
-        .format(YCSB_BINDING_LIB_DIR, sql)
-    stdout, stderr = vm.RobustRemoteCommand(exec_cmd + db_args)
+  exec_cmd = 'java -cp "{0}/*" com.yahoo.ycsb.db.JdbcDBCli -c "{1}" ' \
+      .format(YCSB_BINDING_LIB_DIR, sql)
+  stdout, stderr = vm.RobustRemoteCommand(exec_cmd + db_args)
 
-    if 'successfully executed' not in stdout and not stderr:
-        raise errors.VirtualMachine.RemoteCommandError(stderr)
+  if 'successfully executed' not in stdout and not stderr:
+    raise errors.VirtualMachine.RemoteCommandError(stderr)
 
 
 def Run(benchmark_spec):
-    vms = benchmark_spec.vms
+  vms = benchmark_spec.vms
 
-    run_kwargs = {
-        'db.driver': FLAGS.jdbc_ycsb_db_driver,
-        'db.url': '"%s"' % FLAGS.jdbc_ycsb_db_url,
-        'db.user': FLAGS.jdbc_ycsb_db_user,
-        'db.passwd': FLAGS.jdbc_ycsb_db_passwd,
-        'db.batchsize': FLAGS.jdbc_ycsb_db_batch_size,
-        'jdbc.fetchsize': FLAGS.jdbc_ycsb_fetch_size,
-    }
-    load_kwargs = run_kwargs.copy()
-    if FLAGS['ycsb_preload_threads'].present:
-        load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
-    samples = list(benchmark_spec.executor.LoadAndRun(
-        vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
-    return samples
+  run_kwargs = {
+      'db.driver': FLAGS.jdbc_ycsb_db_driver,
+      'db.url': '"%s"' % FLAGS.jdbc_ycsb_db_url,
+      'db.user': FLAGS.jdbc_ycsb_db_user,
+      'db.passwd': FLAGS.jdbc_ycsb_db_passwd,
+      'db.batchsize': FLAGS.jdbc_ycsb_db_batch_size,
+      'jdbc.fetchsize': FLAGS.jdbc_ycsb_fetch_size,
+  }
+  load_kwargs = run_kwargs.copy()
+  if FLAGS['ycsb_preload_threads'].present:
+    load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
+  samples = list(benchmark_spec.executor.LoadAndRun(
+      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  return samples
 
 
 def Cleanup(benchmark_spec):
-    # support automatic cleanup.
-    ExecuteSql(benchmark_spec.vms[0], DROP_TABLE_SQL)
+  # support automatic cleanup.
+  ExecuteSql(benchmark_spec.vms[0], DROP_TABLE_SQL)
 
 
 def _Install(vm):
-    vm.Install('ycsb')
+  vm.Install('ycsb')
 
-    # Copy driver jar to VM.
-    vm.RemoteCopy(FLAGS.jdbc_ycsb_db_driver_path, YCSB_BINDING_LIB_DIR)
+  # Copy driver jar to VM.
+  vm.RemoteCopy(FLAGS.jdbc_ycsb_db_driver_path, YCSB_BINDING_LIB_DIR)

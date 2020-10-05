@@ -17,10 +17,10 @@
 
 import re
 
-from perfkitbenchmarker import flags
+from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
-from perfkitbenchmarker.data import ResourceNotFound
 
 flags.DEFINE_integer(
     'netperf_histogram_buckets', 100,
@@ -96,7 +96,7 @@ def _CopyTar(vm):
 
   try:
     vm.PushDataFile(NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))
-  except ResourceNotFound:
+  except data.ResourceNotFound:
     vm.Install('curl')
     vm.RemoteCommand('curl %s -L -o %s/%s' %
                      (NETPERF_URL, linux_packages.INSTALL_DIR, NETPERF_TAR))

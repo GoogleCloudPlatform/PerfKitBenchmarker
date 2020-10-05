@@ -20,10 +20,9 @@ import logging
 import os
 import re
 from typing import Any, Dict, List
-
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk

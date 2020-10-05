@@ -22,10 +22,9 @@ flavor.
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders

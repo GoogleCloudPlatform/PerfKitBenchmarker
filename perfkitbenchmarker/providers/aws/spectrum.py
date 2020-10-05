@@ -18,8 +18,8 @@ and deleted.
 """
 
 import json
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import redshift
 from perfkitbenchmarker.providers.aws import util

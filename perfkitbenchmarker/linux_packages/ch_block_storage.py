@@ -16,7 +16,7 @@
 
 import json
 import os
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample

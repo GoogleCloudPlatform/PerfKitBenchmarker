@@ -20,7 +20,7 @@ directory as a subclass of BaseEdwService.
 import os
 from typing import Any, Dict, List, Text
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 
 

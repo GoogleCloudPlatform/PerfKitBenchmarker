@@ -15,7 +15,7 @@
 
 """
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 

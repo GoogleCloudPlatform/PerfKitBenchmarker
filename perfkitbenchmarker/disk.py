@@ -24,7 +24,7 @@ from __future__ import print_function
 import abc
 import logging
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec

@@ -22,7 +22,7 @@ from __future__ import print_function
 import json
 import logging
 import re
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 

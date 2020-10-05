@@ -7,11 +7,10 @@ from __future__ import print_function
 
 import json
 import unittest
-
+from absl import flags
 import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_nfs_service

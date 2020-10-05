@@ -22,8 +22,8 @@ Note: This package is only available for Debian VMs on GCP now. Modification is
 needed for other platforms.
 """
 
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 
 flags.DEFINE_enum('tcmalloc_version', 'off',
                   ['off', 'gperftools', 'experimental'],

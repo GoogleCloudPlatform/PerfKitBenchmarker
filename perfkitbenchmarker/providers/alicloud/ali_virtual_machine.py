@@ -18,21 +18,20 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-import json
-import threading
-import logging
 import base64
-import six
-
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import vm_util
+import json
+import logging
+import threading
+from absl import flags
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import providers
+from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import ali_disk
 from perfkitbenchmarker.providers.alicloud import ali_network
 from perfkitbenchmarker.providers.alicloud import util
-from perfkitbenchmarker import providers
+import six
 
 FLAGS = flags.FLAGS
 NON_HVM_PREFIXES = ['t1', 's1', 's2', 's3', 'm1']

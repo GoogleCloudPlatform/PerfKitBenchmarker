@@ -20,7 +20,7 @@ Cloud specific implementations of Placement Group.
 import json
 import uuid
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util

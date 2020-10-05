@@ -15,8 +15,8 @@
 
 import posixpath
 import re
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample

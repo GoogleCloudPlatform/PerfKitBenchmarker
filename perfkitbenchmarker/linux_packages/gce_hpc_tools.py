@@ -25,7 +25,7 @@ YumInstall(vm) when vm.Install('gce_hpc_tools') is invoked.
 
 import logging
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 
 # Github URL for HPC tools used with flag --gce_hpc_tools

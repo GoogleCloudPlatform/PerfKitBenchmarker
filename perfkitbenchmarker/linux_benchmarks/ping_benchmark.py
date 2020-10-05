@@ -20,8 +20,8 @@ vms in the same zone.
 
 import logging
 import re
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 

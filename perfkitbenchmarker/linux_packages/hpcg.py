@@ -22,7 +22,7 @@ There is also an older version with CUDA 8 support.
 """
 
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 

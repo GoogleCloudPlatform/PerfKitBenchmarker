@@ -30,15 +30,14 @@ import socket
 import threading
 import time
 
+from absl import flags
 import jinja2
-
 from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import resource

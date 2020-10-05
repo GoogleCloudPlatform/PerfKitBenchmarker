@@ -21,9 +21,8 @@ TODO: add global table option.
 """
 
 import os
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb

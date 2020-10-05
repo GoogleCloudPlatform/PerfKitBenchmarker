@@ -19,8 +19,8 @@ import json
 import time
 from typing import Any, Dict, List, Text
 
+from absl import flags
 import numpy as np
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 

@@ -30,12 +30,11 @@ import tempfile
 import threading
 import time
 
+from absl import flags
 import jinja2
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
 from six.moves import range
 

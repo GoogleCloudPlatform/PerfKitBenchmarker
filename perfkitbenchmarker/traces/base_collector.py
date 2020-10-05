@@ -26,10 +26,9 @@ import posixpath
 import threading
 import time
 import uuid
-
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 import six
 

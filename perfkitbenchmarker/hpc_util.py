@@ -14,7 +14,7 @@
 
 """HPC utility functions."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_boolean('mpirun_allow_run_as_root', False,

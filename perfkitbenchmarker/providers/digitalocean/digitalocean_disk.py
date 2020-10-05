@@ -17,9 +17,9 @@ At this time, DigitalOcean does not implement any standalone disk objects,
 the instances come with directly integrated storage.
 """
 
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 
 from perfkitbenchmarker.providers.digitalocean import util

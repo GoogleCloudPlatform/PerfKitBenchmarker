@@ -15,11 +15,10 @@
 import pickle
 import sys
 import unittest
-
+from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec

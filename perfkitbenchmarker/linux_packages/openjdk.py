@@ -15,7 +15,7 @@
 
 """Module containing OpenJDK installation and cleanup functions."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

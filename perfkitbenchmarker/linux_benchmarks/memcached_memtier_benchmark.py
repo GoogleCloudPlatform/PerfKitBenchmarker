@@ -30,9 +30,8 @@ https://redislabs.com/blog/memtier_benchmark-a-high-throughput-benchmarking-tool
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import memtier
 

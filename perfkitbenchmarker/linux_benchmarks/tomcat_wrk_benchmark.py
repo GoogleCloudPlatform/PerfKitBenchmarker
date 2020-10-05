@@ -33,9 +33,8 @@ from __future__ import print_function
 import functools
 import logging
 import operator
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import tomcat
 from perfkitbenchmarker.linux_packages import wrk

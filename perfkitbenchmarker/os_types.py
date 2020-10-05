@@ -13,7 +13,7 @@
 # limitations under the License.
 """Supported types of operating systems that a VM may host."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 AMAZONLINUX1 = 'amazonlinux1'  # deprecated (b/148486659)
 AMAZONLINUX2 = 'amazonlinux2'

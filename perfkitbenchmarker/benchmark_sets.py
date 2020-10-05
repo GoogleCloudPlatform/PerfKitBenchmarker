@@ -22,8 +22,8 @@ import collections
 import copy
 import itertools
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types

@@ -16,9 +16,8 @@
 import copy
 import json
 from typing import Any, Dict, List
-
+from absl import flags
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 
 

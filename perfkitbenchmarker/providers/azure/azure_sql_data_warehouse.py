@@ -20,10 +20,9 @@ import copy
 import json
 import os
 from typing import Dict
-
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure

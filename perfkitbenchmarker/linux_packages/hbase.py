@@ -22,9 +22,8 @@ import logging
 import os
 import posixpath
 import re
-
+from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop

@@ -20,10 +20,9 @@ https://cloud.google.com/compute/docs/instances/define-instance-placement
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import option_decoders

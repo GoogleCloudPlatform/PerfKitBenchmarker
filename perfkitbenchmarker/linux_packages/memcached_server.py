@@ -16,9 +16,8 @@
 """Module containing memcached server installation and cleanup functions."""
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

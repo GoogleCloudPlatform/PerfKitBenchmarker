@@ -15,9 +15,8 @@
 
 import os
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from six.moves.urllib.parse import urlparse
 

@@ -18,11 +18,10 @@ import json
 import logging
 import os
 import re
-
+from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util

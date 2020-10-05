@@ -38,9 +38,8 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import mutilate

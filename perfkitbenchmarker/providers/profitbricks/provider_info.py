@@ -16,11 +16,11 @@
 """
 
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 
 
 class ProfitBricksProviderInfo(provider_info.BaseProviderInfo):
 
-    UNSUPPORTED_BENCHMARKS = ['mysql_service']
-    CLOUD = providers.PROFITBRICKS
+  UNSUPPORTED_BENCHMARKS = ['mysql_service']
+  CLOUD = providers.PROFITBRICKS

@@ -14,7 +14,7 @@
 
 import os
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 flags.DEFINE_string('CS_API_URL',
                     os.environ.get('CS_API_URL'),

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Runs Coremark."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 from perfkitbenchmarker.linux_benchmarks import coremark_benchmark
 

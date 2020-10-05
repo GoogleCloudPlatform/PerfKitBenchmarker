@@ -22,9 +22,9 @@ instructions.
 
 import logging
 import re
+from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_virtual_machine

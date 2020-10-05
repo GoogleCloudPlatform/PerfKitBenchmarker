@@ -38,10 +38,10 @@ import time
 from typing import Dict, Set
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util

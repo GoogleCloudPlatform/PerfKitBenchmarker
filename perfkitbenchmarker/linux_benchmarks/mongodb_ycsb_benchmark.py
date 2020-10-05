@@ -23,9 +23,8 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 
 import functools
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 

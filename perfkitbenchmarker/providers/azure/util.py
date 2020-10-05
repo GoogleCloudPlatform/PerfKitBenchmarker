@@ -20,9 +20,8 @@ from __future__ import print_function
 
 import json
 import re
-
+from absl import flags
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 import six

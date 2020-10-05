@@ -18,7 +18,7 @@ import io
 import posixpath
 import re
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 

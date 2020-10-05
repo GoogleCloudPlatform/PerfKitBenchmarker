@@ -35,9 +35,8 @@ For more on Apache Hadoop, see: http://hadoop.apache.org/
 import copy
 import datetime
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
 

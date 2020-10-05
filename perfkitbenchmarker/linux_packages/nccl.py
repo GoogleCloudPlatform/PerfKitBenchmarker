@@ -15,7 +15,7 @@
 
 """Module containing NCCL installation function."""
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk

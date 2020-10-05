@@ -23,10 +23,9 @@ completion.
 import copy
 import logging
 import os
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService

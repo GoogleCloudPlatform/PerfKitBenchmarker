@@ -21,10 +21,9 @@ import logging
 import os
 import posixpath
 import re
-
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages

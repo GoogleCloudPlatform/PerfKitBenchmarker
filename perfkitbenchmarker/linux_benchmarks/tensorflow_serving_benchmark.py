@@ -46,9 +46,9 @@ When the benchmark is finished, all resources are torn down.
 
 import logging
 import posixpath
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample

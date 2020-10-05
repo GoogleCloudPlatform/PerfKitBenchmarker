@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing flags applicable across benchmark run on AWS."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.providers.aws import util
 
 flags.DEFINE_string(

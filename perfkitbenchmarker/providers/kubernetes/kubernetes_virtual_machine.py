@@ -21,11 +21,10 @@ from __future__ import print_function
 import json
 import logging
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine

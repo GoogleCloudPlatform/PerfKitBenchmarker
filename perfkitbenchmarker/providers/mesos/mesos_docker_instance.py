@@ -14,9 +14,8 @@
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util

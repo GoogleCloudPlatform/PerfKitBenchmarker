@@ -19,8 +19,8 @@ from __future__ import print_function
 
 import json
 import logging
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util

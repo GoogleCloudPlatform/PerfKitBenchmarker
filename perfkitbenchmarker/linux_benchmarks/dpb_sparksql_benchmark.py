@@ -50,12 +50,12 @@ import json
 import logging
 import os
 import re
+from absl import flags
 import numpy as np
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util

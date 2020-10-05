@@ -20,9 +20,8 @@ from __future__ import print_function
 
 import itertools
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import vm_util
 

@@ -20,7 +20,7 @@ wrk2 is a fork of wrk, supporting improved latency stats and fixed throughput.
 import posixpath
 import re
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 

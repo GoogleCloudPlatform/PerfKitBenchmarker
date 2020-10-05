@@ -24,11 +24,10 @@ from __future__ import print_function
 import functools
 import logging
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util

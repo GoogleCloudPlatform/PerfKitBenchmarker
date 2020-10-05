@@ -17,8 +17,8 @@
 """
 
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark as linux_fio
 from perfkitbenchmarker.windows_packages import fio
 

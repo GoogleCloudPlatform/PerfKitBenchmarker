@@ -18,20 +18,18 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import configparser
 import csv
+import io
 import json
 import logging
 import time
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from six import StringIO
-from six.moves import range
-import six.moves.configparser
 
 FIO_DIR = '%s/fio' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/axboe/fio.git'
@@ -101,8 +99,8 @@ def ParseJobFile(job_file):
     A dictionary of dictionaries of sample metadata, using test name as keys,
         dictionaries of sample metadata as value.
   """
-  config = six.moves.configparser.RawConfigParser(allow_no_value=True)
-  config.readfp(StringIO(job_file))
+  config = configparser.RawConfigParser(allow_no_value=True)
+  config.read_file(io.StringIO(job_file))
   global_metadata = {}
   if GLOBAL in config.sections():
     global_metadata = dict(config.items(GLOBAL))

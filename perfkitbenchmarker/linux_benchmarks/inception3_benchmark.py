@@ -26,8 +26,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import time
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.linux_benchmarks import resnet_benchmark
 from perfkitbenchmarker.linux_packages import cloud_tpu_models

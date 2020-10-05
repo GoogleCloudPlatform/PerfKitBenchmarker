@@ -17,7 +17,7 @@
 
 import posixpath
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 

@@ -17,16 +17,13 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
-import os
-import logging
 import base64
-import six
-import yaml
-
+import logging
+import os
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -34,7 +31,8 @@ from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers import profitbricks
 from perfkitbenchmarker.providers.profitbricks import profitbricks_disk
 from perfkitbenchmarker.providers.profitbricks import util
-from perfkitbenchmarker import providers
+import six
+import yaml
 
 PROFITBRICKS_API = profitbricks.PROFITBRICKS_API
 FLAGS = flags.FLAGS

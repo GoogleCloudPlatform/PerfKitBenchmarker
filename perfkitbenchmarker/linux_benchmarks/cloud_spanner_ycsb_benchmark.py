@@ -19,9 +19,8 @@ to test Spanner. Configure the number of VMs via --ycsb_client_vms.
 """
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner

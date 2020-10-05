@@ -25,11 +25,11 @@ import collections
 import itertools
 import os
 import time
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource

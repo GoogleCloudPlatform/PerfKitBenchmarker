@@ -16,11 +16,10 @@
 """
 
 import json
+import logging
 import string
 import threading
-import logging
-
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util

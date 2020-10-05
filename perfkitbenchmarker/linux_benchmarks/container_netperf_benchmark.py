@@ -21,8 +21,8 @@ manpage: http://manpages.ubuntu.com/manpages/maverick/man1/netperf.1.html
 Runs TCP_STREAM benchmark from netperf between two containers.
 """
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
 
 FLAGS = flags.FLAGS

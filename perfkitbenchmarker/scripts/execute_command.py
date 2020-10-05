@@ -31,8 +31,8 @@ status file, which blocks until the process completes.
 import fcntl
 import logging
 import optparse
-import sys
 import subprocess
+import sys
 import threading
 
 # By default, set a timeout of 100 years to mimic no timeout.

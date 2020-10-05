@@ -15,10 +15,10 @@
 
 # pylint: disable=not-context-manager
 
+import builtins
 import json
 import unittest
 from absl import flags as flgs
-import builtins
 import contextlib2
 import mock
 from perfkitbenchmarker import os_types

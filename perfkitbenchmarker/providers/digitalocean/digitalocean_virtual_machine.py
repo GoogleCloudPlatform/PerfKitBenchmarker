@@ -19,11 +19,11 @@ from __future__ import division
 from __future__ import print_function
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
 from perfkitbenchmarker.providers.digitalocean import util
-from perfkitbenchmarker import providers
 from six.moves import range
 
 # DigitalOcean sets up the root account with a temporary

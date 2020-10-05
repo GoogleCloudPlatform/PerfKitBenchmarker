@@ -30,9 +30,8 @@ from __future__ import print_function
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import glibc

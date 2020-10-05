@@ -19,7 +19,7 @@ Clusters can be created and deleted.
 import json
 import logging
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
 

@@ -27,6 +27,7 @@ import pickle
 import threading
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import cloud_tpu
@@ -36,7 +37,6 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group

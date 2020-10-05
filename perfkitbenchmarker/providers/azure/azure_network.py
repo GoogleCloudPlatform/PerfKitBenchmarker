@@ -23,10 +23,9 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers

@@ -24,7 +24,7 @@ import datetime
 import logging
 import posixpath
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop

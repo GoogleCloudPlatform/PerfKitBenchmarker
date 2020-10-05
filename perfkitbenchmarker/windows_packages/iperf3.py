@@ -20,9 +20,8 @@ from __future__ import print_function
 
 import multiprocessing
 import ntpath
-
+from absl import flags
 from perfkitbenchmarker import background_tasks
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from six.moves import range

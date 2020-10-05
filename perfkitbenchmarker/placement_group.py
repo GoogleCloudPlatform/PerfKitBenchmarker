@@ -23,7 +23,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec

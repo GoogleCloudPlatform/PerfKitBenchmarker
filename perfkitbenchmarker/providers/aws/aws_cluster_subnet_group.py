@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing class for AWS's Redshift Cluster Subnet Group."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 

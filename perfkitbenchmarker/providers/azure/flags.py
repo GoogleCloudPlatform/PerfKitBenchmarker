@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing flags applicable across benchmark run on Azure."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 
 NONE = 'None'

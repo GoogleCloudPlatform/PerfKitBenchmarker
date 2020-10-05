@@ -44,13 +44,13 @@ import re
 import threading
 import time
 import uuid
+from absl import flags
 import numpy as np
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import sample

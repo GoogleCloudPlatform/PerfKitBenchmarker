@@ -30,8 +30,8 @@ import json
 import logging
 import threading
 
+from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource

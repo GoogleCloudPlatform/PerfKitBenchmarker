@@ -21,10 +21,9 @@ See https://github.com/hpc/ior for more info.
 
 import itertools
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ior

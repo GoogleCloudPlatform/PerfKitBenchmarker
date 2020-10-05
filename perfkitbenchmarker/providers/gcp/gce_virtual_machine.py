@@ -37,12 +37,11 @@ import posixpath
 import re
 import threading
 import time
-
+from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers

@@ -19,9 +19,8 @@ import ntpath
 import os
 import posixpath
 import re
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import os_types

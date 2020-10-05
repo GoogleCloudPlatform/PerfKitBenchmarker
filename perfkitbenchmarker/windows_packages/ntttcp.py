@@ -29,9 +29,8 @@ import collections
 import ntpath
 import time
 import xml.etree.ElementTree
-
+from absl import flags
 from perfkitbenchmarker import background_tasks
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 import six

@@ -21,7 +21,7 @@ more information).
 import os
 import tempfile
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import version
 import six
 

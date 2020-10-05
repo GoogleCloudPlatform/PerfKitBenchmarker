@@ -28,7 +28,7 @@ from __future__ import print_function
 import posixpath
 import re
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 # There is no way to tell the apt-get installation

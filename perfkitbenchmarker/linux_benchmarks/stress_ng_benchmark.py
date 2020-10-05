@@ -25,10 +25,10 @@ http://manpages.ubuntu.com/manpages/xenial/man1/stress-ng.1.html
 """
 
 import logging
+from absl import flags
 import numpy
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
