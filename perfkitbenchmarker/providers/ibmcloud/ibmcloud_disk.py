@@ -18,9 +18,9 @@ import logging
 import time
 import re
 
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.ibmcloud import utils
 

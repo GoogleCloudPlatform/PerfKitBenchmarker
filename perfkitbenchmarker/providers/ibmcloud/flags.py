@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing flags applicable across benchmark run on IBM Cloud."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 flags.DEFINE_string('ibmcloud_region', 'us-south',
                     'Name of IBM Cloud Location or region.')

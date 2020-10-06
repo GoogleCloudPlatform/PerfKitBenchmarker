@@ -24,12 +24,12 @@ import linecache
 
 from subprocess import Popen, PIPE
 
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud as ibm

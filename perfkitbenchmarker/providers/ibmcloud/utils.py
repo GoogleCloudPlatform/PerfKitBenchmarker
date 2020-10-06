@@ -19,7 +19,7 @@ import logging
 import json
 from collections import OrderedDict
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud
 
 FLAGS = flags.FLAGS
