@@ -18,6 +18,7 @@ import argparse
 import logging
 import os
 from pyspark.sql import SparkSession
+from pyspark.sql.utils import AnalysisException
 
 
 def main():
@@ -33,9 +34,14 @@ def main():
     logging.info('Creating table %s', table)
     table_dir = os.path.join(args.root_dir, table)
     # clean up previous table
-    spark.sql('drop table if exists ' + table)
+    spark.sql('DROP TABLE IF EXISTS ' + table)
     # register new table
     spark.catalog.createTable(table, table_dir, source='parquet')
-
+    try:
+      # This loads the partitions under the table if table is partitioned.
+      spark.sql('MSCK REPAIR TABLE ' + table)
+    except AnalysisException:
+      # The table was not partitioned, which was presumably expected
+      pass
 if __name__ == '__main__':
   main()
