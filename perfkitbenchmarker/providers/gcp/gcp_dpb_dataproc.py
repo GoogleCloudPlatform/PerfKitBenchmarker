@@ -173,20 +173,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
-  def _PostCreate(self):
-    """Get the cluster's data and tag it."""
-    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
-    stdout, _, _ = cmd.Issue()
-    config = json.loads(stdout)['config']
-    master = config['masterConfig']
-    worker = config['workerConfig']
-    for disk in master['instanceNames'] + worker['instanceNames']:
-      cmd = util.GcloudCommand(
-          self, 'compute', 'disks', 'add-labels', disk)
-      cmd.flags['labels'] = util.MakeFormattedDefaultTags()
-      cmd.flags['zone'] = self.dpb_service_zone
-      cmd.Issue()
-
   def _Delete(self):
     """Deletes the cluster."""
     cmd = self.DataprocGcloudCommand('clusters', 'delete', self.cluster_id)
