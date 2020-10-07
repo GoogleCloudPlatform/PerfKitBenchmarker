@@ -680,7 +680,14 @@ class InterruptChecker():
         self.phase_status.wait(vm.GetPreemptibleStatusPollSeconds())
 
   def EndCheckInterruptThread(self):
-    """End check interrupt thread.
+    """End check interrupt thread."""
+    self.phase_status.set()
+
+    for check_thread in self.check_threads:
+      check_thread.join()
+
+  def EndCheckInterruptThreadAndRaiseError(self):
+    """End check interrupt thread and raise error.
 
     Raises:
       InsufficientCapacityCloudFailure when it catches interrupt.
@@ -688,11 +695,7 @@ class InterruptChecker():
     Returns:
       None
     """
-    self.phase_status.set()
-
-    for check_thread in self.check_threads:
-      check_thread.join()
-
+    self.EndCheckInterruptThread()
     if any(vm.IsInterruptible() and vm.WasInterrupted() for vm in self.vms):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure('Interrupt')
 
@@ -903,21 +906,21 @@ def RunBenchmark(spec, collector):
             current_run_stage = stages.PREPARE
             interrupt_checker = InterruptChecker(spec.vms)
             DoPreparePhase(spec, detailed_timer)
-            interrupt_checker.EndCheckInterruptThread()
+            interrupt_checker.EndCheckInterruptThreadAndRaiseError()
             interrupt_checker = None
 
           if stages.RUN in FLAGS.run_stage:
             current_run_stage = stages.RUN
             interrupt_checker = InterruptChecker(spec.vms)
             DoRunPhase(spec, collector, detailed_timer)
-            interrupt_checker.EndCheckInterruptThread()
+            interrupt_checker.EndCheckInterruptThreadAndRaiseError()
             interrupt_checker = None
 
           if stages.CLEANUP in FLAGS.run_stage:
             current_run_stage = stages.CLEANUP
             interrupt_checker = InterruptChecker(spec.vms)
             DoCleanupPhase(spec, detailed_timer)
-            interrupt_checker.EndCheckInterruptThread()
+            interrupt_checker.EndCheckInterruptThreadAndRaiseError()
             interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
@@ -966,10 +969,10 @@ def RunBenchmark(spec, collector):
           DoCleanupPhase(spec, detailed_timer)
         raise
       finally:
-        # Deleting resources should happen first so any errors with publishing
-        # don't prevent teardown.
         if interrupt_checker:
           interrupt_checker.EndCheckInterruptThread()
+        # Deleting resources should happen first so any errors with publishing
+        # don't prevent teardown.
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
         if FLAGS.publish_after_run:
@@ -1011,7 +1014,11 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
 
   # Check for preempted VMs
   def UpdateVmStatus(vm):
-    vm.is_rebooting = False
+    # Setting vm.is_failed_run to True, UpdateInterruptibleVmStatus knows this
+    # is the final interruption checking. GCP only needs to check interruption
+    # when fail happens. For the the other clouds, PKB needs to check while vm
+    # is alive.
+    vm.is_failed_run = True
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)
 

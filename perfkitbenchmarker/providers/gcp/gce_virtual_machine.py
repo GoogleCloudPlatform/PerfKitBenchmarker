@@ -864,8 +864,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     if self.spot_early_termination:  # VM already marked as preemptedor
       return
-    if self.is_rebooting:  # Do not do check while the VM is rebooting
+    if not self.is_failed_run:  # GCE only detects interruption in failed run.
       return
+    logging.info('Failed run detected for %s', self.name)
     # https://cloud.google.com/compute/docs/instances/preemptible#preemption-process
     # Compute Engine sends a preemption notice to the instance in the form of
     # an ACPI G2 Soft Off signal.

@@ -308,7 +308,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self.bootable_time = None
     self.port_listening_time = None
     self.hostname = None
-    self.is_rebooting = False
+    self.is_failed_run = False
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []
@@ -412,7 +412,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       vm_bootable_time = self.VMLastBootTime()
 
     before_reboot_timestamp = time.time()
-    self.is_rebooting = True
     self._Reboot()
 
     while True:
@@ -422,7 +421,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       if vm_bootable_time != self.VMLastBootTime():
         break
     reboot_duration_sec = time.time() - before_reboot_timestamp
-    self.is_rebooting = False
     self._AfterReboot()
     return reboot_duration_sec
 
