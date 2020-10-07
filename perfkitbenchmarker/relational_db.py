@@ -404,11 +404,13 @@ class BaseRelationalDb(resource.BaseResource):
         self.spec.engine_version.startswith('5.6.')):
       mysql_name = 'mysqlclient56'
     elif (self.spec.engine_version == '5.7' or
-          self.spec.engine_version.startswith('5.7.')):
+          self.spec.engine_version.startswith('5.7') or
+          self.spec.engine_version == '8.0' or
+          self.spec.engine_version.startswith('8.0')):
       mysql_name = 'mysqlclient'
     else:
-      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % self.spec.engine_version)
+      raise Exception('Invalid database engine version: %s. Only 5.6, 5.7 '
+                      'and 8.0 are supported.' % self.spec.engine_version)
     self.client_vm.Install(mysql_name)
     self.client_vm.RemoteCommand(
         'sudo sed -i '
