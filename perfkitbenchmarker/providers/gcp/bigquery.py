@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Text
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
@@ -123,7 +123,7 @@ class CliClientInterface(GenericClientInterface):
             os.path.join(service_specific_dir,
                          'provider_specific_script_driver.py')))
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
@@ -190,7 +190,7 @@ class JdbcClientInterface(GenericClientInterface):
     self.client_vm.InstallPreprovisionedBenchmarkData(
         benchmark_name, ['GoogleBigQueryJDBC42.jar'], '')
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
@@ -246,11 +246,11 @@ class JavaClientInterface(GenericClientInterface):
     self.client_vm.InstallPreprovisionedBenchmarkData(
         benchmark_name, ['bq-java-client-1.0.jar'], '')
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
-      query_name: String name of the query to execute
+      query_name: String name of the query to execute.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -291,6 +291,29 @@ class JavaClientInterface(GenericClientInterface):
            '--credentials_file {} --dataset {} --query_files {}'.format(
                self.project_id, key_file_name, self.dataset_id,
                ' '.join(queries)))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    key_file_name = FLAGS.gcp_service_account_key_file
+    if '/' in FLAGS.gcp_service_account_key_file:
+      key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
+    cmd = ('java -cp bq-java-client-1.0.jar '
+           'com.google.cloud.performance.edw.Throughput --project {} '
+           '--credentials_file {} --dataset {} --query_streams {}'.format(
+               self.project_id, key_file_name, self.dataset_id,
+               ' '.join([','.join(stream) for stream in concurrency_streams])))
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 

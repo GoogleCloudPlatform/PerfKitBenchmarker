@@ -92,7 +92,9 @@ class EdwQueryPerformance(object):
     """Process the serialized query performance from client jar.
 
     Expected Performance format:
-      {"query_wall_time_in_secs":1.998,"query_end":1601695222108,"query":"1","query_start":1601695220110,"details":{"job_id":"b66b5a8e-633f-4ee4-8632-4e3d0856172f"}}
+      {"query_wall_time_in_secs":1.998,"query_end":1601695222108,"query":"1",
+      "query_start":1601695220110,
+      "details":{"job_id":"b66b5a8e-633f-4ee4-8632-4e3d0856172f"}}
 
     Args:
       serialized_performance: Stringified json performance.
@@ -647,6 +649,96 @@ class EdwSimultaneousIterationPerformance(object):
     return self.performance.get(query_name).metadata
 
 
+class EdwThroughputIterationPerformance(object):
+  """Class that represents the performance of an iteration of edw queries.
+
+  Attributes:
+    id: A unique string id for the iteration.
+    start_time: The start time of the iteration execution.
+    end_time: The end time of the iteration execution.
+    wall_time: The wall time of the stream execution.
+  """
+
+  def __init__(self, iteration_id: Text, iteration_start_time: int,
+               iteration_end_time: int, iteration_wall_time: float):
+    self.id = iteration_id
+    self.start_time = iteration_start_time
+    self.end_time = iteration_end_time
+    self.wall_time = iteration_wall_time
+
+  @classmethod
+  def from_json(cls, iteration_id: str, serialized_performance: str):
+    """Process the serialized throughput iteration performance from client jar.
+
+    Expected Performance format:
+      {"throughput_start":1601666911596,"throughput_end":1601666916139,
+        "throughput_wall_time_in_secs":4.543,
+        "all_streams_performance_array":[
+          {"stream_start":1601666911597,"stream_end":1601666916139,
+            "stream_wall_time_in_secs":4.542,
+            "stream_performance_array":[
+              {"query_wall_time_in_secs":2.238,"query_end":1601666913849,
+                "query":"1","query_start":1601666911611,
+                "details":{"job_id":"438170b0-b0cb-4185-b733-94dd05b46b05"}},
+              {"query_wall_time_in_secs":2.285,"query_end":1601666916139,
+                "query":"2","query_start":1601666913854,
+                "details":{"job_id":"371902c7-5964-46f6-9f90-1dd00137d0c8"}}
+              ]},
+          {"stream_start":1601666911597,"stream_end":1601666916018,
+            "stream_wall_time_in_secs":4.421,
+            "stream_performance_array":[
+              {"query_wall_time_in_secs":2.552,"query_end":1601666914163,
+                "query":"2","query_start":1601666911611,
+                "details":{"job_id":"5dcba418-d1a2-4a73-be70-acc20c1f03e6"}},
+              {"query_wall_time_in_secs":1.855,"query_end":1601666916018,
+                "query":"1","query_start":1601666914163,
+                "details":{"job_id":"568c4526-ae26-4e9d-842c-03459c3a216d"}}
+            ]}
+        ]}
+
+    Args:
+      iteration_id: String identifier of the throughput iteration.
+      serialized_performance: Stringified json performance.
+
+    Returns:
+      An instance of EdwThroughputIterationPerformance
+    """
+    results = json.loads(serialized_performance)
+    return cls(
+        iteration_id=iteration_id,
+        iteration_start_time=results['throughput_start'],
+        iteration_end_time=results['throughput_end'],
+        iteration_wall_time=results['throughput_wall_time_in_secs'])
+
+  def get_wall_time(self) -> float:
+    """Gets the total wall time, in seconds, for the iteration.
+
+    The wall time is the time from the start of the first stream to the end time
+    of the last stream to finish.
+
+    Returns:
+      The wall time in seconds.
+    """
+    return self.wall_time
+
+  def get_wall_time_performance_sample(
+      self, metadata: Dict[str, str]) -> sample.Sample:
+    """Gets a sample for total wall time performance of the iteration.
+
+    Args:
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A sample of iteration wall time performance
+    """
+    wall_time_metadata = copy.copy(metadata)
+    wall_time_metadata['iteration_start_time'] = self.start_time
+    wall_time_metadata['iteration_end_time'] = self.end_time
+    return sample.Sample('edw_iteration_wall_time', self.wall_time, 'seconds',
+                         wall_time_metadata)
+
+
 class EdwBenchmarkPerformance(object):
   """Class that represents the performance of an edw benchmark.
 
@@ -687,6 +779,23 @@ class EdwBenchmarkPerformance(object):
     Args:
       performance: An instance of EdwSimultaneousIterationPerformance
         encapsulating the simultaneous iteration performance details.
+
+    Raises:
+      EdwPerformanceAggregationError: If the iteration has already been added.
+    """
+    iteration_id = performance.id
+    if iteration_id in self.iteration_performances:
+      raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
+                                           ' iteration: %s.' % iteration_id)
+    self.iteration_performances[iteration_id] = performance
+
+  def add_throughput_iteration_performance(
+      self, performance: EdwThroughputIterationPerformance):
+    """Adds throughput iteration performance.
+
+    Args:
+      performance: An instance of EdwThroughputIterationPerformance
+        encapsulating the throughput iteration performance details.
 
     Raises:
       EdwPerformanceAggregationError: If the iteration has already been added.
@@ -852,6 +961,32 @@ class EdwBenchmarkPerformance(object):
     """Generates samples for all wall time performances.
 
     Benchmark relies on simultaneous iterations to generate the raw wall time
+     performance samples.
+    Benchmark appends the aggregated wall time performance sample
+
+    Args:
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A list of samples (raw and aggregated)
+    """
+    results = []
+
+    for iteration, performance in self.iteration_performances.items():
+      iteration_metadata = copy.copy(metadata)
+      iteration_metadata['iteration'] = iteration
+      results.append(
+          performance.get_wall_time_performance_sample(iteration_metadata))
+    results.append(
+        self.get_aggregated_wall_time_performance_sample(metadata=metadata))
+    return results
+
+  def get_throughput_wall_time_performance_samples(self, metadata: Dict[str,
+                                                                        str]):
+    """Generates samples for all wall time performances.
+
+    Benchmark relies on throughput iterations to generate the raw wall time
      performance samples.
     Benchmark appends the aggregated wall time performance sample
 

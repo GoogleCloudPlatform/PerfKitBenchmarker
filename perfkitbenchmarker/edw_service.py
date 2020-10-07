@@ -164,6 +164,46 @@ class EdwClientInterface(object):
     """
     raise NotImplementedError
 
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Response format:
+      {"throughput_start":1601666911596,"throughput_end":1601666916139,
+        "throughput_wall_time_in_secs":4.543,
+        "all_streams_performance_array":[
+          {"stream_start":1601666911597,"stream_end":1601666916139,
+            "stream_wall_time_in_secs":4.542,
+            "stream_performance_array":[
+              {"query_wall_time_in_secs":2.238,"query_end":1601666913849,
+                "query":"1","query_start":1601666911611,
+                "details":{"job_id":"438170b0-b0cb-4185-b733-94dd05b46b05"}},
+              {"query_wall_time_in_secs":2.285,"query_end":1601666916139,
+                "query":"2","query_start":1601666913854,
+                "details":{"job_id":"371902c7-5964-46f6-9f90-1dd00137d0c8"}}
+              ]},
+          {"stream_start":1601666911597,"stream_end":1601666916018,
+            "stream_wall_time_in_secs":4.421,
+            "stream_performance_array":[
+              {"query_wall_time_in_secs":2.552,"query_end":1601666914163,
+                "query":"2","query_start":1601666911611,
+                "details":{"job_id":"5dcba418-d1a2-4a73-be70-acc20c1f03e6"}},
+              {"query_wall_time_in_secs":1.855,"query_end":1601666916018,
+                "query":"1","query_start":1601666914163,
+                "details":{"job_id":"568c4526-ae26-4e9d-842c-03459c3a216d"}}
+            ]}
+        ]}
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    raise NotImplementedError
+
   def WarmUpQuery(self):
     """Executes a service-agnostic query that can detect cold start issues."""
     with open(SAMPLE_QUERY_PATH, 'w+') as f:
