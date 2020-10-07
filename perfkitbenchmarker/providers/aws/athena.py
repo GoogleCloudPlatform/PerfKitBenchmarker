@@ -347,6 +347,9 @@ class Athena(edw_service.EdwService):
       A dictionary set to underlying data's details (format, etc.)
     """
     data_details = {}
+    # If the information isn't in the cluster identifier, skip collecting it.
+    if '_' not in self.cluster_identifier:
+      return data_details
     parsed_id = re.split(r'_', self.cluster_identifier)
     data_details['format'] = parsed_id[1]
     data_details['compression'] = parsed_id[2]
