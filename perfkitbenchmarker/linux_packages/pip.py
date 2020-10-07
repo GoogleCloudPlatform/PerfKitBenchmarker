@@ -72,9 +72,9 @@ def YumInstall(vm):
 
 
 def SwupdInstall(vm):
-  """Installs the pip package on the VM,"""
-  vm.InstallPackages("which")
-  package_name = "python-basic"
+  """Installs the pip package on the VM."""
+  vm.InstallPackages('which')
+  package_name = 'python-basic'
   Install(vm, package_name)
 
 

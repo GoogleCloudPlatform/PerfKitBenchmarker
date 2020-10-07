@@ -31,7 +31,7 @@ def AptInstall(vm):
 
 
 def SwupdInstall(vm):
-  """Installs the package on the VM"""
+  """Installs the package on the VM."""
   vm.InstallPackages('python-basic')
 
 
