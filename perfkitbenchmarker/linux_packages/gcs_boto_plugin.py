@@ -21,6 +21,10 @@ def _Install(vm):
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install --ignore-installed gcs-oauth2-boto-plugin')
 
+  vm.InstallPackages('python3-pip')
+  vm.RemoteCommand(
+      'sudo pip3 install --ignore-installed gcs-oauth2-boto-plugin')
+
 
 def YumInstall(vm):
   """Installs the GCS boto plugin on the VM."""
@@ -37,3 +41,4 @@ def AptInstall(vm):
 def _Uninstall(vm):
   """Uninstall the GCS boto plugin from the VM."""
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
+  vm.RemoteCommand('/usr/bin/yes | sudo pip3 uninstall gcs-oauth2-boto-plugin')

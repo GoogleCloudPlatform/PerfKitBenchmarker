@@ -365,7 +365,7 @@ def _GetClientLibVersion(vm, library_name):
   Returns:
     The version string of the client.
   """
-  version, _ = vm.RemoteCommand('pip show %s |grep Version' % library_name)
+  version, _ = vm.RemoteCommand('pip3 show %s |grep Version' % library_name)
   logging.info('%s client lib version is: %s', library_name, version)
   return version
 
@@ -1369,9 +1369,11 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
 
 
 def PrepareVM(vm, service):
-  vm.Install('pip')
-  vm.RemoteCommand('sudo pip install absl-py')
-  vm.RemoteCommand('sudo pip install pyyaml')
+  vm.InstallPackages('python3-pip')
+
+  # dependencies of API_TEST_SCRIPT
+  vm.RemoteCommand('sudo pip3 install absl-py')
+  vm.RemoteCommand('sudo pip3 install pyyaml')
 
   vm.Install('openssl')
 
@@ -1407,7 +1409,7 @@ def PrepareVM(vm, service):
 
 def CleanupVM(vm, service):
   service.CleanupVM(vm)
-  vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall absl-py')
+  vm.RemoteCommand('/usr/bin/yes | sudo pip3 uninstall absl-py')
   vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)
