@@ -576,6 +576,8 @@ class EdwSimultaneousIterationPerformance(object):
     """
     wall_time = self.wall_time
     wall_time_metadata = copy.copy(metadata)
+    wall_time_metadata['iteration_start_time'] = self.start_time
+    wall_time_metadata['iteration_end_time'] = self.end_time
     return sample.Sample('edw_iteration_wall_time', wall_time, 'seconds',
                          wall_time_metadata)
 
