@@ -17,27 +17,28 @@ import threading
 import time
 import logging
 import json
-from collections import OrderedDict
 
 from absl import flags
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud
+from perfkitbenchmarker.providers.ibmcloud import util
 
 FLAGS = flags.FLAGS
 
 AVAILABLE = 'available'
 RUNNING = 'running'
 STOPPED = 'stopped'
-DELIMITER = 'z-z'
 
 
 class IbmAPICommand(object):
   """A IBM Cloud rest api command.
 
   Attributes:
+  
     args: list of strings. Positional args to pass, typically
         specifying an operation to perform (e.g. ['image', 'list'] to list
         available images).
-    flags: OrderedDict mapping flag name string to flag value. Flags to pass to
+        
+    flags: a dict mapping flag name string to flag value. Flags to pass to
         ibm cloud rest api. If a provided value is True, the flag is passed without a value. 
         If a provided value is a list, the flag is passed multiple
         times, once with each value in the list.
@@ -62,11 +63,11 @@ class IbmAPICommand(object):
   debug = False
 
   def __init__(self, resource, *args):
-    """Initializes a IbmAPICommand with the provided args and common flags.
+    """Initializes a IbmAPICommand with the provided args and flags.
 
     Args:
-      resource: A Genesis resource of type BaseResource.
-      *args: sequence of strings. Positional args to pass to genesis cli,
+      resource: A IBM Cloud resource of type BaseResource.
+      *args: sequence of strings. Positional args to pass to rest api calls,
       typically specifying an operation to perform (e.g. ['image', 'list']
       to list available images).
     """
@@ -95,7 +96,7 @@ class IbmAPICommand(object):
     return self.gen.GetToken()
 
   def CreateSgRules(self):
-    """Creates some default security group rules """
+    """Creates some default security group rules needed for vms to communicate """
     sgid = self.flags['sgid']
     self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'icmp', None)
     self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', 22)
@@ -106,7 +107,7 @@ class IbmAPICommand(object):
     self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', 443)
 
   def GetSgId(self):
-    """returns sg id """
+    """returns default security group id """
     logging.info('Looking up existing default sg')
     prefix = self.flags['prefix']
     resp = self.gen_sgmgr.List()
@@ -119,19 +120,45 @@ class IbmAPICommand(object):
     return None
 
   def CreatePrefix(self):
-    """Creates address prefix on vpc """
+    """Creates address prefix on vpc needed to attach subnets
+
+    Flags:
+      vpcid: ibm cloud vpc id.
+      zone: name of the zone within ibm network.
+      cidr: ip range that this prefix will cover.
+      name: name of this prefix.
+  
+    Returns:
+      The json representation of the created address prefix.
+    """
     return self.gen_vpcmgr.CreatePrefix(self.flags['vpcid'], self.flags['zone'],
                                         self.flags['cidr'], name=self.flags['name'])
 
   def CreateSubnet(self):
-    """Creates subnet on vpc """
+    """Creates a subnet on the vpc
+
+    Flags:
+      vpcid: ibm cloud vpc id.
+      zone: name of the zone within ibm network.
+      cidr: ip range for the subnet.
+      name: name of this subnet.
+  
+    Returns:
+      The json representation of the created subnet.
+    """
     kwargs = {}
     kwargs['name'] = self.flags['name']
     kwargs['zone'] = self.flags['zone']
     return self.gen_subnetmgr.Create(self.flags['cidr'], self.flags['vpcid'], **kwargs)
 
   def DeleteResource(self):
-    """Deletes a resource """
+    """Deletes a resource based on items set in the flags
+
+    Flags:
+      items: type of resource to delete.
+      id: matching id to delete.
+  
+    """
     items = self.flags['items']
     data_mgr = self.gen_subnetmgr
     if items == 'vpcs':
@@ -149,7 +176,16 @@ class IbmAPICommand(object):
       logging.info('No items found to delete: %s', items)
 
   def ListResources(self):
-    """Returns a list of resource id's """
+    """Returns a list of resource id's matching the resource type and prefix
+
+    Flags:
+      items: type of resource.
+      zone: name of the zone within ibm network, for subnets.
+      preifx: a label matching the resource name.
+  
+    Returns:
+      The id of the first matching resource.
+    """
     items = self.flags['items']
     prefix = self.flags['prefix']
     zone = self.flags['zone']
@@ -183,7 +219,15 @@ class IbmAPICommand(object):
     return resourceid
 
   def ListSubnetsExtra(self):
-    """returns a list of extra subnets """
+    """returns a list of extra subnets, this is not used for regular runs
+
+    Flags:
+      zone: name of the zone within ibm network, for subnets.
+      preifx: a label matching the resource name.
+  
+    Returns:
+      List of ids of the additional subnets matching the prefix and zone.
+    """
     items = 'subnets'
     prefix = self.flags['prefix']
     zone = self.flags['zone']
@@ -201,7 +245,7 @@ class IbmAPICommand(object):
           if itemid and name and name.startswith(prefix):  # extra subnets start with 'sxs'
             if zone == item.get('zone')['name']:
               logging.info('Found extra subnet, name: %s, id: %s', name, itemid)
-              names = name.split(DELIMITER)
+              names = name.split(util.DELIMITER)
               if names[0] not in subnets:
                 subnets[names[0]] = {}
               subnets[names[0]]['id'] = itemid
@@ -214,7 +258,19 @@ class IbmAPICommand(object):
     return subnets
 
   def CreateVolume(self):
-    """Creates an external disk volume """
+    """Creates an external disk volume 
+
+    Flags:
+      name: name of the new volume.
+      capacity: size of the volume in GB.
+      iops: desired iops on the volume.
+      profile: profile name of the volume, usually custom for large volumes
+      encryption_key: optional, encrytion key
+      resource_group: optional, resource group id to assign the volume to.
+  
+    Returns:
+      json representation of the created volume.
+    """
     kwargs = {}
     kwargs['name'] = self.flags['name']
     kwargs['capacity'] = self.flags['capacity']
@@ -231,11 +287,18 @@ class IbmAPICommand(object):
     return self.gen_volumemgr.Delete(self.flags['volume'])
 
   def ShowVolume(self):
-    """Shows volume """
+    """Shows volume in json"""
     return json.dumps(self.gen_volumemgr.Show(self.flags['volume']), indent=2)
 
   def CreateVpc(self):
-    """Creastes a vpc """
+    """Creastes a vpc 
+
+    Flags:
+      name: name of the vpc to create.
+  
+    Returns:
+      The id of the created vpc.
+    """
     vpcid = None
     resp = self.gen_vpcmgr.Create(None, self.flags['name'])
     if resp:
@@ -248,14 +311,34 @@ class IbmAPICommand(object):
     return vpcid
 
   def CreateKey(self):
-    """Creastes a ssh key in RIAS """
+    """Creates a ssh key in ibm cloud
+    
+    Flags:
+      name: name of the key to create.
+      pubkey: public key to use.
+  
+    Returns:
+      The id of the created ssh key.
+    """
     kwargs = {}
     kwargs['name'] = self.flags['name']
     resp = self.gen_keymgr.Create(self.flags['pubkey'], 'rsa', **kwargs)
     return resp.get('id') if resp else None
 
   def CreateInstance(self):
-    """Creastes a vm """
+    """Creates a vm 
+    
+    Flags:
+      name: name of the vm.
+      imageid: id of the image to use.
+      profile: machine type for the vm.
+      vpcid: id of the vpc.
+      user_data: this is set if windows
+      optional: optional args added to kwargs.
+  
+    Returns:
+      The json representation of the created vm.
+    """
     kwargs = {}
     for arg in ['key', 'zone', 'subnet', 'networks', 'encryption_key', 'iops',
                 'capacity', 'resource_group']:
@@ -271,7 +354,14 @@ class IbmAPICommand(object):
       ))
 
   def InstanceGetPrimaryVnic(self):
-    """Creastes a primary network vnic on vm """
+    """Finds the primary network vnic on vm
+    
+    Flags:
+      instanceid: id of the vm.
+  
+    Returns:
+      The found vnic id.
+    """
     resp = self.gen_instmgr.Show(self.flags['instanceid'])
     if 'primary_network_interface' in resp and 'href' in resp['primary_network_interface']:
       items = resp['primary_network_interface']['href'].split('/')
@@ -281,7 +371,14 @@ class IbmAPICommand(object):
     return None
 
   def InstanceFipCreate(self):
-    """Creastes a FIP on vm """
+    """Creates a FIP on vm
+    
+    Flags:
+      name: name of the fip.
+  
+    Returns:
+      json represenation of the created fip.
+    """
     kwargs = {}
     kwargs['name'] = self.flags['name']
     return json.dumps(self.gen_fipmgr.Create(
@@ -291,11 +388,11 @@ class IbmAPICommand(object):
     ))
 
   def InstanceFipDelete(self):
-    """Deletes FIP on vm """
+    """Deletes FIP on vm matching the id """
     self.gen_fipmgr.Delete(self.flags['fip_id'])
 
   def _GetStatus(self, resp):
-    """Gets instance status in resp """
+    """Returns instance status in the given resp """
     status = None
     if not resp:
       logging.error('http response is None')
@@ -307,7 +404,7 @@ class IbmAPICommand(object):
     return status
 
   def InstanceStatus(self):
-    """Gets instance status """
+    """Returns instance status matching the instance id """
     resp = self.gen_instmgr.Show(self.flags['instanceid'])
     status = self._GetStatus(resp)
     logging.info('Instance status: %s, %s', self.flags['instanceid'], status)
@@ -321,7 +418,7 @@ class IbmAPICommand(object):
     return status
 
   def InstanceStart(self):
-    """Starts instance """
+    """Starts the instance matching instance id and returns final status """
     resp = self.gen_instmgr.Start(self.flags['instanceid'])
     status = self._GetStatus(resp)
     logging.info('Instance start issued: %s, %s', self.flags['instanceid'], status)
@@ -335,7 +432,7 @@ class IbmAPICommand(object):
     return status
 
   def InstanceStop(self):
-    """Stops instance """
+    """Stops instance matching the instance id and returns final status """
     resp = self.gen_instmgr.Stop(self.flags['instanceid'], force=False)
     logging.info('Instance stop issued: %s', self.flags['instanceid'])
     resp = self.gen_instmgr.Stop(self.flags['instanceid'], force=True)  # force stop again
@@ -351,22 +448,32 @@ class IbmAPICommand(object):
     return status
 
   def InstanceDelete(self):
-    """Deletes instance """
+    """Deletes instance matching the instance id"""
     self.gen_instmgr.Delete(self.flags['instanceid'])
 
   def InstanceList(self):
-    """Lists instances """
+    """Lists instances and returns json objects of all found instances"""
     return self.gen_instmgr.List()
 
   def InstanceShow(self):
-    """GETs the instance """
+    """Returns the json respresentation of the matching instance id """
     return self.gen_instmgr.Show(self.flags['instanceid'])
 
   def InstanceInitializationShow(self):
-      return self.gen_instmgr.ShowInitialization(self.flags['instanceid'])
+    """Returns the json respresentation of the configuration used to initialize instance id """
+    return self.gen_instmgr.ShowInitialization(self.flags['instanceid'])
 
   def InstanceVnicCreate(self):
-    """Creates instance vnic """
+    """Creates a vnic on the instance
+    
+    Flags:
+      instanceid: id of the vm.
+      name: name of the vnic.
+      subnet: subnet id.
+  
+    Returns:
+      id of the created vnic and assigned private ip address.
+    """
     ip_addr = None
     resp = self.gen_instmgr.CreateVnic(self.flags['instanceid'], self.flags['name'], self.flags['subnet'])
     status = self._GetStatus(resp)
@@ -389,49 +496,74 @@ class IbmAPICommand(object):
     return vnicid, ip_addr
 
   def InstanceVnicShow(self):
-    """GETs instance vnic """
+    """GETs instance vnic
+    
+    Flags:
+      instanceid: id of the vm.
+      vnicid: id of the vnic.
+  
+    Returns:
+      json representation of the found vnic.
+    """
     return json.dumps(self.gen_instmgr.ShowVnic(
-      self.flags['instance'],
+      self.flags['instanceid'],
       self.flags['vnicid']
       ), indent=2)
 
   def InstanceVnicList(self):
-    """GETs all vnics on instance """
+    """Returns a list of all vnics on instance
+    
+    Flags:
+      instanceid: id of the vm.
+  
+    Returns:
+      json objects of all vnics on the instance.
+    """
     return json.dumps(self.gen_instmgr.ListVnics(
-      self.flags['instance']
+      self.flags['instanceid']
       ), indent=2)
 
   def InstanceCreateVolume(self):
-    """Attaches a volume to instance """
+    """Attaches a volume to instance
+    
+    Flags:
+      instanceid: id of the vm.
+      name: name of the volume on the vm.
+      volume: id of the volume to attach to the vm.
+      True: always true, delete the volume when instance is deleted.
+  
+    Returns:
+      json representation of the attached volume on the instance.
+    """
     return json.dumps(self.gen_instmgr.CreateVolume(
-      self.flags['instance'],
+      self.flags['instanceid'],
       self.flags['name'],
       self.flags['volume'],
       True
       ), indent=2)
 
   def InstanceDeleteVolume(self):
-    """Deletes volume on instance """
+    """Deletes the volume on the vm matching instanceid and volume """
     return json.dumps(self.gen_instmgr.DeleteVolume(
-      self.flags['instance'],
+      self.flags['instanceid'],
       self.flags['volume']
       ), indent=2)
 
   def InstanceShowVolume(self):
-    """GETs instance volumes """
-    for item in self.gen_instmgr.ListVolumes(self.flags['instance'])['volume_attachments']:
+    """Returns json representation of the volume matching instanceid"""
+    for item in self.gen_instmgr.ListVolumes(self.flags['instanceid'])['volume_attachments']:
       if item['volume'].get('id') == self.flags['volume']:
         return json.dumps(self.gen_instmgr.ShowVolume(
-          self.flags['instance'],
+          self.flags['instanceid'],
           item.get('id')
           ), indent=2)
 
   def ImageList(self):
-    """Lists images """
+    """Returns json objects of all available images """
     return self.gen_imgmgr.List(account=self.ibmcloud_account_id)
 
   def GetImageId(self):
-    """GETs image id that matches the name """
+    """Returns image id that matches the image name """
     resp = self.gen_imgmgr.List()['images']
     if resp is not None:
       for image in resp:
@@ -440,6 +572,6 @@ class IbmAPICommand(object):
     return None
 
   def ImageShow(self):
-    """GETs image by id """
+    """Returns json object of the image matching the id """
     return self.gen_imgmgr.Show(self.flags['imageid'])
 

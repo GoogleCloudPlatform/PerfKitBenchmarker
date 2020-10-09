@@ -24,7 +24,7 @@ flags.DEFINE_string('ibmcloud_zones', 'us-south-1',
 flags.DEFINE_string('ibmcloud_image_id', None,
                     'IBM Cloud defined image id, if set, overrides default image.')
 
-flags.DEFINE_integer('ibmcloud_volume_iops', 5000,
+flags.DEFINE_integer('ibmcloud_volume_iops', 20000,
                      'Desired volume IOPS.')
 
 flags.DEFINE_integer('ibmcloud_volume_bandwidth', None,

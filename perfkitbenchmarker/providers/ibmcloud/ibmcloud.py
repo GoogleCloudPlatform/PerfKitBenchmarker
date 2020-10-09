@@ -53,6 +53,7 @@ class IbmCloudError(Exception):
 
 
 class IbmCloud:
+  """Base object that handles IBM Cloud REST api call requests"""
 
   def __init__(self, endpoint=None, url=None, account=None, apikey=None,
                vm_creator=False, token=None, verbose=False, version='v1',
@@ -62,9 +63,9 @@ class IbmCloud:
     self._url = url or os.environ.get('IBMCLOUD_ENDPOINT')
     self._acct = account or os.environ.get('IBMCLOUD_ACCOUNT_ID')
     self._apikey = apikey or os.environ.get('IBMCLOUD_APIKEY')
-    self._version = version
     self._token = token or os.environ.get('IBMCLOUD_TOKEN')
     self._token_time = time.time()
+    self._version = version
     self._verbose = verbose
     self._silent = silent
     self._force = force
@@ -264,6 +265,9 @@ class IbmCloud:
 
 
 class BaseManager:
+  """Base class that handles IBM Cloud REST api call requests,
+    use the derived classes for each resource type
+  """
 
   def __init__(self, genesis):
     self._g = genesis
@@ -301,6 +305,8 @@ class BaseManager:
 
 
 class InstanceManager(BaseManager):
+  """Handles requests on instances"""
+
   _type = 'instance'
 
   def Create(self, name, imageid, profile, vpcid, zone=None, key=None,
@@ -441,6 +447,8 @@ class InstanceManager(BaseManager):
 
 
 class VolumeManager(BaseManager):
+  """Handles requests on volumes"""
+
   _type = 'volume'
 
   def Create(self, zone, **kwargs):
@@ -477,6 +485,8 @@ class VolumeManager(BaseManager):
 
 
 class VPCManager(BaseManager):
+  """Handles requests on VPC"""
+
   _type = 'vpc'
 
   def Create(self, default_network_acl, name):
@@ -506,6 +516,8 @@ class VPCManager(BaseManager):
 
 
 class SGManager(BaseManager):
+  """Handles requests on security groups"""
+
   _type = 'security_groups'
 
   def Create(self, resource_group, vpcid, **kwargs):
@@ -564,6 +576,8 @@ class SGManager(BaseManager):
 
 
 class PGManager(BaseManager):
+  """Handles requests on public gateways"""
+
   _type = 'public_gateways'
 
   def Create(self, resource_group, vpcid, zone, **kwargs):
@@ -595,6 +609,8 @@ class PGManager(BaseManager):
 
 
 class RegionManager(BaseManager):
+  """Handles requests on regions"""
+
   _type = 'region'
 
   def Show(self, region):
@@ -602,6 +618,8 @@ class RegionManager(BaseManager):
 
 
 class KeyManager(BaseManager):
+  """Handles requests on ssh keys"""
+
   _type = 'keys'
 
   def Create(self, key, type, **kwargs):
@@ -628,6 +646,8 @@ class KeyManager(BaseManager):
 
 
 class NetworkAclManager(BaseManager):
+  """Handles requests on network acls"""
+
   _type = 'network_acls'
 
   def Create(self, name):
@@ -649,6 +669,8 @@ class NetworkAclManager(BaseManager):
 
 
 class SubnetManager(BaseManager):
+  """Handles requests on subnets"""
+
   _type = 'subnet'
 
   def Create(self, subnet, vpcid, **kwargs):
@@ -694,6 +716,8 @@ class SubnetManager(BaseManager):
 
 
 class ImageManager(BaseManager):
+  """Handles requests on images"""
+
   _type = 'image'
 
   def Create(self, href, osname, name=None):
@@ -721,6 +745,8 @@ class ImageManager(BaseManager):
 
 
 class FipManager(BaseManager):
+  """Handles requests on fips"""
+
   _type = 'floating_ips'
 
   def Create(self, resource_group, target, **kwargs):

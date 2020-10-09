@@ -22,15 +22,18 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.ibmcloud import utils
+
+from perfkitbenchmarker.providers.ibmcloud import ibm_api as ibm
 
 FLAGS = flags.FLAGS
 
 ATTACHED = 'attached'
 AVAILABLE = 'available'
+DEFAULT_DISK_SIZE = 1000
 
 
 class IbmCloudDisk(disk.BaseDisk):
+  """Object representing a IBM Cloud Disk"""
 
   def __init__(self, disk_spec, name, zone):
     super(IbmCloudDisk, self).__init__(disk_spec)
@@ -40,15 +43,16 @@ class IbmCloudDisk(disk.BaseDisk):
     self.attached_vm = None
     self.attached_vdisk_URI = None
     self.device_path = None
+    self.data_disk_size = FLAGS.data_disk_size if FLAGS.data_disk_size is not None else DEFAULT_DISK_SIZE
 
   def _Create(self):
     """Creates an external block volume."""
-    volcmd = utils.IbmAPICommand(self)
+    volcmd = ibm.IbmAPICommand(self)
     volcmd.flags['name'] = self.name
     volcmd.flags['zone'] = self.zone
     volcmd.flags['iops'] = FLAGS.ibmcloud_volume_iops
     volcmd.flags['profile'] = FLAGS.ibmcloud_volume_profile
-    volcmd.flags['capacity'] = FLAGS.data_disk_size
+    volcmd.flags['capacity'] = self.data_disk_size
     if FLAGS.ibmcloud_datavol_encryption_key:
       volcmd.flags['encryption_key'] = FLAGS.ibmcloud_datavol_encryption_key
     if FLAGS.ibmcloud_rgid:
@@ -64,7 +68,7 @@ class IbmCloudDisk(disk.BaseDisk):
     if self.vol_id is None:
       logging.info('Volume %s was not created. Skipping deletion.' % self.name)
       return
-    volcmd = utils.IbmAPICommand(self)
+    volcmd = ibm.IbmAPICommand(self)
     volcmd.flags['volume'] = self.vol_id
     logging.info('Volume delete, volcmd.flags %s', volcmd.flags)
     volcmd.DeleteVolume()
@@ -84,7 +88,11 @@ class IbmCloudDisk(disk.BaseDisk):
     return None
 
   def Attach(self, vm):
-    """Attaches an external volume """
+    """Attaches the disk to a VM.
+
+    Args:
+      vm: instance of the vm to which the disk will be attached.
+    """
     if self.vol_id is None:
       raise errors.Error('Cannot attach remote volume %s' % self.name)
     if vm.vmid is None:
@@ -92,9 +100,9 @@ class IbmCloudDisk(disk.BaseDisk):
                                                                       vm.name)
       raise errors.Error(msg)
 
-    volcmd = utils.IbmAPICommand(self)
+    volcmd = ibm.IbmAPICommand(self)
     volcmd.flags['name'] = self.name
-    volcmd.flags['instance'] = vm.vmid
+    volcmd.flags['instanceid'] = vm.vmid
     volcmd.flags['volume'] = self.vol_id
     volcmd.flags['delete'] = True
 
@@ -126,8 +134,8 @@ class IbmCloudDisk(disk.BaseDisk):
     """Waits and checks until the volume status is attached """
     if self.vol_id is None:
       return
-    volcmd = utils.IbmAPICommand(self)
-    volcmd.flags['instance'] = self.attached_vm.vmid
+    volcmd = ibm.IbmAPICommand(self)
+    volcmd.flags['instanceid'] = self.attached_vm.vmid
     volcmd.flags['volume'] = self.vol_id
     logging.info('Checking volume on instance %s, volume: %s', vm.vmid, self.vol_id)
     resp = volcmd.InstanceShowVolume()
@@ -163,7 +171,7 @@ class IbmCloudDisk(disk.BaseDisk):
       disks = re.findall(r'\Disk /.*/.*: \d+ GiB', stdout)
       for line in disks:
         paths = line.split(' ')
-        if len(paths) >= 4 and paths[2] == str(FLAGS.data_disk_size):
+        if len(paths) >= 4 and paths[2] == str(self.data_disk_size):
           _path = paths[1][0:len(paths[1]) - 1]
           if _path not in vm.device_paths_detected:
             self.device_path = _path
@@ -183,7 +191,7 @@ class IbmCloudDisk(disk.BaseDisk):
       raise errors.Error('Cannot detach remote volume from a non-existing VM.')
     if self.attached_vdisk_URI is None:
       raise errors.Error('Cannot detach remote volume from a non-existing VDisk.')
-    volcmd = utils.IbmAPICommand(self)
+    volcmd = ibm.IbmAPICommand(self)
     volcmd.flags['volume'] = self.attached_vdisk_URI
     resp = volcmd.InstanceDeleteVolume()
     logging.info('Deleted volume: %s', resp)
