@@ -117,6 +117,27 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    query_command = ('java -cp snowflake-jdbc-client-1.0.jar '
+                     'com.google.cloud.performance.edw.Throughput --warehouse'
+                     ' {} --database {} --schema {} --query_streams {}').format(
+                         self.warehouse, self.database, self.schema, ' '.join([
+                             ','.join(stream) for stream in concurrency_streams
+                         ]))
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    return stdout
+
   def GetMetadata(self) -> Dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
     return {'client': FLAGS.snowflake_client_interface}
