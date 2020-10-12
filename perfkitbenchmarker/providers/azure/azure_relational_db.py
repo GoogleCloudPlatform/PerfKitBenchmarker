@@ -413,7 +413,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     vm_util.IssueCommand(cmd)
     self._AssignPortsForWriterInstance()
 
-    if self.spec.engine == 'mysql':
+    if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
       # Azure will add @domainname after the database username
       self.spec.database_username = (self.spec.database_username + '@' +
                                      self.endpoint.split('.')[0])
