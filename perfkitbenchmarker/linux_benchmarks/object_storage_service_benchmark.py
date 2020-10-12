@@ -1630,6 +1630,9 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
 
+  if not hasattr(benchmark_spec, 'service'):
+    logging.info('Skipping cleanup as prepare method failed')
+    return
   service = benchmark_spec.service
   bucket_name = benchmark_spec.bucket_name
   vms = benchmark_spec.vms
