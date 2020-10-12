@@ -327,7 +327,7 @@ def Run(benchmark_spec):
                                    receiving_vm,
                                    receiving_vm.ip_address,
                                    thread_count,
-                                   'external',
+                                   vm_util.IpAddressMetadata.EXTERNAL,
                                    protocol))
 
         # Send using internal IP addresses
@@ -337,7 +337,7 @@ def Run(benchmark_spec):
                                    receiving_vm,
                                    receiving_vm.internal_ip,
                                    thread_count,
-                                   'internal',
+                                   vm_util.IpAddressMetadata.INTERNAL,
                                    protocol))
 
   return results
