@@ -51,6 +51,8 @@ flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to p
 # TODO(user): Revisit flags for accepting query lists.
 flags.DEFINE_string('edw_simultaneous_queries',
                     None, 'CSV list of simultaneous queries to benchmark.')
+flags.DEFINE_string('edw_power_queries', None,
+                    'CSV list of power queries to benchmark.')
 flags.DEFINE_multi_string(
     'concurrency_streams', [], 'List of all query streams to execute. Each '
     'stream should be passed in separately and the queries should be comma '

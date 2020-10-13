@@ -75,7 +75,7 @@ def Prepare(benchmark_spec):
 
   query_locations = [
       os.path.join(FLAGS.local_query_dir, query)
-      for query in FLAGS.queries_to_execute
+      for query in FLAGS.edw_power_queries.split(',')
   ]
   any(vm.PushFile(query_loc) for query_loc in query_locations)
 
@@ -85,36 +85,32 @@ def Run(benchmark_spec):
   results = []
 
   edw_service_instance = benchmark_spec.edw_service
+  client_interface = edw_service_instance.GetClientInterface()
 
   # Run a warm up query in case there are cold start issues.
-  edw_service_instance.GetClientInterface().WarmUpQuery()
+  client_interface.WarmUpQuery()
 
   # Default to executing just the sample query if no queries are provided.
-  queries_to_execute = FLAGS.queries_to_execute or [
+  all_queries = FLAGS.edw_power_queries.split(',') or [
       os.path.basename(edw_service.SAMPLE_QUERY_PATH)
   ]
 
   # Accumulator for the entire benchmark's performance
   benchmark_performance = results_aggregator.EdwBenchmarkPerformance(
-      total_iterations=FLAGS.edw_suite_iterations,
-      expected_suite_queries=queries_to_execute)
+      total_iterations=FLAGS.edw_suite_iterations, expected_queries=all_queries)
 
   # Multiple iterations of the suite are performed to avoid cold start penalty
   for i in range(1, FLAGS.edw_suite_iterations + 1):
     iteration = str(i)
     # Accumulator for the current suite's performance
-    suite_performance = results_aggregator.EdwSuitePerformance(
-        suite_name='edw',
-        suite_sequence=iteration,
-        total_suite_queries=len(queries_to_execute))
+    iteration_performance = results_aggregator.EdwPowerIterationPerformance(
+        iteration_id=iteration, total_queries=len(all_queries))
 
-    for query in queries_to_execute:
-      time, metadata = edw_service_instance.GetClientInterface().ExecuteQuery(
-          query)
-      edw_query_performance = results_aggregator.EdwQueryPerformance(
-          query_name=query, performance=time, metadata=metadata)
-      suite_performance.add_query_performance(edw_query_performance)
-    benchmark_performance.add_suite_performance(iteration, suite_performance)
+    for query in all_queries:
+      execution_time, metadata = client_interface.ExecuteQuery(query)
+      iteration_performance.add_query_performance(query, execution_time,
+                                                  metadata)
+    benchmark_performance.add_power_iteration_performance(iteration_performance)
 
   # Execution complete, generate results only if the benchmark was successful.
   benchmark_metadata = {}
@@ -123,10 +119,6 @@ def Run(benchmark_spec):
     query_samples = benchmark_performance.get_all_query_performance_samples(
         metadata=benchmark_metadata)
     results.extend(query_samples)
-
-    wall_time_samples = benchmark_performance.get_wall_time_performance_samples(
-        metadata=benchmark_metadata)
-    results.extend(wall_time_samples)
 
     geomean_samples = (
         benchmark_performance.get_queries_geomean_performance_samples(

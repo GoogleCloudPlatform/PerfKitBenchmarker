@@ -16,7 +16,6 @@ import copy
 import enum
 import functools
 import json
-import time
 from typing import Any, Dict, List, Text
 
 from absl import flags
@@ -149,145 +148,17 @@ class EdwQueryPerformance(object):
     return self.execution_status == EdwQueryExecutionStatus.SUCCESSFUL
 
 
-class EdwStreamPerformance(object):
-  """Class that represents the performance of one stream of edw queries.
-
-  Attributes:
-    id: A unique string id for the stream.
-    performance: A dictionary of query name to its execution performance which
-      is a EdwQueryPerformance instance.
-    total_count: An integer count of the total number of queries in the stream.
-    successful_count: An integer count of the successful queries in the stream.
-    start_time: The start time of the stream execution.
-    end_time: The end time of the stream execution, updated every time a query
-      performance is added, assuming it to be the last query of the stream.
-  """
-
-  def __init__(self, stream_id: Text, total_stream_queries: int):
-    self.id = stream_id
-    self.performance = {}
-    self.total_count = total_stream_queries
-    self.successful_count = 0
-    self.start_time = time.time()
-
-  def add_query_performance(self, query_performance: EdwQueryPerformance):
-    """Updates the stream's performance map, with a member query performance.
-
-    The method also increaments the success and failure query counts.
-
-    Args:
-      query_performance: An instance of EdwQueryPerformance to be added.
-
-    Raises:
-      EdwPerformanceAggregationError: If the query has already been added.
-    """
-    if query_performance.name in self.performance:
-      raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
-                                           ' query: %s.' %
-                                           query_performance.name)
-    self.performance[query_performance.name] = query_performance
-    self.end_time = time.time()
-    if query_performance.is_successful():
-      self.successful_count += 1
-
-  def has_query_performance(self, query_name: Text) -> bool:
-    """Returns whether the query was executed as part of the stream.
-
-    Args:
-      query_name: A String name of the query to check.
-
-    Returns:
-      A boolean value indicating if the query was executed in the stream.
-    """
-    return query_name in self.performance
-
-  def is_query_successful(self, query_name: Text) -> bool:
-    """Makes sure query was successful in the suite.
-
-    Args:
-      query_name: A String name of the query to check.
-
-    Returns:
-      A boolean value indicating if the query was successful in the suite.
-    """
-    return self.performance.get(query_name).is_successful()
-
-  def get_query_performance(self, query_name: Text) -> EdwQueryPerformance:
-    """Gets a query's execution performance generated during stream execution.
-
-    Args:
-      query_name: A String name of the query to retrieve details for
-
-    Returns:
-      An EdwQueryPerformance instance for the requested query
-    """
-    return self.performance[query_name]
-
-  def get_all_queries_in_stream(self) -> List[Text]:
-    """Gets a list of names of all queries in the stream.
-
-    Returns:
-      A list of all queries in the stream.
-    """
-    return self.performance.keys()
-
-  def get_all_query_performance_samples(
-      self, metadata: Dict[str, str]) -> List[sample.Sample]:
-    """Gets a list of samples for all queries in the stream.
-
-    Args:
-      metadata: A dictionary of execution attributes to be merged with the query
-        execution attributes, for eg. tpc stream, scale of dataset, etc.
-
-    Returns:
-      A list of samples of each query's performance
-    """
-    stream_metadata = copy.copy(metadata)
-    stream_metadata['stream'] = self.id
-    return [
-        x.get_performance_sample(stream_metadata)
-        for x in self.performance.values()
-    ]
-
-  def is_successful(self) -> bool:
-    """Check if the stream was successful, if all the member queries succeed."""
-    return self.total_count == self.successful_count
-
-  def get_wall_time(self) -> float:
-    """Gets the wall time of the stream."""
-    return self.end_time - self.start_time
-
-  def get_wall_time_performance_sample(
-      self, metadata: Dict[str, str]) -> sample.Sample:
-    """Gets a sample for wall time performance of the stream.
-
-    Args:
-      metadata: A dictionary of execution attributes to be merged with the query
-        execution attributes, for eg. tpc stream, scale of dataset, etc.
-
-    Returns:
-      A sample of stream wall time performance
-    """
-    wall_time = self.get_wall_time()
-    wall_time_metadata = copy.copy(metadata)
-    return sample.Sample('edw_stream_wall_time', wall_time, 'seconds',
-                         wall_time_metadata)
-
-
-class EdwIterationPerformance(object):
-  """Class that represents the performance of an iteration of edw queries.
+class EdwPowerIterationPerformance(object):
+  """Class that represents the performance of a power iteration of edw queries.
 
   Attributes:
     id: A unique string id for the iteration.
-    performance: A dictionary of stream name to its execution performance which
-      is a EdwStreamPerformance instance.
-    total_count: An integer count of the total number of queries in the
-      iteration.
+    performance: A dictionary of query name to its execution performance which
+      is a EdwQueryPerformance instance.
     successful_count: An integer count of the successful queries in the
       iteration.
-    start_time: The start time of the stream execution
-    end_time: The end time of the stream execution, updated every time a stream
-      finishes.
+    total_count: An integer count of the total number of queries in the
+      iteration.
   """
 
   def __init__(self, iteration_id: Text, total_queries: int):
@@ -295,28 +166,36 @@ class EdwIterationPerformance(object):
     self.performance = {}
     self.total_count = total_queries
     self.successful_count = 0
-    self.start_time = time.time()
-    self.end_time = time.time()
 
-  def add_stream_performance(self, stream_performance: EdwStreamPerformance):
-    """Updates the iteration's performance map, with a member query performance.
+  def add_query_performance(self, query_name: Text, performance: float,
+                            metadata: Dict[str, str]):
+    """Creates and populates a query performance from the input results.
 
-    The method also increaments the success and failure query counts.
+    Updates the iteration's performance map with the query performance.
+    The method also increaments the success and failure query counts for the
+    iteration.
 
     Args:
-      stream_performance: An instance of EdwStreamPerformance to be added
+      query_name: A string name of the query that was executed
+      performance: A Float variable set to the query's completion time in secs.
+        -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      metadata: Extra metadata to add to each performance.
 
     Raises:
-      EdwPerformanceAggregationError: If the stream has already been added.
+      EdwPerformanceAggregationError: If the query has already been added.
     """
-    if stream_performance.id in self.performance:
-      raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
-                                           ' stream: %s.' %
-                                           stream_performance.id)
-    self.performance[stream_performance.id] = stream_performance
-    self.end_time = max(self.end_time, stream_performance.end_time)
-    if stream_performance.is_successful():
-      self.successful_count += stream_performance.successful_count
+    query_metadata = copy.copy(metadata)
+    query_performance = EdwQueryPerformance(
+        query_name=query_name, performance=performance, metadata=query_metadata)
+
+    if query_performance.name in self.performance:
+      raise EdwPerformanceAggregationError('Attempting to aggregate a '
+                                           'duplicate query: %s.' %
+                                           query_performance.name)
+    self.performance[query_performance.name] = query_performance
+    if query_performance.is_successful():
+      self.successful_count += 1
 
   def has_query_performance(self, query_name: Text) -> bool:
     """Returns whether the query was run at least once in the iteration.
@@ -327,10 +206,7 @@ class EdwIterationPerformance(object):
     Returns:
       A boolean value indicating if the query was executed in the iteration.
     """
-    for stream in self.performance.values():
-      if stream.has_query_performance(query_name):
-        return True
-    return False
+    return query_name in self.performance
 
   def is_query_successful(self, query_name: Text) -> bool:
     """Returns whether the query was successful in the iteration.
@@ -341,56 +217,35 @@ class EdwIterationPerformance(object):
     Returns:
       A boolean value indicating if the query was successful in the iteration.
     """
-    for stream in self.performance.values():
-      if stream.has_query_performance(query_name):
-        if not stream.is_query_successful(query_name):
-          return False
-    return True
+    return self.performance.get(query_name).is_successful()
 
-  def get_aggregated_query_performance(self, query_name: Text) -> float:
-    """Gets a query's execution performance aggregated across all streams in the current iteration.
+  def get_query_performance(self, query_name: Text) -> float:
+    """Gets a query's execution performance generated during iteration execution.
 
     Args:
       query_name: A String name of the query to retrieve details for
 
     Returns:
-      A float value set to the query's average completion time in secs.
+      A float value set to the query's completion time in secs.
     """
-    all_performances = []
-    for stream in self.performance.values():
-      if stream.has_query_performance(query_name):
-        all_performances.append(
-            stream.get_query_performance(query_name).get_performance_value())
-    if not all_performances:
-      return -1.0
-    return sum(all_performances) / len(all_performances)
+    return self.performance[query_name].get_performance_value()
 
-  def get_aggregated_query_metadata(self, query_name: Text) -> Dict[str, Any]:
-    """Gets the metadata of a query aggregated across all streams in the current iteration.
+  def get_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+    """Gets the metadata of a query as executed in the current iteration.
 
     Args:
-      query_name: Name of the query whose aggregated performance is requested
+      query_name: Name of the query whose performance is requested.
 
     Returns:
-      A dictionary set to the query's aggregated metadata, accumulated from the
-       raw query runs in all streams of the current iteration.
+      A dictionary set to the query's metadata.
 
     Raises:
-      EdwPerformanceAggregationError: If the query failed in one or more streams
+      EdwPerformanceAggregationError: If the query failed.
     """
     if not self.is_query_successful(query_name):
       raise EdwPerformanceAggregationError('Cannot aggregate invalid / failed'
                                            ' query' + query_name)
-    result = {}
-    for stream_id, stream_performance in self.performance.items():
-      if stream_performance.has_query_performance(query_name):
-        q_performance = stream_performance.get_query_performance(query_name)
-        result[stream_id + '_runtime'] = q_performance.get_performance_value()
-        result.update({
-            stream_id + '_' + k: v
-            for (k, v) in q_performance.get_performance_metadata().items()
-        })
-    return result
+    return self.performance.get(query_name).metadata
 
   def get_all_queries_in_iteration(self) -> List[Text]:
     """Gets a list of names of all queries in the iteration.
@@ -398,10 +253,7 @@ class EdwIterationPerformance(object):
     Returns:
       A list of all queries in the iteration.
     """
-    all_queries = set()
-    for stream in self.performance.values():
-      all_queries.update(stream.get_all_queries_in_stream())
-    return all_queries
+    return self.performance.keys()
 
   def get_all_query_performance_samples(
       self, metadata: Dict[str, str]) -> List[sample.Sample]:
@@ -414,10 +266,10 @@ class EdwIterationPerformance(object):
     Returns:
       A list of samples of each query's performance
     """
-    return sum([
-        stream.get_all_query_performance_samples(metadata)
-        for stream in self.performance.values()
-    ], [])
+    return [
+        query_performance.get_performance_sample(metadata)
+        for query_performance in self.performance.values()
+    ]
 
   def is_successful(self, expected_queries: List[Text]) -> bool:
     """Check if all the expected queries ran and all succeeded."""
@@ -426,49 +278,20 @@ class EdwIterationPerformance(object):
     all_queries_were_successful = self.total_count == self.successful_count
     return all_queries_ran and all_queries_were_successful
 
-  def get_wall_time(self) -> float:
-    """Gets the total wall time, in seconds, for the iteration.
-
-    The wall time is the time from the start of the first stream to the end time
-    of the last stream to finish.
-
-    Returns:
-      The wall time in seconds.
-    """
-    return self.end_time - self.start_time
-
-  def get_wall_time_performance_sample(self, metadata: Dict[
-      str, str]) -> sample.Sample:
-    """Gets a sample for total wall time performance of the iteration.
-
-    Args:
-      metadata: A dictionary of execution attributes to be merged with the query
-        execution attributes, for eg. tpc suite, scale of dataset, etc.
-
-    Returns:
-      A sample of iteration wall time performance
-    """
-    wall_time = self.get_wall_time()
-    wall_time_metadata = copy.copy(metadata)
-    return sample.Sample('edw_iteration_wall_time', wall_time, 'seconds',
-                         wall_time_metadata)
-
   def get_queries_geomean(self) -> float:
-    """Gets the geometric mean of all queries in all streams of the iteration.
+    """Gets the geometric mean of all queries in the iteration.
 
     Returns:
-      The (float) geometric mean of all the individual queries ran in all
-        streams of the iteration.
+      The (float) geometric mean of all the queries ran in the iteration.
 
     Raises:
-      EdwPerformanceAggregationError: If the suite contains unsuccessful query
-        executions.
+      EdwPerformanceAggregationError: If the iteration contains unsuccessful
+        query executions.
     """
-    query_performances = []
-    for stream in self.performance.values():
-      for query in stream.performance.values():
-        query_performances.append(query.get_performance_value())
-    return geometric_mean(query_performances)
+    return geometric_mean([
+        query_performance.performance
+        for query_performance in self.performance.values()
+    ])
 
   def get_queries_geomean_performance_sample(
       self, expected_queries: List[Text], metadata: Dict[str,
@@ -485,8 +308,8 @@ class EdwIterationPerformance(object):
       A sample of iteration geomean performance.
 
     Raises:
-      EdwPerformanceAggregationError: If the suite contains unsuccessful query
-        executions.
+      EdwPerformanceAggregationError: If the iteration contains unsuccessful
+        query executions.
     """
     if not self.is_successful(expected_queries):
       raise EdwPerformanceAggregationError('Failed executions in iteration.')
@@ -621,18 +444,18 @@ class EdwSimultaneousIterationPerformance(object):
       return self.performance.get(query_name).is_successful()
     return False
 
-  def get_aggregated_query_performance(self, query_name: Text) -> float:
+  def get_query_performance(self, query_name: Text) -> float:
     """Gets a query's execution performance in the current iteration.
 
     Args:
       query_name: A String name of the query to retrieve details for
 
     Returns:
-      A float value set to the query's average completion time in secs.
+      A float value set to the query's completion time in secs.
     """
     return self.performance[query_name].get_performance_value()
 
-  def get_aggregated_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+  def get_query_metadata(self, query_name: Text) -> Dict[str, Any]:
     """Gets the metadata of a query in the current iteration.
 
     Args:
@@ -749,7 +572,7 @@ class EdwBenchmarkPerformance(object):
     expected_queries: A list of query names that are executed in an iteration of
       the benchmark
     iteration_performances: A dictionary of iteration id (String value) to its
-      execution performance (an instance of EdwIterationPerformance)
+      execution performance (an instance of an EdwIterationPerformance)
   """
 
   def __init__(self, total_iterations: int, expected_queries: List[Text]):
@@ -757,8 +580,8 @@ class EdwBenchmarkPerformance(object):
     self.expected_queries = expected_queries
     self.iteration_performances = {}
 
-  def add_iteration_performance(self,
-                                iteration_performance: EdwIterationPerformance):
+  def add_power_iteration_performance(
+      self, iteration_performance: EdwPowerIterationPerformance):
     """Add an iteration's execution performance to the benchmark results.
 
     Args:
@@ -809,10 +632,10 @@ class EdwBenchmarkPerformance(object):
     self.iteration_performances[iteration_id] = performance
 
   def is_successful(self) -> bool:
-    """Check a benchmark's success, only if all the suite sequences succeed."""
+    """Check a benchmark's success, only if all the iterations succeed."""
     return functools.reduce((lambda x, y: x and y), [
-        x.is_successful(self.expected_queries)
-        for x in self.iteration_performances.values()
+        iteration_performance.is_successful(self.expected_queries)
+        for iteration_performance in self.iteration_performances.values()
     ])
 
   def aggregated_query_status(self, query_name: Text) -> bool:
@@ -852,7 +675,7 @@ class EdwBenchmarkPerformance(object):
       raise EdwPerformanceAggregationError('Cannot aggregate invalid / failed '
                                            'query ' + query_name)
     query_performances = [
-        iteration_performance.get_aggregated_query_performance(query_name)
+        iteration_performance.get_query_performance(query_name)
         for iteration_performance in self.iteration_performances.values()
     ]
     return sum(query_performances) / self.total_iterations
@@ -879,7 +702,7 @@ class EdwBenchmarkPerformance(object):
         self.iteration_performances.items()):
       result.update({
           iteration_id + '_' + k: v
-          for (k, v) in iteration_performance.get_aggregated_query_metadata(
+          for (k, v) in iteration_performance.get_query_metadata(
               query_name).items()
       })
     return result
@@ -913,7 +736,8 @@ class EdwBenchmarkPerformance(object):
       sample.Sample]:
     """Generates samples for all query performances.
 
-    Benchmark relies on suite runs to generate the raw query performance samples
+    Benchmark relies on iteration runs to generate the raw query performance
+      samples
     Benchmark appends the aggregated query performance sample
 
     Args:
@@ -1010,39 +834,6 @@ class EdwBenchmarkPerformance(object):
         metadata=metadata))
     return results
 
-  def get_wall_time_performance_samples(self, metadata: Dict[str, str]) -> List[
-      sample.Sample]:
-    """Generates samples for all wall time performances.
-
-    Benchmark relies on suite runs to generate the raw wall time performance
-      samples
-    Benchmark appends the aggregated wall time performance sample
-
-    Args:
-      metadata: A dictionary of execution attributes to be merged with the query
-        execution attributes, for eg. tpc suite, scale of dataset, etc.
-
-    Returns:
-      A list of samples (raw and aggregated)
-    """
-    results = []
-
-    for iteration, performance in self.iteration_performances.items():
-      iteration_metadata = copy.copy(metadata)
-      iteration_metadata['iteration'] = iteration
-      for stream, stream_performance in performance.performance.items():
-        stream_metadata = copy.copy(iteration_metadata)
-        stream_metadata['stream'] = stream
-        results.append(
-            stream_performance.get_wall_time_performance_sample(
-                stream_metadata))
-      results.append(performance.get_wall_time_performance_sample(
-          iteration_metadata))
-
-    results.append(self.get_aggregated_wall_time_performance_sample(
-        metadata=metadata))
-    return results
-
   def get_aggregated_geomean_performance_sample(self,
                                                 metadata:
                                                 Dict[str,
@@ -1077,7 +868,7 @@ class EdwBenchmarkPerformance(object):
                                               ) -> List[sample.Sample]:
     """Generates samples for all geomean performances.
 
-    Benchmark relies on suite runs to generate the raw geomean performance
+    Benchmark relies on iteration runs to generate the raw geomean performance
       samples
     Benchmark appends the aggregated geomean performance sample
 
