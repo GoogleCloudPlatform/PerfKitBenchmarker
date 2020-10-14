@@ -266,9 +266,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Raises:
       ValueError on invalid configuration.
     """
-    if cpus not in [1] + list(range(2, 33, 2)):
+    if cpus not in [1] + list(range(2, 97, 2)):
       raise ValueError(
-          'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
+          'CPUs (%i) much be 1 or an even number in-between 2 and 96, '
           'inclusive.' % cpus)
 
     if memory % 256 != 0:
