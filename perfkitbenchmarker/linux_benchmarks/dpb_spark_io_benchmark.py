@@ -142,6 +142,9 @@ def Run(benchmark_spec):
 
   Returns:
     A list of sample.Sample objects.
+
+  Raises:
+    JobSubmissionError if SQL script fails.
   """
   results = []
   dpb_service_instance = benchmark_spec.dpb_service
@@ -153,15 +156,13 @@ def Run(benchmark_spec):
   query_script_uri = '{}/{}'.format(query_script_folder_uri,
                                     SPARK_SAMPLE_SCRIPT)
 
-  stats = dpb_service_instance.SubmitJob(
+  result = dpb_service_instance.SubmitJob(
       query_file=query_script_uri,
       job_type=BaseDpbService.SPARKSQL_JOB_TYPE)
-  logging.info(stats)
+  logging.info(result)
 
-  if stats['success']:
-    results.append(
-        sample.Sample('run_time', stats['running_time'], 'seconds', metadata))
-  return results
+  results.append(
+      sample.Sample('run_time', result.run_time, 'seconds', metadata))
 
 
 def Cleanup(benchmark_spec):

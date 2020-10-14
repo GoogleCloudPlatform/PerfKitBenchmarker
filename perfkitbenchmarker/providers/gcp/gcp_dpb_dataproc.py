@@ -74,39 +74,19 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.storage_service.PrepareService(location=self.region)
 
   @staticmethod
-  def _ParseTime(state_time):
+  def _ParseTime(state_time: str) -> datetime:
     """Parses time from json output.
 
     Args:
       state_time: string. the state start time.
 
     Returns:
-      datetime.
+      Parsed datetime.
     """
     try:
       return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%S.%fZ')
     except ValueError:
       return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%SZ')
-
-  @staticmethod
-  def _GetStats(stdout):
-    results = json.loads(stdout)
-    stats = {}
-    done_time = GcpDpbDataproc._ParseTime(results['status']['stateStartTime'])
-    pending_time = None
-    start_time = None
-    for state in results['statusHistory']:
-      if state['state'] == 'PENDING':
-        pending_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
-      elif state['state'] == 'RUNNING':
-        start_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
-
-    if done_time and start_time:
-      stats[dpb_service.RUNTIME] = (done_time - start_time).total_seconds()
-    if start_time and pending_time:
-      stats[dpb_service.WAITING] = (
-          (start_time - pending_time).total_seconds())
-    return stats
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -238,13 +218,27 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments
 
-    stdout, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
     if retcode != 0:
-      return {dpb_service.SUCCESS: False}
+      raise dpb_service.JobSubmissionError(stderr)
 
-    stats = self._GetStats(stdout)
-    stats[dpb_service.SUCCESS] = True
-    return stats
+    results = json.loads(stdout)
+    # Otherwise retcode would not have been 0
+    assert results['status']['state'] == 'DONE'
+    done_time = GcpDpbDataproc._ParseTime(results['status']['stateStartTime'])
+    pending_time = None
+    start_time = None
+    for state in results['statusHistory']:
+      if state['state'] == 'PENDING':
+        pending_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
+      elif state['state'] == 'RUNNING':
+        start_time = GcpDpbDataproc._ParseTime(state['stateStartTime'])
+
+    assert pending_time and start_time and done_time
+
+    return dpb_service.JobResult(
+        run_time=(done_time - start_time).total_seconds(),
+        pending_time=(start_time - pending_time).total_seconds())
 
   def SetClusterProperty(self):
     pass

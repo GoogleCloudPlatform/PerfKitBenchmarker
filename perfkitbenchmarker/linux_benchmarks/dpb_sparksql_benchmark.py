@@ -238,16 +238,19 @@ def Prepare(benchmark_spec):
 
   # Create external Hive tables
   if FLAGS.dpb_sparksql_create_hive_tables:
-    stats = dpb_service_instance.SubmitJob(
-        pyspark_file=os.path.join(benchmark_spec.base_dir, SPARK_TABLE_SCRIPT),
-        job_type=BaseDpbService.PYSPARK_JOB_TYPE,
-        job_arguments=[
-            FLAGS.dpb_sparksql_data, ','.join(benchmark_spec.table_subdirs)
-        ])
-    logging.info(stats)
-    if not stats['success']:
+    try:
+      result = dpb_service_instance.SubmitJob(
+          pyspark_file=os.path.join(benchmark_spec.base_dir,
+                                    SPARK_TABLE_SCRIPT),
+          job_type=BaseDpbService.PYSPARK_JOB_TYPE,
+          job_arguments=[
+              FLAGS.dpb_sparksql_data, ','.join(benchmark_spec.table_subdirs)
+          ])
+      logging.info(result)
+    except dpb_service.JobSubmissionError as e:
       raise errors.Benchmarks.PrepareException(
-          'Creating tables from {}/* failed'.format(FLAGS.dpb_sparksql_data))
+          'Creating tables from {}/* failed'.format(
+              FLAGS.dpb_sparksql_data)) from e
 
 
 def Run(benchmark_spec):
@@ -268,50 +271,47 @@ def Run(benchmark_spec):
   metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
 
   results = []
-  unit = 'seconds'
   failing_queries = []
   run_times = {}
   wall_times = {}
   for query in benchmark_spec.queries:
-    stats = _RunSparkSqlJob(
-        dpb_service_instance,
-        os.path.join(benchmark_spec.base_dir, query + '.sql'),
-        os.path.join(benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT),
-        benchmark_spec.table_subdirs)
-    logging.info(stats)
-    metadata_copy = metadata.copy()
-    metadata_copy['query'] = query
-    if stats[dpb_service.SUCCESS]:
-      run_time = stats[dpb_service.RUNTIME]
-      wall_time = run_time + stats[dpb_service.WAITING]
+    try:
+      result = _RunSparkSqlJob(
+          dpb_service_instance,
+          os.path.join(benchmark_spec.base_dir, query + '.sql'),
+          os.path.join(benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT),
+          benchmark_spec.table_subdirs)
+      logging.info(result)
+      metadata_copy = metadata.copy()
+      metadata_copy['query'] = query
       results.append(
-          sample.Sample('sparksql_wall_time', wall_time, unit, metadata_copy))
+          sample.Sample('sparksql_wall_time', result.wall_time, 'seconds',
+                        metadata_copy))
       results.append(
-          sample.Sample('sparksql_run_time', run_time, unit, metadata_copy))
-      wall_times[query] = wall_time
-      run_times[query] = run_time
-    else:
+          sample.Sample('sparksql_run_time', result.run_time, 'seconds',
+                        metadata_copy))
+      wall_times[query] = result.wall_time
+      run_times[query] = result.run_time
+    except dpb_service.JobSubmissionError:
       failing_queries.append(query)
 
   metadata['failing_queries'] = ','.join(sorted(failing_queries))
 
   if results:
     results.append(
-        sample.Sample(
-            'sparksql_total_wall_time',
-            np.fromiter(wall_times.values(), dtype='float').sum(),
-            unit, metadata))
+        sample.Sample('sparksql_total_wall_time',
+                      np.fromiter(wall_times.values(), dtype='float').sum(),
+                      'seconds', metadata))
     results.append(
-        sample.Sample(
-            'sparksql_total_run_time',
-            np.fromiter(run_times.values(), dtype='float').sum(),
-            unit, metadata))
+        sample.Sample('sparksql_total_run_time',
+                      np.fromiter(run_times.values(), dtype='float').sum(),
+                      'seconds', metadata))
     results.append(
         sample.Sample('sparksql_geomean_wall_time',
-                      sample.GeoMean(wall_times.values()), unit, metadata))
+                      sample.GeoMean(wall_times.values()), 'seconds', metadata))
     results.append(
         sample.Sample('sparksql_geomean_run_time',
-                      sample.GeoMean(run_times.values()), unit, metadata))
+                      sample.GeoMean(run_times.values()), 'seconds', metadata))
   else:
     raise errors.Benchmarks.RunError('No queries succeeded.')
 

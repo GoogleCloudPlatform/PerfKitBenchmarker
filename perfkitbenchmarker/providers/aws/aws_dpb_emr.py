@@ -310,9 +310,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     Args:
       step_id: The step id to query.
+
     Returns:
       A dictionary describing the step if the step the step is complete,
           None otherwise.
+
+    Raises:
+      JobSubmissionError if job fails.
     """
 
     cmd = self.cmd_prefix + ['emr', 'describe-step', '--cluster-id',
@@ -320,7 +324,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
-    if state == 'COMPLETED' or state == 'FAILED':
+    if state == 'FAILED':
+      raise dpb_service.JobSubmissionError()
+    if state == 'COMPLETED':
       return result
     else:
       return None
@@ -414,17 +420,14 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(step_cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
-    metrics = {}
 
     result = WaitForStep(step_id)
     pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
     start_time = result['Step']['Status']['Timeline']['StartDateTime']
     end_time = result['Step']['Status']['Timeline']['EndDateTime']
-    metrics[dpb_service.WAITING] = start_time - pending_time
-    metrics[dpb_service.RUNTIME] = end_time - start_time
-    step_state = result['Step']['Status']['State']
-    metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
-    return metrics
+    return dpb_service.JobResult(
+        run_time=end_time - start_time,
+        pending_time=start_time - pending_time)
 
   def SetClusterProperty(self):
     pass

@@ -153,6 +153,9 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
     A list of samples, comprised of the detailed run times of individual stages.
     The samples have associated metadata detailing the cluster details and used
     filesystem.
+
+  Raises:
+    JobSubmissionError if any job fails.
   """
   service = spec.dpb_service
 
@@ -200,15 +203,15 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
             ('teravalidate', [sorted_dir, report_dir])]
   cumulative_runtime = 0
   for (stage, args) in stages:
-    stats = RunStage(spec, stage, args)
-    logging.info(stats)
-    run_time = stats[dpb_service.RUNTIME]
-    wall_time = run_time + stats[dpb_service.WAITING]
+    result = RunStage(spec, stage, args)
+    logging.info(result)
     results.append(
-        sample.Sample(stage + '_run_time', run_time, 'seconds', metadata))
+        sample.Sample(stage + '_run_time', result.run_time, 'seconds',
+                      metadata))
     results.append(
-        sample.Sample(stage + '_wall_time', wall_time, 'seconds', metadata))
-    cumulative_runtime += run_time
+        sample.Sample(stage + '_wall_time', result.wall_time, 'seconds',
+                      metadata))
+    cumulative_runtime += result.run_time
   results.append(
       sample.Sample('cumulative_runtime', cumulative_runtime, 'seconds',
                     metadata))
@@ -227,9 +230,8 @@ def Cleanup(spec: benchmark_spec.BenchmarkSpec):
     service.DeleteBucket(run_uri)
 
 
-def RunStage(spec: benchmark_spec.BenchmarkSpec,
-             stage: str,
-             stage_args: List[str]):
+def RunStage(spec: benchmark_spec.BenchmarkSpec, stage: str,
+             stage_args: List[str]) -> dpb_service.JobResult:
   """Runs one of the 3 job stages of Terasort.
 
   Args:
@@ -238,7 +240,10 @@ def RunStage(spec: benchmark_spec.BenchmarkSpec,
     stage_args: List[str]; arguments for the stage.
 
   Returns:
-    dict result of running job.
+    JobResult of running job.
+
+  Raises:
+    JobSubmissionError if job fails.
   """
   service = spec.dpb_service
   if service.dpb_service_type == dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER:

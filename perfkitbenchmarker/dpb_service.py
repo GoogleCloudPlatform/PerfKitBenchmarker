@@ -23,8 +23,11 @@ import abc
 import datetime
 import logging
 import posixpath
+from typing import Dict, List
 
 from absl import flags
+from dataclasses import dataclass
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
@@ -60,9 +63,29 @@ FLINK = 'flink'
 HIVE = 'hive'
 
 # Metrics and Status related metadata
+# TODO(pclay): Remove these after migrating all callers to SubmitJob
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
+
+
+class JobSubmissionError(errors.Benchmarks.RunError):
+  """Thrown by all implementations if SubmitJob fails."""
+  pass
+
+
+@dataclass
+class JobResult:
+  """Data class for the timing of a successful DPB job."""
+  # Service reported execution time
+  run_time: float
+  # Service reported pending time (0 if service does not report).
+  pending_time: float = 0
+
+  @property
+  def wall_time(self) -> float:
+    """The total time the service reported it took to execute."""
+    return self.run_time + self.pending_time
 
 
 def GetDpbServiceClass(dpb_service_type):
@@ -128,17 +151,17 @@ class BaseDpbService(resource.BaseResource):
 
   @abc.abstractmethod
   def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_stdout_file=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_type=None,
-                properties=None):
+                jarfile: str = None,
+                classname: str = None,
+                pyspark_file: str = None,
+                query_file: str = None,
+                job_poll_interval: float = None,
+                job_stdout_file: str = None,
+                job_arguments: List[str] = None,
+                job_files: List[str] = None,
+                job_jars: List[str] = None,
+                job_type: str = None,
+                properties: Dict[str, str] = None) -> JobResult:
     """Submit a data processing job to the backend.
 
     Args:
@@ -161,10 +184,10 @@ class BaseDpbService(resource.BaseResource):
       properties: Dict of properties to pass with the job.
 
     Returns:
-      dictionary, where success is true if the job succeeded,
-      false otherwise.  The dictionary may also contain an entry for
-      running_time and pending_time if the platform reports those
-      metrics.
+      A JobResult with the timing of the successful job.
+
+    Raises:
+      JobSubmissionError if job fails.
     """
     pass
 
@@ -255,18 +278,17 @@ class BaseDpbService(resource.BaseResource):
        not the arguments passed to the wrapper that submits the job.
 
     Returns:
-      Wall time for executing the Spark application.
-      The statistics from running the Validate job.
+      JobResult of the Spark Job
+
+    Raises:
+      JobSubmissionError if the job fails.
     """
-    start_time = datetime.datetime.now()
-    stats = self.SubmitJob(
+    return self.SubmitJob(
         jarfile=spark_application_jar,
         job_type='spark',
         classname=spark_application_classname,
         job_arguments=spark_application_args
     )
-    end_time = datetime.datetime.now()
-    return self._ProcessWallTime(start_time, end_time), stats
 
   def CreateBucket(self, source_bucket):
     """Creates an object-store bucket used during persistent data processing.
@@ -370,15 +392,16 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     cmd_string = ' '.join(cmd_list)
 
     start_time = datetime.datetime.now()
-    stdout, _ = self.leader.RemoteCommand(cmd_string)
+    stdout, stderr, retcode = self.leader.RemoteCommandWithReturnCode(
+        cmd_string)
+    if retcode:
+      raise JobSubmissionError(stderr)
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
         f.write(stdout)
-    return {SUCCESS: True,
-            RUNTIME: (end_time - start_time).total_seconds(),
-            WAITING: 0}
+    return JobResult(run_time=(end_time - start_time).total_seconds())
 
   def _Delete(self):
     pass
