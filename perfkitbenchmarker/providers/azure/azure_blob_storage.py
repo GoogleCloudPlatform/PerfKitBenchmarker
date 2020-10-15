@@ -16,6 +16,7 @@
 
 import datetime
 import json
+import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
@@ -36,6 +37,10 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   Relevant documentation:
   http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
   """
+
+  def __init__(self):
+    self.storage_account = None
+    self.resource_group = None
 
   STORAGE_NAME = providers.AZURE
 
@@ -112,8 +117,10 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     self.storage_account.Create()
 
   def CleanupService(self):
-    self.storage_account.Delete()
-    self.resource_group.Delete()
+    if hasattr(self, 'storage_account') and self.storage_account:
+      self.storage_account.Delete()
+    if hasattr(self, 'resource_group') and self.resource_group:
+      self.resource_group.Delete()
 
   def MakeBucket(self, bucket, raise_on_failure=True):
     _, stderr, ret_code = vm_util.IssueCommand(
@@ -124,6 +131,11 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
       raise errors.Benchmarks.BucketCreationError(stderr)
 
   def DeleteBucket(self, bucket):
+    if not hasattr(self, 'storage_account') or not self.storage_account:
+      logging.warning(
+          'storage_account not configured. Skipping DeleteBucket %s', bucket)
+      return
+
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'storage', 'container', 'delete', '--name', bucket] +
         self.storage_account.connection_args,
