@@ -177,7 +177,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 
-    _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
+    _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
+
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
     if FLAGS.mysql_flags:
       cmd_string = [
