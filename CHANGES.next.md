@@ -1,6 +1,5 @@
 ### Breaking changes:
 
--   Add ibmcloud as a new provider
 -   The core_os os_type was removed from the Azure provider as
     [the image was deleted](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/endorsed-distros#supported-distributions-and-versions),
     -   It will be replaced by
@@ -9,6 +8,7 @@
 
 ### New features:
 
+-   Add ibmcloud as a new provider.
 -   Add prefix/directory support for object storage service runs.
 -   Add MaskRCNN and ReXtNet-101 to the horovod benchmark.
 -   Add Bigtable Benchmarking tutorial.
