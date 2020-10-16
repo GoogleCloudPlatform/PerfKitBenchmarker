@@ -78,6 +78,7 @@ FLAGS = flags.FLAGS
 TYPE_2_PROVIDER = dict([('athena', 'aws'), ('redshift', 'aws'),
                         ('spectrum', 'aws'), ('snowflake_aws', 'aws'),
                         ('bigquery', 'gcp'), ('endor', 'gcp'),
+                        ('bqfederated', 'gcp'),
                         ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([
     ('athena', 'perfkitbenchmarker.providers.aws.athena'),
@@ -86,6 +87,7 @@ TYPE_2_MODULE = dict([
     ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake'),
     ('bigquery', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('endor', 'perfkitbenchmarker.providers.gcp.bigquery'),
+    ('bqfederated', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('azuresqldatawarehouse', 'perfkitbenchmarker.providers.azure.'
      'azure_sql_data_warehouse')
 ])

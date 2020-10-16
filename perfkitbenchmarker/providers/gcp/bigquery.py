@@ -550,3 +550,42 @@ class Endor(Bigquery):
     data_details['partitioning'] = parsed_id[3]
     data_details['location'] = parsed_id[4]
     return data_details
+
+
+class Bqfederated(Bigquery):
+  """Class representing BigQuery Federated service."""
+
+  SERVICE_TYPE = 'bqfederated'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the BigQuery Federated service.
+
+    Returns:
+      A dictionary set to Federated service details.
+    """
+    basic_data = super(Bqfederated, self).GetMetadata()
+    basic_data['edw_service_type'] = Bqfederated.SERVICE_TYPE
+    basic_data.update(self.client_interface.GetMetadata())
+    basic_data.update(self.GetDataDetails())
+    return basic_data
+
+  def GetDataDetails(self) -> Dict[str, str]:
+    """Returns a dictionary with underlying data details.
+
+    cluster_identifier = <project_id>.<dataset_id>
+    Data details are extracted from the dataset_id that follows the format:
+    <dataset>_<format>_<compression>_<partitioning>_<location>
+    eg.
+    tpch10000_parquet_compressed_partitoned_gcs
+
+    Returns:
+      A dictionary set to underlying data's details (format, etc.)
+    """
+    data_details = {}
+    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    parsed_id = re.split(r'_', dataset_id)
+    data_details['format'] = parsed_id[1]
+    data_details['compression'] = parsed_id[2]
+    data_details['partitioning'] = parsed_id[3]
+    data_details['location'] = parsed_id[4]
+    return data_details
