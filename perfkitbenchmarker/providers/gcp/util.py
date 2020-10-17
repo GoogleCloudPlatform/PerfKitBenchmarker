@@ -13,10 +13,8 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import collections
+import functools
 import json
 import logging
 import re
@@ -26,11 +24,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import six
-
-if six.PY2:
-  import functools32 as functools
-else:
-  import functools
 
 FLAGS = flags.FLAGS
 

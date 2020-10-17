@@ -62,11 +62,8 @@ VM specs, disk specs, or any component of the benchmark configuration
 dictionary.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import copy
+import functools
 import logging
 import re
 
@@ -77,10 +74,6 @@ from perfkitbenchmarker import errors
 import six
 import yaml
 
-if six.PY2:
-  import functools32 as functools
-else:
-  import functools
 
 FLAGS = flags.FLAGS
 CONFIG_CONSTANTS = 'default_config_constants.yaml'
