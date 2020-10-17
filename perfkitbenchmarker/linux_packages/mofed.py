@@ -15,8 +15,8 @@
 
 """Module containing Mellanox OpenFabrics driver installation functions."""
 
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
@@ -35,6 +35,7 @@ import string
 import sys
 from threading import Thread
 import time
+import uuid
 from absl import flags
 import six
 from six.moves import range
@@ -65,15 +66,18 @@ flags.DEFINE_string('bucket', None,
                     'after this test returns.')
 
 flags.DEFINE_enum(
-    'scenario', 'OneByteRW', ['OneByteRW', 'ListConsistency',
-                              'SingleStreamThroughput', 'CleanupBucket',
-                              'MultiStreamWrite', 'MultiStreamRead'],
+    'scenario', 'OneByteRW', [
+        'OneByteRW', 'ListConsistency', 'SingleStreamThroughput',
+        'CleanupBucket', 'MultiStreamWrite', 'MultiStreamRead',
+        'MultiStreamDelete'
+    ],
     'The various scenarios to run. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
     'SingleStreamThroughput: Throughput of single stream large object RW. '
     'CleanupBucket: Cleans up everything in a given bucket.'
     'MultiStreamWrite: Write objects with many streams at once.'
-    'MultiStreamRead: Read objects with many streams at once.')
+    'MultiStreamRead: Read objects with many streams at once.'
+    'MultiStreamDelete: Deletes all objects in a bucket with many streams.')
 
 flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
                      'particular test scenario. Currently only applicable to '
@@ -110,16 +114,30 @@ flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
                     'providers, storage class is determined by the bucket, '
                     'which is passed in by the --bucket parameter.')
 
-flags.DEFINE_enum('object_naming_scheme', 'sequential_by_stream',
-                  ['sequential_by_stream',
-                   'approximately_sequential'],
-                  'How objects will be named. Only applies to the '
-                  'MultiStreamWrite benchmark. '
-                  'sequential_by_stream: object names from each stream '
-                  'will be sequential, but different streams will have '
-                  'different name prefixes. '
-                  'approximately_sequential: object names from all '
-                  'streams will roughly increase together.')
+flags.DEFINE_enum(
+    'object_naming_scheme', 'sequential_by_stream', [
+        'prefix_by_vm_and_stream', 'sequential_by_stream',
+        'approximately_sequential'
+    ], 'How objects will be named. Only applies to the '
+    'MultiStreamWrite benchmark. '
+    'prefix_by_vm_and_stream: object names from each stream will create a '
+    'directory prefix as vm_id/worker_id/ attached to each object name.'
+    'sequential_by_stream: object names from each stream '
+    'will be sequential, but different streams will have '
+    'different name prefixes. '
+    'approximately_sequential: object names from all '
+    'streams will roughly increase together.')
+
+flags.DEFINE_boolean(
+    'bulk_delete', False,
+    'If true, deletes objects with bulk delete client request and records '
+    'average latency per object. Otherwise, deletes one object per request '
+    'and records individual delete latency'
+)
+
+flags.DEFINE_integer('vm_id', 0, 'ID of VM.')
+flags.DEFINE_float('delete_delay', 0,
+                   'Time to delay inbetween delete API call.')
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -364,7 +382,7 @@ def GenerateWritePayload(size):
   # with each item being the default object size of 30 bytes or so, it will lead
   # to out of memory error.
   for i in range(size):
-    payload_bytes[i] = ord(random.choice(string.letters))
+    payload_bytes[i] = ord(random.choice(string.ascii_letters))
 
   return payload_bytes
 
@@ -782,6 +800,55 @@ def MultiStreamReads(service):
   json.dump(streams, sys.stdout, indent=0)
 
 
+def MultiStreamDelete(service):
+  """Run multi-stream delete benchmark.
+
+  Args:
+    service: the ObjectStorageServiceBase object to use.
+
+  This function deletes a list of object names and sizes from
+  FLAGS.objects_written_file (in the format written by
+  MultiStreamWrites and then deletes the objects from the storage
+  service, potentially using multiple threads.
+
+  It doesn't directly return anything, but it writes its results to
+  sys.stdout in the following format:
+
+  [{"operation": "delete", "start_time": start_time_1,
+    "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
+   {"operation": "delete", "start_time": start_time_1,
+    "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
+   ...]
+
+  """
+
+  # Read the object records that the MultiStreamWriter left for us.
+  if FLAGS.objects_written_file is None:
+    raise ValueError(
+        'The MultiStream Read and Delete benchmarks need a list of object '
+        'names to read from. Use '
+        '--objects_written_file=<filename>.')
+  with open(FLAGS.objects_written_file, 'r') as object_file:
+    object_records = json.load(object_file)
+
+  num_workers = FLAGS.num_streams
+  objects_by_worker = [object_records[i::num_workers]
+                       for i in range(num_workers)]
+
+  results = RunWorkerProcesses(
+      DeleteWorker,
+      (service,),
+      per_process_args=objects_by_worker)
+
+  # streams is the data we send back to the controller.
+  streams = []
+  for result in results:
+    result_keys = ('stream_num', 'start_times', 'latencies', 'sizes')
+    streams.append({k: result[k] for k in result_keys})
+
+  json.dump(streams, sys.stdout, indent=0)
+
+
 def SleepUntilTime(when):
   """Sleep until a given time.
 
@@ -820,7 +887,13 @@ def WriteWorker(service, payload,
   latencies = []
   sizes = []
 
-  if naming_scheme == 'sequential_by_stream':
+  if naming_scheme == 'prefix_by_vm_and_stream':
+    # Unique prefix helps with backend sharding
+    uuid_prefix = str(uuid.uuid4())[-8:]
+    name_iterator = PrefixCounterIterator(
+        '%s_vm_%s_worker_%s/pkb_write_worker_%s' %
+        (uuid_prefix, FLAGS.vm_id, worker_num, worker_num))
+  elif naming_scheme == 'sequential_by_stream':
     name_iterator = PrefixCounterIterator(
         'pkb_write_worker_%f_%s' % (time.time(), worker_num))
   elif naming_scheme == 'approximately_sequential':
@@ -885,6 +958,45 @@ def ReadWorker(service, start_time, object_records,
                     'latencies': latencies,
                     'sizes': sizes,
                     'stream_num': worker_num + FLAGS.stream_num_start})
+
+
+def DeleteWorker(service, object_records, result_queue, worker_num):
+  """Delete objects for the multi-stream delete benchmark.
+
+  Performs bulk delete operation if specified by flag. Otherwise, deletes one
+  object per request.
+
+  Args:
+    service: the ObjectStorageServiceBase object to use.
+    object_records: the bytes to delete.
+    result_queue: a mp.Queue to record results in.
+    worker_num: the thread number of this worker.
+  """
+  object_names = []
+  object_sizes = []
+  for name, size in object_records:
+    object_names.append(name)
+    object_sizes.append(size)
+
+  if FLAGS.bulk_delete:
+    start_time, latency = service.BulkDeleteObjects(FLAGS.bucket, object_names,
+                                                    FLAGS.delete_delay)
+    start_times = [start_time]
+    latencies = [latency]
+    sizes = [sum(object_sizes)]
+  else:
+    start_times, latencies, sizes = service.DeleteObjects(
+        FLAGS.bucket,
+        object_names,
+        delay_time=FLAGS.delete_delay,
+        object_sizes=object_sizes)
+
+  result_queue.put({
+      'start_times': start_times,
+      'latencies': latencies,
+      'sizes': sizes,
+      'stream_num': worker_num + FLAGS.stream_num_start
+  })
 
 
 def OneByteRWBenchmark(service):
@@ -1185,6 +1297,8 @@ def Main(argv=sys.argv):
     return MultiStreamWrites(service)
   elif FLAGS.scenario == 'MultiStreamRead':
     return MultiStreamReads(service)
+  elif FLAGS.scenario == 'MultiStreamDelete':
+    return MultiStreamDelete(service)
 
 if __name__ == '__main__':
   sys.exit(Main())

@@ -24,10 +24,10 @@ import copy
 import logging
 import os
 import re
+from absl import flags
 import numpy as np
 
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dstat

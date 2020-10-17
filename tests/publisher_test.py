@@ -20,10 +20,9 @@ import re
 import tempfile
 import unittest
 import uuid
-
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample

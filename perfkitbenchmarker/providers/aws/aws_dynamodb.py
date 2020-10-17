@@ -23,7 +23,7 @@ from __future__ import print_function
 import json
 import logging
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
@@ -141,9 +141,9 @@ class _GetIndexes():
 class AwsDynamoDBInstance(resource.BaseResource):
   """Class for working with DynamoDB."""
 
-  def __init__(self, table_name):
-    super(AwsDynamoDBInstance, self).__init__()
-    self.zone = FLAGS.zones[0]
+  def __init__(self, table_name, **kwargs):
+    super(AwsDynamoDBInstance, self).__init__(**kwargs)
+    self.zone = FLAGS.zones[0] if FLAGS.zones else FLAGS.zone[0]
     self.region = util.GetRegionFromZone(self.zone)
     self.primary_key = ('{{\"AttributeName\": \"{0}\",\"KeyType\": \"HASH\"}}'
                         .format(FLAGS.aws_dynamodb_primarykey))
@@ -197,7 +197,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
       cmd.append(self.gsi_indexes[0])
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to create table! {0}'.format(stderror))
+      logging.warning('Failed to create table! %s', stderror)
 
   def _Delete(self):
     """Deletes the dynamodb table."""
@@ -211,7 +211,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
 
   def _IsReady(self):
     """Check if dynamodb table is ready."""
-    logging.info('Getting table ready status for {0}'.format(self.table_name))
+    logging.info('Getting table ready status for %s', self.table_name)
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'describe-table',
@@ -223,7 +223,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
 
   def Exists(self):
     """Returns true if the dynamodb table exists."""
-    logging.info('Checking if table {0} exists'.format(self.table_name))
+    logging.info('Checking if table %s exists', self.table_name)
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'describe-table',
@@ -244,8 +244,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
         '--table-name', self.table_name]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.info(
-          'Could not find table {0}, {1}'.format(self.table_name, stderr))
+      logging.info('Could not find table %s, %s', self.table_name, stderr)
       return {}
     for table_info in json.loads(stdout)['Table']:
       if table_info[3] == self.table_name:
@@ -274,3 +273,20 @@ class AwsDynamoDBInstance(resource.BaseResource):
         'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
         'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
     }
+
+
+def AddTagsToExistingInstance(table_name, region):
+  """Add tags to an existing DynamoDB table."""
+  cmd = util.AWS_PREFIX + [
+      'dynamodb',
+      'describe-table',
+      '--table-name', table_name,
+      '--region', region
+  ]
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  resource_arn = json.loads(stdout)['Table']['TableArn']
+  cmd = util.AWS_PREFIX + [
+      'dynamodb', 'tag-resource', '--resource-arn', resource_arn, '--region',
+      region, '--tags'
+  ] + util.MakeFormattedDefaultTags()
+  vm_util.IssueCommand(cmd)

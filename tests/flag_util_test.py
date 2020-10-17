@@ -17,8 +17,8 @@
 import sys
 import unittest
 
+from absl import flags
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 
 

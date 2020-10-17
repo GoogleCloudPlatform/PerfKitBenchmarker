@@ -15,7 +15,7 @@
 
 import abc
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 
 

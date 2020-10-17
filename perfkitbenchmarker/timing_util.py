@@ -17,7 +17,7 @@ from collections import OrderedDict
 from contextlib import contextmanager
 import time
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import sample
 
 

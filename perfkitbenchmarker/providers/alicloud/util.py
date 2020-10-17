@@ -20,7 +20,7 @@ from __future__ import division
 from __future__ import print_function
 import shlex
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 import six
 

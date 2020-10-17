@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+# Lint as: python2, python3
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,7 +39,8 @@ Y_TICS = '100'
 DEFAULT_ITERATIONS = '10'
 
 
-class GnuplotInfo():
+class GnuplotInfo(object):
+  """Gnuplot metadata."""
 
   def __init__(self, gnuplot_data_filename,
                entries_per_run,
@@ -55,12 +55,13 @@ class GnuplotInfo():
       entries_per_run: Number of TPS values collected for each run.
       run_uri: (string) run identifier.
       y_max: maximum y value. Used for y-axis limit.
+      iterations: number of iterations.
       title: (optional, string) Chart title.
     """
     self.gnuplot_data_filename = gnuplot_data_filename
     self._generate_filenames(run_uri)
-    self.X_INTERVAL = str(entries_per_run)
-    self.Y_HEIGHT = str(int(100 * round(float(y_max) / 100)))
+    self.x_interval = str(entries_per_run)
+    self.y_height = str(int(100 * round(float(y_max) / 100)))
     self.title = title
     self.iterations = str(iterations)
 
@@ -106,8 +107,8 @@ class GnuplotInfo():
     # If you want to move the legend to the top left, use this:
     output_file.write('set key left top\n')
 
-    if self.Y_HEIGHT > 0:
-      output_file.write('y=' + self.Y_HEIGHT + '\n')
+    if self.y_height > 0:
+      output_file.write('y=' + self.y_height + '\n')
       output_file.write('set yrange [0:y]\n')
       output_file.write('set ytics ' + Y_TICS + '\n')
       output_file.write('unset xtics\n')
@@ -123,7 +124,7 @@ class GnuplotInfo():
       # number. Future implementation should take a list of thread counts and
       # properly handle that here.
       output_file.write('\tthread=thread*2\n')
-      output_file.write('\tx=x+' + self.X_INTERVAL + '\n')
+      output_file.write('\tx=x+' + self.x_interval + '\n')
       output_file.write('}\n')
 
     # plotting data series

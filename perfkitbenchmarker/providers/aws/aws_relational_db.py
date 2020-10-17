@@ -18,7 +18,7 @@ import datetime
 import json
 import logging
 import time
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util

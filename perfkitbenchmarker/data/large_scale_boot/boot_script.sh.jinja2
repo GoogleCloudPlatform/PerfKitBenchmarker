@@ -56,12 +56,10 @@ echo $(date +%s%N) > {{start_time_file}}
 # Launch some VMs
 {% if cloud == 'GCP' %}
   gcloud_args=(
-    --format json
+    --format text
     --quiet
-    --async
     --project {{ project }}
     --scopes compute-rw
-    --network-interface no-address,network-tier=PREMIUM
     --image-family {{ image_family }}
     --image-project {{ image_project }}
     --boot-disk-auto-delete
@@ -73,6 +71,12 @@ echo $(date +%s%N) > {{start_time_file}}
     --zone {{ zone }}
     --metadata "${START_UP_SCRIPT}"
   )
+  {% if os_type == 'linux' %}
+    gcloud_args+=( --network-interface {{ use_public_ip }}address,network-tier=PREMIUM )
+  {% endif %}
+  {% if use_public_ip != '' %}
+    gcloud_args+=( --async )
+  {% endif %}
   VM_NAMES=`seq -f '{{ boot_vm_name_prefix }}-%g' -s ' ' 1 {{ vm_count }}`
   {{ gcloud_path }} compute instances create $VM_NAMES  \
   "${gcloud_args[@]}" &
@@ -84,13 +88,15 @@ echo $(date +%s%N) > {{start_time_file}}
     --image-id {{ image }}
     --key-name {{ key_name }}
     --instance-type {{ boot_machine_type }}
-    --no-associate-public-ip-address
+    --{{ use_public_ip }}associate-public-ip-address
     --tag-specifications 'ResourceType=instance,Tags=[{Key=launcher_id,Value={{launcher_vm_name}}}]'
     --placement AvailabilityZone={{ zone }},GroupName={{ group_name }}
     --user-data "${START_UP_SCRIPT}"
     --count {{vm_count}}
   )
   aws ec2 run-instances "${aws_args[@]}" &
+  sleep 3
+  aws --output text ec2 describe-instances --region {{ region }} --filter Name=tag:launcher_id,Values={{ launcher_vm_name }}
 {% elif cloud == 'Azure' %}
   azure_args=(
     --location {{ location }}

@@ -22,7 +22,7 @@ import logging
 import os
 import re
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util

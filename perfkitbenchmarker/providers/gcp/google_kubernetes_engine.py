@@ -18,11 +18,10 @@ import json
 import logging
 import os
 import re
-
+from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -32,7 +31,7 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 FLAGS.kubernetes_anti_affinity = False
 
-NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
+NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 DEFAULT_CONTAINER_VERSION = 'latest'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
@@ -101,7 +100,15 @@ class GkeCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(GkeCluster, self).GetResourceMetadata()
+    result['project'] = self.project
     result['container_cluster_version'] = self.cluster_version
+    result['boot_disk_type'] = self.vm_config.boot_disk_type
+    result['boot_disk_size'] = self.vm_config.boot_disk_size
+    if self.vm_config.max_local_disks:
+      result['gce_local_ssd_count'] = self.vm_config.max_local_disks
+      # TODO(pclay): support NVME when it leaves alpha
+      # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
+      result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
     return result
 
   def _Create(self):
@@ -141,6 +148,9 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.vm_config.boot_disk_type:
       cmd.flags['disk-type'] = self.vm_config.boot_disk_type
     if self.vm_config.max_local_disks:
+      # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
+      # leaves alpha. See
+      # https://cloud.google.com/sdk/gcloud/reference/alpha/container/clusters/create
       cmd.flags['local-ssd-count'] = self.vm_config.max_local_disks
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
@@ -161,15 +171,15 @@ class GkeCluster(container_service.KubernetesCluster):
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
-    _, stderr, retcode = cmd.Issue(
-        timeout=1200, raise_on_failure=False)
-    if retcode != 0:
+    _, stderr, retcode = cmd.Issue(timeout=1200, raise_on_failure=False)
+    if retcode:
       # Log specific type of failure, if known.
       if 'ZONE_RESOURCE_POOL_EXHAUSTED' in stderr:
         logging.exception('Container resources exhausted: %s', stderr)
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
             'Container resources exhausted in zone %s: %s' %
             (self.zone, stderr))
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
   def _PostCreate(self):

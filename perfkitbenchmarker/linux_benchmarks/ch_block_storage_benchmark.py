@@ -17,8 +17,8 @@
 See https://github.com/cloudharmony/block-storage for more info.
 """
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ch_block_storage
 

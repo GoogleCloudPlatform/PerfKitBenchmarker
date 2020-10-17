@@ -18,11 +18,10 @@ See details at: https://cloud.google.com/dataflow/
 """
 
 import os
-
+from absl import flags
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 
@@ -77,6 +76,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """See base class."""
     pass
 
+  # TODO(saksena): Make this actually follow the contract or better yet delete
+  # this class.
   def SubmitJob(
       self,
       jarfile='',

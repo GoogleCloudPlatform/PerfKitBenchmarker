@@ -17,7 +17,7 @@
 import os
 import unittest
 from absl import flags
-import parameterized
+from absl.testing import parameterized
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -29,7 +29,8 @@ FLAGS.mark_as_parsed()
 NtttcpConf = ntttcp.NtttcpConf
 
 
-class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
+class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
+                              test_util.SamplesTestMixin):
 
   def getDataContents(self, file_name):
     path = os.path.join(os.path.dirname(__file__), '..', 'data', file_name)
@@ -258,11 +259,11 @@ class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     conf_list = ntttcp.ParseConfigList()
     self.assertListEqual(conf_list, expected_list)
 
-  @parameterized.parameterized.expand(
-      [('MissingVal', ['True:7:800:INTERNAL:1', 'False::2:EXTERNAL:2']),
-       ('Misspell', ['rue:7:800:INTERNAL:3', 'True:44:1001:EXTERNAL:4']),
-       ('WrongOrder', ['True:7:INTERNAL:800:1', '44:True:1001:EXTERNAL:6'])])
-  def testMalformedConfig(self, name, conf):
+  @parameterized.named_parameters(
+      ('MissingVal', ['True:7:800:INTERNAL:1', 'False::2:EXTERNAL:2']),
+      ('Misspell', ['rue:7:800:INTERNAL:3', 'True:44:1001:EXTERNAL:4']),
+      ('WrongOrder', ['True:7:INTERNAL:800:1', '44:True:1001:EXTERNAL:6']))
+  def testMalformedConfig(self, conf):
     with self.assertRaises(flags.IllegalFlagValueError):
       ntttcp.FLAGS.ntttcp_config_list = conf
 

@@ -1,5 +1,4 @@
-#!/usr/bin/env python2
-#
+# Lint as: python2, python3
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,6 +93,10 @@ def main():
         return 0
       elif e.errno == errno.ECONNREFUSED:
         print('Connection refused during wait. '
+              'This will be retried with a subsequent wait.')
+        return 0
+      elif e.errno in (errno.EAGAIN, errno.EACCES):
+        print('Status currently being modified and cannot be read right now. '
               'This will be retried with a subsequent wait.')
         return 0
       raise e

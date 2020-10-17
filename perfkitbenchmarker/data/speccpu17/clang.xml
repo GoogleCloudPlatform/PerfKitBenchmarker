@@ -1,0 +1,271 @@
+<?xml version="1.0"?>
+<!DOCTYPE flagsdescription
+    SYSTEM "http://www.spec.org/dtd/cpuflags2.dtd"
+>
+
+<flagsdescription>
+
+<filename>clang</filename>
+  <title>LLVM Clang Compiler Suite SPEC CPU2017 Flag Description</title>
+<header>
+<![CDATA[
+      <h2>Flag descriptions for Clang and Clang++ (see GCC for Fortran)</h2>
+      <p>The documentation for the clang compiler may be found at
+         <a href="https://clang.llvm.org/docs/index.html">
+            clang.llvm.org/docs</a>.  There is a commmand line reference at
+         <a href="https://clang.llvm.org/docs/ClangCommandLineReference.html">clang.llvm.org/docs/ClangCommandLineReference.html</a>
+         <br />The summaries in this document are intended to be useful to readers of SPEC CPU results, but they do not replace the original documentation.
+         <br /><b>Copyright/license information</b>: The above-mentioned pages say 'Copyright 2007-2017, The Clang Team' and appear to fall under the permissive
+         University of Illinois/NCSA Open Source License at llvm.org.  </p>
+]]>
+</header>
+
+  <!-- COMPILER -->
+<flag name="clang_compiler_path_eater"
+     class="compiler"
+    regexp="\S+/(clang|clang\+\+)(?=\s|$)">
+   <display enable="0" />
+   <include text="$1" />
+   <example>/path/to/clang</example>
+</flag>
+
+<flag name="clang"
+   regexp="clang(?=\s|$)"
+   class="compiler">
+   <![CDATA[
+   <p>Invokes the clang C compiler.  </p>
+   <p>clang is a C, C++, and Objective-C compiler which encompasses preprocessing, parsing, optimization, code generation,
+      assembly, and linking. Depending on which high-level mode setting is passed, Clang will stop before doing a full link.
+      <br />
+      <br /><b>Usage:</b> clang [options] filename <br /><br /> While Clang is highly integrated, it is important to
+      understand the stages of compilation, to understand how to invoke it. <br />These stages are</p>
+
+   <ol>
+      <li>Driver The clang executable is actually a small driver which controls the overall execution of other tools such as
+         the compiler, assembler and linker. Typically you do not need to interact with the driver, but you transparently use
+         it to run the other tools.</li>
+      <li>Preprocessing This stage handles tokenization of the input source file, macro expansion, #include expansion and
+         handling of other preprocessor directives. The output of this stage is typically called a .i (for C), .ii (for C++),
+         .mi (for Objective-C), or .mii (for Objective-C++) file.</li>
+
+      <li>Parsing and Semantic Analysis This stage parses the input file, translating preprocessor tokens into a parse tree.
+         Once in the form of a parse tree, it applies semantic analysis to compute types for expressions as well and
+         determine whether the code is well formed. This stage is responsible for generating most of the compiler warnings as
+         well as parse errors. The output of this stage is an Abstract Syntax Tree (AST).</li>
+
+      <li>Code Generation and Optimization This stage translates an AST into low-level intermediate code (known as LLVM IR)
+         and ultimately to machine code. This phase is responsible for optimizing the generated code and handling
+         target-specific code generation. The output of this stage is typically called a .s file or assembly file.  Clang
+         also supports the use of an integrated assembler, in which the code generator produces object files directly. This
+         avoids the overhead of generating the .s file and of calling the target assembler.</li>
+      <li>Assembler This stage runs the target assembler to translate the output of the compiler into a target object file.
+         The output of this stage is typically called a .o file or object file.</li>
+      <li>Linker This stage runs the target linker to merge multiple object files into an executable or dynamic library. The
+         output of this stage is typically called an a.out, .dylib or .so file.</li>
+   </ol>
+   ]]>
+</flag>
+
+<flag name="clangxx"
+   regexp="clang\+\+(?=\s|$)"
+   class="compiler">
+   <![CDATA[
+   <p>Invokes the clang C++ compiler.  </p>
+   ]]>
+</flag>
+
+
+<!-- =============================================================================================================================
+     All other flags are, for ease of maintenance, sorted into alphabetical order.
+     Sorting is alphabetical by the flag as used in compile commands, without regard to
+        - preceding punctuation
+        - preceding 'no-'
+        - upper/lower case
+        - preceding elements of a flag name that are not found in the compile command - i.e. 'F-' (explained a few lines down).
+     =============================================================================================================================
+-->
+
+<flag name="DUSE_OPENMP"
+   class="optimization"
+   parallel="yes"
+   >
+   <![CDATA[<p>
+      Enables handling of OpenMP directives. The DUSE_OPENMP macro enables OpenMP code support in the benchmarks. "OpenMP" stands for "Open Multi-Processing" and is a multi-platform library that supports shared memory multiprocessing programming in C, C++, and Fortran.
+   </p>]]>
+</flag>
+
+<flag name="F-ffp-contract:fast"
+   class="optimization">
+   <![CDATA[<p>
+      The flag "-ffp-contract=fast" enables floating-point expression contraction such as forming fused multiply-add operations if the target platform has native support for those instuctions.
+   </p>]]>
+</flag>
+
+<flag name="F-fopenmp:libomp"
+   class="optimization"
+   parallel="yes"
+   >
+   <![CDATA[<p>
+      Enables the handling of OpenMP directives using libomp. "-fopenmp:libomp" specifies the OpenMP library to use.
+      "OpenMP" stands for "Open Multi-Processing" and is a multi-platform library that supports shared memory multiprocessing programming in C, C++, and Fortran.
+   </p>]]>
+</flag>
+
+<flag name="fplugin-clang"
+   compilers="clang,clangxx"
+   class="optimization"
+   regexp="-fplugin=\S+(?=\s|$)"
+   >
+   <example>-fplugin=/path/to/dragonegg.so</example>
+   <![CDATA[<p>
+      Since LLVM does not currently have a Fortran compiler, "-fplugin=/path/to/dragonegg.so" is used to specify the location of the DragonEgg Fortran plugin that leverages LLVM's optimizers on top of the gfortran compiler.
+   </p>]]>
+</flag>
+
+<flag name="F-freciprocal-math"
+   class="optimization">
+   <![CDATA[<p>
+      Given the expression "a = b / c", instructs the compiler to calculate "a = b * (1/c)".
+   </p>]]>
+</flag>
+
+<flag name="includeLibomp"
+   class="optimization"
+   parallel="yes"
+   regexp="-I (\S+/openmp\S+)"
+   >
+   <example>-I /path/to/lib/openmp/include</example>
+   <![CDATA[<p>
+      Sets the OpenMP library path to be searched at compile time.
+      "OpenMP" stands for "Open Multi-Processing" and is a multi-platform library that supports shared memory multiprocessing programming in C, C++, and Fortran.
+      NOTE: You will have to change the regexp above to match your OpenMP library directory name if it does not match "openmp". If you have already produced invalid results, they can be regenerated using the rawformat command.
+   </p>]]>
+</flag>
+
+<flag name="F-lgfortran"
+   class="optimization"
+   >
+   <![CDATA[
+   <p>
+        -lgfortran: Invokes the ersatz LLVM Fortran compiler. DragonEgg is a gcc plugin that replaces GCC's optimizers and code generators with those from the LLVM project.
+   </p>
+   <p>
+      To build and run Fortran programs:<br />
+      <br />
+  $ gfortran [optimization flags] -fplugin=path/dragonegg.so [plugin optimization flags] -c xyz.f90<br />
+  $ clang -O3 -flto -lgfortran -o xyz xyz.o<br />
+  $ ./xyz <br />
+      <br />
+      Optimization flags: flags that GFortran frontend will use to generate the IR for DragonEgg plugin. It is recommend to use basic out-of-the-box flags (eg: -m64 -O2, preferably least GFortran optimization(-O0)). <br />
+  <br />
+  Plugin optimization flags: Optimization flags DragonEgg plugin will use to generate the optimized LLVM IR and code generation. Here you can use higher optimization flags like -O3, -mavx etc if required.<br />
+      <br />
+      Note:<br />
+      * LLVM releases on llvm.org provides only sources releases.<br />
+      * Latest release of DragonEgg sources is at http://llvm.org/releases/download.html#3.5.2 <br />
+      * DragonEgg is a self contained plugin with llvm embedded within. So its recommended to use LLVM 3.5.2 sources when building DragonEgg.<br />
+   </p>
+   <p>Note: more detailed documentation can be found at the following location: <a
+           href="http://developer.amd.com/wordpress/media/2013/12/DragonEgg-the-Fortran-compiler-%E2%80%94-AOCC-LLVM-a.pdf">http://developer.amd.com/wordpress/media/2013/12/DragonEgg-the-Fortran-compiler-%E2%80%94-AOCC-LLVM-a.pdf</a>.
+   </p>
+   ]]>
+</flag>
+
+<flag name="F-lomp"
+   parallel="yes"
+   class="optimization"
+   >
+   <![CDATA[
+   <p>
+      Adds the OpenMP library at link time.
+      "OpenMP" stands for "Open Multi-Processing" and is a multi-platform library that supports shared memory multiprocessing programming in C, C++, and Fortran.
+   </p>]]>
+</flag>
+
+<flag name="F-march"
+   class="optimization"
+   regexp="-march=(i486|x86-64|auto|native|znver1)"
+   >
+   <example>-march=znver1</example>
+     <![CDATA[
+      <p>
+         Specify that Clang should generate code for a specific processor family member and later. For example, if you specify -march=znver1, the compiler is allowed to generate instructions that are valid on AMD Zen processors, but which may not exist on earlier products.
+      </p>
+      ]]>
+</flag>
+
+<flag name="m32-clang"
+   regexp="-m32"
+   compilers="clang,clangxx"
+   class="optimization"
+   >
+   <example>-m32</example>
+   <![CDATA[<p>
+      Compiles for a 32-bit (LP32) data model. Both long integers and pointers are 32-bit.
+   </p>]]>
+</flag>
+
+<flag name="m64-clang"
+   regexp="-m64"
+   compilers="clang,clangxx"
+   class="optimization"
+   >
+   <example>-m64</example>
+   <![CDATA[<p>
+      Compiles for a 64-bit (LP64) data model. Both long integers and pointers are 64-bit.
+   </p>]]>
+</flag>
+
+<flag name="F-mavx-clang"
+   regexp="-mavx"
+   compilers="clang,clangxx"
+   class="optimization"
+   >
+   <![CDATA[<p>
+      Generate aggressive SIMD vectorization code for processors that include AVX128 extensions.
+   </p>]]>
+</flag>
+
+<flag name="Olevel-clang"
+   compilers="clang,clangxx"
+   regexp="-O\d\b"
+   class="optimization"
+   >
+   <example>-O1, -O2, -O3, -Ofast, -Os, -Oz, -O4, -O</example>
+   <![CDATA[
+       <p>
+          Sets the optimization level.  Choices are -O0, -O1, -O2, -O3, -Ofast, -Os, -Oz, -O4, -O.
+       </p>
+       <p>
+          If multiple "O" options are used, with or without level numbers, the last such option is the one that is effective. Level 2 is assumed if no value is specified (i.e. "-O". The default is "-O2").
+       </p>
+       <p>
+          -O0: Means "no optimization". This level compiles the fastest and generates the most debuggable code.
+       </p>
+       <p>
+          -O1, -O2, -O3 are increasing levels of optimization.  Most optimizations are enabled at -O2. -O3 enables additional optimizations that take longer to compile and may generate larger binary size in an effort to make the target binary run faster.
+       </p>
+       <p>
+          -Ofast enables all the optimizations from -O3 along with other aggressive optimizations that may violate strict compliance with language standards.
+       </p>
+       <p>
+          -Os is like -O2, but with extra optimizations to reduce code size.
+       </p>
+       <p>
+          -Oz is like -Os (and thus -O2), but reduces code size further, but may take more time.
+       </p>
+       <p>
+          -O4 and higher are currently identical to -O3.
+       </p>
+       <p>
+          -O is the same as -O2.
+       </p>
+       <p>Note: more detailed documentation can be found at the following locations: <a
+               href="http://clang.llvm.org/docs/CommandGuide/clang.html">http://clang.llvm.org/docs/CommandGuide/clang.html</a>, <a
+               href="http://developer.amd.com/wordpress/media/2013/12/Clang-the-C-C-Compiler-%E2%80%94-AOCC-LLVM-1.pdf">http://developer.amd.com/wordpress/media/2013/12/Clang-the-C-C-Compiler-%E2%80%94-AOCC-LLVM-1.pdf</a> and <a
+               href="http://developer.amd.com/wordpress/media/2013/12/DragonEgg-the-Fortran-compiler-%E2%80%94-AOCC-LLVM-a.pdf">http://developer.amd.com/wordpress/media/2013/12/DragonEgg-the-Fortran-compiler-%E2%80%94-AOCC-LLVM-a.pdf</a>.
+       </p>
+   ]]>
+</flag>
+
+</flagsdescription>

@@ -69,7 +69,7 @@ from concurrent import futures
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import log_util
 import six
 from six.moves import queue

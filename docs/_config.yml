@@ -1,0 +1,28 @@
+# Welcome to Jekyll!
+#
+# This config file is meant for settings that affect your whole blog, values
+# which you are expected to set up once and rarely need to edit after that.
+# For technical reasons, this file is *NOT* reloaded automatically when you use
+# 'jekyll serve'. If you change this file, please restart the server process.
+
+# Site settings
+title: PerfKitBenchmarker
+email: liubrandon@google.com
+description: >
+  PerfKitBenchmarker home page.
+
+# See https://pmarsceill.github.io/just-the-docs/.
+theme: "just-the-docs"
+remote_theme: pmarsceill/just-the-docs
+
+# Enable or disable the site search
+# Supports true (default) or false
+search_enabled: true
+
+# Aux links for the upper right navigation
+aux_links:
+  "PKB on GitHub":
+    - "https://github.com/GoogleCloudPlatform/PerfKitBenchmarker"
+
+# Color scheme supports "light" (default) and "dark"
+color_scheme: light

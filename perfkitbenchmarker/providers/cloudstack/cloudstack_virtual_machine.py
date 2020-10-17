@@ -23,14 +23,14 @@ from __future__ import print_function
 
 import logging
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
 from perfkitbenchmarker.providers.cloudstack import cloudstack_network
 from perfkitbenchmarker.providers.cloudstack import util
-from perfkitbenchmarker import providers
 from six.moves import range
 
 FLAGS = flags.FLAGS
@@ -62,9 +62,9 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self.project_id = None
     if FLAGS.project:
-        project = self.cs.get_project(FLAGS.project)
-        assert project, "Project not found"
-        self.project_id = project['id']
+      project = self.cs.get_project(FLAGS.project)
+      assert project, "Project not found"
+      self.project_id = project['id']
 
     zone = self.cs.get_zone(self.zone)
     assert zone, "Zone not found"
@@ -81,41 +81,41 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # Create an ssh keypair
     with open(self.ssh_public_key) as keyfd:
-        self.ssh_keypair_name = 'perfkit-sshkey-%s' % FLAGS.run_uri
-        pub_key = keyfd.read()
+      self.ssh_keypair_name = 'perfkit-sshkey-%s' % FLAGS.run_uri
+      pub_key = keyfd.read()
 
-        if not self.cs.get_ssh_keypair(self.ssh_keypair_name, self.project_id):
+      if not self.cs.get_ssh_keypair(self.ssh_keypair_name, self.project_id):
 
-            res = self.cs.register_ssh_keypair(self.ssh_keypair_name,
-                                               pub_key,
-                                               self.project_id)
+        res = self.cs.register_ssh_keypair(self.ssh_keypair_name,
+                                           pub_key,
+                                           self.project_id)
 
-            assert res, "Unable to create ssh keypair"
+        assert res, "Unable to create ssh keypair"
 
 
     # Allocate a public ip
     network_id = self.network.id
     if self.network.is_vpc:
-        network_id = self.network.vpc_id
+      network_id = self.network.vpc_id
 
     public_ip = self.cs.alloc_public_ip(network_id, self.network.is_vpc)
 
     if public_ip:
-        self.ip_address = public_ip['ipaddress']
-        self.ip_address_id = public_ip['id']
+      self.ip_address = public_ip['ipaddress']
+      self.ip_address_id = public_ip['id']
     else:
-        logging.warn("Unable to allocate public IP")
+      logging.warn("Unable to allocate public IP")
 
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
     # Remove the keypair
     if self.cs.get_ssh_keypair(self.ssh_keypair_name, self.project_id):
-        self.cs.unregister_ssh_keypair(self.ssh_keypair_name, self.project_id)
+      self.cs.unregister_ssh_keypair(self.ssh_keypair_name, self.project_id)
 
     # Remove the IP
     if self.ip_address_id:
-        self.cs.release_public_ip(self.ip_address_id)
+      self.cs.release_public_ip(self.ip_address_id)
 
   @vm_util.Retry(max_retries=3)
   def _Create(self):
@@ -155,12 +155,12 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Create a Static NAT rule
     if not self.cs.snat_rule_exists(self.ip_address_id, self.id):
 
-        snat_rule = self.cs.enable_static_nat(self.ip_address_id,
-                                              self.id,
-                                              self.network.id)
+      snat_rule = self.cs.enable_static_nat(self.ip_address_id,
+                                            self.id,
+                                            self.network.id)
 
 
-        assert snat_rule, "Unable to create static NAT"
+      assert snat_rule, "Unable to create static NAT"
 
 
   def _Delete(self):
@@ -174,7 +174,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Check if VM exisits
     vm = self.cs.get_virtual_machine(self.name, self.project_id)
     if vm and 'id' in vm:
-        return True
+      return True
 
     return False
 
@@ -193,14 +193,14 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for i in range(disk_spec.num_striped_disks):
 
-        name = 'disk-%s-%d-%d' % (self.name, i + 1, self.disk_counter)
-        scratch_disk = cloudstack_disk.CloudStackDisk(disk_spec,
-                                                      name,
-                                                      self.zone_id,
-                                                      self.project_id)
+      name = 'disk-%s-%d-%d' % (self.name, i + 1, self.disk_counter)
+      scratch_disk = cloudstack_disk.CloudStackDisk(disk_spec,
+                                                    name,
+                                                    self.zone_id,
+                                                    self.project_id)
 
-        self.disks.append(scratch_disk)
-        self.disk_counter += 1
+      self.disks.append(scratch_disk)
+      self.disk_counter += 1
 
     self._CreateScratchDiskFromDisks(disk_spec, self.disks)
 

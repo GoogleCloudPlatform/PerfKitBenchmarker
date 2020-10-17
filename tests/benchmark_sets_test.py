@@ -15,11 +15,11 @@
 """Tests for perfkitbenchmarker.benchmark_sets."""
 
 import unittest
-from mock import patch
+from absl import flags
+import mock
 
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
@@ -152,7 +152,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
       self.valid_benchmark_set_names.add(benchmark_set_name)
 
     # Mock flags to simulate setting --benchmarks.
-    p = patch(benchmark_sets.__name__ + '.FLAGS')
+    p = mock.patch(benchmark_sets.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.addCleanup(p.stop)
     self.addCleanup(configs.GetConfigFlags.cache_clear)
@@ -173,7 +173,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     valid_benchmark_and_set_names = (self.valid_benchmark_names |
                                      self.valid_benchmark_set_names)
     benchmark_set_items = list(benchmark_sets.BENCHMARK_SETS.items())
-    for key_name, key_value in benchmark_set_items:
+    for _, key_value in benchmark_set_items:
       benchmark_def_list = key_value[benchmark_sets.BENCHMARK_LIST]
       for benchmark_name in benchmark_def_list:
         self.assertIn(benchmark_name, valid_benchmark_and_set_names)
@@ -181,10 +181,13 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testBenchmarkDerivedSets(self):
     # make sure that sets which are derived from the standard_set
     # expands into a valid set of benchmarks
-    with patch.dict(benchmark_sets.BENCHMARK_SETS, {
+    with mock.patch.dict(
+        benchmark_sets.BENCHMARK_SETS, {
             'test_derived_set': {
-            benchmark_sets.MESSAGE: 'test derived benchmark set.',
-            benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}}):
+                benchmark_sets.MESSAGE: 'test derived benchmark set.',
+                benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]
+            }
+        }):
       self.mock_flags.benchmarks = ['test_derived_set']
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
       self.assertIsNotNone(benchmark_tuple_list)
@@ -198,13 +201,17 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # expands into a valid set of benchmarks
     self.mock_flags.benchmarks = [benchmark_sets.STANDARD_SET]
     standard_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    with patch.dict(benchmark_sets.BENCHMARK_SETS, {
-        'test_derived_set': {
-            benchmark_sets.MESSAGE: 'test derived benchmark set.',
-            benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]},
-        'test_nested_derived_set': {
-            benchmark_sets.MESSAGE: 'test nested derived benchmark set.',
-            benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
+    with mock.patch.dict(
+        benchmark_sets.BENCHMARK_SETS, {
+            'test_derived_set': {
+                benchmark_sets.MESSAGE: 'test derived benchmark set.',
+                benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]
+            },
+            'test_nested_derived_set': {
+                benchmark_sets.MESSAGE: 'test nested derived benchmark set.',
+                benchmark_sets.BENCHMARK_LIST: ['test_derived_set']
+            }
+        }):
       # TODO(voellm): better check would be to make sure both lists are the same
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
       self.assertIsNotNone(benchmark_tuple_list)
@@ -270,16 +277,18 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testConfigNames(self):
     self.mock_flags.benchmarks = ['internal_iprf', 'netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(USER_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(USER_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertTrue(self._ContainsModule('iperf', benchmark_tuple_list))
     self.assertTrue(self._ContainsModule('netperf', benchmark_tuple_list))
 
   def testMatrices(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(MATRIX_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(MATRIX_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertEqual(len(benchmark_tuple_list), 4)
     flag_list = [benchmark_tuple[1]['flags']
@@ -288,14 +297,16 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testZipWithDifferentAxesLengths(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(ZIP_CONFIG_DIFFERENT_AXES_LENGTH)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(ZIP_CONFIG_DIFFERENT_AXES_LENGTH)):
       self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
 
   def testZip(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(ZIP_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(ZIP_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertEqual(len(benchmark_tuple_list), 2)
     flag_list = [benchmark_tuple[1]['flags']
@@ -304,8 +315,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testZipSingleAxis(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(SINGLE_ZIP_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(SINGLE_ZIP_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertEqual(len(benchmark_tuple_list), 2)
     flag_list = [benchmark_tuple[1]['flags']
@@ -314,8 +326,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testZipAndMatrix(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(ZIP_AND_MATRIX_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(ZIP_AND_MATRIX_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertEqual(len(benchmark_tuple_list), 4)
     flag_list = [benchmark_tuple[1]['flags']
@@ -324,8 +337,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testFilters(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(FILTER_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(FILTER_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertEqual(len(benchmark_tuple_list), 1)
     self.assertEqual(benchmark_tuple_list[0][1]['flags'],
@@ -334,8 +348,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testFlagPrecedence(self):
     self.mock_flags.benchmarks = ['netperf']
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(FLAG_PRECEDENCE_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(FLAG_PRECEDENCE_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertEqual(len(benchmark_tuple_list), 1)
     self.assertEqual(benchmark_tuple_list[0][1]['flags'],
@@ -346,16 +361,18 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testFlagMatrixNotFound(self):
     self.mock_flags.benchmarks = ['netperf']
     self.mock_flags.flag_matrix = 'bad_flag_matrix_name'
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(USER_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(USER_CONFIG)):
       with self.assertRaises(benchmark_sets.FlagMatrixNotFoundException):
         benchmark_sets.GetBenchmarksFromFlags()
 
   def testFlagZipNotFound(self):
     self.mock_flags.benchmarks = ['netperf']
     self.mock_flags.flag_zip = 'bad_flag_zip_name'
-    with patch('perfkitbenchmarker.configs.GetUserConfig',
-               return_value=yaml.safe_load(USER_CONFIG)):
+    with mock.patch(
+        'perfkitbenchmarker.configs.GetUserConfig',
+        return_value=yaml.safe_load(USER_CONFIG)):
       with self.assertRaises(benchmark_sets.FlagZipNotFoundException):
         benchmark_sets.GetBenchmarksFromFlags()
 

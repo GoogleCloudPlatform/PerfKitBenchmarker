@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 flags.DEFINE_string('docker_custom_image', None,
                     'Custom docker image location')

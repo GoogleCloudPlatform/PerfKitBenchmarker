@@ -14,9 +14,9 @@
 
 """Module containing Intel MKL installation and cleanup functions."""
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
-MKL_DIR = '%s/MKL' % INSTALL_DIR
+MKL_DIR = '%s/MKL' % linux_packages.INSTALL_DIR
 MKL_TAG = 'l_mkl_2018.2.199'
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
 MKL_VERSION = '2018.2.199'
@@ -29,7 +29,7 @@ BENCHMARK_NAME = 'hpcc'
 
 def _Install(vm):
   """Installs the MKL package on the VM."""
-  vm.RemoteCommand('cd {0} && mkdir MKL'.format(INSTALL_DIR))
+  vm.RemoteCommand('cd {0} && mkdir MKL'.format(linux_packages.INSTALL_DIR))
   vm.InstallPreprovisionedBenchmarkData(
       BENCHMARK_NAME, [MKL_TGZ], MKL_DIR)
   vm.RemoteCommand('cd {0} && tar zxvf {1}'.format(MKL_DIR, MKL_TGZ))

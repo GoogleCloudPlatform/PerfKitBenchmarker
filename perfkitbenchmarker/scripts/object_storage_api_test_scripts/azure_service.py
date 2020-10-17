@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,50 +15,75 @@
 
 """An interface to the Azure Blob Storage API."""
 
+from __future__ import absolute_import
+
 import logging
 import time
 
 from absl import flags
-
 import azure.storage.blob
-
-import object_storage_interface
+# This is the path that we SCP object_storage_interface to.
+from providers import object_storage_interface
 
 FLAGS = flags.FLAGS
 
 
 class AzureService(object_storage_interface.ObjectStorageServiceBase):
+  """An interface to Azure Blob Storage, using the python library."""
 
   def __init__(self):
     if FLAGS.azure_key is None or FLAGS.azure_account is None:
       raise ValueError('Must specify azure account and key.')
-    self.blobService = azure.storage.blob.BlobService(FLAGS.azure_account,
-                                                      FLAGS.azure_key)
+    self.blob_service = azure.storage.blob.BlobService(FLAGS.azure_account,
+                                                       FLAGS.azure_key)
 
   def ListObjects(self, bucket, prefix):
     return [obj.name
-            for obj in self.blobService.list_blobs(bucket, prefix=prefix)]
+            for obj in self.blob_service.list_blobs(bucket, prefix=prefix)]
 
-  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
-    for object_name in objects_to_delete:
+  def DeleteObjects(self,
+                    bucket,
+                    objects_to_delete,
+                    objects_deleted=None,
+                    delay_time=0,
+                    object_sizes=None):
+    start_times = []
+    latencies = []
+    sizes = []
+    for index, object_name in enumerate(objects_to_delete):
       try:
-        self.blobService.delete_blob(bucket, object_name)
+        time.sleep(delay_time)
+        start_time = time.time()
+        self.blob_service.delete_blob(bucket, object_name)
+        latency = time.time() - start_time
+        start_times.append(start_time)
+        latencies.append(latency)
         if objects_deleted is not None:
           objects_deleted.append(object_name)
+        if object_sizes:
+          sizes.append(object_sizes[index])
       except:
         logging.exception('Caught exception while deleting object %s.',
                           object_name)
+    return start_times, latencies, sizes
+
+  def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
+    # This version of Azure Blob APIs do not support Bulk Delete
+    # TODO(user): Update to latest version of Azure Blob Storage API
+    start_times, latencies, _ = self.DeleteObjects(
+        bucket, objects_to_delete, delay_time=delay_time)
+    return min(start_times), sum(latencies)
 
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
     stream.seek(0)
     start_time = time.time()
-    self.blobService.put_block_blob_from_file(
+    self.blob_service.put_block_blob_from_file(
         bucket, object, stream, count=size)
     latency = time.time() - start_time
     return start_time, latency
 
   def ReadObject(self, bucket, object):
     start_time = time.time()
-    self.blobService.get_blob_to_bytes(bucket, object)
+    self.blob_service.get_blob_to_bytes(bucket, object)
     latency = time.time() - start_time
     return start_time, latency

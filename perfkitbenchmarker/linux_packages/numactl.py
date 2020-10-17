@@ -14,6 +14,30 @@
 
 """Module containing numactl installation and cleanup functions."""
 
+from perfkitbenchmarker import regex_util
+
+NUMA_CPUS_REGEX = r'node (\d+) cpus: ([\d ]*)'
+
+
+def GetNuma(vm):
+  """Get NUMA topology of the VM.
+
+  Args:
+    vm: VirtualMachine.
+
+  Returns:
+    A dictionary, key is the numa node, value is the
+    number of vCPUs on the node.
+  """
+  out, _ = vm.RemoteCommand('numactl --hardware')
+  matches = regex_util.ExtractAllMatches(NUMA_CPUS_REGEX, out)
+  numa_map = {}
+  for m in matches:
+    node = m[0]
+    num_cpus = len(m[1].split(' '))
+    numa_map[node] = num_cpus
+  return numa_map
+
 
 def _Install(vm):
   """Installs the numactl package on the VM."""

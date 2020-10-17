@@ -20,12 +20,12 @@ oltp benchmarks depending on older version of sysbench will break if we
 install 0.5 or later for them. Therefore, it's necessary that we have a
 separate installer here for 0.5 and later.
 """
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
-SYSBENCH05PLUS_PATH = '%s/bin/sysbench' % INSTALL_DIR
-PREPARE_SCRIPT_PATH = ('%s/share/doc/sysbench/tests/db/parallel_prepare.lua'
-                       % INSTALL_DIR)
-OLTP_SCRIPT_PATH = '%s/share/doc/sysbench/tests/db/oltp.lua' % INSTALL_DIR
+SYSBENCH05PLUS_PATH = '%s/bin/sysbench' % linux_packages.INSTALL_DIR
+PREPARE_SCRIPT_PATH = ('%s/share/doc/sysbench/tests/db/parallel_prepare.lua' %
+                       linux_packages.INSTALL_DIR)
+OLTP_SCRIPT_PATH = '%s/share/doc/sysbench/tests/db/oltp.lua' % linux_packages.INSTALL_DIR
 
 
 def _Install(vm):
@@ -33,14 +33,16 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.InstallPackages('bzr')
   vm.RemoteCommand('cd ~ && bzr branch lp:sysbench')
-  vm.RemoteCommand(('cd ~/sysbench && ./autogen.sh &&'
-                    ' ./configure --prefix=%s --mandir=%s/share/man &&'
-                    ' make') % (INSTALL_DIR, INSTALL_DIR))
+  vm.RemoteCommand(
+      ('cd ~/sysbench && ./autogen.sh &&'
+       ' ./configure --prefix=%s --mandir=%s/share/man &&'
+       ' make') % (linux_packages.INSTALL_DIR, linux_packages.INSTALL_DIR))
   vm.RemoteCommand('cd ~/sysbench && sudo make install')
   vm.RemoteCommand('sudo mkdir %s/share/doc/sysbench/tests/db -p' %
-                   INSTALL_DIR)
+                   linux_packages.INSTALL_DIR)
   vm.RemoteCommand('sudo cp ~/sysbench/sysbench/tests/db/*'
-                   ' %s/share/doc/sysbench/tests/db/' % INSTALL_DIR)
+                   ' %s/share/doc/sysbench/tests/db/' %
+                   linux_packages.INSTALL_DIR)
 
 
 def YumInstall(vm):

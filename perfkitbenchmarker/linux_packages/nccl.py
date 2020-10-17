@@ -15,15 +15,19 @@
 
 """Module containing NCCL installation function."""
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
-flags.DEFINE_string('nccl_version', '2.5.6-2',
+flags.DEFINE_string('nccl_version', '2.7.8-1',
                     'NCCL version to install. '
                     'Input "None" to bypass installation.')
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
+flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
+flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
+                    'MPI home')
+flags.DEFINE_string('nccl_home', '$HOME/nccl/build', 'NCCL home')
 
 FLAGS = flags.FLAGS
 
@@ -31,7 +35,7 @@ GIT_REPO = 'https://github.com/NVIDIA/nccl.git'
 
 
 def _Build(vm):
-  """Installs the OpenMPI package on the VM."""
+  """Installs the NCCL package on the VM."""
   vm.RemoteCommand('[ -d "nccl" ] || git clone {git_repo} --branch v{version}'
                    .format(git_repo=GIT_REPO, version=FLAGS.nccl_version))
   cuda_home = cuda_toolkit.CUDA_HOME
@@ -62,8 +66,7 @@ def AptInstall(vm):
                          build='./nccl/build/pkg/deb/',
                          nccl=FLAGS.nccl_version,
                          cuda=FLAGS.cuda_toolkit_version))
-  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
-  vm.RemoteCommand('sudo ldconfig')  # Refresh LD cache
+
   if FLAGS.nccl_net_plugin:
     vm.Install('google_cloud_sdk')
     vm.RemoteCommand('sudo {gsutil_path} cp {nccl_net_plugin_path} '
@@ -72,3 +75,20 @@ def AptInstall(vm):
                          nccl_net_plugin_path=FLAGS.nccl_net_plugin))
   else:
     vm.RemoteCommand('sudo rm -rf /usr/lib/x86_64-linux-gnu/libnccl-net.so')
+
+  vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
+  vm.RemoteCommand('sudo ldconfig')  # Refresh LD cache
+
+  if FLAGS.aws_efa:
+    vm.InstallPackages('libudev-dev libtool autoconf')
+    vm.RemoteCommand('git clone https://github.com/aws/aws-ofi-nccl.git -b aws')
+    vm.RemoteCommand('cd aws-ofi-nccl && ./autogen.sh && ./configure '
+                     '--with-mpi={mpi} '
+                     '--with-libfabric=/opt/amazon/efa '
+                     '--with-nccl={nccl} '
+                     '--with-cuda={cuda} && sudo make && '
+                     'sudo make install'.format(
+                         mpi=FLAGS.nccl_mpi_home,
+                         nccl=FLAGS.nccl_home,
+                         cuda='/usr/local/cuda-{}'.format(
+                             FLAGS.cuda_toolkit_version)))

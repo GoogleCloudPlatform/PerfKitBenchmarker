@@ -13,20 +13,309 @@
 # limitations under the License.
 """Module containing class for GCP's Bigquery EDW service."""
 
+import copy
 import datetime
 import json
 import logging
-
+import os
+import re
+from typing import Any, Dict, List, Text
+from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
 FLAGS = flags.FLAGS
 
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
+
+
+def GetBigQueryClientInterface(
+    project_id: str, dataset_id: str) -> edw_service.EdwClientInterface:
+  """Builds and Returns the requested BigQuery client Interface.
+
+  Args:
+    project_id: String name of the BigQuery project to benchmark
+    dataset_id: String name of the BigQuery dataset to benchmark
+
+  Returns:
+    A concrete Client Interface object (subclass of GenericClientInterface)
+
+  Raises:
+    RuntimeError: if an unsupported bq_client_interface is requested
+  """
+  if FLAGS.bq_client_interface == 'CLI':
+    return CliClientInterface(project_id, dataset_id)
+  if FLAGS.bq_client_interface == 'JAVA':
+    return JavaClientInterface(project_id, dataset_id)
+  if FLAGS.bq_client_interface == 'SIMBA_JDBC_1_2_4_1007':
+    return JdbcClientInterface(project_id, dataset_id)
+  raise RuntimeError('Unknown BigQuery Client Interface requested.')
+
+
+class GenericClientInterface(edw_service.EdwClientInterface):
+  """Generic Client Interface class for BigQuery.
+
+  Attributes:
+    project_id: String name of the BigQuery project to benchmark
+    dataset_id: String name of the BigQuery dataset to benchmark
+  """
+
+  def __init__(self, project_id: str, dataset_id: str):
+    self.project_id = project_id
+    self.dataset_id = dataset_id
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.bq_client_interface}
+
+
+class CliClientInterface(GenericClientInterface):
+  """Command Line Client Interface class for BigQuery.
+
+  Uses the native Bigquery client that ships with the google_cloud_sdk
+  https://cloud.google.com/bigquery/docs/bq-command-line-tool.
+  """
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the bq tool dependencies and authenticates using a service account.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand('sudo pip install absl-py')
+    self.client_vm.Install('google_cloud_sdk')
+
+    # Push the service account file to the working directory on client vm
+    key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
+    if '/' in FLAGS.gcp_service_account_key_file:
+      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedBenchmarkData(
+          benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+
+    # Authenticate using the service account file
+    vm_gcloud_path = google_cloud_sdk.GCLOUD_PATH
+    activate_cmd = ('{} auth activate-service-account {} --key-file={}'.format(
+        vm_gcloud_path, FLAGS.gcp_service_account, key_file_name))
+    self.client_vm.RemoteCommand(activate_cmd)
+
+    # Push the framework to execute a sql query and gather performance details
+    service_specific_dir = os.path.join('edw', Bigquery.SERVICE_TYPE)
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir, 'script_runner.sh')))
+    runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)
+    self.client_vm.PushFile(
+        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir,
+                         'provider_specific_script_driver.py')))
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = ('python script_driver.py --script={} --bq_project_id={} '
+                     '--bq_dataset_id={}').format(query_name,
+                                                  self.project_id,
+                                                  self.dataset_id)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details['job_id'] = performance[query_name]['job_id']
+    return float(performance[query_name]['execution_time']), details
+
+
+class JdbcClientInterface(GenericClientInterface):
+  """JDBC Client Interface class for BigQuery.
+
+  https://cloud.google.com/bigquery/providers/simba-drivers
+  """
+
+  def SetProvisionedAttributes(self, benchmark_spec):
+    super(JdbcClientInterface,
+          self).SetProvisionedAttributes(benchmark_spec)
+    self.project_id = re.split(r'\.',
+                               benchmark_spec.edw_service.cluster_identifier)[0]
+    self.dataset_id = re.split(r'\.',
+                               benchmark_spec.edw_service.cluster_identifier)[1]
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs
+    a) Java Execution Environment,
+    b) BigQuery Authnetication Credentials,
+    c) JDBC Application to execute a query and gather execution details,
+    d) Simba JDBC BigQuery client code dependencencies, and
+    e) The Simba JDBC interface jar
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+
+    # Push the service account file to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['bq-jdbc-client-1.0.jar'], '')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['GoogleBigQueryJDBC42.jar'], '')
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = (
+        'java -cp bq-jdbc-client-1.0.jar:GoogleBigQueryJDBC42.jar '
+        'com.google.cloud.performance.edw.App --project {} --service_account '
+        '{} --credentials_file {} --dataset {} --query_file {}'.format(
+            self.project_id, FLAGS.gcp_service_account,
+            FLAGS.gcp_service_account_key_file, self.dataset_id, query_name))
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['performance'], details
+
+
+class JavaClientInterface(GenericClientInterface):
+  """Native Java Client Interface class for BigQuery.
+
+  https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-java
+  """
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the Java Execution Environment and a uber jar with
+    a) BigQuery Java client libraries,
+    b) An application to execute a query and gather execution details, and
+    c) their dependencies.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+
+    # Push the service account file to the working directory on client vm
+    if '/' in FLAGS.gcp_service_account_key_file:
+      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedBenchmarkData(
+          benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['bq-java-client-1.0.jar'], '')
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute.
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    key_file_name = FLAGS.gcp_service_account_key_file
+    if '/' in FLAGS.gcp_service_account_key_file:
+      key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
+
+    query_command = ('java -jar bq-java-client-1.0.jar  --project {} '
+                     '--credentials_file {} --dataset {} '
+                     '--query_file {}').format(self.project_id, key_file_name,
+                                               self.dataset_id, query_name)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['performance'], details
+
+  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+
+    Args:
+      queries: List of strings (names) of queries to execute.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    key_file_name = FLAGS.gcp_service_account_key_file
+    if '/' in FLAGS.gcp_service_account_key_file:
+      key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
+    cmd = ('java -cp bq-java-client-1.0.jar '
+           'com.google.cloud.performance.edw.Simultaneous --project {} '
+           '--credentials_file {} --dataset {} --query_files {}'.format(
+               self.project_id, key_file_name, self.dataset_id,
+               ' '.join(queries)))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    key_file_name = FLAGS.gcp_service_account_key_file
+    if '/' in FLAGS.gcp_service_account_key_file:
+      key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
+    cmd = ('java -cp bq-java-client-1.0.jar '
+           'com.google.cloud.performance.edw.Throughput --project {} '
+           '--credentials_file {} --dataset {} --query_streams {}'.format(
+               self.project_id, key_file_name, self.dataset_id,
+               ' '.join([','.join(stream) for stream in concurrency_streams])))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
 
 
 class Bigquery(edw_service.EdwService):
@@ -38,6 +327,12 @@ class Bigquery(edw_service.EdwService):
 
   CLOUD = providers.GCP
   SERVICE_TYPE = 'bigquery'
+
+  def __init__(self, edw_service_spec):
+    super(Bigquery, self).__init__(edw_service_spec)
+    project_id = re.split(r'\.', self.cluster_identifier)[0]
+    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    self.client_interface = GetBigQueryClientInterface(project_id, dataset_id)
 
   def _Create(self):
     """Create a BigQuery cluster.
@@ -64,12 +359,8 @@ class Bigquery(edw_service.EdwService):
   def GetMetadata(self):
     """Return a dictionary of the metadata for the BigQuery cluster."""
     basic_data = super(Bigquery, self).GetMetadata()
+    basic_data.update(self.client_interface.GetMetadata())
     return basic_data
-
-  def RunCommandHelper(self):
-    """Bigquery specific run script command components."""
-    bq = self.cluster_identifier.split('.')
-    return '--bq_project_id={} --bq_dataset_id={}'.format(bq[0], bq[1])
 
   def FormatProjectAndDatasetForCommand(self, dataset=None):
     """Returns the project and dataset in the format needed for bq commands.
@@ -82,21 +373,6 @@ class Bigquery(edw_service.EdwService):
     """
     return ((self.cluster_identifier.split('.')[0] + ':' +
              dataset) if dataset else self.cluster_identifier.replace('.', ':'))
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of bigquery runner.
-
-    Native Bigquery client that ships with the google_cloud_sdk
-    https://cloud.google.com/bigquery/docs/bq-command-line-tool used as client.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    vm.Install('google_cloud_sdk')
-    gcp_util.AuthenticateServiceAccount(vm, benchmark=benchmark_name)
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""
@@ -235,3 +511,81 @@ class Bigquery(edw_service.EdwService):
       if retcode:
         logging.warning('Loading table %s failed. stderr: %s, retcode: %s',
                         table, stderr, retcode)
+
+
+class Endor(Bigquery):
+  """Class representing BigQuery Endor service."""
+
+  SERVICE_TYPE = 'endor'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the BigQuery Endor service.
+
+    Returns:
+      A dictionary set to Endor service details.
+    """
+    basic_data = super(Endor, self).GetMetadata()
+    basic_data['edw_service_type'] = 'endor'
+    basic_data.update(self.client_interface.GetMetadata())
+    basic_data.update(self.GetDataDetails())
+    return basic_data
+
+  def GetDataDetails(self) -> Dict[str, str]:
+    """Returns a dictionary with underlying data details.
+
+    cluster_identifier = <project_id>.<dataset_id>
+    Data details are extracted from the dataset_id that follows the format:
+    <dataset>_<format>_<compression>_<partitioning>_<location>
+    eg.
+    tpch100_parquet_uncompressed_unpartitoned_s3
+
+    Returns:
+      A dictionary set to underlying data's details (format, etc.)
+    """
+    data_details = {}
+    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    parsed_id = re.split(r'_', dataset_id)
+    data_details['format'] = parsed_id[1]
+    data_details['compression'] = parsed_id[2]
+    data_details['partitioning'] = parsed_id[3]
+    data_details['location'] = parsed_id[4]
+    return data_details
+
+
+class Bqfederated(Bigquery):
+  """Class representing BigQuery Federated service."""
+
+  SERVICE_TYPE = 'bqfederated'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the BigQuery Federated service.
+
+    Returns:
+      A dictionary set to Federated service details.
+    """
+    basic_data = super(Bqfederated, self).GetMetadata()
+    basic_data['edw_service_type'] = Bqfederated.SERVICE_TYPE
+    basic_data.update(self.client_interface.GetMetadata())
+    basic_data.update(self.GetDataDetails())
+    return basic_data
+
+  def GetDataDetails(self) -> Dict[str, str]:
+    """Returns a dictionary with underlying data details.
+
+    cluster_identifier = <project_id>.<dataset_id>
+    Data details are extracted from the dataset_id that follows the format:
+    <dataset>_<format>_<compression>_<partitioning>_<location>
+    eg.
+    tpch10000_parquet_compressed_partitoned_gcs
+
+    Returns:
+      A dictionary set to underlying data's details (format, etc.)
+    """
+    data_details = {}
+    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    parsed_id = re.split(r'_', dataset_id)
+    data_details['format'] = parsed_id[1]
+    data_details['compression'] = parsed_id[2]
+    data_details['partitioning'] = parsed_id[3]
+    data_details['location'] = parsed_id[4]
+    return data_details

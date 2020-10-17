@@ -16,9 +16,8 @@
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util

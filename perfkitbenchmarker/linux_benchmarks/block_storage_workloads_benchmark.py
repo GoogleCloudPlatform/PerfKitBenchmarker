@@ -44,9 +44,8 @@ EBS-GP and PIOPS.
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import fio
 
 LOGGING = 'logging'

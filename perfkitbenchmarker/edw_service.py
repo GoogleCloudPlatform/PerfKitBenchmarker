@@ -17,11 +17,10 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
-import json
 import os
+from typing import Any, Dict, List, Text
 
-from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 
 
@@ -48,13 +47,38 @@ flags.DEFINE_string('snowflake_snowsql_config_override_file', None,
 flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
+flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
+# TODO(user): Revisit flags for accepting query lists.
+flags.DEFINE_string('edw_simultaneous_queries',
+                    None, 'CSV list of simultaneous queries to benchmark.')
+flags.DEFINE_string('edw_power_queries', None,
+                    'CSV list of power queries to benchmark.')
+flags.DEFINE_multi_string(
+    'concurrency_streams', [], 'List of all query streams to execute. Each '
+    'stream should be passed in separately and the queries should be comma '
+    'separated, e.g. --concurrency_streams=1,2,3 --concurrency_streams=3,2,1')
+flags.DEFINE_string('snowflake_warehouse', None,
+                    'A virtual warehouse, often referred to simply as a - '
+                    'warehouse, is a cluster of compute in Snowflake. '
+                    'https://docs.snowflake.com/en/user-guide/warehouses.html')  # pylint: disable=line-too-long
+flags.DEFINE_string(
+    'snowflake_database', None,
+    'The hosted snowflake database to use during the benchmark.')
+flags.DEFINE_string(
+    'snowflake_schema', None,
+    'The schema of the hosted snowflake database to use during the benchmark.')
+flags.DEFINE_enum(
+    'snowflake_client_interface', 'JDBC', ['JDBC'],
+    'The Runtime Interface used when interacting with Snowflake.')
+
 
 FLAGS = flags.FLAGS
 
 
 TYPE_2_PROVIDER = dict([('athena', 'aws'), ('redshift', 'aws'),
                         ('spectrum', 'aws'), ('snowflake_aws', 'aws'),
-                        ('bigquery', 'gcp'),
+                        ('bigquery', 'gcp'), ('endor', 'gcp'),
+                        ('bqfederated', 'gcp'),
                         ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([
     ('athena', 'perfkitbenchmarker.providers.aws.athena'),
@@ -62,12 +86,139 @@ TYPE_2_MODULE = dict([
     ('spectrum', 'perfkitbenchmarker.providers.aws.spectrum'),
     ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake'),
     ('bigquery', 'perfkitbenchmarker.providers.gcp.bigquery'),
+    ('endor', 'perfkitbenchmarker.providers.gcp.bigquery'),
+    ('bqfederated', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('azuresqldatawarehouse', 'perfkitbenchmarker.providers.azure.'
      'azure_sql_data_warehouse')
 ])
 DEFAULT_NUMBER_OF_NODES = 1
 # The order of stages is important to the successful lifecycle completion.
 EDW_SERVICE_LIFECYCLE_STAGES = ['create', 'load', 'query', 'delete']
+SAMPLE_QUERY_PATH = '/tmp/sample.sql'
+SAMPLE_QUERY = 'select * from INFORMATION_SCHEMA.TABLES;'
+
+
+class EdwExecutionError(Exception):
+  """Encapsulates errors encountered during execution of a query."""
+
+
+class EdwClientInterface(object):
+  """Defines the interface for EDW service clients.
+
+  Attributes:
+    client_vm: An instance of virtual_machine.BaseVirtualMachine used to
+      interface with the edw service.
+  """
+
+  def __init__(self):
+    self.client_vm = None
+
+  def SetProvisionedAttributes(self, benchmark_spec):
+    """Sets any attributes that were unknown during initialization."""
+    self.client_vm = benchmark_spec.vms[0]
+    self.client_vm.RemoteCommand('echo "\nMaxSessions 100" | '
+                                 'sudo tee -a /etc/ssh/sshd_config')
+
+  def Prepare(self, benchmark_name: Text) -> None:
+    """Prepares the client vm to execute query.
+
+    The default implementation raises an Error, to ensure client specific
+    installation and authentication of runner utilities.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    raise NotImplementedError
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    raise NotImplementedError
+
+  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+    Response format:
+      {"simultaneous_end":1601145943197,"simultaneous_start":1601145940113,
+      "stream_performance_array":[{"query_wall_time_in_secs":2.079,
+      "query_end":1601145942208,"job_id":"914682d9-4f64-4323-bad2-554267cbbd8d",
+      "query":"1","query_start":1601145940129},{"query_wall_time_in_secs":2.572,
+      "query_end":1601145943192,"job_id":"efbf93a1-614c-4645-a268-e3801ae994f1",
+      "query":"2","query_start":1601145940620}],
+      "simultaneous_wall_time_in_secs":3.084}
+
+    Args:
+      queries: List of string names of the queries to execute simultaneously.
+
+    Returns:
+      performance_details: A serialized dictionary of execution details.
+    """
+    raise NotImplementedError
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Response format:
+      {"throughput_start":1601666911596,"throughput_end":1601666916139,
+        "throughput_wall_time_in_secs":4.543,
+        "all_streams_performance_array":[
+          {"stream_start":1601666911597,"stream_end":1601666916139,
+            "stream_wall_time_in_secs":4.542,
+            "stream_performance_array":[
+              {"query_wall_time_in_secs":2.238,"query_end":1601666913849,
+                "query":"1","query_start":1601666911611,
+                "details":{"job_id":"438170b0-b0cb-4185-b733-94dd05b46b05"}},
+              {"query_wall_time_in_secs":2.285,"query_end":1601666916139,
+                "query":"2","query_start":1601666913854,
+                "details":{"job_id":"371902c7-5964-46f6-9f90-1dd00137d0c8"}}
+              ]},
+          {"stream_start":1601666911597,"stream_end":1601666916018,
+            "stream_wall_time_in_secs":4.421,
+            "stream_performance_array":[
+              {"query_wall_time_in_secs":2.552,"query_end":1601666914163,
+                "query":"2","query_start":1601666911611,
+                "details":{"job_id":"5dcba418-d1a2-4a73-be70-acc20c1f03e6"}},
+              {"query_wall_time_in_secs":1.855,"query_end":1601666916018,
+                "query":"1","query_start":1601666914163,
+                "details":{"job_id":"568c4526-ae26-4e9d-842c-03459c3a216d"}}
+            ]}
+        ]}
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    raise NotImplementedError
+
+  def WarmUpQuery(self):
+    """Executes a service-agnostic query that can detect cold start issues."""
+    with open(SAMPLE_QUERY_PATH, 'w+') as f:
+      f.write(SAMPLE_QUERY)
+    self.client_vm.PushFile(SAMPLE_QUERY_PATH)
+    query_name = os.path.basename(SAMPLE_QUERY_PATH)
+    self.ExecuteQuery(query_name)
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Returns the client interface metadata."""
+    raise NotImplementedError
 
 
 class EdwService(resource.BaseResource):
@@ -113,6 +264,11 @@ class EdwService(resource.BaseResource):
     self.spec = edw_service_spec
     # resource workflow management
     self.supports_wait_on_delete = True
+    self.client_interface = None
+
+  def GetClientInterface(self) -> EdwClientInterface:
+    """Gets the active Client Interface."""
+    return self.client_interface
 
   def IsUserManaged(self, edw_service_spec):
     """Indicates if the edw service instance is user managed.
@@ -148,59 +304,6 @@ class EdwService(resource.BaseResource):
                   'edw_cluster_node_count': self.node_count}
     return basic_data
 
-  def RunCommandHelper(self):
-    """Returns EDW instance specific launch command components.
-
-    Returns:
-      A string with additional command components needed when invoking script
-      runner.
-    """
-    raise NotImplementedError
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of runner utilities.
-
-    The default implementation raises an Error, to ensure client specific
-    implementation.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    raise NotImplementedError
-
-  def PrepareClientVm(self, vm, benchmark_name):
-    """Prepare phase to install the runtime environment on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    vm.Install('pip')
-    vm.RemoteCommand('sudo pip install absl-py')
-    self.InstallAndAuthenticateRunner(vm, benchmark_name)
-
-  def PushDataDefinitionDataManipulationScripts(self, vm):
-    """Method to push the database bootstrap and teardown scripts to the vm.
-
-    Args:
-      vm: Client vm on which the scripts will be run.
-    """
-    raise NotImplementedError
-
-  def PushScriptExecutionFramework(self, vm):
-    """Method to push the runner to execute sql scripts on the vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-    """
-    # Push generic runner
-    vm.PushFile(data.ResourcePath(os.path.join('edw', 'script_driver.py')))
-
   def GenerateLifecycleStageScriptName(self, lifecycle_stage):
     """Computes the default name for script implementing an edw lifecycle stage.
 
@@ -213,49 +316,9 @@ class EdwService(resource.BaseResource):
     return os.path.basename(
         os.path.normpath('database_%s.sql' % lifecycle_stage))
 
-  def GenerateScriptExecutionCommand(self, script):
-    """Method to generate the command for running the sql script on the vm.
-
-    Args:
-      script: Script to execute on the client vm.
-
-    Returns:
-      base command components to run the sql script on the vm.
-    """
-    return ['python', 'script_driver.py', '--script={}'.format(script)]
-
-  def GetScriptExecutionResults(self, script_name, client_vm):
-    """A function to trigger single/multi script execution and return performance.
-
-    Args:
-      script_name: Script to execute on the client vm.
-      client_vm: Client vm on which the script will be executed.
-
-    Returns:
-      A tuple of script execution performance results.
-      - latency of executing the script.
-      - reference job_id executed on the edw_service.
-    """
-    script_execution_command = self.GenerateScriptExecutionCommand(script_name)
-    stdout, _ = client_vm.RemoteCommand(script_execution_command)
-    all_script_performance = json.loads(stdout)
-    script_performance = all_script_performance[script_name]
-    return script_performance['execution_time'], script_performance['job_id']
-
-  @classmethod
-  def RunScriptOnClientVm(cls, vm, database, script):
-    """A function to execute the script on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-      database: The database within which the query executes.
-      script: Named query to execute (expected to be on the client vm).
-
-    Returns:
-      A dictionary with the execution performance results that includes
-      execution status and the latency of executing the script.
-    """
-    raise NotImplementedError
+  def Cleanup(self):
+    """Cleans up any temporary resources created for the service."""
+    pass
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""
@@ -310,3 +373,13 @@ class EdwService(resource.BaseResource):
         service.
     """
     raise NotImplementedError
+
+  def RequiresWarmUpSuite(self) -> bool:
+    """Verifies if the edw_service requires a warm up suite execution.
+
+    Currently enabled for all service types, for parity.
+
+    Returns:
+      A boolean value (True) if the warm suite is recommended.
+    """
+    return True

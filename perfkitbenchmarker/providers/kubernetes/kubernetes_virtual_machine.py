@@ -21,11 +21,10 @@ from __future__ import print_function
 import json
 import logging
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
@@ -343,12 +342,19 @@ class DebianBasedKubernetesVirtualMachine(
                                       ignore_failure=False, login_shell=False,
                                       suppress_warning=False, timeout=None):
     """Runs a command in the Kubernetes container."""
+    if retries is None:
+      retries = FLAGS.ssh_retries
     cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i',
            self.name, '--', '/bin/bash', '-c', command]
-    stdout, stderr, retcode = vm_util.IssueCommand(
-        cmd, force_info_log=should_log,
-        suppress_warning=suppress_warning, timeout=timeout,
-        raise_on_failure=False)
+    for _ in range(retries):
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          cmd, force_info_log=should_log,
+          suppress_warning=suppress_warning, timeout=timeout,
+          raise_on_failure=False)
+      # Check for ephemeral connection issues.
+      if not (retcode == 1 and 'error dialing backend: ssh' in stderr):
+        break
+      logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if not ignore_failure and retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
@@ -417,8 +423,9 @@ class DebianBasedKubernetesVirtualMachine(
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
     self.Install('python')
 
-    # Needed for the MKL math library.
-    self.InstallPackages('cpio')
+    # cpio is needed for the MKL math library.
+    # software-properties-common is needed for add-apt-repository
+    self.InstallPackages('cpio software-properties-common')
 
     # Don't assume the relevant CLI is installed in the Kubernetes environment.
     if FLAGS.container_cluster_cloud == 'GCP':

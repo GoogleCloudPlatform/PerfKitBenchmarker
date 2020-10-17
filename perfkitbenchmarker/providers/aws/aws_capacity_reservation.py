@@ -40,9 +40,9 @@ VMs in a VM group share the same shape and zone.
 import datetime
 import json
 import logging
+from absl import flags
 from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util

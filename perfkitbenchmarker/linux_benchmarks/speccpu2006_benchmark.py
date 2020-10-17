@@ -22,8 +22,8 @@ and compiler."
 SPEC CPU2006 homepage: http://www.spec.org/cpu2006/
 """
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2006
 

@@ -21,10 +21,9 @@ YCSB and workloads described in perfkitbenchmarker.linux_packages.ycsb.
 """
 
 import functools
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aerospike_server
 from perfkitbenchmarker.linux_packages import ycsb

@@ -20,7 +20,6 @@ import subprocess
 import sys
 import time
 from absl import flags
-from six.moves import range
 
 FLAGS = flags.FLAGS
 

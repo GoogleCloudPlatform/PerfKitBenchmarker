@@ -15,9 +15,9 @@
 """Module containing LMbench installation and cleanup functions."""
 
 import posixpath
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
-LMBENCH_DIR = posixpath.join(INSTALL_DIR, 'lmbench')
+LMBENCH_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'lmbench')
 GIT = 'https://github.com/intel/lmbench.git'
 COMMIT = '4e4efa113b244b70a1faafd13744578b4edeaeb3'
 
@@ -26,8 +26,8 @@ def _Install(vm):
   """Installs the Lmbench package on the VM."""
 
   vm.Install('build_tools')
-  vm.RemoteCommand('cd %s && git clone %s && cd %s && git checkout %s' % (
-      INSTALL_DIR, GIT, 'lmbench', COMMIT))
+  vm.RemoteCommand('cd %s && git clone %s && cd %s && git checkout %s' %
+                   (linux_packages.INSTALL_DIR, GIT, 'lmbench', COMMIT))
 
 
 def YumInstall(vm):

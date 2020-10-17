@@ -1,3 +1,5 @@
+# PKB custom write-only workload
+
 workload=site.ycsb.workloads.CoreWorkload
 
 readallfields=true

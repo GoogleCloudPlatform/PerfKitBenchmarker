@@ -50,10 +50,9 @@ from __future__ import print_function
 import logging
 import re
 import time
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -134,9 +133,7 @@ sysbench:
         machine_type: db.m4.4xlarge
         zone: us-west-1a
       Azure:
-        machine_type:
-          tier: Standard
-          compute_units: 800
+        machine_type: GP_Gen5_2
         zone: westus
     db_disk_spec:
       GCP:
@@ -160,15 +157,18 @@ sysbench:
             machine_type: m4.4xlarge
             zone: us-west-1a
           Azure:
-            machine_type: Standard_A4m_v2
+            machine_type: Standard_B4ms
             zone: westus
         disk_spec:
           GCP:
             disk_size: 500
+            disk_type: pd-ssd
           AWS:
             disk_size: 500
+            disk_type: gp2
           Azure:
             disk_size: 500
+            disk_type: Premium_LRS
       servers:
         os_type: ubuntu1604
         vm_spec:
@@ -179,7 +179,7 @@ sysbench:
             machine_type: m4.4xlarge
             zone: us-west-1a
           Azure:
-            machine_type: Standard_A4m_v2
+            machine_type: Standard_B4ms
             zone: westus
         disk_spec: *default_500_gb
       replications:
@@ -192,7 +192,7 @@ sysbench:
             machine_type: m4.4xlarge
             zone: us-east-1a
           Azure:
-            machine_type: Standard_A4m_v2
+            machine_type: Standard_B4ms
             zone: eastus
         disk_spec: *default_500_gb
 """
@@ -287,12 +287,23 @@ def AddMetricsForSysbenchOutput(
   results.append(qps_sample)
 
 
+def _GetCommonSysbenchOptions(benchmark_spec):
+  db = benchmark_spec.relational_db
+  return [
+      '--db-ps-mode=%s' % DISABLE,
+      # Error 1205: Lock wait timeout exceeded
+      # Could happen when we overload the database
+      '--mysql-ignore-errors=1205,2013',
+      '--db-driver=mysql',
+      db.MakeSysbenchConnectionString(),
+  ]
+
+
 def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
   """Returns the sysbench command as a string."""
   if duration <= 0:
     raise ValueError('Duration must be greater than zero.')
 
-  db = benchmark_spec.relational_db
   run_cmd_tokens = ['nice',  # run with a niceness of lower priority
                     '-15',   # to encourage cpu time for ssh commands
                     'sysbench',
@@ -302,17 +313,15 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
                      if _IsValidFlag('table_size') else ''),
                     ('--scale=%d' % FLAGS.sysbench_scale
                      if _IsValidFlag('scale') else ''),
-                    '--db-ps-mode=%s' % DISABLE,
                     '--rand-type=%s' % UNIFORM,
                     '--threads=%d' % sysbench_thread_count,
                     '--percentile=%d' % FLAGS.sysbench_latency_percentile,
                     '--report-interval=%d' % FLAGS.sysbench_report_interval,
                     '--max-requests=0',
-                    '--time=%d' % duration,
-                    '--db-driver=mysql',
-                    db.MakeSysbenchConnectionString(),
-                    'run']
-  run_cmd = ' '.join(run_cmd_tokens)
+                    '--time=%d' % duration]
+  run_cmd = ' '.join(run_cmd_tokens +
+                     _GetCommonSysbenchOptions(benchmark_spec) +
+                     ['run'])
   return run_cmd
 
 
@@ -705,11 +714,10 @@ def _PrepareSysbench(client_vm, benchmark_spec):
                            if _IsValidFlag('table_size') else ''),
                           ('--scale=%d' % FLAGS.sysbench_scale
                            if _IsValidFlag('scale') else ''),
-                          '--threads=%d' % num_threads,
-                          '--db-driver=mysql',
-                          db.MakeSysbenchConnectionString(),
-                          'prepare']
-  data_load_cmd = ' '.join(data_load_cmd_tokens)
+                          '--threads=%d' % num_threads]
+  data_load_cmd = ' '.join(data_load_cmd_tokens +
+                           _GetCommonSysbenchOptions(benchmark_spec) +
+                           ['prepare'])
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.

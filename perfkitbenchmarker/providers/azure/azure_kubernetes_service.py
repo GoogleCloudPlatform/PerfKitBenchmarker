@@ -15,10 +15,9 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
-
+from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -125,7 +124,20 @@ class AksCluster(container_service.KubernetesCluster):
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
+    self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the cluster.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(AksCluster, self).GetResourceMetadata()
+    result['container_cluster_version'] = self.cluster_version
+    result['boot_disk_type'] = self.vm_config.os_disk.disk_type
+    result['boot_disk_size'] = self.vm_config.os_disk.disk_size
+    return result
 
   # Creating an AKS cluster with a fresh service principal usually fails due
   # to a race condition. Active Directory knows the service principal exists,
@@ -144,12 +156,13 @@ class AksCluster(container_service.KubernetesCluster):
         '--service-principal', self.service_principal.app_id,
         # TODO(pclay): avoid logging client secret
         '--client-secret', self.service_principal.password,
-        # TODO(pclay): Consider adding
-        # --kubernetes-version=FLAGS.container_cluster_version.
     ] + self.resource_group.args
     if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
       cmd += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
+    if self.cluster_version:
+      cmd += ['--kubernetes-version', self.cluster_version]
 
+    # TODO(pclay): expose quota and capacity errors
     vm_util.IssueCommand(cmd, timeout=1800)
 
   def _Exists(self):

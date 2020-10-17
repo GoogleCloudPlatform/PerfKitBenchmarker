@@ -24,10 +24,9 @@ for more information about AWS Virtual Private Clouds.
 import json
 import logging
 import threading
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
@@ -43,7 +42,7 @@ flags.DEFINE_string(
     'aws_subnet', None,
     'The static AWS subnet id to use.  Default creates a new one')
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
-flags.DEFINE_string('aws_efa_version', '1.8.3',
+flags.DEFINE_string('aws_efa_version', '1.9.4',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
 flags.DEFINE_multi_enum('aws_endpoint', [], ['s3'],
                         'List of AWS endpoints to create')
@@ -697,9 +696,10 @@ class _AwsRegionalNetwork(network.BaseNetwork):
       if self._reference_count:
         return
 
-    self.internet_gateway.Detach()
-    self.internet_gateway.Delete()
-    self.vpc.Delete()
+    if self.created:
+      self.internet_gateway.Detach()
+      self.internet_gateway.Delete()
+      self.vpc.Delete()
 
 
 class AwsNetworkSpec(network.BaseNetworkSpec):

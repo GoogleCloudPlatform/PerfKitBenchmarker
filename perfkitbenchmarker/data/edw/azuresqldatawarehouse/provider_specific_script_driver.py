@@ -26,6 +26,7 @@ flags.DEFINE_string('server', None, 'SQL server.')
 flags.DEFINE_string('database', None, 'SQL Database.')
 flags.DEFINE_string('user', None, 'SQL User.')
 flags.DEFINE_string('password', None, 'SQL Password.')
+flags.DEFINE_string('query_timeout', '600', 'Query timeout in seconds.')
 
 flags.mark_flags_as_required(['server', 'database', 'user', 'password'])
 
@@ -45,5 +46,7 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
   Returns:
     Command list to execute the supplied script.
   """
-  return [driver, FLAGS.server, FLAGS.database, FLAGS.user, FLAGS.password,
-          script, output, error]
+  return [
+      driver, FLAGS.server, FLAGS.database, FLAGS.user, FLAGS.password,
+      FLAGS.query_timeout, script, output, error
+  ]

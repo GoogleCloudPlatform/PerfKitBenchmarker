@@ -15,9 +15,9 @@
 
 import os
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import dstat

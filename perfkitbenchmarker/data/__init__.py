@@ -29,8 +29,8 @@ import abc
 import logging
 import os
 import shutil
+from absl import flags
 import perfkitbenchmarker
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
 import pkg_resources
 import six
@@ -90,6 +90,7 @@ class FileResourceLoader(ResourceLoader):
   """
 
   def __init__(self, path):
+    super().__init__()
     self.path = path
 
     if not os.path.isdir(path):
@@ -118,6 +119,7 @@ class PackageResourceLoader(ResourceLoader):
   """
 
   def __init__(self, package):
+    super().__init__()
     self.package = package
 
   def __repr__(self):

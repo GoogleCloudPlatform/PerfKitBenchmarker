@@ -18,9 +18,8 @@ More info: http://cloudsuite.ch/datacaching
 """
 
 import re
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import docker
 
@@ -79,27 +78,27 @@ def Prepare(benchmark_spec):
 
 
 def _ParseOutput(output_str):
-    numbers = [float(f) for f in re.findall(r"([-+]?\d*\.\d+|\d+)",
-               " ".join(output_str.splitlines(1)[-4:]))]
+  numbers = [float(f) for f in re.findall(r"([-+]?\d*\.\d+|\d+)",
+             " ".join(output_str.splitlines(1)[-4:]))]
 
-    results = []
-    results.append(sample.Sample("Requests per second",
-                                 numbers[1], "req/s"))
-    results.append(sample.Sample("Average latency",
-                                 numbers[7], "ms"))
-    results.append(sample.Sample("90th percentile latency",
-                                 numbers[8], "ms"))
-    results.append(sample.Sample("95th percentile latency",
-                                 numbers[9], "ms"))
-    results.append(sample.Sample("99th percentile latency",
-                                 numbers[10], "ms"))
+  results = []
+  results.append(sample.Sample("Requests per second",
+                               numbers[1], "req/s"))
+  results.append(sample.Sample("Average latency",
+                               numbers[7], "ms"))
+  results.append(sample.Sample("90th percentile latency",
+                               numbers[8], "ms"))
+  results.append(sample.Sample("95th percentile latency",
+                               numbers[9], "ms"))
+  results.append(sample.Sample("99th percentile latency",
+                               numbers[10], "ms"))
 
-    req_rems = numbers[15:-1]
+  req_rems = numbers[15:-1]
 
-    results.append(sample.Sample("Average outstanding requests per requester",
-                                 sum(req_rems) / len(req_rems), "reqs"))
+  results.append(sample.Sample("Average outstanding requests per requester",
+                               sum(req_rems) / len(req_rems), "reqs"))
 
-    return results
+  return results
 
 
 def Run(benchmark_spec):

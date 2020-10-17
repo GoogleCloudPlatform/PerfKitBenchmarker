@@ -17,15 +17,13 @@
 import json
 import os.path
 import unittest
-
+from absl import flags
+from absl.testing import parameterized
 import mock
-
-from parameterized import parameterized
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -257,6 +255,19 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(cidr, spec.cidr_block)
 
 
+class TestAwsVirtualMachine(pkb_common_test_case.TestOsMixin,
+                            aws_virtual_machine.AwsVirtualMachine):
+  pass
+
+
+def CreateTestAwsVm():
+  vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
+                                          zone='us-east-1a',
+                                          machine_type='c3.large',
+                                          spot_price=123.45)
+  return TestAwsVirtualMachine(vm_spec=vm_spec)
+
+
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def open_json_data(self, filename):
@@ -286,10 +297,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
                                              _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
-    self.vm = aws_virtual_machine.AwsVirtualMachine(
-        aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS', zone='us-east-1a',
-                                      machine_type='c3.large',
-                                      spot_price=123.45))
+    self.vm = CreateTestAwsVm()
     self.vm.id = 'i-foo'
     self.vm.image = 'ami-12345'
     self.vm.client_token = '00000000-1111-2222-3333-444444444444'
@@ -312,6 +320,20 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
 
+  def testVcpuLimitExceededDuringCreate(self):
+    stderr = (
+        'An error occurred (VcpuLimitExceeded) when calling the '
+        'RunInstances operation: You have requested more vCPU capacity '
+        'than your current vCPU limit of 1145 allows for the instance '
+        'bucket that the specified instance type belongs to. Please '
+        'visit http://aws.amazon.com/contact-us/ec2-request to request '
+        'an adjustment to this limit.'
+    )
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
+      self.vm._Create()
+    self.assertEqual(str(e.exception), stderr)
+
   def testInstanceQuotaExceededDuringCreate(self):
     stderr = (
         'An error occurred (InstanceLimitExceeded) when calling the '
@@ -322,6 +344,16 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
     with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
+      self.vm._Create()
+    self.assertEqual(str(e.exception), stderr)
+
+  def testInstanceRequestLimitExceededCreate(self):
+    stderr = (
+        'An error occurred (RequestLimitExceeded) when calling the RunInstances'
+        ' operation (reached max retries: 4): Request limit exceeded.'
+    )
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Resource.RetryableCreationError) as e:
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
 
@@ -420,7 +452,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(str(e.exception), stderr)
     self.assertEqual(self.vm.spot_status_code,
                      'InsufficientSpotInstanceCapacity')
-    self.assertTrue(self.vm.early_termination)
+    self.assertTrue(self.vm.spot_early_termination)
     self.vm.use_spot_instance = False
 
   def testDeleteCancelsSpotInstanceRequest(self):
@@ -461,10 +493,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.assert_not_called()
     self.vm.network.is_static = False
 
-  @parameterized.expand([
-      (True, 'network-interfaces', 'associate-public-ip-address'),
-      (False, 'associate-public-ip-address', 'network-interfaces'),
-  ])
+  @parameterized.named_parameters(
+      ('use_efa', True, 'network-interfaces', 'associate-public-ip-address'),
+      ('no_efa', False, 'associate-public-ip-address', 'network-interfaces'),
+  )
   def testElasticNetwork(self, use_efa, should_find, should_not_find):
     # with EFA the "--associate-public-ip-address" flag is not used, instead
     # putting that attribute into --network-interfaces
@@ -478,9 +510,7 @@ def CreateVm():
   """Returns the AWS run-instances command line."""
   vm_util.IssueCommand.side_effect = [('', '', 0)]
   util.IssueRetryableCommand.side_effect = [('', '', 0)]
-  vm_spec = aws_virtual_machine.AwsVmSpec(
-      'test_vm_spec.AWS', zone='us-west-1a', machine_type='c5n.18xlarge')
-  vm = aws_virtual_machine.AwsVirtualMachine(vm_spec)
+  vm = CreateTestAwsVm()
   vm.network.regional_network = mock.Mock()
   vm.network.subnet = mock.Mock(id='subnet-1234')
   vm.network.placement_group = mock.Mock()

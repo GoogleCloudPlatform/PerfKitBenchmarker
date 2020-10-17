@@ -21,7 +21,7 @@ import copy
 import os
 import unittest
 
-
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
 import six
 from six.moves import range
@@ -119,7 +119,8 @@ class BadResultParserTestCase(unittest.TestCase):
 
   def testBadTestRun(self):
     contents = open_data_file('ycsb-test-run-3.dat')
-    self.assertRaises(IOError, ycsb.ParseResults, contents, 'histogram')
+    self.assertRaises(errors.Benchmarks.KnownIntermittentError,
+                      ycsb.ParseResults, contents, 'histogram')
 
 
 class WeightedQuantileTestCase(unittest.TestCase):

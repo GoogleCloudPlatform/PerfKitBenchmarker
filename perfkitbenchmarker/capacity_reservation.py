@@ -14,7 +14,7 @@
 
 """Module containing abstract class for a capacity reservation for VMs."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 
 FLAGS = flags.FLAGS

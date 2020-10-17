@@ -21,9 +21,9 @@ executions.
 import fnmatch
 import os
 
+from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 BEAM_JAVA_SDK = 'java'

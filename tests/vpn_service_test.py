@@ -14,10 +14,11 @@
 """Tests for vpn service."""
 import pickle
 import sys
+import unittest
+from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -92,7 +93,6 @@ class VpnServiceTestCase(BaseVPNServiceTest):
   def testVpnServiceConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(DEFAULT_CFG)
     spec.ConstructVPNService()
-    spec.ConstructVirtualMachines()
     #  test global flags
     self.assertTrue(spec.config.flags['use_vpn'])
     self.assertEqual(spec.config.flags['vpn_service_gateway_count'], 1)
@@ -174,3 +174,7 @@ class TunnelConfigTestCase(BaseVPNServiceTest):
     tunnel_config.setConfig(**conf)
     hash3 = tunnel_config.hash()
     self.assertNotEqual(hash1, hash3)
+
+
+if __name__ == '__main__':
+  unittest.main()

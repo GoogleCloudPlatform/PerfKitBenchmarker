@@ -28,13 +28,11 @@ from __future__ import print_function
 import ntpath
 import os
 import re
-
+from absl import flags
 import numpy as np
-
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import data
 import six
 from six.moves import range
 

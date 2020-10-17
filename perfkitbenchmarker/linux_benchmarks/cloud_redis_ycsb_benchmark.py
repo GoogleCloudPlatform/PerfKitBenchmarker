@@ -21,8 +21,8 @@ from __future__ import division
 from __future__ import print_function
 
 import logging
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb

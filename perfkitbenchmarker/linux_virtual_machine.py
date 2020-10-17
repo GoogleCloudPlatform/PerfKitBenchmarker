@@ -26,10 +26,7 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+import abc
 import collections
 import logging
 import os
@@ -38,20 +35,19 @@ import posixpath
 import re
 import threading
 import time
+from typing import Dict, Set
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
-import six
-from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -139,13 +135,6 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'scp_connect_timeout', 30, 'timeout for SCP connection.', lower_bound=0)
 
-flags.DEFINE_boolean(
-    'ssh_via_internal_ip', False,
-    'Whether to use internal IP addresses for running commands on and pushing '
-    'data to VMs. By default, PKB interacts with VMs using external IP '
-    'addresses.'
-)
-
 flags.DEFINE_string(
     'append_kernel_command_line', None,
     'String to append to the kernel command line. The presence of any '
@@ -176,6 +165,80 @@ flags.DEFINE_integer(
     'Sets the sysctl value net.core.wmem_max. This sets the max OS '
     'send buffer size in bytes for all types of connections')
 
+flags.DEFINE_boolean('gce_hpc_tools', False,
+                     'Whether to apply the hpc-tools environment script.')
+
+
+class CpuVulnerabilities:
+  """The 3 different vulnerablity statuses from vm.cpu_vulernabilities.
+
+  Example input:
+    /sys/devices/system/cpu/vulnerabilities/itlb_multihit:KVM: Vulnerable
+  Is put into vulnerability with a key of "itlb_multihit" and value "KVM"
+
+  Unparsed lines are put into the unknown dict.
+  """
+
+  def __init__(self):
+    self.mitigations: Dict[str, str] = {}
+    self.vulnerabilities: Dict[str, str] = {}
+    self.notaffecteds: Set[str] = set()
+    self.unknowns: Dict[str, str] = {}
+
+  def AddLine(self, full_line: str) -> None:
+    """Parses a line of output from the cpu/vulnerabilities/* files."""
+    if not full_line:
+      return
+    file_path, line = full_line.split(':', 1)
+    file_name = posixpath.basename(file_path)
+    if self._AddMitigation(file_name, line):
+      return
+    if self._AddVulnerability(file_name, line):
+      return
+    if self._AddNotAffected(file_name, line):
+      return
+    self.unknowns[file_name] = line
+
+  def _AddMitigation(self, file_name, line):
+    match = re.match('^Mitigation: (.*)', line) or re.match(
+        '^([^:]+): Mitigation: (.*)$', line)
+    if match:
+      self.mitigations[file_name] = ':'.join(match.groups())
+      return True
+
+  def _AddVulnerability(self, file_name, line):
+    match = re.match('^Vulnerable: (.*)', line) or re.match(
+        '^Vulnerable$', line) or re.match('^([^:]+): Vulnerable$', line)
+    if match:
+      self.vulnerabilities[file_name] = ':'.join(match.groups())
+      return True
+
+  def _AddNotAffected(self, file_name, line):
+    match = re.match('^Not affected$', line)
+    if match:
+      self.notaffecteds.add(file_name)
+      return True
+
+  @property
+  def asdict(self) -> Dict[str, str]:
+    """Returns the parsed CPU vulnerabilities as a dict."""
+    ret = {}
+    if self.mitigations:
+      ret['mitigations'] = ','.join(sorted(self.mitigations))
+      for key, value in self.mitigations.items():
+        ret[f'mitigation_{key}'] = value
+    if self.vulnerabilities:
+      ret['vulnerabilities'] = ','.join(sorted(self.vulnerabilities))
+      for key, value in self.vulnerabilities.items():
+        ret[f'vulnerability_{key}'] = value
+    if self.unknowns:
+      ret['unknowns'] = ','.join(self.unknowns)
+      for key, value in self.unknowns.items():
+        ret[f'unknown_{key}'] = value
+    if self.notaffecteds:
+      ret['notaffecteds'] = ','.join(sorted(self.notaffecteds))
+    return ret
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -185,8 +248,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # Serializing calls to ssh with the -t option fixes the problem.
   _pseudo_tty_lock = threading.Lock()
 
-  def __init__(self):
-    super(BaseLinuxMixin, self).__init__()
+  def __init__(self, *args, **kwargs):
+    super(BaseLinuxMixin, self).__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
     # primary_remote_access_port.
     self.ssh_port = DEFAULT_SSH_PORT
@@ -200,6 +263,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._lscpu_cache = None
     self._partition_table = {}
     self._proccpu_cache = None
+    self._smp_affinity_script = None
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -253,7 +317,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
 
     Returns:
-      A tuple of stdout, stderr, return_code from running the command.
+      A tuple of stdout, stderr from running the command.
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection, or
@@ -273,7 +337,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     stderr_file = file_base + '.stderr'
     status_file = file_base + '.status'
 
-    if not isinstance(command, six.string_types):
+    if not isinstance(command, str):
       command = ' '.join(command)
 
     start_command = ['nohup', 'python', execute_path,
@@ -348,8 +412,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
-      self.RemoteCommand('sudo mkdir -p %s' % linux_packages.INSTALL_DIR)
-      self.RemoteCommand('sudo chmod a+rwxt %s' % linux_packages.INSTALL_DIR)
+      self._CreateInstallDir()
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
@@ -365,6 +428,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RecordAdditionalMetadata()
     self.BurnCpu()
     self.FillDisk()
+
+  def _CreateInstallDir(self):
+    self.RemoteCommand(
+        ('sudo mkdir -p {0}; '
+         'sudo chmod a+rwxt {0}').format(linux_packages.INSTALL_DIR))
 
   def SetFiles(self):
     """Apply --set_files to the VM."""
@@ -633,6 +701,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
+      self.os_metadata[
+          'append_kernel_command_line'] = FLAGS.append_kernel_command_line
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -706,7 +776,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata['disk_filesystem_blocksize'] = block_size
     self.RemoteHostCommand(umount_cmd + fmt_cmd)
 
-  def MountDisk(self, device_path, mount_path, disk_type=None,
+  @vm_util.Retry(
+      timeout=vm_util.DEFAULT_TIMEOUT,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
+  def MountDisk(self,
+                device_path,
+                mount_path,
+                disk_type=None,
                 mount_options=disk.DEFAULT_MOUNT_OPTIONS,
                 fstab_options=disk.DEFAULT_FSTAB_OPTIONS):
     """Mounts a formatted disk in the VM."""
@@ -761,8 +837,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         file_path = file_path.split(':', 1)[1]
       # Replace the last instance of '\' with '/' to make scp happy.
       file_path = '/'.join(file_path.rsplit('\\', 1))
-    remote_ip = '[%s]' % (
-        self.internal_ip if FLAGS.ssh_via_internal_ip else self.ip_address)
+    remote_ip = '[%s]' % self.GetConnectionIp()
     remote_location = '%s@%s:%s' % (
         self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
@@ -857,8 +932,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Multi-line commands passed to ssh won't work on Windows unless the
       # newlines are escaped.
       command = command.replace('\n', '\\n')
-    ip_address = (
-        self.internal_ip if FLAGS.ssh_via_internal_ip else self.ip_address)
+    ip_address = self.GetConnectionIp()
     user_host = '%s@%s' % (self.user_name, ip_address)
     ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_private_key = (self.ssh_private_key if self.is_static else
@@ -923,6 +997,17 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     This will be called after every call to Reboot().
     """
+    # clear out os_info and kernel_release as might have changed
+    previous_os_info = self.os_metadata.pop('os_info', None)
+    previous_kernel_release = self.os_metadata.pop('kernel_release', None)
+    previous_kernel_command = self.os_metadata.pop('kernel_command_line', None)
+    if previous_os_info or previous_kernel_release or previous_kernel_command:
+      self.RecordAdditionalMetadata()
+    if self._lscpu_cache:
+      self._lscpu_cache = None
+      self.CheckLsCpu()
+    if self.install_packages:
+      self._CreateInstallDir()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
 
@@ -1123,6 +1208,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                   '%s %s' % (striped_device, len(devices), ' '.join(devices)))
     self.RemoteHostCommand(stripe_cmd)
 
+    # Save the RAID layout on the disk
+    cmd = ('sudo mdadm --detail --scan | ' +
+           'sudo tee -a /etc/mdadm/mdadm.conf')
+    self.RemoteHostCommand(cmd)
+
+    # Make the disk available during reboot
+    cmd = 'sudo update-initramfs -u'
+    self.RemoteHostCommand(cmd)
+
+    # Automatically mount the disk after reboot
+    cmd = ('echo \'/dev/md0  /mnt/md0  ext4 defaults,nofail'
+           ',discard 0 0\' | sudo tee -a /etc/fstab')
+    self.RemoteHostCommand(cmd)
+
   def BurnCpu(self, burn_cpu_threads=None, burn_cpu_seconds=None):
     """Burns vm cpu for some amount of time and dirty cache.
 
@@ -1141,6 +1240,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if time.time() < end_time:
         time.sleep(end_time - time.time())
       self.RemoteCommand('pkill -9 sysbench')
+
+  def SetSmpAffinity(self):
+    """Set SMP IRQ affinity."""
+    if self._smp_affinity_script:
+      self.PushDataFile(self._smp_affinity_script)
+      self.RemoteCommand('sudo bash %s' % self._smp_affinity_script)
+    else:
+      raise NotImplementedError()
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
@@ -1227,6 +1334,44 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           FLAGS.append_kernel_command_line, reboot=False)
       self._needs_reboot = True
 
+  @abc.abstractmethod
+  def InstallPackages(self, packages: str) -> None:
+    """Installs packages using the OS's package manager."""
+    pass
+
+  def _IsSmtEnabled(self):
+    """Whether simultaneous multithreading (SMT) is enabled on the vm.
+
+    Looks for the "nosmt" attribute in the booted linux kernel command line
+    parameters.
+
+    Returns:
+      Whether SMT is enabled on the vm.
+    """
+    return not bool(re.search(r'\bnosmt\b', self.kernel_command_line))
+
+  @property
+  def cpu_vulnerabilities(self) -> CpuVulnerabilities:
+    """Returns a CpuVulnerabilities of CPU vulnerabilities.
+
+    Output of "grep . .../cpu/vulnerabilities/*" looks like this:
+      /sys/devices/system/cpu/vulnerabilities/itlb_multihit:KVM: Vulnerable
+      /sys/devices/system/cpu/vulnerabilities/l1tf:Mitigation: PTE Inversion
+    Which gets turned into
+      CpuVulnerabilities(vulnerabilities={'itlb_multihit': 'KVM'},
+                         mitigations=    {'l1tf': 'PTE Inversion'})
+    """
+    text, _ = self.RemoteCommand(
+        'sudo grep . /sys/devices/system/cpu/vulnerabilities/*',
+        ignore_failure=True)
+    vuln = CpuVulnerabilities()
+    if not text:
+      logging.warning('No text response when getting CPU vulnerabilities')
+      return vuln
+    for line in text.splitlines():
+      vuln.AddLine(line)
+    return vuln
+
 
 class ClearMixin(BaseLinuxMixin):
   """Class holding Clear Linux specific VM methods and attributes."""
@@ -1268,7 +1413,7 @@ class ClearMixin(BaseLinuxMixin):
     return self.TryRemoteCommand('sudo swupd bundle-list --all | grep {0}'.format(package),
                                  suppress_warning=True)
 
-  def InstallPackages(self, packages):
+  def InstallPackages(self, packages: str) -> None:
     """Installs packages using the swupd bundle manager."""
     self.RemoteCommand('sudo swupd bundle-add {0}'.format(packages))
 
@@ -1359,6 +1504,9 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
   def Install(self, package_name):
     raise NotImplementedError('Only use for cluster boot for now')
 
+  def InstallPackages(self, package_name):
+    raise NotImplementedError('Only use for cluster boot for now')
+
   def Uninstall(self, package_name):
     raise NotImplementedError('Only use for cluster boot for now')
 
@@ -1377,6 +1525,12 @@ class BaseRhelMixin(BaseLinuxMixin):
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
+    if FLAGS.gce_hpc_tools:
+      self.InstallGcpHpcTools()
+
+  def InstallGcpHpcTools(self):
+    """Installs the GCP HPC tools."""
+    self.Install('gce_hpc_tools')
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
@@ -1635,6 +1789,7 @@ class BaseDebianMixin(BaseLinuxMixin):
       package.AptUninstall(self)
     elif hasattr(package, 'Uninstall'):
       package.Uninstall(self)
+    self._installed_packages.discard(package_name)
 
   def GetPathToConfig(self, package_name):
     """Returns the path to the config file for PerfKit packages.
@@ -2254,7 +2409,7 @@ class JujuMixin(BaseDebianMixin):
 
     # Find the already-deployed machines belonging to this vm_group
     machines = []
-    for machine_id, unit in six.iteritems(self.machines):
+    for machine_id, unit in self.machines.items():
       if unit.vm_group == vm_group:
         machines.append(machine_id)
 
@@ -2326,3 +2481,8 @@ class JujuMixin(BaseDebianMixin):
       for unit in self.units:
         unit.controller = self
         self.JujuAddMachine(unit)
+
+
+class BaseLinuxVirtualMachine(BaseLinuxMixin,
+                              virtual_machine.BaseVirtualMachine):
+  """Linux VM for use with pytyping."""

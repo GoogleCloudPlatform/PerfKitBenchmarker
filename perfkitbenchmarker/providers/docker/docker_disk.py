@@ -15,10 +15,9 @@
 """Module containing classes related to Docker disks."""
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

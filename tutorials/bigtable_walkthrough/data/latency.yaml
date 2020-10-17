@@ -1,0 +1,38 @@
+# Bigtable latency benchmark PKB configuration
+# Use the --ycsb_workload_files arg to provide a workload when running
+benchmarks:
+  - cloud_bigtable_ycsb:
+      flags:
+        # Skip the load stage, which is done using load.yaml
+        ycsb_skip_load_stage: True
+
+        # Provisioning: 3 GCE VM clients
+        zones: us-central1-b
+        num_vms: 3
+        machine_type: n1-highcpu-16
+        gce_network_name: default
+
+        # Point to the existing 3-node Bigtable cluster
+        google_bigtable_instance_name: pkb-benchmarks
+        google_bigtable_static_table_name: test_data
+
+        # Run Phase: Run for 30min by setting very high operation_count
+        ycsb_timelimit: 1800 # 30 minutes
+        ycsb_operation_count: 100000000 # Very high
+        # One thread per core to minimize latency
+        ycsb_threads_per_client: "16"
+        ycsb_run_parameters: requestdistribution=zipfian,dataintegrity=true
+
+        # Data size: 1 column per row, row size 1KB, 100GB total size
+        ycsb_field_count: 1
+        ycsb_field_length: 1000
+        ycsb_record_count: 100000000
+
+        # Workload file commented out so users can provide their own
+        # ycsb_workload_files=workloada
+
+        # Lock environment to a particular version
+        hbase_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hbase-1.4.7-bin.tar.gz
+        ycsb_version: 0.17.0
+
+        ycsb_measurement_type: hdrhistogram

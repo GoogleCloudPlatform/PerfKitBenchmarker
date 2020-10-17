@@ -14,8 +14,8 @@
 
 """Run psping between two VMs."""
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.windows_packages import psping

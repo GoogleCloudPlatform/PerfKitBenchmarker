@@ -29,12 +29,11 @@ from __future__ import print_function
 import json
 import logging
 import threading
-
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils

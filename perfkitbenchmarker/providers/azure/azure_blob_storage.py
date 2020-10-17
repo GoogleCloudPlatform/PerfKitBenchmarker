@@ -15,8 +15,10 @@
 """Contains classes/functions related to Azure Blob Storage."""
 
 import datetime
+import json
+import logging
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
@@ -35,6 +37,10 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   Relevant documentation:
   http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
   """
+
+  def __init__(self):
+    self.storage_account = None
+    self.resource_group = None
 
   STORAGE_NAME = providers.AZURE
 
@@ -111,8 +117,10 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     self.storage_account.Create()
 
   def CleanupService(self):
-    self.storage_account.Delete()
-    self.resource_group.Delete()
+    if hasattr(self, 'storage_account') and self.storage_account:
+      self.storage_account.Delete()
+    if hasattr(self, 'resource_group') and self.resource_group:
+      self.resource_group.Delete()
 
   def MakeBucket(self, bucket, raise_on_failure=True):
     _, stderr, ret_code = vm_util.IssueCommand(
@@ -123,6 +131,11 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
       raise errors.Benchmarks.BucketCreationError(stderr)
 
   def DeleteBucket(self, bucket):
+    if not hasattr(self, 'storage_account') or not self.storage_account:
+      logging.warning(
+          'storage_account not configured. Skipping DeleteBucket %s', bucket)
+      return
+
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'storage', 'container', 'delete', '--name', bucket] +
         self.storage_account.connection_args,
@@ -168,9 +181,33 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     return 'wget -O {dst_url} "{src_url}"'.format(src_url=src_url,
                                                   dst_url=dst_url)
 
-  def List(self, buckets):
+  def List(self, bucket):
     """See base class."""
-    raise NotImplementedError()
+    stdout, _, _ = vm_util.IssueCommand([
+        'az', 'storage', 'blob', 'list', '--container-name', bucket,
+        '--account-name', self.storage_account.name
+    ])
+    return [metadata['name'] for metadata in json.loads(str(stdout))]
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Each listed item is a full file name, eg. "supplier/supplier.csv", so just
+    the high level folder name is extracted, and repetitions are eliminated for
+    when there's multiple files in a folder.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    unique_folders = set([
+        obj.split('/')[0].strip()
+        for obj in self.List(bucket)
+        if obj and obj.contains('/')
+    ])
+    return list(unique_folders)
 
   def EmptyBucket(self, bucket):
     # Emptying buckets on Azure is hard. We pass for now - this will

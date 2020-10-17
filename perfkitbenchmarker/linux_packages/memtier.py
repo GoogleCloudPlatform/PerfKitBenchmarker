@@ -20,17 +20,18 @@ from __future__ import division
 from __future__ import print_function
 
 import json
+import logging
 import re
-from perfkitbenchmarker import flags
+from absl import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.15'
 LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
 LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
-LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % INSTALL_DIR
-MEMTIER_DIR = '%s/memtier_benchmark' % INSTALL_DIR
+LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % linux_packages.INSTALL_DIR
+MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = ('autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev')
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
@@ -47,14 +48,23 @@ flags.DEFINE_enum('memtier_protocol', 'memcache_binary',
 flags.DEFINE_integer('memtier_run_count', 1,
                      'Number of full-test iterations to perform. '
                      'Defaults to 1.')
+flags.DEFINE_integer('memtier_run_duration', None,
+                     'Duration for each client count in seconds. '
+                     'By default, test length is set '
+                     'by memtier_requests, the number of requests sent by each '
+                     'client. By specifying run_duration, key space remains '
+                     'the same (from 1 to memtier_requests), but test stops '
+                     'once run_duration is passed. '
+                     'Total test duration = run_duration * runs * '
+                     'len(memtier_clients).')
 flags.DEFINE_integer('memtier_requests', 10000,
                      'Number of total requests per client. Defaults to 10000.')
 flags.DEFINE_list('memtier_clients', [50],
                   'Comma separated list of number of clients per thread. '
                   'Specify more than 1 value to vary the number of clients. '
                   'Defaults to [50].')
-flags.DEFINE_integer('memtier_threads', 4,
-                     'Number of threads. Defaults to 4.')
+flags.DEFINE_list('memtier_threads', [4],
+                  'Number of threads. Defaults to 4.')
 flags.DEFINE_integer('memtier_ratio', 9,
                      'Set:Get ratio. Defaults to 9x Get versus Sets (9 Gets to '
                      '1 Set in 10 total requests).')
@@ -63,9 +73,9 @@ flags.DEFINE_integer('memtier_data_size', 32,
 flags.DEFINE_string('memtier_key_pattern', 'R:R',
                     'Set:Get key pattern. G for Gaussian distribution, R for '
                     'uniform Random, S for Sequential. Defaults to R:R.')
-flags.DEFINE_integer('memtier_pipeline', 1,
-                     'Number of pipelines to use for memtier. Defaults to 1, '
-                     'i.e. no pipelining.')
+flags.DEFINE_list('memtier_pipeline', [1],
+                  'Number of pipelines to use for memtier. Defaults to 1, '
+                  'i.e. no pipelining.')
 
 
 def YumInstall(vm):
@@ -73,8 +83,9 @@ def YumInstall(vm):
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
   vm.Install('wget')
-  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, INSTALL_DIR))
-  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(INSTALL_DIR,
+  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL,
+                                            linux_packages.INSTALL_DIR))
+  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(linux_packages.INSTALL_DIR,
                                                    LIBEVENT_TAR))
   vm.RemoteCommand('cd {0} && ./configure && sudo make install'.format(
       LIBEVENT_DIR))
@@ -112,79 +123,89 @@ def AptUninstall(vm):
 
 def Load(client_vm, server_ip, server_port):
   """Preload the server with data."""
-  client_vm.RemoteCommand(
-      'memtier_benchmark '
-      '-s {server_ip} '
-      '-p {server_port} '
-      '-P {protocol} '
-      '--clients 1 '
-      '--threads 1 '
-      '--ratio 1:0 '
-      '--data-size {data_size} '
-      '--pipeline 100 '
-      '--key-minimum 1 '
-      '--key-maximum {requests} '
-      '-n allkeys '.format(
-          server_ip=server_ip,
-          server_port=server_port,
-          protocol=FLAGS.memtier_protocol,
-          data_size=FLAGS.memtier_data_size,
-          requests=FLAGS.memtier_requests))
+  cmd = [
+      'memtier_benchmark',
+      '-s', server_ip,
+      '-p', str(server_port),
+      '-P', FLAGS.memtier_protocol,
+      '--clients', '1',
+      '--threads', '1',
+      '--ratio', '1:0',
+      '--data-size', str(FLAGS.memtier_data_size),
+      '--pipeline', '100',
+      '--key-minimum', '1',
+      '--key-maximum', str(FLAGS.memtier_requests),
+      '-n', 'allkeys']
+  client_vm.RemoteCommand(' '.join(cmd))
 
 
-def Run(vm, server_ip, server_port):
+def RunOverAllThreadsAndPipelines(client_vm, server_ip, server_port):
+  """Runs memtier over all pipeline and thread combinations."""
+  samples = []
+  for pipeline in FLAGS.memtier_pipeline:
+    for client_thread in FLAGS.memtier_threads:
+      logging.info(
+          'Start benchmarking memcached using memtier:\n'
+          '\tmemtier threads: %s'
+          '\tmemtier pipeline, %s',
+          client_thread, pipeline)
+      tmp_samples = Run(
+          client_vm, server_ip, server_port,
+          client_thread, pipeline)
+      samples.extend(tmp_samples)
+  return samples
+
+
+def Run(vm, server_ip, server_port, threads, pipeline):
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
   samples = []
 
   for client_count in FLAGS.memtier_clients:
     vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
-    vm.RemoteCommand(
-        'memtier_benchmark '
-        '-s {server_ip} '
-        '-p {server_port} '
-        '-P {protocol} '
-        '--run-count {run_count} '
-        '--requests {requests} '
-        '--clients {clients} '
-        '--threads {threads} '
-        '--ratio {ratio} '
-        '--data-size {data_size} '
-        '--key-pattern {key_pattern} '
-        '--pipeline {pipeline} '
-        '--key-minimum 1 '
-        '--key-maximum {requests} '
-        '--random-data > {output_file}'.format(
-            server_ip=server_ip,
-            server_port=server_port,
-            protocol=FLAGS.memtier_protocol,
-            run_count=FLAGS.memtier_run_count,
-            requests=FLAGS.memtier_requests,
-            clients=client_count,
-            threads=FLAGS.memtier_threads,
-            ratio=memtier_ratio,
-            data_size=FLAGS.memtier_data_size,
-            key_pattern=FLAGS.memtier_key_pattern,
-            pipeline=FLAGS.memtier_pipeline,
-            output_file=MEMTIER_RESULTS))
+    cmd = [
+        'memtier_benchmark',
+        '-s', server_ip,
+        '-p', str(server_port),
+        '-P', FLAGS.memtier_protocol,
+        '--run-count', str(FLAGS.memtier_run_count),
+        '--clients', str(client_count),
+        '--threads', str(threads),
+        '--ratio', memtier_ratio,
+        '--data-size', str(FLAGS.memtier_data_size),
+        '--key-pattern', FLAGS.memtier_key_pattern,
+        '--pipeline', str(pipeline),
+        '--key-minimum', '1',
+        '--key-maximum', str(FLAGS.memtier_requests),
+        '--random-data']
+    if FLAGS.memtier_run_duration:
+      cmd.extend(['--test-time', str(FLAGS.memtier_run_duration)])
+    else:
+      cmd.extend(['--requests', str(FLAGS.memtier_requests)])
+    cmd.extend(['>', MEMTIER_RESULTS])
+    vm.RemoteCommand(' '.join(cmd))
 
     results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
-    metadata = GetMetadata()
+    metadata = GetMetadata(threads, pipeline)
     metadata['memtier_clients'] = client_count
     samples.extend(ParseResults(results, metadata))
 
   return samples
 
 
-def GetMetadata():
+def GetMetadata(threads, pipeline):
+  """Metadata for memtier test."""
   meta = {'memtier_protocol': FLAGS.memtier_protocol,
           'memtier_run_count': FLAGS.memtier_run_count,
           'memtier_requests': FLAGS.memtier_requests,
-          'memtier_threads': FLAGS.memtier_threads,
+          'memtier_threads': threads,
           'memtier_ratio': FLAGS.memtier_ratio,
           'memtier_data_size': FLAGS.memtier_data_size,
           'memtier_key_pattern': FLAGS.memtier_key_pattern,
+          'memtier_pipeline': pipeline,
           'memtier_version': GIT_TAG}
+  if FLAGS.memtier_run_duration:
+    meta['memtier_run_duration'] = FLAGS.memtier_run_duration
   return meta
 
 

@@ -16,7 +16,7 @@
 """Module containing mysql installation and cleanup functions."""
 
 import posixpath
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 MYSQL_RPM = 'mysql56-community-release-el6-5.noarch.rpm'
 MYSQL_PSWD = 'perfkitbenchmarker'
@@ -34,10 +34,10 @@ PACKAGE_DATA_URL = {
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
   vm.RemoteCommand('sudo setenforce 0')
-  vm.InstallPreprovisionedPackageData(
-      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR)
-  vm.RemoteCommand(
-      'sudo rpm -ivh --force %s' % posixpath.join(INSTALL_DIR, MYSQL_RPM))
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
+                                      linux_packages.INSTALL_DIR)
+  vm.RemoteCommand('sudo rpm -ivh --force %s' %
+                   posixpath.join(linux_packages.INSTALL_DIR, MYSQL_RPM))
   vm.InstallPackages('mysql-server')
   vm.RemoteCommand('sudo service mysqld start')
   vm.RemoteCommand('/usr/bin/mysqladmin -u root password "%s"' % MYSQL_PSWD)

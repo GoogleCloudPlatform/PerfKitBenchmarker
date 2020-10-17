@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing flags applicable across benchmark run on AWS."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.providers.aws import util
 
 flags.DEFINE_string(
@@ -31,11 +31,6 @@ flags.DEFINE_string('aws_emr_loguri', None,
                     'cluster.  If not set, a bucket will be created.')
 flags.DEFINE_integer('aws_emr_job_wait_time', 18000,
                      'The time to wait for an EMR job to finish, in seconds')
-
-flags.DEFINE_string('s3_custom_endpoint', None,
-                    'If given, a custom endpoint to use for S3 transfers. If '
-                    'this flag is not given, use the standard endpoint for the '
-                    'storage region.')
 flags.DEFINE_boolean('aws_spot_instances', False,
                      'Whether to use AWS spot instances for any AWS VMs.')
 flags.DEFINE_float('aws_spot_price', None,
@@ -89,6 +84,14 @@ flags.DEFINE_boolean('provision_athena', False,
                      'Whether to provision the Athena database.')
 flags.DEFINE_boolean('teardown_athena', True,
                      'Whether to teardown the Athena database.')
-flags.DEFINE_string('athena_output_location', None,
-                    'Athena Query Output Location.')
+flags.DEFINE_string(
+    'athena_output_location_prefix', 'athena-cli-results',
+    'Prefix of the S3 bucket name for Athena Query Output. Suffix will be the '
+    'region and the run URI, and the bucket will be dynamically created and '
+    'deleted during the test.')
 flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
+flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI'],
+                  'The Runtime Interface used when interacting with Redshift.')
+flags.DEFINE_enum('athena_client_interface', 'CLI', ['CLI'],
+                  'The Runtime Interface used when interacting with Athena.')
+flags.DEFINE_string('athena_query_timeout', '600', 'Query timeout in seconds.')

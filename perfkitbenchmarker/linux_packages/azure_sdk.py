@@ -14,7 +14,7 @@
 
 """Package for installing the Azure SDK."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 flags.DEFINE_string('azure_lib_version', '1.0.3',
                     'Use a particular version of azure client lib, e.g.: 1.0.2')
@@ -24,9 +24,10 @@ FLAGS = flags.FLAGS
 def Install(vm):
   """Installs the azure-cli package on the VM."""
   vm.InstallPackages('python-dev')
+  vm.InstallPackages('python3-pip')
 
   if FLAGS.azure_lib_version:
     version_string = '==' + FLAGS.azure_lib_version
   else:
     version_string = ''
-  vm.RemoteCommand('sudo pip install azure%s' % version_string)
+  vm.RemoteCommand('sudo pip3 install azure%s' % version_string)

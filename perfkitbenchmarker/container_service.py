@@ -25,11 +25,11 @@ import collections
 import itertools
 import os
 import time
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
@@ -430,7 +430,8 @@ class BaseContainerCluster(resource.BaseResource):
         'cluster_type': self.CLUSTER_TYPE,
         'zone': self.zone,
         'size': self.num_nodes,
-    } or self.vm_config.GetResourceMetadata()
+        'machine_type': self.vm_config.machine_type,
+    }
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       metadata.update({

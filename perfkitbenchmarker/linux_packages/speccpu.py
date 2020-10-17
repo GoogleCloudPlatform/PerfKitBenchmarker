@@ -15,15 +15,16 @@
 """Module to install, uninstall, and parse results for SPEC CPU 2006 and 2017.
 """
 
+import hashlib
 import itertools
 import logging
 import os
 import posixpath
 import re
-
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.linux_packages import build_tools
@@ -125,6 +126,10 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
   if not examine_members:
     return
 
+  # Copy the cfg to the VM.
+  local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
+  vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
+
   scratch_dir = vm.GetScratchDir()
   cfg_member = '{0}/config/{1}'.format(speccpu_vm_state.base_spec_dir,
                                        runspec_config)
@@ -148,12 +153,13 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
             members=os.linesep.join(sorted(missing_members))))
 
 
-def _CheckIsoAndCfgFile(runspec_config, spec_iso):
+def _CheckIsoAndCfgFile(runspec_config, spec_iso, clang_flag):
   """Searches for the iso file and cfg file.
 
   Args:
     runspec_config: String. Name of the config file to provide to runspec.
     spec_iso: String. Location of spec iso file.
+    clang_flag: String. Location of the clang flag file.
 
   Raises:
     data.ResourcePath: If one of the required files could not be found.
@@ -183,6 +189,32 @@ def _CheckIsoAndCfgFile(runspec_config, spec_iso):
         'more about config files.', runspec_config)
     raise
 
+  if not clang_flag:  # 2017 ISO does not contain clang.xml
+    return
+
+  # Search for the flag.
+  try:
+    data.ResourcePath(clang_flag)
+  except data.ResourceNotFound:
+    logging.error(
+        '%s not found. To run the speccpu benchmark, the clang.xml file '
+        'must be in the perfkitbenchmarker/data directory (or one of the '
+        'specified data directories if the --data_search_paths flag is '
+        'used). Visit https://www.spec.org/cpu2017/docs/flag-description.html '
+        'to learn more about flag files.', clang_flag)
+    raise
+
+
+def _GenerateMd5sum(file_name):
+  """Generates md5sum from file_name."""
+  # https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file
+  hash_md5 = hashlib.md5()
+  file_name_path = data.ResourcePath(file_name)
+  with open(file_name_path, 'rb') as f:
+    for chunk in iter(lambda: f.read(4096), b''):
+      hash_md5.update(chunk)
+  return hash_md5.hexdigest()
+
 
 class SpecInstallConfigurations(object):
   """Configs for SPEC CPU run that must be preserved between PKB stages.
@@ -211,6 +243,9 @@ class SpecInstallConfigurations(object):
     required_members: List. File components that must exist for spec to run.
     log_format: String. Logging format of this spec run.
     runspec_config: String. Name of the config file to run with.
+    base_clang_flag_file_path: Optional String. Basename of clang flag file.
+    clang_flag_file_path: Optional String. Path of clang flag file on the
+        remote machine.
   """
 
   def __init__(self):
@@ -227,6 +262,8 @@ class SpecInstallConfigurations(object):
     self.required_members = None
     self.log_format = None
     self.runspec_config = None
+    self.base_clang_flag_file_path = None
+    self.clang_flag_file_path = None
 
   def UpdateConfig(self, scratch_dir):
     """Updates the configuration after other attributes have been set.
@@ -241,6 +278,10 @@ class SpecInstallConfigurations(object):
       self.iso_file_path = posixpath.join(scratch_dir, self.base_iso_file_path)
     if self.base_mount_dir:
       self.mount_dir = posixpath.join(scratch_dir, self.base_mount_dir)
+    if self.base_clang_flag_file_path:
+      self.clang_flag_file_path = posixpath.join(
+          self.spec_dir, 'config', 'flags',
+          os.path.basename(self.base_clang_flag_file_path))
 
 
 def InstallSPECCPU(vm, speccpu_vm_state):
@@ -261,7 +302,8 @@ def InstallSPECCPU(vm, speccpu_vm_state):
                   speccpu_vm_state)
   except errors.Setup.BadPreprovisionedDataError:
     _CheckIsoAndCfgFile(speccpu_vm_state.runspec_config,
-                        speccpu_vm_state.base_iso_file_path)
+                        speccpu_vm_state.base_iso_file_path,
+                        speccpu_vm_state.base_clang_flag_file_path)
     _PrepareWithIsoFile(vm, speccpu_vm_state)
   vm.Install('speccpu')
 
@@ -277,7 +319,9 @@ def Install(vm):
   # user is smart
   if FLAGS.runspec_build_tool_version:
     build_tool_version = FLAGS.runspec_build_tool_version or '4.7'
-    build_tools.Reinstall(vm, version=build_tool_version)
+    if not (vm.OS_TYPE == os_types.DEBIAN9 and build_tool_version == '6'):
+      # debian9 already comes with version 6
+      build_tools.Reinstall(vm, version=build_tool_version)
   if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')
   vm.Install('numactl')
@@ -324,6 +368,14 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
       speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir))
   vm.RemoteCommand('cp -r {0}/* {1}'.format(speccpu_vm_state.mount_dir,
                                             speccpu_vm_state.spec_dir))
+
+  # cpu2017 iso does not come with config directory nor clang.xml
+  if speccpu_vm_state.clang_flag_file_path:
+    vm.RemoteCommand('mkdir -p {0}'.format(
+        os.path.dirname(speccpu_vm_state.clang_flag_file_path)))
+    vm.PushFile(data.ResourcePath(speccpu_vm_state.base_clang_flag_file_path),
+                speccpu_vm_state.clang_flag_file_path)
+
   vm.RemoteCommand('chmod -R 777 {0}'.format(speccpu_vm_state.spec_dir))
 
   # Copy the cfg to the VM.
@@ -433,6 +485,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
 
   metadata = {
       'runspec_config': speccpu_vm_state.runspec_config,
+      'runspec_config_md5sum': _GenerateMd5sum(speccpu_vm_state.runspec_config),
       'runspec_iterations': str(FLAGS.runspec_iterations),
       'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
       'runspec_define': FLAGS.runspec_define,
@@ -441,7 +494,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec17_copies': FLAGS.spec17_copies,
       'spec17_threads': FLAGS.spec17_threads,
       'spec17_fdo': FLAGS.spec17_fdo,
-      'spec17_subset': FLAGS.spec17_subset
+      'spec17_subset': FLAGS.spec17_subset,
+      'gcc_version': build_tools.GetVersion(vm, 'gcc')
   }
 
   missing_results = []
@@ -550,7 +604,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     version_specific_parameters: List. List of parameters for specific versions.
 
   Returns:
-    A list of sample.Sample objects.
+    A Tuple of (stdout, stderr) the run output.
   """
   speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   runspec_flags = [
@@ -569,9 +623,9 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
       cmd=cmd, flags=fl, subset=benchmark_subset)
 
   cmd = ' && '.join((
-      'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
-      '. ./shrc', 'rm -rf result', runspec_cmd))
-  vm.RobustRemoteCommand(cmd)
+      'cd {0}'.format(speccpu_vm_state.spec_dir), 'rm -rf result', '. ./shrc',
+      '. ./shrc', runspec_cmd))
+  return vm.RobustRemoteCommand(cmd)
 
 
 def Uninstall(vm):

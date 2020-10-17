@@ -50,9 +50,8 @@ import datetime
 import logging
 import os
 import tempfile
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
 

@@ -14,12 +14,12 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
@@ -28,7 +28,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 
 
@@ -120,9 +119,6 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     super(_BenchmarkSpecTestCase, self).setUp()
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
-    p = mock.patch(util.__name__ + '.GetDefaultProject')
-    p.start()
-    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):

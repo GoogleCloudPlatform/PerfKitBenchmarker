@@ -14,9 +14,8 @@
 """Module containing classes related to Swift Storage Service."""
 
 import os
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers

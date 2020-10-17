@@ -6,4 +6,11 @@
         <name>dfs.namenode.datanode.registration.ip-hostname-check</name>
         <value>false</value>
     </property>
+  <property>
+    <name>dfs.block.size</name>
+    <!-- 128 MB -->
+    <value>134217728</value>
+  </property>
+  <!-- TODO(pclay): consider dfs.client.read.shortcircuit (requires native libs) -->
+  <!-- https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/ShortCircuitLocalReads.html -->
 </configuration>

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Runs Coremark."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 from perfkitbenchmarker.linux_benchmarks import coremark_benchmark
 
@@ -28,6 +28,7 @@ def Prepare(benchmark_spec):
   """Installs coremark on the target VM under Cygwin."""
   vm = benchmark_spec.vms[0]
   vm.InstallCygwin(packages=['wget', 'gcc-core', 'tar', 'make'])
+  vm.Install('coremark')
   coremark_benchmark.PrepareCoremark(vm.RemoteCommandCygwin)
 
 

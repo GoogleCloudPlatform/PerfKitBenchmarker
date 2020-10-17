@@ -9,14 +9,14 @@ import json
 import unittest
 import uuid
 from absl import flags
+from absl.testing import parameterized
 import mock
-
-from parameterized import parameterized
 
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
 CLOUD = providers.AWS
@@ -59,7 +59,8 @@ EXISTS_CALL = AwsCommand(
     suppress_failure=None)
 CREATE_CALL = AwsCommand('create-placement-group',
                          '--group-name={}'.format(GROUP_NAME),
-                         '--strategy={}'.format(STRATEGY))
+                         '--strategy={}'.format(STRATEGY),
+                         '--tag-specifications=foobar')
 DELETE_CALL = AwsCommand(
     'delete-placement-group',
     '--group-name={}'.format(GROUP_NAME),
@@ -87,12 +88,10 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AwsPlacementGroupTest, self).setUp()
-    self.mock_cmd = mock.patch.object(vm_util, 'IssueCommand').start()
-    mock.patch.object(uuid, 'uuid4').start().return_value = UUID
-
-  def tearDown(self):
-    super(AwsPlacementGroupTest, self).tearDown()
-    mock.patch.stopall()
+    self.mock_cmd = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand'))
+    uuid_call = self.enter_context(mock.patch.object(uuid, 'uuid4'))
+    uuid_call.return_value = UUID
 
   def assertAwsCommands(self, *expected_calls):
     # easier to read error message when looping through individual items
@@ -109,9 +108,10 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(REGION, pg.region)
     self.assertEqual(STRATEGY, pg.strategy)
 
-  @parameterized.expand([(EXISTS_NONE_RESPONSE, False),
-                         (EXISTS_ONE_RESPONSE, True),
-                         (EXISTS_TWO_RESPONSE, None, True)])
+  @parameterized.named_parameters(
+      ('EXISTS_NONE_RESPONSE', EXISTS_NONE_RESPONSE, False),
+      ('EXISTS_ONE_RESPONSE', EXISTS_ONE_RESPONSE, True),
+      ('EXISTS_TWO_RESPONSE', EXISTS_TWO_RESPONSE, None, True))
   def testExists(self, response, exists_value, throws_exception=False):
     self.mock_cmd.side_effect = [AwsResponse(response)]
     pg = CreateAwsPlacementGroup()
@@ -122,7 +122,9 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(exists_value, pg._Exists())
     self.assertAwsCommands(EXISTS_CALL)
 
-  def testCreate(self):
+  @mock.patch.object(util, 'FormatTagSpecifications')
+  def testCreate(self, mock_cmd):
+    mock_cmd.return_value = 'foobar'
     self.mock_cmd.side_effect = [
         AwsResponse(CREATE_RESPONSE),
         AwsResponse(EXISTS_ONE_RESPONSE),

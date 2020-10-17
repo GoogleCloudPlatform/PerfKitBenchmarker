@@ -16,6 +16,7 @@
 
 import abc
 import unittest
+from absl import flags
 from absl.testing import flagsaver
 import mock
 
@@ -23,7 +24,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -72,7 +72,8 @@ class ScratchDiskTestMixin(object):
     self.patches.append(
         mock.patch(vm_prefix + '.MountDisk'))
     self.patches.append(
-        mock.patch(util.__name__ + '.GetDefaultProject'))
+        mock.patch(
+            util.__name__ + '.GetDefaultProject', side_effect='test_project'))
 
     # Patch subprocess.Popen to make sure we don't issue any commands to spin up
     # resources.

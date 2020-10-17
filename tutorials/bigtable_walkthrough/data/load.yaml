@@ -1,0 +1,28 @@
+# PKB Configuration to load data into a Bigtable instance for running benchmarks
+# Use the latency.yaml and throughput.yaml files in this directory
+# to run benchmarks against this instance.
+benchmarks:
+  - cloud_bigtable_ycsb:
+      flags:
+        ycsb_skip_run_stage: True
+
+        # Point to the existing 3-node Bigtable cluster
+        google_bigtable_instance_name: pkb-benchmarks
+        google_bigtable_static_table_name: test_data
+
+        # Provisioning: 3 GCE VM clients to load data
+        zones: us-central1-b
+        num_vms: 3
+        machine_type: n1-highcpu-16
+        gce_network_name: default
+
+        # Data size: 1 column per row, row size 1KB, 100GB total size
+        ycsb_field_count: 1
+        ycsb_field_length: 1000
+        ycsb_record_count: 100000000
+
+        ycsb_preload_threads: "320"
+
+        # Lock environment to a particular version
+        hbase_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hbase-1.4.7-bin.tar.gz
+        ycsb_version: 0.17.0

@@ -18,10 +18,9 @@ Clusters can be created and deleted.
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -35,8 +34,8 @@ GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
                        'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('dpb_emr_release_label', 'emr-5.23.0',
-                    'The emr version to use for the cluster.')
+flags.DEFINE_string('dpb_emr_release_label', None,
+                    'DEPRECATED use dpb_service.version.')
 
 SPARK_SAMPLE_LOCATION = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
 
@@ -128,7 +127,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
     self.bucket_to_delete = None
-    self.dpb_version = FLAGS.dpb_emr_release_label
+    self.dpb_version = FLAGS.dpb_emr_release_label or self.dpb_version
+    if not self.dpb_version:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service.version must be provided.')
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -308,9 +310,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     Args:
       step_id: The step id to query.
+
     Returns:
       A dictionary describing the step if the step the step is complete,
           None otherwise.
+
+    Raises:
+      JobSubmissionError if job fails.
     """
 
     cmd = self.cmd_prefix + ['emr', 'describe-step', '--cluster-id',
@@ -318,7 +324,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
-    if state == 'COMPLETED' or state == 'FAILED':
+    if state == 'FAILED':
+      raise dpb_service.JobSubmissionError()
+    if state == 'COMPLETED':
       return result
     else:
       return None
@@ -333,7 +341,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_files=None,
                 job_jars=None,
                 job_stdout_file=None,
-                job_type=None):
+                job_type=None,
+                properties=None):
     """See base class."""
     @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=job_poll_interval, fuzz=0)
@@ -343,22 +352,33 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
+    if job_arguments:
+      # Escape commas in arguments
+      job_arguments = (arg.replace(',', '\\,') for arg in job_arguments)
+
+    all_properties = self.GetJobProperties()
+    all_properties.update(properties or {})
+
     if job_type == 'hadoop':
       step_type_spec = 'Type=CUSTOM_JAR'
       jar_spec = 'Jar=' + jarfile
-
-      # How will we handle a class name ????
-      step_list = [step_type_spec, jar_spec]
-
+      arg_list = []
+      # Order is important
+      if classname:
+        arg_list += [classname]
+      arg_list += ['-D{}={}'.format(k, v) for k, v in all_properties.items()]
       if job_arguments:
-        arg_spec = '[' + ','.join(job_arguments) + ']'
-        step_list.append('Args=' + arg_spec)
+        arg_list += job_arguments
+      arg_spec = 'Args=[' + ','.join(arg_list) + ']'
+      step_list = [step_type_spec, jar_spec, arg_spec]
     elif job_type == self.SPARK_JOB_TYPE:
       arg_list = []
       if job_files:
         arg_list += ['--files', ','.join(job_files)]
       if job_jars:
         arg_list += ['--jars', ','.join(job_jars)]
+      for k, v in all_properties.items():
+        arg_list += ['--conf', '{}={}'.format(k, v)]
       # jarfile must be last before args
       arg_list += ['--class', classname, jarfile]
       if job_arguments:
@@ -372,6 +392,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         arg_list += ['--files', ','.join(job_files)]
       if job_jars:
         arg_list += ['--jars', ','.join(job_jars)]
+      for k, v in all_properties.items():
+        arg_list += ['--conf', '{}={}'.format(k, v)]
       # pyspark_file must be last before args
       arg_list += [pyspark_file]
       if job_arguments:
@@ -379,11 +401,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       arg_spec = 'Args=[{}]'.format(','.join(arg_list))
       step_list = ['Type=Spark', arg_spec]
     elif job_type == self.SPARKSQL_JOB_TYPE:
-      jar_spec = 'Jar="command-runner.jar"'
+      assert not job_arguments
       arg_list = [query_file]
-      if job_arguments:
-        arg_list += job_arguments
-      arg_spec = 'Args=[{},-f,{}]'.format(job_type, ','.join(arg_list))
+      jar_spec = 'Jar="command-runner.jar"'
+      for k, v in all_properties.items():
+        arg_list += ['--conf', '{}={}'.format(k, v)]
+      arg_spec = 'Args=[spark-sql,-f,{}]'.format(','.join(arg_list))
       step_list = [jar_spec, arg_spec]
 
     step_string = ','.join(step_list)
@@ -397,17 +420,14 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(step_cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
-    metrics = {}
 
     result = WaitForStep(step_id)
     pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
     start_time = result['Step']['Status']['Timeline']['StartDateTime']
     end_time = result['Step']['Status']['Timeline']['EndDateTime']
-    metrics[dpb_service.WAITING] = start_time - pending_time
-    metrics[dpb_service.RUNTIME] = end_time - start_time
-    step_state = result['Step']['Status']['State']
-    metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
-    return metrics
+    return dpb_service.JobResult(
+        run_time=end_time - start_time,
+        pending_time=start_time - pending_time)
 
   def SetClusterProperty(self):
     pass

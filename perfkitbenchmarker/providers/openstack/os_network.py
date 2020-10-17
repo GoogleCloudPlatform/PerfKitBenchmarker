@@ -16,12 +16,11 @@
 from collections import namedtuple
 import json
 import threading
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers.openstack import utils
 
 
 OSC_FLOATING_IP_CMD = 'floating ip'

@@ -21,11 +21,10 @@ By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Firestore.
 """
 
-import posixpath
 import logging
-
+import posixpath
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 

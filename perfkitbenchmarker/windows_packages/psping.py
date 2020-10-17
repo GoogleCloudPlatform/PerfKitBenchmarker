@@ -21,10 +21,9 @@ psping is a tool made for benchmarking Windows networking.
 
 import json
 import ntpath
-
+from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 

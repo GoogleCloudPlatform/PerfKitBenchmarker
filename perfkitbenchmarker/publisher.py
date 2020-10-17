@@ -35,9 +35,9 @@ import sys
 import time
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -288,6 +288,7 @@ class CSVPublisher(SamplePublisher):
                      'sample_uri')
 
   def __init__(self, path):
+    super().__init__()
     self._path = path
 
   def PublishSamples(self, samples):
@@ -338,6 +339,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
   """
 
   def __init__(self, stream=None):
+    super().__init__()
     self.stream = stream or sys.stdout
 
   def __repr__(self):
@@ -439,6 +441,7 @@ class LogPublisher(SamplePublisher):
   """
 
   def __init__(self, level=logging.INFO, logger=None):
+    super().__init__()
     self.level = level
     self.logger = logger or logging.getLogger()
     self._pprinter = pprint.PrettyPrinter()
@@ -473,6 +476,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
   """
 
   def __init__(self, file_path, mode='wt', collapse_labels=True):
+    super().__init__()
     self.file_path = file_path
     self.mode = mode
     self.collapse_labels = collapse_labels
@@ -509,6 +513,7 @@ class BigQueryPublisher(SamplePublisher):
 
   def __init__(self, bigquery_table, project_id=None, bq_path='bq',
                service_account=None, service_account_private_key_file=None):
+    super().__init__()
     self.bigquery_table = bigquery_table
     self.project_id = project_id
     self.bq_path = bq_path
@@ -573,6 +578,7 @@ class CloudStoragePublisher(SamplePublisher):
   """
 
   def __init__(self, bucket, gsutil_path='gsutil'):
+    super().__init__()
     self.bucket = bucket
     self.gsutil_path = gsutil_path
 
@@ -608,6 +614,7 @@ class ElasticsearchPublisher(SamplePublisher):
   """
 
   def __init__(self, es_uri=None, es_index=None, es_type=None):
+    super().__init__()
     self.es_uri = es_uri
     self.es_index = es_index.lower()
     self.es_type = es_type
@@ -741,6 +748,7 @@ class InfluxDBPublisher(SamplePublisher):
   """
 
   def __init__(self, influx_uri=None, influx_db_name=None):
+    super().__init__()
     # set to default above in flags unless changed
     self.influx_uri = influx_uri
     self.influx_db_name = influx_db_name

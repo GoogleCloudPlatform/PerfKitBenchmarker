@@ -13,24 +13,17 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import collections
+import functools
 import json
 import logging
 import re
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import six
-
-if six.PY2:
-  import functools32 as functools
-else:
-  import functools
 
 FLAGS = flags.FLAGS
 
@@ -225,7 +218,7 @@ class GcloudCommand(object):
       IssueCommandError: if command fails without Rate Limit Exceeded.
 
     """
-    if FLAGS.gcp_retry_on_rate_limited:
+    if FLAGS.retry_on_rate_limited:
       try:
         stdout, stderr, retcode = _issue_command_function(self, **kwargs)
       except errors.VmUtil.IssueCommandError as error:
@@ -273,7 +266,8 @@ class GcloudCommand(object):
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())
 
 
-_QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
+_QUOTA_EXCEEDED_REGEX = re.compile(
+    r"(Quota '.*' exceeded|Insufficient \w+ quota)")
 
 _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
@@ -287,14 +281,15 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       stderr: The stderr from a gcloud command.
       retcode: The return code from a gcloud command.
   """
-  if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
-    message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
-    logging.error(message)
-    raise errors.Benchmarks.QuotaFailure(message)
-  if retcode and _NOT_ENOUGH_RESOURCES_STDERR in stderr:
-    message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
-    logging.error(message)
-    raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+  if retcode:
+    if _QUOTA_EXCEEDED_REGEX.search(stderr):
+      message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
+      logging.error(message)
+      raise errors.Benchmarks.QuotaFailure(message)
+    if _NOT_ENOUGH_RESOURCES_STDERR in stderr:
+      message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
+      logging.error(message)
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
 
 
 def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
@@ -313,11 +308,14 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
     vm_gcloud_path: Optional path to the gcloud binary on the vm.
     benchmark: The module for retrieving the associated service account file.
   """
+  if not FLAGS.gcp_service_account:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Authentication requires the service account name to be '
+        'specified via --gcp_service_account.')
   if not FLAGS.gcp_service_account_key_file:
-    raise errors.Setup.InvalidFlagConfigurationError('Authentication requires '
-                                                     'the service account '
-                                                     'credential json to be '
-                                                     'specified.')
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Authentication requires the service account credential json to be '
+        'specified via --gcp_service_account_key_file.')
   if '/' in FLAGS.gcp_service_account_key_file:
     vm.PushFile(FLAGS.gcp_service_account_key_file, vm_util.VM_TMP_DIR)
     key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
@@ -354,7 +352,8 @@ def FormatTags(tags_dict):
   Returns:
     A string contains formatted tags
   """
-  return ','.join('{0}={1}'.format(k, v) for k, v in six.iteritems(tags_dict))
+  return ','.join(
+      '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict)))
 
 
 def GetDefaultTags(timeout_minutes=None):

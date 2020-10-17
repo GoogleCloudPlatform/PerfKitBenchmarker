@@ -16,8 +16,8 @@
 
 
 def YumInstall(vm):
-  vm.InstallPackages('php5-cli')
+  vm.InstallPackages('php-cli')
 
 
 def AptInstall(vm):
-  vm.InstallPackages('php5-cli')
+  vm.InstallPackages('php-cli')

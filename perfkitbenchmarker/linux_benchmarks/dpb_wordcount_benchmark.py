@@ -31,16 +31,15 @@ https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 import copy
 import datetime
 import tempfile
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
-from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
+from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
 
 BENCHMARK_NAME = 'dpb_wordcount_benchmark'
 

@@ -14,9 +14,8 @@
 
 """Run HammerDB in a single VM."""
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
-
 from perfkitbenchmarker.windows_packages import hammerdb
 
 FLAGS = flags.FLAGS

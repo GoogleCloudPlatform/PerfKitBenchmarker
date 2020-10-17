@@ -32,10 +32,9 @@
 
 import re
 import time
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 

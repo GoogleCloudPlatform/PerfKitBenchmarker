@@ -17,6 +17,7 @@
 import unittest
 
 from absl import flags
+from absl.testing import parameterized
 import mock
 
 from perfkitbenchmarker import linux_virtual_machine
@@ -24,44 +25,20 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
 
-# Need to provide implementations for all of the abstract methods in
-# order to instantiate linux_virtual_machine.BaseLinuxMixin.
-class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
-
-  def Install(self):
-    pass
-
-  def Uninstall(self):
-    pass
+def CreateTestLinuxVm():
+  vm_spec = pkb_common_test_case.CreateTestVmSpec()
+  return pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
 
 
-class LinuxVMResource(virtual_machine.BaseVirtualMachine,
-                      linux_virtual_machine.BaseLinuxMixin):
-
-  CLOUD = 'fake_cloud'
-  OS_TYPE = 'fake_os_type'
-  BASE_OS_TYPE = 'debian'
-
-  def __init__(self, _):
-    super(LinuxVMResource, self).__init__(virtual_machine.BaseVmSpec('test'))
-
-  def Install(self):
-    pass
-
-  def Uninstall(self):
-    pass
-
-  def _Create(self):
-    pass
-
-  def _Delete(self):
-    pass
+# /proc/cmdline on a GCP CentOS7 vm
+_CENTOS7_KERNEL_COMMAND_LINE = (
+    'BOOT_IMAGE=/boot/vmlinuz-3.10.0-1127.13.1.el7.x86_64 '
+    'root=UUID=1-2-3-4-5 ro crashkernel=auto console=ttyS0,38400n8')
 
 
 class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
@@ -76,7 +53,7 @@ class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
     """
     FLAGS['set_files'].parse(set_files)
 
-    vm = LinuxVM()
+    vm = CreateTestLinuxVm()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.SetFiles()
@@ -107,7 +84,7 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
 
   def runTest(self, sysctl, calls):
     FLAGS['sysctl'].parse(sysctl)
-    vm = LinuxVM()
+    vm = CreateTestLinuxVm()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.DoSysctls()
@@ -132,11 +109,12 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(TestDiskOperations, self).setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
-    patcher = mock.patch.object(LinuxVM, 'RemoteHostCommand')
+    patcher = mock.patch.object(pkb_common_test_case.TestLinuxVirtualMachine,
+                                'RemoteHostCommand')
     self.remote_command = patcher.start()
     self.addCleanup(patcher.stop)
     self.remote_command.side_effect = [('', None, 0), ('', None, 0)]
-    self.vm = LinuxVM()
+    self.vm = CreateTestLinuxVm()
 
   def assertRemoteHostCalled(self, *calls):
     self.assertEqual([mock.call(call) for call in calls],
@@ -178,7 +156,7 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(LogDmesgTestCase, self).setUp()
-    self.vm = LinuxVMResource(None)
+    self.vm = CreateTestLinuxVm()
 
   def testPreDeleteDoesNotCallDmesg(self):
     FLAGS.log_dmesg = False
@@ -225,7 +203,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     return '\n'.join(['%s:%s' % entry for entry in data.items()])
 
   def CreateVm(self, os_type, remote_command_text):
-    vm = LinuxVMResource(None)
+    vm = CreateTestLinuxVm()
     vm.OS_TYPE = os_type  # pylint: disable=invalid-name
     vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
     vm.RemoteCommand.return_value = remote_command_text, ''
@@ -307,7 +285,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 class TestPartitionTable(unittest.TestCase):
 
   def CreateVm(self, remote_command_text):
-    vm = LinuxVMResource(None)
+    vm = CreateTestLinuxVm()
     vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
     vm.RemoteCommand.return_value = remote_command_text, ''
     vm.name = 'pkb-test'
@@ -371,6 +349,135 @@ I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
          '/dev/sdb': 402653184000,
          '/dev/sdc': 402653184000,
          '/dev/md0': 805037932544}, results)
+
+
+class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
+  os_info = 'Ubuntu 18.04.1 LTS'
+  kernel_release = '5.3.0-1026'
+  partition_table = 'Disk /dev/sda: 1 GiB, 1073741824 bytes, 2097152 sectors'
+  lscpu_output = '\n'.join([
+      'NUMA node(s): 1',
+      'Core(s) per socket: 1',
+      'Socket(s): 1',
+  ])
+  normal_boot_responses = [
+      'cubic', 'Description: ' + os_info, kernel_release, partition_table
+  ]
+
+  def CreateVm(self, array_of_stdout):
+    vm = CreateTestLinuxVm()
+    vm.RemoteHostCommandWithReturnCode = mock.Mock(
+        side_effect=[(str(text), '') for text in array_of_stdout])
+    vm.CheckLsCpu = mock.Mock(
+        return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
+    return vm
+
+  @parameterized.named_parameters(
+      ('has_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE, True),
+      ('no_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE + ' noht nosmt nr_cpus=1',
+       False))
+  def testIsSmtEnabled(self, proc_cmdline, is_enabled):
+    vm = self.CreateVm([proc_cmdline])
+    self.assertEqual(is_enabled, vm.IsSmtEnabled())
+
+  @parameterized.named_parameters(
+      ('hasSMT_want_real', 32, 'regular', 16),
+      ('noSMT_want_real', 32, 'nosmt', 32),
+  )
+  def testNumCpusForBenchmarkNoSmt(self, vcpus, kernel_command_line,
+                                   expected_num_cpus):
+    vm = self.CreateVm([kernel_command_line, vcpus])
+    self.assertEqual(expected_num_cpus, vm.NumCpusForBenchmark(True))
+
+  def testNumCpusForBenchmarkDefaultCall(self):
+    # shows that IsSmtEnabled is not called unless new optional parameter used
+    vm = self.CreateVm([32])
+    vm.IsSmtEnabled = mock.Mock()
+    self.assertEqual(32, vm.NumCpusForBenchmark())
+    vm.IsSmtEnabled.assert_not_called()
+    self.assertEqual(32, vm.NumCpusForBenchmark(False))
+    vm.IsSmtEnabled.assert_not_called()
+
+  def testBoot(self):
+    vm = self.CreateVm(self.normal_boot_responses)
+    vm.RecordAdditionalMetadata()
+    expected_os_metadata = {
+        '/dev/sda': 1073741824,
+        'kernel_release': self.kernel_release,
+        'os_info': self.os_info,
+    }
+    self.assertEqual(expected_os_metadata, vm.os_metadata)
+
+  def testReboot(self):
+    os_info_new = 'Ubuntu 18.04.1b LTS'
+    kernel_release_new = '5.3.0-1027'
+    additional_commands = [
+        '(reboot command)',
+        '(myhostname)',
+        '(last boot time)',
+        '(create install dir)',
+        'Description: ' + os_info_new,
+        kernel_release_new,
+        '(create install dir)',
+        '(create tmp dir)',
+    ]
+    vm = self.CreateVm(self.normal_boot_responses + additional_commands)
+    vm.RecordAdditionalMetadata()
+    vm.Reboot()
+    self.assertEqual(os_info_new, vm.os_metadata['os_info'])
+    self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
+
+  def testCpuVulnerabilitiesEmpty(self):
+    self.assertEqual({}, self.CreateVm(['']).cpu_vulnerabilities.asdict)
+
+  def testCpuVulnerabilities(self):
+    # lines returned from running "grep . .../cpu/vulnerabilities/*"
+    cpu_vuln_lines = [
+        '.../itlb_multihit:KVM: Vulnerable',
+        '.../l1tf:Mitigation: PTE Inversion',
+        '.../mds:Vulnerable: Clear CPU buffers attempted, no microcode',
+        '.../meltdown:Mitigation: PTI',
+        '.../spec_store_bypass:Mitigation: Speculative Store Bypass disabled',
+        '.../spectre_v1:Mitigation: usercopy/swapgs barriers',
+        '.../spectre_v2:Mitigation: Full generic retpoline, IBPB: conditional',
+        '.../srbds:Not affected',
+        '.../tsx_async_abort:Not affected',
+        # Not actually seen, shows that falls into "unknowns"
+        '.../made_up:Unknown Entry',
+    ]
+    cpu_vuln = self.CreateVm(['\n'.join(cpu_vuln_lines)]).cpu_vulnerabilities
+    expected_mitigation = {
+        'l1tf': 'PTE Inversion',
+        'meltdown': 'PTI',
+        'spec_store_bypass': 'Speculative Store Bypass disabled',
+        'spectre_v1': 'usercopy/swapgs barriers',
+        'spectre_v2': 'Full generic retpoline, IBPB: conditional',
+    }
+    self.assertEqual(expected_mitigation, cpu_vuln.mitigations)
+    expected_vulnerability = {
+        'itlb_multihit': 'KVM',
+        'mds': 'Clear CPU buffers attempted, no microcode'
+    }
+    self.assertEqual(expected_vulnerability, cpu_vuln.vulnerabilities)
+    expected_notaffecteds = set(['srbds', 'tsx_async_abort'])
+    self.assertEqual(expected_notaffecteds, cpu_vuln.notaffecteds)
+    expected_unknowns = {'made_up': 'Unknown Entry'}
+    self.assertEqual(expected_unknowns, cpu_vuln.unknowns)
+    expected_asdict = {
+        'mitigations': 'l1tf,meltdown,spec_store_bypass,spectre_v1,spectre_v2',
+        'mitigation_l1tf': 'PTE Inversion',
+        'mitigation_meltdown': 'PTI',
+        'mitigation_spec_store_bypass': 'Speculative Store Bypass disabled',
+        'mitigation_spectre_v1': 'usercopy/swapgs barriers',
+        'mitigation_spectre_v2': 'Full generic retpoline, IBPB: conditional',
+        'notaffecteds': 'srbds,tsx_async_abort',
+        'unknown_made_up': 'Unknown Entry',
+        'unknowns': 'made_up',
+        'vulnerabilities': 'itlb_multihit,mds',
+        'vulnerability_itlb_multihit': 'KVM',
+        'vulnerability_mds': 'Clear CPU buffers attempted, no microcode',
+    }
+    self.assertEqual(expected_asdict, cpu_vuln.asdict)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-#
+# Lint as: python2, python3
 # Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +31,8 @@ status file, which blocks until the process completes.
 import fcntl
 import logging
 import optparse
-import sys
 import subprocess
+import sys
 import threading
 
 # By default, set a timeout of 100 years to mimic no timeout.

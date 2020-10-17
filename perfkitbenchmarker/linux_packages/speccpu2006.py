@@ -14,7 +14,7 @@
 
 """Module containing installation functions for SPEC CPU 2006."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS

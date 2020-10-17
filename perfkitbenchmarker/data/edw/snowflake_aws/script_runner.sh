@@ -29,7 +29,8 @@ export SNOWFLAKE_SQL_SCRIPT=$2
 
 pids=""
 
-~/bin/snowsql --connection $CONNECTION --filename $SNOWFLAKE_SQL_SCRIPT &
+# ~/bin/snowsql --connection $CONNECTION --filename $SNOWFLAKE_SQL_SCRIPT &
+java -jar snowflake-1.0-SNAPSHOT.jar $CONNECTION $SNOWFLAKE_SQL_SCRIPT 1>snowflake.out 2>snowflake.err &
 
 pid=$!
 

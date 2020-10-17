@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing MXNet CNN installation and cleanup functions."""
-from perfkitbenchmarker import flags
+from absl import flags
 FLAGS = flags.FLAGS
 MXNET_GIT = 'https://github.com/apache/incubator-mxnet.git'
 

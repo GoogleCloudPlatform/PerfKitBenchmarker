@@ -14,12 +14,12 @@
 
 import os
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 URL = 'https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.4.25.tar.gz'
 TARBALL = 'linux-4.4.25.tar.gz'
 UNTAR_DIR = 'linux-4.4.25'
-KERNEL_TARBALL = os.path.join(INSTALL_DIR, TARBALL)
+KERNEL_TARBALL = os.path.join(linux_packages.INSTALL_DIR, TARBALL)
 
 
 def _Install(vm):
@@ -27,7 +27,7 @@ def _Install(vm):
   vm.Install('wget')
   vm.InstallPackages('bc')
   vm.RemoteCommand('mkdir -p {0} && '
-                   'cd {0} && wget {1}'.format(INSTALL_DIR, URL))
+                   'cd {0} && wget {1}'.format(linux_packages.INSTALL_DIR, URL))
 
 
 def AptInstall(vm):
@@ -39,4 +39,5 @@ def YumInstall(vm):
 
 
 def Cleanup(vm):
-  vm.RemoteCommand('cd {} && rm -f {}'.format(INSTALL_DIR, TARBALL))
+  vm.RemoteCommand('cd {} && rm -f {}'.format(linux_packages.INSTALL_DIR,
+                                              TARBALL))

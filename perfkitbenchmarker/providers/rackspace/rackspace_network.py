@@ -19,11 +19,11 @@ Security group rules.
 import json
 import threading
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.rackspace import util
-from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 

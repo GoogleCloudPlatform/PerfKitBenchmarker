@@ -147,6 +147,7 @@ in this lab, you use Cloud Shell and the
 1.  Set up a virtualenv isolated Python environment within Cloud Shell.
 
     ```
+    sudo apt-get install python3-venv -y
     python3 -m venv $HOME/my_virtualenv
     ```
 
@@ -173,10 +174,9 @@ in this lab, you use Cloud Shell and the
 1.  Install PKB dependencies.
 
     ```
+    pip install --upgrade pip
     pip install -r requirements.txt
     ```
-
-    You can safely ignore any warnings about upgrading `pip`.
 
 > __Note__: these setup instructions are specific for running network
 > benchmarks. Comprehensive instructions for running other benchmarks can be
