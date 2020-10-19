@@ -92,6 +92,13 @@ flags.DEFINE_string(
 flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
 flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI'],
                   'The Runtime Interface used when interacting with Redshift.')
-flags.DEFINE_enum('athena_client_interface', 'CLI', ['CLI'],
+flags.DEFINE_enum('athena_client_interface', 'CLI', ['CLI', 'JAVA'],
                   'The Runtime Interface used when interacting with Athena.')
 flags.DEFINE_string('athena_query_timeout', '600', 'Query timeout in seconds.')
+flags.DEFINE_boolean(
+    'athena_metrics_collection', False,
+    'Should the cloud watch metrics be collected for Athena query executions.')
+flags.DEFINE_boolean(
+    'athena_workgroup_delete', True,
+    'Should the dedicated athena workgroups be deleted or kept alive for investigations.'
+)

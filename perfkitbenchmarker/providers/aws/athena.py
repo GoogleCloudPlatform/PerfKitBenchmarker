@@ -13,6 +13,7 @@
 # limitations under the License.
 """Module containing class for AWS's Athena EDW service."""
 
+import copy
 import datetime
 import json
 import logging
@@ -50,13 +51,15 @@ class AthenaQueryError(RuntimeError):
   pass
 
 
-def GetAthenaClientInterface(
-    database: str, output_bucket: str) -> edw_service.EdwClientInterface:
+def GetAthenaClientInterface(database: str, output_bucket: str,
+                             region: str) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested Athena client Interface.
 
   Args:
     database: Name of the Athena database to execute queries against.
     output_bucket: String name of the S3 bucket to store query output.
+    region: String aws region in which the database exists and client operations
+      are performed.
 
   Returns:
     A concrete Client Interface object (subclass of EdwClientInterface)
@@ -65,25 +68,100 @@ def GetAthenaClientInterface(
     RuntimeError: if an unsupported athena_client_interface is requested
   """
   if FLAGS.athena_client_interface == 'CLI':
-    return CliClientInterface(database, output_bucket)
-  raise RuntimeError('Unknown Athena Client Interface requested.')
+    return CliClientInterface(database, output_bucket, region)
+  if FLAGS.athena_client_interface == 'JAVA':
+    return JavaClientInterface(database, output_bucket, region)
+  raise RuntimeError('Unknown Athena Client Interface requested.' +
+                     FLAGS.athena_client_interface)
 
 
-class CliClientInterface(edw_service.EdwClientInterface):
-  """Command Line Client Interface class for Athena.
-
-  Uses the native Athena client available with the awscli
-  https://docs.aws.amazon.com/cli/latest/reference/athena/index.html.
+class GenericClientInterface(edw_service.EdwClientInterface):
+  """Generic Client Interface class for Athena.
 
   Attributes:
     database: String name of the Athena database to execute queries against.
     output_bucket: String name of the S3 bucket to store query output.
+    region: String aws region in which the database exists and client operations
+      are performed.
   """
 
-  def __init__(self, database: str, output_bucket: str):
-    super(CliClientInterface, self).__init__()
+  def __init__(self, database: str, output_bucket: str, region: str):
+    super(GenericClientInterface, self).__init__()
     self.database = database
     self.output_bucket = 's3://%s' % output_bucket
+    self.region = region
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {
+        'client': FLAGS.athena_client_interface,
+        'client_region': self.region
+    }
+
+
+class JavaClientInterface(GenericClientInterface):
+  """Java Client Interface class for Athena.
+  """
+
+  def Prepare(self, benchmark_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the Java Execution Environment and a uber jar with
+    a) Athena Java client libraries,
+    b) An application to execute a query and gather execution details, and
+    collect CW metrics
+    c) their dependencies.
+
+    Args:
+      benchmark_name: String name of the benchmark, to allow extraction and
+        usage of benchmark specific artifacts (certificates, etc.) during client
+        vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        benchmark_name, ['athena-java-client-1.0.jar'], '')
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, run_metadata)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      run_metadata: A dictionary of query execution attributes eg. script name
+    """
+    query_command = (
+        'java -cp athena-java-client-1.0.jar '
+        'com.google.cloud.performance.edw.Single --region {} --database {} '
+        '--output_location {} --query_file {} --query_timeout_secs {}'
+        .format(self.region, self.database, self.output_bucket, query_name,
+                FLAGS.athena_query_timeout))
+    if not FLAGS.athena_metrics_collection:
+      # execute the query in default primary workgroup
+      query_command = '{} --workgroup primary'.format(query_command)
+    query_command = '{} --collect_metrics {} --delete_workgroup {}'.format(
+        query_command, FLAGS.athena_metrics_collection,
+        FLAGS.athena_workgroup_delete)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details.update(json.loads(stdout)['details'])
+    details['query_start'] = json.loads(stdout)['query_start']
+    details['query_end'] = json.loads(stdout)['query_end']
+    performance = json.loads(stdout)['query_wall_time_in_secs']
+    return performance, details
+
+
+class CliClientInterface(GenericClientInterface):
+  """Command Line Client Interface class for Athena.
+
+  Uses the native Athena client available with the awscli
+  https://docs.aws.amazon.com/cli/latest/reference/athena/index.html.
+  """
 
   def Prepare(self, benchmark_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -140,10 +218,6 @@ class CliClientInterface(edw_service.EdwClientInterface):
           'error_details']
     run_metadata.update(self.GetMetadata())
     return execution_time, run_metadata
-
-  def GetMetadata(self) -> Dict[str, str]:
-    """Gets the Metadata attributes for the Client Interface."""
-    return {'client': FLAGS.athena_client_interface}
 
 
 def ReadScript(script_uri):
@@ -212,7 +286,8 @@ class Athena(edw_service.EdwService):
     self.output_bucket = '-'.join(
         [FLAGS.athena_output_location_prefix, self.region, FLAGS.run_uri])
     self.client_interface = GetAthenaClientInterface(self.cluster_identifier,
-                                                     self.output_bucket)
+                                                     self.output_bucket,
+                                                     self.region)
     self.s3_service = s3.S3Service()
     self.s3_service.PrepareService(self.region)
     self.s3_service.MakeBucket(self.output_bucket)
