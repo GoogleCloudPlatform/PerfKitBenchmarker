@@ -207,9 +207,9 @@ class CliClientInterface(GenericClientInterface):
     """
     stdout, _ = self.client_vm.RemoteCommand(
         'python script_driver.py --script={} --database={} --query_timeout={} '
-        '--athena_query_output_bucket={}'.format(query_name, self.database,
-                                                 FLAGS.athena_query_timeout,
-                                                 self.output_bucket))
+        '--athena_query_output_bucket={} --athena_region={}'.format(
+            query_name, self.database, FLAGS.athena_query_timeout,
+            self.output_bucket, self.region))
     script_performance = json.loads(str(stdout))
     execution_time = script_performance[query_name]['execution_time']
     run_metadata = {'script': query_name}
