@@ -20,9 +20,11 @@ See https://github.com/aerospike/act for more info.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import math
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import act
 from six.moves import range
@@ -44,6 +46,11 @@ flags.DEFINE_boolean(
     'act_stop_on_complete', True,
     'Stop the benchmark when completing current load. This can be useful '
     'deciding maximum sustained load for stress tests.')
+flags.DEFINE_boolean('act_dynamic_load', False,
+                     'Dynamically adjust act test load. We start at initial '
+                     'load from --act_load, if the underlying driver not '
+                     'able to keep up, reduce the load and retry.')
+ACT_DYNAMIC_LOAD_STEP = 0.9
 
 
 def GetConfig(user_config):
@@ -57,18 +64,49 @@ def GetConfig(user_config):
   return config
 
 
+def CheckPrerequisites(benchmark_config):
+  """Verifies that the required resources are present.
+
+  Args:
+    benchmark_config: Unused.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  del benchmark_config
+  if FLAGS.act_dynamic_load and len(FLAGS.act_load) > 1:
+    raise errors.Config.InvalidValue(
+        'Attempting to apply dynamic load while setting multiple act_load '
+        'steps.')
+
+
 def Prepare(benchmark_spec):
   """Prepares act benchmark."""
   vm = benchmark_spec.vms[0]
   vm.Install('act')
-  for load in FLAGS.act_load:
-    if FLAGS.act_parallel:
-      for i in range(FLAGS.act_reserved_partitions, len(vm.scratch_disks)):
-        act.PrepActConfig(vm, float(load), i)
-    else:
-      act.PrepActConfig(vm, float(load))
   for d in vm.scratch_disks:
     vm.RemoteCommand('sudo umount %s' % d.mount_point)
+
+
+def PrepareActConfig(vm, load):
+  """Prepare config file for act benchmark."""
+  if FLAGS.act_parallel:
+    for i in range(FLAGS.act_reserved_partitions, len(vm.scratch_disks)):
+      act.PrepActConfig(vm, float(load), i)
+  else:
+    act.PrepActConfig(vm, float(load))
+
+
+def GenerateLoad():
+  """Generate load for act test."""
+  if FLAGS.act_dynamic_load:
+    load = float(FLAGS.act_load[0])
+    while load:
+      yield load
+      load = math.floor(ACT_DYNAMIC_LOAD_STEP * load)
+  else:
+    for load in FLAGS.act_load:
+      yield load
 
 
 def Run(benchmark_spec):
@@ -77,10 +115,11 @@ def Run(benchmark_spec):
   act.RunActPrep(vm)
   samples = []
   run_samples = []
-  for load in FLAGS.act_load:
+  for load in GenerateLoad():
     def _Run(act_load, index):
       run_samples.extend(act.RunAct(vm, act_load, index))
 
+    PrepareActConfig(vm, load)
     if FLAGS.act_parallel:
       args = [((float(load), idx), {})
               for idx in range(
