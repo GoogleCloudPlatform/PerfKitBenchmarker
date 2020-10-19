@@ -22,7 +22,6 @@ from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.providers.aws import aws_network
@@ -46,9 +45,6 @@ READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
 EMR_TIMEOUT = 14400
 
-MANAGER_SG = 'EmrManagedMasterSecurityGroup'
-WORKER_SG = 'EmrManagedSlaveSecurityGroup'
-
 disk_to_hdfs_map = {
     'st1': 'HDD',
     'gp2': 'SSD'
@@ -57,40 +53,6 @@ disk_to_hdfs_map = {
 
 class EMRRetryableException(Exception):
   pass
-
-
-class AwsSecurityGroup(resource.BaseResource):
-  """Object representing a AWS Security Group.
-
-  A security group is created automatically when an Amazon EMR cluster
-  is created.  It is not deleted automatically, and the subnet and VPN
-  cannot be deleted until the security group is deleted.
-
-  Because of this, there's no _Create method, only a _Delete and an
-  _Exists method.
-  """
-
-  def __init__(self, cmd_prefix, group_id):
-    super(AwsSecurityGroup, self).__init__()
-    self.created = True
-    self.group_id = group_id
-    self.cmd_prefix = cmd_prefix
-
-  def _Delete(self):
-    cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
-                             '--group-id=' + self.group_id]
-    vm_util.IssueCommand(cmd, raise_on_failure=False)
-
-  def _Exists(self):
-    cmd = self.cmd_prefix + ['ec2', 'describe-security-groups',
-                             '--group-id=' + self.group_id]
-    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    # if the security group doesn't exist, the describe command gives an error.
-    return retcode == 0
-
-  def _Create(self):
-    if not self.created:
-      raise NotImplemented()
 
 
 class AwsDpbEmr(dpb_service.BaseDpbService):
@@ -135,6 +97,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
+
+  @property
+  def security_group_id(self):
+    """Returns the security group ID of this Cluster."""
+    return self.network.regional_network.vpc.default_security_group_id
 
   def _CreateLogBucket(self):
     """Create the s3 bucket for the EMR cluster's logs."""
@@ -210,10 +177,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              '--log-uri', logs_bucket]
 
     ec2_attributes = [
-        'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
+        'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
+        'SubnetId=' + self.network.subnet.id,
+        # Place all VMs in default security group for simplicity and speed of
+        # provisioning
+        'EmrManagedMasterSecurityGroup=' + self.security_group_id,
+        'EmrManagedSlaveSecurityGroup=' + self.security_group_id,
     ]
-    if self.network:
-      ec2_attributes.append('SubnetId=' + self.network.subnet.id)
     cmd += ['--ec2-attributes', ','.join(ec2_attributes)]
 
     stdout, _, _ = vm_util.IssueCommand(cmd)
@@ -230,39 +200,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              '{}={}'.format(key, value)]
     vm_util.IssueCommand(cmd)
 
-  def _DeleteSecurityGroups(self):
-    """Delete the security groups associated with this cluster."""
-    if self.cluster_id:
-      cmd = self.cmd_prefix + ['emr', 'describe-cluster',
-                               '--cluster-id', self.cluster_id]
-      stdout, _, _ = vm_util.IssueCommand(cmd)
-      cluster_desc = json.loads(stdout)
-      sec_object = cluster_desc['Cluster']['Ec2InstanceAttributes']
-      manager_sg = sec_object[MANAGER_SG]
-      worker_sg = sec_object[WORKER_SG]
-
-      # the manager group and the worker group reference each other, so neither
-      # can be deleted.  First we delete the references to the manager group in
-      # the worker group.  Then we delete the manager group, and then, finally
-      # the worker group.
-
-      # remove all references to the manager group from the worker group.
-      for proto, port in [('tcp', '0-65535'), ('udp', '0-65535'),
-                          ('icmp', '-1')]:
-        for group1, group2 in [(worker_sg, manager_sg),
-                               (manager_sg, worker_sg)]:
-          cmd = self.cmd_prefix + ['ec2', 'revoke-security-group-ingress',
-                                   '--group-id=' + group1,
-                                   '--source-group=' + group2,
-                                   '--protocol=' + proto,
-                                   '--port=' + port]
-          vm_util.IssueCommand(cmd)
-
-      # Now we need to delete the manager, then the worker.
-      for group in manager_sg, worker_sg:
-        sec_group = AwsSecurityGroup(self.cmd_prefix, group)
-        sec_group.Delete()
-
   def _Delete(self):
     if self.cluster_id:
       delete_cmd = self.cmd_prefix + ['emr',
@@ -272,8 +209,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
-    if self.network:
-      self._DeleteSecurityGroups()
     self._DeleteLogBucket()
     aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
