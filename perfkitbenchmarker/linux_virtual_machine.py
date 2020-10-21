@@ -168,6 +168,8 @@ flags.DEFINE_integer(
 flags.DEFINE_boolean('gce_hpc_tools', False,
                      'Whether to apply the hpc-tools environment script.')
 
+RETRYABLE_SSH_RETCODE = 255
+
 
 class CpuVulnerabilities:
   """The 3 different vulnerablity statuses from vm.cpu_vulernabilities.
@@ -307,7 +309,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       of 'command'.
 
     Temporary SSH failures (where ssh returns a 255) while waiting for the
-    command to complete will be tolerated and safely retried.
+    command to complete will be tolerated and safely retried. However, if
+    remote command actually returns 255, SSH will return 1 instead to bypass
+    retry behavior.
 
     Args:
       command: The command to run.
@@ -950,7 +954,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
             ssh_cmd, force_info_log=should_log,
             suppress_warning=suppress_warning,
             timeout=timeout, raise_on_failure=False)
-        if retcode != 255:  # Retry on 255 because this indicates an SSH failure
+        # Retry on 255 because this indicates an SSH failure
+        if retcode != RETRYABLE_SSH_RETCODE:
           break
     finally:
       if login_shell:

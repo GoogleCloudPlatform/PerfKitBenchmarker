@@ -42,6 +42,7 @@ import time
 
 WAIT_TIMEOUT_IN_SEC = 120.0
 WAIT_SLEEP_IN_SEC = 5.0
+RETRYABLE_SSH_RETCODE = 255
 
 
 def main():
@@ -113,6 +114,12 @@ def main():
         return_code = int(return_code_str)
       else:
         print('WARNING: wrapper script interrupted.', file=sys.stderr)
+        return_code = 1
+
+      # RemoteCommand retries 255 as temporary SSH failure. In this case,
+      # long running command actually returned 255 and should not be retried.
+      if return_code == RETRYABLE_SSH_RETCODE:
+        print('WARNING: command returned 255.', file=sys.stderr)
         return_code = 1
 
       stderr_copier = threading.Thread(target=shutil.copyfileobj,
