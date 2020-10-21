@@ -20,8 +20,8 @@ import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -33,7 +33,7 @@ COMMAND_TIMEOUT = 600  # 10 minutes
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a GCP cloud redis instance."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):

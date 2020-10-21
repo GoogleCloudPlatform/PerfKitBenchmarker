@@ -18,12 +18,13 @@ See details at: https://cloud.google.com/dataflow/
 """
 
 import os
+
 from absl import flags
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 
 flags.DEFINE_string('dpb_dataflow_staging_location', None,
                     'Google Cloud Storage bucket for Dataflow to stage the '
@@ -45,7 +46,7 @@ DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   SERVICE_TYPE = 'dataflow'
 
   def __init__(self, dpb_service_spec):
