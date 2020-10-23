@@ -375,7 +375,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
-          '--exclusive', exclusive_file,
           '--delete',
       ])  # pyformat: disable
       return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
@@ -387,8 +386,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # In case the error was with the wrapper script itself, print the log.
       stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
       if stdout.strip():
-        logging.warn('Exception during RobustRemoteCommand. '
-                     'Wrapper script log:\n%s', stdout)
+        logging.warning('Exception during RobustRemoteCommand. '
+                        'Wrapper script log:\n%s', stdout)
       raise
 
   def SetupRemoteFirewall(self):
@@ -562,7 +561,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     })
 
   def DoConfigureTCPWindow(self):
-    """Change TCP window parameters in sysctl"""
+    """Change TCP window parameters in sysctl."""
 
     # Return if none of these flags are set
     if all(x is None for x in [FLAGS.tcp_max_receive_buffer,
@@ -645,7 +644,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     return self._proccpu_cache
 
   def GetOsInfo(self):
-    """Returns information regarding OS type and version"""
+    """Returns information regarding OS type and version."""
     self.Install('lsb_release')
     stdout, _ = self.RemoteCommand('lsb_release -d')
     return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
@@ -685,7 +684,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                 r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes', partition_tables)}
       except regex_util.NoMatchError:
         # TODO(user): Use alternative methods to retrieve partition table.
-        logging.warn('Partition table not found with "%s".', cmd)
+        logging.warning('Partition table not found with "%s".', cmd)
     return self._partition_table
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
