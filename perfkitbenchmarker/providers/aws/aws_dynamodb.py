@@ -221,7 +221,7 @@ class AwsDynamoDBInstance(resource.BaseResource):
     result = json.loads(stdout)
     return result['Table']['TableStatus'] == 'ACTIVE'
 
-  def Exists(self):
+  def _Exists(self):
     """Returns true if the dynamodb table exists."""
     logging.info('Checking if table %s exists', self.table_name)
     cmd = util.AWS_PREFIX + [
