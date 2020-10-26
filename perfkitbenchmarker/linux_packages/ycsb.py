@@ -159,8 +159,8 @@ flags.DEFINE_integer('ycsb_operation_count', None, 'Number of operations '
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination in seconds. '
                      'Set to 0 for unlimited time.')
-flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
-                     'Defaults to None which uses the ycsb default of 10.')
+flags.DEFINE_integer('ycsb_field_count', 10, 'Number of fields in a record. '
+                     'Defaults to 10, which is the default in ycsb v0.17.0.')
 flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
                      'to None which uses the ycsb default of 100.')
 flags.DEFINE_enum('ycsb_requestdistribution',
