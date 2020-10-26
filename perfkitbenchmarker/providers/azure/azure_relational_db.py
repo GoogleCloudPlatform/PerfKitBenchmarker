@@ -19,7 +19,6 @@ import logging
 import time
 from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -59,7 +58,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   must be the same.
 
   """
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
 
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)

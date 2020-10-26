@@ -41,7 +41,6 @@ import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -60,7 +59,7 @@ class AzureSmbService(smb_service.BaseSmbService):
   https://docs.microsoft.com/en-us/azure/storage/files/storage-files-introduction
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
   SMB_TIERS = ('Standard_LRS', 'Premium_LRS')
   # TODO(spencerkim): Add smb tier and version to metadata
   DEFAULT_SMB_VERSION = '3.0'
