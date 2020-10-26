@@ -18,11 +18,12 @@ Spark clusters can be created and deleted.
 
 import json
 import logging
+
 from absl import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
@@ -92,7 +93,7 @@ class AwsEMR(spark_service.BaseSparkService):
     terminated.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   SPARK_SAMPLE_LOCATION = '/usr/lib/spark/lib/spark-examples.jar'
   SERVICE_NAME = 'emr'
 

@@ -18,7 +18,7 @@ import json
 from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers import aws
 
 
 FLAGS = flags.FLAGS
@@ -145,7 +145,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
 
 class Snowflake(edw_service.EdwService):
   """Object representing a Snowflake Data Warehouse Instance hosted on AWS."""
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   SERVICE_TYPE = 'snowflake_aws'
 
   def __init__(self, edw_service_spec):

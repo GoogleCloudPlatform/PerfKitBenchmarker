@@ -27,9 +27,9 @@ import string
 import threading
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
@@ -228,7 +228,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in AWS.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

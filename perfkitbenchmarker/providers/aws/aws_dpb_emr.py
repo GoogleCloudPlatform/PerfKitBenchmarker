@@ -18,12 +18,12 @@ Clusters can be created and deleted.
 
 import json
 import logging
+
 from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
@@ -69,7 +69,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     dpb_version: EMR version to use.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   SERVICE_TYPE = 'emr'
   PERSISTENT_FS_PREFIX = 's3://'
 

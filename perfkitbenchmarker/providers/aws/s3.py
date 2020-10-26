@@ -15,12 +15,13 @@
 """Contains classes/functions related to S3."""
 
 import posixpath
+
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -32,7 +33,7 @@ DEFAULT_AWS_REGION = 'us-east-1'
 class S3Service(object_storage_service.ObjectStorageService):
   """Interface to Amazon S3."""
 
-  STORAGE_NAME = providers.AWS
+  STORAGE_NAME = aws.CLOUD
 
   def PrepareService(self, location):
     self.region = location or DEFAULT_AWS_REGION

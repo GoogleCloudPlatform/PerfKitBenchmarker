@@ -19,12 +19,13 @@ import os
 from perfkitbenchmarker import events
 from perfkitbenchmarker import import_util
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers import gcp
 
 
 GCP = gcp.CLOUD
 AZURE = 'Azure'
-AWS = 'AWS'
+AWS = aws.CLOUD
 ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'

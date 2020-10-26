@@ -11,16 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-"""
-AWS provider info
-"""
+"""AWS provider info."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers import aws
 
 
 class AWSProviderInfo(provider_info.BaseProviderInfo):
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD

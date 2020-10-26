@@ -19,11 +19,12 @@ from __future__ import print_function
 
 import json
 import logging
+
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 
@@ -34,7 +35,7 @@ FLAGS = flags.FLAGS
 class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a AWS Elasticache memcached instance."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   MEMORY_STORE = managed_memory_store.MEMCACHED
 
   def __init__(self, spec):
