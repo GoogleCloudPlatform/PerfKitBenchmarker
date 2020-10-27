@@ -170,7 +170,7 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
   # The samples should all have the same timestamp because they
   # come from the same fio run.
   timestamp = time.time()
-  parameter_metadata = ParseJobFile(job_file)
+  parameter_metadata = ParseJobFile(job_file) if job_file else dict()
   io_modes = list(DATA_DIRECTION.values())
 
   # clat_hist files are indexed sequentially by inner job.  If you have a job
@@ -179,8 +179,9 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
 
   for job in fio_json_result['jobs']:
     job_name = job['jobname']
-    parameters = parameter_metadata[job_name]
-    parameters['fio_job'] = job_name
+    parameters = {'fio_job': job_name}
+    if parameter_metadata:
+      parameters.update(parameter_metadata[job_name])
     if base_metadata:
       parameters.update(base_metadata)
     for mode in io_modes:
