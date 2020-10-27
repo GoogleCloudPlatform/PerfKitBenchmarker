@@ -24,7 +24,6 @@ import logging
 from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gcs
@@ -178,6 +177,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                 job_type=None,
                 properties=None):
     """See base class."""
+    assert job_type
     args = ['jobs', 'submit', job_type]
 
     if job_type == self.PYSPARK_JOB_TYPE:
@@ -188,8 +188,12 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
+    job_jars = job_jars or []
     if classname:
-      cmd.flags['jars'] = jarfile
+      if jarfile:
+        # Dataproc does not support both a main class and a main jar so just
+        # make the main jar an additional jar instead.
+        job_jars.append(jarfile)
       cmd.flags['class'] = classname
     elif jarfile:
       cmd.flags['jar'] = jarfile
@@ -264,38 +268,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """
     self.storage_service.DeleteBucket(source_bucket)
 
-  def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
-    """Method to generate data using a distributed job on the cluster."""
-    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
-    cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
-
-    job_arguments = [TESTDFSIO_PROGRAM]
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-write', '-nrFiles', str(num_files), '-fileSize',
-                          str(size_file)])
-    cmd.additional_flags = ['--'] + job_arguments
-    _, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
-    return {dpb_service.SUCCESS: retcode == 0}
-
-  def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
-    """Method to read data using a distributed job on the cluster."""
-    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
-    cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
-
-    job_arguments = [TESTDFSIO_PROGRAM]
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-read', '-nrFiles', str(num_files), '-fileSize',
-                          str(size_file)])
-    cmd.additional_flags = ['--'] + job_arguments
-    _, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
-    return {dpb_service.SUCCESS: retcode == 0}
-
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
     cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
@@ -310,25 +282,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.additional_flags = ['--'] + job_arguments
     _, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
     return {dpb_service.SUCCESS: retcode == 0}
-
-  def cleanup_data(self, base_dir, udpate_default_fs):
-    """Method to cleanup data using a distributed job on the cluster."""
-    cmd = self.DataprocGcloudCommand('jobs', 'submit', 'hadoop')
-    cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
-
-    job_arguments = [TESTDFSIO_PROGRAM]
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(base_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(base_dir))
-    job_arguments.append('-clean')
-    cmd.additional_flags = ['--'] + job_arguments
-    _, _, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
-    if retcode != 0:
-      return {dpb_service.SUCCESS: False}
-    if udpate_default_fs:
-      vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
-    return {dpb_service.SUCCESS: True}
 
   def MigrateCrossCloud(self,
                         source_location,

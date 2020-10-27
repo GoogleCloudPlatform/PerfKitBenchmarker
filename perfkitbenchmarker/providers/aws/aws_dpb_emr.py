@@ -29,9 +29,6 @@ from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
-GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
-                       'hadoop-mapreduce-client-jobclient.jar')
-
 FLAGS = flags.FLAGS
 flags.DEFINE_string('dpb_emr_release_label', None,
                     'DEPRECATED use dpb_service.version.')
@@ -260,7 +257,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
     if state == 'FAILED':
-      raise dpb_service.JobSubmissionError()
+      raise dpb_service.JobSubmissionError(
+          result['Step']['Status']['FailureDetails'])
     if state == 'COMPLETED':
       return result
     else:
@@ -279,8 +277,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_type=None,
                 properties=None):
     """See base class."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=job_poll_interval, fuzz=0)
+    @vm_util.Retry(
+        timeout=EMR_TIMEOUT,
+        poll_interval=job_poll_interval,
+        fuzz=0,
+        retryable_exceptions=(EMRRetryableException,))
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
@@ -295,17 +296,22 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     all_properties.update(properties or {})
 
     if job_type == 'hadoop':
-      step_type_spec = 'Type=CUSTOM_JAR'
-      jar_spec = 'Jar=' + jarfile
+      if not jarfile or classname:
+        raise ValueError('You must specify jarfile or classname.')
+      if jarfile and classname:
+        raise ValueError('You cannot specify both jarfile and classname.')
       arg_list = []
-      # Order is important
       if classname:
-        arg_list += [classname]
+        # EMR does not support passing classnames as jobs. Instead manually
+        # invoke `hadoop CLASSNAME` using command-runner.jar
+        jarfile = 'command-runner.jar'
+        arg_list = ['hadoop', classname]
+      # Order is important
       arg_list += ['-D{}={}'.format(k, v) for k, v in all_properties.items()]
       if job_arguments:
         arg_list += job_arguments
       arg_spec = 'Args=[' + ','.join(arg_list) + ']'
-      step_list = [step_type_spec, jar_spec, arg_spec]
+      step_list = ['Jar=' + jarfile, arg_spec]
     elif job_type == self.SPARK_JOB_TYPE:
       arg_list = []
       if job_files:
@@ -383,95 +389,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """
     self.storage_service.DeleteBucket(source_bucket)
 
-  def generate_data(self, source_dir, udpate_default_fs, num_files,
-                    size_file):
-    """Method to generate data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['TestDFSIO']
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-write', '-nrFiles', str(num_files), '-fileSize',
-                          str(size_file)])
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="TestDFSIO"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = GENERATE_HADOOP_JAR
-
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    step_state = result['Step']['Status']['State']
-    if step_state != 'COMPLETED':
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
-
-  def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
-    """Method to read data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['TestDFSIO']
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-read', '-nrFiles', str(num_files), '-fileSize',
-                          str(size_file)])
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="TestDFSIO"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = GENERATE_HADOOP_JAR
-
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    step_state = result['Step']['Status']['State']
-    if step_state != 'COMPLETED':
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
-
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
     @vm_util.Retry(timeout=EMR_TIMEOUT,
@@ -516,49 +433,3 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     step_state = result['Step']['Status']['State']
     metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
     return metrics
-
-  def cleanup_data(self, base_dir, udpate_default_fs):
-    """Method to cleanup data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['TestDFSIO']
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(base_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(base_dir))
-    job_arguments.append('-clean')
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="TestDFSIO"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = GENERATE_HADOOP_JAR
-
-    # How will we handle a class name ????
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    step_state = result['Step']['Status']['State']
-    if step_state != 'COMPLETED':
-      return {dpb_service.SUCCESS: False}
-    else:
-      rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
-      stdout, _, _ = vm_util.IssueCommand(rb_step_cmd)
-      return {dpb_service.SUCCESS: True}

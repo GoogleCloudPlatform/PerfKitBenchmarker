@@ -380,8 +380,12 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     """Submit a data processing job to the backend."""
     if job_type != self.HADOOP_JOB_TYPE:
       raise NotImplementedError
-    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'), 'jar', jarfile]
+    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop')]
     # Order is important
+    if jarfile:
+      cmd_list += ['jar', jarfile]
+    # Specifying classname only works if jarfile is omitted or if it has no
+    # main class.
     if classname:
       cmd_list += [classname]
     all_properties = self.GetJobProperties()
