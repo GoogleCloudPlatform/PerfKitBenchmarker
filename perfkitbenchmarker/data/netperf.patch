@@ -316,4 +316,26 @@ diff -u -r netperf-2.6.0/doc/examples/runemomniaggdemo.sh netperf-2.6.0-patch/do
  # UDP_RR for TPC/PPS using single-byte transactions. we do not use
  # TCP_RR any longer because any packet losses or other matters
 
-
+diff -u -r netperf-2.7.0/config.guess  netperf-2.7.0-patch/config.guess
+--- netperf-2.7.0/config.guess  2015-07-20 17:39:35.000000000 +0000
++++ netperf-2.7.0-patch/config.guess    2020-10-27 00:55:55.655438821 +0000
+@@ -814,6 +814,9 @@
+     i*86:Minix:*:*)
+        echo ${UNAME_MACHINE}-pc-minix
+        exit ;;
++    aarch64*:Linux:*:*)
++       echo ${UNAME_MACHINE}-unknown-linux-gnu
++       exit ;;
+     arm*:Linux:*:*)
+        echo ${UNAME_MACHINE}-unknown-linux-gnu
+        exit ;;
+@@ -882,6 +885,9 @@
+     ppc64:Linux:*:*)
+        echo powerpc64-unknown-linux-gnu
+        exit ;;
++    ppc64le:Linux:*:*)
++       echo powerpc64le-unknown-linux-gnu
++       exit ;;
+     alpha:Linux:*:*)
+        case `sed -n '/^cpu model/s/^.*: \(.*\)/\1/p' < /proc/cpuinfo` in
+          EV5)   UNAME_MACHINE=alphaev5 ;;

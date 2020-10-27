@@ -53,3 +53,4 @@
 -   Update files to use absl/flags.
 -   Tries alternate command to get boot time, fixing continuous checking for new
     time on rebooted system.
+-   Correctly handle ARM processors in netperf.
