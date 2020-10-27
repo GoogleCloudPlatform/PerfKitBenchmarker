@@ -728,6 +728,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     stdout, _ = self.RemoteHostCommand(
         'stat -c %z /proc/', retries=1, suppress_warning=True)
+    if stdout.startswith('1970-01-01'):
+      # Fix for ARM returning epochtime
+      date_fmt = '+%Y-%m-%d %H:%M:%S.%s %z'
+      date_cmd = "grep btime /proc/stat | awk '{print $2}'"
+      stdout, _ = self.RemoteHostCommand(f'date "{date_fmt}" -d@$({date_cmd})')
     return stdout
 
   def SnapshotPackages(self):
