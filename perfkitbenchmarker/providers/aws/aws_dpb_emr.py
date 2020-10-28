@@ -296,7 +296,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     all_properties.update(properties or {})
 
     if job_type == 'hadoop':
-      if not jarfile or classname:
+      if not (jarfile or classname):
         raise ValueError('You must specify jarfile or classname.')
       if jarfile and classname:
         raise ValueError('You cannot specify both jarfile and classname.')
