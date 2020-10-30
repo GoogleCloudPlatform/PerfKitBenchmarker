@@ -19,6 +19,7 @@ from __future__ import print_function
 import os
 import unittest
 from absl import flags
+from absl.testing import parameterized
 import mock
 
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
@@ -157,6 +158,24 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
                         '-e "s/rows/8/" '
                         '-e "s/columns/16/" hpccinf.txt')
     vm.RemoteCommand.assert_called_with(expected_command)
+
+  @parameterized.named_parameters(
+      ('nomem_set_large', 2, 32, 74, None, 124416, 8, 8),
+      ('mem_set', 2, 32, 74, 36000, 86784, 8, 8),
+      ('nomem_set', 1, 48, 48, None, 70656, 6, 8))
+  def testCreateHpccDimensions(self, num_vms, num_vcpus, memory_size_gb,
+                               flag_memory_size_mb, problem_size, num_rows,
+                               num_columns):
+    if flag_memory_size_mb:
+      FLAGS.memory_size_mb = flag_memory_size_mb
+    expected = hpcc_benchmark.HpccDimensions(
+        problem_size=problem_size,
+        block_size=hpcc_benchmark.BLOCK_SIZE,
+        num_rows=num_rows,
+        num_columns=num_columns)
+    actual = hpcc_benchmark._CalculateHpccDimensions(
+        num_vms, num_vcpus, memory_size_gb * 1000 * 1024)
+    self.assertEqual(expected, actual)
 
 
 if __name__ == '__main__':
