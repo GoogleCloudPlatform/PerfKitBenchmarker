@@ -110,7 +110,7 @@ def Run(benchmark_spec):
       execution_time, metadata = client_interface.ExecuteQuery(query)
       iteration_performance.add_query_performance(query, execution_time,
                                                   metadata)
-    benchmark_performance.add_power_iteration_performance(iteration_performance)
+    benchmark_performance.add_iteration_performance(iteration_performance)
 
   # Execution complete, generate results only if the benchmark was successful.
   benchmark_metadata = {}

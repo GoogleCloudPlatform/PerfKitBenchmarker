@@ -148,7 +148,11 @@ class EdwQueryPerformance(object):
     return self.execution_status == EdwQueryExecutionStatus.SUCCESSFUL
 
 
-class EdwPowerIterationPerformance(object):
+class EdwBaseIterationPerformance(object):
+  """Class that represents the performance of an iteration of edw queries."""
+
+
+class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
   """Class that represents the performance of a power iteration of edw queries.
 
   Attributes:
@@ -319,7 +323,7 @@ class EdwPowerIterationPerformance(object):
                          geo_mean_metadata)
 
 
-class EdwSimultaneousIterationPerformance(object):
+class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
   """Class that represents the performance of a simultaneous iteration.
 
   Attributes:
@@ -474,7 +478,7 @@ class EdwSimultaneousIterationPerformance(object):
     return self.performance.get(query_name).metadata
 
 
-class EdwThroughputIterationPerformance(object):
+class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
   """Class that represents the performance of an iteration of edw queries.
 
   Attributes:
@@ -572,7 +576,7 @@ class EdwBenchmarkPerformance(object):
     expected_queries: A list of query names that are executed in an iteration of
       the benchmark
     iteration_performances: A dictionary of iteration id (String value) to its
-      execution performance (an instance of an EdwIterationPerformance)
+      execution performance (an instance of EdwBaseIterationPerformance)
   """
 
   def __init__(self, total_iterations: int, expected_queries: List[Text]):
@@ -580,47 +584,12 @@ class EdwBenchmarkPerformance(object):
     self.expected_queries = expected_queries
     self.iteration_performances = {}
 
-  def add_power_iteration_performance(
-      self, iteration_performance: EdwPowerIterationPerformance):
-    """Add an iteration's execution performance to the benchmark results.
+  def add_iteration_performance(self, performance: EdwBaseIterationPerformance):
+    """Add an iteration's performance to the benchmark results.
 
     Args:
-      iteration_performance: An instance of EdwIterationPerformance
-        encapsulating the iteration performance details.
-
-    Raises:
-      EdwPerformanceAggregationError: If the iteration has already been added.
-    """
-    iteration_id = iteration_performance.id
-    if iteration_id in self.iteration_performances:
-      raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
-                                           ' iteration: %s.' % iteration_id)
-    self.iteration_performances[iteration_id] = iteration_performance
-
-  def add_simultaneous_iteration_performance(
-      self, performance: EdwSimultaneousIterationPerformance):
-    """Adds simultaneous iteration performance.
-
-    Args:
-      performance: An instance of EdwSimultaneousIterationPerformance
-        encapsulating the simultaneous iteration performance details.
-
-    Raises:
-      EdwPerformanceAggregationError: If the iteration has already been added.
-    """
-    iteration_id = performance.id
-    if iteration_id in self.iteration_performances:
-      raise EdwPerformanceAggregationError('Attempting to aggregate a duplicate'
-                                           ' iteration: %s.' % iteration_id)
-    self.iteration_performances[iteration_id] = performance
-
-  def add_throughput_iteration_performance(
-      self, performance: EdwThroughputIterationPerformance):
-    """Adds throughput iteration performance.
-
-    Args:
-      performance: An instance of EdwThroughputIterationPerformance
-        encapsulating the throughput iteration performance details.
+      performance: An instance of EdwBaseIterationPerformance encapsulating the
+        iteration performance details.
 
     Raises:
       EdwPerformanceAggregationError: If the iteration has already been added.
@@ -782,38 +751,11 @@ class EdwBenchmarkPerformance(object):
     return sample.Sample('edw_aggregated_wall_time', aggregated_wall_time,
                          'seconds', wall_time_metadata)
 
-  def get_simultaneous_wall_time_performance_samples(self,
-                                                     metadata: Dict[str, str]):
+  def get_wall_time_performance_samples(self, metadata: Dict[str, str]):
     """Generates samples for all wall time performances.
 
-    Benchmark relies on simultaneous iterations to generate the raw wall time
-     performance samples.
-    Benchmark appends the aggregated wall time performance sample
-
-    Args:
-      metadata: A dictionary of execution attributes to be merged with the query
-        execution attributes, for eg. tpc suite, scale of dataset, etc.
-
-    Returns:
-      A list of samples (raw and aggregated)
-    """
-    results = []
-
-    for iteration, performance in self.iteration_performances.items():
-      iteration_metadata = copy.copy(metadata)
-      iteration_metadata['iteration'] = iteration
-      results.append(
-          performance.get_wall_time_performance_sample(iteration_metadata))
-    results.append(
-        self.get_aggregated_wall_time_performance_sample(metadata=metadata))
-    return results
-
-  def get_throughput_wall_time_performance_samples(self, metadata: Dict[str,
-                                                                        str]):
-    """Generates samples for all wall time performances.
-
-    Benchmark relies on throughput iterations to generate the raw wall time
-     performance samples.
+    Benchmark relies on iterations to generate the raw wall time performance
+      samples.
     Benchmark appends the aggregated wall time performance sample
 
     Args:

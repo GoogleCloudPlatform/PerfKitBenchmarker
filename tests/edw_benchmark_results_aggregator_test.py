@@ -224,19 +224,19 @@ class EdwPowerIterationPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
 
 class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def test_add_power_iteration_performance(self):
+  def test_add_iteration_performance(self):
     b_p = agg.EdwBenchmarkPerformance(
         total_iterations=2, expected_queries=[Q1_NAME])
     i1_p = agg.EdwPowerIterationPerformance('1', 1)
     i2_p = agg.EdwPowerIterationPerformance('2', 1)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertEqual(len(b_p.iteration_performances), 2)
     self.assertSameElements(b_p.iteration_performances.keys(), ['1', '2'])
 
-  def test_add_power_iteration_performance_duplicate_iteration(self):
+  def test_add_iteration_performance_duplicate_iteration(self):
     """Testing the scenario where a iteration with missing query is added."""
     # Creating the bechmark performance
     b_p = agg.EdwBenchmarkPerformance(
@@ -244,13 +244,13 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 1)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('1', 1)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
     # Expecting an error to be raised due duplicate iteration ID.
     with self.assertRaises(agg.EdwPerformanceAggregationError):
-      b_p.add_power_iteration_performance(i2_p)
+      b_p.add_iteration_performance(i2_p)
 
   def test_is_successful_all_query_success(self):
     b_p = agg.EdwBenchmarkPerformance(
@@ -258,11 +258,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertEqual(len(b_p.iteration_performances), 2)
     self.assertTrue(b_p.is_successful())
     self.assertSameElements(b_p.iteration_performances.keys(), ['1', '2'])
@@ -273,11 +273,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, QFAIL_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertEqual(len(b_p.iteration_performances), 2)
     self.assertFalse(b_p.is_successful())
     self.assertSameElements(b_p.iteration_performances.keys(), ['1', '2'])
@@ -288,11 +288,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertTrue(b_p.aggregated_query_status(Q1_NAME))
     self.assertTrue(b_p.aggregated_query_status(Q2_NAME))
 
@@ -302,11 +302,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertTrue(b_p.aggregated_query_status(Q1_NAME))
     self.assertFalse(b_p.aggregated_query_status(QFAIL_NAME))
 
@@ -316,11 +316,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, QFAIL_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertTrue(b_p.aggregated_query_status(Q1_NAME))
     self.assertFalse(b_p.aggregated_query_status(Q2_NAME))
 
@@ -330,11 +330,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, 3.0, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, 4.0, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     self.assertEqual(
         b_p.aggregated_query_execution_time(Q1_NAME), (1.0 + 3.0) / 2)
     self.assertEqual(
@@ -346,11 +346,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     with self.assertRaises(agg.EdwPerformanceAggregationError):
       b_p.aggregated_query_execution_time(QFAIL_NAME)
 
@@ -360,11 +360,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, QFAIL_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     with self.assertRaises(agg.EdwPerformanceAggregationError):
       b_p.aggregated_query_execution_time(Q2_NAME)
 
@@ -374,11 +374,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, 1.0, {'job_id': 'q1_i1_job_id'})
     i1_p.add_query_performance(Q2_NAME, 2.0, {'job_id': 'q2_i1_job_id'})
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, 3.0, {'job_id': 'q1_i2_job_id'})
     i2_p.add_query_performance(Q2_NAME, 4.0, {})
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     actual_aggregated_query_metadata_q1 = b_p.aggregated_query_metadata(Q1_NAME)
     expected_aggregated_query_metadata_q1 = {
         '1' + '_job_id': 'q1_i1_job_id',
@@ -399,11 +399,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     with self.assertRaises(agg.EdwPerformanceAggregationError):
       b_p.aggregated_query_metadata(QFAIL_NAME)
 
@@ -413,11 +413,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i1_p.add_query_performance(Q2_NAME, Q2_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, Q1_PERFORMANCE, METADATA_EMPTY)
     i2_p.add_query_performance(Q2_NAME, QFAIL_PERFORMANCE, METADATA_EMPTY)
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     with self.assertRaises(agg.EdwPerformanceAggregationError):
       b_p.aggregated_query_metadata(Q2_NAME)
 
@@ -427,11 +427,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, 1.0, {'job_id': 'q1_i1_job_id'})
     i1_p.add_query_performance(Q2_NAME, 2.0, {'job_id': 'q2_i1_job_id'})
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, 3.0, {'job_id': 'q1_i2_job_id'})
     i2_p.add_query_performance(Q2_NAME, 4.0, {})
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     actual_sample_q1 = b_p.get_aggregated_query_performance_sample(
         Q1_NAME, {'benchmark_name': 'b_name'})
     self.assertEqual(actual_sample_q1.metric, 'edw_aggregated_query_time')
@@ -464,11 +464,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, 1.0, {'job_id': 'q1_i1_job_id'})
     i1_p.add_query_performance(Q2_NAME, 2.0, {'job_id': 'q2_i1_job_id'})
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, 3.0, {'job_id': 'q1_i2_job_id'})
     i2_p.add_query_performance(Q2_NAME, 4.0, {})
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     actual_sample_list = b_p.get_all_query_performance_samples({})
     self.assertEqual(len(actual_sample_list), 6)
     # 4 raw query samples and 2 aggregated samples
@@ -484,11 +484,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, 1.0, {'job_id': 'q1_i1_job_id'})
     i1_p.add_query_performance(Q2_NAME, 2.0, {'job_id': 'q2_i1_job_id'})
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, 3.0, {'job_id': 'q1_i2_job_id'})
     i2_p.add_query_performance(Q2_NAME, 4.0, {})
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     actual_sample = b_p.get_aggregated_geomean_performance_sample(
         {'benchmark_name': 'b_name'})
     self.assertEqual(actual_sample.metric, 'edw_aggregated_geomean')
@@ -508,11 +508,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     i1_p = agg.EdwPowerIterationPerformance('1', 2)
     i1_p.add_query_performance(Q1_NAME, 1.0, {'job_id': 'q1_i1_job_id'})
     i1_p.add_query_performance(Q2_NAME, 2.0, {'job_id': 'q2_i1_job_id'})
-    b_p.add_power_iteration_performance(i1_p)
+    b_p.add_iteration_performance(i1_p)
     i2_p = agg.EdwPowerIterationPerformance('2', 2)
     i2_p.add_query_performance(Q1_NAME, 3.0, {'job_id': 'q1_i2_job_id'})
     i2_p.add_query_performance(Q2_NAME, 4.0, {})
-    b_p.add_power_iteration_performance(i2_p)
+    b_p.add_iteration_performance(i2_p)
     actual_sample_list = b_p.get_queries_geomean_performance_samples(
         {'benchmark_name': 'b_name'})
     self.assertEqual(len(actual_sample_list), 3)
