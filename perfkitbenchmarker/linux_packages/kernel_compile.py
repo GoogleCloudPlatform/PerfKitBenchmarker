@@ -16,9 +16,10 @@ import os
 
 from perfkitbenchmarker import linux_packages
 
-URL = 'https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.4.25.tar.gz'
-TARBALL = 'linux-4.4.25.tar.gz'
-UNTAR_DIR = 'linux-4.4.25'
+LINUX_VERSION = '4.4.35'
+URL = 'https://www.kernel.org/pub/linux/kernel/v4.x/linux-%s.tar.gz' %(LINUX_VERSION)
+TARBALL = 'linux-%s.tar.gz' %(LINUX_VERSION)
+UNTAR_DIR = 'linux-%s' %(LINUX_VERSION)
 KERNEL_TARBALL = os.path.join(linux_packages.INSTALL_DIR, TARBALL)
 
 
