@@ -16,6 +16,7 @@ import copy
 import enum
 import functools
 import json
+import logging
 from typing import Any, Dict, List, Text
 
 from absl import flags
@@ -106,6 +107,8 @@ class EdwQueryPerformance(object):
       metadata = results['details']
     else:
       metadata = {}
+    if results['query_wall_time_in_secs'] == -1:
+      logging.warning('Query %s failed.', results['query'])
     return cls(query_name=results['query'],
                performance=results['query_wall_time_in_secs'],
                metadata=metadata)
@@ -333,18 +336,19 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
     wall_time: The wall time in seconds as a double value.
     performance: A dictionary of query name to its execution performance which
       is an EdwQueryPerformance instance.
+    all_queries_succeeded: Whether all queries in the iteration were successful.
   """
 
-  def __init__(self, iteration_id: Text,
-               iteration_start_time: int,
-               iteration_end_time: int,
-               iteration_wall_time: float,
-               iteration_performance: Dict[str, EdwQueryPerformance]):
+  def __init__(self, iteration_id: Text, iteration_start_time: int,
+               iteration_end_time: int, iteration_wall_time: float,
+               iteration_performance: Dict[str, EdwQueryPerformance],
+               all_queries_succeeded: bool):
     self.id = iteration_id
     self.start_time = iteration_start_time
     self.end_time = iteration_end_time
     self.wall_time = iteration_wall_time
     self.performance = iteration_performance
+    self.all_queries_succeeded = all_queries_succeeded
 
   @classmethod
   def from_json(cls, iteration_id: str, serialized_performance: str):
@@ -367,17 +371,24 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
       An instance of EdwSimultaneousIterationPerformance
     """
     results = json.loads(serialized_performance)
-    query_performances = results['all_queries_performance_array']
     query_performance_map = {}
-    for query_perf_json in query_performances:
-      query_perf = EdwQueryPerformance.from_json(
-          serialized_performance=(json.dumps(query_perf_json)))
-      query_performance_map[query_perf.name] = query_perf
-    return cls(iteration_id=iteration_id,
-               iteration_start_time=results['simultaneous_start'],
-               iteration_end_time=results['simultaneous_end'],
-               iteration_wall_time=results['simultaneous_wall_time_in_secs'],
-               iteration_performance=query_performance_map)
+    all_queries_succeeded = 'failure_reason' not in results
+    if all_queries_succeeded:
+      for query_perf_json in results['all_queries_performance_array']:
+        query_perf = EdwQueryPerformance.from_json(
+            serialized_performance=(json.dumps(query_perf_json)))
+        query_performance_map[query_perf.name] = query_perf
+    else:
+      logging.warning('Failure reported. Reason: %s', results['failure_reson'])
+    return cls(
+        iteration_id=iteration_id,
+        iteration_start_time=(results['simultaneous_start']
+                              if all_queries_succeeded else -1),
+        iteration_end_time=(results['simultaneous_end']
+                            if all_queries_succeeded else -1),
+        iteration_wall_time=results['simultaneous_wall_time_in_secs'],
+        iteration_performance=query_performance_map,
+        all_queries_succeeded=all_queries_succeeded)
 
   def get_wall_time(self) -> float:
     """Gets the total wall time, in seconds, for the iteration.
@@ -423,6 +434,11 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
         query_performance.get_performance_sample(metadata)
         for query_performance in self.performance.values()
     ]
+
+  def is_successful(self, expected_queries: List[Text]) -> bool:
+    """Check if all the expected queries ran and all succeeded."""
+    all_queries_ran = self.performance.keys() == set(expected_queries)
+    return all_queries_ran and self.all_queries_succeeded
 
   def has_query_performance(self, query_name: Text) -> bool:
     """Returns whether the query was run at least once in the iteration.
@@ -486,14 +502,17 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     start_time: The start time of the iteration execution.
     end_time: The end time of the iteration execution.
     wall_time: The wall time of the stream execution.
+    all_queries_succeeded: Whether all queries in the iteration were successful.
   """
 
   def __init__(self, iteration_id: Text, iteration_start_time: int,
-               iteration_end_time: int, iteration_wall_time: float):
+               iteration_end_time: int, iteration_wall_time: float,
+               all_queries_succeeded: bool):
     self.id = iteration_id
     self.start_time = iteration_start_time
     self.end_time = iteration_end_time
     self.wall_time = iteration_wall_time
+    self.all_queries_succeeded = all_queries_succeeded
 
   @classmethod
   def from_json(cls, iteration_id: str, serialized_performance: str):
@@ -533,11 +552,21 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
       An instance of EdwThroughputIterationPerformance
     """
     results = json.loads(serialized_performance)
+    all_queries_succeeded = 'failure_reason' not in results
+    if not all_queries_succeeded:
+      logging.warning('Failure reported. Reason: %s', results['failure_reson'])
     return cls(
         iteration_id=iteration_id,
-        iteration_start_time=results['throughput_start'],
-        iteration_end_time=results['throughput_end'],
-        iteration_wall_time=results['throughput_wall_time_in_secs'])
+        iteration_start_time=(results['throughput_start']
+                              if all_queries_succeeded else -1),
+        iteration_end_time=(results['throughput_end']
+                            if all_queries_succeeded else -1),
+        iteration_wall_time=results['throughput_wall_time_in_secs'],
+        all_queries_succeeded=all_queries_succeeded)
+
+  def is_successful(self, unused_expected_queries: List[Text]) -> bool:
+    """Check if all the queries succeeded."""
+    return self.all_queries_succeeded
 
   def get_wall_time(self) -> float:
     """Gets the total wall time, in seconds, for the iteration.
