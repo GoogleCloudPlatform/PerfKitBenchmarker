@@ -644,7 +644,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 
   def __init__(self, region, vpc_id=None, cidr=None):
     self.region = region
-    self.vpc = AwsVpc(self.region, vpc_id, cidr)
+    self.vpc = AwsVpc(self.region, vpc_id=vpc_id, cidr=cidr)
     self.internet_gateway = AwsInternetGateway(region, vpc_id)
     self.route_table = None
     self.created = False
@@ -674,7 +674,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
       _AwsRegionalNetwork._regional_network_count += 1
 
   @classmethod
-    def GetForRegion(cls, region, vpc_id=None, cidr_block=None):
+  def GetForRegion(cls, region, vpc_id=None, cidr_block=None):
     """Retrieves or creates an _AwsRegionalNetwork.
 
     Args:
@@ -690,12 +690,13 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    key = cls.CLOUD, REGION, region
+    key = cls.CLOUD, REGION, region, \
+          cidr_block
     # Because this method is only called from the AwsNetwork constructor, which
     # is only called from AwsNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
     if key not in benchmark_spec.regional_networks:
-      benchmark_spec.regional_networks[key] = cls(region, vpc_id)
+      benchmark_spec.regional_networks[key] = cls(region, vpc_id, cidr_block)
     return benchmark_spec.regional_networks[key]
 
   def Create(self):
@@ -742,7 +743,7 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
 
   def __init__(self, zone, vpc_id=None, subnet_id=None, cidr=None):
-    super(AwsNetworkSpec, self).__init__(zone)
+    super(AwsNetworkSpec, self).__init__(zone, cidr)
     if vpc_id or subnet_id:
       logging.info('Confirming vpc (%s) and subnet (%s) selections', vpc_id,
                    subnet_id)
@@ -811,6 +812,23 @@ class AwsNetwork(network.BaseNetwork):
           spec.vpc_id,
           cidr_block=self.regional_network.cidr_block,
           subnet_id=spec.subnet_id)
+
+    self.vpn_gateway = {}
+    self.az = spec.zone
+
+    name = 'pkb-network-%s' % FLAGS.run_uri
+    if spec.cidr:
+      self.cidr = spec.cidr
+    if self.cidr and FLAGS.use_vpn:
+      for vpn_gateway_num in range(0, FLAGS.vpn_service_gateway_count):
+        vpn_gateway_name = 'vpngw-%s-%s-%s' % (spec.zone, vpn_gateway_num, FLAGS.run_uri)
+        self.vpn_gateway[vpn_gateway_name] = AwsVPNGW(
+            vpn_gateway_name,
+            name,
+            spec.zone,
+            spec.cidr
+        )
+
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -1078,7 +1096,7 @@ class AwsVPNGWResource(resource.BaseResource):
 
 
 class AwsVPNGW(network.BaseVpnGateway):
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __init__(self, name, network_name, az, cidr):
     super(AwsVPNGW, self).__init__()
@@ -1161,7 +1179,7 @@ class AwsVPNGW(network.BaseVpnGateway):
           "tunnel_config: Created customer gw with id: %s" % self.customer_gw.id
       )
 
-    net = _AwsRegionalNetwork.GetForRegion(self.region)
+    net = _AwsRegionalNetwork.GetForRegion(self.region, cidr_block=self.cidr)
     if not self.attached:
       logging.info(
           "tunnel_config: Attaching VGW %s to VPC %s" %
