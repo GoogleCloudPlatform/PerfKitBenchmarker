@@ -493,6 +493,46 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
                                            ' query' + query_name)
     return self.performance.get(query_name).metadata
 
+  def get_queries_geomean(self) -> float:
+    """Gets the geometric mean of all queries in the iteration.
+
+    Returns:
+      The (float) geometric mean of all the queries ran in the iteration.
+
+    Raises:
+      EdwPerformanceAggregationError: If the iteration contains unsuccessful
+        query executions.
+    """
+    return geometric_mean([
+        query_performance.performance
+        for query_performance in self.performance.values()
+    ])
+
+  def get_queries_geomean_performance_sample(
+      self, expected_queries: List[Text], metadata: Dict[str,
+                                                         str]) -> sample.Sample:
+    """Gets a sample for geomean of all queries in all streams of the iteration.
+
+    Args:
+      expected_queries: A list of query names expected to have been executed in
+        an iteration.
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A sample of iteration geomean performance.
+
+    Raises:
+      EdwPerformanceAggregationError: If the iteration contains unsuccessful
+        query executions.
+    """
+    if not self.is_successful(expected_queries):
+      raise EdwPerformanceAggregationError('Failed executions in iteration.')
+    raw_geo_mean = self.get_queries_geomean()
+    geo_mean_metadata = copy.copy(metadata)
+    return sample.Sample('edw_iteration_geomean_time', raw_geo_mean, 'seconds',
+                         geo_mean_metadata)
+
 
 class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
   """Class that represents the performance of an iteration of edw queries.
