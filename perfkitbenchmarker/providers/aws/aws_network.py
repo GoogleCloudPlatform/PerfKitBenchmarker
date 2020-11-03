@@ -688,8 +688,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    key = cls.CLOUD, REGION, region, \
-          cidr_block
+    key = cls.CLOUD, REGION, region, cidr_block
     # Because this method is only called from the AwsNetwork constructor, which
     # is only called from AwsNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
