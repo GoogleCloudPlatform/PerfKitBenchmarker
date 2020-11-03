@@ -67,39 +67,19 @@ class AwsFirewall(network.BaseFirewall):
     self.firewall_icmp_set = set()
     self._lock = threading.Lock()
 
-  # @TODO: merge this not in rebase
-  def AllowIcmpVpn(self, region, security_group, cidr):
-    # aws ec2 authorize-security-group-ingress
-    # aws ec2 authorize-security-group-ingress --group-id sg-05075517a1daed16a --ip-permissions IpProtocol=icmp,FromPort=-1,ToPort=-1,IpRanges=[{CidrIp=0.0.0.0/0}]
-    # --ip-permissions IpProtocol=icmp,FromPort=-1,ToPort=-1,IpRanges=[{CidrIp=0.0.0.0/0}]
-    entry = (-1, -1, region, security_group)
-    if entry in self.firewall_set:
-      return
-    with self._lock:
-      if entry in self.firewall_set:
-        return
-      authorize_cmd = util.AWS_PREFIX + [
-          'ec2',
-          'authorize-security-group-ingress',
-          '--region=%s' % region,
-          '--group-id=%s' % security_group,
-          '--protocol=icmp',
-          '--port=-1',
-          '--cidr=%s' % cidr
-      ]
-      util.IssueRetryableCommand(authorize_cmd)
-      self.firewall_set.add(entry)
-
-  def AllowIcmp(self, vm):
+  def AllowIcmp(self, vm, region=None, security_group=None, cidr=None):
     """Opens the ICMP protocol on the firewall.
 
     Args:
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
+      region: override vm.region if no vm is passed.
+      security_group: override vm.group_id if no vm is passed.
+      cidr: override default '0.0.0.0/0' for ingress traffic source.
     """
-    source = '0.0.0.0/0'
+    source = cidr or '0.0.0.0/0'
 
     # region, group_id, source
-    entry = (vm.region, vm.group_id, source)
+    entry = (region or vm.region, security_group or vm.group_id, source)
     with self._lock:
       if entry in self.firewall_icmp_set:
         return
@@ -110,8 +90,8 @@ class AwsFirewall(network.BaseFirewall):
       authorize_cmd = util.AWS_PREFIX + [
           'ec2',
           'authorize-security-group-ingress',
-          '--region=%s' % vm.region,
-          '--group-id=%s' % vm.group_id,
+          '--region=%s' % region or vm.region,
+          '--group-id=%s' % security_group or vm.group_id,
           '--protocol=icmp',
           '--port=-1',
           '--cidr=%s' % source]

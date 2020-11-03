@@ -303,10 +303,10 @@ class AwsVPNGW(network.BaseVpnGateway):
       return
 
     if not tunnel_config.endpoints[self.name]['is_configured']:
-      aws_network.AwsFirewall.GetFirewall().AllowIcmpVpn(
-          self.region,
-          net.vpc.default_security_group_id,
-          tunnel_config.endpoints[target_endpoint]['cidr']
+      aws_network.AwsFirewall.GetFirewall().AllowIcmp(None,
+        region=self.region,
+        security_group=net.vpc.default_security_group_id,
+        cidr=tunnel_config.endpoints[target_endpoint]['cidr']
       )
       self.vpn_connection.Create_VPN_Cnxn_Route(
           tunnel_config.endpoints[target_endpoint]['cidr']
