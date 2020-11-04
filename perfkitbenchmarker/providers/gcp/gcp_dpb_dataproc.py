@@ -115,6 +115,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       logging.info('Include the requested applications')
       cmd.flags['optional-components'] = ','.join(self.spec.applications)
 
+    # Enable component gateway for debuggability. Does not impact performance.
+    cmd.flags['enable-component-gateway'] = True
+
     # TODO(pclay): stop ignoring spec.master_group?
     for role in ['worker', 'master']:
       # Set machine type
