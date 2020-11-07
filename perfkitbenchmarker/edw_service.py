@@ -51,6 +51,8 @@ flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to p
 # TODO(user): Revisit flags for accepting query lists.
 flags.DEFINE_string('edw_simultaneous_queries',
                     None, 'CSV list of simultaneous queries to benchmark.')
+flags.DEFINE_integer('edw_simultaneous_query_submission_interval', '0',
+                     'Simultaneous query submission interval in milliseconds.')
 flags.DEFINE_string('edw_power_queries', None,
                     'CSV list of power queries to benchmark.')
 flags.DEFINE_multi_string(
@@ -147,7 +149,8 @@ class EdwClientInterface(object):
     """
     raise NotImplementedError
 
-  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> Dict[str, Any]:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -161,6 +164,7 @@ class EdwClientInterface(object):
       "simultaneous_wall_time_in_secs":3.084}
 
     Args:
+      submission_interval: Simultaneous query submission interval in milliseconds.
       queries: List of string names of the queries to execute simultaneously.
 
     Returns:

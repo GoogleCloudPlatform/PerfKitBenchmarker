@@ -75,7 +75,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
 
     # Push the executable jar to the working directory on client vm
     self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['snowflake-jdbc-client-1.0.jar'], '')
+        benchmark_name, ['snowflake-jdbc-client-2.0.jar'], '')
 
   def ExecuteQuery(self, query_name: str) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -90,30 +90,35 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         successful query the value is expected to be positive.
       performance_details: A dictionary of query execution attributes eg. job_id
     """
-    query_command = ('java -jar snowflake-jdbc-client-1.0.jar --warehouse {} '
+    query_command = ('java -cp snowflake-jdbc-client-2.0.jar '
+                     'com.google.cloud.performance.edw.Single --warehouse {} '
                      '--database {} --schema {} --query_file {}').format(
                          self.warehouse, self.database, self.schema, query_name)
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
-    return json.loads(stdout)['performance'], details
+    return json.loads(stdout)['query_wall_time_in_secs'], details
 
-  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> Dict[str, Any]:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
 
     Args:
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
       queries: List of strings (names) of queries to execute.
 
     Returns:
       A serialized dictionary of execution details.
     """
-    query_command = ('java -cp snowflake-jdbc-client-1.0.jar '
-                     'com.google.cloud.performance.edw.Simultaneous --warehouse'
-                     ' {} --database {} --schema {} --query_files {}').format(
-                         self.warehouse, self.database, self.schema,
-                         ' '.join(queries))
+    query_command = (
+        'java -cp snowflake-jdbc-client-2.0.jar '
+        'com.google.cloud.performance.edw.Simultaneous --warehouse {} '
+        '--database {} --schema {} --submission_interval {} --query_files {}'
+    ).format(self.warehouse, self.database, self.schema, submission_interval,
+             ' '.join(queries))
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
@@ -129,7 +134,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     Returns:
       A serialized dictionary of execution details.
     """
-    query_command = ('java -cp snowflake-jdbc-client-1.0.jar '
+    query_command = ('java -cp snowflake-jdbc-client-2.0.jar '
                      'com.google.cloud.performance.edw.Throughput --warehouse'
                      ' {} --database {} --schema {} --query_streams {}').format(
                          self.warehouse, self.database, self.schema, ' '.join([

@@ -245,7 +245,7 @@ class JavaClientInterface(GenericClientInterface):
           benchmark_name, [FLAGS.gcp_service_account_key_file], '')
     # Push the executable jar to the working directory on client vm
     self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['bq-java-client-1.0.jar'], '')
+        benchmark_name, ['bq-java-client-2.0.jar'], '')
 
   def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -264,21 +264,25 @@ class JavaClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
 
-    query_command = ('java -jar bq-java-client-1.0.jar  --project {} '
+    query_command = ('java -cp bq-java-client-2.0.jar '
+                     'com.google.cloud.performance.edw.Single --project {} '
                      '--credentials_file {} --dataset {} '
                      '--query_file {}').format(self.project_id, key_file_name,
                                                self.dataset_id, query_name)
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
-    return json.loads(stdout)['performance'], details
+    return json.loads(stdout)['query_wall_time_in_secs'], details
 
-  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> Dict[str, Any]:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
 
     Args:
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
       queries: List of strings (names) of queries to execute.
 
     Returns:
@@ -287,11 +291,12 @@ class JavaClientInterface(GenericClientInterface):
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
-    cmd = ('java -cp bq-java-client-1.0.jar '
+    cmd = ('java -cp bq-java-client-2.0.jar '
            'com.google.cloud.performance.edw.Simultaneous --project {} '
-           '--credentials_file {} --dataset {} --query_files {}'.format(
-               self.project_id, key_file_name, self.dataset_id,
-               ' '.join(queries)))
+           '--credentials_file {} --dataset {} --submission_interval {} '
+           '--query_files {}'.format(self.project_id, key_file_name,
+                                     self.dataset_id, submission_interval,
+                                     ' '.join(queries)))
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
@@ -310,7 +315,7 @@ class JavaClientInterface(GenericClientInterface):
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
-    cmd = ('java -cp bq-java-client-1.0.jar '
+    cmd = ('java -cp bq-java-client-2.0.jar '
            'com.google.cloud.performance.edw.Throughput --project {} '
            '--credentials_file {} --dataset {} --query_streams {}'.format(
                self.project_id, key_file_name, self.dataset_id,

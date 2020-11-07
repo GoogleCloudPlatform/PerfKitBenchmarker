@@ -117,13 +117,15 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
     if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
       return None, None
 
-    expected_command = ('java -jar bq-java-client-1.0.jar  --project {} '
+    expected_command = ('java -cp bq-java-client-2.0.jar '
+                        'com.google.cloud.performance.edw.Single --project {} '
                         '--credentials_file {} --dataset {} --query_file '
                         '{}').format(PROJECT_ID, 'SERVICE_ACCOUNT_KEY_FILE',
                                      DATASET_ID, QUERY_NAME)
     if command != expected_command:
       raise RuntimeError
-    response_object = {'performance': 1.0, 'details': {'job_id': 'JOB_ID'}}
+    response_object = {'query_wall_time_in_secs': 1.0,
+                       'details': {'job_id': 'JOB_ID'}}
     response = json.dumps(response_object)
     return response, None
 
