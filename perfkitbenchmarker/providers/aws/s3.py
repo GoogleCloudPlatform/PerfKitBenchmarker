@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to S3."""
 
+import os
 import posixpath
 
 from absl import flags
@@ -60,10 +61,15 @@ class S3Service(object_storage_service.ObjectStorageService):
          '--tagging', 'TagSet=[%s]' % tag_set,
          '--region=%s' % self.region])
 
-  def Copy(self, src_url, dst_url):
+  def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
-    vm_util.IssueCommand(['aws', 's3', 'cp', src_url, dst_url,
-                          '--region', self.region])
+    cmd = ['aws', 's3', 'cp', '--region', self.region]
+    if recursive:
+      cmd.append('--recursive')
+      # Fix cp to mimic gsutil behavior
+      dst_url = os.path.join(dst_url, os.path.basename(src_url))
+    cmd += [src_url, dst_url]
+    vm_util.IssueCommand(cmd)
 
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""

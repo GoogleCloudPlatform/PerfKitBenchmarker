@@ -70,9 +70,13 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     if ret_code and raise_on_failure:
       raise errors.Benchmarks.BucketCreationError(stderr)
 
-  def Copy(self, src_url, dst_url):
+  def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
-    vm_util.IssueCommand(['gsutil', 'cp', src_url, dst_url])
+    cmd = ['gsutil', 'cp']
+    if recursive:
+      cmd += ['-r']
+    cmd += [src_url, dst_url]
+    vm_util.IssueCommand(cmd)
 
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""
