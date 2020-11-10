@@ -42,6 +42,7 @@ import time
 
 WAIT_TIMEOUT_IN_SEC = 120.0
 WAIT_SLEEP_IN_SEC = 5.0
+RETRYABLE_SSH_RETCODE = 255
 
 
 def main():
@@ -55,13 +56,20 @@ def main():
                'Will block until a shared lock is acquired on FILE.')
   p.add_option('-d', '--delete', dest='delete', action='store_true',
                help='Delete stdout, stderr, and status files when finished.')
+  p.add_option(
+      '-x',
+      '--exclusive',
+      dest='exclusive',
+      help='Will block until FILE exists to ensure that status is ready to be '
+      'read. Required.',
+      metavar='FILE')
   options, args = p.parse_args()
   if args:
     sys.stderr.write('Unexpected arguments: {0}\n'.format(args))
     return 1
 
   missing = []
-  for option in ('status',):
+  for option in ('status', 'exclusive'):
     if getattr(options, option) is None:
       missing.append(option)
 
@@ -76,10 +84,11 @@ def main():
   return_code_str = None
   while time.time() < WAIT_TIMEOUT_IN_SEC + start:
     try:
-      with open(options.status, 'r') as status:
-        break
-    except IOError:
-      print('WARNING: file doesn\'t exist, retrying', file=sys.stderr)
+      with open(options.exclusive, 'r'):
+        with open(options.status, 'r'):
+          break
+    except IOError as e:
+      print('WARNING: file doesn\'t exist, retrying: %s' % e, file=sys.stderr)
       time.sleep(WAIT_SLEEP_IN_SEC)
 
   signal.signal(signal.SIGALRM, lambda signum, frame: None)
@@ -113,6 +122,12 @@ def main():
         return_code = int(return_code_str)
       else:
         print('WARNING: wrapper script interrupted.', file=sys.stderr)
+        return_code = 1
+
+      # RemoteCommand retries 255 as temporary SSH failure. In this case,
+      # long running command actually returned 255 and should not be retried.
+      if return_code == RETRYABLE_SSH_RETCODE:
+        print('WARNING: command returned 255.', file=sys.stderr)
         return_code = 1
 
       stderr_copier = threading.Thread(target=shutil.copyfileobj,

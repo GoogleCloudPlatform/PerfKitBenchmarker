@@ -16,10 +16,10 @@ import json
 import logging
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.memcache_service import MemcacheService
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
@@ -30,7 +30,7 @@ ELASTICACHE_PORT = 11211
 class ElastiCacheMemcacheService(MemcacheService):
   """Class for AWS elasticache memcache service."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __init__(self, network, cluster_id, region, node_type, num_servers=1):
     self.cluster_id = cluster_id

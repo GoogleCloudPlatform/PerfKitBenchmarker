@@ -168,6 +168,8 @@ flags.DEFINE_integer(
 flags.DEFINE_boolean('gce_hpc_tools', False,
                      'Whether to apply the hpc-tools environment script.')
 
+RETRYABLE_SSH_RETCODE = 255
+
 
 class CpuVulnerabilities:
   """The 3 different vulnerablity statuses from vm.cpu_vulernabilities.
@@ -299,15 +301,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                           ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
+    This is used for long-running commands that might experience network issues
+    that would normally interrupt a RemoteCommand and fail to provide results.
     Executes a command via a pair of scripts on the VM:
 
     * EXECUTE_COMMAND, which runs 'command' in a nohupped background process.
-    * WAIT_FOR_COMMAND, which waits on a file lock held by EXECUTE_COMMAND until
+    * WAIT_FOR_COMMAND, which first waits on confirmation that EXECUTE_COMMAND
+      has acquired an exclusive lock on a file with the command's status. This
+      is done by waiting for the existence of a file written by EXECUTE_COMMAND
+      once it successfully acquires an exclusive lock. Once confirmed,
+      WAIT_COMMAND waits to acquire the file lock held by EXECUTE_COMMAND until
       'command' completes, then returns with the stdout, stderr, and exit status
       of 'command'.
 
     Temporary SSH failures (where ssh returns a 255) while waiting for the
-    command to complete will be tolerated and safely retried.
+    command to complete will be tolerated and safely retried. However, if
+    remote command actually returns 255, SSH will return 1 instead to bypass
+    retry behavior.
 
     Args:
       command: The command to run.
@@ -336,6 +346,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     stdout_file = file_base + '.stdout'
     stderr_file = file_base + '.stderr'
     status_file = file_base + '.status'
+    exclusive_file = file_base + '.exclusive'
 
     if not isinstance(command, str):
       command = ' '.join(command)
@@ -344,7 +355,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                      '--stdout', stdout_file,
                      '--stderr', stderr_file,
                      '--status', status_file,
-                     '--command', pipes.quote(command)]
+                     '--exclusive', exclusive_file,
+                     '--command', pipes.quote(command)]  # pyformat: disable
     if timeout:
       start_command.extend(['--timeout', str(timeout)])
 
@@ -353,7 +365,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand(start_command)
 
     def _WaitForCommand():
-      wait_command = ['python', wait_path, '--status', status_file]
+      wait_command = ['python', wait_path,
+                      '--status', status_file,
+                      '--exclusive', exclusive_file]  # pyformat: disable
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
@@ -361,7 +375,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
-          '--delete'])
+          '--delete',
+      ])  # pyformat: disable
       return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
                                 ignore_failure=ignore_failure)
 
@@ -371,8 +386,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # In case the error was with the wrapper script itself, print the log.
       stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
       if stdout.strip():
-        logging.warn('Exception during RobustRemoteCommand. '
-                     'Wrapper script log:\n%s', stdout)
+        logging.warning('Exception during RobustRemoteCommand. '
+                        'Wrapper script log:\n%s', stdout)
       raise
 
   def SetupRemoteFirewall(self):
@@ -546,7 +561,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     })
 
   def DoConfigureTCPWindow(self):
-    """Change TCP window parameters in sysctl"""
+    """Change TCP window parameters in sysctl."""
 
     # Return if none of these flags are set
     if all(x is None for x in [FLAGS.tcp_max_receive_buffer,
@@ -629,7 +644,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     return self._proccpu_cache
 
   def GetOsInfo(self):
-    """Returns information regarding OS type and version"""
+    """Returns information regarding OS type and version."""
     self.Install('lsb_release')
     stdout, _ = self.RemoteCommand('lsb_release -d')
     return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
@@ -669,7 +684,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                 r'Disk\s*(.*):[\s\w\.]*,\s(\d*)\sbytes', partition_tables)}
       except regex_util.NoMatchError:
         # TODO(user): Use alternative methods to retrieve partition table.
-        logging.warn('Partition table not found with "%s".', cmd)
+        logging.warning('Partition table not found with "%s".', cmd)
     return self._partition_table
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
@@ -713,6 +728,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     stdout, _ = self.RemoteHostCommand(
         'stat -c %z /proc/', retries=1, suppress_warning=True)
+    if stdout.startswith('1970-01-01'):
+      # Fix for ARM returning epochtime
+      date_fmt = '+%Y-%m-%d %H:%M:%S.%s %z'
+      date_cmd = "grep btime /proc/stat | awk '{print $2}'"
+      stdout, _ = self.RemoteHostCommand(f'date "{date_fmt}" -d@$({date_cmd})')
     return stdout
 
   def SnapshotPackages(self):
@@ -950,7 +970,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
             ssh_cmd, force_info_log=should_log,
             suppress_warning=suppress_warning,
             timeout=timeout, raise_on_failure=False)
-        if retcode != 255:  # Retry on 255 because this indicates an SSH failure
+        # Retry on 255 because this indicates an SSH failure
+        if retcode != RETRYABLE_SSH_RETCODE:
           break
     finally:
       if login_shell:

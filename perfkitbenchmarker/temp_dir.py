@@ -18,17 +18,12 @@ PerfKit Benchmarker creates files under a temporary directory (typically in
 more information).
 """
 
+import functools
 import os
 import tempfile
 
 from absl import flags
 from perfkitbenchmarker import version
-import six
-
-if six.PY2:
-  import functools32 as functools
-else:
-  import functools
 
 _PERFKITBENCHMARKER = 'perfkitbenchmarker'
 _RUNS = 'runs'

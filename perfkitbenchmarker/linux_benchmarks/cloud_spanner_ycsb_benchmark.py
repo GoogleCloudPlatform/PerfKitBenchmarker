@@ -45,21 +45,6 @@ BENCHMARK_DESCRIPTION = 'YCSB'
 BENCHMARK_DATABASE = 'ycsb'
 BENCHMARK_TABLE = 'usertable'
 BENCHMARK_ZERO_PADDING = 12
-BENCHMARK_SCHEMA = """
-CREATE TABLE %s (
-  id     STRING(MAX),
-  field0 STRING(MAX),
-  field1 STRING(MAX),
-  field2 STRING(MAX),
-  field3 STRING(MAX),
-  field4 STRING(MAX),
-  field5 STRING(MAX),
-  field6 STRING(MAX),
-  field7 STRING(MAX),
-  field8 STRING(MAX),
-  field9 STRING(MAX),
-) PRIMARY KEY(id)
-""" % BENCHMARK_TABLE
 
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.admin',
@@ -111,11 +96,13 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
 
+  schema = _BuildSchema()
+
   benchmark_spec.spanner_instance = gcp_spanner.GcpSpannerInstance(
       name=BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri,
       description=BENCHMARK_DESCRIPTION,
       database=BENCHMARK_DATABASE,
-      ddl=BENCHMARK_SCHEMA)
+      ddl=schema)
   if benchmark_spec.spanner_instance._Exists(instance_only=True):
     logging.warning('Cloud Spanner instance %s exists, delete it first.' %
                     FLAGS.cloud_spanner_ycsb_instance)
@@ -180,6 +167,23 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   benchmark_spec.spanner_instance.Delete()
+
+
+def _BuildSchema():
+  """BuildSchema.
+
+  Returns:
+    A string of DDL for creating a Spanner table.
+  """
+  fields = ',\n'.join(
+      [f'field{i} STRING(MAX)' for i in range(FLAGS.ycsb_field_count)]
+  )
+  return f"""
+  CREATE TABLE {BENCHMARK_TABLE} (
+    id     STRING(MAX),
+    {fields}
+  ) PRIMARY KEY(id)
+  """
 
 
 def _Install(vm):

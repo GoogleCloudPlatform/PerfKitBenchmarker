@@ -57,7 +57,7 @@ def _Install(vm):
   # allow it to compile with --enable-demo flag correctly
   vm.PushDataFile('netperf.patch', NETLIB_PATCH)
 
-  vm.RemoteCommand('cd %s && patch -p1 < netperf.patch' %
+  vm.RemoteCommand('cd %s && patch -l -p1 < netperf.patch' %
                    NETPERF_DIR)
 
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '

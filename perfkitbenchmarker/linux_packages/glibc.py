@@ -36,7 +36,7 @@ PACKAGE_DATA_URL = {
     BINUTILS_TAR: posixpath.join(
         'https://ftp.gnu.org/gnu/binutils', BINUTILS_TAR),
     GLIBC_TAR: posixpath.join(
-        'https://fossies.org/linux/misc', GLIBC_TAR)
+        'https://ftp.gnu.org/gnu/libc', GLIBC_TAR)
 }
 
 _GCC_VERSION_RE = re.compile(r'gcc\ version\ (.*?)\ ')

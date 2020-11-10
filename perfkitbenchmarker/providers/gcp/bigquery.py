@@ -20,12 +20,13 @@ import logging
 import os
 import re
 from typing import Any, Dict, List, Text
+
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
@@ -244,7 +245,7 @@ class JavaClientInterface(GenericClientInterface):
           benchmark_name, [FLAGS.gcp_service_account_key_file], '')
     # Push the executable jar to the working directory on client vm
     self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['bq-java-client-1.0.jar'], '')
+        benchmark_name, ['bq-java-client-2.0.jar'], '')
 
   def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -263,21 +264,25 @@ class JavaClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
 
-    query_command = ('java -jar bq-java-client-1.0.jar  --project {} '
+    query_command = ('java -cp bq-java-client-2.0.jar '
+                     'com.google.cloud.performance.edw.Single --project {} '
                      '--credentials_file {} --dataset {} '
                      '--query_file {}').format(self.project_id, key_file_name,
                                                self.dataset_id, query_name)
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
-    return json.loads(stdout)['performance'], details
+    return json.loads(stdout)['query_wall_time_in_secs'], details
 
-  def ExecuteSimultaneous(self, queries: List[str]) -> Dict[str, Any]:
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> Dict[str, Any]:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
 
     Args:
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
       queries: List of strings (names) of queries to execute.
 
     Returns:
@@ -286,11 +291,12 @@ class JavaClientInterface(GenericClientInterface):
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
-    cmd = ('java -cp bq-java-client-1.0.jar '
+    cmd = ('java -cp bq-java-client-2.0.jar '
            'com.google.cloud.performance.edw.Simultaneous --project {} '
-           '--credentials_file {} --dataset {} --query_files {}'.format(
-               self.project_id, key_file_name, self.dataset_id,
-               ' '.join(queries)))
+           '--credentials_file {} --dataset {} --submission_interval {} '
+           '--query_files {}'.format(self.project_id, key_file_name,
+                                     self.dataset_id, submission_interval,
+                                     ' '.join(queries)))
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
@@ -309,7 +315,7 @@ class JavaClientInterface(GenericClientInterface):
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
-    cmd = ('java -cp bq-java-client-1.0.jar '
+    cmd = ('java -cp bq-java-client-2.0.jar '
            'com.google.cloud.performance.edw.Throughput --project {} '
            '--credentials_file {} --dataset {} --query_streams {}'.format(
                self.project_id, key_file_name, self.dataset_id,
@@ -325,7 +331,7 @@ class Bigquery(edw_service.EdwService):
     job_id_prefix: A string prefix for the job id for bigquery job.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   SERVICE_TYPE = 'bigquery'
 
   def __init__(self, edw_service_spec):
@@ -538,6 +544,45 @@ class Endor(Bigquery):
     <dataset>_<format>_<compression>_<partitioning>_<location>
     eg.
     tpch100_parquet_uncompressed_unpartitoned_s3
+
+    Returns:
+      A dictionary set to underlying data's details (format, etc.)
+    """
+    data_details = {}
+    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    parsed_id = re.split(r'_', dataset_id)
+    data_details['format'] = parsed_id[1]
+    data_details['compression'] = parsed_id[2]
+    data_details['partitioning'] = parsed_id[3]
+    data_details['location'] = parsed_id[4]
+    return data_details
+
+
+class Bqfederated(Bigquery):
+  """Class representing BigQuery Federated service."""
+
+  SERVICE_TYPE = 'bqfederated'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the BigQuery Federated service.
+
+    Returns:
+      A dictionary set to Federated service details.
+    """
+    basic_data = super(Bqfederated, self).GetMetadata()
+    basic_data['edw_service_type'] = Bqfederated.SERVICE_TYPE
+    basic_data.update(self.client_interface.GetMetadata())
+    basic_data.update(self.GetDataDetails())
+    return basic_data
+
+  def GetDataDetails(self) -> Dict[str, str]:
+    """Returns a dictionary with underlying data details.
+
+    cluster_identifier = <project_id>.<dataset_id>
+    Data details are extracted from the dataset_id that follows the format:
+    <dataset>_<format>_<compression>_<partitioning>_<location>
+    eg.
+    tpch10000_parquet_compressed_partitoned_gcs
 
     Returns:
       A dictionary set to underlying data's details (format, etc.)

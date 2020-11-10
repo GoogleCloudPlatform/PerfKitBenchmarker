@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Perform Distributed i/o benchmark on data processing backends.
+
 This test writes into and then subsequently reads a specified number of
 files. File size is also specified as a parameter to the test.
 The benchmark implementation accepts list of arguments for both the above
@@ -21,7 +22,7 @@ parameter values. Each file is accessed in a separate map task.
 """
 
 import copy
-import datetime
+
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
@@ -49,7 +50,7 @@ dpb_testdfsio_benchmark:
         AWS:
           disk_size: 1500
           disk_type: gp2
-    worker_count: 8
+    worker_count: 2
 """
 
 flags.DEFINE_enum('dfsio_fs', BaseDpbService.GCS_FS,
@@ -62,8 +63,8 @@ flags.DEFINE_list(
                                   ' dfsio files.')
 
 flags.DEFINE_list(
-    'dfsio_num_files_list', [10], 'A list of number of dfsio files to use'
-                                  ' during individual runs.')
+    'dfsio_num_files_list', [4], 'A list of number of dfsio files to use'
+    ' during individual runs.')
 
 
 FLAGS = flags.FLAGS
@@ -78,9 +79,11 @@ def GetConfig(user_config):
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
+    Args:
+      benchmark_config: The config used to construct the BenchmarkSpec.
+
     Raises:
-    perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid
-    configuration.
+      InvalidValue: On encountering invalid configuration.
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
   if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
@@ -89,7 +92,8 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  del benchmark_spec  # Unused.
+  if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
+    benchmark_spec.dpb_service.CreateBucket(benchmark_spec.uuid.split('-')[0])
 
 
 def Run(benchmark_spec):
@@ -101,35 +105,19 @@ def Run(benchmark_spec):
   Returns:
     A list of samples
   """
+  service = benchmark_spec.dpb_service
   source = '{}'.format(benchmark_spec.uuid.split('-')[0])
-  update_source_default_fs = False
 
   if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
     source = '{}://{}'.format(FLAGS.dfsio_fs, source)
-    update_source_default_fs = True
 
   source_dir = '{}{}'.format(source, '/dfsio')
 
   results = []
   for file_size in FLAGS.dfsio_file_sizes_list:
     for num_files in FLAGS.dfsio_num_files_list:
-      benchmark_spec.dpb_service.CreateBucket(benchmark_spec.uuid.split('-')[0])
-      # TODO(saksena): Respond to data generation failure
-      start = datetime.datetime.now()
-      benchmark_spec.dpb_service.generate_data(source_dir,
-                                               update_source_default_fs,
-                                               num_files, file_size)
-      end_time = datetime.datetime.now()
-      write_run_time = (end_time - start).total_seconds()
 
-      start = datetime.datetime.now()
-      benchmark_spec.dpb_service.read_data(source_dir,
-                                           update_source_default_fs,
-                                           num_files, file_size)
-      end_time = datetime.datetime.now()
-      read_run_time = (end_time - start).total_seconds()
-
-      metadata = copy.copy(benchmark_spec.dpb_service.GetMetadata())
+      metadata = copy.copy(service.GetMetadata())
       metadata.update({'dfsio_fs': FLAGS.dfsio_fs})
       metadata.update({'dfsio_num_files': num_files})
       metadata.update({'dfsio_file_size_mbs': file_size})
@@ -142,14 +130,29 @@ def Run(benchmark_spec):
         metadata.update({'regional': True})
         metadata.update({'region': 'aws_default'})
 
-      results.append(sample.Sample('write_run_time', write_run_time, 'seconds',
-                                   metadata))
-      results.append(sample.Sample('read_run_time', read_run_time, 'seconds',
-                                   metadata))
-      benchmark_spec.dpb_service.cleanup_data(source, update_source_default_fs)
+      # This order is important. Write generates the data for read and clean
+      # deletes it for the next write.
+      for command in ('write', 'read', 'clean'):
+        args = [
+            '-' + command, '-nrFiles',
+            str(num_files), '-fileSize',
+            str(file_size)
+        ]
+        properties = {'test.build.data': source_dir}
+        if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
+          properties['fs.default.name'] = source_dir
+        result = service.SubmitJob(
+            classname='org.apache.hadoop.fs.TestDFSIO',
+            properties=properties,
+            job_arguments=args,
+            job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
+        results.append(
+            sample.Sample(command + '_run_time', result.run_time, 'seconds',
+                          metadata))
   return results
 
 
 def Cleanup(benchmark_spec):
-  """Cleans up the testdfsio benchmark"""
-  del benchmark_spec  # Unused.
+  """Cleans up the testdfsio benchmark."""
+  if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
+    benchmark_spec.dpb_service.DeleteBucket(benchmark_spec.uuid.split('-')[0])

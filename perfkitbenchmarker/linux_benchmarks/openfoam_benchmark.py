@@ -316,7 +316,7 @@ def _IsValidCommand(command):
 
 def _ParseRunCommands(vm, remote_run_file):
   """Parses OpenFOAM run commands from a case's Allrun file."""
-  local_destination = vm_util.GetTempDir() + _RUN_SCRIPT
+  local_destination = vm_util.PrependTempDir(_RUN_SCRIPT)
   vm.PullFile(local_destination, remote_run_file)
   commands = []
   for command in open(local_destination):

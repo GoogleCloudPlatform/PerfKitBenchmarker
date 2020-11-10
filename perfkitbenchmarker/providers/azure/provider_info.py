@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Azure
-
-"""
+"""Provider info for Azure."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers import azure
 
 
 class AzureProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD

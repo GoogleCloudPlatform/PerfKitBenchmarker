@@ -24,14 +24,16 @@ for more information.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
 import datetime
 import json
 import logging
 import time
+
 from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
@@ -51,14 +53,17 @@ GCP_DATABASE_VERSION_MAPPING = {
         '12': 'POSTGRES_12'
     },
     relational_db.SQLSERVER: {
-        '2017': 'SQLSERVER_2017_STANDARD',
+        '2017_Standard': 'SQLSERVER_2017_Standard',
+        '2017_Enterprise': 'SQLSERVER_2017_ENTERPRISE',
+        '2017_Express': 'SQLSERVER_2017_EXPRESS',
+        '2017_Web': 'SQLSERVER_2017_WEB'
     }
 }
 
 
 DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_POSTGRES_VERSION = '9.6'
-DEFAULT_SQL_SERVER_VERSION = '2017'
+DEFAULT_SQL_SERVER_VERSION = '2017_Standard'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
@@ -99,7 +104,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   ideal; however, a password is still required to connect. Currently only
   MySQL 5.7 and Postgres 9.6 are supported.
   """
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
@@ -177,7 +182,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 
-    _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
+    _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
+
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
     if FLAGS.mysql_flags:
       cmd_string = [
@@ -266,9 +273,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Raises:
       ValueError on invalid configuration.
     """
-    if cpus not in [1] + list(range(2, 33, 2)):
+    if cpus not in [1] + list(range(2, 97, 2)):
       raise ValueError(
-          'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
+          'CPUs (%i) much be 1 or an even number in-between 2 and 96, '
           'inclusive.' % cpus)
 
     if memory % 256 != 0:

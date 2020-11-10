@@ -6,8 +6,8 @@ import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
@@ -16,7 +16,7 @@ FLAGS = flags.FLAGS
 
 class GceNfsService(nfs_service.BaseNfsService):
   """Resource for GCE NFS service."""
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   NFS_TIERS = (
       'STANDARD',
       'PREMIUM'

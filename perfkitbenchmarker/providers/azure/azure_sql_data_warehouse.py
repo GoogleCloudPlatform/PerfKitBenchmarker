@@ -23,7 +23,6 @@ from typing import Dict
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 
@@ -153,7 +152,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
 class Azuresqldatawarehouse(edw_service.EdwService):
   """Object representing an Azure SQL data warehouse."""
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
   SERVICE_TYPE = 'azuresqldatawarehouse'
 
   def __init__(self, edw_service_spec):

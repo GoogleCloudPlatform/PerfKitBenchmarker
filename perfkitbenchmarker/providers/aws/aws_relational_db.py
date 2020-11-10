@@ -18,13 +18,15 @@ import datetime
 import json
 import logging
 import time
+
 from absl import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+
 FLAGS = flags.FLAGS
 
 
@@ -110,7 +112,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
   server will be launched in the zone requested, and
   relational_db_secondary_zone will not exist in the metadata.
   """
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __init__(self, relational_db_spec):
     super(AwsRelationalDb, self).__init__(relational_db_spec)

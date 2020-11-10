@@ -23,9 +23,9 @@ import os
 import re
 
 from absl import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import util
 
 
@@ -40,7 +40,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     project: ID of the project.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   SERVICE_NAME = 'dataproc'
 
   def __init__(self, spark_service_spec):

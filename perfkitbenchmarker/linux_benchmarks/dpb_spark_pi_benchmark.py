@@ -74,6 +74,9 @@ def Run(benchmark_spec):
 
   Returns:
     A list of sample.Sample objects.
+
+  Raises:
+    JobSubmissionError if the job fails.
   """
 
   metadata = {}
@@ -85,16 +88,16 @@ def Run(benchmark_spec):
 
   dpb_service_instance = benchmark_spec.dpb_service
 
-  wall_time, phase_stats = dpb_service_instance.SubmitSparkJob(
+  result = dpb_service_instance.SubmitSparkJob(
       spark_application_jar=inspect.getmodule(
           benchmark_spec.dpb_service).SPARK_SAMPLE_LOCATION,
       spark_application_classname='org.apache.spark.examples.SparkPi',
-      spark_application_args=[num_partitions]
-  )
-  logging.info(phase_stats)
-  results.append(sample.Sample('wall_time', wall_time, 'seconds', metadata))
-  results.append(sample.Sample('run_time', phase_stats['running_time'],
-                               'seconds', metadata))
+      spark_application_args=[num_partitions])
+  logging.info(result)
+  results.append(
+      sample.Sample('wall_time', result.wall_time, 'seconds', metadata))
+  results.append(
+      sample.Sample('run_time', result.run_time, 'seconds', metadata))
   return results
 
 

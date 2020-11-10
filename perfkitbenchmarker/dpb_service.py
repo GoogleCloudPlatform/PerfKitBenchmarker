@@ -23,8 +23,11 @@ import abc
 import datetime
 import logging
 import posixpath
+from typing import Dict, List
 
 from absl import flags
+from dataclasses import dataclass
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
@@ -60,14 +63,29 @@ FLINK = 'flink'
 HIVE = 'hive'
 
 # Metrics and Status related metadata
+# TODO(pclay): Remove these after migrating all callers to SubmitJob
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
-# Terasort phases
-TERAGEN = 'teragen'
-TERASORT = 'terasort'
-TERAVALIDATE = 'teravalidate'
+
+class JobSubmissionError(errors.Benchmarks.RunError):
+  """Thrown by all implementations if SubmitJob fails."""
+  pass
+
+
+@dataclass
+class JobResult:
+  """Data class for the timing of a successful DPB job."""
+  # Service reported execution time
+  run_time: float
+  # Service reported pending time (0 if service does not report).
+  pending_time: float = 0
+
+  @property
+  def wall_time(self) -> float:
+    """The total time the service reported it took to execute."""
+    return self.run_time + self.pending_time
 
 
 def GetDpbServiceClass(dpb_service_type):
@@ -105,10 +123,6 @@ class BaseDpbService(resource.BaseResource):
   BEAM_JOB_TYPE = 'beam'
 
   JOB_JARS = {
-      HADOOP_JOB_TYPE: {
-          'terasort':
-              'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
-      },
       SPARK_JOB_TYPE: {
           'pi': 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
       }
@@ -137,17 +151,17 @@ class BaseDpbService(resource.BaseResource):
 
   @abc.abstractmethod
   def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_stdout_file=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_type=None,
-                properties=None):
+                jarfile: str = None,
+                classname: str = None,
+                pyspark_file: str = None,
+                query_file: str = None,
+                job_poll_interval: float = None,
+                job_stdout_file: str = None,
+                job_arguments: List[str] = None,
+                job_files: List[str] = None,
+                job_jars: List[str] = None,
+                job_type: str = None,
+                properties: Dict[str, str] = None) -> JobResult:
     """Submit a data processing job to the backend.
 
     Args:
@@ -170,10 +184,10 @@ class BaseDpbService(resource.BaseResource):
       properties: Dict of properties to pass with the job.
 
     Returns:
-      dictionary, where success is true if the job succeeded,
-      false otherwise.  The dictionary may also contain an entry for
-      running_time and pending_time if the platform reports those
-      metrics.
+      A JobResult with the timing of the successful job.
+
+    Raises:
+      JobSubmissionError if job fails.
     """
     pass
 
@@ -251,98 +265,6 @@ class BaseDpbService(resource.BaseResource):
 
     return self.JOB_JARS[job_category][job_type]
 
-  # TODO(pclay): Move these methods to Terasort benchmark.
-  def GenerateDataForTerasort(self, base_dir, generate_jar,
-                              generate_job_category):
-    """TeraGen generates data used as input data for subsequent TeraSort run.
-
-    Args:
-      base_dir: String for the base directory URI (inclusive of the file system)
-        for terasort benchmark data.
-      generate_jar: String path to the executable for generating the data. Can
-        point to a hadoop/yarn executable.
-      generate_job_category: String category of the generate job for eg. hadoop,
-        spark, hive, etc.
-
-    Returns:
-      Wall time for the Generate job.
-      The statistics from running the Generate job.
-    """
-
-    generate_args = [
-        str(FLAGS.dpb_terasort_num_records), base_dir + TERAGEN
-    ]
-    start_time = datetime.datetime.now()
-    stats = self.SubmitJob(
-        # Not actually a class name, but the jar has a meta class that points
-        # to the actual main class. This way the main class gets the properties.
-        classname=TERAGEN,
-        jarfile=generate_jar,
-        job_poll_interval=5,
-        job_arguments=generate_args,
-        job_type=generate_job_category)
-    end_time = datetime.datetime.now()
-    return self._ProcessWallTime(start_time, end_time), stats
-
-  def SortDataForTerasort(self, base_dir, sort_jar, sort_job_category):
-    """TeraSort samples the input data and sorts the data into a total order.
-
-    TeraSort is implemented as a MapReduce sort job with a custom partitioner
-    that uses a sorted list of n-1 sampled keys that define the key range for
-    each reduce.
-
-    Args:
-      base_dir: String for the base directory URI (inclusive of the file system)
-        for terasort benchmark data.
-      sort_jar: String path to the executable for sorting the data. Can point to
-        a hadoop/yarn executable.
-      sort_job_category: String category of the generate job for eg. hadoop,
-        spark, hive, etc.
-
-    Returns:
-      Wall time for the Sort job.
-      The statistics from running the Sort job.
-    """
-    sort_args = [base_dir + TERAGEN, base_dir + TERASORT]
-    start_time = datetime.datetime.now()
-    stats = self.SubmitJob(
-        # Not actually a class name, but the jar has a meta class that points
-        # to the actual main class. This way the main class gets the properties.
-        classname=TERASORT,
-        jarfile=sort_jar,
-        job_poll_interval=5,
-        job_arguments=sort_args,
-        job_type=sort_job_category)
-    end_time = datetime.datetime.now()
-    return self._ProcessWallTime(start_time, end_time), stats
-
-  def ValidateDataForTerasort(self, base_dir, validate_jar,
-                              validate_job_category):
-    """TeraValidate ensures that the output data of TeraSort is globally sorted.
-
-    Args:
-      base_dir: String for the base directory URI (inclusive of the file system)
-        for terasort benchmark data.
-      validate_jar: String path to the executable for validating the sorted
-        data. Can point to a hadoop/yarn executable.
-      validate_job_category: String category of the validate job for eg. hadoop,
-        spark, hive, etc.
-
-    Returns:
-      Wall time for the Validate job.
-      The statistics from running the Validate job.
-    """
-    validate_args = [base_dir + TERASORT, base_dir + TERAVALIDATE]
-    start_time = datetime.datetime.now()
-    stats = self.SubmitJob(
-        classname=TERAVALIDATE,
-        jarfile=validate_jar,
-        job_poll_interval=5,
-        job_arguments=validate_args,
-        job_type=validate_job_category)
-    end_time = datetime.datetime.now()
-    return self._ProcessWallTime(start_time, end_time), stats
-
   def SubmitSparkJob(self, spark_application_jar, spark_application_classname,
                      spark_application_args):
     """Submit a SparkJob to the service instance, returning performance stats.
@@ -356,18 +278,17 @@ class BaseDpbService(resource.BaseResource):
        not the arguments passed to the wrapper that submits the job.
 
     Returns:
-      Wall time for executing the Spark application.
-      The statistics from running the Validate job.
+      JobResult of the Spark Job
+
+    Raises:
+      JobSubmissionError if the job fails.
     """
-    start_time = datetime.datetime.now()
-    stats = self.SubmitJob(
+    return self.SubmitJob(
         jarfile=spark_application_jar,
         job_type='spark',
         classname=spark_application_classname,
         job_arguments=spark_application_args
     )
-    end_time = datetime.datetime.now()
-    return self._ProcessWallTime(start_time, end_time), stats
 
   def CreateBucket(self, source_bucket):
     """Creates an object-store bucket used during persistent data processing.
@@ -459,8 +380,12 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     """Submit a data processing job to the backend."""
     if job_type != self.HADOOP_JOB_TYPE:
       raise NotImplementedError
-    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'), 'jar', jarfile]
+    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop')]
     # Order is important
+    if jarfile:
+      cmd_list += ['jar', jarfile]
+    # Specifying classname only works if jarfile is omitted or if it has no
+    # main class.
     if classname:
       cmd_list += [classname]
     all_properties = self.GetJobProperties()
@@ -471,14 +396,16 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     cmd_string = ' '.join(cmd_list)
 
     start_time = datetime.datetime.now()
-    stdout, _ = self.leader.RemoteCommand(cmd_string)
+    stdout, stderr, retcode = self.leader.RemoteCommandWithReturnCode(
+        cmd_string)
+    if retcode:
+      raise JobSubmissionError(stderr)
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
         f.write(stdout)
-    return {SUCCESS: True,
-            RUNTIME: (end_time - start_time).total_seconds()}
+    return JobResult(run_time=(end_time - start_time).total_seconds())
 
   def _Delete(self):
     pass

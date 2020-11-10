@@ -463,7 +463,7 @@ def Install(vm):
     vm: The virtual machine to install NVIDIA driver on.
   """
   version_to_install = FLAGS.nvidia_driver_version
-  if version_to_install is None:
+  if not version_to_install:
     return
 
   location = ('{base}/{version}/NVIDIA-Linux-x86_64-{version}.run'

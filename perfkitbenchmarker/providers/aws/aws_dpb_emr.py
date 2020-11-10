@@ -18,20 +18,16 @@ Clusters can be created and deleted.
 
 import json
 import logging
+
 from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
-
-GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
-                       'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('dpb_emr_release_label', None,
@@ -46,9 +42,6 @@ READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
 EMR_TIMEOUT = 14400
 
-MANAGER_SG = 'EmrManagedMasterSecurityGroup'
-WORKER_SG = 'EmrManagedSlaveSecurityGroup'
-
 disk_to_hdfs_map = {
     'st1': 'HDD',
     'gp2': 'SSD'
@@ -57,40 +50,6 @@ disk_to_hdfs_map = {
 
 class EMRRetryableException(Exception):
   pass
-
-
-class AwsSecurityGroup(resource.BaseResource):
-  """Object representing a AWS Security Group.
-
-  A security group is created automatically when an Amazon EMR cluster
-  is created.  It is not deleted automatically, and the subnet and VPN
-  cannot be deleted until the security group is deleted.
-
-  Because of this, there's no _Create method, only a _Delete and an
-  _Exists method.
-  """
-
-  def __init__(self, cmd_prefix, group_id):
-    super(AwsSecurityGroup, self).__init__()
-    self.created = True
-    self.group_id = group_id
-    self.cmd_prefix = cmd_prefix
-
-  def _Delete(self):
-    cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
-                             '--group-id=' + self.group_id]
-    vm_util.IssueCommand(cmd, raise_on_failure=False)
-
-  def _Exists(self):
-    cmd = self.cmd_prefix + ['ec2', 'describe-security-groups',
-                             '--group-id=' + self.group_id]
-    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    # if the security group doesn't exist, the describe command gives an error.
-    return retcode == 0
-
-  def _Create(self):
-    if not self.created:
-      raise NotImplemented()
 
 
 class AwsDpbEmr(dpb_service.BaseDpbService):
@@ -107,7 +66,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     dpb_version: EMR version to use.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   SERVICE_TYPE = 'emr'
   PERSISTENT_FS_PREFIX = 's3://'
 
@@ -135,6 +94,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
+
+  @property
+  def security_group_id(self):
+    """Returns the security group ID of this Cluster."""
+    return self.network.regional_network.vpc.default_security_group_id
 
   def _CreateLogBucket(self):
     """Create the s3 bucket for the EMR cluster's logs."""
@@ -210,10 +174,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              '--log-uri', logs_bucket]
 
     ec2_attributes = [
-        'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
+        'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
+        'SubnetId=' + self.network.subnet.id,
+        # Place all VMs in default security group for simplicity and speed of
+        # provisioning
+        'EmrManagedMasterSecurityGroup=' + self.security_group_id,
+        'EmrManagedSlaveSecurityGroup=' + self.security_group_id,
     ]
-    if self.network:
-      ec2_attributes.append('SubnetId=' + self.network.subnet.id)
     cmd += ['--ec2-attributes', ','.join(ec2_attributes)]
 
     stdout, _, _ = vm_util.IssueCommand(cmd)
@@ -230,39 +197,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              '{}={}'.format(key, value)]
     vm_util.IssueCommand(cmd)
 
-  def _DeleteSecurityGroups(self):
-    """Delete the security groups associated with this cluster."""
-    if self.cluster_id:
-      cmd = self.cmd_prefix + ['emr', 'describe-cluster',
-                               '--cluster-id', self.cluster_id]
-      stdout, _, _ = vm_util.IssueCommand(cmd)
-      cluster_desc = json.loads(stdout)
-      sec_object = cluster_desc['Cluster']['Ec2InstanceAttributes']
-      manager_sg = sec_object[MANAGER_SG]
-      worker_sg = sec_object[WORKER_SG]
-
-      # the manager group and the worker group reference each other, so neither
-      # can be deleted.  First we delete the references to the manager group in
-      # the worker group.  Then we delete the manager group, and then, finally
-      # the worker group.
-
-      # remove all references to the manager group from the worker group.
-      for proto, port in [('tcp', '0-65535'), ('udp', '0-65535'),
-                          ('icmp', '-1')]:
-        for group1, group2 in [(worker_sg, manager_sg),
-                               (manager_sg, worker_sg)]:
-          cmd = self.cmd_prefix + ['ec2', 'revoke-security-group-ingress',
-                                   '--group-id=' + group1,
-                                   '--source-group=' + group2,
-                                   '--protocol=' + proto,
-                                   '--port=' + port]
-          vm_util.IssueCommand(cmd)
-
-      # Now we need to delete the manager, then the worker.
-      for group in manager_sg, worker_sg:
-        sec_group = AwsSecurityGroup(self.cmd_prefix, group)
-        sec_group.Delete()
-
   def _Delete(self):
     if self.cluster_id:
       delete_cmd = self.cmd_prefix + ['emr',
@@ -272,8 +206,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
-    if self.network:
-      self._DeleteSecurityGroups()
     self._DeleteLogBucket()
     aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
@@ -310,9 +242,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     Args:
       step_id: The step id to query.
+
     Returns:
       A dictionary describing the step if the step the step is complete,
           None otherwise.
+
+    Raises:
+      JobSubmissionError if job fails.
     """
 
     cmd = self.cmd_prefix + ['emr', 'describe-step', '--cluster-id',
@@ -320,7 +256,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
-    if state == 'COMPLETED' or state == 'FAILED':
+    if state == 'FAILED':
+      raise dpb_service.JobSubmissionError(
+          result['Step']['Status']['FailureDetails'])
+    if state == 'COMPLETED':
       return result
     else:
       return None
@@ -338,8 +277,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_type=None,
                 properties=None):
     """See base class."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=job_poll_interval, fuzz=0)
+    @vm_util.Retry(
+        timeout=EMR_TIMEOUT,
+        poll_interval=job_poll_interval,
+        fuzz=0,
+        retryable_exceptions=(EMRRetryableException,))
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
@@ -354,17 +296,22 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     all_properties.update(properties or {})
 
     if job_type == 'hadoop':
-      step_type_spec = 'Type=CUSTOM_JAR'
-      jar_spec = 'Jar=' + jarfile
+      if not (jarfile or classname):
+        raise ValueError('You must specify jarfile or classname.')
+      if jarfile and classname:
+        raise ValueError('You cannot specify both jarfile and classname.')
       arg_list = []
-      # Order is important
       if classname:
-        arg_list += [classname]
+        # EMR does not support passing classnames as jobs. Instead manually
+        # invoke `hadoop CLASSNAME` using command-runner.jar
+        jarfile = 'command-runner.jar'
+        arg_list = ['hadoop', classname]
+      # Order is important
       arg_list += ['-D{}={}'.format(k, v) for k, v in all_properties.items()]
       if job_arguments:
         arg_list += job_arguments
       arg_spec = 'Args=[' + ','.join(arg_list) + ']'
-      step_list = [step_type_spec, jar_spec, arg_spec]
+      step_list = ['Jar=' + jarfile, arg_spec]
     elif job_type == self.SPARK_JOB_TYPE:
       arg_list = []
       if job_files:
@@ -414,17 +361,14 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(step_cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
-    metrics = {}
 
     result = WaitForStep(step_id)
     pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
     start_time = result['Step']['Status']['Timeline']['StartDateTime']
     end_time = result['Step']['Status']['Timeline']['EndDateTime']
-    metrics[dpb_service.WAITING] = start_time - pending_time
-    metrics[dpb_service.RUNTIME] = end_time - start_time
-    step_state = result['Step']['Status']['State']
-    metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
-    return metrics
+    return dpb_service.JobResult(
+        run_time=end_time - start_time,
+        pending_time=start_time - pending_time)
 
   def SetClusterProperty(self):
     pass
@@ -444,95 +388,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       source_bucket: String, name of the bucket to delete.
     """
     self.storage_service.DeleteBucket(source_bucket)
-
-  def generate_data(self, source_dir, udpate_default_fs, num_files,
-                    size_file):
-    """Method to generate data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['TestDFSIO']
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-write', '-nrFiles', str(num_files), '-fileSize',
-                          str(size_file)])
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="TestDFSIO"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = GENERATE_HADOOP_JAR
-
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    step_state = result['Step']['Status']['State']
-    if step_state != 'COMPLETED':
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
-
-  def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
-    """Method to read data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['TestDFSIO']
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-read', '-nrFiles', str(num_files), '-fileSize',
-                          str(size_file)])
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="TestDFSIO"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = GENERATE_HADOOP_JAR
-
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    step_state = result['Step']['Status']['State']
-    if step_state != 'COMPLETED':
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
 
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
@@ -578,49 +433,3 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     step_state = result['Step']['Status']['State']
     metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
     return metrics
-
-  def cleanup_data(self, base_dir, udpate_default_fs):
-    """Method to cleanup data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['TestDFSIO']
-    if udpate_default_fs:
-      job_arguments.append('-Dfs.default.name={}'.format(base_dir))
-    job_arguments.append('-Dtest.build.data={}'.format(base_dir))
-    job_arguments.append('-clean')
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="TestDFSIO"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = GENERATE_HADOOP_JAR
-
-    # How will we handle a class name ????
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    step_state = result['Step']['Status']['State']
-    if step_state != 'COMPLETED':
-      return {dpb_service.SUCCESS: False}
-    else:
-      rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
-      stdout, _, _ = vm_util.IssueCommand(rb_step_cmd)
-      return {dpb_service.SUCCESS: True}

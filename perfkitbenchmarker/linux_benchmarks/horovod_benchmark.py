@@ -37,21 +37,21 @@ horovod:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: tf-latest-gpu-gvnic
+          image_family: tf-latest-gpu-gvnic-debian-10
           image_project: deeplearning-platform-release
-          boot_disk_size: 105
+          boot_disk_size: 300
           gpu_type: v100
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-west-2a
           image: ami-06278cf24c1b2f0fe
-          boot_disk_size: 105
+          boot_disk_size: 300
         Azure:
           machine_type: Standard_NC24rs_v3
           image: microsoft-dsvm:aml-workstation:ubuntu:19.11.13
           zone: eastus
-          boot_disk_size: 105
+          boot_disk_size: 300
       vm_count: null
 """
 

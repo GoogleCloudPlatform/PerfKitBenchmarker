@@ -20,7 +20,6 @@ import time
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -36,7 +35,7 @@ REDIS_VERSION = '3.2'
 class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   """Object representing an Azure Redis Cache."""
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
   MEMORY_STORE = managed_memory_store.REDIS
 
   # Azure redis could take up to an hour to create

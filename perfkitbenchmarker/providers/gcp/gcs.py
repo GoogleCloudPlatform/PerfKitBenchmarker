@@ -19,14 +19,15 @@ import ntpath
 import os
 import posixpath
 import re
+
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 
 _DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
 DEFAULT_GCP_REGION = 'us-central1'
@@ -47,7 +48,7 @@ FLAGS = flags.FLAGS
 class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   """Interface to Google Cloud Storage."""
 
-  STORAGE_NAME = providers.GCP
+  STORAGE_NAME = gcp.CLOUD
 
   def PrepareService(self, location):
     self.location = location or DEFAULT_GCP_REGION

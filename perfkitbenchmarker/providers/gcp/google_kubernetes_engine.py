@@ -18,13 +18,14 @@ import json
 import logging
 import os
 import re
+
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 
@@ -40,7 +41,7 @@ SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 class GoogleContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on GCP."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, registry_spec):
     super(GoogleContainerRegistry, self).__init__(registry_spec)
@@ -84,7 +85,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
 class GkeCluster(container_service.KubernetesCluster):
   """Class representing a Google Kubernetes Engine cluster."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)

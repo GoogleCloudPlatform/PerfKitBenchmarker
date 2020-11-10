@@ -45,6 +45,7 @@ from __future__ import print_function
 import logging
 import math
 from absl import flags
+import dataclasses
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -88,6 +89,27 @@ hpcc:
 
 SECONDS_PER_HOUR = 60 * 60
 
+
+@dataclasses.dataclass(frozen=True)
+class HpccDimensions:
+  """Dimensions for the run.
+
+  Replaces values in the data/hpccinf.txt file.  For more details see
+  http://www.netlib.org/benchmark/hpl/tuning.html .  The value in quotes after
+  the field name is the corresponding attribute name in the hpccinf.txt file.
+
+  Attributes:
+    problem_size: 'Ns': the problem size.
+    block_size: 'NBs': number of blocks.
+    num_rows: 'Ps': number of rows for each grid.
+    num_columns: 'Qs': number of columns for each grid.
+  """
+  problem_size: int
+  block_size: int
+  num_rows: int
+  num_columns: int
+
+
 flags.DEFINE_integer('memory_size_mb',
                      None,
                      'The amount of memory in MB on each machine to use. By '
@@ -126,14 +148,13 @@ def CheckPrerequisites(_):
         'Numa binding with with multiple hpcc vm not supported.')
 
 
-def CreateHpccinf(vm, benchmark_spec):
-  """Creates the HPCC input file."""
-  num_vms = len(benchmark_spec.vms)
+def _CalculateHpccDimensions(num_vms, num_cpus, vm_memory_size_actual):
+  """Calculates the HPCC dimensions for the run."""
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
-    total_memory = vm.total_free_memory_kb * 1024 * num_vms
-  total_cpus = vm.NumCpusForBenchmark() * num_vms
+    total_memory = vm_memory_size_actual * 1024 * num_vms
+  total_cpus = num_cpus * num_vms
   block_size = BLOCK_SIZE
 
   # Finds a problem size that will fit in memory and is a multiple of the
@@ -152,13 +173,25 @@ def CreateHpccinf(vm, benchmark_spec):
       num_rows = i
       num_columns = total_cpus // i
       break
+  return HpccDimensions(problem_size, block_size, num_rows, num_columns)
 
+
+def CreateHpccinf(vm, benchmark_spec):
+  """Creates the HPCC input file."""
+  dimensions = _CalculateHpccDimensions(
+      len(benchmark_spec.vms), vm.NumCpusForBenchmark(),
+      vm.total_free_memory_kb)
   file_path = data.ResourcePath(HPCCINF_FILE)
   vm.PushFile(file_path, HPCCINF_FILE)
-  sed_cmd = (('sed -i -e "s/problem_size/%s/" -e "s/block_size/%s/" '
-              '-e "s/rows/%s/" -e "s/columns/%s/" %s') %
-             (problem_size, block_size, num_rows, num_columns, HPCCINF_FILE))
+  sed_cmd = (f'sed -i '
+             f'-e "s/problem_size/{dimensions.problem_size}/" '
+             f'-e "s/block_size/{dimensions.block_size}/" '
+             f'-e "s/rows/{dimensions.num_rows}/" '
+             f'-e "s/columns/{dimensions.num_columns}/" '
+             f'{HPCCINF_FILE}')
   vm.RemoteCommand(sed_cmd)
+  # Store in the spec to put into the run's metadata.
+  benchmark_spec.hpcc_dimensions = dataclasses.asdict(dimensions)
 
 
 def PrepareHpcc(vm):
@@ -241,6 +274,7 @@ def ParseOutput(hpcc_output, benchmark_spec):
       'num_machines': len(benchmark_spec.vms)
   }
   UpdateMetadata(base_metadata)
+  base_metadata.update(benchmark_spec.hpcc_dimensions)
 
   # Parse all metrics from metric=value lines in the HPCC output.
   metric_values = regex_util.ExtractAllFloatMetrics(hpcc_output)

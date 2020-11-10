@@ -20,12 +20,13 @@ https://cloud.google.com/compute/docs/instances/define-instance-placement
 
 import json
 import logging
+
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
@@ -47,7 +48,7 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
       num_vms: Number of VMs to put into the resource group.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -74,7 +75,7 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
 class GcePlacementGroup(placement_group.BasePlacementGroup):
   """Object representing an GCE Placement Group."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, gce_placement_group_spec):
     """Init method for GcePlacementGroup.

@@ -21,13 +21,14 @@ import copy
 import json
 import os
 from typing import Dict
+
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_cluster_parameter_group
 from perfkitbenchmarker.providers.aws import aws_cluster_subnet_group
 from perfkitbenchmarker.providers.aws import util
@@ -171,7 +172,7 @@ class Redshift(edw_service.EdwService):
     project: ID of the project.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   SERVICE_TYPE = 'redshift'
 
   READY_TIMEOUT = 7200
