@@ -21,6 +21,7 @@ import os
 import time
 
 from absl import flags
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
@@ -38,59 +39,11 @@ VPC_NAME = 'vpc'
 VPC_PREFIX_RANGES = ['10.101.0.0/16', '10.102.0.0/16', '10.103.0.0/16', '10.104.0.0/16', '10.105.0.0/16']
 VPC_SUBNETS = ['10.101.0.0/20', '10.102.0.0/20', '10.103.0.0/20', '10.104.0.0/20', '10.105.0.0/20']
 
-# this is needed for windows vms
-USER_DATA = "Content-Type: multipart/mixed; boundary=MIMEBOUNDARY\n\
-MIME-Version: 1.0\n\
---MIMEBOUNDARY\n\
-Content-Type: text/cloud-config; charset=\"us-ascii\"\n\
-MIME-Version: 1.0\n\
-Content-Transfer-Encoding: 7bit\n\
-Content-Disposition: attachment; filename=\"cloud-config\"\n\
-#cloud-config\n\
-set_timezone: America/Chicago\n\
---MIMEBOUNDARY\n\
-Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
-MIME-Version: 1.0\n\
-Content-Transfer-Encoding: 7bit\n\
-Content-Disposition: attachment; filename=\"set-content.ps1\"\n\
-#ps1_sysnative\n\
-Set-Content -Path \"C:\\helloWorld.txt\" -Value \"Hello, World!\"\n\
---MIMEBOUNDARY\n\
-Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
-MIME-Version: 1.0\n\
-Content-Transfer-Encoding: 7bit\n\
-Content-Disposition: attachment; filename=\"set-content.ps1\"\n\
-#ps1_sysnative\n\
-function Setup-Remote-Desktop () {\n\
-Set-ItemProperty \"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" -Name fDenyTSConnections -Value 0\n\
-Set-ItemProperty \"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp\" -Name \"UserAuthentication\" -Value 1\n\
-Enable-NetFireWallRule -DisplayGroup \"Remote Desktop\"\n}\n\
-function Setup-Ping () {\n\
-Set-NetFirewallRule -DisplayName \"File and Printer Sharing (Echo Request - ICMPv4-In)\" -enabled True\n\
-Set-NetFirewallRule -DisplayName \"File and Printer Sharing (Echo Request - ICMPv6-In)\" -enabled True\n}\n\
-Setup-Remote-Desktop\n\
-Setup-Ping\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5201\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5201\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5202\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5202\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5203\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5203\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5204\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5204\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5205\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5205\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20000\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20000\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20001\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20001\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20002\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20002\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20003\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20003\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20010\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20010\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20011\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20011\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20012\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20012\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20013\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20013\n\
-New-NetFirewallRule -DisplayName \"Allow winrm https 5986\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986\n\
-winrm set winrm/config/service/auth '@{Basic=\"true\";Certificate=\"true\"}'\n\
-$cert=New-SelfSignedCertificate -certstorelocation cert:\localmachine\my -dnsname *\n\
-$thumb=($cert).Thumbprint\n\
-New-WSManInstance -ResourceURI winrm/config/Listener -SelectorSet @{Address=\"*\";Transport=\"HTTPS\"} -ValueSet @{CertificateThumbprint=\"$thumb\"}\n\
-powercfg /SetActive (powercfg /List | %{if ($_.Contains(\"High performance\")){$_.Split()[3]}})\n\
-Set-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword MTU -RegistryValue 9000\n\
---MIMEBOUNDARY--"
+_DEFAULT_VOLUME_IOPS = 3000
+_DEFAULT_TIMEOUT = 300
+_WAIT_TIME_RHEL = 300
+_WAIT_TIME_UBUNTU = 600
+_WAIT_TIME_DEBIAN = 120
 
 
 class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -107,7 +60,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   validated_resources_set = set()
   validated_subnets = 0  # indicator for number of subnets created
 
-  def __init__(self, vm_spec):
+  def __init__(self, vm_spec: virtual_machine.BaseVmSpec):
     """Initialize a IBM Cloud virtual machine.
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
@@ -116,11 +69,12 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_name = FLAGS.ibmcloud_image_username
     self.boot_volume_size = FLAGS.ibmcloud_boot_volume_size
     self.boot_volume_iops = FLAGS.ibmcloud_boot_volume_iops
-    self.volume_iops = 3000
+    self.volume_iops = _DEFAULT_VOLUME_IOPS
     if FLAGS.ibmcloud_volume_iops:
       self.volume_iops = FLAGS.ibmcloud_volume_iops
     self.volume_profile = FLAGS.ibmcloud_volume_profile
     self.imageid = FLAGS.ibmcloud_image_id
+    self.image = FLAGS.image
     self.os_data = None
     self.user_data = None
     self.vmid = None
@@ -128,9 +82,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.vm_started = False
     self.instance_start_failed = True
     self.instance_stop_failed = False
-    self.profile = FLAGS.ibmcloud_profile
+    self.profile = FLAGS.machine_type
     self.prefix = FLAGS.ibmcloud_prefix
-    self.zone = None
+    self.zone = 'us-south-1'  # default
     self.fip_address = None
     self.fip_id = None
     self.ssh_pub_keyfile = None
@@ -139,8 +93,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.vpcid = FLAGS.ibmcloud_vpcid
     self.key = FLAGS.ibmcloud_pub_keyid
     self.sgid = None
-    self.encryption_key = FLAGS.ibmcloud_bootvol_encryption_key if \
-    FLAGS.ibmcloud_bootvol_encryption_key else None
+    self.boot_encryption_key = None
+    self.data_encryption_key = None
     self.extra_vdisks_created = False
     self.device_paths_detected = set()
 
@@ -162,8 +116,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info('Image id to use: %s', FLAGS.ibmcloud_image_id)
     else:
       cmd = ibm.IbmAPICommand(self)
-      cmd.flags['image_name'] = FLAGS.ibmcloud_image_name if \
-      FLAGS.ibmcloud_image_name else self._GetDefaultImageName()
+      cmd.flags['image_name'] = self.image or self._GetDefaultImageName()
       logging.info('Looking up image: %s', cmd.flags['image_name'])
       self.imageid = cmd.GetImageId()
       if self.imageid is None:
@@ -181,9 +134,11 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Looks up the resources needed, if not found, creates new """
     logging.info('Checking mzone setup')
     cmd = ibm.IbmAPICommand(self)
-    cmd.flags['prefix'] = self.prefix
-    cmd.flags['zone'] = self.zone
-    cmd.flags['items'] = 'vpcs'
+    cmd.flags.update({
+      'prefix': self.prefix,
+      'zone': self.zone,
+      'items': 'vpcs'
+      })
     self.vpcid = cmd.ListResources()
     logging.info('Vpc found: %s', self.vpcid)
 
@@ -197,8 +152,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.vpcid = cmd.CreateVpc()
       if self.vpcid:
         # let first thread create address prefix for all zones
-        zone_list = [str(item) for item in FLAGS.ibmcloud_zones.split(',')]
-        for zone in zone_list:
+        for zone in FLAGS.zones:
           cmd.flags['vpcid'] = self.vpcid
           cmd.flags['zone'] = zone
           index = int(zone[len(zone) - 1])  # get the ending -1
@@ -215,11 +169,13 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
         os._exit(1)
 
     if not self.subnet:
-      cmd.flags['vpcid'] = self.vpcid
-      cmd.flags['zone'] = self.zone
-      cmd.flags['name'] = self.prefix + VPC_NAME + util.SUBNET_SUFFIX + \
-      str(subnet_index) + util.DELIMITER + self.zone
-      cmd.flags['cidr'] = VPC_SUBNETS[subnet_index - 1]
+      cmd.flags.update({
+        'vpcid': self.vpcid,
+        'zone': self.zone,
+        'name': self.prefix + VPC_NAME + util.SUBNET_SUFFIX + \
+        str(subnet_index) + util.DELIMITER + self.zone,
+        'cidr': VPC_SUBNETS[subnet_index - 1]
+        })
       logging.info('Creating subnet: %s', cmd.flags)
       resp = cmd.CreateSubnet()
       if resp:
@@ -277,7 +233,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       if self.vpcid not in IbmCloudVirtualMachine.validated_resources_set:
         cmd = ibm.IbmAPICommand(self)
         # check till all subnets are gone
-        time_to_end = time.time() + 300
+        time_to_end = time.time() + _DEFAULT_TIMEOUT
         while IbmCloudVirtualMachine.validated_subnets > 0:
           logging.info('Subnets not empty yet')
           if time_to_end < time.time():
@@ -357,17 +313,15 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Checks prerequisites are met otherwise aborts execution."""
     self._CheckCanaryCommand()
     with self._lock:
-      logging.info('')
       logging.info('Validating prerequisites.')
-      logging.info('zones: %s', FLAGS.ibmcloud_zones)
-      if ',' in FLAGS.ibmcloud_zones:
-        zone_list = [str(item) for item in FLAGS.ibmcloud_zones.split(',')]
-        for zone in zone_list:
+      logging.info('zones: %s', FLAGS.zones)
+      if len(FLAGS.zones) > 1:
+        for zone in FLAGS.zones:
           if zone not in IbmCloudVirtualMachine.validated_resources_set:
             self.zone = zone
             break
       else:
-        self.zone = FLAGS.ibmcloud_zones
+        self.zone = FLAGS.zones[0]
       logging.info('zone to use %s', self.zone)
       self._CheckImage()
       self._SetupMzone()
@@ -411,46 +365,55 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Get the information needed to authenticate on IBM Cloud,
       check for the config if env variables for apikey is not set
     """
-    account_id = os.environ.get('IBMCLOUD_ACCOUNT_ID')
-    apikey = os.environ.get('IBMCLOUD_APIKEY')
-    if not account_id or not apikey:
+    account = util.Account(os.environ.get('IBMCLOUD_ACCOUNT_ID'),
+                           os.environ.get('IBMCLOUD_APIKEY'),
+                           None)
+    if not account.name or not account.apikey:
       accounts = os.environ.get('IBMCLOUD_ACCOUNTS')  # read from config file
       if accounts is not None and accounts != '':
         config = util.ReadConfig(accounts)
-        account_id = config[FLAGS.benchmarks[0]][0][0]  # first account
-        apikey = config[FLAGS.benchmarks[0]][0][1]
-        if len(config[FLAGS.benchmarks[0]][0]) > 2:  # override the rgid if set
-          FLAGS.ibmcloud_rgid = config[FLAGS.benchmarks[0]][0][2]
-    if not account_id or not apikey:
+        benchmark = config[FLAGS.benchmarks[0]][0]
+        account = util.Account(benchmark[0], benchmark[1], benchmark[2])  # first account
+        logging.info('account_id: %s', account.name)
+        if FLAGS.ibmcloud_datavol_encryption_key:  # if this flag is set
+          self.data_encryption_key = account.enckey
+          logging.info('KP key to use, data: %s', self.data_encryption_key)
+        if FLAGS.ibmcloud_bootvol_encryption_key:  # use same key as data
+          self.boot_encryption_key = account.enckey
+          logging.info('KP key to use, boot: %s', self.boot_encryption_key)
+
+    if not account.name or not account.apikey:
       raise errors.Config.InvalidValue(
           'PerfKit Benchmarker on IBM Cloud requires that the '
           'environment variables IBMCLOUD_ACCOUNT_ID and IBMCLOUD_APIKEY '
           'are correctly set.')
-    ibm.IbmAPICommand.ibmcloud_account_id = account_id
-    ibm.IbmAPICommand.ibmcloud_apikey = apikey
-    IbmCloudVirtualMachine.ibmcloud_account_id = account_id
-    IbmCloudVirtualMachine.ibmcloud_apikey = apikey
+    ibm.IbmAPICommand.ibmcloud_account_id = account.name
+    ibm.IbmAPICommand.ibmcloud_apikey = account.apikey
+    IbmCloudVirtualMachine.ibmcloud_account_id = account.name
+    IbmCloudVirtualMachine.ibmcloud_apikey = account.apikey
 
   def _CreateInstance(self):
     """Creates IBM Cloud VM instance."""
     cmd = ibm.IbmAPICommand(self)
-    cmd.flags['name'] = self.name
-    cmd.flags['imageid'] = self.imageid
-    cmd.flags['profile'] = self.profile
-    cmd.flags['vpcid'] = self.vpcid
-    cmd.flags['subnet'] = self.subnet
-    cmd.flags['key'] = self.key
-    cmd.flags['zone'] = self.zone
+    cmd.flags.update({
+      'name': self.name,
+      'imageid': self.imageid,
+      'profile': self.profile,
+      'vpcid': self.vpcid,
+      'subnet': self.subnet,
+      'key': self.key,
+      'zone': self.zone
+      })
     cmd.user_data = self.user_data
     if self.boot_volume_size > 0:
       cmd.flags['capacity'] = self.boot_volume_size
     cmd.flags['iops'] = self.boot_volume_iops
-    if self.encryption_key:
-      cmd.flags['encryption_key'] = self.encryption_key
+    if self.boot_encryption_key:
+        cmd.flags['encryption_key'] = self.boot_encryption_key
     logging.info('Creating instance, flags: %s', cmd.flags)
     resp = json.loads(cmd.CreateInstance())
     if 'id' not in resp:
-      raise errors.Error('IBM Cloud ERROR: Failed to create instance: %s', resp)
+      raise errors.Error(f'IBM Cloud ERROR: Failed to create instance: {resp}')
     self.vmid = resp['id']
     logging.info('Instance created, id: %s', self.vmid)
     logging.info('Waiting for instance to start, id: %s', self.vmid)
@@ -459,7 +422,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.instance_start_failed = False
     assert status == ibm.RUNNING
     if status != ibm.RUNNING:
-      logging.error("Instance start failed, status %s" % status)
+      logging.error('Instance start failed, status: %s', status)
       self.instance_start_failed = True
     self.vm_started = not self.instance_start_failed
     logging.info('Instance %s status %s', self.vmid, status)
@@ -473,11 +436,11 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.instance_start_failed = False
     assert status == ibm.RUNNING
     if status != ibm.RUNNING:
-      logging.error("Instance start failed, status %s" % status)
+      logging.error('Instance start failed, status: %s', status)
       self.instance_start_failed = True
     self.vm_started = not self.instance_start_failed
 
-  def _CreateFip(self, name):
+  def _CreateFip(self, name: str):
     """Creates a VNIC in a IBM Cloud VM instance."""
     cmd = ibm.IbmAPICommand(self)
     cmd.flags['instanceid'] = self.vmid
@@ -501,21 +464,21 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['fip_id'] = self.fip_id
     cmd.InstanceFipDelete()
 
-  def _FindVnicIdByName(self, vnics, name):
+  def _FindVnicIdByName(self, vnics: [str], name: str):
     """Finds vnic by name"""
     for vnic in vnics:
       if vnic['name'] == name:
         return vnic['uid']
     return None
 
-  def _FindVnicIdBySubnet(self, vnics, subnet):
+  def _FindVnicIdBySubnet(self, vnics: [str], subnet: str):
     """Finds vnic by subnet"""
     for vnic in vnics:
       if vnic['subnet']['id'] == subnet:
         return vnic['id']
     return None
 
-  def _WaitForIPAssignment(self, networkid):
+  def _WaitForIPAssignment(self, networkid: str):
     """Finds the IP address assigned to the vm."""
     IPv4Address = '0.0.0.0'
     count = 0
@@ -545,7 +508,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info('stop_instance_poll: last status is %s', status)
     self.instance_stop_failed = False
     if status != ibm.STOPPED:
-      logging.error("Instance stop failed: status %s" % status)
+      logging.error('Instance stop failed, status: %s', status)
     self.vm_started = False
 
   def _DeleteInstance(self):
@@ -556,7 +519,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.vm_deleted = True
     logging.info('Instance deleted: %s', cmd.flags['instanceid'])
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, disk_spec: disk.BaseDisk):
     """Create a VM's scratch disk.
 
     Args:
@@ -565,7 +528,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks_names = ('%s-data-%d-%d'
                    % (self.name, len(self.scratch_disks), i)
                    for i in range(disk_spec.num_striped_disks))
-    disks = [ibmcloud_disk.IbmCloudDisk(disk_spec, name, self.zone)
+    disks = [ibmcloud_disk.IbmCloudDisk(disk_spec, name, self.zone, \
+                                        encryption_key=self.data_encryption_key)
              for name in disks_names]
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
@@ -585,7 +549,7 @@ class DebianBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
 
   def PrepareVMEnvironment(self):
     logging.info('Pausing for 2 min before update and installs')
-    time.sleep(120)
+    time.sleep(_WAIT_TIME_DEBIAN)
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y update')
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y install sudo')
     super(DebianBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
@@ -616,19 +580,28 @@ class Ubuntu1804BasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
 
   def PrepareVMEnvironment(self):
     logging.info('Pausing for 10 min before update and installs')
-    time.sleep(600)
+    time.sleep(_WAIT_TIME_UBUNTU)
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y update')
     super(Ubuntu1804BasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
 
 
-class Rhel7BasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
-                                       linux_virtual_machine.Rhel7Mixin):
-  IMAGE_NAME_PREFIX = 'ibm-redhat-7-6-minimal-amd64'
+class RhelBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
+                                      linux_virtual_machine.BaseRhelMixin):
 
   def PrepareVMEnvironment(self):
     logging.info('Pausing for 5 min before update and installs')
-    time.sleep(300)
-    super(Rhel7BasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
+    time.sleep(_WAIT_TIME_RHEL)
+    super(RhelBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
+
+
+class Rhel7BasedIbmCloudVirtualMachine(RhelBasedIbmCloudVirtualMachine,
+                                       linux_virtual_machine.Rhel7Mixin):
+  IMAGE_NAME_PREFIX = 'ibm-redhat-7-6-minimal-amd64'
+
+
+class Rhel8BasedIbmCloudVirtualMachine(RhelBasedIbmCloudVirtualMachine,
+                                       linux_virtual_machine.Rhel8Mixin):
+  IMAGE_NAME_PREFIX = 'ibm-redhat-8-'
 
 
 class WindowsIbmCloudVirtualMachine(IbmCloudVirtualMachine,
@@ -638,7 +611,7 @@ class WindowsIbmCloudVirtualMachine(IbmCloudVirtualMachine,
   def __init__(self, vm_spec):
     super(WindowsIbmCloudVirtualMachine, self).__init__(vm_spec)
     self.user_name = 'Administrator'
-    self.user_data = USER_DATA
+    self.user_data = util.USER_DATA
 
   @vm_util.Retry()
   def _GetDecodedPasswordData(self):

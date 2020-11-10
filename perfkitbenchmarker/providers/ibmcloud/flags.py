@@ -18,8 +18,8 @@ from absl import flags
 flags.DEFINE_string('ibmcloud_region', 'us-south',
                     'Name of IBM Cloud Location or region.')
 
-flags.DEFINE_string('ibmcloud_zones', 'us-south-1',
-                    'comma separated zone names')
+flags.DEFINE_string('ibmcloud_azone', None,
+                    'IBMCloud internal dc name')
 
 flags.DEFINE_string('ibmcloud_image_id', None,
                     'IBM Cloud defined image id, if set, overrides default image.')
@@ -108,14 +108,17 @@ flags.DEFINE_string('ibmcloud_priv_keyfile', None,
 flags.DEFINE_integer('ibmcloud_network_mtu', 9000,
                      'MTU size on network interfaces.')
 
-flags.DEFINE_string('ibmcloud_image_name', None,
-                    'image name')
-
 flags.DEFINE_integer('ibmcloud_subnets_extra', 0,
                      'extra subnets to lookup')
 
 flags.DEFINE_integer('ibmcloud_vdisks_extra', 0,
                      'extra disks to create')
 
-flags.DEFINE_string('ibmcloud_preprovisioned_data', None,
-                    'pre-provisioned data for sample benchmark.')
+flags.DEFINE_string('ibmcloud_preprovisioned_data_bucket', None,
+                    'IBMCloud bucket where pre-provisioned data has been copied.')
+
+flags.DEFINE_string('ibmcloud_image_info', None,
+                    'image info in json formatted file')
+
+flags.DEFINE_boolean('ibmcloud_encrypted_image', False,
+                     'encrypted image.')

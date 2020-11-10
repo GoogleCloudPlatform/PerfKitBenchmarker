@@ -16,14 +16,16 @@
 import os
 import json
 import yaml
+import dataclasses
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud
 
-WINDOWS = 'windows'  # all windows
+WINDOWS = os_types.WINDOWS  # all windows
+DEBIAN = os_types.DEBIAN  # all debian
 UBUNTU = 'ubuntu'  # all ubuntu
 REDHAT = 'redhat'  # all redhat
-DEBIAN = 'debian'  # all debian
 CENTOS = 'centos'  # all centos
 UNKNOWN = 'unknown'
 
@@ -53,8 +55,69 @@ SUBNETS_EXTRA_GATEWAY = {
     SUBNETX4: ['10.101.50.1', '10.102.50.1', '10.103.50.1', '10.104.50.1', '10.105.50.1']
 }
 
+# this is needed for windows vms
+USER_DATA = "Content-Type: multipart/mixed; boundary=MIMEBOUNDARY\n\
+MIME-Version: 1.0\n\
+--MIMEBOUNDARY\n\
+Content-Type: text/cloud-config; charset=\"us-ascii\"\n\
+MIME-Version: 1.0\n\
+Content-Transfer-Encoding: 7bit\n\
+Content-Disposition: attachment; filename=\"cloud-config\"\n\
+#cloud-config\n\
+set_timezone: America/Chicago\n\
+--MIMEBOUNDARY\n\
+Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
+MIME-Version: 1.0\n\
+Content-Transfer-Encoding: 7bit\n\
+Content-Disposition: attachment; filename=\"set-content.ps1\"\n\
+#ps1_sysnative\n\
+Set-Content -Path \"C:\\helloWorld.txt\" -Value \"Hello, World!\"\n\
+--MIMEBOUNDARY\n\
+Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
+MIME-Version: 1.0\n\
+Content-Transfer-Encoding: 7bit\n\
+Content-Disposition: attachment; filename=\"set-content.ps1\"\n\
+#ps1_sysnative\n\
+function Setup-Remote-Desktop () {\n\
+Set-ItemProperty \"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" -Name fDenyTSConnections -Value 0\n\
+Set-ItemProperty \"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp\" -Name \"UserAuthentication\" -Value 1\n\
+Enable-NetFireWallRule -DisplayGroup \"Remote Desktop\"\n}\n\
+function Setup-Ping () {\n\
+Set-NetFirewallRule -DisplayName \"File and Printer Sharing (Echo Request - ICMPv4-In)\" -enabled True\n\
+Set-NetFirewallRule -DisplayName \"File and Printer Sharing (Echo Request - ICMPv6-In)\" -enabled True\n}\n\
+Setup-Remote-Desktop\n\
+Setup-Ping\n\
+New-NetFirewallRule -DisplayName \"Allow iperf 5201\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5201\n\
+New-NetFirewallRule -DisplayName \"Allow iperf 5202\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5202\n\
+New-NetFirewallRule -DisplayName \"Allow iperf 5203\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5203\n\
+New-NetFirewallRule -DisplayName \"Allow iperf 5204\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5204\n\
+New-NetFirewallRule -DisplayName \"Allow iperf 5205\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5205\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20000\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20000\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20001\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20001\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20002\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20002\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20003\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20003\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20010\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20010\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20011\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20011\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20012\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20012\n\
+New-NetFirewallRule -DisplayName \"Allow netperf 20013\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20013\n\
+New-NetFirewallRule -DisplayName \"Allow winrm https 5986\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986\n\
+winrm set winrm/config/service/auth '@{Basic=\"true\";Certificate=\"true\"}'\n\
+$cert=New-SelfSignedCertificate -certstorelocation cert:\localmachine\my -dnsname *\n\
+$thumb=($cert).Thumbprint\n\
+New-WSManInstance -ResourceURI winrm/config/Listener -SelectorSet @{Address=\"*\";Transport=\"HTTPS\"} -ValueSet @{CertificateThumbprint=\"$thumb\"}\n\
+powercfg /SetActive (powercfg /List | %{if ($_.Contains(\"High performance\")){$_.Split()[3]}})\n\
+Set-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword MTU -RegistryValue 9000\n\
+--MIMEBOUNDARY--"
 
-def ReadConfig(config):
+
+@dataclasses.dataclass(frozen=True)
+class Account:
+   name:str
+   apikey:str
+   enckey:str
+
+
+def ReadConfig(config: str):
   """Reads in config yml
 
   Args:
@@ -65,20 +128,22 @@ def ReadConfig(config):
   """
   try:
     with open(config, 'r') as stream:
-      data = json.dumps(yaml.load(stream), sort_keys=True)
+      data = json.dumps(yaml.safe_load(stream, Loader=yaml.FullLoader), sort_keys=True)
       return json.loads(data)
   except Exception as ex:
     raise errors.Error('Failed to load configuration file %s, %s', config, ex)
 
 
-def GetSubnetIndex(ipv4_cidr_block):
+def GetSubnetIndex(ipv4_cidr_block: str):
   """Finds the index for the given cidr
 
   Args:
     ipv4_cidr_block: cidr to find.
 
   Returns:
-    The index number of the found cidr as in the predefined list
+    The index number of the found cidr as in the predefined list.
+    -1 is returned if the cidr is not known and not found 
+    in the predefined list of subnets
   """
   for name in SUBNETXS:
     ip_list = SUBNETS_EXTRA[name]
@@ -88,7 +153,7 @@ def GetSubnetIndex(ipv4_cidr_block):
   return -1
 
 
-def GetRouteCommands(data, index, target_index):
+def GetRouteCommands(data: str, index: int, target_index: int):
   """Creates a list of ip route commands in text format to run on vm,
     not used on normal perfkit runs.
 
@@ -117,22 +182,7 @@ def GetRouteCommands(data, index, target_index):
   return route_cmds
 
 
-def GetMinMax(data):
-  """Finds min and max values in the given list of values"""
-  if not data:
-    return 0.0, 0.0
-  min_value = float(data[0])
-  max_value = float(data[0])
-  for item in data:
-    value = float(item)
-    if value > max_value:
-      max_value = value
-    if value < min_value:
-      min_value = value
-  return min_value, max_value
-
-
-def GetBaseOs(osdata):
+def GetBaseOs(osdata: json):
   """Finds the base os name to use
 
   Args:
@@ -156,16 +206,16 @@ def GetBaseOs(osdata):
   return UNKNOWN
 
 
-def GetGen(account):
+def GetGen(account: Account):
   """Creates a ibmcloud access object """
-  gen = ibmcloud.IbmCloud(account=account[0], apikey=account[1], verbose=False, \
+  gen = ibmcloud.IbmCloud(account=account.name, apikey=account.apikey, verbose=False, \
                      version='v1', silent=True, force=True)
-  if not gen.token():
-    gen.set_token()  # one more try
+  if not gen.Token():
+    gen.SetToken()  # one more try
   return gen
 
 
-def GetImageId(account, imgname):
+def GetImageId(account: Account, imgname: str):
   """Returns image id matching the image name """
   data_mgr = ibmcloud.ImageManager(GetGen(account))
   resp = data_mgr.List()['images']
@@ -176,13 +226,13 @@ def GetImageId(account, imgname):
   return None
 
 
-def GetImageIdInfo(account, imageid):
+def GetImageIdInfo(account: Account, imageid: str):
   """Returns OS information matching the image id """
   data_mgr = ibmcloud.ImageManager(GetGen(account))
   return GetOsInfo(data_mgr.Show(imageid))
 
 
-def GetOsInfo(image):
+def GetOsInfo(image: json):
   """Returns os information in json format
 
   Args:

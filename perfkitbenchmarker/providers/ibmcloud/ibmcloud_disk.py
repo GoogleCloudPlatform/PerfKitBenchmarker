@@ -31,14 +31,18 @@ ATTACHED = 'attached'
 AVAILABLE = 'available'
 DEFAULT_DISK_SIZE = 1000
 
+_MAX_DISK_ATTACH_SECONDS = 300
+_MAX_FIND_DEVICE_SECONDS = 120
+
 
 class IbmCloudDisk(disk.BaseDisk):
   """Object representing a IBM Cloud Disk"""
 
-  def __init__(self, disk_spec, name, zone):
+  def __init__(self, disk_spec: disk.BaseDisk, name: str, zone: str, encryption_key: str=None):
     super(IbmCloudDisk, self).__init__(disk_spec)
     self.name = name
     self.zone = zone
+    self.encryption_key = encryption_key
     self.vol_id = None
     self.attached_vm = None
     self.attached_vdisk_URI = None
@@ -48,16 +52,17 @@ class IbmCloudDisk(disk.BaseDisk):
   def _Create(self):
     """Creates an external block volume."""
     volcmd = ibm.IbmAPICommand(self)
-    volcmd.flags['name'] = self.name
-    volcmd.flags['zone'] = self.zone
-    volcmd.flags['iops'] = FLAGS.ibmcloud_volume_iops
-    volcmd.flags['profile'] = FLAGS.ibmcloud_volume_profile
-    volcmd.flags['capacity'] = self.data_disk_size
-    if FLAGS.ibmcloud_datavol_encryption_key:
-      volcmd.flags['encryption_key'] = FLAGS.ibmcloud_datavol_encryption_key
+    volcmd.flags.update({
+      'name': self.name,
+      'zone': self.zone,
+      'iops': FLAGS.ibmcloud_volume_iops,
+      'profile': FLAGS.ibmcloud_volume_profile,
+      'capacity': self.data_disk_size
+      })
+    if self.encryption_key is not None:
+        volcmd.flags['encryption_key'] = self.encryption_key
     if FLAGS.ibmcloud_rgid:
       volcmd.flags['resource_group'] = FLAGS.ibmcloud_rgid
-
     logging.info('Volume create, volcmd.flags %s', volcmd.flags)
     resp = json.loads(volcmd.CreateVolume())
     self.vol_id = resp['id']
@@ -80,7 +85,7 @@ class IbmCloudDisk(disk.BaseDisk):
       return False
     return True
 
-  def _FindVdiskIdByName(self, vdisks, name):
+  def _FindVdiskIdByName(self, vdisks: [str], name: str):
     """Finds vdisk id by name"""
     for vdisk in vdisks:
       if vdisk['name'] == name:
@@ -94,26 +99,29 @@ class IbmCloudDisk(disk.BaseDisk):
       vm: instance of the vm to which the disk will be attached.
     """
     if self.vol_id is None:
-      raise errors.Error('Cannot attach remote volume %s' % self.name)
+      raise errors.Error(f'Cannot attach remote volume {self.name}')
     if vm.vmid is None:
-      msg = 'Cannot attach remote volume %s to non-existing %s VM' % (self.name,
-                                                                      vm.name)
-      raise errors.Error(msg)
+      raise errors.Error(f'Cannot attach remote volume {self.name} '\
+                         'to non-existing {vm.name} VM')
 
     volcmd = ibm.IbmAPICommand(self)
-    volcmd.flags['name'] = self.name
-    volcmd.flags['instanceid'] = vm.vmid
-    volcmd.flags['volume'] = self.vol_id
-    volcmd.flags['delete'] = True
+    volcmd.flags.update({
+      'name': self.name,
+      'instanceid': vm.vmid,
+      'volume': self.vol_id,
+      'delete': True
+      })
 
     # wait till volume is PROVISIONED before attach
-    resp = json.loads(volcmd.ShowVolume())
-    status = resp['status']
-    endtime = time.time() + 300
-    while status != AVAILABLE and time.time() < endtime:
-      time.sleep(2)
+    status = None
+    endtime = time.time() + _MAX_DISK_ATTACH_SECONDS
+    while time.time() < endtime:
       status = json.loads(volcmd.ShowVolume())['status']
       logging.info('Checking volume status: %s', status)
+      if status == AVAILABLE:
+        logging.info('Volume is available')
+        break
+      time.sleep(2)
 
     if status != AVAILABLE:
       logging.error('Failed to create a volume')
@@ -128,54 +136,49 @@ class IbmCloudDisk(disk.BaseDisk):
     self._WaitForVolumeAttachment(vm)
     self._GetDeviceFromVDisk(vm)
 
-  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
+  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=_MAX_DISK_ATTACH_SECONDS, log_errors=False,
                  retryable_exceptions=errors.Resource.RetryableCreationError)
   def _WaitForVolumeAttachment(self, vm):
     """Waits and checks until the volume status is attached """
     if self.vol_id is None:
       return
     volcmd = ibm.IbmAPICommand(self)
-    volcmd.flags['instanceid'] = self.attached_vm.vmid
-    volcmd.flags['volume'] = self.vol_id
+    volcmd.flags.update({
+      'instanceid': self.attached_vm.vmid,
+      'volume': self.vol_id
+      })
     logging.info('Checking volume on instance %s, volume: %s', vm.vmid, self.vol_id)
-    resp = volcmd.InstanceShowVolume()
-    logging.info('Show volume resp: %s', resp)
     status = None
-    if resp:
-      resp = json.loads(resp)
-      status = resp['status'] if resp and 'status' in resp else 'unknown'
-
-    endtime = time.time() + 300
-    while status != ATTACHED and time.time() < endtime:
-      time.sleep(2)
+    endtime = time.time() + _MAX_DISK_ATTACH_SECONDS
+    while time.time() < endtime:
       resp = volcmd.InstanceShowVolume()
       if resp:
         resp = json.loads(resp)
         status = resp['status'] if resp and 'status' in resp else 'unknown'
         logging.info('Checking instance volume status: %s', status)
-
-    if status == ATTACHED:
-      logging.info('Remote volume %s has been attached to %s', self.name, vm.name)
-    else:
+        if status == ATTACHED:
+          logging.info('Remote volume %s has been attached to %s', self.name, vm.name)
+          break
+      time.sleep(2)
+    if status != ATTACHED:
       logging.error('Failed to attach the volume')
       raise errors.Error('IBMCLOUD ERROR: failed to attach a volume.')
 
   def _GetDeviceFromVDisk(self, vm):
     """Gets device path for the volume """
     cmd = 'fdisk -l'
-    endtime = time.time() + 120
+    endtime = time.time() + _MAX_FIND_DEVICE_SECONDS
     self.device_path = None
     while time.time() < endtime:
       stdout, _ = self.attached_vm.RemoteCommand(cmd, should_log=True)
-      # parse for lines that contain "Disk /dev/vdd: 1000 GiB"
-      disks = re.findall(r'\Disk /.*/.*: \d+ GiB', stdout)
-      for line in disks:
-        paths = line.split(' ')
-        if len(paths) >= 4 and paths[2] == str(self.data_disk_size):
-          _path = paths[1][0:len(paths[1]) - 1]
-          if _path not in vm.device_paths_detected:
-            self.device_path = _path
-            vm.device_paths_detected.add(_path)
+      # parse for lines that contain disk size in bytes
+      disks = re.findall(r'\Disk (\S+): .* (\d+) bytes,', stdout)
+      for device_path, disk_size in disks:
+        logging.info('disk_path: %s, disk_size: %s', device_path, disk_size)
+        if int(disk_size) >= FLAGS.data_disk_size * 1000000000:
+          if device_path not in vm.device_paths_detected:
+            self.device_path = device_path
+            vm.device_paths_detected.add(device_path)
             logging.info('device path found: %s', self.device_path)
             break
       if self.device_path:

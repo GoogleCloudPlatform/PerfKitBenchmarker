@@ -141,11 +141,11 @@ class IbmCloud:
     except Exception as err:
       raise IbmCloudError('Authorization failed: %s' % err)
 
-  def AccountReq(self, method, path, data=None, headers=None, account=None):
+  def AccountReq(self, method, path, data=None, headers=None, account=None, session=None):
     full_path = '/' + self._version + '/%s' % (path)
-    return self.Request(method, full_path, data, headers)
+    return self.Request(method, full_path, data, headers, session=session)
 
-  def Request(self, method, path, data=None, headers=None, timeout=None):
+  def Request(self, method, path, data=None, headers=None, timeout=None, session=None):
       if 'limit' in path:
         path += '&' + self._generation
       else:
@@ -178,8 +178,10 @@ class IbmCloud:
       request_id = None
       try:
         data_timeout = timeout if timeout is not None else HTTP_TIMEOUT
-        res = requests.request(method, self._url + path, data=data, headers=h,
-                               timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))  # verify=False
+        if session is None:
+            res = requests.request(method, self._url + path, data=data, headers=h, timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))  # verify=False
+        else:
+            res = session.request(method, self._url + path, data=data, headers=h, timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))
         if res is not None:
           request_id = res.headers['X-Request-Id'] if 'X-Request-Id' in res.headers else None
           if self._verbose:
@@ -311,7 +313,7 @@ class InstanceManager(BaseManager):
 
   def Create(self, name, imageid, profile, vpcid, zone=None, key=None,
              subnet=None, networks=None, resource_group=None,
-             iops=None, capacity=None, user_data=None, **kwargs):
+             iops=None, capacity=None, user_data=None, session=None, **kwargs):
     _req_data = {
         "name": name,
         "image": {"id": imageid},
@@ -353,7 +355,7 @@ class InstanceManager(BaseManager):
     if user_data:
       _req_data['user_data'] = user_data
 
-    instance = self._g.create_instance(_req_data)
+    instance = self._g.create_instance(_req_data, session=session)
     if not instance:
       raise IbmCloudError("Failed to create instance")
     return instance
@@ -366,9 +368,9 @@ class InstanceManager(BaseManager):
     inst_uri = self.GetUri(instance)
     return self._g.Request('GET', inst_uri)
 
-  def ShowPolling(self, instance, timeout_polling=HTTP_TIMEOUT_CONNECT):
+  def ShowPolling(self, instance, timeout_polling=HTTP_TIMEOUT_CONNECT, session=None):
     inst_uri = self.GetUri(instance)
-    return self._g.Request('GET', inst_uri, timeout=timeout_polling)
+    return self._g.Request('GET', inst_uri, timeout=timeout_polling, session=session)
 
   def ShowInitialization(self, instance):
     inst_uri = self.GetUri(instance) + '/initialization'
@@ -439,11 +441,11 @@ class InstanceManager(BaseManager):
   def ListProfiles(self):
     return self._g.Request('GET', '%s' % self.GetProfileUri())
 
-  def List(self, next=None):
+  def List(self, next=None, session=None):
     inst_uri = '/' + self._g._version + '/instances?limit=100'
     if next:
       inst_uri += '&start=' + next
-    return self._g.Request('GET', inst_uri)
+    return self._g.Request('GET', inst_uri, session=session)
 
 
 class VolumeManager(BaseManager):
@@ -513,6 +515,59 @@ class VPCManager(BaseManager):
 
   def ListPrefix(self, vpc):
     return self._g.AccountReq('GET', 'vpcs/%s/address_prefixes' % vpc)
+
+  def DeletePrefix(self, vpc, prefix):
+    return self._g.AccountReq('DELETE', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix))
+
+  def PatchPrefix(self, vpc, prefix, default=False, name=None):
+    _req_data = {
+      'is_default': default
+    }
+    if name:
+      _req_data['name'] = name
+    return self._g.AccountReq('PATCH', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix), _req_data)
+
+  def CreateRoutingTable(self, vpc, name, routes=None, session=None):
+    _req_data = {
+      'name': name
+    }
+    if routes:
+      _req_data['routes'] = routes
+    vpc_uri = self.get_uri(vpc) + '/routing_tables'
+    return self._g.request('POST', '%s' % vpc_uri, _req_data, session=session)
+
+  def ShowRoutingTable(self, vpc, routing, session=None):
+    return self._g.account_req('GET', 'vpcs/%s/routing_tables/%s' % (vpc, routing), session=session)
+
+  def PatchRoutingTable(self, vpc, routing, ingress, flag, session=None):
+    vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing
+    return self._g.request('PATCH', vpc_uri, {ingress: flag}, session=session)
+
+  def DeleteRoutingTable(self, vpc, routing, session=None):
+    vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing
+    return self._g.request('DELETE', '%s' % vpc_uri, session=session)
+
+  def ListRoutingTable(self, vpc, session=None):
+    return self._g.account_req('GET', 'vpcs/%s/routing_tables?limit=100' % vpc, session=session)
+
+  def CreateRoute(self, vpc, routing, name, zone, action, destination, nexthop=None, session=None):
+    _req_data = {
+      'name': name,
+      'action': action,
+      'destination': destination,
+      'zone': {'name': zone}
+    }
+    if nexthop:
+      _req_data['next_hop'] = {'address': nexthop}
+    vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing + '/routes'
+    return self._g.request('POST', '%s' % vpc_uri, _req_data, session=session)
+
+  def DeleteRoute(self, vpc, routing, route, session=None):
+    vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing + '/routes/' + route
+    return self._g.request('DELETE', '%s' % vpc_uri, session=session)
+
+  def ListRoute(self, vpc, routing, session=None):
+    return self._g.account_req('GET', 'vpcs/%s/routing_tables/%s/routes?limit=100' % (vpc, routing), session=session)
 
 
 class SGManager(BaseManager):
