@@ -23,10 +23,10 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers import gcp
 
-
 GCP = gcp.CLOUD
 AZURE = azure.CLOUD
 AWS = aws.CLOUD
+IBMCLOUD = 'IBMCloud'
 ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'
@@ -39,7 +39,7 @@ PROFITBRICKS = 'ProfitBricks'
 # for performing on premise to cloud benchmarks
 DOCKER = 'Docker'
 
-VALID_CLOUDS = (GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+VALID_CLOUDS = (GCP, AZURE, AWS, IBMCLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
                 RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS, DOCKER)
 
 

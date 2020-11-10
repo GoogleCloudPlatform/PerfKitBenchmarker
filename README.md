@@ -200,6 +200,12 @@ $ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t2.micro
 $ ./pkb.py --cloud=Azure --machine_type=Standard_A0 --benchmarks=iperf
 ```
 
+## Example run on IBMCloud
+
+```bash
+$ ./pkb.py --cloud=IBMCloud --machine_type=cx2-4x8 --benchmarks=iperf
+```
+
 ## Example run on AliCloud
 
 ```bash
@@ -328,6 +334,7 @@ Cloud name | Default zone | Notes
 GCP | us-central1-a | |
 AWS | us-east-1a | |
 Azure | eastus2 | | A PKB zone can be either a Azure location or an Azure location with an availability zone. Format for Azure availability zone support is "location-availability_zone". Example: eastus2-1 specifies Azure location eastus2 with availability zone 1.
+IBMCloud | us-south-1 | |
 AliCloud | West US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |

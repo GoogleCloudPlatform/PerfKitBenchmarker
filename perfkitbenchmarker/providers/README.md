@@ -4,6 +4,7 @@ provider(s) you want to benchmark:
 *   [Google Cloud Platform](https://cloud.google.com)
 *   [AWS](http://aws.amazon.com)
 *   [Azure](http://azure.microsoft.com)
+*   [IBMCloud](https://cloud.ibm.com)
 *   [AliCloud](http://www.aliyun.com)
 *   [DigitalOcean](https://www.digitalocean.com)
 *   [Rackspace Cloud](https://www.rackspace.com)
@@ -22,6 +23,7 @@ want to test Google Cloud, you only need to install and configure `gcloud`.
 *   [Cloudstack](#cloudstack-install-dependencies-and-set-the-api-keys)
 *   [AWS](#install-aws-cli-and-setup-authentication)
 *   [Azure](#windows-azure-cli-and-credentials)
+*   [IBMCloud](#setup-ibmcloud-endpoints-and-credentials)
 *   [AliCloud](#install-alicloud-cli-and-setup-authentication)
 *   [DigitalOcean](#digitalocean-configuration-and-credentials)
 *   [RackSpace](#installing-clis-and-credentials-for-rackspace)
@@ -283,6 +285,41 @@ from Azure:
 ```bash
 $ az provider register -n Microsoft.Compute
 $ az provider register -n Microsoft.Network
+```
+
+### Setup IBMCloud Endpoints and Credentials
+
+Get the API key and API endpoints from IBM Cloud. Set the following environment
+variables.
+
+```bash
+export IBMCLOUD_AUTH_ENDPOINT=https://iam.cloud.ibm.com/identity/token
+export IBMCLOUD_ENDPOINT=<API Endpoint, e.g. https://us-south.iaas.cloud.ibm.com>
+export IBMCLOUD_ACCOUNT_ID=<account id>
+export IBMCLOUD_APIKEY=<API key>
+```
+
+To change default region and zone, point IBMCLOUD_ENDPOINT to the correct endpoint
+and set these parameters.
+
+```bash
+--ibmcloud_region=<region e.g. us-east>
+--zones=<zone e.g. us-east-2>
+```
+
+Use os_type to change OS image.
+
+```bash
+--os_type=debian10
+```
+
+For cross zones network test, set zones to a comma separated string like
+us-east-1,us-east-2
+
+
+```bash
+$ ./pkb.py --cloud=IBMCloud --benchmarks=iperf --machine_type=cx2-4x8 \
+    --ibmcloud_region=us-east --zones=us-east-1,us-east-2 --os_type=debian10
 ```
 
 ### Install AliCloud CLI and setup authentication
