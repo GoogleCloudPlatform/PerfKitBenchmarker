@@ -84,6 +84,8 @@ flags.DEFINE_integer('robertammlm_global_batch_size', 8192, 'global batch size')
 flags.DEFINE_integer('robertammlm_max_epoch', 1, 'max number of epoch')
 flags.DEFINE_enum('robertammlm_profiler', None, [NVPROF, TFPROF],
                   'profiler used to analysis GPU training')
+flags.DEFINE_string('robertammlm_torch_version', '1.6.0',
+                    'The torch version.')
 
 
 def GetConfig(user_config):
@@ -141,6 +143,10 @@ def _DownloadData(benchmark_spec, rank):
   vm.Install('wget')
   vm.RemoteCommand('[ -d $HOME/fairseq ] || git clone {git} -b {branch}'
                    .format(git=FAIRSEQ_GIT, branch=FAIRSEQ_BRANCH))
+  setup_script = posixpath.join('fairseq', 'setup.py')
+  vm_util.ReplaceText(vm, "'torch'",
+                      f"'torch >= {FLAGS.robertammlm_torch_version}'",
+                      setup_script)
   env = 'PATH=/opt/conda/bin:$PATH'
   vm.RemoteCommand('{} python3 -m pip install pyarrow'.format(env))
   vm.RemoteCommand('cd fairseq && {} python3 -m pip install --editable .'
@@ -244,6 +250,7 @@ def _CreateMetadataDict(benchmark_spec):
       'nccl_version': FLAGS.nccl_version,
       'nccl_net_plugin': FLAGS.nccl_net_plugin,
       'nccl_extra_params': FLAGS.nccl_extra_params,
+      'torch_version': FLAGS.robertammlm_torch_version,
   }
 
 
