@@ -71,7 +71,7 @@ def Prepare(benchmark_spec):
 
   edw_service_instance.GetClientInterface().SetProvisionedAttributes(
       benchmark_spec)
-  edw_service_instance.GetClientInterface().Prepare(benchmark_spec.name)
+  edw_service_instance.GetClientInterface().Prepare('edw_common')
 
   query_locations = [
       os.path.join(FLAGS.local_query_dir, query)

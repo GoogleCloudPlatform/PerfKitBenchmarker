@@ -59,7 +59,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.database = database
     self.schema = schema
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs a java client application that uses the JDBC driver for connecting
@@ -67,15 +67,14 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     https://docs.snowflake.com/en/user-guide/jdbc.html
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('openjdk')
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['snowflake-jdbc-client-2.0.jar'], '')
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, ['snowflake-jdbc-client-2.0.jar'], '')
 
   def ExecuteQuery(self, query_name: str) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.

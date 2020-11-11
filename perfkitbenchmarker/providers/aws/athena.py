@@ -104,7 +104,7 @@ class JavaClientInterface(GenericClientInterface):
   """Java Client Interface class for Athena.
   """
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs the Java Execution Environment and a uber jar with
@@ -114,14 +114,13 @@ class JavaClientInterface(GenericClientInterface):
     c) their dependencies.
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('openjdk')
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['athena-java-client-1.0.jar'], '')
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, ['athena-java-client-1.0.jar'], '')
 
   def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -164,15 +163,14 @@ class CliClientInterface(GenericClientInterface):
   https://docs.aws.amazon.com/cli/latest/reference/athena/index.html.
   """
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs the bq tool dependencies and authenticates using a service account.
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('pip')
     self.client_vm.RemoteCommand('sudo pip install absl-py')

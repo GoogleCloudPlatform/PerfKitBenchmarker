@@ -108,15 +108,14 @@ class CliClientInterface(edw_service.EdwClientInterface):
     super(CliClientInterface, self).SetProvisionedAttributes(bm_spec)
     self.host = bm_spec.edw_service.endpoint
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs the redshift tool dependencies.
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('pip')
     self.client_vm.RemoteCommand('sudo pip install absl-py')

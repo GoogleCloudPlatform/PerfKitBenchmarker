@@ -82,15 +82,14 @@ class CliClientInterface(GenericClientInterface):
   https://cloud.google.com/bigquery/docs/bq-command-line-tool.
   """
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs the bq tool dependencies and authenticates using a service account.
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('pip')
     self.client_vm.RemoteCommand('sudo pip install absl-py')
@@ -101,8 +100,8 @@ class CliClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
     else:
-      self.client_vm.InstallPreprovisionedBenchmarkData(
-          benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, [FLAGS.gcp_service_account_key_file], '')
 
     # Authenticate using the service account file
     vm_gcloud_path = google_cloud_sdk.GCLOUD_PATH
@@ -162,7 +161,7 @@ class JdbcClientInterface(GenericClientInterface):
     self.dataset_id = re.split(r'\.',
                                benchmark_spec.edw_service.cluster_identifier)[1]
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs
@@ -173,23 +172,19 @@ class JdbcClientInterface(GenericClientInterface):
     e) The Simba JDBC interface jar
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('openjdk')
 
     # Push the service account file to the working directory on client vm
-    self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, [FLAGS.gcp_service_account_key_file], '')
 
-    # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['bq-jdbc-client-1.0.jar'], '')
-
-    # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['GoogleBigQueryJDBC42.jar'], '')
+    # Push the executable jars to the working directory on client vm
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, ['bq-jdbc-client-1.0.jar', 'GoogleBigQueryJDBC42.jar'],
+        '')
 
   def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -222,7 +217,7 @@ class JavaClientInterface(GenericClientInterface):
   https://cloud.google.com/bigquery/docs/reference/libraries#client-libraries-install-java
   """
 
-  def Prepare(self, benchmark_name: str) -> None:
+  def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
 
     Installs the Java Execution Environment and a uber jar with
@@ -231,9 +226,8 @@ class JavaClientInterface(GenericClientInterface):
     c) their dependencies.
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     self.client_vm.Install('openjdk')
 
@@ -241,11 +235,12 @@ class JavaClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
     else:
-      self.client_vm.InstallPreprovisionedBenchmarkData(
-          benchmark_name, [FLAGS.gcp_service_account_key_file], '')
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, [FLAGS.gcp_service_account_key_file], '')
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedBenchmarkData(
-        benchmark_name, ['bq-java-client-2.0.jar'], '')
+    self.client_vm.InstallPreprovisionedPackageData(package_name,
+                                                    ['bq-java-client-2.0.jar'],
+                                                    '')
 
   def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.

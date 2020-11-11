@@ -121,16 +121,15 @@ class EdwClientInterface(object):
     self.client_vm.RemoteCommand('echo "\nMaxSessions 100" | '
                                  'sudo tee -a /etc/ssh/sshd_config')
 
-  def Prepare(self, benchmark_name: Text) -> None:
+  def Prepare(self, package_name: Text) -> None:
     """Prepares the client vm to execute query.
 
     The default implementation raises an Error, to ensure client specific
     installation and authentication of runner utilities.
 
     Args:
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
     """
     raise NotImplementedError
 

@@ -19,7 +19,7 @@ from absl import flags
 from perfkitbenchmarker.providers.gcp import bigquery
 from tests import pkb_common_test_case
 
-BENCHMARK_NAME = 'BENCHMARK_NAME'
+PACKAGE_NAME = 'PACKAGE_NAME'
 DATASET_ID = 'DATASET_ID'
 PROJECT_ID = 'PROJECT_ID'
 QUERY_NAME = 'QUERY_NAME'
@@ -62,9 +62,9 @@ class FakeRemoteVMForCliClientInterfacePrepare(object):
     if command not in self.valid_remote_command_list:
       raise RuntimeError
 
-  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
-                                         install_path):
-    if benchmark_name != 'BENCHMARK_NAME':
+  def InstallPreprovisionedPackageData(self, package_name, filenames,
+                                       install_path):
+    if package_name != 'PACKAGE_NAME':
       raise RuntimeError
 
   def PushFile(self, source_path):
@@ -104,9 +104,9 @@ class FakeRemoteVMForJavaClientInterfacePrepare(object):
     else:
       raise RuntimeError
 
-  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
-                                         install_path):
-    if benchmark_name != 'BENCHMARK_NAME':
+  def InstallPreprovisionedPackageData(self, package_name, filenames,
+                                       install_path):
+    if package_name != 'PACKAGE_NAME':
       raise RuntimeError
 
 
@@ -134,7 +134,7 @@ class FakeBenchmarkSpec(object):
   """Fake BenchmarkSpec to use for setting client interface attributes."""
 
   def __init__(self, client_vm):
-    self.name = BENCHMARK_NAME
+    self.name = PACKAGE_NAME
     self.vms = [client_vm]
 
 
@@ -177,7 +177,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(interface, bigquery.CliClientInterface)
     bm_spec = FakeBenchmarkSpec(FakeRemoteVMForCliClientInterfacePrepare())
     interface.SetProvisionedAttributes(bm_spec)
-    interface.Prepare(BENCHMARK_NAME)
+    interface.Prepare(PACKAGE_NAME)
 
   def testCliClientInterfaceExecuteQuery(self):
     FLAGS.bq_client_interface = 'CLI'
@@ -196,7 +196,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
     bm_spec = FakeBenchmarkSpec(FakeRemoteVMForJavaClientInterfacePrepare())
     interface.SetProvisionedAttributes(bm_spec)
-    interface.Prepare(BENCHMARK_NAME)
+    interface.Prepare(PACKAGE_NAME)
 
   def testJavaClientInterfaceExecuteQuery(self):
     FLAGS.bq_client_interface = 'JAVA'
