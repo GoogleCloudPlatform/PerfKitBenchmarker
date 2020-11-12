@@ -650,7 +650,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
-    if FLAGS.aws_efa:
+    if FLAGS.aws_efa and FLAGS.aws_efa_version:
       self.InstallPackages('curl')
       url = _EFA_URL.format(version=FLAGS.aws_efa_version)
       self.RemoteCommand(
