@@ -89,6 +89,7 @@ _SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
 
 _RUN_CMD = ('{mpi} '
             '--hostfile {hostfile} '
+            '--mca pml ^cm '
             '--mca btl tcp,self '
             '--mca btl_tcp_if_exclude docker0,lo '
             '--bind-to none '
