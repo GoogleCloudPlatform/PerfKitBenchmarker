@@ -170,6 +170,10 @@ flags.DEFINE_boolean('use_pkb_logging', True, 'Whether to use PKB-specific '
                      'ABSL logging directly.')
 flags.DEFINE_boolean('log_dmesg', False, 'Whether to log dmesg from '
                      'each VM to the PKB log file before the VM is deleted.')
+flags.DEFINE_boolean('always_teardown_on_exception', False, 'Whether to tear '
+                     'down VMs when there is exception during the PKB run. If'
+                     'enabled, VMs will be torn down even if FLAGS.run_stage '
+                     'does not specify teardown.')
 
 
 def GetCurrentUser():
@@ -967,6 +971,11 @@ def RunBenchmark(spec, collector):
         # here.
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
           DoCleanupPhase(spec, detailed_timer)
+
+        if (FLAGS.always_teardown_on_exception and
+            stages.TEARDOWN not in FLAGS.run_stage):
+          # Note that if TEARDOWN is specified, it will happen below.
+          DoTeardownPhase(spec, detailed_timer)
         raise
       finally:
         if interrupt_checker:
