@@ -134,8 +134,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
           {'VolumeSpecification': {
               'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
               'VolumeType': self.spec.worker_group.disk_spec.disk_type},
-           'VolumesPerInstance':
-               self.spec.worker_group.disk_spec.num_striped_disks}]}
+           'VolumesPerInstance': self.spec.worker_group.disk_count}]}
       self.dpb_hdfs_type = disk_to_hdfs_map[
           self.spec.worker_group.disk_spec.disk_type]
 
