@@ -320,7 +320,7 @@ def _Install(vm):
     # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
     vm.RemoteCommand('cd {hist_dir}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
                      'disableClassPathURLCheck=true '
-                     '{mvn_cmd} > /dev/null 2>&1'.format(
+                     '{mvn_cmd}'.format(
                          hist_dir=HDRHISTOGRAM_DIR,
                          mvn_cmd=maven.GetRunCommand('install')))
 
