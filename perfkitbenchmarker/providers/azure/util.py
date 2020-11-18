@@ -56,7 +56,7 @@ def GetAzureStorageAccountKey(storage_account_name, resource_group_args):
 
   response = json.loads(stdout)
   # A new storage account comes with two keys, but we only need one.
-  assert response[0]['permissions'] == 'Full'
+  assert response[0]['permissions'].lower() == 'full'
   return response[0]['value']
 
 
