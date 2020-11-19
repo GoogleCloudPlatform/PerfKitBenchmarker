@@ -29,6 +29,7 @@
 -   Report CPU vulnerabilities as a sample via the --record_cpu_vuln flag.
 -   Add retry when calling MountDisk.
 -   Measure time to running status of a VM in large_scale_boot benchmark.
+-   SpecCPU2017 runs on Redhat, Centos7
 
 ### Bug fixes and maintenance updates:
 

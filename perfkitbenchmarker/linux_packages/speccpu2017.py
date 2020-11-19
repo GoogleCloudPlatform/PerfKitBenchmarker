@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -92,11 +92,14 @@ def Install(vm):
                                       linux_packages.INSTALL_DIR)
   vm.RemoteCommand('cd {0} && tar xf {1} && tar xf {2}'.format(
       linux_packages.INSTALL_DIR, LLVM_TAR, OPENMP_TAR))
-  vm.RemoteCommand('sudo apt-get install -y libjemalloc1 libjemalloc-dev')
-  vm.RemoteCommand('sudo apt-get update && sudo apt-get install -y libomp-dev')
   # spec17 tarball comes pre-packages with runner scripts for x86 architecture.
   # But because we may have x86 or arm architecture machines, just rerun the
   # install script to regenerate the runner scripts based on what spec detects
   # to be the vm architecture.
   vm.RemoteCommand('echo yes | {0}/cpu2017/install.sh'.format(
       vm.GetScratchDir()))
+
+
+def AptInstall(vm):
+  vm.InstallPackages('libjemalloc1 libjemalloc-dev libomp-dev')
+  Install(vm)
