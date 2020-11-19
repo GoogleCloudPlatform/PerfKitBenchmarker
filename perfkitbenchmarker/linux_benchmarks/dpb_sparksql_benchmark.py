@@ -30,13 +30,11 @@ of files on a Hadoop Compatible File System (HCFS) or it can read from temporary
 views registered from Spark SQL data sources:
 https://spark.apache.org/docs/latest/sql-data-sources.html.
 
-Spark SQL queries can either be run using the spark-sql CLI or a custom pyspark
-runner.
+Spark SQL queries are run using custom pyspark runner.
 
-The spark-sql CLI only supports Hive data. This benchmark can create and
-replace external Hive tables using `--dpb_sparksql_create_hive_tables=true`
-Alternatively you could pre-provision a Hive metastore with data before running
-the benchmark.
+This benchmark can create and replace external Hive tables using
+`--dpb_sparksql_create_hive_tables=true` Alternatively you could pre-provision
+a Hive metastore with data before running the benchmark.
 
 If you do not want to use a Hive Metastore, the custom pyspark runner can
 register data as temporary views during job submission. This supports the
@@ -50,8 +48,9 @@ import json
 import logging
 import os
 import re
+from typing import List, Optional
+
 from absl import flags
-import numpy as np
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_service
@@ -89,17 +88,11 @@ BENCHMARK_NAMES = {
     'tpch': 'TPC-H'
 }
 
-SPARK_SQL = dpb_service.BaseDpbService.SPARKSQL_JOB_TYPE
-PYSPARK = dpb_service.BaseDpbService.PYSPARK_JOB_TYPE
 
 flags.DEFINE_string(
     'dpb_sparksql_data', None,
     'The HCFS based dataset to run Spark SQL query '
     'against')
-flags.DEFINE_enum(
-    'dpb_sparksql_job_type', PYSPARK, [PYSPARK, SPARK_SQL],
-    'How to trigger the query. Either with the spark-sql CLI '
-    'or with a PySpark harness inside PKB.')
 flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
                   'Whether to load dpb_sparksql_data into external hive tables '
                   'or not.')
@@ -109,9 +102,10 @@ flags.DEFINE_string(
     "and 'bigquery' for bigquery if unspecified.")
 flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
-flags.DEFINE_list('dpb_sparksql_order', [],
-                  'The names (numbers) of the queries to run in order. '
-                  'If omitted all queries are run in lexographic order.')
+flags.DEFINE_list(
+    'dpb_sparksql_order', [],
+    'The names (numbers) of the queries to run in order. '
+    'If omitted all queries are run in lexicographic order.')
 flags.DEFINE_string(
     'spark_bigquery_connector',
     None,
@@ -129,9 +123,6 @@ flags.DEFINE_string(
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
-JOB_CATEGORY = BaseDpbService.SPARK_JOB_TYPE
-JOB_TYPE = 'spark-sql'
 # Creates spark table using pyspark by loading the parquet data.
 # Args:
 # argv[1]: string, The table name in the dataset that this script will create.
@@ -156,22 +147,9 @@ def CheckPrerequisites(benchmark_config):
     Config.InvalidValue: On encountering invalid configuration.
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
-  if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
-    raise errors.Config.InvalidValue(
-        'Invalid backend {} for Spark SQL. Not in: {}'.format(
-            dpb_service_type, SUPPORTED_DPB_BACKENDS))
-
   if not FLAGS.dpb_sparksql_data and FLAGS.dpb_sparksql_create_hive_tables:
     raise errors.Config.InvalidValue(
         'You must pass dpb_sparksql_data with dpb_sparksql_create_hive_tables')
-  if FLAGS.dpb_sparksql_job_type == SPARK_SQL:
-    if FLAGS.bigquery_tables:
-      raise errors.Config.InvalidValue(
-          'spark-sql job type does not support temporary bigquery views.')
-    if FLAGS.dpb_sparksql_data and not FLAGS.dpb_sparksql_create_hive_tables:
-      raise errors.Config.InvalidValue(
-          'spark-sql job type cannot query HCFS data without '
-          '--dpb_sparksql_create_hive_tables.')
   if FLAGS.bigquery_tables and not FLAGS.spark_bigquery_connector:
     # Remove if Dataproc ever bundles BigQuery connector
     raise errors.Config.InvalidValue(
@@ -199,28 +177,8 @@ def Prepare(benchmark_spec):
   storage_service = dpb_service_instance.storage_service
   storage_service.MakeBucket(bucket)
   benchmark_spec.base_dir = dpb_service_instance.PERSISTENT_FS_PREFIX + bucket
-
-  temp_run_dir = temp_dir.GetRunDirPath()
-  spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
-  vm_util.IssueCommand(['git', 'clone', SPARK_SQL_PERF_GIT, spark_sql_perf_dir])
-  vm_util.IssueCommand(['git', 'checkout', SPARK_SQL_PERF_GIT_COMMIT],
-                       cwd=spark_sql_perf_dir)
-  benchmark_spec.queries = []
-  query_dir = os.path.join(spark_sql_perf_dir, 'src', 'main', 'resources',
-                           FLAGS.dpb_sparksql_query)
-  for dir_name, _, files in os.walk(query_dir):
-    for filename in files:
-      match = re.match(r'q?([0-9]+)a?.sql', filename)
-      if match:
-        query_id = match.group(1)
-        # if order is specified only upload those queries
-        if not FLAGS.dpb_sparksql_order or query_id in FLAGS.dpb_sparksql_order:
-          benchmark_spec.queries.append(query_id)
-          query = '{}.sql'.format(query_id)
-          src_url = os.path.join(dir_name, filename)
-          storage_service.CopyToBucket(src_url, bucket, query)
-  if not benchmark_spec.queries:
-    raise errors.Benchmarks.PrepareException('No queries were staged')
+  benchmark_spec.staged_queries = _LoadAndStageQueries(
+      storage_service, benchmark_spec.base_dir)
 
   for script in [SPARK_TABLE_SCRIPT, SPARK_SQL_RUNNER_SCRIPT]:
     src_url = data.ResourcePath(script)
@@ -266,87 +224,70 @@ def Run(benchmark_spec):
     Benchmarks.RunError if no query succeeds.
   """
   dpb_service_instance = benchmark_spec.dpb_service
+  storage_service = dpb_service_instance.storage_service
   metadata = benchmark_spec.dpb_service.GetMetadata()
 
   metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
 
+  # Run PySpark Spark SQL Runner
+  report_dir = os.path.join(benchmark_spec.base_dir, 'report')
+  args = [
+      '--sql-scripts',
+      ','.join(benchmark_spec.staged_queries),
+      '--report-dir',
+      report_dir,
+  ]
+  table_metadata = _GetTableMetadata(benchmark_spec.table_subdirs)
+  if table_metadata:
+    args += ['--table-metadata', json.dumps(table_metadata)]
+  jars = []
+  if FLAGS.spark_bigquery_connector:
+    jars.append(FLAGS.spark_bigquery_connector)
+  job_result = dpb_service_instance.SubmitJob(
+      pyspark_file=os.path.join(
+          benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT),
+      job_arguments=args,
+      job_jars=jars,
+      job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
+
+  # Spark can only write data to directories not files. So do a recursive copy
+  # of that directory and then search it for the single JSON file with the
+  # results.
+  temp_run_dir = temp_dir.GetRunDirPath()
+  storage_service.Copy(report_dir, temp_run_dir, recursive=True)
+  report_file = None
+  for dir_name, _, files in os.walk(os.path.join(temp_run_dir, 'report')):
+    for filename in files:
+      if filename.endswith('.json'):
+        report_file = os.path.join(dir_name, filename)
+        logging.info(report_file)
+  if not report_file:
+    raise errors.Benchmarks.RunError('Job report not found.')
+
   results = []
-  failing_queries = []
   run_times = {}
-  wall_times = {}
-  for query in benchmark_spec.queries:
-    try:
-      result = _RunSparkSqlJob(
-          dpb_service_instance,
-          os.path.join(benchmark_spec.base_dir, query + '.sql'),
-          os.path.join(benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT),
-          benchmark_spec.table_subdirs)
-      logging.info(result)
+  with open(report_file, 'r') as file:
+    for line in file:
+      result = json.loads(line)
+      query_id = _GetQueryId(result['script'])
       metadata_copy = metadata.copy()
-      metadata_copy['query'] = query
+      metadata_copy['query'] = query_id
       results.append(
-          sample.Sample('sparksql_wall_time', result.wall_time, 'seconds',
+          sample.Sample('sparksql_run_time', result['duration'], 'seconds',
                         metadata_copy))
-      results.append(
-          sample.Sample('sparksql_run_time', result.run_time, 'seconds',
-                        metadata_copy))
-      wall_times[query] = result.wall_time
-      run_times[query] = result.run_time
-    except dpb_service.JobSubmissionError:
-      failing_queries.append(query)
+      run_times[query_id] = result['duration']
 
-  metadata['failing_queries'] = ','.join(sorted(failing_queries))
-
-  if results:
-    results.append(
-        sample.Sample('sparksql_total_wall_time',
-                      np.fromiter(wall_times.values(), dtype='float').sum(),
-                      'seconds', metadata))
-    results.append(
-        sample.Sample('sparksql_total_run_time',
-                      np.fromiter(run_times.values(), dtype='float').sum(),
-                      'seconds', metadata))
-    results.append(
-        sample.Sample('sparksql_geomean_wall_time',
-                      sample.GeoMean(wall_times.values()), 'seconds', metadata))
-    results.append(
-        sample.Sample('sparksql_geomean_run_time',
-                      sample.GeoMean(run_times.values()), 'seconds', metadata))
-  else:
-    raise errors.Benchmarks.RunError('No queries succeeded.')
-
+  results.append(
+      sample.Sample('sparksql_total_wall_time', job_result.wall_time, 'seconds',
+                    metadata))
+  results.append(
+      sample.Sample('sparksql_geomean_run_time',
+                    sample.GeoMean(run_times.values()), 'seconds', metadata))
   return results
 
 
-def _RunSparkSqlJob(dpb_service_instance,
-                    staged_sql_file,
-                    staged_sql_runner_file=None,
-                    table_subdirs=None):
-  """Run a Spark SQL script either with the spark-sql command or spark_sql_runner.py."""
-  if FLAGS.dpb_sparksql_job_type == SPARK_SQL:
-    return dpb_service_instance.SubmitJob(
-        query_file=staged_sql_file, job_type=SPARK_SQL)
-  if FLAGS.dpb_sparksql_job_type == PYSPARK:
-    assert staged_sql_runner_file
-    args = [
-        os.path.basename(staged_sql_file), '--table_metadata',
-        _GetTableMetadataJson(table_subdirs)
-    ]
-    jars = []
-    if FLAGS.spark_bigquery_connector:
-      jars.append(FLAGS.spark_bigquery_connector)
-    return dpb_service_instance.SubmitJob(
-        pyspark_file=staged_sql_runner_file,
-        job_arguments=args,
-        job_files=[staged_sql_file],
-        job_jars=jars,
-        job_type=PYSPARK)
-  raise errors.Config.UnrecognizedOption('Unsupported job type ' +
-                                         FLAGS.dpb_sparksql_job_type)
-
-
-def _GetTableMetadataJson(table_subdirs=None):
-  """Compute a JSON map of table metadata for spark_sql_runner --table_metadata."""
+def _GetTableMetadata(table_subdirs=None):
+  """Compute map of table metadata for spark_sql_runner --table_metadata."""
   metadata = {}
   if not FLAGS.dpb_sparksql_create_hive_tables:
     for subdir in table_subdirs or []:
@@ -360,7 +301,75 @@ def _GetTableMetadataJson(table_subdirs=None):
     if FLAGS.bigquery_record_format:
       bq_options['readDataFormat'] = FLAGS.bigquery_record_format
     metadata[name] = (FLAGS.dpb_sparksql_data_format or 'bigquery', bq_options)
-  return json.dumps(metadata)
+  return metadata
+
+
+def _GetQueryId(filename: str) -> Optional[str]:
+  """Extract query id from file name."""
+  match = re.match(r'(.*/)?q?([0-9]+[ab]?)\.sql$', filename)
+  if match:
+    return match.group(2)
+
+
+def _LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
+  """Loads queries from Github and stages them in object storage.
+
+  Queries are selected using --dpb_sparksql_query and --dpb_sparksql_order.
+
+  Args:
+    storage_service: object_strorage_service to stage queries into.
+    base_dir: object storage directory to stage queries into.
+
+  Returns:
+    The paths to the stage queries
+
+  Raises:
+    PrepareException if a requested query is not found or no quueries are
+    staged.
+  """
+  temp_run_dir = temp_dir.GetRunDirPath()
+  spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
+
+  # Clone repo
+  vm_util.IssueCommand(['git', 'clone', SPARK_SQL_PERF_GIT, spark_sql_perf_dir])
+  vm_util.IssueCommand(['git', 'checkout', SPARK_SQL_PERF_GIT_COMMIT],
+                       cwd=spark_sql_perf_dir)
+  query_dir = os.path.join(spark_sql_perf_dir, 'src', 'main', 'resources',
+                           FLAGS.dpb_sparksql_query)
+
+  # Search repo for queries
+  query_file = {}  # map query -> staged file
+  for dir_name, _, files in os.walk(query_dir):
+    for filename in files:
+      query_id = _GetQueryId(filename)
+      if query_id:
+        # if order is specified only upload those queries
+        if not FLAGS.dpb_sparksql_order or query_id in FLAGS.dpb_sparksql_order:
+          src_file = os.path.join(dir_name, filename)
+          staged_file = '{}/{}.sql'.format(base_dir, filename)
+          storage_service.Copy(src_file, staged_file)
+          query_file[query_id] = staged_file
+  if not query_file:
+    raise errors.Benchmarks.PrepareException('No queries were staged')
+
+  if FLAGS.dpb_sparksql_order:
+    # Validate all requested queries are present.
+    missing_queries = set(FLAGS.dpb_sparksql_order) - set(query_file.keys())
+    if missing_queries:
+      raise errors.Benchmarks.PrepareException(
+          'Could not find queries {}'.format(missing_queries))
+    queries_in_order = FLAGS.dpb_sparksql_order
+  else:
+    # User wants all queries. Put them in sorted order.
+    def QueryPair(query):
+      """Split query into int and letter pair."""
+      query_pattern = r'^([0-9]+)([ab]?)$'
+      match = re.match(query_pattern, query)
+      return int(match.group(1)), match.group(2)
+    queries_in_order = query_file.keys().sort(key=QueryPair)
+
+  # Return staged queries in proper order
+  return [query_file[query] for query in queries_in_order]
 
 
 def Cleanup(_):

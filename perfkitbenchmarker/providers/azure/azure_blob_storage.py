@@ -140,7 +140,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         self.storage_account.connection_args,
         raise_on_failure=False)
 
-  def Copy(self, src_url, dst_url):
+  def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
     raise NotImplementedError()
 

@@ -104,12 +104,17 @@ class ObjectStorageService(
     pass
 
   @abc.abstractmethod
-  def Copy(self, src_url, dst_url):
-    """Copy files and objects.
+  def Copy(self, src_url, dst_url, recursive=False):
+    """Copy files, objects and directories.
+
+    Note: Recursive copy behavior mimics gsutil cp -r where:
+    Copy(/foo/bar, /baz, True) copies the directory bar into /baz/bar whereas
+    aws s3 cp --recursive would copy the contents of bar into /baz.
 
     Args:
       src_url: string, the source url path.
       dst_url: string, the destination url path.
+      recursive: whether to copy directories.
     """
     pass
 
