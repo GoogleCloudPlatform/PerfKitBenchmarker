@@ -451,12 +451,10 @@ class LogPublisher(SamplePublisher):
                                                self.level)
 
   def PublishSamples(self, samples):
-    data = [
-        '\n' + '-' * 25 + 'PerfKitBenchmarker Complete Results' + '-' * 25 +
-        '\n']
+    header = '\n' + '-' * 25 + 'PerfKitBenchmarker Complete Results' + '-' * 25
+    self.logger.log(self.level, header)
     for sample in samples:
-      data.append('%s\n' % self._pprinter.pformat(sample))
-    self.logger.log(self.level, ''.join(data))
+      self.logger.log(self.level, self._pprinter.pformat(sample))
 
 
 # TODO: Extract a function to write delimited JSON to a stream.

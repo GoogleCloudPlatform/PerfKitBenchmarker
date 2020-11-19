@@ -72,7 +72,7 @@ class LogPublisherTestCase(unittest.TestCase):
     instance = publisher.LogPublisher(logger=logger, level=level)
 
     instance.PublishSamples([{'test': 'testa'}, {'test': 'testb'}])
-    logger.log.assert_called_once_with(level, mock.ANY)
+    logger.log.assert_called_with(level, mock.ANY)
 
 
 class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
