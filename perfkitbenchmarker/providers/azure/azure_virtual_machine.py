@@ -937,9 +937,10 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   """Returns a string used to download preprovisioned data."""
   module_name_with_underscores_removed = module_name.replace('_', '-')
   destpath = posixpath.join(install_path, filename)
-  # TODO(ferneyhough): Refactor this so that this mkdir command
-  # is run on all clouds, and is os-agnostic (this is linux specific).
-  mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
+  if install_path:
+    # TODO(ferneyhough): Refactor this so that this mkdir command
+    # is run on all clouds, and is os-agnostic (this is linux specific).
+    mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
 
   account_name = FLAGS.azure_preprovisioned_data_bucket
   connection_string = util.GetAzureStorageConnectionString(account_name, [])
@@ -956,7 +957,9 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
           name=filename,
           file=destpath,
           connection_string=connection_string))
-  return '{0} && {1}'.format(mkdir_command, download_command)
+  if install_path:
+    return '{0} && {1}'.format(mkdir_command, download_command)
+  return download_command
 
 
 def GenerateStatPreprovisionedDataCommand(module_name, filename):
