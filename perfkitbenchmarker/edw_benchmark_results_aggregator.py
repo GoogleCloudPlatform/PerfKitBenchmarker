@@ -379,7 +379,7 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
             serialized_performance=(json.dumps(query_perf_json)))
         query_performance_map[query_perf.name] = query_perf
     else:
-      logging.warning('Failure reported. Reason: %s', results['failure_reson'])
+      logging.warning('Failure reported. Reason: %s', results['failure_reason'])
     return cls(
         iteration_id=iteration_id,
         iteration_start_time=(results['simultaneous_start']
@@ -594,7 +594,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     results = json.loads(serialized_performance)
     all_queries_succeeded = 'failure_reason' not in results
     if not all_queries_succeeded:
-      logging.warning('Failure reported. Reason: %s', results['failure_reson'])
+      logging.warning('Failure reported. Reason: %s', results['failure_reason'])
     return cls(
         iteration_id=iteration_id,
         iteration_start_time=(results['throughput_start']
