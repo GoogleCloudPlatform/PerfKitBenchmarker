@@ -90,7 +90,7 @@ flags.DEFINE_string(
     'region and the run URI, and the bucket will be dynamically created and '
     'deleted during the test.')
 flags.DEFINE_string('eksctl', 'eksctl', 'Path to eksctl.')
-flags.DEFINE_enum('redshift_client_interface', 'CLI', ['CLI', 'JDBC'],
+flags.DEFINE_enum('redshift_client_interface', 'JDBC', ['JDBC'],
                   'The Runtime Interface used when interacting with Redshift.')
 flags.DEFINE_enum('athena_client_interface', 'CLI', ['CLI', 'JAVA'],
                   'The Runtime Interface used when interacting with Athena.')
