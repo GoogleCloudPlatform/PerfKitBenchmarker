@@ -22,14 +22,15 @@ raised will be propagated.
 """
 import logging
 import os
-from blinker import Namespace
+
+from absl import flags
+import blinker
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 
 FLAGS = flags.FLAGS
-_events = Namespace()
+_events = blinker.Namespace()
 
 
 initialization_complete = _events.signal('system-ready', doc="""

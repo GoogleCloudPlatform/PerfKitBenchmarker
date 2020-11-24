@@ -18,11 +18,10 @@ cloud TPU can be created and deleted.
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -41,7 +40,7 @@ class GcpTpu(cloud_tpu.BaseTpu):
     tpu_ip: the TPU IP.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   SERVICE_NAME = 'tpu'
   TPU_IP = '10.240.{}.2'
   DEFAULT_TPU_VERSION = '1.6'

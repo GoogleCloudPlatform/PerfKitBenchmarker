@@ -22,12 +22,11 @@ import logging
 import os
 import posixpath
 import re
-
+from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 FLAGS = flags.FLAGS
@@ -43,7 +42,7 @@ HBASE_VERSION_PATTERN = re.compile('HBase (.*)$', re.IGNORECASE | re.MULTILINE)
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
               'hbase/hbase-env.sh.j2']
 
-HBASE_DIR = posixpath.join(INSTALL_DIR, 'hbase')
+HBASE_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hbase')
 HBASE_BIN = posixpath.join(HBASE_DIR, 'bin')
 HBASE_CONF_DIR = posixpath.join(HBASE_DIR, 'conf')
 

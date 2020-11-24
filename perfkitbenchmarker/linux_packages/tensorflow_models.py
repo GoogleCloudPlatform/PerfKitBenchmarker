@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing TensorFlow models installation and cleanup functions."""
-from perfkitbenchmarker import flags
+from absl import flags
 FLAGS = flags.FLAGS
 TF_MODELS_GIT = 'https://github.com/tensorflow/models.git'
 

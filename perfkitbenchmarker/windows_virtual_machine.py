@@ -20,9 +20,9 @@ import os
 import time
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -205,9 +205,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
           command timed out.
     """
     logging.info('Running command on %s: %s', self, command)
-    s = winrm.Session('https://%s:%s' % (self.ip_address, self.winrm_port),
-                      auth=(self.user_name, self.password),
-                      server_cert_validation='ignore')
+    s = winrm.Session(
+        'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
+        auth=(self.user_name, self.password),
+        server_cert_validation='ignore')
     encoded_command = six.ensure_str(
         base64.b64encode(command.encode('utf_16_le')))
 
@@ -309,7 +310,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     drive, remote_path = ntpath.splitdrive(remote_path)
     remote_drive = (drive or self.system_drive).rstrip(':')
-    network_drive = '\\\\%s\\%s$' % (self.ip_address, remote_drive)
+    network_drive = '\\\\%s\\%s$' % (self.GetConnectionIp(), remote_drive)
 
     if vm_util.RunningOnWindows():
       self._PsDriveRemoteCopy(local_path, remote_path, copy_to, network_drive)
@@ -595,7 +596,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
   def _RunDiskpartScript(self, script):
     """Runs the supplied Diskpart script on the VM."""
-    with vm_util.NamedTemporaryFile(prefix='diskpart') as tf:
+    with vm_util.NamedTemporaryFile(prefix='diskpart', mode='w') as tf:
       tf.write(script)
       tf.close()
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
@@ -692,6 +693,11 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       executables.append(executable_name)
     else:
       self.os_metadata['high_cpu_priority'] = [executable_name]
+
+  def _IsSmtEnabled(self):
+    """Whether SMT is enabled on the vm."""
+    # TODO(user): find way to do this in Windows
+    raise NotImplementedError('SMT detection currently not implemented')
 
 
 class Windows2012CoreMixin(BaseWindowsMixin):

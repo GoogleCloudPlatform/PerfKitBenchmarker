@@ -34,6 +34,28 @@ class SampleTestCase(unittest.TestCase):
                              metadata=metadata.copy())
     self.assertDictEqual(metadata, instance.metadata)
 
+  def testNoneValueShouldBeZero(self):
+    instance = sample.Sample(metric='Test', value=None, unit='Mbps')
+    self.assertIsInstance(instance.value, float)
+    self.assertEqual(0.0, instance.value)
+
+  def testValuesShouldBeFloats(self):
+    instance = sample.Sample(metric='Test', value=1, unit='Mbps')
+    self.assertIsInstance(instance.value, float)
+    self.assertEqual(1.0, instance.value)
+
+    instance = sample.Sample(metric='Test', value=1.0, unit='Mbps')
+    self.assertIsInstance(instance.value, float)
+    self.assertEqual(1.0, instance.value)
+
+    instance = sample.Sample(metric='Test', value='1', unit='Mbps')
+    self.assertIsInstance(instance.value, float)
+    self.assertEqual(1.0, instance.value)
+
+    instance = sample.Sample(metric='Test', value='1.0', unit='Mbps')
+    self.assertIsInstance(instance.value, float)
+    self.assertEqual(1.0, instance.value)
+
 
 class TestPercentileCalculator(unittest.TestCase):
 

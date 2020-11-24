@@ -19,9 +19,8 @@ http://collectd.org
 import logging
 import os
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import collectd
 

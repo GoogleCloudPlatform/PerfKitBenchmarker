@@ -12,23 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for background workload framework"""
+"""Tests for background workload framework."""
 
 import functools
 import unittest
-
+from absl import flags
 import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -45,17 +43,13 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
-    p = mock.patch(util.__name__ + '.GetDefaultProject')
-    p.start()
-    self.addCleanup(p.stop)
 
   def _CheckAndIncrement(self, throwaway=None, expected_last_call=None):
     self.assertEqual(self.last_call, expected_last_call)
     self.last_call += 1
 
   def testBackgroundWorkloadSpec(self):
-    """ Check that the benchmark spec calls the prepare, stop, and start
-    methods on the vms """
+    """Check that benchmark spec calls the prepare, stop, and start on vm."""
 
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
@@ -63,6 +57,8 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
     spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
+    vm0.IsInterruptible = mock.MagicMock(return_value=False)
+    vm1.IsInterruptible = mock.MagicMock(return_value=False)
     spec.ConstructVirtualMachines()
     spec.vms = [vm0, vm1]
     timer = timing_util.IntervalTimer()

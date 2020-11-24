@@ -14,9 +14,9 @@
 """Tests for SMB service."""
 
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import smb_service
 from tests import pkb_common_test_case
 

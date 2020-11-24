@@ -1,0 +1,18 @@
+{# Cloud specific command to get status of VMs. #}
+{% if cloud == 'GCP' %}
+  {{ gcloud_path }} compute instances describe \
+  {{ boot_vm_name_prefix }}-1 \
+  --zone {{ zone }} \
+  --format 'value(status)'
+
+{% elif cloud == 'AWS' %}
+  aws --output text ec2 describe-instances \
+  --region {{ region }} \
+  --filter Name=tag:launcher_id,Values={{ launcher_vm_name }} | grep STATE
+
+{% elif cloud == 'Azure' %}
+  az vm get-instance-view \
+  --name {{ boot_vm_name_prefix }}-{{ start_id }} \
+  --resource-group {{ resource_group }} \
+  --query instanceView.statuses[1] |grep 'displayStatus'
+{% endif %}

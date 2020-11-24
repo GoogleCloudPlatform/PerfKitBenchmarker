@@ -15,7 +15,7 @@
 
 import itertools
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 
 PROVISION = 'provision'

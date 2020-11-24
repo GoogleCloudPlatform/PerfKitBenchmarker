@@ -3,20 +3,20 @@
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import nfs_service
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
+from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
 
 class GceNfsService(nfs_service.BaseNfsService):
   """Resource for GCE NFS service."""
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
   NFS_TIERS = (
       'STANDARD',
       'PREMIUM'
@@ -44,7 +44,10 @@ class GceNfsService(nfs_service.BaseNfsService):
     volume_arg = 'name={0},capacity={1}'.format(
         self.server_directory.strip('/'), self.disk_spec.disk_size)
     network_arg = 'name={0}'.format(self.network)
-    args = ['--file-share', volume_arg, '--network', network_arg]
+    args = [
+        '--file-share', volume_arg, '--network', network_arg, '--labels',
+        util.MakeFormattedDefaultTags()
+    ]
     if self.nfs_tier:
       args += ['--tier', self.nfs_tier]
     try:

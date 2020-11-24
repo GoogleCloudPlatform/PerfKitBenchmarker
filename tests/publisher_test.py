@@ -20,10 +20,9 @@ import re
 import tempfile
 import unittest
 import uuid
-
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
@@ -73,7 +72,7 @@ class LogPublisherTestCase(unittest.TestCase):
     instance = publisher.LogPublisher(logger=logger, level=level)
 
     instance.PublishSamples([{'test': 'testa'}, {'test': 'testb'}])
-    logger.log.assert_called_once_with(level, mock.ANY)
+    logger.log.assert_called_with(level, mock.ANY)
 
 
 class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):

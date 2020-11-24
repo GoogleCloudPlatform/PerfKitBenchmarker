@@ -14,19 +14,17 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
-
+from absl import flags
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_emr
 from perfkitbenchmarker.providers.gcp import gcp_dataproc
-from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -69,9 +67,6 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(_BenchmarkSpecTestCase, self).setUp()
-    p = mock.patch(util.__name__ + '.GetDefaultProject')
-    p.start()
-    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     p = mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')

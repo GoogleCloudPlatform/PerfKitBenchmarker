@@ -16,9 +16,9 @@
 import collections
 import re
 import time
+from absl import flags
 import numpy as np
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -40,10 +40,6 @@ flags.DEFINE_integer('nccl_num_runs', 10, 'The number of consecutive run.',
 flags.DEFINE_integer('nccl_seconds_between_runs', 10,
                      'Sleep between consecutive run.')
 flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
-flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
-flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
-                    'MPI home')
-flags.DEFINE_string('nccl_nccl_home', '/usr/local/nccl2', 'NCCL home')
 flags.DEFINE_boolean('nccl_install_mofed', False,
                      'Install Mellanox OpenFabrics drivers')
 
@@ -68,8 +64,8 @@ nccl:
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-west-2a
-          image: ami-07728e9e2742b0662
+          zone: us-east-1a
+          image: ami-084e787069ee27fb7
           boot_disk_size: 105
         Azure:
           machine_type: Standard_NC24rs_v3
@@ -93,6 +89,7 @@ _SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
 
 _RUN_CMD = ('{mpi} '
             '--hostfile {hostfile} '
+            '--mca pml ^cm '
             '--mca btl tcp,self '
             '--mca btl_tcp_if_exclude docker0,lo '
             '--bind-to none '
@@ -139,25 +136,13 @@ def _PrepareVm(vm):
     vm: virtual machine on which to install NCCL
   """
   vm.AuthenticateVm()
-  vm.Install('nccl')
   vm.Install('openmpi')
+  vm.Install('nccl')
 
   env = ''
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
            '$LD_LIBRARY_PATH &&')
-    vm.InstallPackages('libudev-dev libtool autoconf')
-    vm.RemoteCommand('git clone https://github.com/aws/aws-ofi-nccl.git -b aws')
-    vm.RemoteCommand('cd aws-ofi-nccl && ./autogen.sh && ./configure '
-                     '--with-mpi={mpi} '
-                     '--with-libfabric=/opt/amazon/efa '
-                     '--with-nccl={nccl} '
-                     '--with-cuda={cuda} && sudo make && '
-                     'sudo make install'.format(
-                         mpi=FLAGS.nccl_mpi_home,
-                         nccl=FLAGS.nccl_nccl_home,
-                         cuda='/usr/local/cuda-{}'.format(
-                             FLAGS.cuda_toolkit_version)))
   if FLAGS.nccl_install_mofed:
     vm.Install('mofed')
   vm.RemoteCommand('rm -rf nccl-tests')
@@ -165,7 +150,7 @@ def _PrepareVm(vm):
   vm.RemoteCommand('cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
                    'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
                        env=env, mpi=FLAGS.nccl_mpi_home,
-                       nccl=FLAGS.nccl_nccl_home,
+                       nccl=FLAGS.nccl_home,
                        cuda='/usr/local/cuda-{}'.format(
                            FLAGS.cuda_toolkit_version)))
 
@@ -201,7 +186,9 @@ def _CreateMetadataDict():
               'nthreads': FLAGS.nccl_nthreads,
               'iters': FLAGS.nccl_iters,
               'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices,
-              'net_plugin': FLAGS.nccl_net_plugin,
+              'nccl_version': FLAGS.nccl_version,
+              'nccl_net_plugin': FLAGS.nccl_net_plugin,
+              'nccl_extra_params': FLAGS.nccl_extra_params,
               'extra_params': FLAGS.nccl_extra_params}
   if FLAGS.nccl_install_mofed:
     metadata['mofed_version'] = FLAGS.mofed_version

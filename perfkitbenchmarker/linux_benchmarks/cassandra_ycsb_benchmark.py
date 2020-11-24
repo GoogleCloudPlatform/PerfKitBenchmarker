@@ -23,10 +23,9 @@ YCSB and workloads described in perfkitbenchmarker.linux_packages.ycsb.
 import functools
 import logging
 import os
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cassandra
 from perfkitbenchmarker.linux_packages import ycsb

@@ -20,9 +20,8 @@ from __future__ import print_function
 
 import json
 import re
-
+from absl import flags
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 import six
@@ -57,7 +56,7 @@ def GetAzureStorageAccountKey(storage_account_name, resource_group_args):
 
   response = json.loads(stdout)
   # A new storage account comes with two keys, but we only need one.
-  assert response[0]['permissions'] == 'Full'
+  assert response[0]['permissions'].lower() == 'full'
   return response[0]['value']
 
 
@@ -75,7 +74,7 @@ def FormatTags(tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag' parameter.
   """
-  return [FormatTag(k, v) for k, v in six.iteritems(tags_dict)]
+  return [FormatTag(k, v) for k, v in sorted(six.iteritems(tags_dict))]
 
 
 def GetResourceTags(timeout_minutes):

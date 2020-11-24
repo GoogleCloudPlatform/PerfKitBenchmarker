@@ -28,14 +28,13 @@ import logging
 import posixpath
 import re
 import time
-
+from absl import flags
 import jinja2
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
@@ -544,6 +543,9 @@ def Run(benchmark_spec):
     for item in samples:
       item.metadata['valid_run'] = valid_run
       item.metadata['nonoverlap_percentage'] = nonoverlap_percent
+  for item in samples:
+    item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
+    item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
 
   return samples
 

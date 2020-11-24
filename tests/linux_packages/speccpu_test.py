@@ -15,14 +15,15 @@
 """Tests for speccpu."""
 
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker.linux_benchmarks import speccpu2017_benchmark  # noqa
+# from perfkitbenchmarker.linux_benchmarks import speccpu2017_benchmark  # noqa
+from perfkitbenchmarker.linux_packages import build_tools
 from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
@@ -46,6 +47,7 @@ TEST_OUTPUT_SPECINT = """
 """
 
 GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
+                 'runspec_config_md5sum': 'abcd',
                  'runspec_define': '',
                  'runspec_iterations': '3',
                  'runspec_enable_32bit': 'False',
@@ -54,7 +56,8 @@ GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
                  'spec17_fdo': False,
                  'spec17_copies': None,
                  'spec17_threads': None,
-                 'spec17_subset': ['intspeed', 'fpspeed', 'intrate', 'fprate']}
+                 'spec17_subset': ['intspeed', 'fpspeed', 'intrate', 'fprate'],
+                 'gcc_version': '7'}
 
 EXPECTED_RESULT_SPECINT = [
     sample.Sample(metric='400.perlbench', value=23.4, unit='',
@@ -411,6 +414,12 @@ EXPECTED_PARTIAL_PEAK_RESULT_SPECINT = [
 
 class Speccpu2006BenchmarkTestCase(unittest.TestCase,
                                    test_util.SamplesTestMixin):
+
+  def setUp(self):
+    super(Speccpu2006BenchmarkTestCase, self).setUp()
+    mock.patch.object(build_tools, 'GetVersion').start().return_value = '7'
+    mock.patch.object(speccpu, '_GenerateMd5sum').start().return_value = 'abcd'
+    self.addCleanup(mock.patch.stopall)
 
   def testParseResultsC(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1604Mixin)

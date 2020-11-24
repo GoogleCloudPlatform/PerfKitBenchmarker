@@ -29,8 +29,8 @@ from __future__ import division
 from __future__ import print_function
 import logging
 import re
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
@@ -111,9 +111,7 @@ def ParseNetperfAggregateOutput(stdout):
   metadata = {}
   aggregate_samples = []
 
-  stdout_ascii = stdout.encode("ascii")
-
-  for line in stdout_ascii.splitlines():
+  for line in stdout.splitlines():
     match = re.search('peak interval', line)
     if match:
       line_split = line.split()

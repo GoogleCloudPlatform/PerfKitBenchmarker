@@ -17,15 +17,18 @@ Clusters can be created (based on new configuration or restored from a snapshot)
 and deleted.
 """
 
+import copy
 import json
 import os
+from typing import Any, Dict, List, Text
 
+from absl import flags
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_cluster_parameter_group
 from perfkitbenchmarker.providers.aws import aws_cluster_subnet_group
 from perfkitbenchmarker.providers.aws import util
@@ -38,6 +41,7 @@ READY_STATUSES = ['available']
 ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = '--automated-snapshot-retention-period=0'
 DEFAULT_DATABASE_NAME = 'dev'
 BOOTSTRAP_DB = 'sample'
+REDSHIFT_JDBC_JAR = 'redshift-jdbc-client-1.0.jar'
 
 
 def AddTags(resource_arn, region):
@@ -62,6 +66,216 @@ def GetDefaultRegion():
   return stdout
 
 
+def GetRedshiftClientInterface(database: str, user: str,
+                               password: str) -> edw_service.EdwClientInterface:
+  """Builds and Returns the requested Redshift client Interface.
+
+  Args:
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+
+  Returns:
+    A concrete Client Interface object.
+
+  Raises:
+    RuntimeError: if an unsupported redshift_client_interface is requested
+  """
+  if FLAGS.redshift_client_interface == 'CLI':
+    return CliClientInterface(database, user, password)
+  if FLAGS.redshift_client_interface == 'JDBC':
+    return JdbcClientInterface(database, user, password)
+  raise RuntimeError('Unknown Redshift Client Interface requested.')
+
+
+class CliClientInterface(edw_service.EdwClientInterface):
+  """Command Line Client Interface class for Redshift.
+
+  Uses the native Redshift client that ships with pgbench.
+  https://docs.aws.amazon.com/cli/latest/reference/redshift/index.html
+
+  Attributes:
+    host: Host endpoint to be used for interacting with the cluster.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+  """
+
+  def __init__(self, database: str, user: str, password: str):
+    self.database = database
+    self.user = user
+    self.password = password
+
+  def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
+    """Sets any attributes that were unknown during initialization."""
+    super(CliClientInterface, self).SetProvisionedAttributes(bm_spec)
+    self.host = bm_spec.edw_service.endpoint
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the redshift tool dependencies.
+
+    Args:
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
+    """
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand('sudo pip install absl-py')
+    self.client_vm.Install('pgbench')
+
+    # Push the framework to execute a sql query and gather performance details
+    service_specific_dir = os.path.join('edw', Redshift.SERVICE_TYPE)
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir, 'script_runner.sh')))
+    runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)
+    self.client_vm.PushFile(
+        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+    self.client_vm.PushFile(
+        data.ResourcePath(
+            os.path.join(service_specific_dir,
+                         'provider_specific_script_driver.py')))
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = ('python script_driver.py --script={} --host={} '
+                     '--database={} --user={} --password={}').format(
+                         query_name, self.host, self.database, self.user,
+                         self.password)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    details['job_id'] = performance[query_name]['job_id']
+    return float(performance[query_name]['execution_time']), details
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.redshift_client_interface}
+
+
+class JdbcClientInterface(edw_service.EdwClientInterface):
+  """Native JDBC Client Interface class for Redshift.
+
+  https://docs.aws.amazon.com/redshift/latest/mgmt/jdbc20-install.html
+
+  Attributes:
+    host: Host endpoint to be used for interacting with the cluster.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+  """
+
+  def __init__(self, database: str, user: str, password: str):
+    self.database = database
+    # Use the default port.
+    self.port = '5439'
+    self.user = user
+    self.password = password
+
+  def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
+    """Sets any attributes that were unknown during initialization."""
+    super(JdbcClientInterface, self).SetProvisionedAttributes(bm_spec)
+    endpoint = bm_spec.edw_service.endpoint
+    self.host = f'jdbc:redshift://{endpoint}:{self.port}/{self.database}'
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the redshift tool dependencies.
+
+    Args:
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedPackageData(package_name,
+                                                    [REDSHIFT_JDBC_JAR], '')
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute.
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = ('java -cp {} com.google.cloud.performance.edw.Single '
+                     '--endpoint {} --query_file {}').format(
+                         REDSHIFT_JDBC_JAR, self.host, query_name)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    if 'failure_reason' in performance:
+      details.update({'failure_reason': performance['failure_reason']})
+    else:
+      details.update(performance['details'])
+    return performance['query_wall_time_in_secs'], details
+
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+
+    Args:
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
+      queries: List of strings (names) of queries to execute.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    cmd = ('java -cp {} com.google.cloud.performance.edw.Simultaneous '
+           '--endpoint {} --submission_interval {} --query_files {}'.format(
+               REDSHIFT_JDBC_JAR, self.host, submission_interval,
+               ' '.join(queries)))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    cmd = ('java -cp {} com.google.cloud.performance.edw.Throughput '
+           '--endpoint {} --query_streams {}'.format(
+               REDSHIFT_JDBC_JAR, self.host,
+               ' '.join([','.join(stream) for stream in concurrency_streams])))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.redshift_client_interface}
+
+
 class Redshift(edw_service.EdwService):
   """Object representing a Redshift cluster.
 
@@ -70,7 +284,7 @@ class Redshift(edw_service.EdwService):
     project: ID of the project.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   SERVICE_TYPE = 'redshift'
 
   READY_TIMEOUT = 7200
@@ -98,6 +312,8 @@ class Redshift(edw_service.EdwService):
 
     if self.db is None:
       self.db = DEFAULT_DATABASE_NAME
+    self.client_interface = GetRedshiftClientInterface(self.db, self.user,
+                                                       self.password)
 
   def _CreateDependencies(self):
     self.cluster_subnet_group.Create()
@@ -313,66 +529,5 @@ class Redshift(edw_service.EdwService):
     basic_data['region'] = self.region
     if self.snapshot is not None:
       basic_data['snapshot'] = self.snapshot
+    basic_data.update(self.client_interface.GetMetadata())
     return basic_data
-
-  def RunCommandHelper(self):
-    """Redshift specific run script command components."""
-    return '--host={} --database={} --user={} --password={}'.format(
-        self.endpoint, self.db, self.user, self.password)
-
-  def InstallAndAuthenticateRunner(self, vm, benchmark_name):
-    """Method to perform installation and authentication of redshift runner.
-
-    psql, a terminal-based front end from PostgreSQL, used as client
-    https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-from-psql.html
-
-    Args:
-      vm: Client vm on which the script will be run.
-      benchmark_name: String name of the benchmark, to allow extraction and
-        usage of benchmark specific artifacts (certificates, etc.) during client
-        vm preparation.
-    """
-    vm.Install('pgbench')
-
-  def PushDataDefinitionDataManipulationScripts(self, vm):
-    """Prepare phase to install the runtime environment on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-    """
-    service_specific_dir = os.path.join('edw', self.SERVICE_TYPE)
-    use_case_specific_dir = os.path.join(service_specific_dir, BOOTSTRAP_DB)
-    bootstrap_script_list = ['database_%s.sql' % x
-                             for x in edw_service.EDW_SERVICE_LIFECYCLE_STAGES]
-    for script in bootstrap_script_list:
-      create_script_path = os.path.join(use_case_specific_dir, script)
-      vm.PushFile(data.ResourcePath(create_script_path))
-
-  def PushScriptExecutionFramework(self, vm):
-    """Prepare phase to install the runtime environment on the client vm.
-
-    Args:
-      vm: Client vm on which the script will be run.
-    """
-    super(Redshift, self).PushScriptExecutionFramework(vm)
-    service_specific_dir = os.path.join('edw', self.SERVICE_TYPE)
-    service_specific_script_list = ['script_runner.sh',
-                                    'provider_specific_script_driver.py']
-    for script in service_specific_script_list:
-      vm.PushFile(data.ResourcePath(os.path.join(service_specific_dir, script)))
-    runner_perms_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
-    vm.RemoteCommand(runner_perms_update_cmd)
-
-  def GenerateScriptExecutionCommand(self, script):
-    """Method to generate the command for running the sql script on the vm.
-
-    Args:
-      script: Script to execute on the client vm.
-
-    Returns:
-      Instance specific command to execute the sql script.
-    """
-    launch_command = super(Redshift,
-                           self).GenerateScriptExecutionCommand(script)
-    launch_command.append(self.RunCommandHelper())
-    return ' '.join(launch_command)

@@ -34,6 +34,7 @@ from __future__ import division
 from __future__ import print_function
 
 import datetime
+import enum
 import glob
 import json
 import logging
@@ -43,14 +44,13 @@ import re
 import threading
 import time
 import uuid
-
+from absl import flags
 import numpy as np
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import sample
@@ -179,6 +179,12 @@ flags.DEFINE_boolean(
     'record_individual_latency_samples', False,
     'If set, record the latency of each download and upload '
     'in its own sample.')
+flags.DEFINE_boolean(
+    'object_storage_bulk_delete', False,
+    'If true, deletes objects with bulk delete client request and records '
+    'average latency per object. Otherwise, deletes one object per request '
+    'and records individual delete latency'
+)
 
 FLAGS = flags.FLAGS
 
@@ -222,6 +228,7 @@ API_TEST_SCRIPT_PACKAGE_FILES = [
 ]
 
 SCRIPT_DIR = '/tmp/run'
+REMOTE_PACKAGE_DIR = posixpath.join(SCRIPT_DIR, 'providers')
 DOWNLOAD_DIRECTORY = posixpath.join(SCRIPT_DIR, 'temp')
 
 # Various constants to name the result metrics.
@@ -277,6 +284,8 @@ MULTISTREAM_DELAY_PER_VM = 5.0 * units.second
 MULTISTREAM_DELAY_PER_STREAM = 0.1 * units.second
 # And add a constant factor for PKB-side processing
 MULTISTREAM_DELAY_CONSTANT = 10.0 * units.second
+# Max number of delete operations per second
+MULTISTREAM_DELETE_OPS_PER_SEC = 3500
 
 # The multistream write benchmark writes a file in the VM's /tmp with
 # the objects it has written, which is used by the multistream read
@@ -297,6 +306,14 @@ STORAGE_TO_API_SCRIPT_DICT = {
     providers.AZURE: 'AZURE'}
 
 _SECONDS_PER_HOUR = 60 * 60
+
+
+class MultistreamOperationType(enum.Enum):
+  """MultiStream Operations supported by object_storage_api_tests script."""
+  download = 1
+  upload = 2
+  delete = 3
+  bulk_delete = 4
 
 
 def GetConfig(user_config):
@@ -348,7 +365,7 @@ def _GetClientLibVersion(vm, library_name):
   Returns:
     The version string of the client.
   """
-  version, _ = vm.RemoteCommand('pip show %s |grep Version' % library_name)
+  version, _ = vm.RemoteCommand('pip3 show %s |grep Version' % library_name)
   logging.info('%s client lib version is: %s', library_name, version)
   return version
 
@@ -372,6 +389,21 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
       MULTISTREAM_DELAY_CONSTANT +
       MULTISTREAM_DELAY_PER_VM * num_vms +
       MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
+
+
+def MultiThreadDeleteDelay(num_vms, threads_per_vm):
+  """Calculates delay time between delete operation.
+
+  Args:
+    num_vms: number of VMs to start threads on.
+    threads_per_vm: number of threads to start on each VM.
+
+  Returns:
+    float. Delay time in seconds based on number of vms and threads and the
+      maximum number of delete operations per second.
+  """
+
+  return (num_vms * threads_per_vm) / (MULTISTREAM_DELETE_OPS_PER_SEC)
 
 
 def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
@@ -407,6 +439,7 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
       FLAGS.object_storage_multistream_objects_per_stream)
   metadata['object_naming'] = FLAGS.object_storage_object_naming_scheme
 
+  min_num_records = min((len(start_time) for start_time in start_times))
   num_records = sum((len(start_time) for start_time in start_times))
   logging.info('Processing %s total operation records', num_records)
 
@@ -437,17 +470,17 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
 
   # Find the indexes in each stream where all streams are active,
   # following Python's [inclusive, exclusive) index convention.
-  active_start_indexes = []
-  for start_time in start_times:
+  active_start_indexes = np.full(num_streams, 0)
+  for index, start_time in enumerate(start_times):
     for i in range(len(start_time)):
       if start_time[i] >= last_start_time:
-        active_start_indexes.append(i)
+        active_start_indexes[index] = i
         break
-  active_stop_indexes = []
-  for stop_time in stop_times:
+  active_stop_indexes = np.full(num_streams, min_num_records)
+  for index, stop_time in enumerate(stop_times):
     for i in range(len(stop_time) - 1, -1, -1):
       if stop_time[i] <= first_stop_time:
-        active_stop_indexes.append(i + 1)
+        active_stop_indexes[index] = i + 1
         break
   active_latencies = [
       latencies[i][active_start_indexes[i]:active_stop_indexes[i]]
@@ -504,7 +537,8 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                           LATENCY_UNIT, this_size_metadata))
 
     # Build the object latency histogram if user requested it
-    if FLAGS.object_storage_latency_histogram_interval:
+    if FLAGS.object_storage_latency_histogram_interval and any(
+        size in x for x in sizes):
       histogram_interval = FLAGS.object_storage_latency_histogram_interval
       hist_latencies = [[l for l, s in zip(*w_l_s) if s == size]
                         for w_l_s in zip(latencies, sizes)]
@@ -696,7 +730,9 @@ def OneByteRWBenchmark(results, metadata, vm, command_builder,
   _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
   logging.info('OneByteRW raw result is %s', raw_result)
 
-  for up_and_down in ['upload', 'download']:
+  for up_and_down in ([
+      MultistreamOperationType.upload, MultistreamOperationType.download
+  ]):
     search_string = 'One byte %s - (.*)' % up_and_down
     result_string = re.findall(search_string, raw_result)
     sample_name = ONE_BYTE_LATENCY % up_and_down
@@ -736,7 +772,9 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
   _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
   logging.info('SingleStreamThroughput raw result is %s', raw_result)
 
-  for up_and_down in ['upload', 'download']:
+  for up_and_down in [
+      MultistreamOperationType.upload, MultistreamOperationType.download
+  ]:
     search_string = 'Single stream %s throughput in Bps: (.*)' % up_and_down
     result_string = re.findall(search_string, raw_result)
     sample_name = SINGLE_STREAM_THROUGHPUT % up_and_down
@@ -882,8 +920,10 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
 
   def RunOneProcess(vm_idx):
     logging.info('Running on VM %s.', vm_idx)
-    cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % (vm_idx * streams_per_vm)])
+    cmd = command_builder.BuildCommand(cmd_args + [
+        '--stream_num_start=%s' % (vm_idx * streams_per_vm),
+        '--vm_id=%s' % vm_idx
+    ])
     out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=False)
     output[vm_idx] = out
 
@@ -970,12 +1010,16 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                FLAGS.object_storage_object_sizes, size_distribution)
 
   streams_per_vm = FLAGS.object_storage_streams_per_vm
+  num_vms = FLAGS.num_vms
 
   start_time = (
       time.time() +
-      MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
+      MultiThreadStartDelay(num_vms, streams_per_vm).m_as('second'))
+
+  delete_delay = MultiThreadDeleteDelay(num_vms, streams_per_vm)
 
   logging.info('Start time is %s', start_time)
+  logging.info('Delete delay is %s', delete_delay)
 
   cmd_args = [
       '--bucket=%s' % bucket_name,
@@ -985,16 +1029,26 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
       '--start_time=%s' % start_time,
       '--objects_written_file=%s' % objects_written_file]
 
-  if operation == 'upload':
+  if operation == MultistreamOperationType.upload:
     cmd_args += [
         '--object_sizes="%s"' % size_distribution,
         '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
         '--scenario=MultiStreamWrite']
-  elif operation == 'download':
+  elif operation == MultistreamOperationType.download:
     cmd_args += ['--scenario=MultiStreamRead']
+  elif operation == MultistreamOperationType.delete:
+    cmd_args += [
+        '--scenario=MultiStreamDelete',
+        '--delete_delay=%s' % delete_delay
+    ]
+  elif operation == MultistreamOperationType.bulk_delete:
+    cmd_args += [
+        '--scenario=MultiStreamDelete', '--bulk_delete=true',
+        '--delete_delay=%s' % delete_delay
+    ]
   else:
     raise Exception('Value of operation must be \'upload\' or \'download\'.'
-                    'Value is: \'' + operation + '\'')
+                    'Value is: \'' + operation.name + '\'')
 
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
                                     streams_per_vm)
@@ -1002,13 +1056,18 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   if FLAGS.object_storage_worker_output:
     with open(FLAGS.object_storage_worker_output, 'w') as out_file:
       out_file.write(json.dumps(output))
-  _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
-                             list(six.iterkeys(size_distribution)), results,
-                             metadata=metadata)
+  _ProcessMultiStreamResults(
+      start_times,
+      latencies,
+      sizes,
+      operation.name,
+      list(six.iterkeys(size_distribution)),
+      results,
+      metadata=metadata)
 
   # Write the objects written file if the flag is set and this is an upload
   objects_written_path_local = _ColdObjectsWrittenFilename()
-  if operation == 'upload' and objects_written_path_local is not None:
+  if operation == MultistreamOperationType.upload and objects_written_path_local is not None:
     # Get the objects written from all the VMs
     # Note these are JSON lists with the following format:
     # [[object1_name, object1_size],[object2_name, object2_size],...]
@@ -1052,13 +1111,13 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'upload')
+                     bucket_name, MultistreamOperationType.upload)
 
   logging.info('Finished multi-stream write test. Starting '
                'multi-stream read test.')
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'download')
+                     bucket_name, MultistreamOperationType.download)
 
   logging.info('Finished multi-stream read test.')
 
@@ -1084,7 +1143,7 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
   logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'upload')
+                     bucket_name, MultistreamOperationType.upload)
 
   logging.info('Finished multi-stream write test.')
 
@@ -1137,9 +1196,37 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
                     '%s' % e)
 
   _MultiStreamOneWay(results, metadata, vms, command_builder, service,
-                     bucket_name, 'download')
+                     bucket_name, MultistreamOperationType.download)
 
   logging.info('Finished multi-stream read test.')
+
+
+def MultiStreamDelete(results, metadata, vms, command_builder, service,
+                      bucket_name):
+  """A benchmark for multi-stream delete.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vms: the VMs to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: The provider's ObjectStorageService
+    bucket_name: the primary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+  logging.info('Starting multi-stream delete test on %s VMs.', len(vms))
+
+  if FLAGS.object_storage_bulk_delete:
+    _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                       bucket_name, MultistreamOperationType.bulk_delete)
+  else:
+    _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                       bucket_name, MultistreamOperationType.delete)
+
+  logging.info('Finished multi-stream delete test.')
 
 
 def CheckPrerequisites(benchmark_config):
@@ -1282,9 +1369,11 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
 
 
 def PrepareVM(vm, service):
-  vm.Install('pip')
-  vm.RemoteCommand('sudo pip install absl-py')
-  vm.RemoteCommand('sudo pip install pyyaml')
+  vm.InstallPackages('python3-pip')
+
+  # dependencies of API_TEST_SCRIPT
+  vm.RemoteCommand('sudo pip3 install absl-py')
+  vm.RemoteCommand('sudo pip3 install pyyaml')
 
   vm.Install('openssl')
 
@@ -1297,9 +1386,8 @@ def PrepareVM(vm, service):
   vm.RemoteCommand('sudo mkdir -p ' + DOWNLOAD_DIRECTORY)
   vm.RemoteCommand('sudo chmod 777 ' + DOWNLOAD_DIRECTORY)
 
-  remote_package_dir = posixpath.join(SCRIPT_DIR, 'providers')
-  vm.RemoteCommand('sudo mkdir -p ' + remote_package_dir)
-  vm.RemoteCommand('sudo chmod 777  ' + remote_package_dir)
+  vm.RemoteCommand('sudo mkdir -p ' + REMOTE_PACKAGE_DIR)
+  vm.RemoteCommand('sudo chmod 777  ' + REMOTE_PACKAGE_DIR)
 
   file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, SCRIPT_DIR)
@@ -1314,14 +1402,14 @@ def PrepareVM(vm, service):
     path = data.ResourcePath(
         os.path.join(API_TEST_SCRIPTS_DIR, file_name))
     logging.info('Uploading %s to %s', path, vm)
-    vm.PushFile(path, remote_package_dir)
+    vm.PushFile(path, REMOTE_PACKAGE_DIR)
 
   service.PrepareVM(vm)
 
 
 def CleanupVM(vm, service):
   service.CleanupVM(vm)
-  vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall absl-py')
+  vm.RemoteCommand('/usr/bin/yes | sudo pip3 uninstall absl-py')
   vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)
@@ -1526,7 +1614,10 @@ def Run(benchmark_spec):
   keep_bucket = (FLAGS.object_storage_objects_written_file_prefix is not None or
                  FLAGS.object_storage_dont_delete_bucket)
   if not keep_bucket:
-    service.EmptyBucket(bucket_name)
+    MultiStreamDelete(results, metadata, vms, command_builder, service,
+                      bucket_name)
+
+  service.UpdateSampleMetadata(results)
 
   return results
 
@@ -1539,6 +1630,9 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
 
+  if not hasattr(benchmark_spec, 'service'):
+    logging.info('Skipping cleanup as prepare method failed')
+    return
   service = benchmark_spec.service
   bucket_name = benchmark_spec.bucket_name
   vms = benchmark_spec.vms

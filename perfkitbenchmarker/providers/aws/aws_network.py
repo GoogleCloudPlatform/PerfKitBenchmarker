@@ -25,14 +25,14 @@ import json
 import logging
 import threading
 
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
@@ -43,7 +43,7 @@ flags.DEFINE_string(
     'aws_subnet', None,
     'The static AWS subnet id to use.  Default creates a new one')
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
-flags.DEFINE_string('aws_efa_version', '1.8.3',
+flags.DEFINE_string('aws_efa_version', '1.9.4',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
 flags.DEFINE_multi_enum('aws_endpoint', [], ['s3'],
                         'List of AWS endpoints to create')
@@ -58,7 +58,7 @@ ZONE = 'zone'
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __init__(self):
     self.firewall_set = set()
@@ -609,7 +609,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
   _regional_network_count = 0
   _regional_network_lock = threading.Lock()
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
@@ -697,9 +697,10 @@ class _AwsRegionalNetwork(network.BaseNetwork):
       if self._reference_count:
         return
 
-    self.internet_gateway.Detach()
-    self.internet_gateway.Delete()
-    self.vpc.Delete()
+    if self.created:
+      self.internet_gateway.Detach()
+      self.internet_gateway.Delete()
+      self.vpc.Delete()
 
 
 class AwsNetworkSpec(network.BaseNetworkSpec):
@@ -732,7 +733,7 @@ class AwsNetwork(network.BaseNetwork):
     placement_group: An AwsPlacementGroup instance.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)

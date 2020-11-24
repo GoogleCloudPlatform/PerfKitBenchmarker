@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.providers"""
+"""Tests for perfkitbenchmarker.providers."""
 
 import unittest
-
+from absl import flags
 import mock
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.configs import benchmark_config_spec

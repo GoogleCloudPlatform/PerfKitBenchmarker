@@ -30,10 +30,9 @@ import os
 import pipes
 import posixpath
 import subprocess
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
@@ -420,6 +419,8 @@ def Run(benchmark_spec):
         'bigtable_replication_zone'] = FLAGS.bigtable_replication_cluster_zone
     metadata['bigtable_storage_type'] = FLAGS.bigtable_storage_type
     metadata['bigtable_node_count'] = FLAGS.bigtable_node_count
+    metadata['bigtable_multicluster_routing'] = (
+        FLAGS.bigtable_multicluster_routing)
 
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
   # This leads to incorrect update latencies, since since the call returns

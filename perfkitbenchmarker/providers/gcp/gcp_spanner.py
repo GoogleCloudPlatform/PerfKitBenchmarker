@@ -19,7 +19,7 @@ Instances can be created and deleted.
 import json
 import logging
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
 
@@ -56,8 +56,8 @@ class GcpSpannerInstance(resource.BaseResource):
     ddl:         The schema of the database.
   """
 
-  def __init__(self, name, description, database, ddl):
-    super(GcpSpannerInstance, self).__init__()
+  def __init__(self, name, description, database, ddl, **kwargs):
+    super(GcpSpannerInstance, self).__init__(**kwargs)
     self._name = name
     self._description = description
     self._database = database
@@ -69,7 +69,9 @@ class GcpSpannerInstance(resource.BaseResource):
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
-    self.project = FLAGS.cloud_spanner_project or util.GetDefaultProject()
+    self.project = (
+        FLAGS.cloud_spanner_project or FLAGS.project or
+        util.GetDefaultProject())
     self.zone = None
 
   def _Create(self):
@@ -119,7 +121,7 @@ class GcpSpannerInstance(resource.BaseResource):
     # Do not log error or warning when checking existence.
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
-      logging.info('Could not found GCP Spanner instances %s.' % self._name)
+      logging.info('Could not found GCP Spanner instances %s.', self._name)
       return False
 
     if instance_only:
@@ -132,7 +134,7 @@ class GcpSpannerInstance(resource.BaseResource):
     # Do not log error or warning when checking existence.
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
-      logging.info('Could not found GCP Spanner database %s.' % self._database)
+      logging.info('Could not found GCP Spanner database %s.', self._database)
       return False
 
     return True

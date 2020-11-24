@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!-- Put site-specific property overrides in this file. -->
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+    <property>
+        <name>mapreduce.job.maps</name>
+        <value>{{ num_map_tasks }}</value>
+    </property>
+    <property>
+        <name>mapreduce.job.reduces</name>
+        <value>{{ num_reduce_tasks }}</value>
+    </property>
+    <property>
+        <name>mapreduce.map.memory.mb</name>
+        <value>{{ map_memory_mb }}</value>
+    </property>
+    <property>
+        <name>mapreduce.map.java.opts</name>
+        <value>-Xmx{{ map_heap_mb }}M</value>
+    </property>
+    <property>
+        <name>mapreduce.reduce.memory.mb</name>
+        <value>{{ reduce_memory_mb }}</value>
+    </property>
+    <property>
+        <name>mapreduce.reduce.java.opts</name>
+        <value>-Xmx{{ reduce_heap_mb }}M</value>
+    </property>
+    <property>
+        <!-- This is the fraction of map tasks that must complete before reduce
+        tasks start. If we did a good job of scheduling map tasks to all fit in
+        one wave the default of .05 should be fine (possibly better), but
+        annecdotally this seemed to minimally help. It is conistent with
+        Dataproc.-->
+        <name>mapreduce.job.reduce.slowstart.completedmaps</name>
+        <value>0.95</value>
+    </property>
+  <!-- TODO(pclay): consider setting
+    * mapreduce.task.io.sort.*
+    * mapreduce.reduce.merge.*
+    * mapreduce.reduce.shuffle.*
+    * mapreduce.*.speculative
+    * mapreduce.map.output.compress
+    or simply not running MapReduce.
+  -->
+</configuration>

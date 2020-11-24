@@ -28,6 +28,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import abc
 import collections
 import itertools
 import json
@@ -35,13 +36,12 @@ import logging
 import posixpath
 import re
 import threading
-
+from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -65,6 +65,15 @@ NUM_LOCAL_VOLUMES = {
     'Standard_L80s_v2': 10
 }
 
+# https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events
+_SCHEDULED_EVENTS_CMD = ('curl -H Metadata:true http://169.254.169.254/metadata'
+                         '/scheduledevents?api-version=2019-01-01')
+
+_SCHEDULED_EVENTS_CMD_WIN = ('Invoke-RestMethod -Headers @{"Metadata"="true"} '
+                             '-Uri http://169.254.169.254/metadata/'
+                             'scheduledevents?api-version=2019-01-01 | '
+                             'ConvertTo-Json')
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -78,7 +87,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     low_priority: boolean. True if the VM should be low-priority, else False.
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
 
   def __init__(self, *args, **kwargs):
     super(AzureVmSpec, self).__init__(*args, **kwargs)
@@ -145,13 +154,14 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
 class AzurePublicIPAddress(resource.BaseResource):
   """Class to represent an Azure Public IP Address."""
 
-  def __init__(self, location, availability_zone, name):
+  def __init__(self, location, availability_zone, name, dns_name=None):
     super(AzurePublicIPAddress, self).__init__()
     self.location = location
     self.availability_zone = availability_zone
     self.name = name
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
+    self.dns_name = dns_name
 
   def _Create(self):
     cmd = [
@@ -162,6 +172,9 @@ class AzurePublicIPAddress(resource.BaseResource):
     if self.availability_zone:
       # Availability Zones require Standard IPs.
       cmd += ['--zone', self.availability_zone, '--sku', 'Standard']
+
+    if self.dns_name:
+      cmd += ['--dns-name', self.dns_name]
 
     _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -457,9 +470,7 @@ class AzureVirtualMachine(
     six.with_metaclass(AzureVirtualMachineMetaClass,
                        virtual_machine.BaseVirtualMachine)):
   """Object representing an Azure Virtual Machine."""
-  CLOUD = providers.AZURE
-  # Subclasses should override IMAGE_URN.
-  IMAGE_URN = None
+  CLOUD = azure.CLOUD
 
   _lock = threading.Lock()
   # TODO(buggay): remove host groups & hosts as globals -> create new spec
@@ -494,14 +505,14 @@ class AzureVirtualMachine(
     self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
                         self.public_ip.name, vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
-    self.image = vm_spec.image or self.IMAGE_URN
+    self.image = vm_spec.image or type(self).IMAGE_URN
     self.host = None
     if self.use_dedicated_host:
       self.host_series_sku = _GetSkuType(self.machine_type)
       self.host_list = None
     self.low_priority = vm_spec.low_priority
     self.low_priority_status_code = None
-    self.early_termination = False
+    self.spot_early_termination = False
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     disk_spec.disk_type = (
@@ -515,6 +526,12 @@ class AzureVirtualMachine(
         self.storage_account,
         None,
         is_image=True)
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def IMAGE_URN(cls):
+    raise NotImplementedError()
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -578,15 +595,12 @@ class AzureVirtualMachine(
       create_cmd.extend(['--ssh-key-value', self.ssh_public_key])
 
     # Uses a custom default because create has a very long tail.
-    azure_vm_create_timeout = 1200
+    azure_vm_create_timeout = 1800
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
-    if retcode and (
-        'Error Code: QuotaExceeded' in stderr or
-        re.search(r'exceeding approved \S+ \S+ quota', stderr) or
-        re.search(r'CloudError\("The template deployment .+ is not valid',
-                  stderr) or
-        'exceeding quota limit' in stderr):
+    if retcode and ('Error Code: QuotaExceeded' in stderr or
+                    re.search(r'exceeding approved \S+ \S+ quota', stderr) or
+                    'exceeding quota limit' in stderr):
       raise errors.Benchmarks.QuotaFailure(
           virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
     # TODO(buggay) refactor to share code with gcp_virtual_machine.py
@@ -734,17 +748,27 @@ class AzureVirtualMachine(
     if self.network.placement_group:
       result['placement_group_strategy'] = self.network.placement_group.strategy
     else:
-      result['placement_group_strategy'] = None
+      result['placement_group_strategy'] = placement_group.PLACEMENT_GROUP_NONE
     result['preemptible'] = self.low_priority
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
-  @vm_util.Retry(max_retries=5)
   def UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
-    if self.low_priority:
-      self.early_termination = True
+    if self.spot_early_termination:
+      return
+    if self.low_priority and self._Exists():
+      stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
+          _SCHEDULED_EVENTS_CMD)
+      if return_code:
+        logging.error('Checking Interrupt Error: %s', stderr)
+      else:
+        events = json.loads(stdout).get('Events', [])
+        self.spot_early_termination = any(
+            event.get('EventType') == 'Preempt' for event in events)
+        if self.spot_early_termination:
+          logging.info('Spotted early termination on %s', self)
 
   def IsInterruptible(self):
     """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
@@ -759,7 +783,7 @@ class AzureVirtualMachine(
 
     Returns: True if this vm was terminated early by Azure.
     """
-    return self.early_termination
+    return self.spot_early_termination
 
   def GetVmStatusCode(self):
     """Returns the early termination code if any.
@@ -767,6 +791,14 @@ class AzureVirtualMachine(
     Returns: Early termination code.
     """
     return self.low_priority_status_code
+
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
+
+    Returns:
+      Seconds between polls
+    """
+    return 5
 
 
 class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,
@@ -816,9 +848,8 @@ class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'OpenLogic:CentOS:8.0:latest'
 
 
-class CoreOsBasedAzureVirtualMachine(AzureVirtualMachine,
-                                     linux_virtual_machine.CoreOsMixin):
-  IMAGE_URN = 'CoreOS:CoreOS:Stable:latest'
+# TODO(pclay): Add Fedora CoreOS when available:
+#   https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
 
 
 class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
@@ -847,6 +878,18 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         '--version', '1.4',
         '--protected-settings=%s' % config
     ] + self.resource_group.args)
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted."""
+    if self.spot_early_termination:
+      return
+    if self.low_priority and self._Exists():
+      stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
+      events = json.loads(stdout).get('Events', [])
+      self.spot_early_termination = any(
+          event.get('EventType') == 'Preempt' for event in events)
+      if self.spot_early_termination:
+        logging.info('Spotted early termination on %s', self)
 
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:
@@ -894,9 +937,10 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   """Returns a string used to download preprovisioned data."""
   module_name_with_underscores_removed = module_name.replace('_', '-')
   destpath = posixpath.join(install_path, filename)
-  # TODO(ferneyhough): Refactor this so that this mkdir command
-  # is run on all clouds, and is os-agnostic (this is linux specific).
-  mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
+  if install_path:
+    # TODO(ferneyhough): Refactor this so that this mkdir command
+    # is run on all clouds, and is os-agnostic (this is linux specific).
+    mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
 
   account_name = FLAGS.azure_preprovisioned_data_bucket
   connection_string = util.GetAzureStorageConnectionString(account_name, [])
@@ -913,7 +957,9 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
           name=filename,
           file=destpath,
           connection_string=connection_string))
-  return '{0} && {1}'.format(mkdir_command, download_command)
+  if install_path:
+    return '{0} && {1}'.format(mkdir_command, download_command)
+  return download_command
 
 
 def GenerateStatPreprovisionedDataCommand(module_name, filename):

@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+# Lint as: python2, python3
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -304,7 +303,10 @@ def _get_run_uri(filename):
   """
   grab_file_tail_cmd = ['tail', '-n', TAIL_LINE_NUM, filename]
   p = subprocess.Popen(
-      grab_file_tail_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      grab_file_tail_cmd,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      universal_newlines=True)
   lines = p.stdout.readlines()
   r = re.compile(URI_REGEX)
   for line in lines:

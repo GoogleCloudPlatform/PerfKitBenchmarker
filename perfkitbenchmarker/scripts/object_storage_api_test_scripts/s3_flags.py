@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,4 +17,4 @@
 
 from absl import flags
 
-flags.DEFINE_string('host', None, 'The hostname of the storage endpoint.')
+flags.DEFINE_string('region', None, 'The S3 region to use.')

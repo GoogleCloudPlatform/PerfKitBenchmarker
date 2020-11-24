@@ -17,9 +17,8 @@ import datetime
 import json
 import logging
 import time
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -59,7 +58,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   must be the same.
 
   """
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
 
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)
@@ -146,6 +145,30 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
+  def SetDbConfiguration(self, name, value):
+    """Set configuration for the database instance.
+
+    Args:
+        name: string, the name of the settings to change
+        value: value, string the value to set
+    """
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        'server',
+        'configuration',
+        'set',
+        '--name',
+        name,
+        '--value',
+        value,
+        '--resource-group',
+        self.resource_group.name,
+        '--server',
+        self.instance_id
+    ]
+    vm_util.IssueCommand(cmd)
+
   def RenameDatabase(self, new_name):
     """Renames an the database instace."""
     engine = self.spec.engine
@@ -190,7 +213,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """Creates a managed MySql or Postgres instance."""
     if not self.spec.high_availability:
       raise Exception('Azure databases can only be used in high '
-                      'availability.')
+                      'availability. Please rerurn with flag '
+                      '--managed_db_high_availability=True')
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -206,13 +230,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         self.spec.database_username,
         '--admin-password',
         self.spec.database_password,
-        '--performance-tier',
-        self.spec.db_spec.tier,
-        '--compute-units',
-        str(self.spec.db_spec.compute_units),
         # AZ command line expects 128000MB-1024000MB in increments of 128000MB
         '--storage-size',
         str(self.spec.db_disk_spec.disk_size * 1000),
+        '--sku-name',
+        self.spec.db_spec.machine_type,
         '--version',
         self.spec.engine_version,
     ]
@@ -390,6 +412,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     vm_util.IssueCommand(cmd)
     self._AssignPortsForWriterInstance()
 
+    if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
+      # Azure will add @domainname after the database username
+      self.spec.database_username = (self.spec.database_username + '@' +
+                                     self.endpoint.split('.')[0])
+
   def _IsInstanceReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.
 
@@ -415,7 +442,17 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
-        state = server_show_json['state']
+        engine = self.spec.engine
+        if engine == relational_db.POSTGRES:
+          state = server_show_json['userVisibleState']
+        elif engine == relational_db.MYSQL:
+          state = server_show_json['userVisibleState']
+        elif engine == relational_db.SQLSERVER:
+          state = server_show_json['state']
+        else:
+          raise relational_db.RelationalDbEngineNotFoundException(
+              'The db engine does not contain a valid state')
+
         if state == 'Ready':
           break
       time.sleep(5)
@@ -470,38 +507,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         self.instance_id,
         self.spec.database_password,
         database_name)
-
-  def MakeMysqlConnectionString(self, use_localhost=False):
-    """Makes the connection string used to connect via mysql command.
-
-    Override implemenation in base class.  Azure postgres needs this format.
-
-    Args:
-      use_localhost: Whether to use 'localhost' instead of the endpoint or not.
-
-    Returns:
-        The connection string to use.
-    """
-    return '-h {0}{1} -u {2}{3} -p{4}'.format(
-        self.endpoint if not use_localhost else 'localhost',
-        ' -P 3306' if not self.is_managed_db else '',
-        self.spec.database_username, ('@%s' % self.endpoint) if
-        (self.is_managed_db and not use_localhost) else '',
-        self.spec.database_password)
-
-  def MakeSysbenchConnectionString(self):
-    """Makes the connection string used to connect via sysbench command.
-
-    Override implemenation in base class.  Azure postgres needs this format.
-
-    Returns:
-        The connection string to use.
-    """
-    return ('--mysql-host={0}{1} --mysql-user={2}@{0} '
-            '--mysql-password="{3}" '.format(
-                self.endpoint,
-                ' --mysql-port=3306' if not self.is_managed_db else '',
-                self.spec.database_username, self.spec.database_password))
 
   def _FailoverHA(self):
     raise NotImplementedError()

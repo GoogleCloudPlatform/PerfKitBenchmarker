@@ -21,9 +21,8 @@ TODO: add global table option.
 """
 
 import os
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
@@ -106,7 +105,7 @@ def Run(benchmark_spec):
     run_kwargs.update({'dynamodb.consistentReads': 'true'})
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
-    load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
+    load_kwargs['threads'] = FLAGS.ycsb_preload_threads
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
   benchmark_metadata = {

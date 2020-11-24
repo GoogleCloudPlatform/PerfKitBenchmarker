@@ -31,16 +31,17 @@ import re
 import threading
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -55,37 +56,6 @@ HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3', 't3'])
-# Following dictionary based on
-# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
-NUM_LOCAL_VOLUMES = {
-    'c1.medium': 1, 'c1.xlarge': 4,
-    'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
-    'c3.8xlarge': 2, 'cc2.8xlarge': 4,
-    'cg1.4xlarge': 2, 'cr1.8xlarge': 2, 'g2.2xlarge': 1,
-    'hi1.4xlarge': 2, 'hs1.8xlarge': 24,
-    'i2.xlarge': 1, 'i2.2xlarge': 2, 'i2.4xlarge': 4, 'i2.8xlarge': 8,
-    'm1.small': 1, 'm1.medium': 1, 'm1.large': 2, 'm1.xlarge': 4,
-    'm2.xlarge': 1, 'm2.2xlarge': 1, 'm2.4xlarge': 2,
-    'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
-    'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
-    'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
-    'd2.8xlarge': 24, 'i3.large': 1, 'i3.xlarge': 1,
-    'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8,
-    'i3.metal': 8,
-    'c5d.large': 1, 'c5d.xlarge': 1, 'c5d.2xlarge': 1, 'c5d.4xlarge': 1,
-    'c5d.9xlarge': 1, 'c5d.18xlarge': 2,
-    'm5d.large': 1, 'm5d.xlarge': 1, 'm5d.2xlarge': 1, 'm5d.4xlarge': 2,
-    'm5d.12xlarge': 2, 'm5d.24xlarge': 4,
-    'r5d.large': 1, 'r5d.xlarge': 1, 'r5d.2xlarge': 1, 'r5d.4xlarge': 2,
-    'r5d.12xlarge': 2, 'r5d.24xlarge': 4,
-    'z1d.large': 1, 'z1d.xlarge': 1, 'z1d.2xlarge': 1, 'z1d.3xlarge': 2,
-    'z1d.6xlarge': 1, 'z1d.12xlarge': 2,
-    'x1.16xlarge': 1, 'x1.32xlarge': 2,
-    'x1e.xlarge': 1, 'x1e.2xlarge': 1, 'x1e.4xlarge': 1, 'x1e.8xlarge': 1,
-    'x1e.16xlarge': 1, 'x1e.32xlarge': 2,
-    'f1.2xlarge': 1, 'f1.4xlarge': 1, 'f1.16xlarge': 4,
-    'p3dn.24xlarge': 2
-}
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
@@ -111,7 +81,7 @@ AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
 USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
     ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
-ARM_PROCESSOR_PREFIXES = ['a1']
+ARM_PROCESSOR_PREFIXES = ['a1', 'm6g', 'c6g', 'r6g', 'm6gd']
 
 # Processor architectures
 ARM = 'arm64'
@@ -120,11 +90,16 @@ X86 = 'x86_64'
 # These are the project numbers of projects owning common images.
 # Some numbers have corresponding owner aliases, but they are not used here.
 AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
-# https://coreos.com/os/docs/latest/booting-on-ec2.html
-COREOS_IMAGE_PROJECT = '595879546273'
+# From https://wiki.debian.org/Cloud/AmazonEC2Image/Stretch
+# Marketplace AMI exists, but not in all regions
+DEBIAN_9_IMAGE_PROJECT = '379101102735'
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
-# TODO(pclay): replace with Marketplace AMI when available
-DEBIAN_IMAGE_PROJECT = '136693071363'
+DEBIAN_10_IMAGE_PROJECT = '136693071363'
+# Owns AMIs lists here:
+# https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+# Also owns the AMIS listed in
+# https://builds.coreos.fedoraproject.org/streams/stable.json
+CENTOS_IMAGE_PROJECT = '125523088429'
 MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
 # https://access.redhat.com/articles/2962171
 RHEL_IMAGE_PROJECT = '309956199498'
@@ -137,6 +112,10 @@ WINDOWS_IMAGE_PROJECT = '801119661308'  # alias amazon
 # Machine type to host architecture.
 _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
     'a1': 'cortex-a72',
+    'c6g': 'graviton2',
+    'm6g': 'graviton2',
+    'm6gd': 'graviton2',
+    'r6g': 'graviton2',
 }
 
 # Parameters for use with Elastic Fiber Adapter
@@ -151,7 +130,8 @@ _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
 # Command to install Libfabric and OpenMPI
 _EFA_INSTALL_CMD = ';'.join([
     'curl -O {url}', 'tar -xvzf {tarfile}', 'cd aws-efa-installer',
-    'sudo ./efa_installer.sh -y', 'rm -rf {tarfile} aws-efa-installer'
+    'sudo ./efa_installer.sh -y || exit 1', 'cd ..',
+    'rm -rf {tarfile} aws-efa-installer'
 ])
 
 
@@ -243,9 +223,9 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     root_block_device['Ebs'].pop('Encrypted')
     mappings.append(root_block_device)
 
-  if (machine_type in NUM_LOCAL_VOLUMES and
+  if (machine_type in aws_disk.NUM_LOCAL_VOLUMES and
       not aws_disk.LocalDriveIsNvme(machine_type)):
-    for i in range(NUM_LOCAL_VOLUMES[machine_type]):
+    for i in range(aws_disk.NUM_LOCAL_VOLUMES[machine_type]):
       od = collections.OrderedDict()
       od['VirtualName'] = 'ephemeral%s' % i
       od['DeviceName'] = '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
@@ -338,7 +318,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
       use_dedicated_host: bool. Whether to create this VM on a dedicated host.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -417,11 +397,15 @@ class AwsKeyFileManager(object):
       cat_cmd = ['cat',
                  vm_util.GetPublicKeyPath()]
       keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+      formatted_tags = util.FormatTagSpecifications('key-pair',
+                                                    util.MakeDefaultTags())
       import_cmd = util.AWS_PREFIX + [
           'ec2', '--region=%s' % region,
           'import-key-pair',
           '--key-name=%s' % cls.GetKeyNameForRun(),
-          '--public-key-material=%s' % keyfile]
+          '--public-key-material=%s' % keyfile,
+          '--tag-specifications=%s' % formatted_tags,
+      ]
       _, stderr, retcode = vm_util.IssueCommand(
           import_cmd, raise_on_failure=False)
       if retcode:
@@ -458,7 +442,7 @@ class AwsKeyFileManager(object):
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   # The IMAGE_NAME_FILTER is passed to the AWS CLI describe-images command to
   # filter images by name. This must be set by subclasses, but may be overridden
@@ -482,6 +466,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # filter)
   IMAGE_PRODUCT_CODE_FILTER = None
 
+  # CoreOS only distinguishes between stable and testing images in the
+  # description
+  IMAGE_DESCRIPTION_FILTER = None
+
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
   DEFAULT_USER_NAME = 'ec2-user'
 
@@ -501,8 +489,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
-    if self.machine_type in NUM_LOCAL_VOLUMES:
-      self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
+    if self.machine_type in aws_disk.NUM_LOCAL_VOLUMES:
+      self.max_local_disks = aws_disk.NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.placement_group = getattr(vm_spec, 'placement_group',
@@ -525,13 +513,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'spot_block_duration_minutes':
             self.spot_block_duration_minutes,
         'placement_group_strategy':
-            self.placement_group.strategy if self.placement_group else 'none',
+            self.placement_group.strategy
+            if self.placement_group else placement_group.PLACEMENT_GROUP_NONE,
         'aws_credit_specification':
             FLAGS.aws_credit_specification
             if FLAGS.aws_credit_specification else 'none'
     })
-    self.early_termination = False
+    self.spot_early_termination = False
     self.spot_status_code = None
+    # See:
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-os.html
+    self._smp_affinity_script = 'smp_affinity.sh'
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(
@@ -592,7 +584,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--region=%s' % region,
         'ec2',
         'describe-images',
-        '--query', 'Images[*].{Name:Name,ImageId:ImageId}',
+        '--query', ('Images[*].{Name:Name,ImageId:ImageId,'
+                    'CreationDate:CreationDate}'),
         '--filters',
         'Name=name,Values=%s' % cls.IMAGE_NAME_FILTER,
         'Name=block-device-mapping.volume-type,Values=%s' %
@@ -602,6 +595,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if cls.IMAGE_PRODUCT_CODE_FILTER:
       describe_cmd.extend(['Name=product-code,Values=%s' %
                            cls.IMAGE_PRODUCT_CODE_FILTER])
+    if cls.IMAGE_DESCRIPTION_FILTER:
+      describe_cmd.extend(['Name=description,Values=%s' %
+                           cls.IMAGE_DESCRIPTION_FILTER])
     describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
@@ -632,13 +628,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not images:
       raise AwsImageNotFoundError('No AMIs with given filters found.')
 
-    # We want to return the latest version of the image, and since the wildcard
-    # portion of the image name is the image's creation date, we can just take
-    # the image with the 'largest' name.
-    # TODO(deitz): Investigate sorting by CreationDate instead of by Name.
-    return max(images, key=lambda image: image['Name'])['ImageId']
+    return max(images, key=lambda image: image['CreationDate'])['ImageId']
 
-  @vm_util.Retry()
+  @vm_util.Retry(max_retries=2)
   def _PostCreate(self):
     """Get the instance's data and tag it."""
     describe_cmd = util.AWS_PREFIX + [
@@ -658,7 +650,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
-    if FLAGS.aws_efa:
+    if FLAGS.aws_efa and FLAGS.aws_efa_version:
       self.InstallPackages('curl')
       url = _EFA_URL.format(version=FLAGS.aws_efa_version)
       self.RemoteCommand(
@@ -791,14 +783,16 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'InsufficientInstanceCapacity' in stderr:
       if self.use_spot_instance:
         self.spot_status_code = 'InsufficientSpotInstanceCapacity'
-        self.early_termination = True
+        self.spot_early_termination = True
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if 'SpotMaxPriceTooLow' in stderr:
       self.spot_status_code = 'SpotMaxPriceTooLow'
-      self.early_termination = True
+      self.spot_early_termination = True
       raise errors.Resource.CreationError(stderr)
-    if 'InstanceLimitExceeded' in stderr:
+    if 'InstanceLimitExceeded' in stderr or 'VcpuLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
+    if 'RequestLimitExceeded' in stderr and FLAGS.retry_on_rate_limited:
+      raise errors.Resource.RetryableCreationError(stderr)
     if retcode:
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
@@ -820,8 +814,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
-  @vm_util.Retry(max_retries=5)
   def UpdateInterruptibleVmStatus(self):
+    if self.spot_early_termination:
+      return
     if hasattr(self, 'spot_instance_request_id'):
       describe_cmd = util.AWS_PREFIX + [
           '--region=%s' % self.region,
@@ -831,8 +826,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, _, _ = vm_util.IssueCommand(describe_cmd)
       sir_response = json.loads(stdout)['SpotInstanceRequests']
       self.spot_status_code = sir_response[0]['Status']['Code']
-      self.early_termination = (self.spot_status_code in
-                                AWS_INITIATED_SPOT_TERMINAL_STATUSES)
+      self.spot_early_termination = (self.spot_status_code in
+                                     AWS_INITIATED_SPOT_TERMINAL_STATUSES)
 
   @vm_util.Retry(poll_interval=1, log_errors=False,
                  retryable_exceptions=(AwsTransitionalVmRetryableError,))
@@ -899,15 +894,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if aws_disk.LocalDriveIsNvme(self.machine_type) and \
        aws_disk.EbsDriveIsNvme(self.machine_type):
       # identify boot drive
-      cmd = 'lsblk | grep "part /$" | grep -o "nvme[0-9]*"'
+      # If this command ever fails consider 'findmnt -nM / -o source'
+      cmd = ('realpath /dev/disk/by-label/cloudimg-rootfs '
+             '| grep --only-matching "nvme[0-9]*"')
       boot_drive = self.RemoteCommand(cmd, ignore_failure=True)[0].strip()
-      if len(boot_drive) > 0:
+      if boot_drive:
         # get the boot drive index by dropping the nvme prefix
         boot_idx = int(boot_drive[4:])
         logging.info('found boot drive at nvme index %d', boot_idx)
         return boot_idx
       else:
-        # boot drive is not nvme
+        logging.warning('Failed to identify NVME boot drive index. Assuming 0.')
         return 0
 
   def CreateScratchDisk(self, disk_spec):
@@ -992,7 +989,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Returns: True if this vm was terminated early by AWS.
     """
-    return self.early_termination
+    return self.spot_early_termination
 
   def GetVmStatusCode(self):
     """Returns the early termination code if any.
@@ -1000,6 +997,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns: Early termination code.
     """
     return self.spot_status_code
+
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
+
+    Returns:
+      Seconds between polls
+    """
+    return 5
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.
@@ -1027,23 +1032,26 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.CoreOsMixin):
-  IMAGE_NAME_FILTER = 'CoreOS-stable-*-hvm*'
-  IMAGE_OWNER = COREOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'fedora-coreos-*-hvm'
+  # CoreOS only distinguishes between stable and testing in the description
+  IMAGE_DESCRIPTION_FILTER = 'Fedora CoreOS stable *'
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'core'
 
 
 class Debian9BasedAwsVirtualMachine(AwsVirtualMachine,
                                     linux_virtual_machine.Debian9Mixin):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Stretch
   IMAGE_NAME_FILTER = 'debian-stretch-*64-*'
+  IMAGE_OWNER = DEBIAN_9_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
 
 
 class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
                                      linux_virtual_machine.Debian10Mixin):
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
-  # TODO(pclay): replace with Marketplace AMI when available
   IMAGE_NAME_FILTER = 'debian-10-*64*'
-  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  IMAGE_OWNER = DEBIAN_10_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
 
 
@@ -1119,9 +1127,19 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
                                     linux_virtual_machine.CentOs7Mixin):
   """Class with configuration for AWS CentOS 7 virtual machines."""
   # Documentation on finding the CentOS 7 image:
-  # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
+  # https://wiki.centos.org/Cloud/AWS#x86_64
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
+  DEFAULT_USER_NAME = 'centos'
+
+
+class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.CentOs8Mixin):
+  """Class with configuration for AWS CentOS 8 virtual machines."""
+  # This describes the official AMIs listed here:
+  # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'CentOS 8*'
   DEFAULT_USER_NAME = 'centos'
 
 

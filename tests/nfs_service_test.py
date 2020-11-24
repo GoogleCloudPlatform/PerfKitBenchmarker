@@ -14,11 +14,10 @@
 """Tests for NFS service."""
 
 import unittest
-
+from absl import flags
 import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import nfs_service
 from tests import pkb_common_test_case
 

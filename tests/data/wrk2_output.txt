@@ -5,14 +5,14 @@ Running 1m test @ https://www.google.com
     Latency    58.33ms   24.98ms 244.10ms   96.20%
     Req/Sec     9.49      6.99    23.00     66.92%
   Latency Distribution (HdrHistogram - Recorded Latency)
- 50.000%   53.31ms
+ 50.000%   53.31us
  75.000%   56.99ms
  90.000%   62.62ms
  99.000%  223.23ms
  99.900%  244.22ms
  99.990%  244.22ms
- 99.999%  244.22ms
-100.000%  244.22ms
+ 99.999%   36.00s
+100.000%    0.90m
 
   Detailed Percentile spectrum:
        Value   Percentile   TotalCount 1/(1-Percentile)

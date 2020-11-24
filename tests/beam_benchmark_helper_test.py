@@ -14,13 +14,13 @@
 
 """Tests for beam_benchmark_helper."""
 
-import mock
 import tempfile
 import unittest
+from absl import flags
+import mock
 
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -233,9 +233,8 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
       mock_spec = mock.MagicMock()
       mock_spec.service_type = dpb_service.DATAFLOW
 
-      actual_cmd, _ = beam_benchmark_helper.BuildBeamCommand(mock_spec,
-                                                             'org.apache.beam.sdk.java',
-                                                             ['--args'])
+      actual_cmd, _ = beam_benchmark_helper.BuildBeamCommand(
+          mock_spec, 'org.apache.beam.sdk.java', ['--args'])
       expected_cmd = [
           'gradlew',
           ':sdks:java:integrationTest',

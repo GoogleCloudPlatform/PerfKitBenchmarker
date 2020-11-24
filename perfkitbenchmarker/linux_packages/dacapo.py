@@ -13,7 +13,7 @@
 # limitations under the License.
 """Package for installing the DaCapo benchmarks."""
 
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 _DACAPO_URL = ('https://sourceforge.net/projects/dacapobench/files/'
                '9.12-bach-MR1/dacapo-9.12-MR1-bach.jar')
@@ -22,4 +22,4 @@ _DACAPO_URL = ('https://sourceforge.net/projects/dacapobench/files/'
 def Install(vm):
   """Installs the `dacapo` package on the VM."""
   vm.Install('openjdk')
-  vm.RemoteCommand('wget %s -P %s' % (_DACAPO_URL, INSTALL_DIR))
+  vm.RemoteCommand('wget %s -P %s' % (_DACAPO_URL, linux_packages.INSTALL_DIR))

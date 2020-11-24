@@ -19,9 +19,8 @@ This benchmark can run any tensor2tensor model, including ones that target TPU's
 """
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark

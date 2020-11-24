@@ -14,8 +14,8 @@
 
 """Benchmark for Redis Enterprise database."""
 
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_enterprise
 

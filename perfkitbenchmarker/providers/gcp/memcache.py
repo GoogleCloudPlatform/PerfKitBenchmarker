@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker.memcache_service import MemcacheService
+from perfkitbenchmarker.providers import gcp
 
 
 class MemcacheService(MemcacheService):
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self):
     pass

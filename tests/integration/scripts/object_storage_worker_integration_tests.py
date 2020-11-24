@@ -16,10 +16,8 @@
 
 import time
 import unittest
-
-import object_storage_interface
 import object_storage_api_tests  # noqa: importing for flags
-
+import object_storage_interface
 import validate_service
 
 

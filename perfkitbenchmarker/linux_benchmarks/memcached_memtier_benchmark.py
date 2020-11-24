@@ -30,10 +30,8 @@ https://redislabs.com/blog/memtier_benchmark-a-high-throughput-benchmarking-tool
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
-import logging
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import memtier
 
@@ -123,10 +121,10 @@ def Run(benchmark_spec):
   server = benchmark_spec.vm_groups['server'][0]
   server_ip = server.internal_ip
   metadata = {'memcached_version': memcached_server.GetVersion(server),
-              'memcached_server_size': FLAGS.memcached_size_mb}
-
-  logging.info('Start benchmarking memcached using memtier.')
-  samples = memtier.Run(client, server_ip, memcached_server.MEMCACHED_PORT)
+              'memcached_server_size': FLAGS.memcached_size_mb,
+              'memcached_server_threads': FLAGS.memcached_num_threads}
+  samples = memtier.RunOverAllThreadsAndPipelines(
+      client, server_ip, memcached_server.MEMCACHED_PORT)
   for sample in samples:
     sample.metadata.update(metadata)
 

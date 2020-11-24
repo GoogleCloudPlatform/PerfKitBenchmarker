@@ -15,13 +15,10 @@
 """Tests for Stencil2D benchmark."""
 import os
 import unittest
-
+from absl import flags
 import mock
-from mock import ANY
-from mock import call
 
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import stencil2d_benchmark
 
 
@@ -101,7 +98,10 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
     stencil2d_benchmark.FLAGS.stencil2d_problem_sizes = (
         flag_util.IntegerList(problem_sizes))
 
-    expected_calls = [call(ANY, size, ANY, ANY, ANY) for size in problem_sizes]
+    expected_calls = [
+        mock.call(mock.ANY, size, mock.ANY, mock.ANY, mock.ANY)
+        for size in problem_sizes
+    ]
 
     stencil2d_benchmark.Run(benchmark_spec)
     run_single_iteration_mock.assert_has_calls(expected_calls, any_order=True)

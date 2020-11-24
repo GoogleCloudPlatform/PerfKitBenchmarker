@@ -14,9 +14,9 @@
 """Tests for _TpuGroupSpec."""
 
 import unittest
+from absl import flags
 
 from perfkitbenchmarker import cloud_tpu
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
 

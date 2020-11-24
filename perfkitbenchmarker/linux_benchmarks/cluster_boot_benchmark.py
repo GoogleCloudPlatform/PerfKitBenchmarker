@@ -15,9 +15,8 @@
 
 import logging
 import time
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
@@ -44,6 +43,10 @@ cluster_boot:
         Kubernetes:
           image: null
       vm_count: null
+  flags:
+    # We don't want boot time samples to be affected from retrying, so don't
+    # retry cluster_boot when rate limited.
+    retry_on_rate_limited: False
 """
 
 flags.DEFINE_boolean(

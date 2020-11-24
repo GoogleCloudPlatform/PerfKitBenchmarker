@@ -21,13 +21,13 @@ Coremark homepage: http://www.eembc.org/coremark/
 """
 
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import coremark
 
 BENCHMARK_NAME = 'coremark'
 BENCHMARK_CONFIG = """
@@ -38,8 +38,6 @@ coremark:
       vm_spec: *default_single_core
 """
 
-COREMARK_TAR_URL = 'https://github.com/eembc/coremark/archive/v1.01.tar.gz'
-COREMARK_TAR = 'v1.01.tar.gz'
 COREMARK_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'coremark-1.01')
 COREMARK_BUILDFILE = 'linux64/core_portme.mak'
 
@@ -73,11 +71,6 @@ def PrepareCoremark(remote_command):
   Args:
     remote_command: Function to run a remote command on the VM.
   """
-  remote_command(
-      'wget %s -P %s' % (COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
-  remote_command(
-      'cd %s && tar xvfz %s' % (
-          linux_packages.INSTALL_DIR, COREMARK_TAR))
   if FLAGS.coremark_parallelism_method == PARALLELISM_PTHREAD:
     remote_command('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
                    '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
@@ -90,8 +83,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification.
   """
   vm = benchmark_spec.vms[0]
-  vm.Install('build_tools')
-  vm.Install('wget')
+  vm.Install('coremark')
   PrepareCoremark(vm.RemoteCommand)
 
 
@@ -169,7 +161,7 @@ def CleanupCoremark(remote_command):
     remote_command: Function to run a remote command on the VM.
   """
   remote_command('rm -rf %s' % COREMARK_DIR)
-  remote_command('rm -f %s' % COREMARK_TAR)
+  remote_command('rm -f %s' % coremark.COREMARK_TAR)
 
 
 def Cleanup(benchmark_spec):

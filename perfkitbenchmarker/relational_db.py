@@ -14,10 +14,12 @@
 
 
 from abc import abstractmethod
+import random
 import re
+import string
 import uuid
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 import six
@@ -59,6 +61,10 @@ flags.DEFINE_string('managed_db_memory', None,
 flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
 flags.DEFINE_string('managed_db_disk_type', None, 'Disk type of the database.')
+flags.DEFINE_integer('managed_db_azure_compute_units', None,
+                     'Number of Dtus in the database.')
+flags.DEFINE_string('managed_db_tier', None,
+                    'Tier in azure. (Basic, Standard, Premium).')
 flags.DEFINE_string('client_vm_machine_type', None,
                     'Machine type of the client vm.')
 flags.DEFINE_integer('client_vm_cpus', None, 'Number of Cpus in the client vm.')
@@ -125,8 +131,19 @@ class UnsupportedError(Exception):
 
 
 def GenerateRandomDbPassword():
-  """Generate a random password 10 characters in length."""
-  return str(uuid.uuid4())[:10]
+  """Generate a strong random password.
+
+   # pylint: disable=line-too-long
+  Reference: https://docs.microsoft.com/en-us/sql/relational-databases/security/password-policy?view=sql-server-ver15
+  # pylint: enable=line-too-long
+
+  Returns:
+    A random database password.
+  """
+  prefix = [random.choice(string.ascii_lowercase),
+            random.choice(string.ascii_uppercase),
+            random.choice(string.digits)]
+  return ''.join(prefix) + str(uuid.uuid4())[:10]
 
 
 def GetRelationalDbClass(cloud):
@@ -285,6 +302,7 @@ class BaseRelationalDb(resource.BaseResource):
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
         'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
+        'use_managed_db': self.is_managed_db,
         'client_vm_disk_type':
             self.spec.vm_groups['clients'].disk_spec.disk_type,
         'client_vm_disk_size':
@@ -386,11 +404,13 @@ class BaseRelationalDb(resource.BaseResource):
         self.spec.engine_version.startswith('5.6.')):
       mysql_name = 'mysqlclient56'
     elif (self.spec.engine_version == '5.7' or
-          self.spec.engine_version.startswith('5.7.')):
+          self.spec.engine_version.startswith('5.7') or
+          self.spec.engine_version == '8.0' or
+          self.spec.engine_version.startswith('8.0')):
       mysql_name = 'mysqlclient'
     else:
-      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % self.spec.engine_version)
+      raise Exception('Invalid database engine version: %s. Only 5.6, 5.7 '
+                      'and 8.0 are supported.' % self.spec.engine_version)
     self.client_vm.Install(mysql_name)
     self.client_vm.RemoteCommand(
         'sudo sed -i '

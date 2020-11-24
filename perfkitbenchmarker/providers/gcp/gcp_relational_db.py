@@ -24,25 +24,46 @@ for more information.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
 import datetime
 import json
 import logging
 import time
+
+from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
 
 FLAGS = flags.FLAGS
 
+GCP_DATABASE_VERSION_MAPPING = {
+    relational_db.MYSQL: {
+        '5.5': 'MYSQL_5_5',
+        '5.6': 'MYSQL_5_6',
+        '5.7': 'MYSQL_5_7'
+    },
+    relational_db.POSTGRES: {
+        '9.6': 'POSTGRES_9_6',
+        '10': 'POSTGRES_10',
+        '11': 'POSTGRES_11',
+        '12': 'POSTGRES_12'
+    },
+    relational_db.SQLSERVER: {
+        '2017_Standard': 'SQLSERVER_2017_Standard',
+        '2017_Enterprise': 'SQLSERVER_2017_ENTERPRISE',
+        '2017_Express': 'SQLSERVER_2017_EXPRESS',
+        '2017_Web': 'SQLSERVER_2017_WEB'
+    }
+}
+
+
 DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_POSTGRES_VERSION = '9.6'
-DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
-DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
-DEFAULT_GCP_SQLSERVER_VERSION = 'SQLSERVER_2017_STANDARD'
+DEFAULT_SQL_SERVER_VERSION = '2017_Standard'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
@@ -57,7 +78,7 @@ DEFAULT_PORTS = {
 DEFAULT_ENGINE_VERSIONS = {
     relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
     relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
-    relational_db.SQLSERVER: DEFAULT_GCP_SQLSERVER_VERSION,
+    relational_db.SQLSERVER: DEFAULT_SQL_SERVER_VERSION,
 }
 
 # PostgreSQL restrictions on memory.
@@ -67,6 +88,7 @@ CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 IS_READY_TIMEOUT = 600  # 10 minutes
+DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
 CREATION_TIMEOUT = 1200  # 20 minutes
 
 
@@ -82,7 +104,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   ideal; however, a password is still required to connect. Currently only
   MySQL 5.7 and Postgres 9.6 are supported.
   """
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
@@ -125,6 +147,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--storage-size=%d' % storage_size,
+        '--labels=%s' % util.MakeFormattedDefaultTags(),
     ]
     if self.spec.engine == relational_db.MYSQL:
       cmd_string.append('--enable-bin-log')
@@ -159,7 +182,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 
-    _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
+    _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
+
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
     if FLAGS.mysql_flags:
       cmd_string = [
@@ -248,9 +273,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Raises:
       ValueError on invalid configuration.
     """
-    if cpus not in [1] + list(range(2, 32, 2)):
+    if cpus not in [1] + list(range(2, 97, 2)):
       raise ValueError(
-          'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
+          'CPUs (%i) much be 1 or an even number in-between 2 and 96, '
           'inclusive.' % cpus)
 
     if memory % 256 != 0:
@@ -294,11 +319,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                                self.replica_instance_id, '--quiet')
-      cmd.Issue(raise_on_failure=False)
+      cmd.Issue(raise_on_failure=False, timeout=DELETE_INSTANCE_TIMEOUT)
 
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                              self.instance_id, '--quiet', '--async')
-    cmd.Issue(raise_on_failure=False)
+    cmd.Issue(raise_on_failure=False, timeout=DELETE_INSTANCE_TIMEOUT)
 
   def _Exists(self):
     """Returns true if the underlying resource exists.
@@ -441,19 +466,20 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Raises:
       NotImplementedError on invalid engine / version combination.
     """
-    if engine == relational_db.MYSQL:
-      if version == DEFAULT_MYSQL_VERSION:
-        return DEFAULT_GCP_MYSQL_VERSION
-      elif version == '5.6':
-        return 'MYSQL_5_6'
-    elif engine == relational_db.POSTGRES:
-      if version == DEFAULT_POSTGRES_VERSION:
-        return DEFAULT_GCP_POSTGRES_VERSION
-    elif engine == relational_db.SQLSERVER:
-      if version == DEFAULT_GCP_SQLSERVER_VERSION:
-        return DEFAULT_GCP_SQLSERVER_VERSION
-    raise NotImplementedError('Unsupported managed DB version: '
-                              '{0}, {1}'.format(engine, version))
+    if engine not in GCP_DATABASE_VERSION_MAPPING:
+      valid_databases = ', '.join(GCP_DATABASE_VERSION_MAPPING.keys())
+      raise NotImplementedError(
+          'Database {0} is not supported,supported '
+          'databases include {1}'.format(engine, valid_databases))
+
+    version_mapping = GCP_DATABASE_VERSION_MAPPING[engine]
+    if version not in version_mapping:
+      valid_versions = ', '.join(version_mapping.keys())
+      raise NotImplementedError(
+          'Version {0} is not supported,supported '
+          'versions include {1}'.format(version, valid_versions))
+
+    return version_mapping[version]
 
   @staticmethod
   def _GetDefaultPort(engine):

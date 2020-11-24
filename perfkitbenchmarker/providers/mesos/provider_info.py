@@ -16,8 +16,8 @@
 
 """
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 
 
 class MesosProviderInfo(provider_info.BaseProviderInfo):

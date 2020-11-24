@@ -44,9 +44,8 @@ from __future__ import print_function
 import logging
 import re
 import time
-
+from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 flags.DEFINE_string('ceph_secret', None,
                     'Name of the Ceph Secret used by Kubernetes in order to '

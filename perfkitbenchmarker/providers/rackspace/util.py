@@ -19,7 +19,7 @@ from __future__ import print_function
 
 from collections import OrderedDict
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import vm_util
 import six
 

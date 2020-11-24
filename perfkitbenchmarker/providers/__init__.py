@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""Providers for PKB."""
 import importlib
 import logging
 import os
@@ -19,11 +19,14 @@ import os
 from perfkitbenchmarker import events
 from perfkitbenchmarker import import_util
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker.providers import aws
+from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers import gcp
 
 
-GCP = 'GCP'
-AZURE = 'Azure'
-AWS = 'AWS'
+GCP = gcp.CLOUD
+AZURE = azure.CLOUD
+AWS = aws.CLOUD
 ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'

@@ -22,11 +22,10 @@ multichase codebase: https://github.com/google/multichase
 import itertools
 import logging
 import posixpath
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 

@@ -19,10 +19,9 @@ at: http://dacapobench.org/
 
 import os
 import re
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 

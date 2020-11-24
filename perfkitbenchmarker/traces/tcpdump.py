@@ -22,9 +22,8 @@ pkb-<machine_name>-<benchmark>-<UUID>-tcpdump.stdout that can be read in with
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+from absl import flags
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.traces import base_collector
 
 flags.DEFINE_boolean(

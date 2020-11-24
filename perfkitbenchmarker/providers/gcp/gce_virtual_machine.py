@@ -28,32 +28,34 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import abc
 import collections
-import copy
 import itertools
 import json
 import logging
 import posixpath
 import re
 import threading
+import time
 
+from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
-
 import six
 from six.moves import range
 import yaml
@@ -64,8 +66,13 @@ NVME = 'NVME'
 SCSI = 'SCSI'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
+_FAILED_TO_START_DUE_TO_PREEMPTION = (
+    'Instance failed to start due to preemption.')
 _GCE_VM_CREATE_TIMEOUT = 600
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
+_SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
+_WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gsutil cp - {preempt_marker}'
+_PREEMPT_DURATION = 30
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -94,7 +101,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     boot_disk_type: string or None. The type of the boot disk.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, *args, **kwargs):
     super(GceVmSpec, self).__init__(*args, **kwargs)
@@ -106,6 +113,20 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     else:
       self.cpus = None
       self.memory = None
+
+    # The A2 machine family, unlike other GCP offerings has a preset number of
+    # GPUs, so we set them directly from the machine_type
+    # https://cloud.google.com/blog/products/compute/announcing-google-cloud-a2-vm-family-based-on-nvidia-a100-gpu
+    if self.machine_type and self.machine_type.startswith('a2-'):
+      a2_lookup = {
+          'a2-highgpu-1g': 1,
+          'a2-highgpu-2g': 2,
+          'a2-highgpu-4g': 4,
+          'a2-highgpu-8g': 8,
+          'a2-megagpu-16g': 16
+      }
+      self.gpu_count = a2_lookup[self.machine_type]
+      self.gpu_type = virtual_machine.GPU_A100
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -323,7 +344,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   # Subclasses should override the default image OR
   # both the image family and image_project.
@@ -360,7 +381,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
-    self.early_termination = False
+    self.spot_early_termination = False
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
@@ -381,10 +402,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
-    # We don't want boot time samples to be affected from retrying, so don't
-    # retry cluster_boot when rate limited.
-    if 'cluster_boot' in FLAGS.benchmarks:
-      FLAGS.gcp_retry_on_rate_limited = False
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -427,7 +444,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
     else:
       cmd.flags['machine-type'] = self.machine_type
-    if self.gpu_count:
+    if self.gpu_count and 'a2-' not in self.machine_type:
+      # A2 machine type already has predefined GPU type and count.
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
@@ -438,6 +456,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
     if self.gce_shielded_secure_boot:
       cmd.flags['shielded-secure-boot'] = True
+
+    if self.network.placement_group:
+      self.metadata.update(self.network.placement_group.GetResourceMetadata())
+      cmd.flags['resource-policies'] = self.network.placement_group.name
+      cmd.flags['maintenance-policy'] = 'TERMINATE'
+    else:
+      self.metadata[
+          'placement_group_style'] = placement_group.PLACEMENT_GROUP_NONE
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
@@ -468,6 +494,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         continue
       metadata[key] = value
 
+    if self.preemptible:
+      cmd.flags['preemptible'] = True
+      preemptible_status_bucket = (
+          f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/')
+      self.preempt_marker = f'{preemptible_status_bucket}{self.name}'
+      metadata.update([self._PreemptibleMetadataKeyValue()])
+
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
     # TODO(user): If GCE one day supports live migration on GPUs
@@ -483,11 +516,36 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
-    if self.preemptible:
-      cmd.flags['preemptible'] = True
     cmd.flags['network-tier'] = self.gce_network_tier.upper()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
+
+  @abc.abstractmethod
+  def _PreemptibleMetadataKeyValue(self):
+    """Returns the metadata (key, value) tuple for use with preemptible instance creation."""
+
+  def _RemoveShutdownScript(self):
+    # Remove shutdown script which copies status when it is interrupted
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'remove-metadata', self.name)
+    key, _ = self._PreemptibleMetadataKeyValue()
+    cmd.flags['keys'] = key
+    cmd.Issue(raise_on_failure=False)
+
+  def Reboot(self):
+    if self.preemptible:
+      self._UpdateInterruptibleVmStatus()
+    super(GceVirtualMachine, self).Reboot()
+    if self.preemptible:
+      # Reboot occurred without interruption, remove preempt marker
+      vm_util.IssueCommand([FLAGS.gsutil_path, 'rm', self.preempt_marker],
+                           raise_on_failure=False)
+
+  def _PreDelete(self):
+    super(GceVirtualMachine, self)._PreDelete()
+    if self.preemptible:
+      self._RemoveShutdownScript()
 
   def _Create(self):
     """Create a GCE VM instance."""
@@ -529,12 +587,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     if retcode:
       if (create_cmd.rate_limited and 'already exists' in stderr and
-          FLAGS.gcp_retry_on_rate_limited):
+          FLAGS.retry_on_rate_limited):
         # Gcloud create commands may still create VMs despite being rate
         # limited.
         return
       if util.RATE_LIMITED_MESSAGE in stderr:
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
+      if self.preemptible and _FAILED_TO_START_DUE_TO_PREEMPTION in stderr:
+        self.spot_early_termination = True
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            'Interrupted before VM started')
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
@@ -654,7 +716,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           name = 'local-ssd-%d' % self.local_disk_counter
           disk_number = self.local_disk_counter + 1
         elif FLAGS.gce_ssd_interface == NVME:
-          name = 'nvme0n%d' % (self.local_disk_counter + 1)
+          # Device can either be /dev/nvme0n1 or /dev/nvme1n1. Find out which.
+          name, _ = self.RemoteCommand('find /dev/nvme*n%d' %
+                                       (self.local_disk_counter + 1))
+          name = name.strip().split('/')[-1]
           disk_number = self.local_disk_counter + self.NVME_START_INDEX
         else:
           raise errors.Error('Unknown Local SSD Interface.')
@@ -766,23 +831,56 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
-  @vm_util.Retry(max_retries=5)
-  def UpdateInterruptibleVmStatus(self):
+  def _UpdateInterruptibleVmStatus(self):
     """Updates the interruptible status if the VM was preempted."""
-    if self.preemptible:
-      # Drop zone since compute operations list takes 'zones', not 'zone', and
-      # the argument is deprecated in favor of --filter.
-      vm_without_zone = copy.copy(self)
-      vm_without_zone.zone = None
-      gcloud_command = util.GcloudCommand(vm_without_zone, 'compute',
-                                          'operations', 'list')
-      gcloud_command.flags['filter'] = 'zone:%s targetLink.scope():%s' % (
-          self.zone, self.name)
-      gcloud_command.additional_flags.append('--log-http')
-      stdout, _, _ = gcloud_command.Issue()
-      self.early_termination = any(
-          operation['operationType'] == 'compute.instances.preempted'
-          for operation in json.loads(stdout))
+    # Check to see if the VM's preempt_marker file exists in GCS.
+    _, _, retcode = vm_util.IssueCommand(
+        [FLAGS.gsutil_path, 'stat', self.preempt_marker],
+        raise_on_failure=False, suppress_warning=True)
+    # The VM is preempted if the command exits without an error
+    self.spot_early_termination = not bool(retcode)
+    if self.spot_early_termination:
+      logging.info('VM %s interrupted', self.name)
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the interruptible status if the VM was preempted.
+
+    Compute Engine sends a preemption notice to the instance in the form of an
+    ACPI G2 Soft Off signal.  If the instance does not stop after 30 seconds,
+    Compute Engine sends an ACPI G3 Mechanical Off signal to the operating
+    system.
+
+    See details at
+    https://cloud.google.com/compute/docs/instances/preemptible#preemption-process
+
+
+    The sequence of events:
+    1. The machine starts to stop some service. At the same time, Connection
+       refused and PKB can not run remote command.
+    2. The machine starts to run shutdown script, the GCS bucket is updated.
+    3. This machine is preempted.
+    4. This machine is deleted.
+    """
+    if not self.preemptible:  # Only do checks on preemptible VMs
+      return
+    if self.spot_early_termination:  # VM already marked as preemptedor
+      return
+    if not self.is_failed_run:  # GCE only detects interruption in failed run.
+      return
+    logging.info('Failed run detected for %s', self.name)
+    # https://cloud.google.com/compute/docs/instances/preemptible#preemption-process
+    # Compute Engine sends a preemption notice to the instance in the form of
+    # an ACPI G2 Soft Off signal.
+    # If the instance does not stop after 30 seconds, Compute Engine sends an
+    # ACPI G3 Mechanical Off signal to the operating system.
+    end_time = time.time() + _PREEMPT_DURATION
+    while time.time() <= end_time:
+      self._UpdateInterruptibleVmStatus()
+      if self.spot_early_termination:
+        # VM marked as interrupted, stop checking
+        break
+      else:
+        time.sleep(1)
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -796,7 +894,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Returns: True if this vm was terminated early by GCP.
     """
-    return self.early_termination
+    return self.spot_early_termination
 
   def GetVmStatusCode(self):
     """Returns the early termination code if any.
@@ -805,57 +903,92 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return self.preemptible_status_code
 
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
 
-class Debian9BasedGceVirtualMachine(GceVirtualMachine,
-                                    linux_vm.Debian9Mixin):
+    Returns:
+      Seconds between polls
+    """
+    return 30
+
+
+class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
+  """Class supporting Linux GCE virtual machines."""
+
+  def _PreemptibleMetadataKeyValue(self):
+    """See base class."""
+    return 'shutdown-script', _SHUTDOWN_SCRIPT.format(
+        preempt_marker=self.preempt_marker, user=self.user_name)
+
+  def OnStartup(self):
+    super(BaseLinuxGceVirtualMachine, self).OnStartup()
+    if self.preemptible:
+      # Prepare VM to use GCS. When an instance is interrupt, the shutdown
+      # script will copy the status a GCS bucket.
+      gcs.GoogleCloudStorageService.AcquireWritePermissionsLinux(self)
+
+
+class Debian9BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
-class Debian10BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Debian10Mixin):
+class Debian10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-10'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
-class Rhel7BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel7Mixin):
+class Rhel7BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel7Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-7'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
-class Rhel8BasedGceVirtualMachine(GceVirtualMachine, linux_vm.Rhel8Mixin):
+class Rhel8BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-8'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
-class CentOs7BasedGceVirtualMachine(GceVirtualMachine, linux_vm.CentOs7Mixin):
+class CentOs7BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.CentOs7Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-7'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
-class CentOs8BasedGceVirtualMachine(GceVirtualMachine, linux_vm.CentOs8Mixin):
+class CentOs8BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.CentOs8Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-8'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class ContainerOptimizedOsBasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.ContainerOptimizedOsMixin):
+    BaseLinuxGceVirtualMachine, linux_vm.ContainerOptimizedOsMixin):
   DEFAULT_IMAGE_FAMILY = 'cos-stable'
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
 
-class CoreOsBasedGceVirtualMachine(GceVirtualMachine, linux_vm.CoreOsMixin):
-  DEFAULT_IMAGE_FAMILY = 'coreos-stable'
-  DEFAULT_IMAGE_PROJECT = 'coreos-cloud'
+class CoreOsBasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin):
+  DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
+  DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
+
+  def __init__(self, vm_spec):
+    super(CoreOsBasedGceVirtualMachine, self).__init__(vm_spec)
+    # Fedora CoreOS only creates the core user
+    self.user_name = 'core'
 
 
-class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
-                                       linux_vm.Ubuntu1604Mixin):
+class Ubuntu1604BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1604Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1604-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
-class Ubuntu1804BasedGceVirtualMachine(GceVirtualMachine,
-                                       linux_vm.Ubuntu1804Mixin):
+class Ubuntu1804BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1804Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
@@ -896,6 +1029,11 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
     self.password = response['password']
+
+  def _PreemptibleMetadataKeyValue(self):
+    """See base class."""
+    return 'windows-shutdown-script-ps1', _WINDOWS_SHUTDOWN_SCRIPT_PS1.format(
+        preempt_marker=self.preempt_marker)
 
   @vm_util.Retry(
       max_retries=10,
@@ -939,6 +1077,13 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = self.RemoteCommand('netsh int tcp show global')
     if 'Receive-Side Scaling State          : enabled' in stdout:
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
+
+  def OnStartup(self):
+    super(BaseWindowsGceVirtualMachine, self).OnStartup()
+    if self.preemptible:
+      # Prepare VM to use GCS. When an instance is interrupt, the shutdown
+      # script will copy the status a GCS bucket.
+      gcs.GoogleCloudStorageService.AcquireWritePermissionsWindows(self)
 
 
 class Windows2012CoreGceVirtualMachine(

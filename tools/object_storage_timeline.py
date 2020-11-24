@@ -15,11 +15,11 @@
 # limitations under the License.
 
 import json
-import numpy as np
-import matplotlib.collections as mplc
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpl_patches
 import sys
+import matplotlib.collections as mplc
+import matplotlib.patches as mpl_patches
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class DraggableXRange:

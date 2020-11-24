@@ -11,7 +11,7 @@
 # privileged mode (so it can see all GPUs), and manually mounts the CUDA
 # lib and bin directories.
 
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: nvidia-add-unrestricted-permissions-dameon-set

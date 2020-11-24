@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import logging
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 import yaml
 

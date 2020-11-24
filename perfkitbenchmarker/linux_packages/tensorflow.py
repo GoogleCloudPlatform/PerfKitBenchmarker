@@ -15,7 +15,7 @@
 
 """Module containing TensorFlow installation and cleanup functions."""
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 

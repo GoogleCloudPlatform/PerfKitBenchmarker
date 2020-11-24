@@ -25,10 +25,10 @@ http://manpages.ubuntu.com/manpages/xenial/man1/stress-ng.1.html
 """
 
 import logging
+from absl import flags
 import numpy
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
@@ -129,9 +129,9 @@ flags.register_validator(
 
 ALL_VERSIONS = ['0.05.23', '0.09.25']
 flags.DEFINE_enum(
-    'stress_ng_version', '0.05.23', ALL_VERSIONS,
-    'Stress-ng version to use. Default is 0.05.23 which '
-    'is the default package on Ubuntu 1604.')
+    'stress_ng_version', '0.09.25', ALL_VERSIONS,
+    'Stress-ng version to use. Default is 0.09.25 which '
+    'is the default package on Ubuntu 1804.')
 
 
 def _GeoMeanOverflow(iterable):

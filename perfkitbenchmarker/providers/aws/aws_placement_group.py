@@ -20,11 +20,11 @@ Cloud specific implementations of Placement Group.
 import json
 import uuid
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 
@@ -38,7 +38,7 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
       zone: The AWS zone the Placement Group is in.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -62,7 +62,7 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
 class AwsPlacementGroup(placement_group.BasePlacementGroup):
   """Object representing an AWS Placement Group."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __init__(self, aws_placement_group_spec):
     """Init method for AwsPlacementGroup.
@@ -79,12 +79,18 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
 
   def _Create(self):
     """Creates the Placement Group."""
+    formatted_tags = util.FormatTagSpecifications('placement-group',
+                                                  util.MakeDefaultTags())
+
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-placement-group',
         '--region=%s' % self.region,
         '--group-name=%s' % self.name,
-        '--strategy=%s' % self.strategy]
+        '--strategy=%s' % self.strategy,
+        '--tag-specifications=%s' % formatted_tags
+    ]
+
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):

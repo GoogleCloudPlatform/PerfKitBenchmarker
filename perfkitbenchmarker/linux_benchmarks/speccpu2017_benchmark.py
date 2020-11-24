@@ -23,10 +23,13 @@ memory subsystem and compiler.
 SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 """
 
+import time
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import build_tools
 from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2017
 
@@ -44,6 +47,14 @@ FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE] + [
     'namd_r', 'parest_r', 'povray_r', 'blender_r']
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_boolean('spec17_build_only', False,
+                     'Compile benchmarks only, but don\'t run benchmarks. '
+                     'Defaults to False. The benchmark fails if the build '
+                     'fails.')
+flags.DEFINE_boolean('spec17_rebuild', True,
+                     'Rebuild spec binaries, defaults to True. Set to False '
+                     'when using run_stage_iterations > 1 to avoid recompiling')
 
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -90,6 +101,7 @@ def CheckVmPrerequisites(vm):
 
   Rate runs require 2 GB minimum system memory.
   Speed runs require 16 GB minimum system memory.
+  Taken from https://www.spec.org/cpu2017/Docs/system-requirements.html
 
   Args:
     vm: virtual machine to run spec on.
@@ -98,7 +110,8 @@ def CheckVmPrerequisites(vm):
   """
   available_memory = vm.total_free_memory_kb
   if 'intspeed' in FLAGS.spec17_subset or 'fpspeed' in FLAGS.spec17_subset:
-    if available_memory < 16 * KB_TO_GB_MULTIPLIER:
+    # AWS machines that advertise 16 GB have slightly less than that
+    if available_memory < 15.6 * KB_TO_GB_MULTIPLIER:
       raise errors.Config.InvalidValue(
           'Available memory of %s GB is insufficient for spec17 speed runs.'
           % (available_memory / KB_TO_GB_MULTIPLIER))
@@ -167,6 +180,10 @@ def _Run(vm):
          'ulimit -s unlimited && ')
 
   cmd += 'runcpu '
+  if FLAGS.spec17_build_only:
+    cmd += '--action build '
+  if FLAGS.spec17_rebuild:
+    cmd += '--rebuild '
 
   version_specific_parameters = []
   # rate runs require 2 GB minimum system main memory per copy,
@@ -183,8 +200,21 @@ def _Run(vm):
     version_specific_parameters.append('--feedback ')
     vm.RemoteCommand('cd /scratch/cpu2017; mkdir fdo_profiles')
 
-  speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
-              version_specific_parameters)
+  start_time = time.time()
+  stdout, _ = speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
+                          version_specific_parameters)
+
+  if FLAGS.spec17_build_only:
+    if 'Error' in stdout and 'Please review this file' in stdout:
+      raise errors.Benchmarks.RunError('Error during SPEC compilation.')
+    return [
+        sample.Sample(
+            'compilation_time',
+            time.time() - start_time, 's', {
+                'spec17_subset': FLAGS.spec17_subset,
+                'gcc_version': build_tools.GetVersion(vm, 'gcc')
+            })
+    ]
 
   partial_results = True
   # Do not allow partial results if any benchmark subset is a full suite.

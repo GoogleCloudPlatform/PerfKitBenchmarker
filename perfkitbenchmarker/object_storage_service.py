@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+import logging
 import os
 
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 import six
 
 flags.DEFINE_string('object_storage_credential_file', None,
@@ -49,8 +50,10 @@ class AutoRegisterObjectStorageMeta(abc.ABCMeta):
   def __init__(cls, name, bases, dct):
     super(AutoRegisterObjectStorageMeta, cls).__init__(name, bases, dct)
     if cls.STORAGE_NAME in _OBJECT_STORAGE_REGISTRY:
-      raise Exception('Duplicate storage implementations for name "%s"' %
-                      cls.STORAGE_NAME)
+      logging.info(
+          "Duplicate storage implementations for name '%s'. "
+          'Replacing %s with %s', cls.STORAGE_NAME,
+          _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME].__name__, cls.__name__)
     _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME] = cls
 
 
@@ -101,12 +104,17 @@ class ObjectStorageService(
     pass
 
   @abc.abstractmethod
-  def Copy(self, src_url, dst_url):
-    """Copy files and objects.
+  def Copy(self, src_url, dst_url, recursive=False):
+    """Copy files, objects and directories.
+
+    Note: Recursive copy behavior mimics gsutil cp -r where:
+    Copy(/foo/bar, /baz, True) copies the directory bar into /baz/bar whereas
+    aws s3 cp --recursive would copy the contents of bar into /baz.
 
     Args:
       src_url: string, the source url path.
       dst_url: string, the destination url path.
+      recursive: whether to copy directories.
     """
     pass
 
@@ -150,9 +158,20 @@ class ObjectStorageService(
     """List providers, buckets, or objects.
 
     Args:
-      bucket: the name of the bucket to create.
+      bucket: the name of the bucket to list the contents of.
     """
     pass
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    return []
 
   @abc.abstractmethod
   def DeleteBucket(self, bucket):
@@ -257,6 +276,15 @@ class ObjectStorageService(
     """
 
     return {}
+
+  def UpdateSampleMetadata(self, samples):
+    """Updates metadata of samples with provider specific information.
+
+    Args:
+      samples: the samples that need the metadata to be updated with provider
+                specific information.
+    """
+    pass
 
   def APIScriptArgs(self):
     """Extra arguments for the API test script.

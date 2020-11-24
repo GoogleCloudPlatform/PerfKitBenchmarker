@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-#
+# Lint as: python2, python3
 # Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +31,8 @@ status file, which blocks until the process completes.
 import fcntl
 import logging
 import optparse
-import sys
 import subprocess
+import sys
 import threading
 
 # By default, set a timeout of 100 years to mimic no timeout.
@@ -53,6 +52,13 @@ def main():
                     until this process exits. Required.""", metavar='FILE')
   parser.add_option('-c', '--command', dest='command', help="""Shell command to
                     execute. Required.""")
+  parser.add_option(
+      '-x',
+      '--exclusive',
+      dest='exclusive',
+      help='Make FILE exist to indicate the exclusive lock on status has been '
+      'placed. Required.',
+      metavar='FILE')
   parser.add_option('-t', '--timeout', dest='timeout',
                     default=_DEFAULT_NEAR_ETERNAL_TIMEOUT,
                     type='int', help="""Timeout in seconds before killing
@@ -63,7 +69,7 @@ def main():
     return 1
 
   missing = []
-  for option in ('stdout', 'stderr', 'status', 'command'):
+  for option in ('stdout', 'stderr', 'status', 'command', 'exclusive'):
     if getattr(options, option) is None:
       missing.append(option)
 
@@ -85,6 +91,11 @@ def main():
         p = subprocess.Popen(options.command, stdout=stdout, stderr=stderr,
                              shell=True)
         logging.info('Started pid %d: %s', p.pid, options.command)
+
+        # Create empty file to inform consumers of status that we've taken an
+        # exclusive lock on it.
+        with open(options.exclusive, 'w'):
+          pass
 
         if options.pid:
           with open(options.pid, 'w') as pid:

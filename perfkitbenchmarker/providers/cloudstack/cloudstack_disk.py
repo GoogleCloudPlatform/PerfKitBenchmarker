@@ -16,12 +16,11 @@
 Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
-import string
 import logging
-
+import string
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.cloudstack import util
 
 FLAGS = flags.FLAGS
@@ -51,7 +50,7 @@ class CloudStackDisk(disk.BaseDisk):
     assert self.disk_offering_id, "Unable get disk offering of given size"
 
     if disk_spec.disk_type:
-        logging.warn("Cloudstack does not support disk types")
+      logging.warn("Cloudstack does not support disk types")
 
 
   @vm_util.Retry(max_retries=3)
@@ -75,14 +74,14 @@ class CloudStackDisk(disk.BaseDisk):
     """Deletes the disk."""
     vol = self.cs.get_volume(self.name, self.project_id)
     if vol:
-        self.cs.delete_volume(self.volume_id)
+      self.cs.delete_volume(self.volume_id)
 
 
   def _Exists(self):
     """Returns true if the disk exists."""
     vol = self.cs.get_volume(self.name, self.project_id)
     if vol:
-        return True
+      return True
     return False
 
 
@@ -122,7 +121,7 @@ class CloudStackDisk(disk.BaseDisk):
     sorted_do = sorted(disk_offerings, key=lambda x: x['disksize'])
 
     for do in sorted_do:
-        if int(do['disksize']) >= disk_size:
-            return do['id']
+      if int(do['disksize']) >= disk_size:
+        return do['id']
 
     return None

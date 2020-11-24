@@ -18,10 +18,10 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import mock
 
+from absl import flags
+import mock
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import benchmark_config_spec
 import six

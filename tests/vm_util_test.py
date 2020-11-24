@@ -19,11 +19,10 @@ import subprocess
 import threading
 import time
 import unittest
-
+from absl import flags
 import mock
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
 import psutil

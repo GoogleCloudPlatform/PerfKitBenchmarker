@@ -18,10 +18,12 @@ import io
 import posixpath
 import re
 
+from absl import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-IOR_DIR = '%s/ior' % INSTALL_DIR
+FLAGS = flags.FLAGS
+IOR_DIR = '%s/ior' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/hpc/ior'
 GIT_TAG = '945fba2aa2d571e8babc4f5f01e78e9f5e6e193e'
 _METADATA_KEYS = [
@@ -105,6 +107,7 @@ def ParseMdtestResults(test_output):
   for num_tasks, num_files, summary in summaries:
     metadata = {
         'command_line': command_line, 'num_tasks': num_tasks,
+        'drop_caches': FLAGS.mdtest_drop_caches,
         'num_files': num_files, 'dir_per_task': dir_per_task
     }
     result_lines = re.findall(_MDTEST_RESULT_REGEX, summary)

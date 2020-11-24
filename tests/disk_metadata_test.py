@@ -15,12 +15,12 @@
 """Test the annotation of disk objects with metadata."""
 
 import unittest
+from absl import flags
 import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk

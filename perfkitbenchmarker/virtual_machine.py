@@ -30,15 +30,14 @@ import socket
 import threading
 import time
 
+from absl import flags
 import jinja2
-
 from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import resource
@@ -105,10 +104,44 @@ flags.DEFINE_bool(
     'If set, this run will not create firewall rules. This is useful if the '
     'user project already has all of the firewall rules in place and/or '
     'creating new ones is expensive')
+flags.DEFINE_bool(
+    'preprovision_ignore_checksum', False,
+    'Ignore checksum verification for preprovisioned data. '
+    'Not recommended, please use with caution')
+flags.DEFINE_boolean(
+    'connect_via_internal_ip', False,
+    'Whether to use internal IP addresses for running commands on and pushing '
+    'data to VMs. By default, PKB interacts with VMs using external IP '
+    'addresses.')
 
-# Note: If adding a gpu type here, be sure to add it to
-# the flag definition in pkb.py too.
-VALID_GPU_TYPES = ['k80', 'p100', 'v100', 'p4', 'p4-vws', 't4']
+# Deprecated. Use connect_via_internal_ip.
+flags.DEFINE_boolean(
+    'ssh_via_internal_ip', False,
+    'Whether to use internal IP addresses for running commands on and pushing '
+    'data to VMs. By default, PKB interacts with VMs using external IP '
+    'addresses.')
+flags.DEFINE_boolean('retry_on_rate_limited', True,
+                     'Whether to retry commands when rate limited.')
+
+GPU_K80 = 'k80'
+GPU_P100 = 'p100'
+GPU_V100 = 'v100'
+GPU_A100 = 'a100'
+GPU_P4 = 'p4'
+GPU_P4_VWS = 'p4-vws'
+GPU_T4 = 't4'
+VALID_GPU_TYPES = [
+    GPU_K80, GPU_P100, GPU_V100, GPU_A100, GPU_P4, GPU_P4_VWS, GPU_T4
+]
+
+flags.DEFINE_integer(
+    'gpu_count', None,
+    'Number of gpus to attach to the VM. Requires gpu_type to be '
+    'specified.')
+flags.DEFINE_enum(
+    'gpu_type', None, VALID_GPU_TYPES,
+    'Type of gpus to attach to the VM. Requires gpu_count to be '
+    'specified.')
 
 
 def GetVmSpecClass(cloud):
@@ -261,8 +294,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     remote_access_ports: A list of ports which must be opened on the firewall
         in order to access the VM.
   """
-  OS_TYPE = None
-  BASE_OS_TYPE = None
   # Represents whether the VM type can be (cleanly) rebooted. Should be false
   # for a class if rebooting causes issues, e.g. for KubernetesVirtualMachine
   # needing to reboot often indicates a design problem since restarting a
@@ -277,6 +308,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self.bootable_time = None
     self.port_listening_time = None
     self.hostname = None
+    self.is_failed_run = False
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []
@@ -287,9 +319,23 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._reachable = {}
     self._total_memory_kb = None
     self._num_cpus = None
+    self._is_smt_enabled = None
     self.os_metadata = {}
-    if self.OS_TYPE:
-      assert self.BASE_OS_TYPE in os_types.BASE_OS_TYPES
+    assert type(
+        self).BASE_OS_TYPE in os_types.BASE_OS_TYPES, '%s is not in %s' % (
+            type(self).BASE_OS_TYPE, os_types.BASE_OS_TYPES)
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def OS_TYPE(cls):
+    raise NotImplementedError()
+
+  @property
+  @classmethod
+  @abc.abstractmethod
+  def BASE_OS_TYPE(cls):
+    raise NotImplementedError()
 
   def GetOSResourceMetadata(self):
     """Returns a dict containing VM OS metadata.
@@ -321,6 +367,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           return code is non-zero.
       timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
+      kwargs: Additional command arguments.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -424,6 +471,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     This will be called once immediately after the VM has booted.
     """
     events.on_vm_startup.send(vm=self)
+    # Resets the cached SMT enabled status and number cpus value.
+    self._is_smt_enabled = None
+    self._num_cpus = None
 
   def PrepareVMEnvironment(self):
     """Performs any necessary setup on the VM specific to the OS.
@@ -571,7 +621,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       self._num_cpus = self._GetNumCpus()
     return self._num_cpus
 
-  def NumCpusForBenchmark(self):
+  def NumCpusForBenchmark(self, report_only_physical_cpus=False):
     """Gets the number of CPUs for benchmark configuration purposes.
 
     Many benchmarks scale their configurations based off of the number of CPUs
@@ -582,10 +632,19 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     ensure that they are not being used during benchmarking, the CPUs should be
     disabled.
 
+    Args:
+      report_only_physical_cpus: Whether to report only the physical
+      (non-SMT) CPUs.  Default is to report all vCPUs.
+
     Returns:
       The number of CPUs for benchmark configuration purposes.
     """
-    return FLAGS.num_cpus_override or self.num_cpus
+    if FLAGS.num_cpus_override:
+      return FLAGS.num_cpus_override
+    if report_only_physical_cpus and self.IsSmtEnabled():
+      # return half the number of CPUs.
+      return self.num_cpus // 2
+    return self.num_cpus
 
   @abc.abstractmethod
   def _GetNumCpus(self):
@@ -715,11 +774,23 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     actual_sha256 = self.GetSha256sum(install_path, filename)
     if actual_sha256 != expected_sha256:
       raise errors.Setup.BadPreprovisionedDataError(
-          'Invalid sha256sum for %s/%s: %s (actual) != %s (expected)' % (
+          'Invalid sha256sum for %s/%s: %s (actual) != %s (expected). Might '
+          'want to run using --preprovision_ignore_checksum '
+          '(not recommended).' % (
               module_name, filename, actual_sha256, expected_sha256))
 
-  def TestConnectRemoteAccessPort(self, port=None):
-    """Tries to connect to remote access port and throw if it fails."""
+  def TestConnectRemoteAccessPort(self, port=None, socket_timeout=0.5):
+    """Tries to connect to remote access port and throw if it fails.
+
+    Args:
+      port: Integer of the port to connect to. Defaults to
+          the default remote connection port of the VM.
+      socket_timeout: The number of seconds to wait on the socket before failing
+          and retrying. If this is too low, the connection may never succeed. If
+          this is too high it will add latency (because the current connection
+          may fail after a time that a new connection would succeed).
+          Defaults to 500ms.
+    """
     if not self.ip_address:
       raise errors.VirtualMachine.VirtualMachineError(
           'Trying to connect to a VM without an external IP address')
@@ -729,11 +800,20 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) \
         as sock:
       # Before the IP is reachable the socket times out (and throws). After that
-      # it throws immediately until the port is listened to.
-      # 250 ms fits well within the 500 ms cluster_boot polling fuzz.
-      sock.settimeout(0.25)  # seconds
+      # it throws immediately.
+      sock.settimeout(socket_timeout)  # seconds
       sock.connect((self.ip_address, port))
     logging.info('Connected to port %s on %s', port, self)
+
+  def IsSmtEnabled(self):
+    """Whether simultaneous multithreading (SMT) is enabled on the vm."""
+    if self._is_smt_enabled is None:
+      self._is_smt_enabled = self._IsSmtEnabled()
+    return self._is_smt_enabled
+
+  @abc.abstractmethod
+  def _IsSmtEnabled(self):
+    """Whether SMT is enabled on the vm."""
 
 
 class DeprecatedOsMixin(BaseOsMixin):
@@ -756,7 +836,7 @@ class DeprecatedOsMixin(BaseOsMixin):
     logging.warning(warning)
 
 
-class BaseVirtualMachine(resource.BaseResource):
+class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   """Base class for Virtual Machines.
 
   This class holds VM methods and attributes relating to the VM as a cloud
@@ -805,7 +885,7 @@ class BaseVirtualMachine(resource.BaseResource):
     """Initialize BaseVirtualMachine class.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
@@ -851,7 +931,7 @@ class BaseVirtualMachine(resource.BaseResource):
   @classmethod
   @abc.abstractmethod
   def CLOUD(cls):
-    return NotImplementedError
+    raise NotImplementedError()
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -861,6 +941,12 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.ip_address:
       return self.ip_address
     return super(BaseVirtualMachine, self).__str__()
+
+  def GetConnectionIp(self):
+    """Gets the IP to use for connecting to the VM."""
+    if FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip:
+      return self.internal_ip
+    return self.ip_address
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -942,6 +1028,7 @@ class BaseVirtualMachine(resource.BaseResource):
         'image': self.image,
         'zone': self.zone,
         'cloud': self.CLOUD,
+        'os_type': type(self).OS_TYPE,
     })
     if self.cidr is not None:
       result['cidr'] = self.cidr
@@ -957,18 +1044,10 @@ class BaseVirtualMachine(resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
-    # Hack: Silently fail if we have no num_cpus or OS_TYPE attribute.
-    # This property is defined in BaseOsMixin and should always
-    # be available during regular PKB usage because virtual machines
-    # always have a mixin. However, in testing virtual machine objects
-    # are often instantiated without a mixin, so the line below was
-    # failing because the attribute didn't exist.
-    if getattr(self, 'num_cpus', None):
+    if self.num_cpus is not None:
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
-    if getattr(self, 'OS_TYPE', None):
-      result['os_type'] = self.OS_TYPE
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -999,12 +1078,19 @@ class BaseVirtualMachine(resource.BaseResource):
         continue
       url = fallback_url.get(filename)
       sha256sum = preprovisioned_data.get(filename)
-      preprovisioned = self.ShouldDownloadPreprovisionedData(
-          module_name, filename)
-      if not sha256sum:
+      try:
+        preprovisioned = self.ShouldDownloadPreprovisionedData(
+            module_name, filename)
+      except NotImplementedError:
+        logging.info('The provider does not implement '
+                     'ShouldDownloadPreprovisionedData. Attempting to '
+                     'download the data via URL')
+        preprovisioned = False
+      if not FLAGS.preprovision_ignore_checksum and not sha256sum:
         raise errors.Setup.BadPreprovisionedDataError(
-            'Cannot find sha256sum hash for file %s in module %s. See '
-            'README.md for information about preprovisioned data. '
+            'Cannot find sha256sum hash for file %s in module %s. Might want '
+            'to run using --preprovision_ignore_checksum (not recommended). '
+            'See README.md for information about preprovisioned data. '
             'Cannot find file in /data directory either, fail to upload from '
             'local directory.' % (filename, module_name))
 
@@ -1024,8 +1110,9 @@ class BaseVirtualMachine(resource.BaseResource):
             'Cannot find fallback url of the file to download from web. '
             'Cannot find file in /data directory either, fail to upload from '
             'local directory.' % (filename, module_name))
-      self.CheckPreprovisionedData(
-          install_path, module_name, filename, sha256sum)
+      if not FLAGS.preprovision_ignore_checksum:
+        self.CheckPreprovisionedData(
+            install_path, module_name, filename, sha256sum)
 
   def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
                                          install_path):
@@ -1172,6 +1259,8 @@ class BaseVirtualMachine(resource.BaseResource):
   def UpdateInterruptibleVmStatus(self):
     """Updates the status of the discounted vm.
     """
+    # TODO(tohaowu) Set it to pure virtual function after finishing it on all
+    # the providers.
     pass
 
   def WasInterrupted(self):
@@ -1195,6 +1284,14 @@ class BaseVirtualMachine(resource.BaseResource):
       Vm status code.
     """
     return None
+
+  def GetPreemptibleStatusPollSeconds(self):
+    """Get seconds between preemptible status polls.
+
+    Returns:
+      Seconds between polls
+    """
+    return 5
 
   def _PreDelete(self):
     """See base class."""

@@ -32,6 +32,16 @@ _DISK_SPEC_DICTS = [{
 }]
 
 
+class TestStaticVirtualMachine(pkb_common_test_case.TestOsMixin,
+                               svm.StaticVirtualMachine):
+  pass
+
+
+def CreateTestStaticVm():
+  vm_spec = svm.StaticVmSpec(_COMPONENT)
+  return TestStaticVirtualMachine(vm_spec=vm_spec)
+
+
 class StaticVmSpecTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
@@ -113,14 +123,14 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     vm_pool = svm.StaticVirtualMachine.vm_pool
     self.assertEqual(2, len(vm_pool))
     self._AssertStaticVMsEqual(
-        svm.StaticVirtualMachine(
+        TestStaticVirtualMachine(
             svm.StaticVmSpec(
                 _COMPONENT,
                 ip_address='174.12.14.1',
                 user_name='perfkitbenchmarker',
                 ssh_private_key='perfkitbenchmarker.pem')), vm_pool[0])
     self._AssertStaticVMsEqual(
-        svm.StaticVirtualMachine(
+        TestStaticVirtualMachine(
             svm.StaticVmSpec(
                 _COMPONENT,
                 ip_address='174.12.14.121',
@@ -153,7 +163,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     vm_pool = svm.StaticVirtualMachine.vm_pool
     self.assertEqual(1, len(vm_pool))
     self._AssertStaticVMsEqual(
-        svm.StaticVirtualMachine(
+        TestStaticVirtualMachine(
             svm.StaticVmSpec(
                 _COMPONENT,
                 ip_address='174.12.14.1',

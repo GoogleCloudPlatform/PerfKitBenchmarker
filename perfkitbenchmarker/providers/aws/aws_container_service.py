@@ -17,15 +17,18 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
 import json
 import os
 import uuid
+
+from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_load_balancer
 from perfkitbenchmarker.providers.aws import aws_logs
 from perfkitbenchmarker.providers.aws import aws_network
@@ -57,7 +60,16 @@ class EcrRepository(resource.BaseResource):
         '--region', self.region,
         '--repository-name', self.name
     ]
-    vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(create_cmd,
+                                              raise_on_failure=False)
+    if retcode:
+      if 'InsufficientInstanceCapacity' in stderr:
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+      if 'InstanceLimitExceeded' in stderr or 'VpcLimitExceeded' in stderr:
+        raise errors.Benchmarks.QuotaFailure(stderr)
+      raise errors.Resource.CreationError(
+          'Failed to create EKS Cluster: {} return code: {}'.format(
+              retcode, stderr))
 
   def _Exists(self):
     """Returns True if the repository exists."""
@@ -86,7 +98,7 @@ class EcrRepository(resource.BaseResource):
 class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on AWS."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
 
   def __init__(self, registry_spec):
     super(ElasticContainerRegistry, self).__init__(registry_spec)
@@ -419,7 +431,7 @@ class EcsService(container_service.BaseContainerService):
 class FargateCluster(container_service.BaseContainerCluster):
   """Class representing an AWS Fargate cluster."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   CLUSTER_TYPE = 'Fargate'
 
   def __init__(self, cluster_spec):
@@ -493,7 +505,7 @@ class FargateCluster(container_service.BaseContainerCluster):
 class AwsKopsCluster(container_service.KubernetesCluster):
   """Class representing a kops based Kubernetes cluster."""
 
-  CLOUD = providers.AWS
+  CLOUD = aws.CLOUD
   CLUSTER_TYPE = 'kops'
 
   def __init__(self, spec):

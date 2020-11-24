@@ -15,7 +15,7 @@
 
 """Module containing CUDA Deep Neural Network library installation functions."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 CUDNN_7_4_9 = 'libcudnn7=7.4.2.24-1+cuda9.0'

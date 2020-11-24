@@ -14,6 +14,7 @@
 
 """Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine."""
 
+import builtins
 import contextlib
 import copy
 import json
@@ -21,7 +22,6 @@ import re
 import unittest
 
 from absl import flags
-import builtins
 import mock
 
 from perfkitbenchmarker import benchmark_spec
@@ -79,10 +79,9 @@ def PatchCriticalObjects(retvals=None):
   with mock.patch(
       vm_util.__name__ + '.IssueCommand',
       side_effect=ReturnVal) as issue_command, mock.patch(
-          builtins.__name__ + '.open'), mock.patch(
-              vm_util.__name__ +
-              '.NamedTemporaryFile'), mock.patch(util.__name__ +
-                                                 '.GetDefaultProject'):
+          builtins.__name__ +
+          '.open'), mock.patch(vm_util.__name__ +
+                               '.NamedTemporaryFile'):
     yield issue_command
 
 
@@ -171,7 +170,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testVmWithMachineTypeNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='test_machine_type', project='p')
-    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset(
         {'dedicated_host': False, 'machine_type': 'test_machine_type',
@@ -183,7 +182,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='test_machine_type', preemptible=True,
         project='p')
-    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset(
         {'dedicated_host': False, 'machine_type': 'test_machine_type',
@@ -194,7 +193,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCustomVmNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '1.0GiB'}, project='p')
-    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset(
         {'cpus': 1, 'memory_mib': 1024, 'project': 'p',
@@ -206,7 +205,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, machine_type={'cpus': 1, 'memory': '1.0GiB'},
         preemptible=True,
         project='fakeproject')
-    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset({
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
@@ -219,7 +218,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         gpu_count=2,
         gpu_type='k80',
         project='fakeproject')
-    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset({
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
@@ -428,6 +427,30 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                     vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
 
+  def testCosVm(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.COS)
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                         machine_type='fake-machine-type')
+    fake_image = 'fake_cos_image'
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
+      vm = vm_class(spec)
+      vm._Create()
+      vm.created = True
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn('--image-family cos-stable', command_string)
+      self.assertIn('--image-project cos-cloud', command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 3)
+      vm_metadata = vm.GetResourceMetadata()
+      self.assertDictContainsSubset({'image': fake_image,
+                                     'image_family': 'cos-stable',
+                                     'image_project': 'cos-cloud'},
+                                    vm_metadata)
+
 
 class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -460,7 +483,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
           FLAGS,
           image='image',
           machine_type='test_machine_type')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm = pkb_common_test_case.TestGceVirtualMachine(vm_spec)
       vm._Create()
       return ' '.join(issue_command.call_args[0][0]), issue_command.call_count
 
@@ -573,7 +596,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'cpus': 1,
               'memory': '1.0GiB',
           })
-      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       vm._Create()  # No error should be thrown.
       self.assertEqual(issue_command.call_count, 5)
 
@@ -588,7 +611,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'cpus': 1,
               'memory': '1.0GiB',
           })
-      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(
           errors.Benchmarks.QuotaFailure.RateLimitExceededError):
         vm._Create()
@@ -603,7 +626,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'cpus': 1,
               'memory': '1.0GiB',
           })
-      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(errors.Resource.CreationError):
         vm._Create()
 
@@ -614,7 +637,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'cpus': 1,
               'memory': '1.0GiB',
           })
-      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       vm._Create()
       self.assertEqual(issue_command.call_count, 1)
       self.assertNotIn('--accelerator', issue_command.call_args[0][0])
@@ -626,7 +649,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           machine_type='n1-standard-8',
           gpu_count=2,
           gpu_type='k80')
-      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       vm._Create()
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--accelerator', issue_command.call_args[0][0])

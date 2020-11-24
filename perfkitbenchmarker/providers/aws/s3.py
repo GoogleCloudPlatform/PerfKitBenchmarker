@@ -14,13 +14,15 @@
 
 """Contains classes/functions related to S3."""
 
+import os
 import posixpath
+
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -28,16 +30,11 @@ FLAGS = flags.FLAGS
 AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
 
-# S3 endpoints for a given region can be formed by prefixing the region with
-# 's3.' and suffixing it with '.amazonaws.com'.
-AWS_S3_ENDPOINT_PREFIX = 's3.'
-AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
-
 
 class S3Service(object_storage_service.ObjectStorageService):
   """Interface to Amazon S3."""
 
-  STORAGE_NAME = providers.AWS
+  STORAGE_NAME = aws.CLOUD
 
   def PrepareService(self, location):
     self.region = location or DEFAULT_AWS_REGION
@@ -64,10 +61,15 @@ class S3Service(object_storage_service.ObjectStorageService):
          '--tagging', 'TagSet=[%s]' % tag_set,
          '--region=%s' % self.region])
 
-  def Copy(self, src_url, dst_url):
+  def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
-    vm_util.IssueCommand(['aws', 's3', 'cp', src_url, dst_url,
-                          '--region', self.region])
+    cmd = ['aws', 's3', 'cp', '--region', self.region]
+    if recursive:
+      cmd.append('--recursive')
+      # Fix cp to mimic gsutil behavior
+      dst_url = os.path.join(dst_url, os.path.basename(src_url))
+    cmd += [src_url, dst_url]
+    vm_util.IssueCommand(cmd)
 
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""
@@ -85,11 +87,31 @@ class S3Service(object_storage_service.ObjectStorageService):
     return 'aws s3 cp "%s" "%s" --region=%s' % (
         src_url, local_path, self.region)
 
-  def List(self, buckets):
+  def List(self, bucket):
     """See base class."""
-    stdout, _, _ = vm_util.IssueCommand(['aws', 's3', 'ls', buckets,
-                                         '--region', self.region])
+    stdout, _, _ = vm_util.IssueCommand(
+        ['aws', 's3', 'ls', bucket, '--region', self.region])
     return stdout
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Each result that is a folder has "PRE" in front of the name (meaning
+    prefix), eg. "PRE customer/", so that part is removed from each line. When
+    there's more than one result, splitting on the newline returns a final blank
+    row, so blank values are skipped.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    return [
+        obj.split('PRE ')[1].strip().replace('/', '')
+        for obj in self.List(bucket).split('\n')
+        if obj and obj.endswith('/')
+    ]
 
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
@@ -118,7 +140,7 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   def PrepareVM(self, vm):
     vm.Install('awscli')
-    vm.Install('boto')
+    vm.Install('boto3')
 
     vm.PushFile(
         object_storage_service.FindCredentialFile('~/' +
@@ -139,16 +161,14 @@ class S3Service(object_storage_service.ObjectStorageService):
         'time aws s3 sync s3://%s/ %s' % (bucket, dest))
 
   def Metadata(self, vm):
-    return {object_storage_service.BOTO_LIB_VERSION:
-            linux_packages.GetPipPackageVersion(vm, 'boto')}
+    return {
+        object_storage_service.BOTO_LIB_VERSION:
+            linux_packages.GetPipPackageVersion(vm, 'boto3')
+    }
 
   def APIScriptArgs(self):
-    if FLAGS.s3_custom_endpoint:
-      return ['--host=' + FLAGS.s3_custom_endpoint]
-    else:
-      return ['--host=%s%s%s' % (AWS_S3_ENDPOINT_PREFIX, self.region,
-                                 AWS_S3_ENDPOINT_SUFFIX)]
+    return ['--region=' + self.region]
 
   @classmethod
   def APIScriptFiles(cls):
-    return ['boto_service.py', 's3.py']
+    return ['s3.py']

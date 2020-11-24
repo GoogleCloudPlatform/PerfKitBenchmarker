@@ -23,13 +23,11 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
-
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -244,7 +242,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
   _regional_network_count = 0
   vnet_lock = threading.Lock()
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
 
   def __init__(self, spec, location, name, number_subnets):
     super(AzureVirtualNetwork, self).__init__(spec)
@@ -413,6 +411,15 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
   def _Delete(self):
     pass
 
+  def _GetRulePriority(self, rule, rule_name):
+    # Azure priorities are between 100 and 4096, but we reserve 4095
+    # for the special DenyAll rule created by DisallowAllPorts.
+    rule_priority = 100 + len(self.rules)
+    if rule_priority >= 4095:
+      raise ValueError('Too many firewall rules!')
+    self.rules[rule] = rule_name
+    return rule_priority
+
   def AttachToSubnet(self):
     vm_util.IssueRetryableCommand([
         azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'update', '--name',
@@ -444,12 +451,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         return
       port_range = '%s-%s' % (start_port, end_port)
       rule_name = 'allow-%s-%s' % (port_range, source_range_str)
-      # Azure priorities are between 100 and 4096, but we reserve 4095
-      # for the special DenyAll rule created by DisallowAllPorts.
-      rule_priority = 100 + len(self.rules)
-      if rule_priority >= 4095:
-        raise ValueError('Too many firewall rules!')
-      self.rules[rule] = rule_name
+      rule_priority = self._GetRulePriority(rule, rule_name)
 
     network_cmd = [
         azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
@@ -460,6 +462,25 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     network_cmd.extend(self.resource_group.args + self.args)
     vm_util.IssueRetryableCommand(network_cmd)
 
+  def AllowIcmp(self):
+    source_address = '0.0.0.0/0'
+    # '*' in Azure represents all ports
+    rule = ('*', source_address)
+    rule_name = 'allow-icmp'
+    with self.rules_lock:
+      if rule in self.rules:
+        return
+      rule_priority = self._GetRulePriority(rule, rule_name)
+      network_cmd = [
+          azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
+          rule_name, '--access', 'Allow', '--source-address-prefixes',
+          source_address, '--source-port-ranges', '*',
+          '--destination-port-ranges', '*', '--priority',
+          str(rule_priority), '--protocol', 'Icmp'
+      ]
+      network_cmd.extend(self.resource_group.args + self.args)
+      vm_util.IssueRetryableCommand(network_cmd)
+
 
 class AzureFirewall(network.BaseFirewall):
   """A fireall on Azure is a Network Security Group.
@@ -468,7 +489,7 @@ class AzureFirewall(network.BaseFirewall):
   proxy methods through to the right NSG instance.
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
@@ -487,6 +508,15 @@ class AzureFirewall(network.BaseFirewall):
     """Closes all ports on the firewall."""
     pass
 
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+
+    vm.network.nsg.AllowIcmp()
+
 
 class AzureNetwork(network.BaseNetwork):
   """Locational network components.
@@ -495,7 +525,7 @@ class AzureNetwork(network.BaseNetwork):
   we need for an Azure zone (aka location).
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = azure.CLOUD
 
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)

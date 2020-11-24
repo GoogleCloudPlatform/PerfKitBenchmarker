@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 
 # Many places in the PKB codebase directly reference the global FLAGS. Several

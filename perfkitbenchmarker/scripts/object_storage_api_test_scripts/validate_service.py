@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-
+# Lint as: python2, python3
 # Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,21 +15,26 @@
 
 """A script to validate ObjectStorageServiceBase implementations."""
 
-import cStringIO
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import logging
 import sys
 
 from absl import flags
-
 import object_storage_api_tests
+import six
+from six.moves import range
 
 FLAGS = flags.FLAGS
 
 
 def ValidateService(service):
+  """Sanity test for the a storage service."""
   object_names = ['object_' + str(i) for i in range(10)]
   payload = object_storage_api_tests.GenerateWritePayload(100)
-  handle = cStringIO.StringIO(payload)
+  handle = six.StringIO(payload)
 
   logging.info('Starting test.')
 

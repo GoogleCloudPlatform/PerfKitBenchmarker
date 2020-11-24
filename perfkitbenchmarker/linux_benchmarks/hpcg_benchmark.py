@@ -20,10 +20,10 @@ Requires openmpi 1.10.2
 import logging
 import os
 import re
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util

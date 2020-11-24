@@ -13,10 +13,12 @@
 # limitations under the License.
 """Run MLPerf benchmarks."""
 
+import json
 import posixpath
+import re
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -45,9 +47,9 @@ mlperf:
           min_cpu_platform: skylake
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-east-1
+          zone: us-east-1a
           boot_disk_size: 105
-          image: ami-07728e9e2742b0662
+          image: ami-0a4a0d42e3b855a2c
         Azure:
           machine_type: Standard_ND40s_v2
           zone: eastus
@@ -315,7 +317,7 @@ def Prepare(benchmark_spec, vm=None):
           'sudo docker build --pull --network=host -t mlperf-nvidia:object_detection . ',
           should_log=True)
       _DownloadData(benchmark_spec.coco_data_dir,
-                    posixpath.join('/data', 'coco'), vm)
+                    posixpath.join('/data', 'coco2017'), vm)
 
     if 'gnmt' in benchmark_spec.benchmark:
       vm.RemoteCommand(
@@ -331,7 +333,7 @@ def Prepare(benchmark_spec, vm=None):
           'sudo docker build --pull --network=host -t mlperf-nvidia:single_stage_detector . ',
           should_log=True)
       _DownloadData(benchmark_spec.coco_data_dir,
-                    posixpath.join('/data', 'coco'), vm)
+                    posixpath.join('/data', 'coco2017'), vm)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -387,18 +389,36 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
     metadata_copy = metadata.copy()
     epoch = regex_util.ExtractExactlyOneMatch(r'"epoch_num": (\d+)', result)
     if ('transformer' in model and (not use_tpu)):
-      value = regex_util.ExtractExactlyOneMatch(r'"value": "(\d+\.\d+)"',
-                                                result)
+      value = float(regex_util.ExtractExactlyOneMatch(r'"value": "(\d+\.\d+)"',
+                                                      result))
     elif 'mask' in model:
-      # TODO(user): Add support for two accuracy values
-      value = 0
+      mask_value, mask_metadata = regex_util.ExtractExactlyOneMatch(
+          r'^"value": (.*?), "metadata": (.*)$', result)
+      metadata_copy.update(json.loads(mask_value)['accuracy'])
+      metadata_copy.update(json.loads(mask_metadata))
+      value = float(json.loads(mask_value)['accuracy']['BBOX']) * 100
     else:
-      value = regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)', result)
+      value = float(regex_util.ExtractExactlyOneMatch(r'"value": (\d+\.\d+)',
+                                                      result))
+      if 'ssd' in model or 'minigo' in model or 'resnet' in model:
+        value *= 100
     metadata_copy['times'] = wall_time - start
     metadata_copy['epoch'] = int(epoch)
     samples.append(
-        sample.Sample('Eval Accuracy',
-                      float(value) * 100, '%', metadata_copy))
+        sample.Sample('Eval Accuracy', value, '%', metadata_copy))
+
+  if 'resnet' in model:
+    results = re.findall(r'Speed: (\S+) samples/sec', output)
+    results.extend(re.findall(r'(\S+) examples/sec', output))
+  elif 'transformer' in model:
+    results = re.findall(r'wps=(\S+),', output)
+  elif 'gnmt' in model:
+    results = re.findall(r'Tok/s (\S+)', output)
+  elif 'ssd' in model:
+    results = re.findall(r'avg. samples / sec: (\S+)', output)
+  for speed in results:
+    samples.append(sample.Sample('speed', float(speed), 'samples/sec',
+                                 metadata))
 
   if not use_tpu:
     if 'minigo' in model:
@@ -473,31 +493,31 @@ def Run(benchmark_spec):
     common_env = 'DGXSYSTEM=DGX1 NEXP=1'
     if 'resnet' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path, 'resnet/implementations/mxnet')
-      env = 'DATADIR=/data/imagenet LOGDIR=/tmp/resnet PULL=0 '
+      env = 'DATADIR=/data/imagenet LOGDIR=/tmp/resnet PULL=0'
     elif 'transformer' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path,
                                 'transformer/implementations/pytorch')
-      env = 'DATADIR=/data/wmt/utf8 LOGDIR=/tmp/transformer PULL=0 '
+      env = 'DATADIR=/data/wmt/utf8 LOGDIR=/tmp/transformer PULL=0'
     elif 'minigo' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path,
                                 'minigo/implementations/tensorflow')
-      env = 'LOGDIR=/tmp/minigo CONT=mlperf-nvidia:minigo '
+      env = 'LOGDIR=/tmp/minigo CONT=mlperf-nvidia:minigo'
     elif 'mask' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path,
                                 'maskrcnn/implementations/pytorch')
-      env = 'LOGDIR=/tmp/mask DATADIR=/data PULL=0 '
+      env = 'LOGDIR=/tmp/mask DATADIR=/data PULL=0'
     elif 'gnmt' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path, 'gnmt/implementations/pytorch')
-      env = 'LOGDIR=/tmp/gnmt DATADIR=/data/gnmt PULL=0 '
+      env = 'LOGDIR=/tmp/gnmt DATADIR=/data/gnmt PULL=0'
     elif 'ssd' in benchmark_spec.benchmark:
       run_path = posixpath.join(benchmark_path, 'ssd/implementations/pytorch')
-      env = 'LOGDIR=/tmp/ssd DATADIR=/data PULL=0 '
+      env = 'LOGDIR=/tmp/ssd DATADIR=/data PULL=0'
 
     run_script = posixpath.join(run_path, 'run.sub')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     mlperf_benchmark_cmd = (
-        'chmod 755 {run_script} && sudo {common_env} {env} {run_script} '
-        .format(run_script=run_script, common_env=common_env, env=env))
+        'cd {run_path} && chmod 755 run.sub && sudo {common_env} {env} '
+        './run.sub'.format(run_path=run_path, common_env=common_env, env=env))
 
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     mlperf_benchmark_cmd = '{env} {cmd}'.format(

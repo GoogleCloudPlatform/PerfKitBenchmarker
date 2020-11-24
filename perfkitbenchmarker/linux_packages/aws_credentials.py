@@ -25,10 +25,9 @@ for calls from the VM to other AWS services, such as SQS or Kinesis.
 
 import logging
 import os
-
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 
 
 FLAGS = flags.FLAGS

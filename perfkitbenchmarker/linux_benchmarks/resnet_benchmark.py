@@ -26,10 +26,9 @@ from __future__ import print_function
 import datetime
 import posixpath
 import time
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark

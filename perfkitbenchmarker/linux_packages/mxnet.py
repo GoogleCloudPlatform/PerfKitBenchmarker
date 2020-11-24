@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing MXNet installation and cleanup functions."""
 import posixpath
-from perfkitbenchmarker import flags
+from absl import flags
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 

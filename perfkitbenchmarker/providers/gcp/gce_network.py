@@ -28,14 +28,15 @@ import json
 import logging
 import threading
 
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-
+from perfkitbenchmarker.providers import gcp
+from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
 import six
 
@@ -46,7 +47,7 @@ ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway."""
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, name, network_name, region, cidr, project):
     super(GceVpnGateway, self).__init__()
@@ -537,7 +538,7 @@ class GceFirewallRule(resource.BaseResource):
 class GceFirewall(network.BaseFirewall):
   """An object representing the GCE Firewall."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self):
     """Initialize GCE firewall class."""
@@ -710,7 +711,7 @@ class GceSubnetResource(resource.BaseResource):
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
-  CLOUD = providers.GCP
+  CLOUD = gcp.CLOUD
 
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
@@ -737,7 +738,8 @@ class GceNetwork(network.BaseNetwork):
     if subnet_region is None:
       self.subnet_resource = None
     else:
-      self.subnet_resource = GceSubnetResource(name, name, subnet_region,
+      self.subnet_resource = GceSubnetResource(FLAGS.gce_subnet_name or name,
+                                               name, subnet_region,
                                                self.cidr, self.project)
 
     # Stage FW rules.
@@ -769,6 +771,22 @@ class GceNetwork(network.BaseNetwork):
         self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
             vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
+
+    # Add GCE Placement Group
+    no_placement_group = (
+        not FLAGS.placement_group_style or
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
+    if no_placement_group:
+      self.placement_group = None
+    else:
+      placement_group_spec = gce_placement_group.GcePlacementGroupSpec(
+          'GcePlacementGroupSpec',
+          flag_values=FLAGS,
+          zone=network_spec.zone,
+          project=self.project,
+          num_vms=self._GetNumberVms())
+      self.placement_group = gce_placement_group.GcePlacementGroup(
+          placement_group_spec)
 
   def _GetNetworksFromSpec(self, network_spec):
     """Returns a list of distinct CIDR networks for this benchmark.
@@ -874,6 +892,19 @@ class GceNetwork(network.BaseNetwork):
       return (cls.CLOUD, spec.project, spec.cidr)
     return (cls.CLOUD, spec.project)
 
+  def _GetNumberVms(self):
+    """Counts the number of VMs to be used in this benchmark.
+
+    Cannot do a len(benchmark_spec.vms) as that hasn't been populated yet.  Go
+    through all the group_specs and sum up the vm_counts.
+
+    Returns:
+      Count of the number of VMs in the benchmark.
+    """
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    return sum((group_spec.vm_count - len(group_spec.static_vms))
+               for group_spec in benchmark_spec.config.vm_groups.values())
+
   def Create(self):
     """Creates the actual network."""
     if not FLAGS.gce_network_name:
@@ -890,9 +921,13 @@ class GceNetwork(network.BaseNetwork):
         vm_util.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Create(),
             list(self.vpn_gateway.keys()))
+    if self.placement_group:
+      self.placement_group.Create()
 
   def Delete(self):
     """Deletes the actual network."""
+    if self.placement_group:
+      self.placement_group.Delete()
     if not FLAGS.gce_network_name:
       if getattr(self, 'vpn_gateway', False):
         vm_util.RunThreaded(

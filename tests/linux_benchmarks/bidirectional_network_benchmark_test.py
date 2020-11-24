@@ -18,10 +18,10 @@ import os
 import re
 import threading
 import unittest
+from absl import flags
 import mock
 import numpy
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import bidirectional_network_benchmark
 from tests import pkb_common_test_case
 

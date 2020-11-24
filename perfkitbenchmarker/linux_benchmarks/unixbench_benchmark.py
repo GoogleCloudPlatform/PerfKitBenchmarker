@@ -21,10 +21,9 @@ some memory bandwidth, and disk.
 """
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import unixbench

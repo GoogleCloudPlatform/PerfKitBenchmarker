@@ -69,9 +69,12 @@ from os.path import isfile
 import random
 import re
 import sys
+import threading
 import time
+from typing import List, Optional
 import uuid
 
+from absl import flags
 from perfkitbenchmarker import archive
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_lookup
@@ -84,7 +87,6 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
@@ -156,15 +158,6 @@ flags.DEFINE_list(
 flags.DEFINE_string('machine_type', None, 'Machine '
                     'types that will be created for benchmarks that don\'t '
                     'require a particular type.')
-flags.DEFINE_integer(
-    'gpu_count', None,
-    'Number of gpus to attach to the VM. Requires gpu_type to be '
-    'specified.')
-flags.DEFINE_enum(
-    'gpu_type', None,
-    ['k80', 'p100', 'v100', 'p4', 'p4-vws', 't4'],
-    'Type of gpus to attach to the VM. Requires gpu_count to be '
-    'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
                      'variable number of machines, the number of VMs to use.')
 flags.DEFINE_string('image', None, 'Default image that will be '
@@ -177,6 +170,10 @@ flags.DEFINE_boolean('use_pkb_logging', True, 'Whether to use PKB-specific '
                      'ABSL logging directly.')
 flags.DEFINE_boolean('log_dmesg', False, 'Whether to log dmesg from '
                      'each VM to the PKB log file before the VM is deleted.')
+flags.DEFINE_boolean('always_teardown_on_exception', False, 'Whether to tear '
+                     'down VMs when there is exception during the PKB run. If'
+                     'enabled, VMs will be torn down even if FLAGS.run_stage '
+                     'does not specify teardown.')
 
 
 def GetCurrentUser():
@@ -344,6 +341,10 @@ flags.DEFINE_integer(
     'The time in seconds to sleep after the run phase. This can be useful '
     'for letting the VM sit idle after the bechmarking phase is complete.')
 flags.DEFINE_bool(
+    'before_run_pause', False,
+    'If true, wait for command line input before executing the run phase. '
+    'This is useful for debugging benchmarks during development.')
+flags.DEFINE_bool(
     'before_cleanup_pause', False,
     'If true, wait for command line input before executing the cleanup phase. '
     'This is useful for debugging benchmarks during development.')
@@ -366,6 +367,8 @@ flags.DEFINE_boolean('record_lscpu', True,
                      'Whether to record the lscpu output in a sample')
 flags.DEFINE_boolean('record_proccpu', True,
                      'Whether to record the /proc/cpuinfo output in a sample')
+flags.DEFINE_boolean('record_cpu_vuln', True,
+                     'Whether to record the CPU vulnerabilities on linux VMs')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -646,6 +649,61 @@ def DoProvisionPhase(spec, timer):
     spec.Pickle()
 
 
+class InterruptChecker():
+  """An class that check interrupt on VM."""
+
+  def __init__(self, vms):
+    """Start check interrupt thread.
+
+    Args:
+      vms: A list of virtual machines.
+    """
+    self.vms = vms
+    self.check_threads = []
+    self.phase_status = threading.Event()
+    for vm in vms:
+      if vm.IsInterruptible():
+        check_thread = threading.Thread(target=self.CheckInterrupt, args=(vm,))
+        check_thread.start()
+        self.check_threads.append(check_thread)
+
+  def CheckInterrupt(self, vm):
+    """Check interrupt.
+
+    Args:
+      vm: the virtual machine object.
+
+    Returns:
+      None
+    """
+    while not self.phase_status.isSet():
+      vm.UpdateInterruptibleVmStatus()
+      if vm.WasInterrupted():
+        return
+      else:
+        self.phase_status.wait(vm.GetPreemptibleStatusPollSeconds())
+
+  def EndCheckInterruptThread(self):
+    """End check interrupt thread."""
+    self.phase_status.set()
+
+    for check_thread in self.check_threads:
+      check_thread.join()
+
+  def EndCheckInterruptThreadAndRaiseError(self):
+    """End check interrupt thread and raise error.
+
+    Raises:
+      InsufficientCapacityCloudFailure when it catches interrupt.
+
+    Returns:
+      None
+    """
+    self.EndCheckInterruptThread()
+    if any(vm.IsInterruptible() and vm.WasInterrupted() for vm in self.vms):
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure('Interrupt')
+
+
 def DoPreparePhase(spec, timer):
   """Performs the Prepare phase of benchmark execution.
 
@@ -675,6 +733,8 @@ def DoRunPhase(spec, collector, timer):
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Run function.
   """
+  if FLAGS.before_run_pause:
+    six.moves.input('Hit enter to begin Run.')
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
   consecutive_failures = 0
@@ -717,6 +777,8 @@ def DoRunPhase(spec, collector, timer):
 
     if FLAGS.record_proccpu:
       samples.extend(_CreateProcCpuSamples(spec.vms))
+    if FLAGS.record_cpu_vuln and run_number == 0:
+      samples.extend(_CreateCpuVulnerabilitySamples(spec.vms))
 
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
@@ -746,7 +808,7 @@ def DoCleanupPhase(spec, timer):
       benchmark module's Cleanup function.
   """
   if FLAGS.before_cleanup_pause:
-    six.moves.input('Hit enter to begin cleanup.')
+    six.moves.input('Hit enter to begin Cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
@@ -838,6 +900,7 @@ def RunBenchmark(spec, collector):
     with spec.RedirectGlobalFlags():
       end_to_end_timer = timing_util.IntervalTimer()
       detailed_timer = timing_util.IntervalTimer()
+      interrupt_checker = None
       try:
         with end_to_end_timer.Measure('End to End'):
           if stages.PROVISION in FLAGS.run_stage:
@@ -845,15 +908,24 @@ def RunBenchmark(spec, collector):
 
           if stages.PREPARE in FLAGS.run_stage:
             current_run_stage = stages.PREPARE
+            interrupt_checker = InterruptChecker(spec.vms)
             DoPreparePhase(spec, detailed_timer)
+            interrupt_checker.EndCheckInterruptThreadAndRaiseError()
+            interrupt_checker = None
 
           if stages.RUN in FLAGS.run_stage:
             current_run_stage = stages.RUN
+            interrupt_checker = InterruptChecker(spec.vms)
             DoRunPhase(spec, collector, detailed_timer)
+            interrupt_checker.EndCheckInterruptThreadAndRaiseError()
+            interrupt_checker = None
 
           if stages.CLEANUP in FLAGS.run_stage:
             current_run_stage = stages.CLEANUP
+            interrupt_checker = InterruptChecker(spec.vms)
             DoCleanupPhase(spec, detailed_timer)
+            interrupt_checker.EndCheckInterruptThreadAndRaiseError()
+            interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
             current_run_stage = stages.TEARDOWN
@@ -899,8 +971,15 @@ def RunBenchmark(spec, collector):
         # here.
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
           DoCleanupPhase(spec, detailed_timer)
+
+        if (FLAGS.always_teardown_on_exception and
+            stages.TEARDOWN not in FLAGS.run_stage):
+          # Note that if TEARDOWN is specified, it will happen below.
+          DoTeardownPhase(spec, detailed_timer)
         raise
       finally:
+        if interrupt_checker:
+          interrupt_checker.EndCheckInterruptThread()
         # Deleting resources should happen first so any errors with publishing
         # don't prevent teardown.
         if stages.TEARDOWN in FLAGS.run_stage:
@@ -942,7 +1021,13 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
+  # Check for preempted VMs
   def UpdateVmStatus(vm):
+    # Setting vm.is_failed_run to True, UpdateInterruptibleVmStatus knows this
+    # is the final interruption checking. GCP only needs to check interruption
+    # when fail happens. For the the other clouds, PKB needs to check while vm
+    # is alive.
+    vm.is_failed_run = True
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)
 
@@ -1227,6 +1312,18 @@ def _CreateProcCpuSamples(vms):
       metadata['proc_{}'.format(processor_id)] = ';'.join(sorted(values))
     samples.append(sample.Sample('proccpu_mapping', 0, '', metadata))
   return samples
+
+
+def _CreateCpuVulnerabilitySamples(vms) -> List[sample.Sample]:
+  """Returns samples of the VMs' CPU vulernabilites."""
+
+  def CreateSample(vm) -> Optional[sample.Sample]:
+    metadata = {'vm_name': vm.name}
+    metadata.update(vm.cpu_vulnerabilities.asdict)
+    return sample.Sample('cpu_vuln', 0, '', metadata)
+
+  linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
+  return vm_util.RunThreaded(CreateSample, linux_vms)
 
 
 def Main():

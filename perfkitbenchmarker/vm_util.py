@@ -30,12 +30,11 @@ import tempfile
 import threading
 import time
 
+from absl import flags
 import jinja2
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
 from six.moves import range
 
@@ -348,7 +347,9 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   if env:
     logging.debug('Environment variables: %s', env)
 
-  full_cmd = ' '.join(cmd)
+  # Force conversion to string so you get a nice log statement before hitting a
+  # type error or NPE. subprocess will still catch it.
+  full_cmd = ' '.join(str(w) for w in cmd)
   logging.info('Running: %s', full_cmd)
 
   time_file_path = '/usr/bin/time'

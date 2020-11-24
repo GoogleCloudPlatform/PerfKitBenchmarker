@@ -21,13 +21,12 @@ https://github.com/wg/wrk
 
 import csv
 import posixpath
-
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
 import six
 
 WRK_URL = 'https://github.com/wg/wrk/archive/4.0.1.tar.gz'
-WRK_DIR = posixpath.join(INSTALL_DIR, 'wrk')
+WRK_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'wrk')
 WRK_PATH = posixpath.join(WRK_DIR, 'wrk')
 
 # Rather than parse WRK's free text output, this script is used to generate a

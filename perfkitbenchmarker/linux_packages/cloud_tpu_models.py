@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing cloud TPU models installation and cleanup functions."""
-from perfkitbenchmarker import flags
+from absl import flags
 FLAGS = flags.FLAGS
 CLOUD_TPU_GIT = 'https://github.com/tensorflow/tpu.git'
 

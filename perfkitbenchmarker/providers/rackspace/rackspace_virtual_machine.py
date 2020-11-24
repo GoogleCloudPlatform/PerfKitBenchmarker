@@ -37,13 +37,12 @@ import json
 import logging
 import re
 import tempfile
-
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
 from perfkitbenchmarker.providers.rackspace import rackspace_network

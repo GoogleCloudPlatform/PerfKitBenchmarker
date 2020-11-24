@@ -15,15 +15,20 @@
 """Contains classes/functions related to Google Cloud Storage."""
 
 import logging
+import ntpath
+import os
 import posixpath
 import re
 
+from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers import gcp
+from perfkitbenchmarker.providers.gcp import util
 
 _DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
 DEFAULT_GCP_REGION = 'us-central1'
@@ -44,7 +49,7 @@ FLAGS = flags.FLAGS
 class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   """Interface to Google Cloud Storage."""
 
-  STORAGE_NAME = providers.GCP
+  STORAGE_NAME = gcp.CLOUD
 
   def PrepareService(self, location):
     self.location = location or DEFAULT_GCP_REGION
@@ -66,9 +71,21 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     if ret_code and raise_on_failure:
       raise errors.Benchmarks.BucketCreationError(stderr)
 
-  def Copy(self, src_url, dst_url):
+    command = ['gsutil', 'label', 'ch']
+    for key, value in util.GetDefaultTags().items():
+      command.extend(['-l', f'{key}:{value}'])
+    command.extend([f'gs://{bucket}'])
+    _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
+    if ret_code and raise_on_failure:
+      raise errors.Benchmarks.BucketCreationError(stderr)
+
+  def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
-    vm_util.IssueCommand(['gsutil', 'cp', src_url, dst_url])
+    cmd = ['gsutil', 'cp']
+    if recursive:
+      cmd += ['-r']
+    cmd += [src_url, dst_url]
+    vm_util.IssueCommand(cmd)
 
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""
@@ -84,10 +101,32 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     """See base class."""
     return 'gsutil cp "%s" "%s"' % (src_url, local_path)
 
-  def List(self, buckets):
+  def List(self, bucket):
     """See base class."""
-    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', buckets])
+    # Full URI is required by gsutil.
+    if not bucket.startswith('gs://'):
+      bucket = 'gs://' + bucket
+    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', bucket])
     return stdout
+
+  def ListTopLevelSubfolders(self, bucket):
+    """Lists the top level folders (not files) in a bucket.
+
+    Each folder is returned as its full uri, eg. "gs://pkbtpch1/customer/", so
+    just the folder name is extracted. When there's more than one, splitting
+    on the newline returns a final blank row, so blank values are skipped.
+
+    Args:
+      bucket: Name of the bucket to list the top level subfolders of.
+
+    Returns:
+      A list of top level subfolder names. Can be empty if there are no folders.
+    """
+    return [
+        obj.split('/')[-2].strip()
+        for obj in self.List(bucket).split('\n')
+        if obj and obj.endswith('/')
+    ]
 
   @vm_util.Retry()
   def DeleteBucket(self, bucket):
@@ -127,6 +166,86 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         '{account}:{access}'.format(account=account, access=access),
         'gs://{}'.format(bucket)])
 
+  @classmethod
+  def AcquireWritePermissionsWindows(cls, vm):
+    """Prepare boto file on a remote Windows instance.
+
+    If the boto file specifies a service key file, copy that service key file to
+    the VM and modify the .boto file on the VM to point to the copied file.
+
+    Args:
+      vm: gce virtual machine object.
+    """
+    boto_src = object_storage_service.FindBotoFile()
+    boto_des = ntpath.join(vm.home_dir, posixpath.basename(boto_src))
+    stdout, _ = vm.RemoteCommand(f'Test-Path {boto_des}')
+    if 'True' in stdout:
+      return
+    with open(boto_src) as f:
+      boto_contents = f.read()
+    match = re.search(r'gs_service_key_file\s*=\s*(.*)', boto_contents)
+    if match:
+      service_key_src = match.group(1)
+      service_key_des = ntpath.join(vm.home_dir,
+                                    posixpath.basename(service_key_src))
+      boto_src = cls._PrepareGcsServiceKey(vm, boto_src, service_key_src,
+                                           service_key_des)
+    vm.PushFile(boto_src, boto_des)
+
+  @classmethod
+  def AcquireWritePermissionsLinux(cls, vm):
+    """Prepare boto file on a remote Linux instance.
+
+    If the boto file specifies a service key file, copy that service key file to
+    the VM and modify the .boto file on the VM to point to the copied file.
+
+    Args:
+      vm: gce virtual machine object.
+    """
+    vm_pwd, _ = vm.RemoteCommand('pwd')
+    home_dir = vm_pwd.strip()
+    boto_src = object_storage_service.FindBotoFile()
+    boto_des = posixpath.join(home_dir, posixpath.basename(boto_src))
+    if vm.TryRemoteCommand(f'test -f {boto_des}'):
+      return
+    with open(boto_src) as f:
+      boto_contents = f.read()
+    match = re.search(r'gs_service_key_file\s*=\s*(.*)', boto_contents)
+    if match:
+      service_key_src = match.group(1)
+      service_key_des = posixpath.join(home_dir,
+                                       posixpath.basename(service_key_src))
+      boto_src = cls._PrepareGcsServiceKey(vm, boto_src, service_key_src,
+                                           service_key_des)
+    vm.PushFile(boto_src, boto_des)
+
+  @classmethod
+  def _PrepareGcsServiceKey(cls, vm, boto_src, service_key_src,
+                            service_key_des):
+    """Copy GS service key file to remote VM and update key path in boto file.
+
+    Args:
+      vm: gce virtual machine object.
+      boto_src: string, the boto file path in local machine.
+      service_key_src: string, the gs service key file in local machine.
+      service_key_des: string, the gs service key file in remote VM.
+
+    Returns:
+      The updated boto file path.
+    """
+    vm.PushFile(service_key_src, service_key_des)
+    key = 'gs_service_key_file'
+    with open(boto_src, 'r') as src_file:
+      boto_path = os.path.join(temp_dir.GetRunDirPath(),
+                               posixpath.basename(boto_src))
+      with open(boto_path, 'w') as des_file:
+        for line in src_file:
+          if line.startswith(f'{key} = '):
+            des_file.write(f'{key} = {service_key_des}\n')
+          else:
+            des_file.write(line)
+    return boto_path
+
   def PrepareVM(self, vm):
     vm.Install('wget')
     # Unfortunately there isn't one URL scheme that works for both
@@ -153,25 +272,10 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     vm.RemoteCommand('mkdir -p .config')
 
     if FLAGS.gcs_client == GCS_CLIENT_BOTO:
-      boto_file = object_storage_service.FindBotoFile()
-      vm.PushFile(boto_file, object_storage_service.DEFAULT_BOTO_LOCATION)
-
-      # If the boto file specifies a service key file, copy that service key
-      # file to the VM and modify the .boto file on the VM to point to the
-      # copied file.
-      with open(boto_file) as f:
-        boto_contents = f.read()
-      match = re.search(r'gs_service_key_file\s*=\s*(.*)', boto_contents)
-      if match:
-        service_key_file = match.group(1)
-        vm.PushFile(service_key_file, _DEFAULT_GCP_SERVICE_KEY_FILE)
-        vm_pwd, _ = vm.RemoteCommand('pwd')
-        vm.RemoteCommand(
-            'sed -i '
-            '-e "s|^gs_service_key_file.*|gs_service_key_file = %s|" %s' %
-            (re.escape(
-                posixpath.join(vm_pwd.strip(), _DEFAULT_GCP_SERVICE_KEY_FILE)),
-             object_storage_service.DEFAULT_BOTO_LOCATION))
+      if vm.BASE_OS_TYPE == os_types.WINDOWS:
+        self.AcquireWritePermissionsWindows(vm)
+      else:
+        self.AcquireWritePermissionsLinux(vm)
       vm.Install('gcs_boto_plugin')
 
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)

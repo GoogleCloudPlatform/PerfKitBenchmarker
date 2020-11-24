@@ -14,10 +14,9 @@
 
 import json
 import logging
-
+from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -38,7 +37,7 @@ def CreateVolume(resource, name):
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['size'] = resource.disk_size
   if FLAGS.openstack_volume_type:
-      vol_cmd.flags['type'] = FLAGS.openstack_volume_type
+    vol_cmd.flags['type'] = FLAGS.openstack_volume_type
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
   return vol_resp

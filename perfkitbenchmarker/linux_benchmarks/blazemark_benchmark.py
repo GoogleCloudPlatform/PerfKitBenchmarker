@@ -15,10 +15,9 @@
 """Run Blazemark benchmark."""
 
 import logging
-
+from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import blazemark
 
 flags.DEFINE_list('blazemark_set', ['all'],

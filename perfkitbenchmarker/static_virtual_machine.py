@@ -30,8 +30,8 @@ import json
 import logging
 import threading
 
+from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
@@ -314,4 +314,9 @@ class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
 
 class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.CentOs7Mixin):
+  pass
+
+
+class Debian9BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.Debian9Mixin):
   pass

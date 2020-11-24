@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing flags applicable across benchmark run on GCP."""
 
-from perfkitbenchmarker import flags
+from absl import flags
 
 # Sentinel value for unspecified platform.
 GCP_MIN_CPU_PLATFORM_NONE = 'none'
@@ -44,6 +44,9 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'gce_network_name', None, 'The name of an already created '
     'network to use instead of creating a new one.')
+flags.DEFINE_string(
+    'gce_subnet_name', None, 'The name of an already created '
+    'subnet to use instead of creating a new one.')
 flags.DEFINE_string(
     'gce_subnet_region', None, 'Region to create subnet in '
     'instead of automatically creating one in every region.')
@@ -82,7 +85,7 @@ flags.DEFINE_string('gcp_node_type', None,
 flags.DEFINE_enum(
     'gcp_min_cpu_platform', None, [
         GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge', 'haswell',
-        'broadwell', 'skylake'
+        'broadwell', 'skylake', 'cascadelake',
     ], 'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
 flags.DEFINE_string(
@@ -130,5 +133,21 @@ flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
                      'rules are added manually, PKB will not know about all of '
                      'them. However, they must be deleted in order to '
                      'successfully delete the PKB-created network.')
-flags.DEFINE_boolean('gcp_retry_on_rate_limited', True,
-                     'Whether to retry commands when rate limited.')
+flags.DEFINE_enum('bq_client_interface', 'CLI',
+                  ['CLI', 'JAVA', 'SIMBA_JDBC_1_2_4_1007'],
+                  'The Runtime Interface used when interacting with BigQuery.')
+flags.DEFINE_string('gcp_preemptible_status_bucket', None,
+                    'The GCS bucket to store the preemptible status when '
+                    'running on GCP.')
+
+
+def _ValidatePreemptFlags(flags_dict):
+  if flags_dict['gce_preemptible_vms']:
+    return bool(flags_dict['gcp_preemptible_status_bucket'])
+  return True
+
+
+flags.register_multi_flags_validator(
+    ['gce_preemptible_vms', 'gcp_preemptible_status_bucket'],
+    _ValidatePreemptFlags, 'When gce_preemptible_vms is specified, '
+    'gcp_preemptible_status_bucket must be specified.')

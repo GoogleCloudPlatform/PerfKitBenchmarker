@@ -16,10 +16,10 @@
 """Module containing scimark2 installation and cleanup functions."""
 
 import posixpath
-from perfkitbenchmarker.linux_packages import INSTALL_DIR
+from perfkitbenchmarker import linux_packages
 
 # Use this directory for all data stored in the VM for this test.
-PATH = '{0}/scimark2'.format(INSTALL_DIR)
+PATH = '{0}/scimark2'.format(linux_packages.INSTALL_DIR)
 
 # Download location for both the C and Java tests.
 BASE_URL = 'https://math.nist.gov/scimark2'
