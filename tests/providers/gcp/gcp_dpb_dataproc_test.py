@@ -65,8 +65,8 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCreateBucket(self, mock_issue):
     cluster = LocalGcpDpbDataproc()
     cluster.CreateBucket(BUCKET_NAME)
-    self.assertEqual(mock_issue.call_count, 1)
-    call_arg_list, _ = mock_issue.call_args
+    self.assertEqual(mock_issue.call_count, 2)
+    call_arg_list, _ = mock_issue.call_args_list[0]
     self.assertListEqual([
         'gsutil', 'mb', '-l',
         GCP_ZONE_US_CENTRAL1_A.rsplit('-', 1)[0], '-c', 'regional',

@@ -28,6 +28,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import gcp
+from perfkitbenchmarker.providers.gcp import util
 
 _DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
 DEFAULT_GCP_REGION = 'us-central1'
@@ -66,6 +67,14 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       command.extend(['-p', FLAGS.project])
     command.extend(['gs://%s' % bucket])
 
+    _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
+    if ret_code and raise_on_failure:
+      raise errors.Benchmarks.BucketCreationError(stderr)
+
+    command = ['gsutil', 'label', 'ch']
+    for key, value in util.GetDefaultTags().items():
+      command.extend(['-l', f'{key}:{value}'])
+    command.extend([f'gs://{bucket}'])
     _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
     if ret_code and raise_on_failure:
       raise errors.Benchmarks.BucketCreationError(stderr)
