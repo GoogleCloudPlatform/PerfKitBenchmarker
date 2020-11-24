@@ -20,7 +20,7 @@ and deleted.
 import copy
 import json
 import os
-from typing import Dict
+from typing import Any, Dict, List, Text
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
@@ -41,6 +41,7 @@ READY_STATUSES = ['available']
 ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = '--automated-snapshot-retention-period=0'
 DEFAULT_DATABASE_NAME = 'dev'
 BOOTSTRAP_DB = 'sample'
+REDSHIFT_JDBC_JAR = 'redshift-jdbc-client-1.0.jar'
 
 
 def AddTags(resource_arn, region):
@@ -82,6 +83,8 @@ def GetRedshiftClientInterface(database: str, user: str,
   """
   if FLAGS.redshift_client_interface == 'CLI':
     return CliClientInterface(database, user, password)
+  if FLAGS.redshift_client_interface == 'JDBC':
+    return JdbcClientInterface(database, user, password)
   raise RuntimeError('Unknown Redshift Client Interface requested.')
 
 
@@ -157,6 +160,116 @@ class CliClientInterface(edw_service.EdwClientInterface):
     details = copy.copy(self.GetMetadata())
     details['job_id'] = performance[query_name]['job_id']
     return float(performance[query_name]['execution_time']), details
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.redshift_client_interface}
+
+
+class JdbcClientInterface(edw_service.EdwClientInterface):
+  """Native JDBC Client Interface class for Redshift.
+
+  https://docs.aws.amazon.com/redshift/latest/mgmt/jdbc20-install.html
+
+  Attributes:
+    host: Host endpoint to be used for interacting with the cluster.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+  """
+
+  def __init__(self, database: str, user: str, password: str):
+    self.database = database
+    # Use the default port.
+    self.port = '5439'
+    self.user = user
+    self.password = password
+
+  def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
+    """Sets any attributes that were unknown during initialization."""
+    super(JdbcClientInterface, self).SetProvisionedAttributes(bm_spec)
+    endpoint = bm_spec.edw_service.endpoint
+    self.host = f'jdbc:redshift://{endpoint}:{self.port}/{self.database}'
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the redshift tool dependencies.
+
+    Args:
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedPackageData(package_name,
+                                                    [REDSHIFT_JDBC_JAR], '')
+
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute.
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = ('java -cp {} com.google.cloud.performance.edw.Single '
+                     '--endpoint {} --query_file {}').format(
+                         REDSHIFT_JDBC_JAR, self.host, query_name)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    if 'failure_reason' in performance:
+      details.update({'failure_reason': performance['failure_reason']})
+    else:
+      details.update(performance['details'])
+    return performance['query_wall_time_in_secs'], details
+
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> Dict[str, Any]:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+
+    Args:
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
+      queries: List of strings (names) of queries to execute.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    cmd = ('java -cp {} com.google.cloud.performance.edw.Simultaneous '
+           '--endpoint {} --submission_interval {} --query_files {}'.format(
+               REDSHIFT_JDBC_JAR, self.host, submission_interval,
+               ' '.join(queries)))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+    """Executes a throughput test and returns performance details.
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    cmd = ('java -cp {} com.google.cloud.performance.edw.Throughput '
+           '--endpoint {} --query_streams {}'.format(
+               REDSHIFT_JDBC_JAR, self.host,
+               ' '.join([','.join(stream) for stream in concurrency_streams])))
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
 
   def GetMetadata(self) -> Dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
