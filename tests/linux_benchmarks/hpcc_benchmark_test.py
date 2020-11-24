@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+from typing import Optional
 import unittest
 from absl import flags
 from absl.testing import parameterized
@@ -24,7 +25,6 @@ import mock
 
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
 from tests import pkb_common_test_case
-import six
 
 FLAGS = flags.FLAGS
 
@@ -40,13 +40,14 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def assertContainsSubDict(self, super_dict, sub_dict):
     """Asserts that every item in sub_dict is in super_dict."""
-    for key, value in six.iteritems(sub_dict):
+    for key, value in sub_dict.items():
       self.assertEqual(super_dict[key], value)
 
   def testParseHpccValues(self):
     """Tests parsing the HPCC values."""
     benchmark_spec = mock.MagicMock()
-    samples = hpcc_benchmark.ParseOutput(self.contents, benchmark_spec)
+    samples = hpcc_benchmark.ParseOutput(self.contents)
+    hpcc_benchmark._AddCommonMetadata(samples, benchmark_spec)
     self.assertEqual(46, len(samples))
 
     # Verify metric values and units are parsed correctly.
@@ -105,10 +106,11 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testParseHpccMetadata(self):
     """Tests parsing the HPCC metadata."""
     benchmark_spec = mock.MagicMock()
-    samples = hpcc_benchmark.ParseOutput(self.contents, benchmark_spec)
+    samples = hpcc_benchmark.ParseOutput(self.contents)
+    hpcc_benchmark._AddCommonMetadata(samples, benchmark_spec)
     self.assertEqual(46, len(samples))
     results = {metric: metadata for metric, _, _, metadata, _ in samples}
-    for metadata in six.itervalues(results):
+    for metadata in results.values():
       self.assertEqual(metadata['hpcc_math_library'], 'openblas')
       self.assertEqual(metadata['hpcc_version'], '1.5.0')
 
@@ -163,9 +165,11 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('nomem_set_large', 2, 32, 74, None, 124416, 8, 8),
       ('mem_set', 2, 32, 74, 36000, 86784, 8, 8),
       ('nomem_set', 1, 48, 48, None, 70656, 6, 8))
-  def testCreateHpccDimensions(self, num_vms, num_vcpus, memory_size_gb,
-                               flag_memory_size_mb, problem_size, num_rows,
-                               num_columns):
+  def testCreateHpccDimensions(self, num_vms: int, num_vcpus: int,
+                               memory_size_gb: int,
+                               flag_memory_size_mb: Optional[int],
+                               problem_size: int, num_rows: int,
+                               num_columns: int) -> None:
     if flag_memory_size_mb:
       FLAGS.memory_size_mb = flag_memory_size_mb
     expected = hpcc_benchmark.HpccDimensions(
