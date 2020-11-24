@@ -517,6 +517,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     cmd.flags['network-tier'] = self.gce_network_tier.upper()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
 
