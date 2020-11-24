@@ -127,12 +127,6 @@ _EFA_PARAMS = {
 # Location of EFA installer
 _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
             'aws-efa-installer-{version}.tar.gz')
-# Command to install Libfabric and OpenMPI
-_EFA_INSTALL_CMD = ';'.join([
-    'curl -O {url}', 'tar -xvzf {tarfile}', 'cd aws-efa-installer',
-    'sudo ./efa_installer.sh -y || exit 1', 'cd ..',
-    'rm -rf {tarfile} aws-efa-installer'
-])
 
 
 class AwsTransitionalVmRetryableError(Exception):
@@ -651,10 +645,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
     if FLAGS.aws_efa and FLAGS.aws_efa_version:
+      # Download EFA then call InstallEfa method so that subclass can override
       self.InstallPackages('curl')
       url = _EFA_URL.format(version=FLAGS.aws_efa_version)
-      self.RemoteCommand(
-          _EFA_INSTALL_CMD.format(url=url, tarfile=posixpath.basename(url)))
+      tarfile = posixpath.basename(url)
+      self.RemoteCommand(f'curl -O {url}; tar -xvzf {tarfile}')
+      self._InstallEfa()
+      # Run test program to confirm EFA working
+      self.RemoteCommand('cd aws-efa-installer; ./efa_test.sh')
+
+  def _InstallEfa(self):
+    """Installs AWS EFA packages.
+
+    See https://aws.amazon.com/hpc/efa/
+    """
+    self.RemoteCommand('cd aws-efa-installer; sudo ./efa_installer.sh -y')
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -1131,6 +1136,15 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
   IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
   DEFAULT_USER_NAME = 'centos'
+
+  def _InstallEfa(self):
+    logging.info('Upgrading Centos7 kernel, installing kernel headers and '
+                 'rebooting before installing EFA.')
+    self.RemoteCommand('sudo yum upgrade -y kernel')
+    self.InstallPackages('kernel-devel')
+    self.Reboot()
+    self.WaitForBootCompletion()
+    super(CentOs7BasedAwsVirtualMachine, self)._InstallEfa()
 
 
 class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,

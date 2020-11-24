@@ -260,12 +260,16 @@ class TestAwsVirtualMachine(pkb_common_test_case.TestOsMixin,
   pass
 
 
+def TestVmSpec():
+  return aws_virtual_machine.AwsVmSpec(
+      'test_vm_spec.AWS',
+      zone='us-east-1a',
+      machine_type='c3.large',
+      spot_price=123.45)
+
+
 def CreateTestAwsVm():
-  vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
-                                          zone='us-east-1a',
-                                          machine_type='c3.large',
-                                          spot_price=123.45)
-  return TestAwsVirtualMachine(vm_spec=vm_spec)
+  return TestAwsVirtualMachine(vm_spec=TestVmSpec())
 
 
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -505,6 +509,30 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertRegex(aws_cmd, 'run-instances .*--' + should_find)
     self.assertNotRegex(aws_cmd, 'run-instances .*--' + should_not_find)
 
+  def testSkipEfaInstall(self):
+    # when aws_efa_version is blanked out do not install EFA
+    FLAGS.aws_efa = True
+    FLAGS.aws_efa_version = ''
+    vm = InitCentosVm()
+    vm._InstallEfa = mock.Mock()
+    vm._PostCreate()
+    vm._InstallEfa.assert_not_called()
+
+  def testInstallEfaCentos(self):
+    # Confirms vm._PostCreate() calls for EFA creation
+    FLAGS.aws_efa = True
+    vm = InitCentosVm()
+    vm._PostCreate()
+    aws_cmd = '; '.join([
+        cmd[0][0] for cmd in vm.RemoteHostCommandWithReturnCode.call_args_list
+    ])
+    self.assertRegex(
+        aws_cmd, '.*'.join([
+            'curl -O https://s3-us-west-2', 'yum upgrade -y kernel',
+            'yum install -y kernel-devel', 'reboot', 'efa_installer.sh -y',
+            './efa_test.sh'
+        ]))
+
 
 def CreateVm():
   """Returns the AWS run-instances command line."""
@@ -517,6 +545,24 @@ def CreateVm():
   vm.network.Create()
   vm._Create()
   return ' '.join(vm_util.IssueCommand.call_args[0][0])
+
+
+def InitCentosVm():
+  aws_response = {
+      'Reservations': [{
+          'Instances': [{
+              'PublicIpAddress': '10.0.0.1',
+              'PrivateIpAddress': '10.0.0.2',
+              'SecurityGroups': [{
+                  'GroupId': None
+              }]
+          }]
+      }]
+  }
+  util.IssueRetryableCommand.return_value = json.dumps(aws_response), ''
+  vm = aws_virtual_machine.CentOs7BasedAwsVirtualMachine(TestVmSpec())
+  vm.RemoteHostCommandWithReturnCode = mock.Mock(return_value=('', '', 0))  # pylint: disable=invalid-name
+  return vm
 
 
 class AwsIsRegionTestCase(pkb_common_test_case.PkbCommonTestCase):
