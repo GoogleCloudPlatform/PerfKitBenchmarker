@@ -19,7 +19,7 @@ Clusters can be paused and unpaused.
 import copy
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Text
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
@@ -123,7 +123,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
             os.path.join(service_specific_dir,
                          'provider_specific_script_driver.py')))
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
@@ -197,7 +197,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(package_name,
                                                     [SYNAPSE_JDBC_JAR], '')
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:

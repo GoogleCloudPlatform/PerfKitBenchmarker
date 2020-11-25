@@ -15,7 +15,7 @@
 
 import copy
 import json
-from typing import Any, Dict, List
+from typing import Dict, List, Text
 from absl import flags
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.providers import aws
@@ -76,7 +76,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(
         package_name, ['snowflake-jdbc-client-2.0.jar'], '')
 
-  def ExecuteQuery(self, query_name: str) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
@@ -99,7 +99,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     return json.loads(stdout)['query_wall_time_in_secs'], details
 
   def ExecuteSimultaneous(self, submission_interval: int,
-                          queries: List[str]) -> Dict[str, Any]:
+                          queries: List[str]) -> str:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -121,9 +121,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
-  def ExecuteThroughput(
-      self,
-      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
     """Executes a throughput test and returns performance details.
 
     Args:

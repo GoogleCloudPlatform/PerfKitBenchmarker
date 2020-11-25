@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Text
+from typing import Dict, List, Text
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -270,7 +270,7 @@ class JavaClientInterface(GenericClientInterface):
     return json.loads(stdout)['query_wall_time_in_secs'], details
 
   def ExecuteSimultaneous(self, submission_interval: int,
-                          queries: List[str]) -> Dict[str, Any]:
+                          queries: List[str]) -> str:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -295,9 +295,7 @@ class JavaClientInterface(GenericClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
-  def ExecuteThroughput(
-      self,
-      concurrency_streams: List[List[str]]) -> (Dict[str, Any], Dict[str, str]):
+  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
     """Executes a throughput test and returns performance details.
 
     Args:

@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Dict
+from typing import Dict, Text
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -122,7 +122,7 @@ class JavaClientInterface(GenericClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(
         package_name, ['athena-java-client-1.0.jar'], '')
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
@@ -191,7 +191,7 @@ class CliClientInterface(GenericClientInterface):
             os.path.join(service_specific_dir,
                          'provider_specific_script_driver.py')))
 
-  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
 
     Args:
