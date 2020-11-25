@@ -192,28 +192,10 @@ class GkeCluster(container_service.KubernetesCluster):
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
-    self._AddTags()
-
     if self.vm_config.gpu_count:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
       kubernetes_helper.CreateFromFile(
           data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))
-
-  def _AddTags(self):
-    """Tags all VMs in the cluster."""
-    vms_in_cluster = []
-    for instance_group in self._GetInstanceGroups():
-      vms_in_cluster.extend(self._GetInstancesFromInstanceGroup(instance_group))
-
-    for vm_name in vms_in_cluster:
-      cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
-                               vm_name)
-      cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
-      cmd.Issue()
-
-      cmd = util.GcloudCommand(self, 'compute', 'disks', 'add-labels', vm_name)
-      cmd.flags['labels'] = util.MakeFormattedDefaultTags()
-      cmd.Issue()
 
   def _GetInstanceGroups(self):
     cmd = util.GcloudCommand(self, 'container', 'node-pools', 'list')

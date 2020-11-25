@@ -172,9 +172,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
         cluster._Create()
       self.assertEqual(issue_command.call_count, 1)
 
-  @mock.patch.object(
-      google_kubernetes_engine.GkeCluster, '_AddTags', return_value=None)
-  def testPostCreate(self, _):
+  def testPostCreate(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -356,9 +354,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
                     command_string)
 
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
-  @mock.patch.object(
-      google_kubernetes_engine.GkeCluster, '_AddTags', return_value=None)
-  def testPostCreate(self, _, create_from_file_patch):
+  def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
