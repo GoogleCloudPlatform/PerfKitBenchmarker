@@ -83,6 +83,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
     cmd.flags['redis-version'] = self.redis_version
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.Issue(timeout=COMMAND_TIMEOUT)
 
   def _IsReady(self):
