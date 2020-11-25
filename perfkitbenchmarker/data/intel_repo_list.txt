@@ -1,0 +1,6 @@
+deb https://apt.repos.intel.com/intelpython binary/
+deb https://apt.repos.intel.com/mkl all main
+deb https://apt.repos.intel.com/ipp all main
+deb https://apt.repos.intel.com/tbb all main
+deb https://apt.repos.intel.com/daal all main
+deb https://apt.repos.intel.com/mpi all main

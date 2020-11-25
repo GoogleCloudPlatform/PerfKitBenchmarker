@@ -14,6 +14,7 @@
 -   Add ycsb_skip_run_stage argument.
 -   Move PKB static website files from gh-pages branch to master branch.
 -   Add UDP benchmarking to iPerf.
+-   Add ability to use Intel package repos.
 
 ### Enhancements:
 
