@@ -19,7 +19,7 @@ Clusters can be paused and unpaused.
 import copy
 import json
 import os
-from typing import Dict
+from typing import Dict, List
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
@@ -33,6 +33,7 @@ FLAGS = flags.FLAGS
 VALID_EXIST_STATUSES = ['Resuming', 'Online']
 READY_STATUSES = ['Online']
 PAUSING_STATUSES = ['Pausing']
+SYNAPSE_JDBC_JAR = 'synapse-jdbc-client-1.0.jar'
 
 
 def GetSqlDataWarehouseClientInterface(
@@ -57,6 +58,9 @@ def GetSqlDataWarehouseClientInterface(
   if FLAGS.sqldatawarehouse_client_interface == 'CLI':
     return CliClientInterface(server_name, database, user, password,
                               resource_group)
+  if FLAGS.sqldatawarehouse_client_interface == 'JDBC':
+    return JdbcClientInterface(server_name, database, user, password,
+                               resource_group)
   raise RuntimeError('Unknown SqlDataWarehouse Client Interface requested.')
 
 
@@ -142,6 +146,125 @@ class CliClientInterface(edw_service.EdwClientInterface):
     details = copy.copy(self.GetMetadata())
     details['job_id'] = performance[query_name]['job_id']
     return float(performance[query_name]['execution_time']), details
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.sqldatawarehouse_client_interface}
+
+
+class JdbcClientInterface(edw_service.EdwClientInterface):
+  """JDBC Client Interface class for Azure SqlDataWarehouse.
+
+  Attributes:
+    server_name: Name of the SqlDataWarehouse server to use.
+    database: Name of the database to run queries against.
+    user: Redshift username for authentication.
+    password: Redshift password for authentication.
+    resource_group: Azure resource group used to whitelist the VM's IP address.
+  """
+
+  def __init__(self, server_name: str, database: str, user: str, password: str,
+               resource_group: str):
+    self.server_name = server_name
+    self.database = database
+    self.user = user
+    self.password = password
+    self.resource_group = resource_group
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query.
+
+    Installs the sql server tool dependencies.
+
+    Args:
+      package_name: String name of the package defining the preprovisioned data
+        (certificates, etc.) to extract and use during client vm preparation.
+    """
+    self.client_vm.Install('openjdk')
+    self.client_vm.Install('mssql_tools')
+    self.client_vm.Install('azure_cli')
+    self.whitelist_ip = self.client_vm.ip_address
+
+    cmd = [
+        azure.AZURE_PATH, 'sql', 'server', 'firewall-rule', 'create', '--name',
+        self.whitelist_ip, '--resource-group', self.resource_group, '--server',
+        self.server_name, '--end-ip-address', self.whitelist_ip,
+        '--start-ip-address', self.whitelist_ip
+    ]
+    vm_util.IssueCommand(cmd)
+
+    # Push the executable jar to the working directory on client vm
+    self.client_vm.InstallPreprovisionedPackageData(package_name,
+                                                    [SYNAPSE_JDBC_JAR], '')
+
+  def ExecuteQuery(self, query_name) -> (float, Dict[str, str]):
+    """Executes a query and returns performance details.
+
+    Args:
+      query_name: String name of the query to execute
+
+    Returns:
+      A tuple of (execution_time, execution details)
+      execution_time: A Float variable set to the query's completion time in
+        secs. -1.0 is used as a sentinel value implying the query failed. For a
+        successful query the value is expected to be positive.
+      performance_details: A dictionary of query execution attributes eg. job_id
+    """
+    query_command = (f'java -cp {SYNAPSE_JDBC_JAR} '
+                     f'com.google.cloud.performance.edw.Single '
+                     f'--server {self.server_name} --database {self.database} '
+                     f'--query_timeout {FLAGS.query_timeout} '
+                     f'--query_file {query_name}')
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    performance = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    if 'failure_reason' in performance:
+      details.update({'failure_reason': performance['failure_reason']})
+    else:
+      details.update(performance['details'])
+    return performance['query_wall_time_in_secs'], details
+
+  def ExecuteSimultaneous(self, submission_interval: int,
+                          queries: List[str]) -> str:
+    """Executes queries simultaneously on client and return performance details.
+
+    Simultaneous app expects queries as white space separated query file names.
+
+    Args:
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
+      queries: List of strings (names) of queries to execute.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    query_list = ' '.join(queries)
+    cmd = (f'java -cp {SYNAPSE_JDBC_JAR} '
+           f'com.google.cloud.performance.edw.Simultaneous '
+           f'--server {self.server_name} --database {self.database} '
+           f'--submission_interval {submission_interval} --query_timeout '
+           f'{FLAGS.query_timeout} --query_files {query_list}')
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
+    """Executes a throughput test and returns performance details.
+
+    Args:
+      concurrency_streams: List of streams to execute simultaneously, each of
+        which is a list of string names of queries.
+
+    Returns:
+      A serialized dictionary of execution details.
+    """
+    query_list = ' '.join([','.join(stream) for stream in concurrency_streams])
+    cmd = (
+        f'java -cp {SYNAPSE_JDBC_JAR} '
+        f'com.google.cloud.performance.edw.Throughput '
+        f'--server {self.server_name} --database {self.database} '
+        f'--query_timeout {FLAGS.query_timeout} --query_streams {query_list}')
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
 
   def GetMetadata(self) -> Dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
