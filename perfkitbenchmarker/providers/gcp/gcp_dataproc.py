@@ -128,6 +128,7 @@ class GcpDataproc(spark_service.BaseSparkService):
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
 
   def _Delete(self):

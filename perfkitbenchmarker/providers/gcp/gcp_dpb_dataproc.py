@@ -149,6 +149,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     _, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
