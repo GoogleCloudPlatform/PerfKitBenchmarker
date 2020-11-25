@@ -470,6 +470,12 @@ class Bigquery(edw_service.EdwService):
     cmd.append(project_dataset)
     vm_util.IssueCommand(cmd)
 
+    cmd = ['bq', 'update']
+    for key, value in gcp_util.GetDefaultTags().items():
+      cmd.extend(['--set_label', f'{key}:{value}'])
+    cmd.append(project_dataset)
+    vm_util.IssueCommand(cmd)
+
   def LoadDataset(self,
                   source_bucket,
                   tables,
