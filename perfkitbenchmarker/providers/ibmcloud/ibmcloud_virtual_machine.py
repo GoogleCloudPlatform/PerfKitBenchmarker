@@ -216,9 +216,10 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not ibm.IbmAPICommand.ibmcloud_auth_token or \
     time.time() - ibm.IbmAPICommand.ibmcloud_auth_token_time > FLAGS.ibmcloud_timeout:
       self._CheckLogin()
+    self._StopInstance()
     if self.fip_address:
       self._DeleteFip()
-    self._StopInstance()
+    time.sleep(10)
     self._DeleteInstance()
     if not FLAGS.ibmcloud_resources_keep:
       self.network.Delete()

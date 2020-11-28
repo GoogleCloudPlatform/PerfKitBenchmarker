@@ -288,13 +288,13 @@ class BaseManager:
     self._g = genesis
 
   def GetUri(self, item):
-    return '/' + '%ss' % self._type + "/" + item
+    return '%ss' % self._type + "/" + item
 
   def GetUris(self, item):
-    return '/' + '%s' % self._type + "/" + item
+    return '%s' % self._type + "/" + item
 
   def GetProfileUri(self):
-    return '/' + '%s' % self._type + "/profiles"
+    return '%s' % self._type + "/profiles"
 
   def Create(self, **kwargs):
     create_method = getattr(self._g, 'create_%s' % self._type)
