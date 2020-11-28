@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,10 @@ from datetime import datetime
 from itertools import cycle
 from io import IOBase
 from urllib.parse import urlparse
+import logging
 import requests
+
+from perfkitbenchmarker import vm_util
 
 IMAGE_UPLOAD_ATTEMPTS = 5
 SPEC_PATHS = [
@@ -94,37 +97,38 @@ class IbmCloud:
     if not self._token or self._force or self._token_time < (time.time() - 3000):
       self.SetToken()
 
+  @vm_util.Retry(max_retries=3, timeout=vm_util.DEFAULT_TIMEOUT)
   def GetToken(self):
-    """Get a user token """
+    """Get a user token."""
     token = None
     _req_data = {
-        'grant_type': 'urn:ibm:params:oauth:grant-type:apikey',
-        'response_type': 'cloud_iam',
-        'apikey': self._apikey
+      'grant_type': 'urn:ibm:params:oauth:grant-type:apikey',
+      'response_type': 'cloud_iam',
+      'apikey': self._apikey
     }
     count = 1
     while token is None:
       if not self._silent:
-        print('Sending a POST request to get a token: %s', self._endpoint)
+        logging.info('Sending a POST request to get a token: %s', self._endpoint)
       resp = requests.request('POST', self._endpoint, data=_req_data, headers=None,
                               timeout=(HTTP_TIMEOUT_CONNECT, HTTP_TIMEOUT))
       if resp is not None:
         if self._verbose:
-          print('DEBUG: response=%s', str(resp))
+          logging.info('response=%s', str(resp))
           if resp.text:
-            print('DEBUG: response text=%s', resp.text)
+            logging.info('response text=%s', resp.text)
         if resp.status_code >= 200 and resp.status_code <= 299:
           resp = json.loads(resp.text)
           if 'access_token' in resp:
             token = resp['access_token']
             if self._verbose:
-              print('token: %s', token)
+              logging.info('token: %s', token)
             break
         else:
-          print('ERROR, POST:', self._endpoint, ' response status_code: ',
-                resp.status_code, ' resp: ', str(resp))
+          logging.error('POST: %s, response status_code: %s, resp: %s',
+                        self._endpoint, resp.status_code, str(resp))
       else:
-        print('Request POST: %s, no response returned', self._endpoint)
+        logging.info('Request POST: %s, no response returned', self._endpoint)
       count += 1
       if count > 3:
         break
@@ -132,96 +136,105 @@ class IbmCloud:
     return token
 
   def Token(self):
+    """Returns the token."""
     return self._token
 
   def SetToken(self):
+    """Gets a new token."""
     try:
       self._token = self.GetToken()
       self._token_time = time.time()
     except Exception as err:
       raise IbmCloudError('Authorization failed: %s' % err)
 
-  def AccountReq(self, method, path, data=None, headers=None, account=None, session=None):
-    full_path = '/' + self._version + '/%s' % (path)
-    return self.Request(method, full_path, data, headers, session=session)
-
   def Request(self, method, path, data=None, headers=None, timeout=None, session=None):
-      if 'limit' in path:
-        path += '&' + self._generation
+    """Constructs base rest api calls to run against IBM Cloud regional api server.
+    Args:
+      method: one of GET, POST, PUT, PATCH or DELETE.
+      path: rest api uri.
+      data: body data.
+      headers: header data if any.
+      timeout: timeout for the request
+      session: session object if available.
+    """
+    path = '/' + self._version + '/%s' % (path)
+    if 'limit' in path:
+      path += '&' + self._generation
+    else:
+      path += '?' + self._generation
+
+    h = {'Authorization': 'Bearer ' + self._token}
+    if self._trace:
+      h['trace'] = 'on'
+    if data is not None and not isinstance(data, IOBase):
+      h['Content-Type'] = 'application/json'
+      data = json.dumps(data)
+    if headers:
+      h.update(headers)
+    if self._verbose:
+      h['trace'] = 'on'
+      curl = '>>> curl -X %s' % method
+      for k, v in h.items():
+        curl += ' -H "%s: %s"' % (k, v)
+      if data:
+        curl += ' -d ' + '"' + str(data).replace('"', '\\"') + '"'
+      curl += ' %s://%s%s' % (self._scheme, self._netloc, path)
+      logging.info(curl)
+      if data:
+        logging.info('==== DATA ====')
+        logging.info(data)
+
+    res = None
+    response_code = None
+    response_text = None
+    request_id = None
+    try:
+      data_timeout = timeout if timeout is not None else HTTP_TIMEOUT
+      if session is None:
+          res = requests.request(method, self._url + path, data=data, headers=h, timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))  # verify=False
       else:
-        path += '?' + self._generation
-
-      h = {'Authorization': 'Bearer ' + self._token}
-      if self._trace:
-        h['trace'] = 'on'
-      if data is not None and not isinstance(data, IOBase):
-        h['Content-Type'] = 'application/json'
-        data = json.dumps(data)
-      if headers:
-        h.update(headers)
-      if self._verbose:
-        h['trace'] = 'on'
-        curl = '>>> curl -X %s' % method
-        for k, v in h.items():
-          curl += ' -H "%s: %s"' % (k, v)
-        if data:
-          curl += ' -d ' + '"' + str(data).replace('"', '\\"') + '"'
-        curl += ' %s://%s%s' % (self._scheme, self._netloc, path)
-        print(curl)
-        if data:
-          print('==== DATA ====')
-          print(data)
-
-      res = None
-      response_code = None
-      response_text = None
-      request_id = None
-      try:
-        data_timeout = timeout if timeout is not None else HTTP_TIMEOUT
-        if session is None:
-            res = requests.request(method, self._url + path, data=data, headers=h, timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))  # verify=False
-        else:
-            res = session.request(method, self._url + path, data=data, headers=h, timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))
-        if res is not None:
-          request_id = res.headers['X-Request-Id'] if 'X-Request-Id' in res.headers else None
-          if self._verbose:
-            print('Request ', method, ': ', path, ' request id=', request_id)
-            print('DEBUG: response=', str(res))
-            if res.text:
-              print('DEBUG: response text=', res.text)
-          response_code = res.status_code
-          if res.status_code < 200 or res.status_code > 299:
-            print('ERROR: Request ', method, ': ', path, ' response status_code: ',
-                  res.status_code, ' res:', str(res))
-            try:
-              if 'errors' in res.text:
-                restext = json.loads(res.text)
-                print('    *** {} -- {}\n\n'.format(restext['errors'][0]['code'],
-                                                    restext['errors'][0]['message']))
-            except Exception:
-              pass
-            response_text = str(res.text)
-        else:
-          print('Request ', method, ': ', path, ' no response returned')
-      except requests.exceptions.RequestException as e:
-        print('RequestException: {}'.format(e))
-
-      if res and res.status_code != 204:
-        try:
-          res = json.loads(res.text)
-        except:
-          raise IbmCloudError('Request %s failed: %s' % (path, str(res)))
-
+          res = session.request(method, self._url + path, data=data, headers=h, timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))
+      if res is not None:
+        request_id = res.headers['X-Request-Id'] if 'X-Request-Id' in res.headers else None
         if self._verbose:
-          print('==== RESPONSE ====')
-          print(json.dumps(str(res), indent=2))
-
-      if self._vm_creator:
-        return res, response_code, response_text, request_id
+          logging.info('Request %s:, %s, request id: %s ', method, path, request_id)
+          logging.info('response=%s', str(res))
+          if res.text:
+            logging.info('response text=%s', res.text)
+        response_code = res.status_code
+        if res.status_code < 200 or res.status_code > 299:
+          logging.error('Request %s:, %s, response status_code: %s, res: %s',
+                        method, path, res.status_code, str(res))
+          try:
+            if 'errors' in res.text:
+              restext = json.loads(res.text)
+              logging.info('    *** {} -- {}\n\n'.format(restext['errors'][0]['code'],
+                                                  restext['errors'][0]['message']))
+          except Exception:
+            pass
+          response_text = str(res.text)
       else:
-        return res
+        logging.info('Request %s: %s, no response returned', method, path)
+    except requests.exceptions.RequestException as e:
+      logging.error('RequestException: {}'.format(e))
+
+    if res and res.status_code != 204:
+      try:
+        res = json.loads(res.text)
+      except:
+        raise IbmCloudError('Request %s failed: %s' % (path, str(res)))
+
+      if self._verbose:
+        logging.info('==== RESPONSE ====')
+        logging.info(json.dumps(str(res), indent=2))
+
+    if self._vm_creator:
+      return res, response_code, response_text, request_id
+    else:
+      return res
 
   def __getattr__(self, name):
+    """Handles non standard action method names with underscores."""
     if '_' not in name:
       raise AttributeError(name)
 
@@ -243,7 +256,7 @@ class IbmCloud:
 
       def create(*args, **kwargs):
         path = '/'.join(roundrobin(paths, args[:-1]))
-        return self.AccountReq('POST', path, args[-1], **kwargs)
+        return self.Request('POST', path, args[-1], **kwargs)
 
       return create
 
@@ -251,7 +264,7 @@ class IbmCloud:
 
       def show(*args, **kwargs):
         path = '/'.join(roundrobin(paths, args))
-        return self.AccountReq('GET', path, **kwargs)
+        return self.Request('GET', path, **kwargs)
 
       return show
 
@@ -259,7 +272,7 @@ class IbmCloud:
 
       def delete(*args, **kwargs):
         path = '/'.join(roundrobin(paths, args))
-        return self.AccountReq('DELETE', path, **kwargs)
+        return self.Request('DELETE', path, **kwargs)
 
       return delete
 
@@ -275,13 +288,13 @@ class BaseManager:
     self._g = genesis
 
   def GetUri(self, item):
-    return '/' + self._g._version + '/' + '%ss' % self._type + "/" + item
+    return '/' + '%ss' % self._type + "/" + item
 
   def GetUris(self, item):
-    return '/' + self._g._version + '/' + '%s' % self._type + "/" + item
+    return '/' + '%s' % self._type + "/" + item
 
   def GetProfileUri(self):
-    return '/' + self._g._version + '/' + '%s' % self._type + "/profiles"
+    return '/' + '%s' % self._type + "/profiles"
 
   def Create(self, **kwargs):
     create_method = getattr(self._g, 'create_%s' % self._type)
@@ -307,18 +320,34 @@ class BaseManager:
 
 
 class InstanceManager(BaseManager):
-  """Handles requests on instances"""
+  """Handles requests on instances."""
 
   _type = 'instance'
 
   def Create(self, name, imageid, profile, vpcid, zone=None, key=None,
              subnet=None, networks=None, resource_group=None,
              iops=None, capacity=None, user_data=None, session=None, **kwargs):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the vm.
+         imageid: image id to use.
+         profile: machine_type.
+         vpcid: vpc id.
+         zone: zone name.
+         key: regional ssh key id.
+         subnet: subnet id.
+         networks: optional. additional subnet ids.
+         resource_group: optional.
+         iops: iops on the boot volume.
+         capacity: boot volume size.
+         user_data: user data for windows.
+         session: session id if used.
+    """
     _req_data = {
-        "name": name,
-        "image": {"id": imageid},
-        "vpc": {"id": vpcid},
-        "profile": {"name": profile}
+      "name": name,
+      "image": {"id": imageid},
+      "vpc": {"id": vpcid},
+      "profile": {"name": profile}
     }
     if zone: _req_data['zone'] = {"name": zone}
     if key: _req_data['keys'] = [{"id": key}]
@@ -332,8 +361,7 @@ class InstanceManager(BaseManager):
       networkids = [str(item) for item in networks.split(',')]
       for subnet in networkids:
         _req_data['network_interfaces'].append(
-          {"subnet": {"id": subnet}}
-          )
+          {"subnet": {"id": subnet}})
 
     bootvol_attr = {}  # attributes for the boot volume
     keycrn = kwargs.get('encryption_key', None)
@@ -350,8 +378,7 @@ class InstanceManager(BaseManager):
     data_volume = kwargs.get('external_data_volume', None)
     if data_volume:
       _req_data['volume_attachments'] = [{
-          "volume": {"id": data_volume}}
-      ]
+        "volume": {"id": data_volume}}]
     if user_data:
       _req_data['user_data'] = user_data
 
@@ -361,46 +388,55 @@ class InstanceManager(BaseManager):
     return instance
 
   def Start(self, instance):
+    """Send a vm start request."""
     inst_uri = self.GetUri(instance) + '/actions'
     return self._g.Request('POST', inst_uri, {"type": "start"})
 
   def Show(self, instance):
+    """Send a vm get request."""
     inst_uri = self.GetUri(instance)
     return self._g.Request('GET', inst_uri)
 
   def ShowPolling(self, instance, timeout_polling=HTTP_TIMEOUT_CONNECT, session=None):
+    """Send a vm get request."""
     inst_uri = self.GetUri(instance)
     return self._g.Request('GET', inst_uri, timeout=timeout_polling, session=session)
 
   def ShowInitialization(self, instance):
+    """Send a vm get initialization request."""
     inst_uri = self.GetUri(instance) + '/initialization'
     return self._g.Request('GET', inst_uri)
 
   def Delete(self, instance):
+    """Send a vm delete request."""
     inst_uri = self.GetUri(instance)
     return self._g.Request('DELETE', inst_uri)
 
   def Stop(self, instance, force=False):
+    """Send a vm stop request."""
     inst_uri = self.GetUri(instance) + '/actions'
     _req_data = {
-        'type': 'stop',
-        'force': force
+      'type': 'stop',
+      'force': force
     }
     return self._g.Request('POST', '%s' % inst_uri, _req_data)
 
   def Reboot(self, instance, force=False):
+    """Send a vm reboot request."""
     inst_uri = self.GetUri(instance) + '/actions'
     _req_data = {
-        'type': 'reboot',
-        'force': force
+      'type': 'reboot',
+      'force': force
     }
     return self._g.Request('POST', inst_uri, _req_data)
 
   def ShowVnic(self, instance, vnicid):
+    """Send a vm vnic get request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces/' + vnicid
     return self._g.Request('GET', inst_uri)
 
   def CreateVnic(self, instance, name, subnet):
+    """Send a vm vnic create request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces'
     return self._g.Request('POST', inst_uri,
                            {
@@ -410,14 +446,17 @@ class InstanceManager(BaseManager):
                           )
 
   def ListVnics(self, instance):
+    """Send a vm vnic list request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces'
     return self._g.Request('GET', inst_uri)
 
   def DeleteVnic(self, instance, vnicid):
+    """Send a vm vnic delete request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces/' + vnicid
     return self._g.Request('DELETE', inst_uri)
 
   def CreateVolume(self, instance, name, volume, delete):
+    """Send a volume create request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments'
     return self._g.Request('POST', '%s' % inst_uri,
                            {"delete_volume_on_instance_delete": delete,
@@ -427,21 +466,26 @@ class InstanceManager(BaseManager):
                           )
 
   def ListVolumes(self, instance):
+    """Send a volume list request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments'
     return self._g.Request('GET', inst_uri)
 
   def ShowVolume(self, instance, volume_attachment):
+    """Send a volume get request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments/' + volume_attachment
     return self._g.Request('GET', inst_uri)
 
   def DeleteVolume(self, instance, volume_attachment):
+    """Send a volume delete request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments/' + volume_attachment
     return self._g.Request('DELETE', inst_uri)
 
   def ListProfiles(self):
+    """Send a vm profiles list request."""
     return self._g.Request('GET', '%s' % self.GetProfileUri())
 
   def List(self, next=None, session=None):
+    """Send a vm list request."""
     inst_uri = '/' + self._g._version + '/instances?limit=100'
     if next:
       inst_uri += '&start=' + next
@@ -454,10 +498,20 @@ class VolumeManager(BaseManager):
   _type = 'volume'
 
   def Create(self, zone, **kwargs):
+    """Construct and send a vm create request.
+       Args:
+         zone: zone name.
+         name: volume name.
+         profile: volume profile.
+         capacity: boot volume size.
+         iops: iops on the volume.
+         resource_group: optional.
+         encryption_key: key to encrypt, optional.
+    """
     _req_data = {
-        'zone': {'name': zone},
-        'profile': {'name': kwargs.get('profile', 'general-purpose')}
-        }
+      'zone': {'name': zone},
+      'profile': {'name': kwargs.get('profile', 'general-purpose')}
+      }
     if kwargs.get('capacity', None):
       _req_data['capacity'] = kwargs.get('capacity')
     if kwargs.get('iops', None):
@@ -471,19 +525,23 @@ class VolumeManager(BaseManager):
     return self._g.create_volume(_req_data)
 
   def Show(self, vol_id):
-    return self._g.AccountReq('GET', 'volumes/%s' % vol_id)
+    """Send a volume get request."""
+    return self._g.Request('GET', 'volumes/%s' % vol_id)
 
   def Delete(self, vol_id):
-    return self._g.AccountReq('DELETE', 'volumes/%s' % vol_id)
+    """Send a volume delete request."""
+    return self._g.Request('DELETE', 'volumes/%s' % vol_id)
 
   def List(self, next=None):
+    """Send a volume list request."""
     uri = '/' + self._g._version + '/volumes?limit=100'
     if next:
       uri += '&start=' + next
     return self._g.Request('GET', uri)
 
-  def ListProfiles(self, account=None):
-    return self._g.AccountReq('GET', 'volume/profiles')
+  def ListProfiles(self):
+    """Send a volume profile list request."""
+    return self._g.Request('GET', 'volume/profiles')
 
 
 class VPCManager(BaseManager):
@@ -492,18 +550,25 @@ class VPCManager(BaseManager):
   _type = 'vpc'
 
   def Create(self, default_network_acl, name):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the vpc.
+    """
     _req_data = {
-        "name": name
+      "name": name
     }
     return self._g.create_vpc(_req_data)
 
-  def Show(self, vpc, account=None):
-    return self._g.AccountReq('GET', 'vpcs/%s' % vpc)
+  def Show(self, vpc):
+    """Send a vpc get request."""
+    return self._g.Request('GET', 'vpcs/%s' % vpc)
 
-  def Delete(self, vpc, account=None):
-    return self._g.AccountReq('DELETE', 'vpcs/%s' % vpc)
+  def Delete(self, vpc):
+    """Send a vpc delete request."""
+    return self._g.Request('DELETE', 'vpcs/%s' % vpc)
 
   def CreatePrefix(self, vpc, zone, cidr, name=None):
+    """Send a vpc address prefix create request."""
     _req_data = {
       'zone': {'name': zone},
       'cidr': cidr
@@ -514,43 +579,52 @@ class VPCManager(BaseManager):
     return self._g.Request('POST', '%s' % vpc_uri, _req_data)
 
   def ListPrefix(self, vpc):
-    return self._g.AccountReq('GET', 'vpcs/%s/address_prefixes' % vpc)
+    """Send a vpc address prefix list request."""
+    return self._g.Request('GET', 'vpcs/%s/address_prefixes' % vpc)
 
   def DeletePrefix(self, vpc, prefix):
-    return self._g.AccountReq('DELETE', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix))
+    """Send a vpc address prefix delete request."""
+    return self._g.Request('DELETE', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix))
 
   def PatchPrefix(self, vpc, prefix, default=False, name=None):
+    """Send a vpc address prefix patch request."""
     _req_data = {
       'is_default': default
     }
     if name:
       _req_data['name'] = name
-    return self._g.AccountReq('PATCH', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix), _req_data)
+    return self._g.Request('PATCH', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix), _req_data)
 
   def CreateRoutingTable(self, vpc, name, routes=None, session=None):
+    """Send a vpc routing table create request."""
     _req_data = {
       'name': name
     }
     if routes:
       _req_data['routes'] = routes
     vpc_uri = self.get_uri(vpc) + '/routing_tables'
-    return self._g.request('POST', '%s' % vpc_uri, _req_data, session=session)
+    return self._g.Request('POST', '%s' % vpc_uri, _req_data, session=session)
 
   def ShowRoutingTable(self, vpc, routing, session=None):
-    return self._g.account_req('GET', 'vpcs/%s/routing_tables/%s' % (vpc, routing), session=session)
+    """Send a vpc routing table get request."""
+    return self._g.Request('GET', 'vpcs/%s/routing_tables/%s' % (vpc, routing), session=session)
 
   def PatchRoutingTable(self, vpc, routing, ingress, flag, session=None):
+    """Send a vpc routing table patch request."""
     vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing
-    return self._g.request('PATCH', vpc_uri, {ingress: flag}, session=session)
+    return self._g.Request('PATCH', vpc_uri, {ingress: flag}, session=session)
 
   def DeleteRoutingTable(self, vpc, routing, session=None):
+    """Send a vpc routing table delete request."""
     vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing
-    return self._g.request('DELETE', '%s' % vpc_uri, session=session)
+    return self._g.Request('DELETE', '%s' % vpc_uri, session=session)
 
   def ListRoutingTable(self, vpc, session=None):
-    return self._g.account_req('GET', 'vpcs/%s/routing_tables?limit=100' % vpc, session=session)
+    """Send a vpc routing table list request."""
+    return self._g.Request('GET', 'vpcs/%s/routing_tables?limit=100' % vpc, session=session)
 
   def CreateRoute(self, vpc, routing, name, zone, action, destination, nexthop=None, session=None):
+    """Send a vpc route create request."""
     _req_data = {
       'name': name,
       'action': action,
@@ -560,14 +634,16 @@ class VPCManager(BaseManager):
     if nexthop:
       _req_data['next_hop'] = {'address': nexthop}
     vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing + '/routes'
-    return self._g.request('POST', '%s' % vpc_uri, _req_data, session=session)
+    return self._g.Request('POST', '%s' % vpc_uri, _req_data, session=session)
 
   def DeleteRoute(self, vpc, routing, route, session=None):
+    """Send a vpc route delete request."""
     vpc_uri = self.get_uri(vpc) + '/routing_tables/' + routing + '/routes/' + route
-    return self._g.request('DELETE', '%s' % vpc_uri, session=session)
+    return self._g.Request('DELETE', '%s' % vpc_uri, session=session)
 
   def ListRoute(self, vpc, routing, session=None):
-    return self._g.account_req('GET', 'vpcs/%s/routing_tables/%s/routes?limit=100' % (vpc, routing), session=session)
+    """Send a vpc route list request."""
+    return self._g.Request('GET', 'vpcs/%s/routing_tables/%s/routes?limit=100' % (vpc, routing), session=session)
 
 
 class SGManager(BaseManager):
@@ -576,6 +652,12 @@ class SGManager(BaseManager):
   _type = 'security_groups'
 
   def Create(self, resource_group, vpcid, **kwargs):
+    """Construct and send a security group create request.
+       Args:
+         name: name of the vm.
+         vpcid: vpc id.
+         resource_group: optional.
+    """
     _req_data = {
       'vpc': {
           'id': vpcid
@@ -590,26 +672,40 @@ class SGManager(BaseManager):
 
     return self._g.create_security_groups(_req_data)
 
-  def List(self, account=None):
-    return self._g.AccountReq('GET', self._type)
+  def List(self):
+    """Send a security group list request."""
+    return self._g.Request('GET', self._type)
 
-  def Show(self, sg, account=None):
+  def Show(self, sg):
+    """Send a security group get request."""
     sg_id = self.GetUris(sg)
     return self._g.Request('GET', sg_id)
 
-  def Delete(self, sg, account=None):
+  def Delete(self, sg):
+    """Send a security group delete request."""
     sg_id = self.GetUris(sg)
     return self._g.Request('DELETE', sg_id)
 
   def ShowRule(self, sg, ruleid):
+    """Send a security group rule get request."""
     sg_uri = self.GetUris(sg) + '/rules/' + ruleid
     return self._g.Request('GET', sg_uri)
 
   def ListRules(self, sg):
+    """Send a security group rule list request."""
     sg_uri = self.GetUris(sg) + '/rules'
     return self._g.Request('GET', sg_uri)
 
   def CreateRule(self, sg, direction, ip_version, cidr_block, protocol, port, port_min=None, port_max=None):
+    """Send a security group rule create request.
+       Args:
+         direction: in or outbound.
+         ip_version: ipv4 or 6.
+         cidr: cidr_block.
+         protocol: tcp or udp.
+         port_min: port min.
+         port_max: port max.
+    """
     sg_uri = self.GetUris(sg) + '/rules'
     _req_data = {
        'direction': direction,
@@ -626,6 +722,7 @@ class SGManager(BaseManager):
     return self._g.Request('POST', sg_uri, _req_data)
 
   def DeleteRule(self, sg, ruleid):
+    """Send a security group rule delete request."""
     sg_uri = self.GetUris(sg) + '/rules/' + ruleid
     return self._g.Request('DELETE', '%s' % sg_uri)
 
@@ -636,6 +733,14 @@ class PGManager(BaseManager):
   _type = 'public_gateways'
 
   def Create(self, resource_group, vpcid, zone, **kwargs):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the vm.
+         vpcid: vpc id.
+         zone: zone name.
+         resource_group: optional.
+         floating_ip: optional, floating ip id.
+    """
     _req_data = {
       'vpc': {'id': vpcid},
       'zone': {'name': zone}
@@ -648,17 +753,19 @@ class PGManager(BaseManager):
       _req_data['name'] = kwargs.get('name', None)
     if kwargs.get('floating_ip', None):
       _req_data['floating_ip'] = {'id': kwargs.get('floating_ip')}
-
     return self._g.create_public_gateways(_req_data)
 
-  def List(self, account=None):
-    return self._g.AccountReq('GET', self._type)
+  def List(self):
+    """Send a public gateway list request."""
+    return self._g.Request('GET', self._type)
 
-  def Show(self, pg, account=None):
+  def Show(self, pg):
+    """Send a public gateway get request."""
     pg_id = self.GetUris(pg)
     return self._g.Request('GET', pg_id)
 
-  def Delete(self, pg, account=None):
+  def Delete(self, pg):
+    """Send a public gateway delete request."""
     pg_id = self.GetUris(pg)
     return self._g.Request('DELETE', pg_id)
 
@@ -669,7 +776,8 @@ class RegionManager(BaseManager):
   _type = 'region'
 
   def Show(self, region):
-    return self._g.AccountReq('GET', 'regions/%s' % region)
+    """Send a region get request."""
+    return self._g.Request('GET', 'regions/%s' % region)
 
 
 class KeyManager(BaseManager):
@@ -678,6 +786,13 @@ class KeyManager(BaseManager):
   _type = 'keys'
 
   def Create(self, key, type, **kwargs):
+    """Construct and send a ssh key create request.
+       Args:
+         key: public key string.
+         type: rsa.
+         name: name of the key:
+         resource_group: optional.
+    """
     _req_data = {
       'public_key': key,
       'type': type
@@ -688,14 +803,17 @@ class KeyManager(BaseManager):
       _req_data['resource_group'] = {'id':kwargs.get('resource_group', None)}
     return self._g.create_key(_req_data)
 
-  def List(self, account=None):
-    return self._g.AccountReq('GET', self._type)
+  def List(self):
+    """Send a key list request."""
+    return self._g.Request('GET', self._type)
 
-  def Show(self, key, account=None):
+  def Show(self, key):
+    """Send a key get request."""
     key_id = self.GetUris(key)
     return self._g.Request('GET', key_id)
 
-  def Delete(self, key, account=None):
+  def Delete(self, key):
+    """Send a key delete request."""
     key_id = self.GetUris(key)
     return self._g.Request('DELETE', key_id)
 
@@ -706,19 +824,26 @@ class NetworkAclManager(BaseManager):
   _type = 'network_acls'
 
   def Create(self, name):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the vm.
+    """
     _req_data = {
       "name": name
     }
     return self._g.create_network_acls(_req_data)
 
-  def List(self, account=None):
-    return self._g.AccountReq('GET', 'network_acls')
+  def List(self):
+    """Send a network_acl list request."""
+    return self._g.Request('GET', 'network_acls')
 
-  def Show(self, network_acl, account=None):
+  def Show(self, network_acl):
+    """Send a network_acl get request."""
     network_acl_id = self.GetUris(network_acl)
     return self._g.Request('GET', network_acl_id)
 
-  def Delete(self, network_acl, account=None):
+  def Delete(self, network_acl):
+    """Send a network_acl delete request."""
     network_acl_id = self.GetUris(network_acl)
     return self._g.Request('DELETE', network_acl_id)
 
@@ -729,6 +854,14 @@ class SubnetManager(BaseManager):
   _type = 'subnet'
 
   def Create(self, subnet, vpcid, **kwargs):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the subnet.
+         vpcid: vpc id.
+         zone: zone name.
+         ip_version: ipv4 or 6.
+         ipv4_cidr_block: cidr for subnet.
+    """
     _req_data = {
       "ipv4_cidr_block": subnet,
       "vpc": {"id": vpcid},
@@ -742,30 +875,36 @@ class SubnetManager(BaseManager):
       }
     return self._g.create_subnet(_req_data)
 
-  def Show(self, subnet, account=None):
+  def Show(self, subnet):
+    """Send a subnet get request."""
     subnet_id = self.GetUri(subnet)
     return self._g.Request('GET', subnet_id)
 
-  def Delete(self, subnet, account=None):
+  def Delete(self, subnet):
+    """Send a subnet delete request."""
     subnet_id = self.GetUri(subnet)
     return self._g.Request('DELETE', subnet_id)
 
   def Patch(self, **kwargs):
+    """Send a subnet patch request."""
     subnet_id = self.GetUri(kwargs.get('subnet'))
     return self._g.Request('PATCH', subnet_id, kwargs)
 
   def ShowPg(self, subnet):
+    """Send a subnet public gateway get request."""
     uri = self.GetUri(subnet) + '/public_gateway'
     return self._g.Request('GET', uri)
 
   def AttachPg(self, subnet, pgid):
+    """Send a subnet public gateway attach request."""
     uri = self.GetUri(subnet) + '/public_gateway'
     _req_data = {
        'id': pgid
-        }
+       }
     return self._g.Request('PUT', uri, _req_data)
 
   def DeletePg(self, subnet):
+    """Send a subnet public gateway delete request."""
     uri = self.GetUri(subnet) + '/public_gateway'
     return self._g.Request('DELETE', uri)
 
@@ -776,25 +915,32 @@ class ImageManager(BaseManager):
   _type = 'image'
 
   def Create(self, href, osname, name=None):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the image.
+         file: href to the image.
+         operating_system: os name.
+    """
     _req_data = {
       'file': {
-          'href': href
-          }
+        'href': href
+        }
     }
     if name is not None:
       _req_data['name'] = name
     if osname is not None:
       _req_data['operating_system'] = {
-          'name': osname
-          }
-
+        'name': osname
+        }
     return self._g.create_image(_req_data)
 
-  def Show(self, img, account=None):
+  def Show(self, img):
+    """Send a image get request."""
     img_id = self.GetUri(img)
     return self._g.Request('GET', img_id)
 
-  def Delete(self, img, account=None):
+  def Delete(self, img):
+    """Send a image delete request."""
     img_id = self.GetUri(img)
     return self._g.Request('DELETE', img_id)
 
@@ -805,15 +951,22 @@ class FipManager(BaseManager):
   _type = 'floating_ips'
 
   def Create(self, resource_group, target, **kwargs):
+    """Construct and send a vm create request.
+       Args:
+         name: name of the fip.
+         target: id of the vm network interface.
+         zone: zone name.
+         resource_group: optional.
+    """
     _req_data = {
       'target': {
-          'id': target
-          }
+        'id': target
+        }
     }
     if resource_group:
       _req_data['resource_group'] = {
-          'id': resource_group
-          }
+        'id': resource_group
+        }
     if kwargs.get('name', None):
       _req_data['name'] = kwargs.get('name', None)
     if kwargs.get('zone', None):
@@ -821,13 +974,16 @@ class FipManager(BaseManager):
 
     return self._g.create_floating_ips(_req_data)
 
-  def List(self, account=None):
-    return self._g.AccountReq('GET', self._type)
+  def List(self):
+    """Send a fip list request."""
+    return self._g.Request('GET', self._type)
 
-  def Show(self, fip, account=None):
+  def Show(self, fip):
+    """Send a fip get request."""
     fip_id = self.GetUris(fip)
     return self._g.Request('GET', fip_id)
 
   def Delete(self, fip):
+    """Send a fip delete request."""
     fip_id = self.GetUris(fip)
     return self._g.Request('DELETE', fip_id)

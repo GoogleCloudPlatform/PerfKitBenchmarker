@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,16 +27,19 @@ from perfkitbenchmarker.providers.ibmcloud import ibm_api as ibm
 
 FLAGS = flags.FLAGS
 
-ATTACHED = 'attached'
-AVAILABLE = 'available'
-DEFAULT_DISK_SIZE = 1000
-
 _MAX_DISK_ATTACH_SECONDS = 300
 _MAX_FIND_DEVICE_SECONDS = 120
 
 
 class IbmCloudDisk(disk.BaseDisk):
-  """Object representing a IBM Cloud Disk"""
+  """Object holding the information needed to create an IbmCloudDisk.
+
+  Attributes:
+    disk_spec: disk spec.
+    zone: zone name.
+    name: disk name.
+    encryption_key: enryption key.
+  """
 
   def __init__(self, disk_spec: disk.BaseDisk, name: str, zone: str, encryption_key: str=None):
     super(IbmCloudDisk, self).__init__(disk_spec)
@@ -47,7 +50,6 @@ class IbmCloudDisk(disk.BaseDisk):
     self.attached_vm = None
     self.attached_vdisk_URI = None
     self.device_path = None
-    self.data_disk_size = FLAGS.data_disk_size if FLAGS.data_disk_size is not None else DEFAULT_DISK_SIZE
 
   def _Create(self):
     """Creates an external block volume."""
@@ -57,7 +59,7 @@ class IbmCloudDisk(disk.BaseDisk):
       'zone': self.zone,
       'iops': FLAGS.ibmcloud_volume_iops,
       'profile': FLAGS.ibmcloud_volume_profile,
-      'capacity': self.data_disk_size
+      'capacity': self.disk_size
       })
     if self.encryption_key is not None:
         volcmd.flags['encryption_key'] = self.encryption_key
@@ -118,12 +120,12 @@ class IbmCloudDisk(disk.BaseDisk):
     while time.time() < endtime:
       status = json.loads(volcmd.ShowVolume())['status']
       logging.info('Checking volume status: %s', status)
-      if status == AVAILABLE:
+      if status == ibm.States.AVAILABLE:
         logging.info('Volume is available')
         break
       time.sleep(2)
 
-    if status != AVAILABLE:
+    if status != ibm.States.AVAILABLE:
       logging.error('Failed to create a volume')
       raise errors.Error('IBMCLOUD ERROR: failed to provision a volume.')
 
@@ -154,13 +156,13 @@ class IbmCloudDisk(disk.BaseDisk):
       resp = volcmd.InstanceShowVolume()
       if resp:
         resp = json.loads(resp)
-        status = resp['status'] if resp and 'status' in resp else 'unknown'
+        status = resp.get('status', 'unknown')
         logging.info('Checking instance volume status: %s', status)
-        if status == ATTACHED:
+        if status == ibm.States.ATTACHED:
           logging.info('Remote volume %s has been attached to %s', self.name, vm.name)
           break
       time.sleep(2)
-    if status != ATTACHED:
+    if status != ibm.States.ATTACHED:
       logging.error('Failed to attach the volume')
       raise errors.Error('IBMCLOUD ERROR: failed to attach a volume.')
 
@@ -175,7 +177,7 @@ class IbmCloudDisk(disk.BaseDisk):
       disks = re.findall(r'\Disk (\S+): .* (\d+) bytes,', stdout)
       for device_path, disk_size in disks:
         logging.info('disk_path: %s, disk_size: %s', device_path, disk_size)
-        if int(disk_size) >= FLAGS.data_disk_size * 1000000000:
+        if int(disk_size) >= self.disk_size * 1000000000:
           if device_path not in vm.device_paths_detected:
             self.device_path = device_path
             vm.device_paths_detected.add(device_path)
@@ -191,9 +193,11 @@ class IbmCloudDisk(disk.BaseDisk):
   def Detach(self):
     """Deletes the volume from instance """
     if self.attached_vm is None:
-      raise errors.Error('Cannot detach remote volume from a non-existing VM.')
+      logging.warning('Cannot detach remote volume from a non-existing VM.')
+      return
     if self.attached_vdisk_URI is None:
-      raise errors.Error('Cannot detach remote volume from a non-existing VDisk.')
+      logging.warning('Cannot detach remote volume from a non-existing VDisk.')
+      return
     volcmd = ibm.IbmAPICommand(self)
     volcmd.flags['volume'] = self.attached_vdisk_URI
     resp = volcmd.InstanceDeleteVolume()

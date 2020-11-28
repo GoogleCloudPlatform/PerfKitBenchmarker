@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,14 +15,8 @@
 
 from absl import flags
 
-flags.DEFINE_string('ibmcloud_region', 'us-south',
-                    'Name of IBM Cloud Location or region.')
-
 flags.DEFINE_string('ibmcloud_azone', None,
                     'IBMCloud internal DC name')
-
-flags.DEFINE_string('ibmcloud_image_id', None,
-                    'IBM Cloud defined image id, if set, overrides default image.')
 
 flags.DEFINE_integer('ibmcloud_volume_iops', 20000,
                      'Desired volume IOPS.')
@@ -37,13 +31,10 @@ flags.DEFINE_string('ibmcloud_image_username', 'root',
                     'Ssh username for cloud image.')
 
 flags.DEFINE_integer('ibmcloud_polling_delay', 2,
-                     'Delay between polling attempts for action objects.')
+                     'Delay between polling attempts in seconds.')
 
 flags.DEFINE_string('ibmcloud_login_validfrom', None,
                     'Valid from for token creation.')
-
-flags.DEFINE_integer('ibmcloud_sleep_post_login', 5,
-                     'Sleep for some seconds after login.')
 
 flags.DEFINE_string('ibmcloud_speccpu_tarfile', None,
                     'tarball for speccpu2017.')
@@ -54,20 +45,11 @@ flags.DEFINE_integer('ibmcloud_timeout', 600,
 flags.DEFINE_integer('ibmcloud_boot_disk_size', 10,
                      'boot volume disk size.')
 
-flags.DEFINE_boolean('ibmcloud_numa_pin', False,
-                     'numaPin flag.')
-
-flags.DEFINE_string('ibmcloud_cpu_family', None,
-                    'one of allowed cpu family.')
-
 flags.DEFINE_boolean('ibmcloud_debug', False,
                      'debug flag.')
 
 flags.DEFINE_boolean('ibmcloud_resources_keep', False,
                      'keep resources.')
-
-flags.DEFINE_string('ibmcloud_profile', 'cx2-2x4',
-                    'same as machine_type')
 
 flags.DEFINE_string('ibmcloud_volume_profile', 'custom',
                     'volume profile')
@@ -101,9 +83,6 @@ flags.DEFINE_integer('ibmcloud_boot_volume_size', 0,
 
 flags.DEFINE_string('ibmcloud_pub_keyid', None,
                     'rias public sshkey id')
-
-flags.DEFINE_string('ibmcloud_priv_keyfile', None,
-                    'full path to ssh key file containing private key.')
 
 flags.DEFINE_integer('ibmcloud_network_mtu', 9000,
                      'MTU size on network interfaces.')

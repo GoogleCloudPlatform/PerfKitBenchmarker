@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,9 +24,15 @@ from perfkitbenchmarker.providers.ibmcloud import util
 
 FLAGS = flags.FLAGS
 
-AVAILABLE = 'available'
-RUNNING = 'running'
-STOPPED = 'stopped'
+
+class Enum(tuple): __getattr__ = tuple.index
+
+
+class States(Enum):
+  AVAILABLE = 'available'
+  RUNNING = 'running'
+  STOPPED = 'stopped'
+  ATTACHED = 'attached'
 
 
 class IbmAPICommand(object):
@@ -62,7 +68,7 @@ class IbmAPICommand(object):
   num_requests = None
   debug = False
 
-  def __init__(self, resource, *args):
+  def __init__(self, resource, *args, **kwargs):
     """Initializes a IbmAPICommand with the provided args and flags.
 
     Args:
@@ -86,8 +92,8 @@ class IbmAPICommand(object):
       IbmAPICommand.gen_volumemgr = ibmcloud.VolumeManager(IbmAPICommand.gen)
       IbmAPICommand.gen_vpcmgr = ibmcloud.VPCManager(IbmAPICommand.gen)
       IbmAPICommand.gen_sgmgr = ibmcloud.SGManager(IbmAPICommand.gen)
-    self.args = list(args)
-    self.flags = {}
+    self.args = args
+    self.flags = kwargs
     self.user_data = None
     self.sgid = None
 
@@ -408,10 +414,10 @@ class IbmAPICommand(object):
     resp = self.gen_instmgr.Show(self.flags['instanceid'])
     status = self._GetStatus(resp)
     logging.info('Instance status: %s, %s', self.flags['instanceid'], status)
-    if status != RUNNING:
+    if status != States.RUNNING:
       endtime = time.time() + FLAGS.ibmcloud_timeout
       status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
-      while status != RUNNING and time.time() < endtime:
+      while status != States.RUNNING and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay)
         status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
         logging.info('Checking instance status: %s, %s', self.flags['instanceid'], status)
@@ -422,10 +428,10 @@ class IbmAPICommand(object):
     resp = self.gen_instmgr.Start(self.flags['instanceid'])
     status = self._GetStatus(resp)
     logging.info('Instance start issued: %s, %s', self.flags['instanceid'], status)
-    if status != RUNNING:
+    if status != States.RUNNING:
       endtime = time.time() + FLAGS.ibmcloud_timeout
       status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
-      while status != RUNNING and time.time() < endtime:
+      while status != States.RUNNING and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay)
         status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
         logging.info('Checking instance start status: %s, %s', self.flags['instanceid'], status)
@@ -438,10 +444,10 @@ class IbmAPICommand(object):
     resp = self.gen_instmgr.Stop(self.flags['instanceid'], force=True)  # force stop again
     status = self._GetStatus(resp)
     logging.info('Instance stop force issued: %s, %s', self.flags['instanceid'], status)
-    if status != STOPPED:
+    if status != States.STOPPED:
       endtime = time.time() + FLAGS.ibmcloud_timeout
       status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
-      while status != STOPPED and time.time() < endtime:
+      while status != States.STOPPED and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay * 2)
         status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
         logging.info('Checking instance stop status: %s, %s', self.flags['instanceid'], status)
@@ -480,19 +486,19 @@ class IbmAPICommand(object):
     vnicid = resp['id']
     port_speed = resp['port_speed']
     logging.info('Vnic created, vnicid: %s, port speed: %s, vnic status: %s', vnicid, port_speed, status)
-    if status != AVAILABLE:
+    if status != States.AVAILABLE:
       endtime = time.time() + FLAGS.ibmcloud_timeout
       resp = self.gen_instmgr.ShowVnic(self.flags['instanceid'], vnicid)
       status = self._GetStatus(resp)
-      while status != AVAILABLE and time.time() < endtime:
+      while status != States.AVAILABLE and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay)
         resp = self.gen_instmgr.ShowVnic(self.flags['instanceid'], vnicid)
         status = self._GetStatus(resp)
         logging.info('Checking instance vnic status: %s', status)
-    if status == AVAILABLE:
+    if status == States.AVAILABLE:
       ip_addr = resp.get('primary_ipv4_address')
       logging.info('primary_ipv4_address: %s', ip_addr)
-    assert status == AVAILABLE
+    assert status == States.AVAILABLE
     return vnicid, ip_addr
 
   def InstanceVnicShow(self):
@@ -567,7 +573,7 @@ class IbmAPICommand(object):
     resp = self.gen_imgmgr.List()['images']
     if resp is not None:
       for image in resp:
-        if image['name'].startswith(self.flags['image_name']) and image['status'] == AVAILABLE:
+        if image['name'].startswith(self.flags['image_name']) and image['status'] == States.AVAILABLE:
           return image['id']
     return None
 

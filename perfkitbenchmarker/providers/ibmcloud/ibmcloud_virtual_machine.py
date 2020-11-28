@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,17 +30,12 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.ibmcloud import ibm_api as ibm
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_disk
+from perfkitbenchmarker.providers.ibmcloud import ibmcloud_network
 from perfkitbenchmarker.providers.ibmcloud import util
 
 FLAGS = flags.FLAGS
 
-# each prefix range of /18 can only house 4 subnets with /20, use /16, 0: zone1, 1: zone2, etc
-VPC_NAME = 'vpc'
-VPC_PREFIX_RANGES = ['10.101.0.0/16', '10.102.0.0/16', '10.103.0.0/16', '10.104.0.0/16', '10.105.0.0/16']
-VPC_SUBNETS = ['10.101.0.0/20', '10.102.0.0/20', '10.103.0.0/20', '10.104.0.0/20', '10.105.0.0/20']
-
 _DEFAULT_VOLUME_IOPS = 3000
-_DEFAULT_TIMEOUT = 300
 _WAIT_TIME_RHEL = 300
 _WAIT_TIME_UBUNTU = 600
 _WAIT_TIME_DEBIAN = 120
@@ -53,12 +48,11 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   IMAGE_NAME_PREFIX = None
 
   _lock = threading.Lock()
-  _lock_vpc = threading.Lock()
   command_works = False
   ibmcloud_apikey = None
   ibmcloud_account_id = None
   validated_resources_set = set()
-  validated_subnets = 0  # indicator for number of subnets created
+  validated_subnets = 0
 
   def __init__(self, vm_spec: virtual_machine.BaseVmSpec):
     """Initialize a IBM Cloud virtual machine.
@@ -73,7 +67,6 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     if FLAGS.ibmcloud_volume_iops:
       self.volume_iops = FLAGS.ibmcloud_volume_iops
     self.volume_profile = FLAGS.ibmcloud_volume_profile
-    self.imageid = FLAGS.ibmcloud_image_id
     self.image = FLAGS.image
     self.os_data = None
     self.user_data = None
@@ -88,6 +81,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.fip_address = None
     self.fip_id = None
     self.ssh_pub_keyfile = None
+    self.network = None
     self.subnet = FLAGS.ibmcloud_subnet
     self.subnets = {}
     self.vpcid = FLAGS.ibmcloud_vpcid
@@ -112,18 +106,15 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CheckImage(self):
     """Verifies we have an imageid to use """
-    if FLAGS.ibmcloud_image_id:
-      logging.info('Image id to use: %s', FLAGS.ibmcloud_image_id)
+    cmd = ibm.IbmAPICommand(self)
+    cmd.flags['image_name'] = self.image or self._GetDefaultImageName()
+    logging.info('Looking up image: %s', cmd.flags['image_name'])
+    self.imageid = cmd.GetImageId()
+    if self.imageid is None:
+      logging.info('Failed to find valid image id')
+      os._exit(1)
     else:
-      cmd = ibm.IbmAPICommand(self)
-      cmd.flags['image_name'] = self.image or self._GetDefaultImageName()
-      logging.info('Looking up image: %s', cmd.flags['image_name'])
-      self.imageid = cmd.GetImageId()
-      if self.imageid is None:
-        logging.info('Failed to find valid image id')
-        os._exit(1)
-      else:
-        logging.info('Image id found: %s', self.imageid)
+      logging.info('Image id found: %s', self.imageid)
 
   @classmethod
   def _GetDefaultImageName(cls):
@@ -141,59 +132,27 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       })
     self.vpcid = cmd.ListResources()
     logging.info('Vpc found: %s', self.vpcid)
-
     cmd.flags['items'] = 'subnets'
     self.subnet = cmd.ListResources()
     logging.info('Subnet found: %s', self.subnet)
-    subnet_index = int(self.zone[len(self.zone) - 1])  # get the ending -1
+
     if not self.vpcid:
       logging.info('Creating a vpc')
-      cmd.flags['name'] = self.prefix + FLAGS.run_uri + 'vpc'
-      self.vpcid = cmd.CreateVpc()
-      if self.vpcid:
-        # let first thread create address prefix for all zones
-        for zone in FLAGS.zones:
-          cmd.flags.update({
-            'vpcid': self.vpcid,
-            'zone': zone
-            })
-          index = int(zone[len(zone) - 1])  # get the ending -1
-          cmd.flags['cidr'] = VPC_PREFIX_RANGES[index - 1]
-          cmd.flags['name'] = self.prefix + VPC_NAME + util.DELIMITER + zone
-          resp = cmd.CreatePrefix()
-          if resp:
-            logging.info('Created vpc prefix range: %s', resp.get('id'))
-          else:
-            logging.info('Failed to create vpc prefix range, exiting')
-            os._exit(1)
-      else:
-        logging.error('Failed to create vpc, exiting')
-        os._exit(1)
+      self.network.Create()
+      self.vpcid = self.network.vpcid
 
     if not self.subnet:
-      cmd.flags.update({
-        'vpcid': self.vpcid,
-        'zone': self.zone,
-        'name': self.prefix + VPC_NAME + util.SUBNET_SUFFIX + \
-        str(subnet_index) + util.DELIMITER + self.zone,
-        'cidr': VPC_SUBNETS[subnet_index - 1]
-        })
-      logging.info('Creating subnet: %s', cmd.flags)
-      resp = cmd.CreateSubnet()
-      if resp:
-        self.subnet = resp.get('id')
-        IbmCloudVirtualMachine.validated_subnets += 1
-        logging.info('Created subnet: %s, zone %s', self.subnet, self.zone)
-      else:
-        logging.error('Failed to create subnet, exiting')
-        os._exit(1)
+      logging.info('Creating a subnet')
+      self.network.CreateSubnet(self.vpcid)
+      self.subnet = self.network.subnet
 
     if FLAGS.ibmcloud_subnets_extra > 0:
+      # these are always created outside perfkit
       cmd.flags['prefix'] = util.SUBNET_SUFFIX_EXTRA
       self.subnets = cmd.ListSubnetsExtra()
       logging.info('Extra subnets found: %s', self.subnets)
 
-    # look up for exsting key that matches this run uri
+    # look up for existing key that matches this run uri
     cmd.flags['items'] = 'keys'
     cmd.flags['prefix'] = self.prefix + FLAGS.run_uri
     self.key = cmd.ListResources()
@@ -203,12 +162,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['prefix'] = self.prefix + FLAGS.run_uri
       self.key = self._CreateRiasKey()
       if self.key is None:
-        logging.info('Failed to create a new key')
-        os._exit(1)
+        raise errors.Error('IBM Cloud ERROR: Failed to create a rias key')
       logging.info('Created a new key: %s', self.key)
-
-    if not self.vpcid or not self.subnet or not self.key:
-      raise errors.Error('IBM Cloud ERROR: Failed to lookup resources')
 
     logging.info('Looking up the image: %s', self.imageid)
     cmd.flags['imageid'] = self.imageid
@@ -216,39 +171,12 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info('Image os: %s', self.os_data)
     logging.info('Checking mzone setup finished')
 
-  def _CleanUp(self):
-    """
-    deletes the used resources, subnet, vpc, rias key
-    """
+  def _DeleteKey(self):
+    """Deletes the rias key."""
     with self._lock:
-      if IbmCloudVirtualMachine.validated_subnets > 0:
-        cmd = ibm.IbmAPICommand(self)
-        cmd.flags['items'] = 'subnets'
-        cmd.flags['id'] = self.subnet
-        logging.info('Waiting to delete subnet')
-        time.sleep(30)
-        cmd.DeleteResource()
-        IbmCloudVirtualMachine.validated_subnets -= 1
-
-    # different lock so all threads get a chance to delete its subnet if different
-    with self._lock_vpc:
-      if self.vpcid not in IbmCloudVirtualMachine.validated_resources_set:
-        cmd = ibm.IbmAPICommand(self)
-        # check till all subnets are gone
-        time_to_end = time.time() + _DEFAULT_TIMEOUT
-        while IbmCloudVirtualMachine.validated_subnets > 0:
-          logging.info('Subnets not empty yet')
-          if time_to_end < time.time():
-            break
-          time.sleep(10)
-        cmd.flags['items'] = 'vpcs'
-        cmd.flags['id'] = self.vpcid
-        logging.info('Pausing before deleting vpc')
-        time.sleep(10)
-        cmd.DeleteResource()
-        IbmCloudVirtualMachine.validated_resources_set.add(self.vpcid)
       # key is not dependent on vpc, one key is used
       if self.key not in IbmCloudVirtualMachine.validated_resources_set:
+        time.sleep(5)
         cmd = ibm.IbmAPICommand(self)
         cmd.flags['items'] = 'keys'
         cmd.flags['id'] = self.key
@@ -293,11 +221,11 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._StopInstance()
     self._DeleteInstance()
     if not FLAGS.ibmcloud_resources_keep:
-      self._CleanUp()
+      self.network.Delete()
+    self._DeleteKey()
 
   def _DeleteDependencies(self):
-    """Delete dependencies that were needed for the VM after the VM has been
-    deleted."""
+    """Delete dependencies."""
     pass
 
   def _Exists(self):
@@ -326,6 +254,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.zone = FLAGS.zones[0]
       logging.info('zone to use %s', self.zone)
       self._CheckImage()
+      self.network = ibmcloud_network.IbmCloudNetwork(self.prefix, self.zone)
       self._SetupMzone()
       IbmCloudVirtualMachine.validated_resources_set.add(self.zone)
       logging.info('Prerequisites validated.')
@@ -422,8 +351,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['instanceid'] = self.vmid
     status = cmd.InstanceStatus()
     self.instance_start_failed = False
-    assert status == ibm.RUNNING
-    if status != ibm.RUNNING:
+    assert status == ibm.States.RUNNING
+    if status != ibm.States.RUNNING:
       logging.error('Instance start failed, status: %s', status)
       self.instance_start_failed = True
     self.vm_started = not self.instance_start_failed
@@ -436,8 +365,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     status = cmd.InstanceStart()
     logging.info('start_instance_poll: last status is %s', status)
     self.instance_start_failed = False
-    assert status == ibm.RUNNING
-    if status != ibm.RUNNING:
+    assert status == ibm.States.RUNNING
+    if status != ibm.States.RUNNING:
       logging.error('Instance start failed, status: %s', status)
       self.instance_start_failed = True
     self.vm_started = not self.instance_start_failed
@@ -499,7 +428,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
           IPv4Address = network['primary_ipv4_address']
           break
       logging.info('Waiting on ip assignment: %s', IPv4Address)
-    assert IPv4Address != '0.0.0.0'
+    if IPv4Address == '0.0.0.0':
+      raise ValueError('Failed to retrieve ip address')
     return IPv4Address
 
   def _StopInstance(self):
@@ -509,7 +439,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     status = cmd.InstanceStop()
     logging.info('stop_instance_poll: last status is %s', status)
     self.instance_stop_failed = False
-    if status != ibm.STOPPED:
+    if status != ibm.States.STOPPED:
       logging.error('Instance stop failed, status: %s', status)
     self.vm_started = False
 

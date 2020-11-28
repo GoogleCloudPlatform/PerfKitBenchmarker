@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ import os
 import json
 import yaml
 import dataclasses
+
+from typing import Any, List, Dict
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -55,26 +57,8 @@ SUBNETS_EXTRA_GATEWAY = {
     SUBNETX4: ['10.101.50.1', '10.102.50.1', '10.103.50.1', '10.104.50.1', '10.105.50.1']
 }
 
-# this is needed for windows vms
-USER_DATA = "Content-Type: multipart/mixed; boundary=MIMEBOUNDARY\n\
-MIME-Version: 1.0\n\
---MIMEBOUNDARY\n\
-Content-Type: text/cloud-config; charset=\"us-ascii\"\n\
-MIME-Version: 1.0\n\
-Content-Transfer-Encoding: 7bit\n\
-Content-Disposition: attachment; filename=\"cloud-config\"\n\
-#cloud-config\n\
-set_timezone: America/Chicago\n\
---MIMEBOUNDARY\n\
-Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
-MIME-Version: 1.0\n\
-Content-Transfer-Encoding: 7bit\n\
-Content-Disposition: attachment; filename=\"set-content.ps1\"\n\
-#ps1_sysnative\n\
-Set-Content -Path \"C:\\helloWorld.txt\" -Value \"Hello, World!\"\n\
---MIMEBOUNDARY\n\
-Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
-MIME-Version: 1.0\n\
+# for windows
+USER_DATA = "Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
 Content-Transfer-Encoding: 7bit\n\
 Content-Disposition: attachment; filename=\"set-content.ps1\"\n\
 #ps1_sysnative\n\
@@ -87,19 +71,6 @@ Set-NetFirewallRule -DisplayName \"File and Printer Sharing (Echo Request - ICMP
 Set-NetFirewallRule -DisplayName \"File and Printer Sharing (Echo Request - ICMPv6-In)\" -enabled True\n}\n\
 Setup-Remote-Desktop\n\
 Setup-Ping\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5201\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5201\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5202\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5202\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5203\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5203\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5204\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5204\n\
-New-NetFirewallRule -DisplayName \"Allow iperf 5205\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5205\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20000\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20000\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20001\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20001\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20002\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20002\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20003\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20003\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20010\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20010\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20011\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20011\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20012\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20012\n\
-New-NetFirewallRule -DisplayName \"Allow netperf 20013\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 20013\n\
 New-NetFirewallRule -DisplayName \"Allow winrm https 5986\" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5986\n\
 winrm set winrm/config/service/auth '@{Basic=\"true\";Certificate=\"true\"}'\n\
 $cert=New-SelfSignedCertificate -certstorelocation cert:\localmachine\my -dnsname *\n\
@@ -107,7 +78,7 @@ $thumb=($cert).Thumbprint\n\
 New-WSManInstance -ResourceURI winrm/config/Listener -SelectorSet @{Address=\"*\";Transport=\"HTTPS\"} -ValueSet @{CertificateThumbprint=\"$thumb\"}\n\
 powercfg /SetActive (powercfg /List | %{if ($_.Contains(\"High performance\")){$_.Split()[3]}})\n\
 Set-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword MTU -RegistryValue 9000\n\
---MIMEBOUNDARY--"
+"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -117,7 +88,7 @@ class Account:
    enckey:str
 
 
-def ReadConfig(config: str):
+def ReadConfig(config: str) -> Dict[Any, Any]:
   """Reads in config yml
 
   Args:
@@ -128,13 +99,12 @@ def ReadConfig(config: str):
   """
   try:
     with open(config, 'r') as stream:
-      data = json.dumps(yaml.safe_load(stream, Loader=yaml.FullLoader), sort_keys=True)
-      return json.loads(data)
+      return yaml.safe_load(stream)
   except Exception as ex:
     raise errors.Error('Failed to load configuration file %s, %s', config, ex)
 
 
-def GetSubnetIndex(ipv4_cidr_block: str):
+def GetSubnetIndex(ipv4_cidr_block: str) -> int:
   """Finds the index for the given cidr
 
   Args:
@@ -153,7 +123,7 @@ def GetSubnetIndex(ipv4_cidr_block: str):
   return -1
 
 
-def GetRouteCommands(data: str, index: int, target_index: int):
+def GetRouteCommands(data: str, index: int, target_index: int) -> List[str]:
   """Creates a list of ip route commands in text format to run on vm,
     not used on normal perfkit runs.
 
@@ -232,7 +202,7 @@ def GetImageIdInfo(account: Account, imageid: str):
   return GetOsInfo(data_mgr.Show(imageid))
 
 
-def GetOsInfo(image: json):
+def GetOsInfo(image: Dict[Any, Any]) -> Dict[str, Any]:
   """Returns os information in json format
 
   Args:
