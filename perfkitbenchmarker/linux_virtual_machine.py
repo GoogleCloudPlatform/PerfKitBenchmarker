@@ -1031,6 +1031,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._CreateInstallDir()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
+    self._has_remote_command_script = False
 
   def MoveFile(self, target, source_path, remote_path=''):
     self.MoveHostFile(target, source_path, remote_path)
