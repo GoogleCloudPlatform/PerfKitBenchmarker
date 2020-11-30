@@ -971,7 +971,7 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('load', **kwargs)
-    stdout, stderr = vm.RobustRemoteCommand(command)
+    stdout, stderr = vm.RobustRemoteCommand(command, should_log=True)
     return ParseResults(str(stderr + stdout), self.measurement_type)
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
@@ -1072,7 +1072,7 @@ class YCSBExecutor(object):
     hdr_files_dir = kwargs.get('hdrhistogram.output.path', None)
     if hdr_files_dir:
       vm.RemoteCommand('mkdir -p {0}'.format(hdr_files_dir))
-    stdout, stderr = vm.RobustRemoteCommand(command)
+    stdout, stderr = vm.RobustRemoteCommand(command, should_log=True)
     return ParseResults(str(stderr + stdout), self.measurement_type)
 
   def _RunThreaded(self, vms, **kwargs):

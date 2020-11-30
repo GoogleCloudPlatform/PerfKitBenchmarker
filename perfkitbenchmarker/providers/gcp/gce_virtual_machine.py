@@ -452,7 +452,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['no-restart-on-failure'] = True
     if self.node_group:
       cmd.flags['node-group'] = self.node_group.name
-    if self.min_cpu_platform:
+    if self.min_cpu_platform and 'n1-' in self.machine_type:
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
     if self.gce_shielded_secure_boot:
       cmd.flags['shielded-secure-boot'] = True

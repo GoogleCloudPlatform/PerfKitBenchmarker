@@ -40,6 +40,8 @@ flags.DEFINE_integer('aerospike_replication_factor', 1,
                      'Replication factor for aerospike server.')
 flags.DEFINE_integer('aerospike_transaction_threads_per_queue', 4,
                      'Number of threads per transaction queue.')
+flags.DEFINE_integer('aerospike_vms', 1,
+                     'Number of vms (nodes) for aerospike server.')
 
 
 def _Install(vm):
@@ -58,12 +60,12 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the memtier package on the VM."""
+  """Installs the aerospike_server package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the memtier package on the VM."""
+  """Installs the aerospike_server package on the VM."""
   vm.InstallPackages('netcat-openbsd zlib1g-dev')
   _Install(vm)
 
@@ -147,10 +149,13 @@ def ConfigureAndStart(server, seed_node_ips=None):
       server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
 
   server.RemoteCommand('cd %s && make init' % AEROSPIKE_DIR)
-  server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
-                       AEROSPIKE_DIR)
+  # Persist the nohup command past the ssh session
+  # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
+  cmd = (f'sh -c \'cd {AEROSPIKE_DIR} && nohup sudo make start > '
+         f'~/aerospike.log 2>&1 &\'')
+  server.RemoteCommand(cmd)
   _WaitForServerUp(server)
-  logging.info("Aerospike server configured and started.")
+  logging.info('Aerospike server configured and started.')
 
 
 def Uninstall(vm):

@@ -31,6 +31,8 @@
 -   Add retry when calling MountDisk.
 -   Measure time to running status of a VM in large_scale_boot benchmark.
 -   SpecCPU2017 runs on Redhat, Centos7
+-   Aerospike YCSB can have multiple server nodes and different client/server
+    machine types.
 
 ### Bug fixes and maintenance updates:
 

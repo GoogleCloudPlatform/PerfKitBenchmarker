@@ -30,6 +30,13 @@ from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 
+# TODO(user): unify overrides into --client_machine_type/server_machine_type
+flags.DEFINE_string('aerospike_client_machine_type', None,
+                    'Machine type to use for the aerospike client if different '
+                    'from aerospike server machine type.')
+flags.DEFINE_string('aerospike_server_machine_type', None,
+                    'Machine type to use for the aerospike server if different '
+                    'from aerospike client machine type.')
 
 BENCHMARK_NAME = 'aerospike_ycsb'
 BENCHMARK_CONFIG = """
@@ -45,7 +52,7 @@ aerospike_ycsb:
       vm_count: null
       disk_count: 0
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 
@@ -60,6 +67,17 @@ def GetConfig(user_config):
     else:
       config['vm_groups']['workers']['disk_count'] = (
           config['vm_groups']['workers']['disk_count'] or 1)
+  if FLAGS.aerospike_server_machine_type:
+    vm_spec = config['vm_groups']['workers']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = FLAGS.aerospike_server_machine_type
+  if FLAGS.aerospike_client_machine_type:
+    vm_spec = config['vm_groups']['clients']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = FLAGS.aerospike_client_machine_type
+
+  if FLAGS['aerospike_vms'].present:
+    config['vm_groups']['workers']['vm_count'] = FLAGS.aerospike_vms
 
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
@@ -118,9 +136,20 @@ def Run(benchmark_spec):
   loaders = benchmark_spec.vm_groups['clients']
   aerospike_vms = benchmark_spec.vm_groups['workers']
 
-  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-              'num_vms': len(aerospike_vms),
-              'Storage Type': FLAGS.aerospike_storage_type}
+  metadata = {
+      'ycsb_client_vms':
+          FLAGS.ycsb_client_vms,
+      'num_vms':
+          len(aerospike_vms),
+      'Storage Type':
+          FLAGS.aerospike_storage_type,
+      'memory_size':
+          int(aerospike_vms[0].total_memory_kb * 0.8),
+      'transaction_threads_per_queue':
+          FLAGS.aerospike_transaction_threads_per_queue,
+      'replication_factor':
+          FLAGS.aerospike_replication_factor,
+  }
 
   samples = list(benchmark_spec.executor.LoadAndRun(loaders))
 
