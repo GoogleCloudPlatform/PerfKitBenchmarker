@@ -517,6 +517,12 @@ class Bigquery(edw_service.EdwService):
         logging.warning('Loading table %s failed. stderr: %s, retcode: %s',
                         table, stderr, retcode)
 
+      cmd = ['bq', 'update']
+      for key, value in gcp_util.GetDefaultTags().items():
+        cmd.extend(['--set_label', f'{key}:{value}'])
+      cmd.append(f'{project_dataset}.{table}')
+      vm_util.IssueCommand(cmd)
+
 
 class Endor(Bigquery):
   """Class representing BigQuery Endor service."""
