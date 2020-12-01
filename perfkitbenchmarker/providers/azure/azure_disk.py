@@ -173,7 +173,7 @@ class AzureDisk(disk.BaseDisk):
     with self._lock:
       _, _, retcode = vm_util.IssueCommand([
           azure.AZURE_PATH, 'vm', 'disk', 'attach', '--new', '--caching',
-          self.host_caching, '--disk', self.name, '--lun',
+          self.host_caching, '--name', self.name, '--lun',
           str(self.lun), '--sku', self.disk_type, '--vm-name', self.vm_name,
           '--size-gb',
           str(self.disk_size)
