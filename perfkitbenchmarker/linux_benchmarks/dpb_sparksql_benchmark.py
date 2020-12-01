@@ -105,7 +105,7 @@ flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
 flags.DEFINE_list(
     'dpb_sparksql_order', [],
     'The names (numbers) of the queries to run in order. '
-    'If omitted all queries are run in lexicographic order.')
+    'Required.')
 flags.DEFINE_string(
     'spark_bigquery_connector',
     None,
@@ -160,6 +160,9 @@ def CheckPrerequisites(benchmark_config):
     logging.warning(
         'You did not specify --dpb_sparksql_data or --bigquery_tables. '
         'You will probably not have data to query!')
+  if not FLAGS.dpb_sparksql_order:
+    raise errors.Config.InvalidValue(
+        'You must specify the queries to run with --dpb_sparksql_order')
 
 
 def Prepare(benchmark_spec):
@@ -266,16 +269,23 @@ def Run(benchmark_spec):
 
   results = []
   run_times = {}
+  passing_queries = set()
   with open(report_file, 'r') as file:
     for line in file:
       result = json.loads(line)
+      logging.info('Timing: %s', result)
       query_id = _GetQueryId(result['script'])
+      assert query_id
+      passing_queries.add(query_id)
       metadata_copy = metadata.copy()
       metadata_copy['query'] = query_id
       results.append(
           sample.Sample('sparksql_run_time', result['duration'], 'seconds',
                         metadata_copy))
       run_times[query_id] = result['duration']
+
+  metadata['failing_queries'] = ','.join(
+      sorted(set(FLAGS.dpb_sparksql_order) - passing_queries))
 
   results.append(
       sample.Sample('sparksql_total_wall_time', job_result.wall_time, 'seconds',
@@ -321,11 +331,10 @@ def _LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
     base_dir: object storage directory to stage queries into.
 
   Returns:
-    The paths to the stage queries
+    The paths to the stage queries.
 
   Raises:
-    PrepareException if a requested query is not found or no quueries are
-    staged.
+    PrepareException if a requested query is not found.
   """
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
@@ -343,33 +352,21 @@ def _LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
     for filename in files:
       query_id = _GetQueryId(filename)
       if query_id:
-        # if order is specified only upload those queries
-        if not FLAGS.dpb_sparksql_order or query_id in FLAGS.dpb_sparksql_order:
+        # only upload specified queries
+        if query_id in FLAGS.dpb_sparksql_order:
           src_file = os.path.join(dir_name, filename)
-          staged_file = '{}/{}.sql'.format(base_dir, filename)
+          staged_file = '{}/{}'.format(base_dir, filename)
           storage_service.Copy(src_file, staged_file)
           query_file[query_id] = staged_file
-  if not query_file:
-    raise errors.Benchmarks.PrepareException('No queries were staged')
 
-  if FLAGS.dpb_sparksql_order:
-    # Validate all requested queries are present.
-    missing_queries = set(FLAGS.dpb_sparksql_order) - set(query_file.keys())
-    if missing_queries:
-      raise errors.Benchmarks.PrepareException(
-          'Could not find queries {}'.format(missing_queries))
-    queries_in_order = FLAGS.dpb_sparksql_order
-  else:
-    # User wants all queries. Put them in sorted order.
-    def QueryPair(query):
-      """Split query into int and letter pair."""
-      query_pattern = r'^([0-9]+)([ab]?)$'
-      match = re.match(query_pattern, query)
-      return int(match.group(1)), match.group(2)
-    queries_in_order = query_file.keys().sort(key=QueryPair)
+  # Validate all requested queries are present.
+  missing_queries = set(FLAGS.dpb_sparksql_order) - set(query_file.keys())
+  if missing_queries:
+    raise errors.Benchmarks.PrepareException(
+        'Could not find queries {}'.format(missing_queries))
 
   # Return staged queries in proper order
-  return [query_file[query] for query in queries_in_order]
+  return [query_file[query] for query in FLAGS.dpb_sparksql_order]
 
 
 def Cleanup(_):

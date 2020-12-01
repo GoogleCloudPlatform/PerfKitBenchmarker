@@ -5,6 +5,8 @@
     -   It will be replaced by
         [Fedora Core OS](https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/)
         if a public image is made avaiable.
+-   The `dpb_sparksql_benchmark` now requires passing the requested queries with
+    `--dpb_sparksql_query_order`
 
 ### New features:
 
