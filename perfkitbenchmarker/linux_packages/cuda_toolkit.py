@@ -237,6 +237,12 @@ def AptInstall(vm):
   if current_version == version_to_install:
     return
 
+  cuda_path = f'/usr/local/cuda-{FLAGS.cuda_toolkit_version}'
+  if vm.TryRemoteCommand(f'stat {cuda_path}'):
+    vm.RemoteCommand('sudo rm -rf /usr/local/cuda', ignore_failure=True)
+    vm.RemoteCommand(f'sudo ln -s {cuda_path} /usr/local/cuda')
+    return
+
   vm.Install('build_tools')
   vm.Install('wget')
   vm.Install('nvidia_driver')
