@@ -3,13 +3,13 @@ Innovative Computing Laboratory, University of Tennessee
 HPL.out      output file name (if any)
 8            device out (6=stdout,7=stderr,file)
 1            # of problems sizes (N)
-problem_size Ns
+{{ problem_size }} Ns
 1            # of NBs
-block_size   NBs
+{{ block_size }} NBs
 0            PMAP process mapping (0=Row-,1=Column-major)
 1            # of process grids (P x Q)
-rows         Ps
-columns      Qs
+{{ rows }}     Ps
+{{ columns }}  Qs
 16.0         threshold
 1            # of panel fact
 2            PFACTs (0=left, 1=Crout, 2=Right)

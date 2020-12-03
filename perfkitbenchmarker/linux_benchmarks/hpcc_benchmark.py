@@ -60,6 +60,7 @@ from perfkitbenchmarker.linux_packages import numactl
 from perfkitbenchmarker.linux_packages import openblas
 
 FLAGS = flags.FLAGS
+LOCAL_HPCCINF_FILE = 'hpccinf.j2'
 HPCCINF_FILE = 'hpccinf.txt'
 MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
@@ -141,7 +142,7 @@ def CheckPrerequisites(_) -> None:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
     NotImplementedError: On certain flag combination not currently supported.
   """
-  data.ResourcePath(HPCCINF_FILE)
+  data.ResourcePath(LOCAL_HPCCINF_FILE)
   if FLAGS['hpcc_binary'].present:
     data.ResourcePath(FLAGS.hpcc_binary)
   if FLAGS.hpcc_numa_binding and FLAGS.num_vms > 1:
@@ -185,15 +186,15 @@ def CreateHpccinf(vm: linux_vm.BaseLinuxVirtualMachine,
       len(benchmark_spec.vms), vm.NumCpusForBenchmark(),
       vm.total_free_memory_kb)
   vm.RemoteCommand(f'rm -f {HPCCINF_FILE}')
-  file_path = data.ResourcePath(HPCCINF_FILE)
-  vm.PushFile(file_path, HPCCINF_FILE)
-  sed_cmd = (f'sed -i '
-             f'-e "s/problem_size/{dimensions.problem_size}/" '
-             f'-e "s/block_size/{dimensions.block_size}/" '
-             f'-e "s/rows/{dimensions.num_rows}/" '
-             f'-e "s/columns/{dimensions.num_columns}/" '
-             f'{HPCCINF_FILE}')
-  vm.RemoteCommand(sed_cmd)
+  vm.RenderTemplate(
+      data.ResourcePath(LOCAL_HPCCINF_FILE),
+      remote_path=HPCCINF_FILE,
+      context={
+          'problem_size': dimensions.problem_size,
+          'block_size': dimensions.block_size,
+          'rows': dimensions.num_rows,
+          'columns': dimensions.num_columns
+      })
   # Store in the spec to put into the run's metadata.
   benchmark_spec.hpcc_dimensions = dataclasses.asdict(dimensions)
 
@@ -350,6 +351,9 @@ def RunHpccSource(
       mpi_cmd, timeout=FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR)
   logging.info('HPCC Results:')
   stdout, _ = headnode_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
+  if stdout.startswith('HPL ERROR'):
+    # Annoyingly the mpi_cmd will succeed when there is an HPL error
+    raise errors.Benchmarks.RunError(f'Error running HPL: {stdout}')
 
   return ParseOutput(stdout)
 

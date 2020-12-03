@@ -23,6 +23,7 @@ from absl import flags
 from absl.testing import parameterized
 import mock
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
 from tests import pkb_common_test_case
 
@@ -154,12 +155,25 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.NumCpusForBenchmark.return_value = 128
     spec = mock.Mock(vms=[None])
     hpcc_benchmark.CreateHpccinf(vm, spec)
-    expected_command = ('sed -i '
-                        '-e "s/problem_size/231936/" '
-                        '-e "s/block_size/192/" '
-                        '-e "s/rows/8/" '
-                        '-e "s/columns/16/" hpccinf.txt')
-    vm.RemoteCommand.assert_called_with(expected_command)
+    vm.RenderTemplate.assert_called_with(
+        mock.ANY,
+        remote_path='hpccinf.txt',
+        context={
+            'problem_size': 231936,
+            'block_size': 192,
+            'rows': 8,
+            'columns': 16
+        })
+    # Test that the template_path file name is correct
+    self.assertEqual('hpccinf.j2',
+                     os.path.basename(vm.RenderTemplate.call_args[0][0]))
+
+  def testMpiRunErrorsOut(self):
+    vm = mock.Mock()
+    vm.NumCpusForBenchmark.return_value = 128
+    vm.RemoteCommand.return_value = 'HPL ERROR', ''
+    with self.assertRaises(errors.Benchmarks.RunError):
+      hpcc_benchmark.RunHpccSource([vm])
 
   @parameterized.named_parameters(
       ('nomem_set_large', 2, 32, 74, None, 124416, 8, 8),
