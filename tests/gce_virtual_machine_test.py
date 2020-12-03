@@ -22,6 +22,7 @@ import re
 import unittest
 
 from absl import flags
+from absl.testing import parameterized
 import mock
 
 from perfkitbenchmarker import benchmark_spec
@@ -224,6 +225,28 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
         'dedicated_host': False, 'gpu_count': 2, 'gpu_type': 'k80'
     }, vm.GetResourceMetadata())
+
+  @parameterized.named_parameters(
+      ('custom', {
+          'cpus': 1,
+          'memory': '1.0GiB'
+      }, 'skylake', 'skylake'),
+      ('n1', 'n1-standard-2', 'skylake', 'skylake'),
+      ('n2', 'n2-standard-4', 'skylake', None),
+  )
+  def testGenerateCreateCommand(self, machine_type, min_cpu_platform_flag,
+                                min_cpu_platform_in_command):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type=machine_type,
+        gpu_count=2,
+        gpu_type='t4',
+        project='fakeproject',
+        min_cpu_platform=min_cpu_platform_flag)
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    gcloud_cmd = vm._GenerateCreateCommand('x')
+    self.assertEqual(min_cpu_platform_in_command,
+                     gcloud_cmd.flags.get('min-cpu-platform'))
 
 
 def _CreateFakeDiskMetadata(image):

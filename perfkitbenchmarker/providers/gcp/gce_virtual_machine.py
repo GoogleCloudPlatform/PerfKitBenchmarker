@@ -442,9 +442,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
+      if self.min_cpu_platform:
+        cmd.flags['min-cpu-platform'] = self.min_cpu_platform
     else:
       cmd.flags['machine-type'] = self.machine_type
-    if self.gpu_count and 'a2-' not in self.machine_type:
+      if self.min_cpu_platform and 'n1-' in self.machine_type:
+        cmd.flags['min-cpu-platform'] = self.min_cpu_platform
+      else:
+        logging.warning('Cannot set min-cpu-platform for %s', self.machine_type)
+    if self.gpu_count and self.machine_type and 'a2-' not in self.machine_type:
       # A2 machine type already has predefined GPU type and count.
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
@@ -452,8 +458,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['no-restart-on-failure'] = True
     if self.node_group:
       cmd.flags['node-group'] = self.node_group.name
-    if self.min_cpu_platform and 'n1-' in self.machine_type:
-      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
     if self.gce_shielded_secure_boot:
       cmd.flags['shielded-secure-boot'] = True
 
