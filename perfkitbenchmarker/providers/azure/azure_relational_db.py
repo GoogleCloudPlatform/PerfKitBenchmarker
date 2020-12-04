@@ -36,7 +36,21 @@ DEFAULT_POSTGRES_PORT = 5432
 DEFALUT_SQLSERVER_VERSION = 'DEFAULT'
 DEFAULT_SQLSERVER_PORT = 1433
 
+# Disk size configurations details at
+# https://docs.microsoft.com/en-us/cli/azure/mysql/server?view=azure-cli-latest#az_mysql_server_create
+AZURE_MIN_DB_DISK_SIZE_MB = 5120  # Minimum db disk size supported by Azure
+AZURE_MAX_DB_DISK_SIZE_MB = 16777216  # Maximum db disk size supported by Azure
+
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
+
+# Longest time recorded is 20 minutes when
+# creating STANDARD_D64_V3 - 12/02/2020
+# The Azure command timeout with the following error message:
+#
+# Deployment failed. Correlation ID: fcdc3c76-33cc-4eb1-986c-fbc30ce7d820.
+# The operation timed out and automatically rolled back.
+# Please retry the operation.
+CREATE_AZURE_DB_TIMEOUT = 60 * 30
 
 
 class AzureRelationalDb(relational_db.BaseRelationalDb):
@@ -215,6 +229,24 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       raise Exception('Azure databases can only be used in high '
                       'availability. Please rerurn with flag '
                       '--managed_db_high_availability=True')
+
+    # Valid storage sizes range from minimum of 5120 MB
+    # and additional increments of 1024 MB up to maximum of 16777216 MB.
+    azure_disk_size_mb = self.spec.db_disk_spec.disk_size * 1024
+    if azure_disk_size_mb > AZURE_MAX_DB_DISK_SIZE_MB:
+      error_msg = ('Azure disk size was specified as in the disk spec as %s,'
+                   'got rounded to %s which is greater than the '
+                   'maximum of 16777216 MB' % (
+                       self.spec.db_disk_spec.disk_size, azure_disk_size_mb))
+      raise errors.Config.InvalidValue(error_msg)
+
+    elif azure_disk_size_mb < AZURE_MIN_DB_DISK_SIZE_MB:
+      error_msg = ('Azure disk size was specified '
+                   'as in the disk spec as %s, got rounded to %s '
+                   'which is smaller than the minimum of 5120 MB' % (
+                       self.spec.db_disk_spec.disk_size, azure_disk_size_mb))
+      raise  errors.Config.InvalidValue(error_msg)
+
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -230,15 +262,15 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         self.spec.database_username,
         '--admin-password',
         self.spec.database_password,
-        # AZ command line expects 128000MB-1024000MB in increments of 128000MB
         '--storage-size',
-        str(self.spec.db_disk_spec.disk_size * 1000),
+        str(azure_disk_size_mb),
         '--sku-name',
         self.spec.db_spec.machine_type,
         '--version',
         self.spec.engine_version,
     ]
-    vm_util.IssueCommand(cmd)
+
+    vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
 
   def _CreateSqlServerInstance(self):
     """Creates a managed sql server instance."""

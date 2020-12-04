@@ -235,7 +235,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if self.spec.engine == relational_db.MYSQL:
       self.replica_instance_id = 'replica-' + self.instance_id
       return '--failover-replica-name=' + self.replica_instance_id
-    elif self.spec.engine == relational_db.POSTGRES:
+    elif (self.spec.engine == relational_db.POSTGRES or
+          self.spec.engine == relational_db.SQLSERVER):
       return '--availability-type=REGIONAL'
     else:
       raise UnsupportedDatabaseEngineException(
