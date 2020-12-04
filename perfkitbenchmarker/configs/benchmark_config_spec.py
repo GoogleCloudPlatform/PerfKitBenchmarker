@@ -43,6 +43,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.dpb_service import BaseDpbService
+from perfkitbenchmarker.providers.gcp import gcp_spanner
 import six
 
 _DEFAULT_DISK_COUNT = 1
@@ -1191,6 +1192,34 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _SpannerDecoder(option_decoders.TypeVerifier):
+  """Validate the spanner dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_SpannerDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify spanner dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _SpannerSpec built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    spanner_config = super().Decode(value, component_full_name, flag_values)
+    return gcp_spanner.SpannerSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **spanner_config)
+
+
 class _TpuGroupsDecoder(option_decoders.TypeVerifier):
   """Validate the tpu dictionary of a benchmark config object."""
 
@@ -1612,6 +1641,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'vpc_peering': (option_decoders.BooleanDecoder, {
             'default': False,
+            'none_ok': True,
+        }),
+        'spanner': (_SpannerDecoder, {
+            'default': None,
             'none_ok': True,
         }),
     })

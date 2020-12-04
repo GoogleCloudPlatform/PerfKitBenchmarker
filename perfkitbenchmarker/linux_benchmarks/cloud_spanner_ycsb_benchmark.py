@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Run YCSB benchmark against Google Cloud Spanner
+"""Run YCSB benchmark against Google Cloud Spanner.
 
 By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Spanner. Configure the number of VMs via --ycsb_client_vms.
@@ -27,19 +27,7 @@ from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
 
 BENCHMARK_NAME = 'cloud_spanner_ycsb'
-BENCHMARK_CONFIG = """
-cloud_spanner_ycsb:
-  description: >
-      Run YCSB against Google Cloud Spanner.
-      Configure the number of VMs via --ycsb_client_vms.
-  vm_groups:
-    default:
-      vm_spec: *default_single_core
-      vm_count: 1
-  flags:
-    gcloud_scopes: >
-      https://www.googleapis.com/auth/spanner.admin
-      https://www.googleapis.com/auth/spanner.data"""
+
 BENCHMARK_INSTANCE_PREFIX = 'ycsb-'
 BENCHMARK_DESCRIPTION = 'YCSB'
 BENCHMARK_DATABASE = 'ycsb'
@@ -49,6 +37,23 @@ BENCHMARK_ZERO_PADDING = 12
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.admin',
     'https://www.googleapis.com/auth/spanner.data')
+
+BENCHMARK_CONFIG = f"""
+cloud_spanner_ycsb:
+  description: >
+      Run YCSB against Google Cloud Spanner.
+      Configure the number of VMs via --ycsb_client_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: 1
+  spanner:
+    service_type: {gcp_spanner.DEFAULT_SPANNER_TYPE}
+    nodes: 1
+    description: {BENCHMARK_DESCRIPTION}
+  flags:
+    gcloud_scopes: >
+      {' '.join(REQUIRED_SCOPES)}"""
 
 CLIENT_TAR_URL = {
     'go': 'https://storage.googleapis.com/cloud-spanner-client-packages/'
@@ -78,6 +83,7 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  config['spanner']['ddl'] = _BuildSchema()
   return config
 
 
@@ -95,22 +101,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
-
-  schema = _BuildSchema()
-
-  benchmark_spec.spanner_instance = gcp_spanner.GcpSpannerInstance(
-      name=BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri,
-      description=BENCHMARK_DESCRIPTION,
-      database=BENCHMARK_DATABASE,
-      ddl=schema)
-  if benchmark_spec.spanner_instance._Exists(instance_only=True):
-    logging.warning('Cloud Spanner instance %s exists, delete it first.' %
-                    FLAGS.cloud_spanner_ycsb_instance)
-    benchmark_spec.spanner_instance.Delete()
-  benchmark_spec.spanner_instance.Create()
-  if not benchmark_spec.spanner_instance._Exists():
-    logging.warning('Failed to create Cloud Spanner instance and database.')
-    benchmark_spec.spanner_instance.Delete()
 
   if FLAGS.cloud_spanner_ycsb_client_type != 'java':
     ycsb.SetYcsbTarUrl(CLIENT_TAR_URL[FLAGS.cloud_spanner_ycsb_client_type])
@@ -166,7 +156,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  benchmark_spec.spanner_instance.Delete()
+  del benchmark_spec
 
 
 def _BuildSchema():

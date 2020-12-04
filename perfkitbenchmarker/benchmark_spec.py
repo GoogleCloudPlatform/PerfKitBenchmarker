@@ -50,7 +50,7 @@ from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
-
+from perfkitbenchmarker.providers.gcp import gcp_spanner
 import six
 from six.moves import range
 import six.moves._thread
@@ -146,6 +146,7 @@ class BenchmarkSpec(object):
     self.dpb_service = None
     self.container_cluster = None
     self.relational_db = None
+    self.spanner = None
     self.tpus = []
     self.tpu_groups = {}
     self.edw_service = None
@@ -258,6 +259,15 @@ class BenchmarkSpec(object):
     providers.LoadProvider(cloud)
     relational_db_class = (relational_db.GetRelationalDbClass(cloud))
     self.relational_db = relational_db_class(self.config.relational_db)
+
+  def ConstructSpanner(self) -> None:
+    """Create the spanner instance."""
+    spanner_spec: gcp_spanner.SpannerSpec = self.config.spanner
+    if spanner_spec is None:
+      return
+    logging.info('Constructing spanner instance with spec: %s.', spanner_spec)
+    spanner_class = gcp_spanner.GetSpannerClass(spanner_spec.service_type)
+    self.spanner = spanner_class.FromSpec(spanner_spec)
 
   def ConstructTpuGroup(self, group_spec):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -633,6 +643,8 @@ class BenchmarkSpec(object):
     if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.SetVms(self.vm_groups)
       self.relational_db.Create()
+    if self.spanner:
+      self.spanner.Create()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.edw_service:
@@ -659,6 +671,8 @@ class BenchmarkSpec(object):
       self.dpb_service.Delete()
     if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.Delete()
+    if self.spanner:
+      self.spanner.Delete()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
     if self.edw_service:
