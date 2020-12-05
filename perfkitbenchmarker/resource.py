@@ -151,7 +151,7 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
     """Return true if the underlying resource is getting deleted.
 
     Supplying this method is optional.  Potentially use when the resource has an
-    aynchcronous deletion operation to avoid rerunning the deletion command and
+    asynchronous deletion operation to avoid rerunning the deletion command and
     track the deletion time correctly. If the subclass does not implement it
     then it just returns false.
 
