@@ -35,6 +35,7 @@
 -   SpecCPU2017 runs on Redhat, Centos7
 -   Aerospike YCSB can have multiple server nodes and different client/server
     machine types.
+-   HPL's configuration file customizable with flags.
 
 ### Bug fixes and maintenance updates:
 

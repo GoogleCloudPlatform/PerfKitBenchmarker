@@ -21,13 +21,45 @@ from typing import Optional
 import unittest
 from absl import flags
 from absl.testing import parameterized
+import dataclasses
+import jinja2
 import mock
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+
+def ReadDataFile(file_name: str) -> str:
+  with open(data.ResourcePath(file_name)) as fp:
+    return fp.read()
+
+
+def ReadTestDataFile(file_name: str) -> str:
+  path = os.path.join(os.path.dirname(__file__), '..', 'data', file_name)
+  with open(path) as fp:
+    return fp.read()
+
+
+def DefaultHpccDimensions(problem_size: int, num_rows: int,
+                          num_columns: int) -> hpcc_benchmark.HpccDimensions:
+  return hpcc_benchmark.HpccDimensions(
+      problem_size=problem_size,
+      block_size=hpcc_benchmark.BLOCK_SIZE,
+      num_rows=num_rows,
+      num_columns=num_columns,
+      pfacts=2,
+      nbmins=4,
+      rfacts=1,
+      bcasts=1,
+      depths=1,
+      swap=2,
+      l1=0,
+      u=0,
+      equilibration=1)
 
 
 class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -48,7 +80,7 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     """Tests parsing the HPCC values."""
     benchmark_spec = mock.MagicMock()
     samples = hpcc_benchmark.ParseOutput(self.contents)
-    hpcc_benchmark._AddCommonMetadata(samples, benchmark_spec)
+    hpcc_benchmark._AddCommonMetadata(samples, benchmark_spec, {})
     self.assertEqual(46, len(samples))
 
     # Verify metric values and units are parsed correctly.
@@ -108,7 +140,7 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     """Tests parsing the HPCC metadata."""
     benchmark_spec = mock.MagicMock()
     samples = hpcc_benchmark.ParseOutput(self.contents)
-    hpcc_benchmark._AddCommonMetadata(samples, benchmark_spec)
+    hpcc_benchmark._AddCommonMetadata(samples, benchmark_spec, {})
     self.assertEqual(46, len(samples))
     results = {metric: metadata for metric, _, _, metadata, _ in samples}
     for metadata in results.values():
@@ -155,15 +187,23 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.NumCpusForBenchmark.return_value = 128
     spec = mock.Mock(vms=[None])
     hpcc_benchmark.CreateHpccinf(vm, spec)
+    context = {
+        'problem_size': 231936,
+        'block_size': 192,
+        'num_rows': 8,
+        'num_columns': 16,
+        'pfacts': 2,
+        'nbmins': 4,
+        'rfacts': 1,
+        'bcasts': 1,
+        'depths': 1,
+        'swap': 2,
+        'l1': 0,
+        'u': 0,
+        'equilibration': 1,
+    }
     vm.RenderTemplate.assert_called_with(
-        mock.ANY,
-        remote_path='hpccinf.txt',
-        context={
-            'problem_size': 231936,
-            'block_size': 192,
-            'rows': 8,
-            'columns': 16
-        })
+        mock.ANY, remote_path='hpccinf.txt', context=context)
     # Test that the template_path file name is correct
     self.assertEqual('hpccinf.j2',
                      os.path.basename(vm.RenderTemplate.call_args[0][0]))
@@ -186,14 +226,17 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
                                num_columns: int) -> None:
     if flag_memory_size_mb:
       FLAGS.memory_size_mb = flag_memory_size_mb
-    expected = hpcc_benchmark.HpccDimensions(
-        problem_size=problem_size,
-        block_size=hpcc_benchmark.BLOCK_SIZE,
-        num_rows=num_rows,
-        num_columns=num_columns)
+    expected = DefaultHpccDimensions(problem_size, num_rows, num_columns)
     actual = hpcc_benchmark._CalculateHpccDimensions(
         num_vms, num_vcpus, memory_size_gb * 1000 * 1024)
-    self.assertEqual(expected, actual)
+    self.assertEqual(dataclasses.asdict(expected), dataclasses.asdict(actual))
+
+  def testRenderHpcConfig(self):
+    env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+    template = env.from_string(ReadDataFile('hpccinf.j2'))
+    context = dataclasses.asdict(DefaultHpccDimensions(192, 10, 11))
+    text = template.render(**context).strip()
+    self.assertEqual(ReadTestDataFile('hpl.dat.txt').strip(), text)
 
 
 if __name__ == '__main__':

@@ -103,12 +103,38 @@ class HpccDimensions:
     block_size: 'NBs': number of blocks.
     num_rows: 'Ps': number of rows for each grid.
     num_columns: 'Qs': number of columns for each grid.
+    pfacts: 'PFACTs': matrix-vector operation based factorization.
+    nbmins: 'NBMINs': the number of columns at which to stop factorization.
+    rfacts: 'RFACTs': type of recursive panel factorization.
+    bcasts: 'BCASTs': methodology to broadcast the current panel.
+    depths: 'DEPTHs': look ahread depth.
+    swap: swapping algorithm to use.
+    l1: 'L1': whether the upper triangle of the panel of columns should be
+       stored in transposed form.
+    u: 'U': whether the panel of rows U should be stored in transposed form.
+    equilibration: whether to enable the equilibration phase.
   """
   problem_size: int
   block_size: int
   num_rows: int
   num_columns: int
+  pfacts: int
+  nbmins: int
+  rfacts: int
+  bcasts: int
+  depths: int
+  swap: int
+  l1: int
+  u: int
+  equilibration: int
 
+
+# Translating the --hpcc_ flags into numbers in the HPL configuration file
+PFACT_RFACT_MAPPING = {'left': 0, 'crout': 1, 'right': 2}
+BCAST_MAPPING = {'1rg': 0, '1rM': 1, '2rg': 2, '2rM': 3, 'Lng': 4, 'LnM': 5}
+SWAP_MAPPING = {'bin-exch': 0, 'long': 1, 'mix': 2}
+L1_U_MAPPING = {True: 0, False: 1}
+EQUILIBRATION_MAPPING = {True: 1, False: 0}
 
 flags.DEFINE_integer(
     'memory_size_mb', None,
@@ -130,6 +156,43 @@ flags.DEFINE_boolean(
     'hpcc_numa_binding', False,
     'If True, attempt numa binding with membind and cpunodebind.')
 
+# HPL.dat configuration parameters
+CONFIG_PROBLEM_SIZE = flags.DEFINE_integer(
+    'hpcc_problem_size', None,
+    'Size of problems to solve.  Leave as None to run one single problem '
+    'whose size is based on the amount of memory.')
+CONFIG_BLOCK_SIZE = flags.DEFINE_integer(
+    'hpcc_block_size', None,
+    'Block size.  Left as None to be based on the amount of memory.')
+CONFIG_DIMENSIONS = flags.DEFINE_string(
+    'hpcc_dimensions', None,
+    'Number of rows and columns in the array: "1,2" is 1 row, 2 columns. '
+    'Leave as None for computer to select based on number of CPUs.')
+CONFIG_PFACTS = flags.DEFINE_enum(
+    'hpcc_pfacts', 'right', sorted(PFACT_RFACT_MAPPING),
+    'What type of matrix-vector operation based factorization to use.')
+CONFIG_NBMINS = flags.DEFINE_integer(
+    'hpcc_nbmins', 4,
+    'The number of columns at which to stop panel factorization.')
+CONFIG_RFACTS = flags.DEFINE_enum(
+    'hpcc_rfacts', 'crout', sorted(PFACT_RFACT_MAPPING),
+    'The type of recursive panel factorization to use.')
+CONFIG_BCASTS = flags.DEFINE_enum(
+    'hpcc_bcasts', '1rM', sorted(BCAST_MAPPING),
+    'The broadcast methodology to use on the current panel.')
+CONFIG_DEPTHS = flags.DEFINE_integer(
+    'hpcc_depths', 1, 'Look ahead depth. '
+    '0: next panel is factorized after current completely finished. '
+    '1: next panel is immediately factorized after current is updated.')
+CONFIG_SWAP = flags.DEFINE_enum('hpcc_swap', 'mix', sorted(SWAP_MAPPING),
+                                'Swapping algorithm to use.')
+CONFIG_L1 = flags.DEFINE_boolean(
+    'hpcc_l1', True, 'Whether to store the upper triangle as transposed.')
+CONFIG_U = flags.DEFINE_boolean('hpcc_u', True,
+                                'Whether to store the U column as transposed.')
+CONFIG_EQUILIBRATION = flags.DEFINE_boolean(
+    'hpcc_equilibration', True, 'Whether to enable the equilibration phase.')
+
 
 def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -148,6 +211,16 @@ def CheckPrerequisites(_) -> None:
   if FLAGS.hpcc_numa_binding and FLAGS.num_vms > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Numa binding with with multiple hpcc vm not supported.')
+  if CONFIG_DIMENSIONS.value:
+    parts = CONFIG_DIMENSIONS.value.split(',')
+    if len(parts) != 2:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'For --hpcc_dimensions must have two values like "1,2" '
+          f'not "{CONFIG_DIMENSIONS.value}"')
+    if not (parts[0].isnumeric() and parts[1].isnumeric()):
+      raise errors.Setup.InvalidFlagConfigurationError(
+          '--hpcc_dimensions must be integers like "1,2" not '
+          f'"{parts[0]},{parts[1]}"')
 
 
 def _CalculateHpccDimensions(num_vms: int, num_cpus: int,
@@ -158,29 +231,51 @@ def _CalculateHpccDimensions(num_vms: int, num_cpus: int,
   else:
     total_memory = vm_memory_size_actual * 1024 * num_vms
   total_cpus = num_cpus * num_vms
-  block_size = BLOCK_SIZE
+  block_size = CONFIG_BLOCK_SIZE.value or BLOCK_SIZE
 
-  # Finds a problem size that will fit in memory and is a multiple of the
-  # block size.
-  base_problem_size = math.sqrt(total_memory * .1)
-  blocks = int(base_problem_size / block_size)
-  blocks = blocks if (blocks % 2) == 0 else blocks - 1
-  problem_size = block_size * blocks
+  if CONFIG_PROBLEM_SIZE.value:
+    problem_size = CONFIG_PROBLEM_SIZE.value
+  else:
+    # Finds a problem size that will fit in memory and is a multiple of the
+    # block size.
+    base_problem_size = math.sqrt(total_memory * .1)
+    blocks = int(base_problem_size / block_size)
+    blocks = blocks if (blocks % 2) == 0 else blocks - 1
+    problem_size = block_size * blocks
 
-  # Makes the grid as 'square' as possible, with rows < columns
-  sqrt_cpus = int(math.sqrt(total_cpus)) + 1
-  num_rows = 0
-  num_columns = 0
-  for i in reversed(list(range(sqrt_cpus))):
-    if total_cpus % i == 0:
-      num_rows = i
-      num_columns = total_cpus // i
-      break
-  return HpccDimensions(problem_size, block_size, num_rows, num_columns)
+  if CONFIG_DIMENSIONS.value:
+    num_rows, num_columns = [
+        int(item) for item in CONFIG_DIMENSIONS.value.split(',')
+    ]
+  else:
+    # Makes the grid as 'square' as possible, with rows < columns
+    sqrt_cpus = int(math.sqrt(total_cpus)) + 1
+    num_rows = 0
+    num_columns = 0
+    for i in reversed(list(range(sqrt_cpus))):
+      if total_cpus % i == 0:
+        num_rows = i
+        num_columns = total_cpus // i
+        break
+
+  return HpccDimensions(
+      problem_size=problem_size,
+      block_size=block_size,
+      num_rows=num_rows,
+      num_columns=num_columns,
+      pfacts=PFACT_RFACT_MAPPING[CONFIG_PFACTS.value],
+      nbmins=CONFIG_NBMINS.value,
+      rfacts=PFACT_RFACT_MAPPING[CONFIG_RFACTS.value],
+      bcasts=BCAST_MAPPING[CONFIG_BCASTS.value],
+      depths=CONFIG_DEPTHS.value,
+      swap=SWAP_MAPPING[CONFIG_SWAP.value],
+      l1=L1_U_MAPPING[CONFIG_L1.value],
+      u=L1_U_MAPPING[CONFIG_U.value],
+      equilibration=EQUILIBRATION_MAPPING[CONFIG_EQUILIBRATION.value])
 
 
 def CreateHpccinf(vm: linux_vm.BaseLinuxVirtualMachine,
-                  benchmark_spec: bm_spec.BenchmarkSpec) -> None:
+                  benchmark_spec: bm_spec.BenchmarkSpec) -> HpccDimensions:
   """Creates the HPCC input file."""
   dimensions = _CalculateHpccDimensions(
       len(benchmark_spec.vms), vm.NumCpusForBenchmark(),
@@ -189,14 +284,8 @@ def CreateHpccinf(vm: linux_vm.BaseLinuxVirtualMachine,
   vm.RenderTemplate(
       data.ResourcePath(LOCAL_HPCCINF_FILE),
       remote_path=HPCCINF_FILE,
-      context={
-          'problem_size': dimensions.problem_size,
-          'block_size': dimensions.block_size,
-          'rows': dimensions.num_rows,
-          'columns': dimensions.num_columns
-      })
-  # Store in the spec to put into the run's metadata.
-  benchmark_spec.hpcc_dimensions = dataclasses.asdict(dimensions)
+      context=dataclasses.asdict(dimensions))
+  return dimensions
 
 
 def PrepareHpcc(vm: linux_vm.BaseLinuxVirtualMachine) -> None:
@@ -307,19 +396,21 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     A list of sample.Sample objects.
   """
   # recreate the HPL config file with each run in case parameters change
-  CreateHpccinf(benchmark_spec.vms[0], benchmark_spec)
+  dimensions = CreateHpccinf(benchmark_spec.vms[0], benchmark_spec)
+  logging.info('HPL.dat dimensions: %s', dimensions)
   samples = RunHpccSource(benchmark_spec.vms)
-  _AddCommonMetadata(samples, benchmark_spec)
+  _AddCommonMetadata(samples, benchmark_spec, dataclasses.asdict(dimensions))
   return samples
 
 
 def _AddCommonMetadata(samples: List[sample.Sample],
-                       benchmark_spec: bm_spec.BenchmarkSpec):
+                       benchmark_spec: bm_spec.BenchmarkSpec,
+                       dimensions: Dict[str, Any]) -> None:
   """Adds metadata common to all samples."""
   for item in samples:
     item.metadata.update(BaseMetadata())
     item.metadata['num_machines'] = len(benchmark_spec.vms)
-    item.metadata.update(benchmark_spec.hpcc_dimensions)
+    item.metadata.update(dimensions)
 
 
 def RunHpccSource(
