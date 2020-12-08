@@ -156,9 +156,17 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
     # "-o" flag above specifies CSV output, but there is one extra header line:
     banner = next(fp)
     assert banner.startswith('MIGRATED'), stdout
-    r = csv.DictReader(fp)
-    results = next(r)
+    header = None
+    results = None
+    for row in csv.reader(fp):
+      if header and len(header) == len(row):
+        results = dict(zip(header, row))
+        break
+      else:
+        if 'Throughput' in row:
+          header = row
     logging.info('Netperf Results: %s', results)
+    assert results
     assert 'Throughput' in results
   except:
     raise Exception('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
