@@ -117,7 +117,7 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
     if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
       return None, None
 
-    expected_command = ('java -cp bq-java-client-2.2.jar '
+    expected_command = ('java -cp bq-java-client-2.3.jar '
                         'com.google.cloud.performance.edw.Single --project {} '
                         '--credentials_file {} --dataset {} --query_file '
                         '{}').format(PROJECT_ID, 'SERVICE_ACCOUNT_KEY_FILE',

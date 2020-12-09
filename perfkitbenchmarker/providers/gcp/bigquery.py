@@ -239,7 +239,7 @@ class JavaClientInterface(GenericClientInterface):
           package_name, [FLAGS.gcp_service_account_key_file], '')
     # Push the executable jar to the working directory on client vm
     self.client_vm.InstallPreprovisionedPackageData(package_name,
-                                                    ['bq-java-client-2.2.jar'],
+                                                    ['bq-java-client-2.3.jar'],
                                                     '')
 
   def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
@@ -259,7 +259,7 @@ class JavaClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
 
-    query_command = ('java -cp bq-java-client-2.2.jar '
+    query_command = ('java -cp bq-java-client-2.3.jar '
                      'com.google.cloud.performance.edw.Single --project {} '
                      '--credentials_file {} --dataset {} '
                      '--query_file {}').format(self.project_id, key_file_name,
@@ -286,7 +286,7 @@ class JavaClientInterface(GenericClientInterface):
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
-    cmd = ('java -cp bq-java-client-2.2.jar '
+    cmd = ('java -cp bq-java-client-2.3.jar '
            'com.google.cloud.performance.edw.Simultaneous --project {} '
            '--credentials_file {} --dataset {} --submission_interval {} '
            '--query_files {}'.format(self.project_id, key_file_name,
@@ -308,7 +308,7 @@ class JavaClientInterface(GenericClientInterface):
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
-    cmd = ('java -cp bq-java-client-2.2.jar '
+    cmd = ('java -cp bq-java-client-2.3.jar '
            'com.google.cloud.performance.edw.Throughput --project {} '
            '--credentials_file {} --dataset {} --query_streams {}'.format(
                self.project_id, key_file_name, self.dataset_id,
