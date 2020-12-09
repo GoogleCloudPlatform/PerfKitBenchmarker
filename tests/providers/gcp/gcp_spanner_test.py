@@ -31,9 +31,9 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
     spanner = gcp_spanner.GcpSpannerInstance.FromSpec(test_spec)
 
-    self.assertEqual(spanner._name, 'test_instance')
+    self.assertEqual(spanner.name, 'test_instance')
     self.assertEqual(spanner._description, 'test_description')
-    self.assertEqual(spanner._database, 'test_database')
+    self.assertEqual(spanner.database, 'test_database')
     self.assertEqual(spanner._ddl, 'test_schema')
     self.assertEqual(spanner._nodes, 2)
     self.assertEqual(spanner.project, 'test_project')

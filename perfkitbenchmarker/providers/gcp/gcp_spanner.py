@@ -183,9 +183,9 @@ class GcpSpannerInstance(resource.BaseResource):
                project: str = None,
                **kwargs):
     super(GcpSpannerInstance, self).__init__(**kwargs)
-    self._name = name
+    self.name = name
+    self.database = database
     self._description = description
-    self._database = database
     self._ddl = ddl
     self._config = config or FLAGS.cloud_spanner_config
     self._nodes = nodes or FLAGS.cloud_spanner_nodes
@@ -209,7 +209,7 @@ class GcpSpannerInstance(resource.BaseResource):
 
   def _Create(self):
     """Creates the instance, the database, and update the schema."""
-    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self._name)
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self.name)
     cmd.flags['description'] = self._description
     cmd.flags['nodes'] = self._nodes
     cmd.flags['config'] = self._config
@@ -219,16 +219,16 @@ class GcpSpannerInstance(resource.BaseResource):
       return
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
-                             self._database)
-    cmd.flags['instance'] = self._name
+                             self.database)
+    cmd.flags['instance'] = self.name
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Create GCP Spanner database failed.')
       return
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
-                             self._database)
-    cmd.flags['instance'] = self._name
+                             self.database)
+    cmd.flags['instance'] = self.name
     cmd.flags['ddl'] = self._ddl
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
@@ -239,7 +239,7 @@ class GcpSpannerInstance(resource.BaseResource):
   def _Delete(self):
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'delete',
-                             self._name)
+                             self.name)
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Delete GCP Spanner instance failed.')
@@ -249,25 +249,25 @@ class GcpSpannerInstance(resource.BaseResource):
   def _Exists(self, instance_only=False):
     """Returns true if the instance and the database exists."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
-                             self._name)
+                             self.name)
 
     # Do not log error or warning when checking existence.
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
-      logging.info('Could not found GCP Spanner instances %s.', self._name)
+      logging.info('Could not found GCP Spanner instances %s.', self.name)
       return False
 
     if instance_only:
       return True
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'describe',
-                             self._database)
-    cmd.flags['instance'] = self._name
+                             self.database)
+    cmd.flags['instance'] = self.name
 
     # Do not log error or warning when checking existence.
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
-      logging.info('Could not found GCP Spanner database %s.', self._database)
+      logging.info('Could not found GCP Spanner database %s.', self.database)
       return False
 
     return True
