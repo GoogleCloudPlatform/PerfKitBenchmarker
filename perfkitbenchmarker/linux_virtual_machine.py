@@ -439,7 +439,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoConfigureTCPWindow()
     self.UpdateEnvironmentPath()
     self._RebootIfNecessary()
-    self._DisableCpus()
     self.RecordAdditionalMetadata()
     self.BurnCpu()
     self.FillDisk()
@@ -459,8 +458,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def _DisableCpus(self):
     """Apply num_disable_cpus to the VM.
-
-    This setting does not persist if the VM is rebooted.
 
     Raises:
       ValueError: if num_disable_cpus is outside of (0 ... num_cpus-1)
@@ -1032,6 +1029,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
     self._has_remote_command_script = False
+    self._DisableCpus()
 
   def MoveFile(self, target, source_path, remote_path=''):
     self.MoveHostFile(target, source_path, remote_path)
