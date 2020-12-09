@@ -325,8 +325,14 @@ def GetUDPStreamSample(command_out, sender_cpu_results, receiving_cpu_results,
   data_line = command_out.split('\n')[0].split(' ')
   data_line = [val for val in data_line if val]
 
-  actual_bandwidth = float(data_line[6])
-  units = data_line[7]
+  try:
+    actual_bandwidth = float(data_line[6])
+    units = data_line[7]
+  except IndexError as e:
+    # nuttcp connection timed out during the run.
+    raise errors.Benchmarks.KnownIntermittentError(
+        f'Not enough data to parse nuttcp results, command timed out: {e}')
+
   packet_loss = data_line[16]
 
   metadata = {
