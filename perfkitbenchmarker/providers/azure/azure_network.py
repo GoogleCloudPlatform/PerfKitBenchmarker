@@ -569,9 +569,14 @@ class AzureNetwork(network.BaseNetwork):
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.location,
         storage_account_prefix[:24 - len(suffix)] + suffix)
+
+    # Length restriction from https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftnetwork  pylint: disable=line-too-long
     prefix = '%s-%s' % (self.resource_group.name, self.location)
+    vnet_name = prefix + '-vnet'
+    if len(vnet_name) > 64:
+      vnet_name = prefix[:59] + '-vnet'
     self.vnet = AzureVirtualNetwork.GetForLocation(spec, self.location,
-                                                   prefix + '-vnet')
+                                                   vnet_name)
     subnet_name = self.vnet.name
     if self.availability_zone:
       subnet_name += '-' + self.availability_zone
