@@ -21,12 +21,12 @@ import logging
 from typing import Dict, Optional
 
 from absl import flags
+import dataclasses
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
 
-DEFAULT_REGION = 'us-central1'
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('cloud_spanner_config',
@@ -43,7 +43,20 @@ flags.DEFINE_string('cloud_spanner_project',
 # Valid GCP Spanner types:
 DEFAULT_SPANNER_TYPE = 'default'
 
+_DEFAULT_REGION = 'us-central1'
+_DEFAULT_DESCRIPTION = 'Spanner instance created by PKB.'
+_DEFAULT_DDL = """
+  CREATE TABLE pkb_table (
+    id     STRING(MAX),
+    field0 STRING(MAX)
+  ) PRIMARY KEY(id)
+  """
 
+# Common decoder configuration option.
+_NONE_OK = {'default': None, 'none_ok': True}
+
+
+@dataclasses.dataclass
 class SpannerSpec(spec.BaseSpec):
   """Configurable options of a Spanner instance."""
   service_type: str
@@ -71,10 +84,6 @@ class SpannerSpec(spec.BaseSpec):
       to construct in order to decode the named option.
     """
     result = super()._GetOptionDecoderConstructions()
-
-    # Get values needed for defaults
-    run_uri = FLAGS.run_uri
-
     result.update({
         'service_type': (
             option_decoders.EnumDecoder,
@@ -84,41 +93,15 @@ class SpannerSpec(spec.BaseSpec):
                 ],
                 'default': DEFAULT_SPANNER_TYPE
             }),
-        'name': (option_decoders.StringDecoder, {
-            'default': f'pkb-{run_uri}'
-        }),
-        'description': (option_decoders.StringDecoder, {
-            'default': 'Spanner instance created by PKB.',
-        }),
-        'database': (option_decoders.StringDecoder, {
-            'default': f'pkb-db-{run_uri}'
-        }),
-        'ddl': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
-        'config': (option_decoders.StringDecoder, {
-            'default': f'regional-{cls._GetDefaultRegion()}'
-        }),
-        'nodes': (option_decoders.IntDecoder, {
-            'default': 1,
-        }),
-        'project': (option_decoders.StringDecoder, {
-            'default': None
-        }),
+        'name': (option_decoders.StringDecoder, _NONE_OK),
+        'database': (option_decoders.StringDecoder, _NONE_OK),
+        'description': (option_decoders.StringDecoder, _NONE_OK),
+        'ddl': (option_decoders.StringDecoder, _NONE_OK),
+        'config': (option_decoders.StringDecoder, _NONE_OK),
+        'nodes': (option_decoders.IntDecoder, _NONE_OK),
+        'project': (option_decoders.StringDecoder, _NONE_OK),
     })
-
     return result
-
-  @classmethod
-  def _GetDefaultRegion(cls):
-    """Defaults to the region used for the test."""
-    try:
-      region = util.GetRegionFromZone(
-          FLAGS.zones[0] if FLAGS.zones else FLAGS.zone[0])
-    except IndexError:
-      region = DEFAULT_REGION
-    return region
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -140,16 +123,6 @@ class SpannerSpec(spec.BaseSpec):
     if flag_values['cloud_spanner_project'].present:
       config_values['project'] = flag_values.cloud_spanner_project
 
-  def __repr__(self):
-    return (f'SpannerSpec (service_type: {self.service_type}, '
-            f'name: {self.name} '
-            f'description: {self.description}, '
-            f'database: {self.database}, '
-            f'ddl: {self.ddl}, '
-            f'config: {self.config}, '
-            f'nodes: {self.nodes}, '
-            f'project: {self.project})')
-
 
 class GcpSpannerInstance(resource.BaseResource):
   """Object representing a GCP Spanner Instance.
@@ -157,7 +130,7 @@ class GcpSpannerInstance(resource.BaseResource):
   The project and Cloud Spanner config must already exist. Instance and database
   will be created and torn down before and after the test.
 
-  The following parameters are set by corresponding FLAGs.
+  The following parameters are overridden by the corresponding FLAGs.
     project:     FLAGS.cloud_spanner_project
     config:      FLAGS.cloud_spanner_config
     nodes:       FLAGS.cloud_spanner_nodes
@@ -174,21 +147,21 @@ class GcpSpannerInstance(resource.BaseResource):
   SERVICE_TYPE = DEFAULT_SPANNER_TYPE
 
   def __init__(self,
-               name: str,
-               description: str,
-               database: str,
-               ddl: str,
-               config: str = None,
-               nodes: int = None,
-               project: str = None,
+               name: Optional[str] = None,
+               description: str = _DEFAULT_DESCRIPTION,
+               database: Optional[str] = None,
+               ddl: str = _DEFAULT_DDL,
+               config: Optional[str] = None,
+               nodes: int = 1,
+               project: Optional[str] = None,
                **kwargs):
     super(GcpSpannerInstance, self).__init__(**kwargs)
-    self.name = name
-    self.database = database
+    self.name = name or f'pkb-instance-{FLAGS.run_uri}'
+    self.database = database or f'pkb-database-{FLAGS.run_uri}'
     self._description = description
     self._ddl = ddl
-    self._config = config or FLAGS.cloud_spanner_config
-    self._nodes = nodes or FLAGS.cloud_spanner_nodes
+    self._config = config or self._GetDefaultConfig()
+    self._nodes = nodes
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
@@ -196,16 +169,26 @@ class GcpSpannerInstance(resource.BaseResource):
         project or FLAGS.project or util.GetDefaultProject())
     self.zone = None
 
+  def _GetDefaultConfig(self):
+    """Gets the config that corresponds the region used for the test."""
+    try:
+      region = util.GetRegionFromZone(
+          FLAGS.zones[0] if FLAGS.zones else FLAGS.zone[0])
+    except IndexError:
+      region = _DEFAULT_REGION
+    return f'regional-{region}'
+
   @classmethod
   def FromSpec(cls, spanner_spec: SpannerSpec) -> 'GcpSpannerInstance':
     """Initialize Spanner from the provided spec."""
-    return cls(spanner_spec.name,
-               spanner_spec.description,
-               spanner_spec.database,
-               spanner_spec.ddl,
-               spanner_spec.config,
-               spanner_spec.nodes,
-               spanner_spec.project)
+    return cls(
+        name=spanner_spec.name,
+        description=spanner_spec.description,
+        database=spanner_spec.database,
+        ddl=spanner_spec.ddl,
+        config=spanner_spec.config,
+        nodes=spanner_spec.nodes,
+        project=spanner_spec.project)
 
   def _Create(self):
     """Creates the instance, the database, and update the schema."""
