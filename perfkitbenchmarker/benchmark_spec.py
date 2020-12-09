@@ -671,7 +671,7 @@ class BenchmarkSpec(object):
       self.dpb_service.Delete()
     if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.Delete()
-    if self.spanner:
+    if hasattr(self, 'spanner') and self.spanner:
       self.spanner.Delete()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
