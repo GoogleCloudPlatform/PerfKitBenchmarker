@@ -1372,6 +1372,7 @@ def PrepareVM(vm, service):
   vm.InstallPackages('python3-pip')
 
   # dependencies of API_TEST_SCRIPT
+  vm.RemoteCommand('sudo pip3 install --upgrade pip')
   vm.RemoteCommand('sudo pip3 install absl-py')
   vm.RemoteCommand('sudo pip3 install pyyaml')
 
