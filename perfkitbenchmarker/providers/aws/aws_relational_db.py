@@ -723,8 +723,9 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     Supplying this method is optional. It is intended to allow additional
     flexibility in creating resource dependencies separately from _Create().
     """
-    self._AssertClientAndDbInSameRegion()
-    self._SetupNetworking()
+    if self.is_managed_db:
+      self._AssertClientAndDbInSameRegion()
+      self._SetupNetworking()
 
   def _DeleteDependencies(self):
     """Method that will be called once after _DeleteResource() is called.
@@ -732,7 +733,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     Supplying this method is optional. It is intended to allow additional
     flexibility in deleting resource dependencies separately from _Delete().
     """
-    self._TeardownNetworking()
+    if self.is_managed_db:
+      self._TeardownNetworking()
 
   def _FailoverHA(self):
     """Fail over from master to replica."""
