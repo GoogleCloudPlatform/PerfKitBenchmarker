@@ -63,3 +63,4 @@
 -   Correctly handle ARM processors in netperf.
 -   Added --always_teardown_on_exception to allow pkb to perform teardown when
     there is exception at the provision|prepare|run|cleanup stage.
+-   Updates boto and awscli installation to pip3.

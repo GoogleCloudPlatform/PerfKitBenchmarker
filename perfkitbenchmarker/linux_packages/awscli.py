@@ -19,8 +19,8 @@ from perfkitbenchmarker import errors
 
 def Install(vm):
   """Installs the awscli package on the VM."""
-  vm.Install('pip')
-  vm.RemoteCommand('sudo pip install awscli')
+  vm.InstallPackages('python3-pip')
+  vm.RemoteCommand('sudo pip3 install awscli')
 
 
 def YumInstall(vm):
@@ -34,4 +34,4 @@ def YumInstall(vm):
 
 
 def Uninstall(vm):
-  vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
+  vm.RemoteCommand('/usr/bin/yes | sudo pip3 uninstall awscli')
