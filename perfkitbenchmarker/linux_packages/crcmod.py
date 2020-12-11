@@ -18,8 +18,8 @@
 
 def _Install(vm):
   """Installs the crcmod package on the VM."""
-  vm.Install('pip')
-  vm.RemoteCommand('sudo pip install -U crcmod')
+  vm.InstallPackages('python3-pip')
+  vm.RemoteCommand('sudo pip3 install -U crcmod')
 
 
 def YumInstall(vm):
