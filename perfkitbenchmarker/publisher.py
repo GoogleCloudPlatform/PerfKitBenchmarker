@@ -131,6 +131,10 @@ flags.DEFINE_string(
     'influx_db_name', 'perfkit',
     'Name of Influx DB database that you wish to publish to or create')
 
+flags.DEFINE_boolean(
+    'record_log_publisher', True,
+    'Whether to use the log publisher or not.')
+
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
@@ -876,7 +880,10 @@ class SampleCollector(object):
   @classmethod
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
-    publishers = [LogPublisher(), PrettyPrintStreamPublisher()]
+    publishers = []
+    if FLAGS.record_log_publisher:
+      publishers.append(LogPublisher())
+    publishers.append(PrettyPrintStreamPublisher())
 
     # Publish to the default JSON path even if we will also publish to a
     # different path due to flags.
