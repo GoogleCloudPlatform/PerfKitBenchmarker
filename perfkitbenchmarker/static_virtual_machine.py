@@ -302,6 +302,11 @@ class Ubuntu1604BasedStaticVirtualMachine(
   pass
 
 
+class Ubuntu1804BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin):
+  pass
+
+
 class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
                                      linux_virtual_machine.ClearMixin):
   pass
@@ -312,11 +317,26 @@ class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
+class Rhel8BasedStaticVirtualMachine(StaticVirtualMachine,
+                                     linux_virtual_machine.Rhel8Mixin):
+  pass
+
+
 class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.CentOs7Mixin):
   pass
 
 
+class CentOs8BasedStaticVirtualMachine(StaticVirtualMachine,
+                                       linux_virtual_machine.CentOs8Mixin):
+  pass
+
+
 class Debian9BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.Debian9Mixin):
+  pass
+
+
+class Debian10BasedStaticVirtualMachine(StaticVirtualMachine,
+                                        linux_virtual_machine.Debian10Mixin):
   pass
