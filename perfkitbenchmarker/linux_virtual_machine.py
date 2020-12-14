@@ -438,6 +438,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoConfigureNetworkForBBR()
     self.DoConfigureTCPWindow()
     self.UpdateEnvironmentPath()
+    self._DisableCpus()
     self._RebootIfNecessary()
     self.RecordAdditionalMetadata()
     self.BurnCpu()
