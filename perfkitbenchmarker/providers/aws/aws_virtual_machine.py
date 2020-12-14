@@ -1060,34 +1060,36 @@ class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
   DEFAULT_USER_NAME = 'admin'
 
 
-class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
+class UbuntuBasedAwsVirtualMachine(AwsVirtualMachine):
+  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
+  DEFAULT_USER_NAME = 'ubuntu'
+
+
+class Ubuntu1604BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
-  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
-  DEFAULT_USER_NAME = 'ubuntu'
 
 
-class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
+class Ubuntu1710BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
-  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
-  DEFAULT_USER_NAME = 'ubuntu'
 
 
-class Ubuntu1804BasedAwsVirtualMachine(AwsVirtualMachine,
+class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
-  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
-  DEFAULT_USER_NAME = 'ubuntu'
 
 
-class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
+class Ubuntu2004BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu2004Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-focal-20.04-*64-server-20*'
+
+
+class JujuBasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
   """Class with configuration for AWS Juju virtual machines."""
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
-  DEFAULT_USER_NAME = 'ubuntu'
 
 
 class AmazonLinux2BasedAwsVirtualMachine(

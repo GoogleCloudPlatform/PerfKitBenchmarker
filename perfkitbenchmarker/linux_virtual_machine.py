@@ -1918,6 +1918,14 @@ class Ubuntu1804Mixin(BaseUbuntuMixin):
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
+# Inherit Ubuntu 18's idiosyncracies.
+# Note https://bugs.launchpad.net/snappy/+bug/1659719 is also marked not fix in
+# focal.
+class Ubuntu2004Mixin(Ubuntu1804Mixin):
+  """Class holding Ubuntu2004 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU2004
+
+
 class Ubuntu1604Cuda9Mixin(BaseUbuntuMixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
