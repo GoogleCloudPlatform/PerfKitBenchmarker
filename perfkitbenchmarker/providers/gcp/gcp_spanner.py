@@ -59,6 +59,12 @@ _NONE_OK = {'default': None, 'none_ok': True}
 @dataclasses.dataclass
 class SpannerSpec(spec.BaseSpec):
   """Configurable options of a Spanner instance."""
+
+  # Needed for registering the spec class.
+  SPEC_TYPE = 'SpannerSpec'
+  SPEC_ATTRS = ['SERVICE_TYPE']
+  SERVICE_TYPE = DEFAULT_SPANNER_TYPE
+
   service_type: str
   name: str
   description: str
@@ -122,6 +128,11 @@ class SpannerSpec(spec.BaseSpec):
       config_values['nodes'] = flag_values.cloud_spanner_nodes
     if flag_values['cloud_spanner_project'].present:
       config_values['project'] = flag_values.cloud_spanner_project
+
+
+def GetSpannerSpecClass(service_type) -> Optional[spec.BaseSpecMetaClass]:
+  """Return the SpannerSpec class corresponding to 'service_type'."""
+  return spec.GetSpecClass(SpannerSpec, SERVICE_TYPE=service_type)
 
 
 class GcpSpannerInstance(resource.BaseResource):

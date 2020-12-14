@@ -1215,7 +1215,14 @@ class _SpannerDecoder(option_decoders.TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     spanner_config = super().Decode(value, component_full_name, flag_values)
-    return gcp_spanner.SpannerSpec(
+    # Allow for subclass-specific specs.
+    if 'service_type' in spanner_config:
+      spanner_spec_class = gcp_spanner.GetSpannerSpecClass(
+          spanner_config['service_type'])
+    else:
+      raise errors.Config.InvalidValue(
+          'Required attribute `service_type` missing from spanner config.')
+    return spanner_spec_class(
         self._GetOptionFullName(component_full_name), flag_values,
         **spanner_config)
 
