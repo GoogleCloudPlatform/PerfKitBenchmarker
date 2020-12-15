@@ -18,7 +18,9 @@ HPCG_DIR=`pwd`
 
 DATETIME=`hostname`.`date +"%Y%m%d.%H%M%S"`
 
-MPIFLAGS="--mca btl tcp,self"   # just to get rid of warning on psg cluster node wo proper IB sw installed
+# Just to get rid of warning on psg cluster node wo proper IB sw installed
+# Use mca btl_tcp_if_exclude to skip docker network in DLVM.
+MPIFLAGS="--mca btl tcp,self --mca btl_tcp_if_exclude docker0,lo"
 HPCG_BIN="hpcg"
 
 echo " ****** running HPCG 9-3-20 binary=$HPCG_BIN on $NUM_GPUS GPUs ***************************** "
