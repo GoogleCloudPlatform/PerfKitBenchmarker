@@ -53,6 +53,16 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       vm._Create()
 
+  def testInsufficientSpotCapacity(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='test_machine_type', zone='testing',
+        low_priority=True)
+    vm = TestAzureVirtualMachine(spec)
+
+    self.mock_cmd.side_effect = [('', 'OverconstrainedAllocationRequest', 1)]
+    with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
+      vm._Create()
+
 
 class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
 
