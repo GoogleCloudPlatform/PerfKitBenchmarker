@@ -51,6 +51,7 @@ _DEFAULT_DDL = """
     field0 STRING(MAX)
   ) PRIMARY KEY(id)
   """
+_DEFAULT_NODES = 1
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -159,20 +160,20 @@ class GcpSpannerInstance(resource.BaseResource):
 
   def __init__(self,
                name: Optional[str] = None,
-               description: str = _DEFAULT_DESCRIPTION,
+               description: Optional[str] = None,
                database: Optional[str] = None,
-               ddl: str = _DEFAULT_DDL,
+               ddl: Optional[str] = None,
                config: Optional[str] = None,
-               nodes: int = 1,
+               nodes: Optional[int] = None,
                project: Optional[str] = None,
                **kwargs):
     super(GcpSpannerInstance, self).__init__(**kwargs)
     self.name = name or f'pkb-instance-{FLAGS.run_uri}'
     self.database = database or f'pkb-database-{FLAGS.run_uri}'
-    self._description = description
-    self._ddl = ddl
+    self._description = description or _DEFAULT_DESCRIPTION
+    self._ddl = ddl or _DEFAULT_DDL
     self._config = config or self._GetDefaultConfig()
-    self._nodes = nodes
+    self._nodes = nodes or _DEFAULT_NODES
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
