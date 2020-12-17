@@ -50,7 +50,7 @@ def _Build(vm):
                                      cuda_home, 'lib64')))
 
   vm.RemoteCommand('cd nccl && {env} make -j 20 pkg.debian.build'
-                   .format(env=vm_util.DictonaryToEnvString(env_vars)))
+                   .format(env=vm_util.DictionaryToEnvString(env_vars)))
 
 
 def AptInstall(vm):

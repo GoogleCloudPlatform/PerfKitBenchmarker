@@ -221,5 +221,11 @@ class VmUtilTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_vm.RemoteCommand.assert_called_with(
         'sed -i -r "s|current|new|" test_file')
 
+  def testDictionaryToEnvString(self):
+    self.assertEqual('', vm_util.DictionaryToEnvString({}))
+    test_dict = {'a': 'b', 'c': 'd'}
+    self.assertEqual('a=b c=d', vm_util.DictionaryToEnvString(test_dict))
+    self.assertEqual('a=b;c=d', vm_util.DictionaryToEnvString(test_dict, ';'))
+
 if __name__ == '__main__':
   unittest.main()

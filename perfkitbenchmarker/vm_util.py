@@ -22,6 +22,7 @@ import contextlib
 import logging
 import os
 import platform
+import posixpath
 import random
 import re
 import string
@@ -685,16 +686,25 @@ def ReplaceText(vm, current_value, new_value, file_name, regex_char='/'):
                        file=file_name))
 
 
-def DictonaryToEnvString(dictionary):
+def DictionaryToEnvString(dictionary, joiner=' '):
   """Convert a dictionary to a space sperated 'key=value' string.
 
   Args:
     dictionary: the key-value dictionary to be convert
+    joiner: string to separate the entries in the returned value.
 
   Returns:
     a string representing the dictionary
   """
-  dict_str = ''
-  for key, value in sorted(dictionary.items()):
-    dict_str += ' {key}={value}'.format(key=key, value=value)
-  return dict_str
+  return joiner.join(
+      f'{key}={value}' for key, value in sorted(dictionary.items()))
+
+
+def CreateRemoteFile(vm, file_contents, file_path):
+  """Creates a file on the remote server."""
+  with NamedTemporaryFile(mode='w') as tf:
+    tf.write(file_contents)
+    tf.close()
+    parent_dir = posixpath.dirname(file_path)
+    vm.RemoteCommand(f'[ -d {parent_dir} ] || mkdir -p {parent_dir}')
+    vm.PushFile(tf.name, file_path)

@@ -193,11 +193,9 @@ def _ConfigureSpec(prime_client, clients, benchmark,
   sed_cmd = 'sudo sed -i {0} {1}'.format(sed_expressions, config_path)
   prime_client.RemoteCommand(sed_cmd)
 
-  with vm_util.NamedTemporaryFile(mode='w') as tf:
-    for client in clients:
-      tf.write('%s %s\n' % (client.internal_ip, _MOUNT_POINT))
-    tf.close()
-    prime_client.PushFile(tf.name, posixpath.join(_SPEC_DIR, _MOUNTPOINTS_FILE))
+  mount_points = [f'{client.internal_ip} {_MOUNT_POINT}' for client in clients]
+  vm_util.CreateRemoteFile(prime_client, '\n'.join(mount_points),
+                           posixpath.join(_SPEC_DIR, _MOUNTPOINTS_FILE))
 
 
 def Prepare(benchmark_spec):
