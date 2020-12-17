@@ -828,7 +828,7 @@ class Ubuntu1710BasedAzureVirtualMachine(AzureVirtualMachine,
 
 class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1804Mixin):
-  IMAGE_URN = 'Canonical:UbuntuServer:18.0a4-LTS:latest'
+  IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
 
 
 class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
