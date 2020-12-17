@@ -44,8 +44,8 @@ horovod:
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-west-2a
-          image: ami-06278cf24c1b2f0fe
+          zone: us-east-1a
+          image: ami-02e86b825fe559330
           boot_disk_size: 300
         Azure:
           machine_type: Standard_NC24rs_v3
@@ -192,8 +192,8 @@ def _PrepareHorovod(vm):
     vm.RemoteCommand(f'sudo {pip} install --force-reinstall pyarrow')
     vm.Install('openmpi')
   elif FLAGS.cloud == 'AWS':
-    vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
-    pip = 'anaconda3/envs/tensorflow_p36/bin/pip'
+    vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p37')
+    pip = 'anaconda3/envs/tensorflow_p37/bin/pip'
 
   # 10.0 -> 110
   cuda_version = cuda_toolkit.GetCudaToolkitVersion(vm).replace('.', '')
@@ -373,8 +373,8 @@ def Run(benchmark_spec):
   # GCP should work out of the box with the deep learning image but the AWS
   # image requires us to use the correct Tensorflow Python environment.
   if FLAGS.cloud == 'AWS':
-    master_vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p36')
-    python_interpreter = 'anaconda3/envs/tensorflow_p36/bin/python'
+    master_vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p37')
+    python_interpreter = 'anaconda3/envs/tensorflow_p37/bin/python'
   else:
     python_interpreter = '/opt/conda/bin/python'
 
