@@ -425,13 +425,13 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'ec2',
         'run-instances',
         '--region=us-east-1',
-        '--subnet-id=subnet-id',
         '--client-token=00000000-1111-2222-3333-444444444444',
         '--image-id=ami-12345',
         '--instance-type=c3.large',
         '--key-name=perfkit-key-aaaaaa',
         '--tag-specifications=foobar',
         '--associate-public-ip-address',
+        '--subnet-id=subnet-id',
         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
         '"DeviceName": "/dev/xvdc"}]',
@@ -515,6 +515,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.aws_efa_version = ''
     vm = InitCentosVm()
     vm._InstallEfa = mock.Mock()
+    vm._ConfigureEfa = mock.Mock()
     vm._PostCreate()
     vm._InstallEfa.assert_not_called()
 
@@ -522,6 +523,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     # Confirms vm._PostCreate() calls for EFA creation
     FLAGS.aws_efa = True
     vm = InitCentosVm()
+    vm._ConfigureElasticIp = mock.Mock()
     vm._PostCreate()
     aws_cmd = '; '.join([
         cmd[0][0] for cmd in vm.RemoteHostCommandWithReturnCode.call_args_list

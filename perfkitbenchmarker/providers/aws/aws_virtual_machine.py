@@ -122,7 +122,9 @@ _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
 _EFA_PARAMS = {
     'InterfaceType': 'efa',
     'DeviceIndex': 0,
-    'AssociatePublicIpAddress': True
+    'NetworkCardIndex': 0,
+    'Groups': '',
+    'SubnetId': ''
 }
 # Location of EFA installer
 _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
@@ -527,6 +529,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host and self.use_spot_instance:
       raise ValueError(
           'Tenancy=host is not supported for Spot Instances')
+    self.allocation_id = None
+    self.association_id = None
 
   @property
   def host_list(self):
@@ -637,14 +641,27 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
-    self.ip_address = instance['PublicIpAddress']
     self.internal_ip = instance['PrivateIpAddress']
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
 
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
-    if FLAGS.aws_efa and FLAGS.aws_efa_version:
+    if FLAGS.aws_efa:
+      self.ip_address = self._ConfigureEfa(instance)
+    else:
+      self.ip_address = instance['PublicIpAddress']
+
+  def _ConfigureEfa(self, instance):
+    """Configuare EFA and associate Elastic IP.
+
+    Args:
+      instance: dict which contains instance info.
+
+    Returns:
+      the public IP address string.
+    """
+    if FLAGS.aws_efa_version:
       # Download EFA then call InstallEfa method so that subclass can override
       self.InstallPackages('curl')
       url = _EFA_URL.format(version=FLAGS.aws_efa_version)
@@ -653,6 +670,43 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self._InstallEfa()
       # Run test program to confirm EFA working
       self.RemoteCommand('cd aws-efa-installer; ./efa_test.sh')
+    return self._ConfigureElasticIp(instance)
+
+  def _ConfigureElasticIp(self, instance):
+    """Create and associate Elastic IP.
+
+    Args:
+      instance: dict which contains instance info.
+
+    Returns:
+      the public IP address string.
+    """
+    network_interface_id = None
+    for network_interface in instance['NetworkInterfaces']:
+      # The primary network interface (eth0) for the instance.
+      if network_interface['Attachment']['DeviceIndex'] == 0:
+        network_interface_id = network_interface['NetworkInterfaceId']
+        break
+    assert network_interface_id is not None
+
+    stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX +
+                                        ['ec2', 'allocate-address',
+                                         f'--region={self.region}',
+                                         '--domain=vpc'])
+    response = json.loads(stdout)
+    ip_address = response['PublicIp']
+    self.allocation_id = response['AllocationId']
+
+    util.AddDefaultTags(self.allocation_id, self.region)
+
+    stdout, _, _ = vm_util.IssueCommand(
+        util.AWS_PREFIX + ['ec2', 'associate-address',
+                           f'--region={self.region}',
+                           f'--allocation-id={self.allocation_id}',
+                           f'--network-interface-id={network_interface_id}'])
+    response = json.loads(stdout)
+    self.association_id = response['AssociationId']
+    return ip_address
 
   def _InstallEfa(self):
     """Installs AWS EFA packages.
@@ -719,7 +773,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'ec2',
         'run-instances',
         '--region=%s' % self.region,
-        '--subnet-id=%s' % self.network.subnet.id,
         '--client-token=%s' % self.client_token,
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
@@ -727,12 +780,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--tag-specifications=%s' %
         util.FormatTagSpecifications('instance', tags)]
     if FLAGS.aws_efa:
-      create_cmd.extend([
-          '--network-interfaces',
-          ','.join(['%s=%s' % item for item in sorted(_EFA_PARAMS.items())])
-      ])
+      efas = ['--network-interfaces']
+      for device_index in range(FLAGS.aws_efa_count):
+        efa_params = _EFA_PARAMS.copy()
+        efa_params.update({
+            'NetworkCardIndex': device_index,
+            'DeviceIndex': device_index,
+            'Groups': self.group_id,
+            'SubnetId': self.network.subnet.id
+        })
+        efas.append(','.join(f'{key}={value}' for key, value in
+                             sorted(efa_params.items())))
+      create_cmd.extend(efas)
     else:
       create_cmd.append('--associate-public-ip-address')
+      create_cmd.append(f'--subnet-id={self.network.subnet.id}')
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:
@@ -818,6 +880,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'cancel-spot-instance-requests',
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
+
+    if FLAGS.aws_efa:
+      if self.association_id:
+        vm_util.IssueCommand(util.AWS_PREFIX +
+                             ['ec2', 'disassociate-address',
+                              f'--region={self.region}',
+                              f'--association-id={self.association_id}'])
+
+      if self.allocation_id:
+        vm_util.IssueCommand(util.AWS_PREFIX +
+                             ['ec2', 'release-address',
+                              f'--region={self.region}',
+                              f'--allocation-id={self.allocation_id}'])
 
   def UpdateInterruptibleVmStatus(self):
     if self.spot_early_termination:
@@ -1025,6 +1100,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['efa'] = FLAGS.aws_efa
     if FLAGS.aws_efa:
       result['efa_version'] = FLAGS.aws_efa_version
+      result['efa_count'] = FLAGS.aws_efa_count
     result['preemptible'] = self.use_spot_instance
     return result
 

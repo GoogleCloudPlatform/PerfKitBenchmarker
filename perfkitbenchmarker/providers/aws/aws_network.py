@@ -45,6 +45,7 @@ flags.DEFINE_string(
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
 flags.DEFINE_string('aws_efa_version', '1.9.4',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
+flags.DEFINE_integer('aws_efa_count', 1, 'The number of EFAs per instance.')
 flags.DEFINE_multi_enum('aws_endpoint', [], ['s3'],
                         'List of AWS endpoints to create')
 
