@@ -18,7 +18,7 @@ import json
 import yaml
 import dataclasses
 
-from typing import Any, List, Dict
+from typing import Any, Dict
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -33,29 +33,6 @@ UNKNOWN = 'unknown'
 
 SUBNET_SUFFIX = 's'
 DELIMITER = 'z-z'
-
-# these are used to create extra subnets for multi vnic support in perfkit,
-# not used for vm provisioning, up to 4 extra totaling 5 subnets
-SUBNET_SUFFIX_EXTRA = 'sxs'
-SUBNETX1 = SUBNET_SUFFIX_EXTRA + '1'
-SUBNETX2 = SUBNET_SUFFIX_EXTRA + '2'
-SUBNETX3 = SUBNET_SUFFIX_EXTRA + '3'
-SUBNETX4 = SUBNET_SUFFIX_EXTRA + '4'
-SUBNETXS = [SUBNETX1, SUBNETX2, SUBNETX3, SUBNETX4]
-
-SUBNETS_EXTRA = {
-    SUBNETX1: ['10.101.20.0/24', '10.102.20.0/24', '10.103.20.0/24', '10.104.20.0/24', '10.105.20.0/24'],
-    SUBNETX2: ['10.101.30.0/24', '10.102.30.0/24', '10.103.30.0/24', '10.104.30.0/24', '10.105.30.0/24'],
-    SUBNETX3: ['10.101.40.0/24', '10.102.40.0/24', '10.103.40.0/24', '10.104.40.0/24', '10.105.40.0/24'],
-    SUBNETX4: ['10.101.50.0/24', '10.102.50.0/24', '10.103.50.0/24', '10.104.50.0/24', '10.105.50.0/24']
-}
-
-SUBNETS_EXTRA_GATEWAY = {
-    SUBNETX1: ['10.101.20.1', '10.102.20.1', '10.103.20.1', '10.104.20.1', '10.105.20.1'],
-    SUBNETX2: ['10.101.30.1', '10.102.30.1', '10.103.30.1', '10.104.30.1', '10.105.30.1'],
-    SUBNETX3: ['10.101.40.1', '10.102.40.1', '10.103.40.1', '10.104.40.1', '10.105.40.1'],
-    SUBNETX4: ['10.101.50.1', '10.102.50.1', '10.103.50.1', '10.104.50.1', '10.105.50.1']
-}
 
 # for windows
 USER_DATA = "Content-Type: text/x-shellscript; charset=\"us-ascii\"\n\
@@ -102,54 +79,6 @@ def ReadConfig(config: str) -> Dict[Any, Any]:
       return yaml.safe_load(stream)
   except Exception as ex:
     raise errors.Error('Failed to load configuration file %s, %s', config, ex)
-
-
-def GetSubnetIndex(ipv4_cidr_block: str) -> int:
-  """Finds the index for the given cidr
-
-  Args:
-    ipv4_cidr_block: cidr to find.
-
-  Returns:
-    The index number of the found cidr as in the predefined list.
-    -1 is returned if the cidr is not known and not found 
-    in the predefined list of subnets
-  """
-  for name in SUBNETXS:
-    ip_list = SUBNETS_EXTRA[name]
-    for i in range(len(ip_list)):
-      if ip_list[i] == ipv4_cidr_block:
-        return i
-  return -1
-
-
-def GetRouteCommands(data: str, index: int, target_index: int) -> List[str]:
-  """Creates a list of ip route commands in text format to run on vm,
-    not used on normal perfkit runs.
-
-  Args:
-    data: output from route command on vm.
-    index: subnet index.
-    target_index: target subnet index.
-
-  Returns:
-    The index number of the found cidr as in the predefined list
-  """
-  route_cmds = []
-  if data:
-    for subnet_name in SUBNETXS:
-      subnet_cidr_block = SUBNETS_EXTRA[subnet_name][index]
-      target_cidr_block = SUBNETS_EXTRA[subnet_name][target_index]
-      subnet_gateway = SUBNETS_EXTRA_GATEWAY[subnet_name][index]
-      route_entry = subnet_cidr_block.split('/24')
-      interface = None
-      for line in data.splitlines():
-        items = line.split()
-        if len(items) > 6 and items[0] == route_entry[0]:
-          interface = items[7]
-          route_cmds.append('ip route add ' + target_cidr_block + ' via ' + \
-                            subnet_gateway + ' dev ' + interface)
-  return route_cmds
 
 
 def GetBaseOs(osdata: json):

@@ -36,9 +36,9 @@ from perfkitbenchmarker.providers.ibmcloud import util
 FLAGS = flags.FLAGS
 
 _DEFAULT_VOLUME_IOPS = 3000
-_WAIT_TIME_RHEL = 300
+_WAIT_TIME_DEBIAN = 60
+_WAIT_TIME_RHEL = 60
 _WAIT_TIME_UBUNTU = 600
-_WAIT_TIME_DEBIAN = 120
 
 
 class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -48,9 +48,6 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   IMAGE_NAME_PREFIX = None
 
   _lock = threading.Lock()
-  command_works = False
-  ibmcloud_apikey = None
-  ibmcloud_account_id = None
   validated_resources_set = set()
   validated_subnets = 0
 
@@ -71,22 +68,18 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_data = None
     self.user_data = None
     self.vmid = None
+    self.vm_created = False
     self.vm_deleted = False
-    self.vm_started = False
-    self.instance_start_failed = True
-    self.instance_stop_failed = False
     self.profile = FLAGS.machine_type
     self.prefix = FLAGS.ibmcloud_prefix
     self.zone = 'us-south-1'  # default
     self.fip_address = None
     self.fip_id = None
-    self.ssh_pub_keyfile = None
     self.network = None
     self.subnet = FLAGS.ibmcloud_subnet
     self.subnets = {}
     self.vpcid = FLAGS.ibmcloud_vpcid
     self.key = FLAGS.ibmcloud_pub_keyid
-    self.sgid = None
     self.boot_encryption_key = None
     self.data_encryption_key = None
     self.extra_vdisks_created = False
@@ -121,9 +114,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Returns the default image name prefx """
     return cls.IMAGE_NAME_PREFIX
 
-  def _SetupMzone(self):
+  def _SetupResources(self):
     """Looks up the resources needed, if not found, creates new """
-    logging.info('Checking mzone setup')
+    logging.info('Checking resources')
     cmd = ibm.IbmAPICommand(self)
     cmd.flags.update({
       'prefix': self.prefix,
@@ -148,7 +141,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if FLAGS.ibmcloud_subnets_extra > 0:
       # these are always created outside perfkit
-      cmd.flags['prefix'] = util.SUBNET_SUFFIX_EXTRA
+      cmd.flags['prefix'] = ibmcloud_network.SUBNET_SUFFIX_EXTRA
       self.subnets = cmd.ListSubnetsExtra()
       logging.info('Extra subnets found: %s', self.subnets)
 
@@ -169,7 +162,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['imageid'] = self.imageid
     self.os_data = util.GetOsInfo(cmd.ImageShow())
     logging.info('Image os: %s', self.os_data)
-    logging.info('Checking mzone setup finished')
+    logging.info('Checking resources finished')
 
   def _DeleteKey(self):
     """Deletes the rias key."""
@@ -187,7 +180,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Creates and starts a IBM Cloud VM instance."""
     self._CreateInstance()
     if self.subnet:  # this is for the primary vnic and fip
-      self.fip_address, self.fip_id = self._CreateFip(self.name + 'fip')
+      self.fip_address, self.fip_id = self.network.CreateFip(self.name + 'fip', self.vmid)
       self.ip_address = self.fip_address
       self.internal_ip = self._WaitForIPAssignment(self.subnet)
       logging.info('Fip: %s, ip: %s', self.ip_address, self.internal_ip)
@@ -213,12 +206,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Delete all the resources that were created """
     if self.vm_deleted:
       return
-    if not ibm.IbmAPICommand.ibmcloud_auth_token or \
-    time.time() - ibm.IbmAPICommand.ibmcloud_auth_token_time > FLAGS.ibmcloud_timeout:
-      self._CheckLogin()
     self._StopInstance()
     if self.fip_address:
-      self._DeleteFip()
+      self.network.DeleteFip(self.vmid, self.fip_address, self.fip_id)
     time.sleep(10)
     self._DeleteInstance()
     if not FLAGS.ibmcloud_resources_keep:
@@ -230,11 +220,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
   def _Exists(self):
-    if self.vm_deleted:
-      return False
-    if self.instance_stop_failed:
-      return False
-    return True
+    return self.vm_created and not self.vm_deleted
 
   def _CreateDependencies(self):
     """Validate and Create dependencies prior creating the VM."""
@@ -242,7 +228,6 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CheckPrerequisites(self):
     """Checks prerequisites are met otherwise aborts execution."""
-    self._CheckCanaryCommand()
     with self._lock:
       logging.info('Validating prerequisites.')
       logging.info('zones: %s', FLAGS.zones)
@@ -256,73 +241,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info('zone to use %s', self.zone)
       self._CheckImage()
       self.network = ibmcloud_network.IbmCloudNetwork(self.prefix, self.zone)
-      self._SetupMzone()
+      self._SetupResources()
       IbmCloudVirtualMachine.validated_resources_set.add(self.zone)
       logging.info('Prerequisites validated.')
-
-  def _CheckCanaryCommand(self):
-    """Checks that the IBM Cloud API is working, and as a side effect gets
-    an auth-token for use on later API commands."""
-    if IbmCloudVirtualMachine.command_works:  # fast path
-      return
-    with self._lock:
-      if IbmCloudVirtualMachine.command_works:
-        return
-      self._CheckLogin()
-
-  def _CheckLogin(self):
-    """Checks basic env variables are set and retrieves a token."""
-    if not os.environ.get('IBMCLOUD_ENDPOINT'):
-      raise errors.Config.InvalidValue(
-        'PerfKit Benchmarker on IBM Cloud requires that the '
-        'environment variable IBMCLOUD_ENDPOINT is set.')
-    self._GetAuthenticationInformation()
-    try:
-      cmd = ibm.IbmAPICommand(self, 'login')
-      cmd.flags['apikey'] = IbmCloudVirtualMachine.ibmcloud_apikey
-      if FLAGS.ibmcloud_login_validfrom:
-        cmd.flags['validfrom'] = FLAGS.ibmcloud_login_validfrom
-      cmd.flags['leaseduration'] = '24h'
-    except Exception as exc:
-      raise errors.Config.InvalidValue(
-        'IBM Cloud API test command failed. Please make sure the IBM Cloud '
-        'environment variable IBMCLOUD_ENDPOINT and IBMCLOUD_AUTH_ENDPOINT '
-        'are correctly set and that the correct values for authentication '
-        'were supplied. IBM Cloud ERROR: {0}'.format(exc))
-    ibm.IbmAPICommand.ibmcloud_auth_token = cmd.GetToken()
-    ibm.IbmAPICommand.ibmcloud_auth_token_time = time.time()
-    IbmCloudVirtualMachine.command_works = True
-
-  def _GetAuthenticationInformation(self):
-    """Get the information needed to authenticate on IBM Cloud,
-      check for the config if env variables for apikey is not set
-    """
-    account = util.Account(os.environ.get('IBMCLOUD_ACCOUNT_ID'),
-                           os.environ.get('IBMCLOUD_APIKEY'),
-                           None)
-    if not account.name or not account.apikey:
-      accounts = os.environ.get('IBMCLOUD_ACCOUNTS')  # read from config file
-      if accounts is not None and accounts != '':
-        config = util.ReadConfig(accounts)
-        benchmark = config[FLAGS.benchmarks[0]][0]
-        account = util.Account(benchmark[0], benchmark[1], benchmark[2])  # first account
-        logging.info('account_id: %s', account.name)
-        if FLAGS.ibmcloud_datavol_encryption_key:  # if this flag is set
-          self.data_encryption_key = account.enckey
-          logging.info('KP key to use, data: %s', self.data_encryption_key)
-        if FLAGS.ibmcloud_bootvol_encryption_key:  # use same key as data
-          self.boot_encryption_key = account.enckey
-          logging.info('KP key to use, boot: %s', self.boot_encryption_key)
-
-    if not account.name or not account.apikey:
-      raise errors.Config.InvalidValue(
-          'PerfKit Benchmarker on IBM Cloud requires that the '
-          'environment variables IBMCLOUD_ACCOUNT_ID and IBMCLOUD_APIKEY '
-          'are correctly set.')
-    ibm.IbmAPICommand.ibmcloud_account_id = account.name
-    ibm.IbmAPICommand.ibmcloud_apikey = account.apikey
-    IbmCloudVirtualMachine.ibmcloud_account_id = account.name
-    IbmCloudVirtualMachine.ibmcloud_apikey = account.apikey
 
   def _CreateInstance(self):
     """Creates IBM Cloud VM instance."""
@@ -347,16 +268,14 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'id' not in resp:
       raise errors.Error(f'IBM Cloud ERROR: Failed to create instance: {resp}')
     self.vmid = resp['id']
+    self.vm_created = True
     logging.info('Instance created, id: %s', self.vmid)
     logging.info('Waiting for instance to start, id: %s', self.vmid)
     cmd.flags['instanceid'] = self.vmid
     status = cmd.InstanceStatus()
-    self.instance_start_failed = False
     assert status == ibm.States.RUNNING
     if status != ibm.States.RUNNING:
       logging.error('Instance start failed, status: %s', status)
-      self.instance_start_failed = True
-    self.vm_started = not self.instance_start_failed
     logging.info('Instance %s status %s', self.vmid, status)
 
   def _StartInstance(self):
@@ -365,50 +284,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['instanceid'] = self.vmid
     status = cmd.InstanceStart()
     logging.info('start_instance_poll: last status is %s', status)
-    self.instance_start_failed = False
     assert status == ibm.States.RUNNING
     if status != ibm.States.RUNNING:
       logging.error('Instance start failed, status: %s', status)
-      self.instance_start_failed = True
-    self.vm_started = not self.instance_start_failed
-
-  def _CreateFip(self, name: str):
-    """Creates a VNIC in a IBM Cloud VM instance."""
-    cmd = ibm.IbmAPICommand(self)
-    cmd.flags['instanceid'] = self.vmid
-    vnicid = cmd.InstanceGetPrimaryVnic()
-    cmd.flags['name'] = name
-    cmd.flags['target'] = vnicid
-    logging.info('Creating FIP for instanceid: %s', self.vmid)
-    resp = json.loads(cmd.InstanceFipCreate())
-    if resp:
-      logging.info('FIP create resp: %s', resp)
-      assert resp['address'] != None
-      return resp['address'], resp['id']
-    logging.error('FAILED to create FIP for instance %s', self.vmid)
-    return None, None
-
-  def _DeleteFip(self):
-    """Deletes fip in a IBM Cloud VM instance."""
-    logging.info('Deleting FIP, instanceid: %s, fip address: %s, fip id: %s',
-                 self.vmid, self.fip_address, self.fip_id)
-    cmd = ibm.IbmAPICommand(self)
-    cmd.flags['fip_id'] = self.fip_id
-    cmd.InstanceFipDelete()
-
-  def _FindVnicIdByName(self, vnics: [str], name: str):
-    """Finds vnic by name"""
-    for vnic in vnics:
-      if vnic['name'] == name:
-        return vnic['uid']
-    return None
-
-  def _FindVnicIdBySubnet(self, vnics: [str], subnet: str):
-    """Finds vnic by subnet"""
-    for vnic in vnics:
-      if vnic['subnet']['id'] == subnet:
-        return vnic['id']
-    return None
 
   def _WaitForIPAssignment(self, networkid: str):
     """Finds the IP address assigned to the vm."""
@@ -439,10 +317,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['instanceid'] = self.vmid
     status = cmd.InstanceStop()
     logging.info('stop_instance_poll: last status is %s', status)
-    self.instance_stop_failed = False
     if status != ibm.States.STOPPED:
       logging.error('Instance stop failed, status: %s', status)
-    self.vm_started = False
 
   def _DeleteInstance(self):
     """Deletes a IBM Cloud VM instance."""
@@ -481,7 +357,6 @@ class DebianBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
                                         linux_virtual_machine.BaseDebianMixin):
 
   def PrepareVMEnvironment(self):
-    logging.info('Pausing for 2 min before update and installs')
     time.sleep(_WAIT_TIME_DEBIAN)
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y update')
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y install sudo')
@@ -522,7 +397,6 @@ class RhelBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
                                       linux_virtual_machine.BaseRhelMixin):
 
   def PrepareVMEnvironment(self):
-    logging.info('Pausing for 5 min before update and installs')
     time.sleep(_WAIT_TIME_RHEL)
     super(RhelBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
 

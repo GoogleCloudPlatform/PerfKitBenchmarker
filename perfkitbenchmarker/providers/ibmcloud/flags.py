@@ -33,12 +33,6 @@ flags.DEFINE_string('ibmcloud_image_username', 'root',
 flags.DEFINE_integer('ibmcloud_polling_delay', 2,
                      'Delay between polling attempts in seconds.')
 
-flags.DEFINE_string('ibmcloud_login_validfrom', None,
-                    'Valid from for token creation.')
-
-flags.DEFINE_string('ibmcloud_speccpu_tarfile', None,
-                    'tarball for speccpu2017.')
-
 flags.DEFINE_integer('ibmcloud_timeout', 600,
                      'timeout in secs.')
 
@@ -92,9 +86,6 @@ flags.DEFINE_integer('ibmcloud_subnets_extra', 0,
 
 flags.DEFINE_integer('ibmcloud_vdisks_extra', 0,
                      'extra disks to create')
-
-flags.DEFINE_string('ibmcloud_preprovisioned_data_bucket', None,
-                    'IBMCloud bucket where pre-provisioned data has been copied.')
 
 flags.DEFINE_string('ibmcloud_image_info', None,
                     'image info in json formatted file')

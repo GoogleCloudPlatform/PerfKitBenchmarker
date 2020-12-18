@@ -157,7 +157,8 @@ class IbmCloud:
       timeout: timeout for the request
       session: session object if available.
     """
-    path = '/' + self._version + '/%s' % (path)
+    path = f'/{self._version}/{path}'
+
     if 'limit' in path:
       path += '&' + self._generation
     else:

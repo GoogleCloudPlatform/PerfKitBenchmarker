@@ -13,16 +13,20 @@
 # limitations under the License.
 """Utilities for working with IBM Cloud resources."""
 
+import os
 import threading
 import time
 import logging
 import json
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud
 from perfkitbenchmarker.providers.ibmcloud import util
 
 FLAGS = flags.FLAGS
+
+ONE_HOUR = 3600
 
 
 class Enum(tuple): __getattr__ = tuple.index
@@ -64,11 +68,8 @@ class IbmAPICommand(object):
   ibmcloud_auth_token = None
   ibmcloud_auth_token_time = 0
   _lock = threading.Lock()
-  base_time = 0.0
-  num_requests = None
-  debug = False
 
-  def __init__(self, resource, *args, **kwargs):
+  def __init__(self, *args, **kwargs):
     """Initializes a IbmAPICommand with the provided args and flags.
 
     Args:
@@ -77,10 +78,12 @@ class IbmAPICommand(object):
       typically specifying an operation to perform (e.g. ['image', 'list']
       to list available images).
     """
-    if args and args[0] == 'login':
+    self._CheckEnvironment()
+    if self.gen is None or \
+      time.time() - self.ibmcloud_auth_token_time >= ONE_HOUR:
       IbmAPICommand.gen = ibmcloud.IbmCloud(account=self.ibmcloud_account_id,
                                             apikey=self.ibmcloud_apikey,
-                                            verbose=self.debug,
+                                            verbose=False,
                                             version='v1',
                                             silent=True,
                                             force=False)
@@ -92,10 +95,132 @@ class IbmAPICommand(object):
       IbmAPICommand.gen_volumemgr = ibmcloud.VolumeManager(IbmAPICommand.gen)
       IbmAPICommand.gen_vpcmgr = ibmcloud.VPCManager(IbmAPICommand.gen)
       IbmAPICommand.gen_sgmgr = ibmcloud.SGManager(IbmAPICommand.gen)
+      self.ibmcloud_auth_token = self.GetToken()
+      self.ibmcloud_auth_token_time = time.time()
+
     self.args = args
     self.flags = kwargs
     self.user_data = None
-    self.sgid = None
+#     self.sgid = None
+
+  @property
+  def vpc_id(self):
+    return self.flags['vpcid']
+
+  @property
+  def sg_id(self):
+    return self.flags['sgid']
+
+  @property
+  def zone(self):
+    return self.flags['zone']
+
+  @property
+  def cidr(self):
+    return self.flags['cidr']
+
+  @property
+  def name(self):
+    return self.flags['name']
+
+  @property
+  def prefix(self):
+    return self.flags['prefix']
+
+  @property
+  def items(self):
+    return self.flags['items']
+
+  @property
+  def capacity(self):
+    return self.flags['capacity']
+
+  @property
+  def iops(self):
+    return self.flags['iops']
+
+  @property
+  def profile(self):
+    return self.flags['profile']
+
+  @property
+  def encryption_key(self):
+    return self.flags['encryption_key']
+
+  @property
+  def resource_group(self):
+    return self.flags['resource_group']
+
+  @property
+  def volume(self):
+    return self.flags['volume']
+
+  @property
+  def pubkey(self):
+    return self.flags['pubkey']
+
+  @property
+  def image_id(self):
+    return self.flags['imageid']
+
+  @property
+  def target(self):
+    return self.flags['target']
+
+  @property
+  def vnic_id(self):
+    return self.flags['vnicid']
+
+  @property
+  def fip_id(self):
+    return self.flags['fipid']
+
+  @property
+  def instance_id(self):
+    return self.flags['instanceid']
+
+  @property
+  def subnet(self):
+    return self.flags['subnet']
+
+  @property
+  def image_name(self):
+    return self.flags['image_name']
+
+  @property
+  def resource_id(self):
+    return self.flags['id']
+
+  def _CheckEnvironment(self):
+    """Get the information needed to authenticate on IBM Cloud,
+      check for the config if env variables for apikey is not set
+    """
+    if not os.environ.get('IBMCLOUD_ENDPOINT'):
+      raise errors.Config.InvalidValue(
+        'PerfKit Benchmarker on IBM Cloud requires that the '
+        'environment variable IBMCLOUD_ENDPOINT is set.')
+    account = util.Account(os.environ.get('IBMCLOUD_ACCOUNT_ID'),
+                           os.environ.get('IBMCLOUD_APIKEY'),
+                           None)
+    if not account.name or not account.apikey:
+      accounts = os.environ.get('IBMCLOUD_ACCOUNTS')  # read from config file
+      if accounts is not None and accounts != '':
+        config = util.ReadConfig(accounts)
+        benchmark = config[FLAGS.benchmarks[0]][0]
+        account = util.Account(benchmark[0], benchmark[1], benchmark[2])  # first account
+        logging.info('account_id: %s', account.name)
+        if FLAGS.ibmcloud_datavol_encryption_key:  # if this flag is set
+          self.data_encryption_key = account.enckey
+          logging.info('KP key to use, data: %s', self.data_encryption_key)
+        if FLAGS.ibmcloud_bootvol_encryption_key:  # use same key as data
+          self.boot_encryption_key = account.enckey
+          logging.info('KP key to use, boot: %s', self.boot_encryption_key)
+
+    if not account.name or not account.apikey:
+      raise errors.Config.InvalidValue(
+          'PerfKit Benchmarker on IBM Cloud requires that the '
+          'environment variables IBMCLOUD_ACCOUNT_ID and IBMCLOUD_APIKEY '
+          'are correctly set.')
 
   def GetToken(self):
     """Returns user token """
@@ -103,19 +228,18 @@ class IbmAPICommand(object):
 
   def CreateSgRules(self):
     """Creates some default security group rules needed for vms to communicate """
-    sgid = self.flags['sgid']
-    self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'icmp', None)
-    self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', 22)
-    self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', None,
+    self.gen_sgmgr.CreateRule(self.sg_id, 'inbound', 'ipv4', '0.0.0.0/0', 'icmp', None)
+    self.gen_sgmgr.CreateRule(self.sg_id, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', 22)
+    self.gen_sgmgr.CreateRule(self.sg_id, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', None,
                               port_min=1024, port_max=50000)
-    self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'udp', None,
+    self.gen_sgmgr.CreateRule(self.sg_id, 'inbound', 'ipv4', '0.0.0.0/0', 'udp', None,
                               port_min=1024, port_max=50000)
-    self.gen_sgmgr.CreateRule(sgid, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', 443)
+    self.gen_sgmgr.CreateRule(self.sg_id, 'inbound', 'ipv4', '0.0.0.0/0', 'tcp', 443)
 
-  def GetSgId(self):
+  def GetSecurityGroupId(self):
     """returns default security group id """
     logging.info('Looking up existing default sg')
-    prefix = self.flags['prefix']
+    prefix = self.prefix
     resp = self.gen_sgmgr.List()
     if resp and 'security_groups' in resp:
       for item in resp['security_groups']:
@@ -137,8 +261,8 @@ class IbmAPICommand(object):
     Returns:
       The json representation of the created address prefix.
     """
-    return self.gen_vpcmgr.CreatePrefix(self.flags['vpcid'], self.flags['zone'],
-                                        self.flags['cidr'], name=self.flags['name'])
+    return self.gen_vpcmgr.CreatePrefix(self.vpc_id, self.zone,
+                                        self.cidr, name=self.name)
 
   def CreateSubnet(self):
     """Creates a subnet on the vpc
@@ -153,9 +277,9 @@ class IbmAPICommand(object):
       The json representation of the created subnet.
     """
     kwargs = {}
-    kwargs['name'] = self.flags['name']
-    kwargs['zone'] = self.flags['zone']
-    return self.gen_subnetmgr.Create(self.flags['cidr'], self.flags['vpcid'], **kwargs)
+    kwargs['name'] = self.name
+    kwargs['zone'] = self.zone
+    return self.gen_subnetmgr.Create(self.cidr, self.vpc_id, **kwargs)
 
   def DeleteResource(self):
     """Deletes a resource based on items set in the flags
@@ -165,21 +289,20 @@ class IbmAPICommand(object):
       id: matching id to delete.
   
     """
-    items = self.flags['items']
     data_mgr = self.gen_subnetmgr
-    if items == 'vpcs':
+    if self.items == 'vpcs':
       data_mgr = self.gen_vpcmgr
-    elif items == 'keys':
+    elif self.items == 'keys':
       data_mgr = self.gen_keymgr
     resp = data_mgr.List()
-    if resp and items in resp:
-      for item in resp[items]:
+    if resp and self.items in resp:
+      for item in resp[self.items]:
         item_id = item.get('id')
-        if item_id and item_id == self.flags['id']:
+        if item_id and item_id == self.resource_id:
           data_mgr.Delete(item_id)
-          logging.info('Deleted %s, id: %s', items, item_id)
+          logging.info('Deleted %s, id: %s', self.items, item_id)
     else:
-      logging.info('No items found to delete: %s', items)
+      logging.info('No items found to delete: %s', self.items)
 
   def ListResources(self):
     """Returns a list of resource id's matching the resource type and prefix
@@ -192,36 +315,29 @@ class IbmAPICommand(object):
     Returns:
       The id of the first matching resource.
     """
-    items = self.flags['items']
-    prefix = self.flags['prefix']
-    zone = self.flags['zone']
-    logging.info('Looking up existing %s matching prefix: %s, zone: %s', items, prefix, zone)
+    logging.info('Looking up existing %s matching prefix: %s, zone: %s',
+                 self.items, self.prefix, self.zone)
     data_mgr = self.gen_subnetmgr
-    if items == 'vpcs':
+    if self.items == 'vpcs':
       data_mgr = self.gen_vpcmgr
-    elif items == 'keys':
+    elif self.items == 'keys':
       data_mgr = self.gen_keymgr
     resourceid = None  # instead of returning a list, we just return first matching item
-    counter = 1
-    while counter < 4:
-      resp = data_mgr.List()
-      if resp and items in resp:
-        for item in resp[items]:
-          itemid = item.get('id')
-          name = item.get('name')
-          if itemid and name and name.startswith(prefix):
-            if items == 'subnets':
-              if zone == item.get('zone')['name']:
-                resourceid = itemid  # find the id that matches the zone name
-                break
-            else:  # for vpc and key
-              resourceid = itemid  # # for vpcs, just get the first matching
+    resp = data_mgr.List()
+    if resp and self.items in resp:
+      for item in resp[self.items]:
+        itemid = item.get('id')
+        name = item.get('name')
+        if itemid and name and name.startswith(self.prefix):
+          if self.items == 'subnets':
+            if self.zone == item.get('zone')['name']:
+              resourceid = itemid  # find the id that matches the zone name
               break
-        break  # empty
-      else:
-        logging.error('Failed to retrieve %s, no data returned', items)
-        counter += 1
-        time.sleep(10)  # 5 still fails when accounts >= 10
+          else:  # for vpc and key
+            resourceid = itemid  # # for vpcs, just get the first matching
+            break
+    else:
+      logging.error('Failed to retrieve %s, no data returned', self.items)
     return resourceid
 
   def ListSubnetsExtra(self):
@@ -235,32 +351,25 @@ class IbmAPICommand(object):
       List of ids of the additional subnets matching the prefix and zone.
     """
     items = 'subnets'
-    prefix = self.flags['prefix']
-    zone = self.flags['zone']
-    logging.info('Looking up extra subnets for zone: %s', zone)
+    logging.info('Looking up extra subnets for zone: %s', self.zone)
     data_mgr = self.gen_subnetmgr
     subnets = {}
-    counter = 1
-    while counter < 4:
-      resp = data_mgr.List()
-      if resp and items in resp:
-        for item in resp[items]:
-          itemid = item.get('id')
-          name = item.get('name')
-          ipv4_cidr_block = item.get('ipv4_cidr_block')
-          if itemid and name and name.startswith(prefix):  # extra subnets start with 'sxs'
-            if zone == item.get('zone')['name']:
-              logging.info('Found extra subnet, name: %s, id: %s', name, itemid)
-              names = name.split(util.DELIMITER)
-              if names[0] not in subnets:
-                subnets[names[0]] = {}
-              subnets[names[0]]['id'] = itemid
-              subnets[names[0]]['ipv4_cidr_block'] = ipv4_cidr_block  # needed to create route later
-        break  # empty or done
-      else:
-        logging.error('Failed to retrieve extra subnets, no data returned')
-        counter += 1
-        time.sleep(10)  # 5 still fails when accounts >= 10
+    resp = data_mgr.List()
+    if resp and items in resp:
+      for item in resp[items]:
+        itemid = item.get('id')
+        name = item.get('name')
+        ipv4_cidr_block = item.get('ipv4_cidr_block')
+        if itemid and name and name.startswith(self.prefix):  # extra subnets start with 'sxs'
+          if self.zone == item.get('zone')['name']:
+            logging.info('Found extra subnet, name: %s, id: %s', name, itemid)
+            names = name.split(util.DELIMITER)
+            if names[0] not in subnets:
+              subnets[names[0]] = {}
+            subnets[names[0]]['id'] = itemid
+            subnets[names[0]]['ipv4_cidr_block'] = ipv4_cidr_block  # needed to create route later
+    else:
+      logging.error('Failed to retrieve extra subnets, no data returned')
     return subnets
 
   def CreateVolume(self):
@@ -278,26 +387,26 @@ class IbmAPICommand(object):
       json representation of the created volume.
     """
     kwargs = {}
-    kwargs['name'] = self.flags['name']
-    kwargs['capacity'] = self.flags['capacity']
-    kwargs['iops'] = self.flags['iops']
-    kwargs['profile'] = self.flags['profile']
+    kwargs['name'] = self.name
+    kwargs['capacity'] = self.capacity
+    kwargs['iops'] = self.iops
+    kwargs['profile'] = self.profile
     if 'encryption_key' in self.flags:
-      kwargs['encryption_key'] = self.flags['encryption_key']
+      kwargs['encryption_key'] = self.encryption_key
     if 'resource_group' in self.flags:
-      kwargs['resource_group'] = self.flags['resource_group']
-    return json.dumps(self.gen_volumemgr.Create(self.flags['zone'], **kwargs))
+      kwargs['resource_group'] = self.resource_group
+    return json.dumps(self.gen_volumemgr.Create(self.zone, **kwargs))
 
   def DeleteVolume(self):
     """Deletes volume """
-    return self.gen_volumemgr.Delete(self.flags['volume'])
+    return self.gen_volumemgr.Delete(self.volume)
 
   def ShowVolume(self):
     """Shows volume in json"""
-    return json.dumps(self.gen_volumemgr.Show(self.flags['volume']), indent=2)
+    return json.dumps(self.gen_volumemgr.Show(self.volume), indent=2)
 
   def CreateVpc(self):
-    """Creastes a vpc 
+    """Creates a vpc 
 
     Flags:
       name: name of the vpc to create.
@@ -306,12 +415,12 @@ class IbmAPICommand(object):
       The id of the created vpc.
     """
     vpcid = None
-    resp = self.gen_vpcmgr.Create(None, self.flags['name'])
+    resp = self.gen_vpcmgr.Create(None, self.name)
     if resp:
       vpcid = resp.get('id')
-      self.sgid = resp.get('default_security_group')['id']
-      logging.info('Created vpc: %s, sgid: %s', vpcid, self.sgid)
-      self.flags['sgid'] = self.sgid
+      sgid = resp.get('default_security_group')['id']
+      logging.info('Created vpc: %s, sgid: %s', vpcid, sgid)
+      self.flags['sgid'] = sgid
       self.CreateSgRules()
       logging.info('Created sg rules for icmp, tcp 22/443, tcp/udp 1024-50000')
     return vpcid
@@ -328,7 +437,7 @@ class IbmAPICommand(object):
     """
     kwargs = {}
     kwargs['name'] = self.flags['name']
-    resp = self.gen_keymgr.Create(self.flags['pubkey'], 'rsa', **kwargs)
+    resp = self.gen_keymgr.Create(self.pubkey, 'rsa', **kwargs)
     return resp.get('id') if resp else None
 
   def CreateInstance(self):
@@ -351,10 +460,10 @@ class IbmAPICommand(object):
       if arg in self.flags:
         kwargs[arg] = self.flags[arg]
     return json.dumps(self.gen_instmgr.Create(
-      self.flags['name'],
-      self.flags['imageid'],
-      self.flags['profile'],
-      self.flags['vpcid'],
+      self.name,
+      self.image_id,
+      self.profile,
+      self.vpc_id,
       user_data=self.user_data,
       **kwargs
       ))
@@ -368,12 +477,12 @@ class IbmAPICommand(object):
     Returns:
       The found vnic id.
     """
-    resp = self.gen_instmgr.Show(self.flags['instanceid'])
+    resp = self.gen_instmgr.Show(self.instance_id)
     if 'primary_network_interface' in resp and 'href' in resp['primary_network_interface']:
       items = resp['primary_network_interface']['href'].split('/')
       logging.info('vnic found: %s', items[len(items) - 1])
       return items[len(items) - 1]
-    logging.error('no href in instance: %s', self.flags['instanceid'])
+    logging.error('no href in instance: %s', self.instance_id)
     return None
 
   def InstanceFipCreate(self):
@@ -386,16 +495,16 @@ class IbmAPICommand(object):
       json represenation of the created fip.
     """
     kwargs = {}
-    kwargs['name'] = self.flags['name']
+    kwargs['name'] = self.name
     return json.dumps(self.gen_fipmgr.Create(
       None,
-      self.flags['target'],
+      self.target,
       **kwargs
     ))
 
   def InstanceFipDelete(self):
     """Deletes FIP on vm matching the id """
-    self.gen_fipmgr.Delete(self.flags['fip_id'])
+    self.gen_fipmgr.Delete(self.fip_id)
 
   def _GetStatus(self, resp):
     """Returns instance status in the given resp """
@@ -411,16 +520,16 @@ class IbmAPICommand(object):
 
   def InstanceStatus(self):
     """Returns instance status matching the instance id """
-    resp = self.gen_instmgr.Show(self.flags['instanceid'])
+    resp = self.gen_instmgr.Show(self.instance_id)
     status = self._GetStatus(resp)
-    logging.info('Instance status: %s, %s', self.flags['instanceid'], status)
+    logging.info('Instance status: %s, %s', self.instance_id, status)
     if status != States.RUNNING:
       endtime = time.time() + FLAGS.ibmcloud_timeout
-      status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
+      status = self._GetStatus(self.gen_instmgr.Show(self.instance_id))
       while status != States.RUNNING and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay)
-        status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
-        logging.info('Checking instance status: %s, %s', self.flags['instanceid'], status)
+        status = self._GetStatus(self.gen_instmgr.Show(self.instance_id))
+        logging.info('Checking instance status: %s, %s', self.instance_id, status)
     return status
 
   def InstanceStart(self):
@@ -439,23 +548,23 @@ class IbmAPICommand(object):
 
   def InstanceStop(self):
     """Stops instance matching the instance id and returns final status """
-    resp = self.gen_instmgr.Stop(self.flags['instanceid'], force=False)
-    logging.info('Instance stop issued: %s', self.flags['instanceid'])
-    resp = self.gen_instmgr.Stop(self.flags['instanceid'], force=True)  # force stop again
+    resp = self.gen_instmgr.Stop(self.instance_id, force=False)
+    logging.info('Instance stop issued: %s', self.instance_id)
+    resp = self.gen_instmgr.Stop(self.instance_id, force=True)  # force stop again
     status = self._GetStatus(resp)
-    logging.info('Instance stop force issued: %s, %s', self.flags['instanceid'], status)
+    logging.info('Instance stop force issued: %s, %s', self.instance_id, status)
     if status != States.STOPPED:
       endtime = time.time() + FLAGS.ibmcloud_timeout
-      status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
+      status = self._GetStatus(self.gen_instmgr.Show(self.instance_id))
       while status != States.STOPPED and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay * 2)
-        status = self._GetStatus(self.gen_instmgr.Show(self.flags['instanceid']))
-        logging.info('Checking instance stop status: %s, %s', self.flags['instanceid'], status)
+        status = self._GetStatus(self.gen_instmgr.Show(self.instance_id))
+        logging.info('Checking instance stop status: %s, %s', self.instance_id, status)
     return status
 
   def InstanceDelete(self):
     """Deletes instance matching the instance id"""
-    self.gen_instmgr.Delete(self.flags['instanceid'])
+    self.gen_instmgr.Delete(self.instance_id)
 
   def InstanceList(self):
     """Lists instances and returns json objects of all found instances"""
@@ -463,11 +572,11 @@ class IbmAPICommand(object):
 
   def InstanceShow(self):
     """Returns the json respresentation of the matching instance id """
-    return self.gen_instmgr.Show(self.flags['instanceid'])
+    return self.gen_instmgr.Show(self.instance_id)
 
   def InstanceInitializationShow(self):
     """Returns the json respresentation of the configuration used to initialize instance id """
-    return self.gen_instmgr.ShowInitialization(self.flags['instanceid'])
+    return self.gen_instmgr.ShowInitialization(self.instance_id)
 
   def InstanceVnicCreate(self):
     """Creates a vnic on the instance
@@ -481,18 +590,18 @@ class IbmAPICommand(object):
       id of the created vnic and assigned private ip address.
     """
     ip_addr = None
-    resp = self.gen_instmgr.CreateVnic(self.flags['instanceid'], self.flags['name'], self.flags['subnet'])
+    resp = self.gen_instmgr.CreateVnic(self.instance_id, self.name, self.subnet)
     status = self._GetStatus(resp)
     vnicid = resp['id']
     port_speed = resp['port_speed']
     logging.info('Vnic created, vnicid: %s, port speed: %s, vnic status: %s', vnicid, port_speed, status)
     if status != States.AVAILABLE:
       endtime = time.time() + FLAGS.ibmcloud_timeout
-      resp = self.gen_instmgr.ShowVnic(self.flags['instanceid'], vnicid)
+      resp = self.gen_instmgr.ShowVnic(self.instance_id, vnicid)
       status = self._GetStatus(resp)
       while status != States.AVAILABLE and time.time() < endtime:
         time.sleep(FLAGS.ibmcloud_polling_delay)
-        resp = self.gen_instmgr.ShowVnic(self.flags['instanceid'], vnicid)
+        resp = self.gen_instmgr.ShowVnic(self.instance_id, vnicid)
         status = self._GetStatus(resp)
         logging.info('Checking instance vnic status: %s', status)
     if status == States.AVAILABLE:
@@ -512,8 +621,8 @@ class IbmAPICommand(object):
       json representation of the found vnic.
     """
     return json.dumps(self.gen_instmgr.ShowVnic(
-      self.flags['instanceid'],
-      self.flags['vnicid']
+      self.instance_id,
+      self.vnic_id
       ), indent=2)
 
   def InstanceVnicList(self):
@@ -526,7 +635,7 @@ class IbmAPICommand(object):
       json objects of all vnics on the instance.
     """
     return json.dumps(self.gen_instmgr.ListVnics(
-      self.flags['instanceid']
+      self.instance_id
       ), indent=2)
 
   def InstanceCreateVolume(self):
@@ -542,25 +651,25 @@ class IbmAPICommand(object):
       json representation of the attached volume on the instance.
     """
     return json.dumps(self.gen_instmgr.CreateVolume(
-      self.flags['instanceid'],
-      self.flags['name'],
-      self.flags['volume'],
+      self.instance_id,
+      self.name,
+      self.volume,
       True
       ), indent=2)
 
   def InstanceDeleteVolume(self):
     """Deletes the volume on the vm matching instanceid and volume """
     return json.dumps(self.gen_instmgr.DeleteVolume(
-      self.flags['instanceid'],
-      self.flags['volume']
+      self.instance_id,
+      self.volume
       ), indent=2)
 
   def InstanceShowVolume(self):
     """Returns json representation of the volume matching instanceid"""
-    for item in self.gen_instmgr.ListVolumes(self.flags['instanceid'])['volume_attachments']:
-      if item['volume'].get('id') == self.flags['volume']:
+    for item in self.gen_instmgr.ListVolumes(self.instance_id)['volume_attachments']:
+      if item['volume'].get('id') == self.volume:
         return json.dumps(self.gen_instmgr.ShowVolume(
-          self.flags['instanceid'],
+          self.instance_id,
           item.get('id')
           ), indent=2)
 
@@ -573,11 +682,11 @@ class IbmAPICommand(object):
     resp = self.gen_imgmgr.List()['images']
     if resp is not None:
       for image in resp:
-        if image['name'].startswith(self.flags['image_name']) and image['status'] == States.AVAILABLE:
+        if image['name'].startswith(self.image_name) and image['status'] == States.AVAILABLE:
           return image['id']
     return None
 
   def ImageShow(self):
     """Returns json object of the image matching the id """
-    return self.gen_imgmgr.Show(self.flags['imageid'])
+    return self.gen_imgmgr.Show(self.image_id)
 
