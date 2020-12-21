@@ -73,8 +73,8 @@ flags.DEFINE_integer('netperf_udp_stream_send_size_in_bytes', 1024,
 flags.DEFINE_integer('netperf_tcp_stream_send_size_in_bytes', 131072,
                      'Send size to use for TCP_STREAM tests (netperf -m flag)')
 flags.DEFINE_integer('netperf_mss', None,
-                     'Sets the Maximum Segment Size (in bytes) to use. The effective MSS '
-                     'will be slightly smaller than the value specified here. '
+                     'Sets the Maximum Segment Size (in bytes) for netperf TCP tests to use. '
+                     'The effective MSS will be slightly smaller than the value specified here. '
                      'If you try to set an MSS higher than the current MTU, '
                      'the MSS will be set to the highest possible value for that MTU.')
 
@@ -108,7 +108,8 @@ OUTPUT_SELECTOR = (
     'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
     'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
     'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
-    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS')
+    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS',
+    'TRANSPORT_MSS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
 PORT_START = 20000
