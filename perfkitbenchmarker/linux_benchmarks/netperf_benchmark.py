@@ -72,6 +72,11 @@ flags.DEFINE_integer('netperf_udp_stream_send_size_in_bytes', 1024,
 # of 16K so that we can achieve the "link rate".
 flags.DEFINE_integer('netperf_tcp_stream_send_size_in_bytes', 131072,
                      'Send size to use for TCP_STREAM tests (netperf -m flag)')
+flags.DEFINE_integer('netperf_mss', None,
+                     'Sets the Maximum Segment Size (in bytes) to use. The effective MSS '
+                     'will be slightly smaller than the value specified here. '
+                     'If you try to set an MSS higher than the current MTU, '
+                     'the MSS will be set to the highest possible value for that MTU.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR', 'UDP_STREAM']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
