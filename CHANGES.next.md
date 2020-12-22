@@ -7,6 +7,9 @@
         if a public image is made avaiable.
 -   The `dpb_sparksql_benchmark` now requires passing the requested queries with
     `--dpb_sparksql_query_order`
+-   AwsVirtualMachine.IMAGE_OWNER has been changed from a string to a list of
+    strings to support images which have multiple owners e.g. AmazonLinux2 in
+    opt-in regions.
 
 ### New features:
 

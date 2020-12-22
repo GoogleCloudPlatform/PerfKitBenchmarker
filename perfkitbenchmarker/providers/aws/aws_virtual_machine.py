@@ -89,25 +89,30 @@ X86 = 'x86_64'
 
 # These are the project numbers of projects owning common images.
 # Some numbers have corresponding owner aliases, but they are not used here.
-AMAZON_LINUX_IMAGE_PROJECT = '137112412989'  # alias amazon
+AMAZON_LINUX_IMAGE_PROJECT = [
+    '137112412989',  # alias amazon most regions
+    '210953353124',  # alias amazon for af-south-1
+    '910595266909',  # alias amazon for ap-east-1
+    '071630900071',  # alias amazon for eu-south-1
+]
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Stretch
 # Marketplace AMI exists, but not in all regions
-DEBIAN_9_IMAGE_PROJECT = '379101102735'
+DEBIAN_9_IMAGE_PROJECT = ['379101102735']
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
-DEBIAN_10_IMAGE_PROJECT = '136693071363'
+DEBIAN_10_IMAGE_PROJECT = ['136693071363']
 # Owns AMIs lists here:
 # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
 # Also owns the AMIS listed in
 # https://builds.coreos.fedoraproject.org/streams/stable.json
-CENTOS_IMAGE_PROJECT = '125523088429'
-MARKETPLACE_IMAGE_PROJECT = '679593333241'  # alias aws-marketplace
+CENTOS_IMAGE_PROJECT = ['125523088429']
+MARKETPLACE_IMAGE_PROJECT = ['679593333241']  # alias aws-marketplace
 # https://access.redhat.com/articles/2962171
-RHEL_IMAGE_PROJECT = '309956199498'
+RHEL_IMAGE_PROJECT = ['309956199498']
 # https://help.ubuntu.com/community/EC2StartersGuide#Official_Ubuntu_Cloud_Guest_Amazon_Machine_Images_.28AMIs.29
-UBUNTU_IMAGE_PROJECT = '099720109477'  # Owned by canonical
+UBUNTU_IMAGE_PROJECT = ['099720109477']  # Owned by canonical
 # Some Windows images are also available in marketplace project, but this is the
 # one selected by the AWS console.
-WINDOWS_IMAGE_PROJECT = '801119661308'  # alias amazon
+WINDOWS_IMAGE_PROJECT = ['801119661308']  # alias amazon
 
 # Machine type to host architecture.
 _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
@@ -454,9 +459,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # images considered.
   IMAGE_NAME_REGEX = None
 
-  # Project that owns the AMIs of this OS type. Default to AWS Marketplace
-  # official image project.
-  IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
+  # List of projects that own the AMIs of this OS type. Default to
+  # AWS Marketplace official image project.  Note that opt-in regions may have a
+  # different image owner than default regions.
+  IMAGE_OWNER = [MARKETPLACE_IMAGE_PROJECT]
 
   # Some AMIs use a project code to find the latest (in addition to owner, and
   # filter)
@@ -596,7 +602,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if cls.IMAGE_DESCRIPTION_FILTER:
       describe_cmd.extend(['Name=description,Values=%s' %
                            cls.IMAGE_DESCRIPTION_FILTER])
-    describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
+    describe_cmd.extend(['--owners'] + cls.IMAGE_OWNER)
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
     if not stdout:
@@ -758,7 +764,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       if IsPlacementGroupCompatible(self.machine_type):
         placement.append('GroupName=%s' % self.placement_group.name)
       else:
-        logging.warn(
+        logging.warning(
             'VM not placed in Placement Group. VM Type %s not supported',
             self.machine_type)
     placement = ','.join(placement)
