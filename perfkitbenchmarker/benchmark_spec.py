@@ -38,6 +38,7 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
+from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
@@ -146,6 +147,7 @@ class BenchmarkSpec(object):
     self.dpb_service = None
     self.container_cluster = None
     self.relational_db = None
+    self.non_relational_db = None
     self.spanner = None
     self.tpus = []
     self.tpu_groups = {}
@@ -259,6 +261,18 @@ class BenchmarkSpec(object):
     providers.LoadProvider(cloud)
     relational_db_class = (relational_db.GetRelationalDbClass(cloud))
     self.relational_db = relational_db_class(self.config.relational_db)
+
+  def ConstructNonRelationalDb(self):
+    """Create the non_relational db and create groups for its vms."""
+    db_spec: non_relational_db.BaseNonRelationalDbSpec = self.config.non_relational_db
+    if db_spec is None:
+      return
+    logging.info('Constructing non-relational db instance with spec: %s.',
+                 db_spec)
+    service_type = db_spec.service_type
+    non_relational_db_class = non_relational_db.GetNonRelationalDbClass(
+        service_type)
+    self.non_relational_db = non_relational_db_class.FromSpec(db_spec)
 
   def ConstructSpanner(self) -> None:
     """Create the spanner instance."""
@@ -643,6 +657,8 @@ class BenchmarkSpec(object):
     if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.SetVms(self.vm_groups)
       self.relational_db.Create()
+    if self.non_relational_db:
+      self.non_relational_db.Create()
     if self.spanner:
       self.spanner.Create()
     if self.tpus:
@@ -671,6 +687,8 @@ class BenchmarkSpec(object):
       self.dpb_service.Delete()
     if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.Delete()
+    if hasattr(self, 'non_relational_db') and self.non_relational_db:
+      self.non_relational_db.Delete()
     if hasattr(self, 'spanner') and self.spanner:
       self.spanner.Delete()
     if self.tpus:

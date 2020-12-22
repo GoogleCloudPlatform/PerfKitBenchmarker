@@ -33,6 +33,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
@@ -1192,6 +1193,42 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
+  """Validate the non_relational_db dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_NonRelationalDbDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify non_relational_db dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _NonRelationalDbService built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    non_relational_db_config = super().Decode(value, component_full_name,
+                                              flag_values)
+    if 'service_type' in non_relational_db_config:
+      db_spec_class = non_relational_db.GetNonRelationalDbSpecClass(
+          non_relational_db_config['service_type'])
+    else:
+      raise errors.Config.InvalidValue(
+          'Required attribute `service_type` missing from non_relational_db '
+          'config.')
+    return db_spec_class(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **non_relational_db_config)
+
+
 class _SpannerDecoder(option_decoders.TypeVerifier):
   """Validate the spanner dictionary of a benchmark config object."""
 
@@ -1648,6 +1685,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'vpc_peering': (option_decoders.BooleanDecoder, {
             'default': False,
+            'none_ok': True,
+        }),
+        'non_relational_db': (_NonRelationalDbDecoder, {
+            'default': None,
             'none_ok': True,
         }),
         'spanner': (_SpannerDecoder, {

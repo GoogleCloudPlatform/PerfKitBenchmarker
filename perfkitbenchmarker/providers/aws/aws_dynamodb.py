@@ -24,7 +24,7 @@ import json
 import logging
 
 from absl import flags
-from perfkitbenchmarker import resource
+from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 from six.moves import range
@@ -138,8 +138,9 @@ class _GetIndexes():
     return gsi_items
 
 
-class AwsDynamoDBInstance(resource.BaseResource):
+class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
   """Class for working with DynamoDB."""
+  SERVICE_TYPE = non_relational_db.DYNAMODB
 
   def __init__(self, table_name, **kwargs):
     super(AwsDynamoDBInstance, self).__init__(**kwargs)
