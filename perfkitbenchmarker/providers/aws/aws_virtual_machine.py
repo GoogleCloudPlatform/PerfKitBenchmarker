@@ -462,7 +462,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # List of projects that own the AMIs of this OS type. Default to
   # AWS Marketplace official image project.  Note that opt-in regions may have a
   # different image owner than default regions.
-  IMAGE_OWNER = [MARKETPLACE_IMAGE_PROJECT]
+  IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
 
   # Some AMIs use a project code to find the latest (in addition to owner, and
   # filter)
