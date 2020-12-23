@@ -110,7 +110,7 @@ class HpccDimensions:
     depths: 'DEPTHs': look ahread depth.
     swap: swapping algorithm to use.
     l1: 'L1': whether the upper triangle of the panel of columns should be
-       stored in transposed form.
+      stored in transposed form.
     u: 'U': whether the panel of rows U should be stored in transposed form.
     equilibration: whether to enable the equilibration phase.
   """
@@ -148,7 +148,7 @@ flags.DEFINE_list(
     'hpcc_mpi_env', [], 'Comma separated list containing environment variables '
     'to use with mpirun command. e.g. '
     'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512')
-flags.DEFINE_integer(
+flags.DEFINE_float(
     'hpcc_timeout_hours', 4,
     'The number of hours to wait for the HPCC binary to '
     'complete before timing out and assuming it failed.')
@@ -422,10 +422,9 @@ def RunHpccSource(
                              'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
                              'fi'))
   num_processes = len(vms) * headnode_vm.NumCpusForBenchmark()
-  mpi_env = ' '.join([f'-x {v}' for v in FLAGS.hpcc_mpi_env])
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
   mpi_flags = (f'-machinefile {MACHINEFILE} --mca orte_rsh_agent '
-               f'"ssh -o StrictHostKeyChecking=no" {run_as_root} {mpi_env}')
+               f'"ssh -o StrictHostKeyChecking=no" {run_as_root} {_MpiEnv()}')
   mpi_cmd = 'mpirun '
   if FLAGS.hpcc_numa_binding:
     numa_map = numactl.GetNuma(headnode_vm)
@@ -439,7 +438,7 @@ def RunHpccSource(
     mpi_cmd += f'-np {num_processes} {mpi_flags} ./hpcc'
 
   headnode_vm.RobustRemoteCommand(
-      mpi_cmd, timeout=FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR)
+      mpi_cmd, timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
   logging.info('HPCC Results:')
   stdout, _ = headnode_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
   if stdout.startswith('HPL ERROR'):
@@ -447,6 +446,11 @@ def RunHpccSource(
     raise errors.Benchmarks.RunError(f'Error running HPL: {stdout}')
 
   return ParseOutput(stdout)
+
+
+def _MpiEnv(mpi_flag: str = '-x') -> str:
+  """Returns the --hpcc_mpi_env flags as a string for the mpirun command."""
+  return ' '.join([f'{mpi_flag} {v}' for v in FLAGS.hpcc_mpi_env])
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
