@@ -654,7 +654,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
     if FLAGS.aws_efa:
-      self.ip_address = self._ConfigureEfa(instance)
+      self._ConfigureEfa(instance)
     else:
       self.ip_address = instance['PublicIpAddress']
 
@@ -663,10 +663,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       instance: dict which contains instance info.
-
-    Returns:
-      the public IP address string.
     """
+    self._ConfigureElasticIp(instance)
     if FLAGS.aws_efa_version:
       # Download EFA then call InstallEfa method so that subclass can override
       self.InstallPackages('curl')
@@ -676,16 +674,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self._InstallEfa()
       # Run test program to confirm EFA working
       self.RemoteCommand('cd aws-efa-installer; ./efa_test.sh')
-    return self._ConfigureElasticIp(instance)
 
   def _ConfigureElasticIp(self, instance):
     """Create and associate Elastic IP.
 
     Args:
       instance: dict which contains instance info.
-
-    Returns:
-      the public IP address string.
     """
     network_interface_id = None
     for network_interface in instance['NetworkInterfaces']:
@@ -700,7 +694,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                          f'--region={self.region}',
                                          '--domain=vpc'])
     response = json.loads(stdout)
-    ip_address = response['PublicIp']
+    self.ip_address = response['PublicIp']
     self.allocation_id = response['AllocationId']
 
     util.AddDefaultTags(self.allocation_id, self.region)
@@ -712,7 +706,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                            f'--network-interface-id={network_interface_id}'])
     response = json.loads(stdout)
     self.association_id = response['AssociationId']
-    return ip_address
 
   def _InstallEfa(self):
     """Installs AWS EFA packages.
