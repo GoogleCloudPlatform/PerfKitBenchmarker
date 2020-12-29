@@ -40,6 +40,7 @@
 -   Aerospike YCSB can have multiple server nodes and different client/server
     machine types.
 -   HPL's configuration file customizable with flags.
+-   Added Intel MPI to linux_packages.
 
 ### Bug fixes and maintenance updates:
 
