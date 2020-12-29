@@ -141,10 +141,9 @@ def _DownloadData(benchmark_spec, rank):
   vm.Install('wget')
   vm.RemoteCommand('[ -d $HOME/fairseq ] || git clone {git} -b {branch}'
                    .format(git=FAIRSEQ_GIT, branch=FAIRSEQ_BRANCH))
-  env = 'PATH=/opt/conda/bin:$PATH'
-  vm.RemoteCommand('{} python3 -m pip install pyarrow'.format(env))
-  vm.RemoteCommand('cd fairseq && {} python3 -m pip install --editable .'
-                   .format(env))
+  vm.RemoteCommand(f'{FLAGS.torch_env} python3 -m pip install pyarrow')
+  vm.RemoteCommand(f'cd fairseq && {FLAGS.torch_env} python3 -m pip install '
+                   '--editable .')
   vm.RemoteCommand('mkdir -p {}'.format(DATA_PATH))
   text_zip = posixpath.join(DATA_PATH, posixpath.basename(WIKI_TEXT))
   vm.RemoteCommand('wget -O {des} {src}'.format(des=text_zip, src=WIKI_TEXT))
@@ -158,26 +157,25 @@ def _DownloadData(benchmark_spec, rank):
                    .format(des=bpe_dir, src=VOCAB_BPE))
   for phase in ('train', 'valid', 'test'):
     vm.RemoteCommand(
-        'cd {data_path} && {env} python3 -m '
+        f'cd {DATA_PATH} && {FLAGS.torch_env} python3 -m '
         'examples.roberta.multiprocessing_bpe_encoder '
         '--encoder-json gpt2_bpe/encoder.json '
         '--vocab-bpe gpt2_bpe/vocab.bpe '
-        '--inputs wikitext-103-raw/wiki.{phase}.raw '
-        '--outputs wikitext-103-raw/wiki.{phase}.bpe '
+        f'--inputs wikitext-103-raw/wiki.{phase}.raw '
+        f'--outputs wikitext-103-raw/wiki.{phase}.bpe '
         '--keep-empty '
-        '--workers 60 '
-        .format(env=env, data_path=DATA_PATH, phase=phase))
+        '--workers 60 ')
 
   vm.RemoteCommand('wget -O {des}/dict.txt {src}'
                    .format(des=bpe_dir, src=FAIRSEQ_DICT))
   vm.RemoteCommand(
-      'cd {data_path} && {env} fairseq-preprocess '
+      f'cd {DATA_PATH} && {FLAGS.torch_env} fairseq-preprocess '
       '--only-source  --srcdict gpt2_bpe/dict.txt '
       '--trainpref wikitext-103-raw/wiki.train.bpe '
       '--validpref wikitext-103-raw/wiki.valid.bpe '
       '--testpref wikitext-103-raw/wiki.test.bpe '
       '--destdir data-bin/wikitext-103 '
-      '--workers 60'.format(env=env, data_path=DATA_PATH))
+      '--workers 60')
   data_bin = posixpath.join(DATA_PATH, 'data-bin')
   vm.RemoteCommand('mkdir -p {}/mlm-w103'.format(data_bin))
   vm.RemoteCommand('for x in `seq 1 {word_count}`;'
@@ -314,7 +312,7 @@ def _Run(benchmark_spec, rank):
                 r'-o /tmp/pkb/%h.%p.nvprof'.format(cuda_toolkit.CUDA_HOME))
 
   distributed_cmd = (
-      '-m torch.distributed.launch '
+      'torch.distributed.launch '
       '--nproc_per_node={nproc_per_node} '
       '--nnodes={num_vms} '
       '--node_rank={rank} '
@@ -364,21 +362,14 @@ def _Run(benchmark_spec, rank):
       'update-freq': benchmark_spec.update_freq,
       'max-epoch': benchmark_spec.max_epoch,
   })
-  path = ['/usr/local/cuda/bin', '/opt/conda/bin', '/opt/conda/condabin',
-          '$PATH']
-  if FLAGS.aws_efa:
-    path.insert(0, '/opt/amazon/openmpi')
-    path.insert(0, '/opt/amazon/openmpi/bin')
-  roberta_benchmark_cmd = (
-      'PATH={path} DGXSYSTEM=DGX1 NEXP=1 PULL=0 LOGDIR=/tmp/robertammlm '
-      '{nccl_env} {prof_cmd} python3 {distributed_cmd} '
-      '$HOME/fairseq/train.py {data_path}/data-bin/mlm-w103 '
-      .format(path=':'.join(path), nccl_env=' '.join(nccl_env),
-              data_path=DATA_PATH, distributed_cmd=distributed_cmd,
-              prof_cmd=prof_cmd))
-  roberta_benchmark_cmd += ' '.join(
-      '--{}={}'.format(key, value) if value else '--{}'.format(key)
+  roberta_benchmark_flags = ' '.join(
+      f'--{key}={value}' if value else f'--{key}'
       for key, value in sorted(cmd_flags.items()))
+  roberta_benchmark_cmd = (
+      f'{FLAGS.torch_env} DGXSYSTEM=DGX1 NEXP=1 PULL=0 LOGDIR=/tmp/robertammlm '
+      f'{" ".join(nccl_env)} {prof_cmd} python3 -m {distributed_cmd} '
+      f'$HOME/fairseq/train.py {DATA_PATH}/data-bin/mlm-w103 '
+      f'{roberta_benchmark_flags}')
   metadata = _CreateMetadataDict(benchmark_spec)
   stdout, _ = vm.RobustRemoteCommand(roberta_benchmark_cmd, should_log=True)
   return MakeSamplesFromOutput(metadata, stdout) if master == vm else []

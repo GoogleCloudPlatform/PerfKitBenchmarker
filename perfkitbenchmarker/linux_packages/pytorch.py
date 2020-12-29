@@ -25,7 +25,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('torch_version', '1.7.1', 'The torch version.')
 flags.DEFINE_string('torchvision_version', '0.8.2', 'The torchvision version.')
 flags.DEFINE_string('torchaudio_version', '0.7.2', 'The torchaudio version.')
-flags.DEFINE_string('torch_env', 'PATH=/opt/conda/bin:$PATH python3 -m',
+flags.DEFINE_string('torch_env', 'PATH=/opt/conda/bin:$PATH',
                     'The torch install environment.')
 
 _PYTORCH_WHL = 'https://download.pytorch.org/whl/torch_stable.html'
@@ -33,14 +33,14 @@ _PYTORCH_WHL = 'https://download.pytorch.org/whl/torch_stable.html'
 
 def Install(vm):
   """Installs PyTorch on the VM."""
-  vm.Install('pip')
+  vm.InstallPackages('python3-pip')
   toolkit = 'cpu'
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     # Translates --cuda_toolkit_version=10.2 to "cu102" for the toolkit to
     # install
     toolkit = f'cu{"".join(FLAGS.cuda_toolkit_version.split("."))}'
   vm.RemoteCommand(
-      f'{FLAGS.torch_env} pip install '
+      f'{FLAGS.torch_env} python3 -m pip install '
       f'torch=={FLAGS.torch_version}+{toolkit} '
       f'torchvision=={FLAGS.torchvision_version}+{toolkit} '
       f'torchaudio=={FLAGS.torchaudio_version} '
