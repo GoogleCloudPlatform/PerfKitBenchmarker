@@ -54,6 +54,7 @@ from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hpcc
 from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import numactl
@@ -303,15 +304,19 @@ def PrepareBinaries(vms: List[linux_vm.BaseLinuxVirtualMachine]) -> None:
     headnode_vm.PushFile(data.ResourcePath(FLAGS.hpcc_binary), './hpcc')
   else:
     headnode_vm.RemoteCommand(f'cp {hpcc.HPCC_DIR}/hpcc hpcc')
+  vm_util.RunThreaded(lambda vm: _PrepareBinaries(headnode_vm, vm), vms[1:])
 
-  for vm in vms[1:]:
-    vm.Install('fortran')
-    headnode_vm.MoveFile(vm, 'hpcc', 'hpcc')
-    headnode_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
-    vm.RemoteCommand('sudo mv orted /usr/bin/orted')
-    if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
-      headnode_vm.MoveFile(vm, '/lib/libiomp5.so', 'libiomp5.so')
-      vm.RemoteCommand('sudo mv libiomp5.so /lib/libiomp5.so')
+
+def _PrepareBinaries(headnode_vm: linux_vm.BaseLinuxVirtualMachine,
+                     vm: linux_vm.BaseLinuxVirtualMachine) -> None:
+  """Prepares the binaries on the vm."""
+  vm.Install('fortran')
+  headnode_vm.MoveFile(vm, 'hpcc', 'hpcc')
+  headnode_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
+  vm.RemoteCommand('sudo mv orted /usr/bin/orted')
+  if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
+    headnode_vm.MoveFile(vm, '/lib/libiomp5.so', 'libiomp5.so')
+    vm.RemoteCommand('sudo mv libiomp5.so /lib/libiomp5.so')
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:

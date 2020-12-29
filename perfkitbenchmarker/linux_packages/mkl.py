@@ -1,4 +1,4 @@
-# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,21 +49,27 @@ def _Install(vm):
                    'echo "source /opt/intel/compilers_and_libraries/linux/bin/'
                    'compilervars.sh -arch intel64 -platform linux" '
                    '>>/etc/bash.bashrc')
-  vm.RemoteCommand('cd /opt/intel/mkl/interfaces/fftw2xc && '
-                   'sudo make libintel64 PRECISION=MKL_DOUBLE interface='
-                   'ilp64 mpi=openmpi compiler=gnu')
-  vm.RemoteCommand('cd /opt/intel/mkl/interfaces/fftw2xf && '
-                   'sudo make libintel64 PRECISION=MKL_DOUBLE interface='
-                   'ilp64 mpi=openmpi compiler=gnu')
-  vm.RemoteCommand('cd /opt/intel/mkl/interfaces/fftw3xc && '
-                   'sudo make libintel64 PRECISION=MKL_DOUBLE interface='
-                   'ilp64 mpi=openmpi compiler=gnu')
-  vm.RemoteCommand('cd /opt/intel/mkl/interfaces/fftw3xf && '
-                   'sudo make libintel64 PRECISION=MKL_DOUBLE interface='
-                   'ilp64 mpi=openmpi compiler=gnu')
+  _CompileInterfaces(vm)
   vm.RemoteCommand(
       'sudo ln -s /opt/intel/compilers_and_libraries_2018.2.199/linux/compiler/'
       'lib/intel64/libiomp5.so /lib/libiomp5.so')
+
+
+def _CompileInterfaces(vm):
+  """Compiles the MKL FFT interfaces.
+
+  Args:
+    vm: Virtual Machine to compile on.
+  """
+  mpi_lib = 'openmpi'
+  make_options = ('PRECISION=MKL_DOUBLE '
+                  'interface=ilp64 '
+                  f'mpi={mpi_lib} '
+                  'compiler=gnu')
+  for interface in ('fftw2xc', 'fftw2xf', 'fftw3xc', 'fftw3xf'):
+    cmd = (f'cd /opt/intel/mkl/interfaces/{interface} && '
+           f'sudo make libintel64 {make_options}')
+    vm.RemoteCommand(cmd)
 
 
 def YumInstall(vm):
