@@ -59,7 +59,7 @@ def Reinstall(vm, version='4.7'):
     else:
       new_pkg = pkg + '-' + version
       vm.InstallPackages(new_pkg)
-      vm.RemoteCommand('sudo rm /usr/bin/{pkg}'.format(pkg=pkg))
+      vm.RemoteCommand('sudo rm -f /usr/bin/{pkg}'.format(pkg=pkg))
       vm.RemoteCommand('sudo ln -s /usr/bin/{new_pkg} /usr/bin/{pkg}'.format(
           new_pkg=new_pkg, pkg=pkg))
       logging.info('Updated version of %s: Old: %s New: %s', pkg,
