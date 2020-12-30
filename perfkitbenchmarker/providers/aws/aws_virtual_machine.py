@@ -664,7 +664,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       instance: dict which contains instance info.
     """
-    self._ConfigureElasticIp(instance)
+    if FLAGS.aws_efa_count > 1:
+      self._ConfigureElasticIp(instance)
+    else:
+      self.ip_address = instance['PublicIpAddress']
     if FLAGS.aws_efa_version:
       # Download EFA then call InstallEfa method so that subclass can override
       self.InstallPackages('curl')
@@ -788,6 +791,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id
         })
+        if FLAGS.aws_efa_count == 1:
+          efa_params['AssociatePublicIpAddress'] = True
         efas.append(','.join(f'{key}={value}' for key, value in
                              sorted(efa_params.items())))
       create_cmd.extend(efas)
