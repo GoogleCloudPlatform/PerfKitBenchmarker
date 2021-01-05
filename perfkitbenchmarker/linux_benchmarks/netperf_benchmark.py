@@ -109,7 +109,7 @@ OUTPUT_SELECTOR = (
     'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
     'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
     'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
-    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS',
+    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS,'
     'TRANSPORT_MSS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
@@ -284,6 +284,9 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     logging.error(message)
     raise errors.Benchmarks.KnownIntermittentError(message)
 
+  print("RESULTS")
+  print(results)
+
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
@@ -291,6 +294,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     meta_keys.extend([
         ('Local Transport Retransmissions', 'netperf_retransmissions'),
         ('Remote Transport Retransmissions', 'netserver_retransmissions'),
+        ('Transport MSS bytes', 'netperf_effective_mss')
     ])
 
   metadata.update({meta_key: results[netperf_key]
