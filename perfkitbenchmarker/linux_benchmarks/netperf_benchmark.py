@@ -76,7 +76,8 @@ flags.DEFINE_integer('netperf_mss', None,
                      'Sets the Maximum Segment Size (in bytes) for netperf TCP tests to use. '
                      'The effective MSS will be slightly smaller than the value specified here. '
                      'If you try to set an MSS higher than the current MTU, '
-                     'the MSS will be set to the highest possible value for that MTU.')
+                     'the MSS will be set to the highest possible value for that MTU. '
+                     'If you try to set the MSS lower than 88 bytes, the default MSS will be used')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR', 'UDP_STREAM']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -401,6 +402,10 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                         thinktime=FLAGS.netperf_thinktime,
                         thinktime_array_size=FLAGS.netperf_thinktime_array_size,
                         thinktime_run_length=FLAGS.netperf_thinktime_run_length)
+
+  if FLAGS.netperf_mss and 'TCP' in benchmark_name.upper():
+    netperf_cmd += (' -G {mss}b'.format(
+                      mss=FLAGS.netperf_mss))
 
   # Run all of the netperf processes and collect their stdout
   # TODO(dlott): Analyze process start delta of netperf processes on the remote
