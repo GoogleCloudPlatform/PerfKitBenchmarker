@@ -284,9 +284,6 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     logging.error(message)
     raise errors.Benchmarks.KnownIntermittentError(message)
 
-  print("RESULTS")
-  print(results)
-
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
