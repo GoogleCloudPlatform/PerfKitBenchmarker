@@ -41,6 +41,7 @@
     machine types.
 -   HPL's configuration file customizable with flags.
 -   Added Intel MPI to linux_packages.
+-   Added ability to use MKL 2018.2 from Intel repos via --mkl_install_from_repo
 
 ### Bug fixes and maintenance updates:
 

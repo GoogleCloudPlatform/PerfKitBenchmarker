@@ -75,3 +75,22 @@ def YumPrepare(vm):
   vm.RemoteCommand(f'rm {_YUM_DOWNLOAD_KEY}')
   # need to update with -y to force import of known GPG key
   vm.RemoteCommand('sudo yum update -y')
+
+
+def CopyIntelFiles(source_vm, target_vm) -> None:
+  """Copies the /opt/intel files from the source_vm to the target_vm.
+
+  Instead of installing the Intel packages on all the VMs install it on one
+  and scp the files.  This can also be done via an NFS mount.
+
+  Args:
+    source_vm: The virtual machine that has the /opt/intel files.
+    target_vm: Destination VM for the /opt/intel files
+  """
+  root_dir = '/opt/intel'
+  mkdir_cmd = (f'sudo mkdir {root_dir}; '
+               f'sudo chown {target_vm.user_name} {root_dir}')
+  target_vm.RemoteCommand(mkdir_cmd)
+  tar_cmd = f'cd {root_dir}; tar -cf - *'
+  untar_cmd = f"ssh {target_vm.internal_ip} '(cd {root_dir} ; tar -xf -)'"
+  source_vm.RemoteCommand(f'{tar_cmd} | {untar_cmd}')

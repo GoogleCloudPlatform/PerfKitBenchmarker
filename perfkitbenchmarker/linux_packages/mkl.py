@@ -14,21 +14,45 @@
 
 """Module containing Intel MKL installation and cleanup functions."""
 
+from absl import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker.linux_packages import intel_repo
+
 
 MKL_DIR = '%s/MKL' % linux_packages.INSTALL_DIR
 MKL_TAG = 'l_mkl_2018.2.199'
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
 MKL_VERSION = '2018.2.199'
+# While some of the dependencies are "-199" the intel-mkl package is "-046"
+_MKL_VERSION_REPO = '2018.2-046'
 
 # TODO(user): InstallPreprovisionedBenchmarkData currently assumes that
 # BENCHMARK_NAME is associated with a benchmark. Once it is expanded to include
 # packages, we can associate the preprovisioned data for MKL with this package.
 BENCHMARK_NAME = 'hpcc'
 
+# Default installs MKL as it was previously done via preprovisioned data
+USE_MKL_REPO = flags.DEFINE_bool('mkl_install_from_repo', False,
+                                 'Whether to install MKL from the Intel repo.')
+
+# File contains MKL specific environment variables
+_MKL_VARS_FILE = '/opt/intel/mkl/bin/mklvars.sh'
+
+# Command to source for Intel64 based VMs to set environment variables
+SOURCE_MKL_INTEL64_CMD = f'MKLVARS_ARCHITECTURE=intel64 . {_MKL_VARS_FILE}'
+
 
 def _Install(vm):
   """Installs the MKL package on the VM."""
+  if USE_MKL_REPO.value:
+    vm.InstallPackages(f'intel-mkl-{_MKL_VERSION_REPO}')
+  else:
+    _InstallFromPreprovisionedData(vm)
+  _CompileInterfaces(vm)
+
+
+def _InstallFromPreprovisionedData(vm):
+  """Installs the MKL package from preprovisioned data on the VM."""
   vm.RemoteCommand('cd {0} && mkdir MKL'.format(linux_packages.INSTALL_DIR))
   vm.InstallPreprovisionedBenchmarkData(
       BENCHMARK_NAME, [MKL_TGZ], MKL_DIR)
@@ -49,10 +73,6 @@ def _Install(vm):
                    'echo "source /opt/intel/compilers_and_libraries/linux/bin/'
                    'compilervars.sh -arch intel64 -platform linux" '
                    '>>/etc/bash.bashrc')
-  _CompileInterfaces(vm)
-  vm.RemoteCommand(
-      'sudo ln -s /opt/intel/compilers_and_libraries_2018.2.199/linux/compiler/'
-      'lib/intel64/libiomp5.so /lib/libiomp5.so')
 
 
 def _CompileInterfaces(vm):
@@ -74,9 +94,13 @@ def _CompileInterfaces(vm):
 
 def YumInstall(vm):
   """Installs the MKL package on the VM."""
+  if USE_MKL_REPO.value:
+    intel_repo.YumPrepare(vm)
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the MKL package on the VM."""
+  if USE_MKL_REPO.value:
+    intel_repo.AptPrepare(vm)
   _Install(vm)

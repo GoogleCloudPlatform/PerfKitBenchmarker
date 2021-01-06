@@ -56,6 +56,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hpcc
+from perfkitbenchmarker.linux_packages import intel_repo
 from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import numactl
 from perfkitbenchmarker.linux_packages import openblas
@@ -77,6 +78,9 @@ BENCHMARK_DATA = {
     # Math Kernel Library(Intel Mkl)".
     MKL_TGZ: 'e28d12173bef9e615b0ded2f95f59a42b3e9ad0afa713a79f8801da2bfb31936',
 }
+
+# File for mpirun to run that calls ./hpcc
+HPCC_WRAPPER = 'hpcc_wrapper.sh'
 
 BENCHMARK_NAME = 'hpcc'
 BENCHMARK_CONFIG = """
@@ -315,8 +319,7 @@ def _PrepareBinaries(headnode_vm: linux_vm.BaseLinuxVirtualMachine,
   headnode_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
   vm.RemoteCommand('sudo mv orted /usr/bin/orted')
   if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
-    headnode_vm.MoveFile(vm, '/lib/libiomp5.so', 'libiomp5.so')
-    vm.RemoteCommand('sudo mv libiomp5.so /lib/libiomp5.so')
+    intel_repo.CopyIntelFiles(headnode_vm, vm)
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
@@ -431,16 +434,22 @@ def RunHpccSource(
   mpi_flags = (f'-machinefile {MACHINEFILE} --mca orte_rsh_agent '
                f'"ssh -o StrictHostKeyChecking=no" {run_as_root} {_MpiEnv()}')
   mpi_cmd = 'mpirun '
+  hpcc_exec = './hpcc'
+  if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
+    # Must exec HPCC wrapper script to pickup location of libiomp5.so
+    vm_util.RunThreaded(_CreateHpccWrapper, vms)
+    hpcc_exec = f'./{HPCC_WRAPPER}'
+
   if FLAGS.hpcc_numa_binding:
     numa_map = numactl.GetNuma(headnode_vm)
     numa_hpcc_cmd = []
     for node, num_cpus in numa_map.items():
       numa_hpcc_cmd.append(f'-np {num_cpus} {mpi_flags} '
                            f'numactl --cpunodebind {node} '
-                           f'--membind {node} ./hpcc')
+                           f'--membind {node} {hpcc_exec}')
     mpi_cmd += ' : '.join(numa_hpcc_cmd)
   else:
-    mpi_cmd += f'-np {num_processes} {mpi_flags} ./hpcc'
+    mpi_cmd += f'-np {num_processes} {mpi_flags} {hpcc_exec}'
 
   headnode_vm.RobustRemoteCommand(
       mpi_cmd, timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
@@ -451,6 +460,21 @@ def RunHpccSource(
     raise errors.Benchmarks.RunError(f'Error running HPL: {stdout}')
 
   return ParseOutput(stdout)
+
+
+def _CreateHpccWrapper(vm: linux_vm.BaseLinuxVirtualMachine) -> None:
+  """Creates a bash script to run HPCC on the VM.
+
+  This is required for when MKL is installed via the Intel repos as the
+  libiomp5.so file is not in /lib but rather in one found via sourcing the
+  mklvars.sh file.
+
+  Args:
+    vm: Virtual machine to put file on.
+  """
+  text = ['#!/bin/bash', mkl.SOURCE_MKL_INTEL64_CMD, './hpcc']
+  vm_util.CreateRemoteFile(vm, '\n'.join(text), HPCC_WRAPPER)
+  vm.RemoteCommand(f'chmod +x {HPCC_WRAPPER}')
 
 
 def _MpiEnv(mpi_flag: str = '-x') -> str:
