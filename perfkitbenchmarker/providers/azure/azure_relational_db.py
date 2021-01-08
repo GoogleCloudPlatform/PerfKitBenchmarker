@@ -159,6 +159,34 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
+  def GetConfigFromMachineType(self, machine_type):
+    """Returns a tuple of (edition, family, vcore) from Azure machine type.
+
+    Args:
+     machine_type (string): Azure machine type i.e GP_Gen5_4
+    Returns:
+      (string, string, string): edition, family, vcore
+    Raises:
+      UnsupportedError: if the machine type is not supported.
+    """
+    machine_type = machine_type.split('_')
+    if len(machine_type) != 3:
+      raise relational_db.UnsupportedError(
+          'Unsupported machine type {0},'
+          ' sample machine type GP_Gen5_2'.format(machine_type))
+    edition = machine_type[0]
+    if edition == 'BC':
+      edition = 'BusinessCritical'
+    elif edition == 'GP':
+      edition = 'GeneralPurpose'
+    else:
+      raise relational_db.UnsupportedError(
+          'Unsupported edition {}. Only supports BC or GP'.format(machine_type))
+
+    family = machine_type[1]
+    vcore = machine_type[2]
+    return (edition, family, vcore)
+
   def SetDbConfiguration(self, name, value):
     """Set configuration for the database instance.
 
@@ -292,32 +320,59 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     ]
     vm_util.IssueCommand(cmd)
 
-    # Supported families & capacities for 'Standard' are:
-    # [(None, 10), (None, 20), (None, 50), (None, 100), (None, 200),
-    # (None, 400), (None, 800), (None, 1600), (None, 3000)]
+    # Azure support two ways of specifying machine type DTU or with vcores
+    # if compute units is specified we will use the DTU model
+    if self.spec.db_spec.compute_units is not None:
+      # Supported families & capacities for 'Standard' are:
+      # [(None, 10), (None, 20), (None, 50), (None, 100), (None, 200),
+      # (None, 400), (None, 800), (None, 1600), (None, 3000)]
 
-    # Supported families & capacities for 'Premium' are:
-    # [(None, 125), (None, 250), (None, 500), (None, 1000), (None, 1750),
-    #  (None, 4000)].
+      # Supported families & capacities for 'Premium' are:
+      # [(None, 125), (None, 250), (None, 500), (None, 1000), (None, 1750),
+      #  (None, 4000)].
 
-    cmd = [
-        azure.AZURE_PATH,
-        self.GetAzCommandForEngine(),
-        'db',
-        'create',
-        '--resource-group',
-        self.resource_group.name,
-        '--server',
-        self.instance_id,
-        '--name',
-        DEFAULT_DATABASE_NAME,
-        '--edition',
-        self.spec.db_spec.tier,
-        '--capacity',
-        str(self.spec.db_spec.compute_units),
-        '--zone-redundant',
-        'true' if self.spec.high_availability else 'false'
-    ]
+      cmd = [
+          azure.AZURE_PATH,
+          self.GetAzCommandForEngine(),
+          'db',
+          'create',
+          '--resource-group',
+          self.resource_group.name,
+          '--server',
+          self.instance_id,
+          '--name',
+          DEFAULT_DATABASE_NAME,
+          '--edition',
+          self.spec.db_spec.tier,
+          '--capacity',
+          str(self.spec.db_spec.compute_units),
+          '--zone-redundant',
+          'true' if self.spec.high_availability else 'false'
+      ]
+    else:
+      # Sample machine_type: GP_Gen5_2
+      edition, family, vcore = (
+          self.GetConfigFromMachineType(self.spec.db_spec.machine_type))
+      cmd = [
+          azure.AZURE_PATH,
+          self.GetAzCommandForEngine(),
+          'db',
+          'create',
+          '--resource-group',
+          self.resource_group.name,
+          '--server',
+          self.instance_id,
+          '--name',
+          DEFAULT_DATABASE_NAME,
+          '--edition',
+          edition,
+          '--family',
+          family,
+          '--capacity',
+          vcore,
+          '--zone-redundant',
+          'true' if self.spec.high_availability else 'false'
+      ]
     vm_util.IssueCommand(cmd)
     self.database_name = DEFAULT_DATABASE_NAME
 
