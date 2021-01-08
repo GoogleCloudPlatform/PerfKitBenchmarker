@@ -306,7 +306,7 @@ class Redshift(edw_service.EdwService):
     self.cluster_subnet_group = aws_cluster_subnet_group.RedshiftClusterSubnetGroup(
         self.cmd_prefix)
     self.cluster_parameter_group = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
-        edw_service_spec.concurrency, self.cmd_prefix)
+        self.cmd_prefix)
 
     if self.db is None:
       self.db = DEFAULT_DATABASE_NAME
@@ -523,7 +523,6 @@ class Redshift(edw_service.EdwService):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = super(Redshift, self).GetMetadata()
-    basic_data['edw_cluster_concurrency'] = self.concurrency
     basic_data['region'] = self.region
     if self.snapshot is not None:
       basic_data['snapshot'] = self.snapshot

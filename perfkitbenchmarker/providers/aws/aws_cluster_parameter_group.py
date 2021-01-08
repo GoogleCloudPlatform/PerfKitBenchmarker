@@ -23,36 +23,20 @@ FLAGS = flags.FLAGS
 class RedshiftClusterParameterGroup(resource.BaseResource):
   """Cluster Parameter Group associated with a Redshift cluster.
 
-  A cluster parameter group allows you to specify concurrency for the cluster.
-
-
   Attributes:
     name: A string name of the cluster parameter group.
-    concurrency: An integer concurrency value for the cluster.
   """
 
-  def __init__(self, concurrency, cmd_prefix):
+  def __init__(self, cmd_prefix):
     super(RedshiftClusterParameterGroup, self).__init__(user_managed=False)
     self.cmd_prefix = cmd_prefix
     self.name = 'pkb-' + FLAGS.run_uri
-    self.concurrency = concurrency
 
   def _Create(self):
     cmd = self.cmd_prefix + [
         'redshift', 'create-cluster-parameter-group', '--parameter-group-name',
         self.name, '--parameter-group-family', 'redshift-1.0', '--description',
         'Cluster Parameter group for run uri {}'.format(FLAGS.run_uri)
-    ]
-    vm_util.IssueCommand(cmd)
-    wlm_concurrency_parameter_prefix = ('[{"ParameterName":"wlm_json_configurat'
-                                        'ion","ParameterValue":"[{\\\"query_con'
-                                        'currency\\\":')
-    wlm_concurrency_parameter_postfix = '}]","ApplyType":"dynamic"}]'
-    cmd = self.cmd_prefix + [
-        'redshift', 'modify-cluster-parameter-group', '--parameter-group-name',
-        self.name, '--parameters', '{}{}{}'.format(
-            wlm_concurrency_parameter_prefix, str(self.concurrency),
-            wlm_concurrency_parameter_postfix)
     ]
     vm_util.IssueCommand(cmd)
 

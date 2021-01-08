@@ -39,24 +39,17 @@ class RedshiftClusterParameterGroupTestCase(
 
   def testValidClusterParameterGroupCreation(self):
     cpg = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
-        1, list(util.AWS_PREFIX))
+        list(util.AWS_PREFIX))
     self.assertEqual(cpg.name, 'pkb-%s' % TEST_RUN_URI)
     with mock.patch(
         vm_util.__name__ + '.IssueCommand',
         return_value=('out_', 'err_', 0)) as mock_issue:
       cpg._Create()
-      self.assertEqual(mock_issue.call_count, 2)
-      mock_issue.assert_called_with([
-          'aws', '--output', 'json', 'redshift',
-          'modify-cluster-parameter-group', '--parameter-group-name',
-          'pkb-%s' % TEST_RUN_URI, '--parameters',
-          ('[{"ParameterName":"wlm_json_configuration","ParameterValue":"'
-           '[{\\"query_concurrency\\":1}]","ApplyType":"dynamic"}]')
-      ])
+      self.assertEqual(mock_issue.call_count, 1)
 
   def testValidClusterParameterGroupDeletion(self):
     cpg = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
-        1, list(util.AWS_PREFIX))
+        list(util.AWS_PREFIX))
     self.assertEqual(cpg.name, 'pkb-%s' % TEST_RUN_URI)
     with mock.patch(
         vm_util.__name__ + '.IssueCommand',
