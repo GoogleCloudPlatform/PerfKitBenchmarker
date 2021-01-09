@@ -416,6 +416,9 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model='resnet'):
     results = re.findall(r'Tok/s (\S+)', output)
   elif 'ssd' in model:
     results = re.findall(r'avg. samples / sec: (\S+)', output)
+  elif 'mask' in model:
+    results = map(lambda speed: 1/float(speed),
+                  re.findall(r'\((\S+) s / img per device,', output))
   for speed in results:
     samples.append(sample.Sample('speed', float(speed), 'samples/sec',
                                  metadata))
