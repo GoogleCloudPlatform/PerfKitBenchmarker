@@ -68,8 +68,6 @@ def GetAthenaClientInterface(database: str, output_bucket: str,
   Raises:
     RuntimeError: if an unsupported athena_client_interface is requested
   """
-  if FLAGS.athena_client_interface == 'CLI':
-    return CliClientInterface(database, output_bucket, region)
   if FLAGS.athena_client_interface == 'JAVA':
     return JavaClientInterface(database, output_bucket, region)
   raise RuntimeError('Unknown Athena Client Interface requested.' +
