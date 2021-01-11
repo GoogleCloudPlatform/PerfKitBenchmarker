@@ -33,6 +33,7 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the multichase package on the VM."""
+  vm.InstallPackages('glibc-static')
   _Install(vm)
 
 
