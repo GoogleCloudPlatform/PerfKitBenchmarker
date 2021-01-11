@@ -291,7 +291,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     meta_keys.extend([
         ('Local Transport Retransmissions', 'netperf_retransmissions'),
         ('Remote Transport Retransmissions', 'netserver_retransmissions'),
-        ('Transport MSS bytes', 'netperf_effective_mss')
+        ('Transport MSS bytes', 'netperf_mss')
     ])
 
   metadata.update({meta_key: results[netperf_key]
@@ -407,7 +407,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   if FLAGS.netperf_mss and 'TCP' in benchmark_name.upper():
     netperf_cmd += (' -G {mss}b'.format(
                       mss=FLAGS.netperf_mss))
-    metadata['netperf_requested_mss'] = FLAGS.netperf_mss
+    metadata['netperf_mss_requested'] = FLAGS.netperf_mss
 
   # Run all of the netperf processes and collect their stdout
   # TODO(dlott): Analyze process start delta of netperf processes on the remote
