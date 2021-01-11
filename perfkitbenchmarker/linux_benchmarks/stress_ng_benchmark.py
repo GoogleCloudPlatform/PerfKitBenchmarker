@@ -177,7 +177,7 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   vm.InstallPackages(
-      'build-essential libaio-dev libapparmor-dev libattr1-dev libbsd-dev libcap-dev libgcrypt11-dev libkeyutils-dev libsctp-dev zlib1g-dev'
+      'build-essential git libaio-dev libapparmor-dev libattr1-dev libbsd-dev libcap-dev libgcrypt11-dev libkeyutils-dev libsctp-dev zlib1g-dev'
   )
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, STRESS_NG_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(
