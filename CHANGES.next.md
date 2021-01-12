@@ -42,6 +42,7 @@
 -   HPL's configuration file customizable with flags.
 -   Added Intel MPI to linux_packages.
 -   Added ability to use MKL 2018.2 from Intel repos via --mkl_install_from_repo
+-   Added ability to install gfortran 9 with --fortran_version=9
 
 ### Bug fixes and maintenance updates:
 

@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Module containing fortran installation and cleanup functions."""
+
+import logging
+from absl import flags
+
+VERSION = flags.DEFINE_integer('fortran_version', None,
+                               'Version of gfortran to install')
 
 
 def GetLibPath(vm):
@@ -23,9 +28,42 @@ def GetLibPath(vm):
 
 def YumInstall(vm):
   """Installs the fortran package on the VM."""
-  vm.InstallPackages('gcc-gfortran libgfortran')
+  if VERSION.value:
+    _YumInstallVersion(vm, VERSION.value)
+  else:
+    vm.InstallPackages('gcc-gfortran libgfortran')
+  _LogFortranVersion(vm)
 
 
 def AptInstall(vm):
   """Installs the fortan package on the VM."""
-  vm.InstallPackages('gfortran')
+  if VERSION.value:
+    _AptInstallVersion(vm, VERSION.value)
+  else:
+    vm.InstallPackages('gfortran')
+  _LogFortranVersion(vm)
+
+
+def _YumInstallVersion(vm, version):
+  """Does yum install for the version of fortran."""
+  vm.InstallPackages('centos-release-scl-rh')
+  devtoolset = f'devtoolset-{version}'
+  vm.InstallPackages(f'{devtoolset}-gcc-gfortran')
+  # Sets the path to use the newly installed version
+  vm.RemoteCommand(f'echo "source scl_source enable {devtoolset}" >> .bashrc')
+
+
+def _AptInstallVersion(vm, version):
+  """Does an apt install for the version of fortran."""
+  vm.RemoteCommand('sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; '
+                   'sudo apt update')
+  vm.InstallPackages(f'gfortran-{version}')
+  # make symlink so that 'gfortran' will use the newly installed version
+  vm.RemoteCommand('sudo update-alternatives --install /usr/bin/gfortran '
+                   f'gfortran /usr/bin/gfortran-{version} 100')
+
+
+def _LogFortranVersion(vm):
+  """Logs the version of gfortran."""
+  txt, _ = vm.RemoteCommand('gfortran -dumpversion')
+  logging.info('Version of fortran: %s', txt.strip())
