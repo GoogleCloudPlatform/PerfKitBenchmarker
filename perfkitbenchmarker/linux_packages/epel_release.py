@@ -40,7 +40,7 @@ _EPEL_CMDS = {
 }
 
 # The ids of the EPEL yum repo
-_EPEL_REPO_IDS = frozenset(['epel', 'epel/x86_64'])
+_EPEL_REPO_IDS = frozenset(['epel', 'epel/x86_64', 'epel/aarch64'])
 
 
 def AptInstall(vm):
