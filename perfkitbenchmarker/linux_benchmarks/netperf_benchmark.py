@@ -72,6 +72,14 @@ flags.DEFINE_integer('netperf_udp_stream_send_size_in_bytes', 1024,
 # of 16K so that we can achieve the "link rate".
 flags.DEFINE_integer('netperf_tcp_stream_send_size_in_bytes', 131072,
                      'Send size to use for TCP_STREAM tests (netperf -m flag)')
+flags.DEFINE_integer(
+    'netperf_mss', None,
+    'Sets the Maximum Segment Size (in bytes) for netperf TCP tests to use. '
+    'The effective MSS will be slightly smaller than the value specified here. '
+    'If you try to set an MSS higher than the current MTU, '
+    'the MSS will be set to the highest possible value for that MTU. '
+    'If you try to set the MSS lower than 88 bytes, the default MSS will be '
+    'used.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR', 'UDP_STREAM']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -103,7 +111,8 @@ OUTPUT_SELECTOR = (
     'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
     'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
     'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
-    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS')
+    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS,'
+    'TRANSPORT_MSS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
 PORT_START = 20000
@@ -284,6 +293,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     meta_keys.extend([
         ('Local Transport Retransmissions', 'netperf_retransmissions'),
         ('Remote Transport Retransmissions', 'netserver_retransmissions'),
+        ('Transport MSS bytes', 'netperf_mss')
     ])
 
   metadata.update({meta_key: results[netperf_key]
@@ -395,6 +405,10 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                         thinktime=FLAGS.netperf_thinktime,
                         thinktime_array_size=FLAGS.netperf_thinktime_array_size,
                         thinktime_run_length=FLAGS.netperf_thinktime_run_length)
+
+  if FLAGS.netperf_mss and 'TCP' in benchmark_name.upper():
+    netperf_cmd += (' -G {mss}b'.format(mss=FLAGS.netperf_mss))
+    metadata['netperf_mss_requested'] = FLAGS.netperf_mss
 
   # Run all of the netperf processes and collect their stdout
   # TODO(dlott): Analyze process start delta of netperf processes on the remote
