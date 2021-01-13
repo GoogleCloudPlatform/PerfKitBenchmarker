@@ -398,7 +398,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                     f'{FLAGS.netperf_thinktime_run_length} ')
 
   if FLAGS.netperf_mss and 'TCP' in benchmark_name.upper():
-    netperf_cmd += (' -G {mss}b'.format(mss=FLAGS.netperf_mss))
+    netperf_cmd += f' -G {FLAGS.netperf_mss}b'
     metadata['netperf_mss_requested'] = FLAGS.netperf_mss
 
   # Run all of the netperf processes and collect their stdout
