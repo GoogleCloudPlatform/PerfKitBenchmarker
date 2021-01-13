@@ -161,11 +161,17 @@ class UnmanagedNfsService(BaseNfsService):
   }
   _NFS_RESTART_CMD = 'sudo systemctl restart {nfs_name}'
 
-  def __init__(self, disk_spec, server_vm, check_export_not_same_mount=True):
+  def __init__(self,
+               disk_spec,
+               server_vm,
+               check_export_not_same_mount=True,
+               server_directory=None):
     super(UnmanagedNfsService, self).__init__(disk_spec, None)
     self.server_vm = server_vm
     # Path on the server to export. Must be different from mount_point.
-    self.server_directory = disk_spec.device_path or '/pkb-nfs-server-directory'
+    self.server_directory = (
+        server_directory or disk_spec.device_path or
+        '/pkb-nfs-server-directory')
     logging.info('Exporting server directory %s', self.server_directory)
     if check_export_not_same_mount:
       assert self.server_directory != disk_spec.mount_point, (
@@ -181,8 +187,12 @@ class UnmanagedNfsService(BaseNfsService):
     Args:
       export_dir_path: Path to the directory to export.
     """
-    self.server_vm.RemoteCommand(
-        self._EXPORT_FS_COMMAND.format(export_dir=export_dir_path))
+    if self.server_vm.TryRemoteCommand(
+        f'grep "^{export_dir_path} " /etc/exports'):
+      logging.info('Already NFS exported directory %s', export_dir_path)
+    else:
+      self.server_vm.RemoteCommand(
+          self._EXPORT_FS_COMMAND.format(export_dir=export_dir_path))
     nfs_name = self._NFS_NAME[self.server_vm.BASE_OS_TYPE]
     self.server_vm.RemoteCommand(
         self._NFS_RESTART_CMD.format(nfs_name=nfs_name))
@@ -198,3 +208,9 @@ class UnmanagedNfsService(BaseNfsService):
   def _IsReady(self):
     """Boolean function to determine if disk is NFS mountable."""
     return True
+
+
+def NfsExport(server_vm, local_disk_path):
+  """NFS exports the directory on the VM."""
+  service = UnmanagedNfsService(None, server_vm, False, local_disk_path)
+  service.Create()

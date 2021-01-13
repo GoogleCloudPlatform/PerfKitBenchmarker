@@ -44,6 +44,7 @@
 -   Added ability to use MKL 2018.2 from Intel repos via --mkl_install_from_repo
 -   Added ability to install gfortran 9 with --fortran_version=9
 -   Added MSS support to netperf with `--netperf_mss`.
+-   Added nfs_service.NfsExport(vm, path) to easily NFS export a directory.
 
 ### Bug fixes and maintenance updates:
 
