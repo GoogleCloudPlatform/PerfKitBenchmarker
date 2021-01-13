@@ -388,10 +388,9 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
 
   elif benchmark_name.upper() == 'TCP_STREAM':
-    netperf_cmd += (' -m {send_size} -M {send_size} '.format(
-        send_size=FLAGS.netperf_tcp_stream_send_size_in_bytes))
-    metadata[
-        'netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
+    send_size = FLAGS.netperf_tcp_stream_send_size_in_bytes
+    netperf_cmd += f' -m {send_size} -M {send_size} '
+    metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
 
   if FLAGS.netperf_thinktime != 0:
     netperf_cmd += (f' -X {FLAGS.netperf_thinktime},{FLAGS.netperf_thinktime_array_size},'

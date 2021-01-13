@@ -32,9 +32,8 @@ flags.DEFINE_integer(
     'benchmark produces.')
 FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.7.0.tar.gz'
-NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
-              NETPERF_TAR)
-NETPERF_DIR = '%s/netperf-netperf-2.7.0' % linux_packages.INSTALL_DIR
+NETPERF_URL = f'https://github.com/HewlettPackard/netperf/archive/{NETPERF_TAR}'
+NETPERF_DIR = f'{linux_packages.INSTALL_DIR}/netperf-netperf-2.7.0'
 
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
@@ -50,25 +49,22 @@ def _Install(vm):
   vm.Install('build_tools')
 
   _CopyTar(vm)
-  vm.RemoteCommand('cd %s && tar xvzf %s' %
-                   (linux_packages.INSTALL_DIR, NETPERF_TAR))
+  vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR} && tar xvzf {NETPERF_TAR}')
   # Modify netperf to print out all buckets in its histogram rather than
   # aggregating, edit runemomniaggdemo script, and apply fix to
   # allow it to compile with --enable-demo flag correctly
   vm.PushDataFile('netperf.patch', NETLIB_PATCH)
 
-  vm.RemoteCommand('cd %s && patch -l -p1 < netperf.patch' %
-                   NETPERF_DIR)
+  vm.RemoteCommand(f'cd {NETPERF_DIR} && patch -l -p1 < netperf.patch')
 
-  vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
+  vm.RemoteCommand(f'cd {NETPERF_DIR} && '
+                   f'CFLAGS=-DHIST_NUM_OF_BUCKET={FLAGS.netperf_histogram_buckets} '
                    './configure --enable-burst '
                    '--enable-demo --enable-histogram '
-                   '&& make && sudo make install' %
-                   (NETPERF_DIR, FLAGS.netperf_histogram_buckets))
+                   '&& make && sudo make install')
 
-  vm.RemoteCommand('cd %s && chmod +x runemomniaggdemo.sh'
-                   '&& chmod +x find_max_burst.sh'
-                   % (NETPERF_EXAMPLE_DIR))
+  vm.RemoteCommand(f'cd {NETPERF_EXAMPLE_DIR} && chmod +x runemomniaggdemo.sh'
+                   '&& chmod +x find_max_burst.sh')
 
   # Set keepalive to a low value to ensure that the control connection
   # is not closed by the cloud networking infrastructure.
@@ -98,8 +94,7 @@ def _CopyTar(vm):
     vm.PushDataFile(NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))
   except data.ResourceNotFound:
     vm.Install('curl')
-    vm.RemoteCommand('curl %s -L -o %s/%s' %
-                     (NETPERF_URL, linux_packages.INSTALL_DIR, NETPERF_TAR))
+    vm.RemoteCommand(f'curl {NETPERF_URL} -L -o {linux_packages.INSTALL_DIR}/{NETPERF_TAR}')
 
 
 def YumInstall(vm):
