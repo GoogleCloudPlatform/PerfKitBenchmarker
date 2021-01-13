@@ -159,18 +159,17 @@ def Prepare(benchmark_spec):
   if vm_util.ShouldRunOnExternalIpAddress():
     # Open all of the command and data ports
     vms[1].AllowPort(PORT_START, PORT_START + num_streams * 2 - 1)
-  netserver_cmd = ('for i in $(seq {port_start} 2 {port_end}); do '
-                   '{netserver_path} -p $i & done').format(
-                       port_start=PORT_START,
-                       port_end=PORT_START + num_streams * 2 - 1,
-                       netserver_path=netperf.NETSERVER_PATH)
+
+  PORT_END = PORT_START + num_streams * 2 - 1
+  netserver_cmd = (f'for i in $(seq {PORT_START} 2 {PORT_END}); do '
+                   f'{netperf.NETSERVER_PATH} -p $i & done')
   vms[1].RemoteCommand(netserver_cmd)
 
   # Copy remote test script to client
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
-  logging.info('Uploading %s to %s', path, vms[0])
+  logging.info(f'Uploading {path} to {vms[0]}')
   vms[0].PushFile(path, REMOTE_SCRIPT)
-  vms[0].RemoteCommand('sudo chmod 777 %s' % REMOTE_SCRIPT)
+  vms[0].RemoteCommand(f'sudo chmod 777 {REMOTE_SCRIPT}')
 
 
 def _SetupHostFirewall(benchmark_spec):
@@ -188,8 +187,8 @@ def _SetupHostFirewall(benchmark_spec):
   if vm_util.ShouldRunOnExternalIpAddress():
     ip_addrs.append(client_vm.ip_address)
 
-  logging.info('setting up host firewall on %s running %s for client at %s',
-               server_vm.name, server_vm.image, ip_addrs)
+  logging.info(f'setting up host firewall on {server_vm.name} '
+               f'running {server_vm.image} for client at {ip_addrs}')
   cmd = 'sudo iptables -A INPUT -p %s -s %s -j ACCEPT'
   for protocol in 'tcp', 'udp':
     for ip_addr in ip_addrs:
@@ -366,7 +365,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # -I specifies the confidence % and width - here 99% confidence that the true
   #    value is within +/- 2.5% of the reported value
   # -i specifies the maximum and minimum number of iterations.
-  confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
+  confidence = (f'-I 99,5 -i {FLAGS.netperf_max_iter},3'
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if enable_latency_histograms else ''
 
@@ -377,24 +376,16 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
               'sending_thread_count': num_streams,
               'max_iter': FLAGS.netperf_max_iter or 1}
 
-  netperf_cmd = ('{netperf_path} -p {{command_port}} -j {verbosity} '
-                 '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
-                 ' -- '
-                 '-P ,{{data_port}} '
-                 '-o {output_selector}').format(
-                     netperf_path=netperf.NETPERF_PATH,
-                     benchmark_name=benchmark_name,
-                     server_ip=server_ip,
-                     length=FLAGS.netperf_test_length,
-                     output_selector=OUTPUT_SELECTOR,
-                     confidence=confidence,
-                     verbosity=verbosity)
+  netperf_cmd = (f'{netperf.NETPERF_PATH} -p {{command_port}} -j {verbosity} '
+                 f'-t {benchmark_name} -H {server_ip} -l {FLAGS.netperf_test_length} {confidence}'
+                 f' -- '
+                 f'-P ,{{data_port}} '
+                 f'-o {OUTPUT_SELECTOR}')
 
   if benchmark_name.upper() == 'UDP_STREAM':
-    netperf_cmd += (' -R 1 -m {send_size} -M {send_size} '.format(
-        send_size=FLAGS.netperf_udp_stream_send_size_in_bytes))
-    metadata[
-        'netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
+    send_size = FLAGS.netperf_udp_stream_send_size_in_bytes
+    netperf_cmd += f' -R 1 -m {send_size} -M {send_size} '
+    metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
 
   elif benchmark_name.upper() == 'TCP_STREAM':
     netperf_cmd += (' -m {send_size} -M {send_size} '.format(
@@ -403,11 +394,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
         'netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
 
   if FLAGS.netperf_thinktime != 0:
-    netperf_cmd += (' -X {thinktime},{thinktime_array_size},'
-                    '{thinktime_run_length} ').format(
-                        thinktime=FLAGS.netperf_thinktime,
-                        thinktime_array_size=FLAGS.netperf_thinktime_array_size,
-                        thinktime_run_length=FLAGS.netperf_thinktime_run_length)
+    netperf_cmd += (f' -X {FLAGS.netperf_thinktime},{FLAGS.netperf_thinktime_array_size},'
+                    f'{FLAGS.netperf_thinktime_run_length} ')
 
   if FLAGS.netperf_mss and 'TCP' in benchmark_name.upper():
     netperf_cmd += (' -G {mss}b'.format(mss=FLAGS.netperf_mss))
@@ -421,8 +409,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # complete
   remote_cmd_timeout = \
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
-  remote_cmd = ('./%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' %
-                (REMOTE_SCRIPT, netperf_cmd, num_streams, PORT_START))
+  remote_cmd = (f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
+                f'--num_streams={num_streams} --port_start={PORT_START}')
   remote_stdout, _ = vm.RobustRemoteCommand(remote_cmd, should_log=True,
                                             timeout=remote_cmd_timeout)
 
@@ -461,7 +449,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # Create samples for throughput stats
     for stat, value in throughput_stats.items():
       samples.append(
-          sample.Sample('%s_Throughput_%s' % (benchmark_name, stat),
+          sample.Sample(f'{benchmark_name}_Throughput_{stat}',
                         float(value),
                         throughput_unit, metadata))
     if enable_latency_histograms:
@@ -473,13 +461,13 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
       hist_metadata = {'histogram': json.dumps(latency_histogram)}
       hist_metadata.update(metadata)
       samples.append(sample.Sample(
-          '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
+          f'{benchmark_name}_Latency_Histogram', 0, 'us', hist_metadata))
       # Calculate stats on aggregate latency histogram
       latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
       # Create samples for the latency stats
       for stat, value in latency_stats.items():
         samples.append(
-            sample.Sample('%s_Latency_%s' % (benchmark_name, stat),
+            sample.Sample(f'{benchmark_name}_Latency_{stat}',
                           float(value),
                           'us', metadata))
     return samples
@@ -498,7 +486,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   client_vm = vms[0]  # Client aka "sending vm"
   server_vm = vms[1]  # Server aka "receiving vm"
-  logging.info('netperf running on %s', client_vm)
+  logging.info(f'netperf running on {client_vm}')
   results = []
   metadata = {
       'sending_zone': client_vm.zone,
@@ -541,4 +529,4 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms[1].RemoteCommand('sudo killall netserver')
-  vms[0].RemoteCommand('sudo rm -rf %s' % REMOTE_SCRIPT)
+  vms[0].RemoteCommand(f'sudo rm -rf {REMOTE_SCRIPT}')
