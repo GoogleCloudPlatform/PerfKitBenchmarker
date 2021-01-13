@@ -356,8 +356,9 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   """
   enable_latency_histograms = FLAGS.netperf_enable_histograms or num_streams > 1
   # Throughput benchmarks don't have latency histograms
-  enable_latency_histograms = (enable_latency_histograms and
-                               (benchmark_name not in ['TCP_STREAM', 'UDP_STREAM']))
+  enable_latency_histograms = (
+      enable_latency_histograms and
+      (benchmark_name not in ['TCP_STREAM', 'UDP_STREAM']))
   # Flags:
   # -o specifies keys to include in CSV output.
   # -j keeps additional latency numbers
@@ -391,13 +392,15 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
   if benchmark_name.upper() == 'UDP_STREAM':
     netperf_cmd += (' -R 1 -m {send_size} -M {send_size} '.format(
-                    send_size=FLAGS.netperf_udp_stream_send_size_in_bytes))
-    metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
+        send_size=FLAGS.netperf_udp_stream_send_size_in_bytes))
+    metadata[
+        'netperf_send_size_in_bytes'] = FLAGS.netperf_udp_stream_send_size_in_bytes
 
   elif benchmark_name.upper() == 'TCP_STREAM':
     netperf_cmd += (' -m {send_size} -M {send_size} '.format(
-                    send_size=FLAGS.netperf_tcp_stream_send_size_in_bytes))
-    metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
+        send_size=FLAGS.netperf_tcp_stream_send_size_in_bytes))
+    metadata[
+        'netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
 
   if FLAGS.netperf_thinktime != 0:
     netperf_cmd += (' -X {thinktime},{thinktime_array_size},'
