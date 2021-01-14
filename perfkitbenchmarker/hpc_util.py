@@ -21,23 +21,43 @@ flags.DEFINE_boolean('mpirun_allow_run_as_root', False,
                      'Whether to allow mpirun to be run by the root user.')
 
 
-def CreateMachineFile(vms, num_slots=lambda vm: vm.NumCpusForBenchmark(),
-                      remote_path='MACHINEFILE'):
+def CreateMachineFile(vms,
+                      num_slots=lambda vm: vm.NumCpusForBenchmark(),
+                      remote_path='MACHINEFILE',
+                      mpi_vendor='openmpi'):
   """Create a file with the IP of each machine in the cluster on its own line.
 
   The file is then pushed to the provided path on the master vm.
+
+  Pass in "num_slots=lambda vm: 0" to create a machine file without a defined
+  number of slots.
+
+  OpenMPI's format: "<host> slots=<slots>"
+    https://www.open-mpi.org/faq/?category=running#mpirun-hostfile
+  IntelMPI's format: "<host>:<slots>"
+    https://software.intel.com/content/www/us/en/develop/articles/controlling-process-placement-with-the-intel-mpi-library.html
 
   Args:
     vms: The list of vms which will be in the cluster.
     num_slots: The function to use to calculate the number of slots
       for each vm. Defaults to vm.NumCpusForBenchmark()
     remote_path: remote path of the machine file. Defaults to MACHINEFILE
+    mpi_vendor: Implementation of MPI.  Can be openmpi or intel.
   """
+
+  def Line(vm, vm_name=None):
+    vm_name = vm_name or vm.internal_ip
+    slots = num_slots(vm)
+    if not slots:
+      return vm_name
+    if mpi_vendor == 'intel':
+      return f'{vm_name}:{slots}'
+    return f'{vm_name} slots={slots}'
+
   with vm_util.NamedTemporaryFile(mode='w') as machine_file:
     master_vm = vms[0]
-    machine_file.write('localhost slots=%d\n' % num_slots(master_vm))
+    machine_file.write(Line(master_vm, 'localhost') + '\n')
     for vm in vms[1:]:
-      machine_file.write('%s slots=%d\n' % (vm.internal_ip,
-                                            num_slots(vm)))
+      machine_file.write(Line(vm) + '\n')
     machine_file.close()
     master_vm.PushFile(machine_file.name, remote_path)

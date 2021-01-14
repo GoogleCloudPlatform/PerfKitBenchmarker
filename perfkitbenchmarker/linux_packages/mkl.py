@@ -38,6 +38,9 @@ USE_MKL_REPO = flags.DEFINE_bool('mkl_install_from_repo', False,
 # File contains MKL specific environment variables
 _MKL_VARS_FILE = '/opt/intel/mkl/bin/mklvars.sh'
 
+# Dedicated path to the MKL 2018 root directory
+_MKL_ROOT_2018 = '/opt/intel/compilers_and_libraries_2018/linux/mkl'
+
 # Command to source for Intel64 based VMs to set environment variables
 SOURCE_MKL_INTEL64_CMD = f'MKLVARS_ARCHITECTURE=intel64 . {_MKL_VARS_FILE}'
 
@@ -48,6 +51,11 @@ def _Install(vm):
     vm.InstallPackages(f'intel-mkl-{_MKL_VERSION_REPO}')
   else:
     _InstallFromPreprovisionedData(vm)
+  # Restore the /opt/intel/mkl/bin/mklvars.sh symlink that is missing if
+  # Intel MPI > 2018 installed.
+  if not vm.TryRemoteCommand(f'test -e {_MKL_VARS_FILE}'):
+    if vm.TryRemoteCommand(f'test -d {_MKL_ROOT_2018}'):
+      vm.RemoteCommand(f'sudo ln -s {_MKL_ROOT_2018} /opt/intel/mkl')
   _CompileInterfaces(vm)
 
 
