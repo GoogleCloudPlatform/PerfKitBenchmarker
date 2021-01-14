@@ -147,27 +147,26 @@ def RunNetperfAggregate(vm, server_ips):
   """
 
   # setup remote hosts file
-  vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && rm remote_hosts")
+  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm remote_hosts')
   ip_num = 0
   for ip in server_ips:
-    vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && "
-                     f"echo 'REMOTE_HOSTS[{ip_num}]={ip}' >> remote_hosts")
+    vm.RemoteCommand(f"echo 'REMOTE_HOSTS[{ip_num}]={ip}' >> "
+                     f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
     ip_num += 1
 
-  vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && "
-                   f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> remote_hosts")
-  vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && export PATH=$PATH:.")
+  vm.RemoteCommand(f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
+                   f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
 
   # allow script to be executed and run script
   stdout, stderr = vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && "
-                                    "export PATH=$PATH:. && chmod "
-                                    "+x runemomniaggdemo.sh && "
+                                    "export PATH=$PATH:. && "
+                                    "chmod +x runemomniaggdemo.sh && "
                                     "./runemomniaggdemo.sh",
                                     ignore_failure=True, should_log=True,
                                     login_shell=False, timeout=1200)
 
   # print out netperf_tps.log to log
-  stdout_1, stderr_1 = vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && cat netperf_tps.log",
+  stdout_1, stderr_1 = vm.RemoteCommand(f'cat {netperf.NETPERF_EXAMPLE_DIR}/netperf_tps.log',
                                         ignore_failure=True, should_log=True,
                                         login_shell=False, timeout=1200)
 
@@ -175,8 +174,8 @@ def RunNetperfAggregate(vm, server_ips):
   logging.info(stderr_1)
 
   # do post processing step
-  proc_stdout, proc_stderr = vm.RemoteCommand(f"cd {netperf.NETPERF_EXAMPLE_DIR} && ./post_proc.py "
-                                              "--intervals netperf_tps.log",
+  proc_stdout, proc_stderr = vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && ./post_proc.py '
+                                              '--intervals netperf_tps.log',
                                               ignore_failure=True)
 
   samples = ParseNetperfAggregateOutput(proc_stdout)

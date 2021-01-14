@@ -106,10 +106,10 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
   """
   if (ip_type == vm_util.IpAddressMetadata.INTERNAL and
       not sending_vm.IsReachable(receiving_vm)):
-    logging.warn(f'{receiving_vm} is not reachable from {sending_vm}')
+    logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
-  logging.info(f'Ping results (ip_type = {ip_type}):')
+  logging.info('Ping results (ip_type = %s):', ip_type)
   ping_cmd = f'ping -c 100 {receiving_ip}'
   stdout, _ = sending_vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])

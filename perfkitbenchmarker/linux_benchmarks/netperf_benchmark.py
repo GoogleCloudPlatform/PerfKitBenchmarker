@@ -167,7 +167,7 @@ def Prepare(benchmark_spec):
 
   # Copy remote test script to client
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
-  logging.info(f'Uploading {path} to {vms[0]}')
+  logging.info('Uploading %s to %s', path, vms[0])
   vms[0].PushFile(path, REMOTE_SCRIPT)
   vms[0].RemoteCommand(f'sudo chmod 777 {REMOTE_SCRIPT}')
 
@@ -187,8 +187,8 @@ def _SetupHostFirewall(benchmark_spec):
   if vm_util.ShouldRunOnExternalIpAddress():
     ip_addrs.append(client_vm.ip_address)
 
-  logging.info(f'setting up host firewall on {server_vm.name} '
-               f'running {server_vm.image} for client at {ip_addrs}')
+  logging.info('setting up host firewall on %s running %s for client at %s',
+               server_vm.name, server_vm.image, ip_addrs)
   cmd = 'sudo iptables -A INPUT -p %s -s %s -j ACCEPT'
   for protocol in 'tcp', 'udp':
     for ip_addr in ip_addrs:
@@ -376,9 +376,13 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
               'sending_thread_count': num_streams,
               'max_iter': FLAGS.netperf_max_iter or 1}
 
-  netperf_cmd = (f'{netperf.NETPERF_PATH} -p {{command_port}} -j {verbosity} '
-                 f'-t {benchmark_name} -H {server_ip} -l {FLAGS.netperf_test_length} {confidence}'
-                 f' -- '
+  netperf_cmd = (f'{netperf.NETPERF_PATH} '
+                 f'-p {{command_port}} '
+                 f'-j {verbosity} '
+                 f'-t {benchmark_name} '
+                 f'-H {server_ip} '
+                 f'-l {FLAGS.netperf_test_length} {confidence}'
+                  ' -- '
                  f'-P ,{{data_port}} '
                  f'-o {OUTPUT_SELECTOR}')
 
@@ -393,7 +397,9 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     metadata['netperf_send_size_in_bytes'] = FLAGS.netperf_tcp_stream_send_size_in_bytes
 
   if FLAGS.netperf_thinktime != 0:
-    netperf_cmd += (f' -X {FLAGS.netperf_thinktime},{FLAGS.netperf_thinktime_array_size},'
+    netperf_cmd += (' -X '
+                    f'{FLAGS.netperf_thinktime},'
+                    f'{FLAGS.netperf_thinktime_array_size},'
                     f'{FLAGS.netperf_thinktime_run_length} ')
 
   if FLAGS.netperf_mss and 'TCP' in benchmark_name.upper():
@@ -485,7 +491,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   client_vm = vms[0]  # Client aka "sending vm"
   server_vm = vms[1]  # Server aka "receiving vm"
-  logging.info(f'netperf running on {client_vm}')
+  logging.info('netperf running on %s', client_vm)
   results = []
   metadata = {
       'sending_zone': client_vm.zone,
