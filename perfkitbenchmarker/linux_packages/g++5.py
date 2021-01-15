@@ -28,7 +28,5 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the g++-5 package on the VM."""
-  vm.RemoteCommand(
-      'sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y; '
-      'sudo apt-get update')
+  vm.Install('ubuntu_toolchain')
   vm.InstallPackages('g++-5')

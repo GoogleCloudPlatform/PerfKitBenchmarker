@@ -49,8 +49,7 @@ def Reinstall(vm, version='4.7'):
   # TODO(user): Make this work on yum based systems.
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
     raise errors.Error('Updating GCC only works on Debian based systems.')
-  vm.RemoteCommand('sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y')
-  vm.RemoteCommand('sudo apt-get update')
+  vm.Install('ubuntu_toolchain')
   for pkg in ('gcc', 'gfortran', 'g++'):
     version_string = GetVersion(vm, pkg)
     if version in version_string:

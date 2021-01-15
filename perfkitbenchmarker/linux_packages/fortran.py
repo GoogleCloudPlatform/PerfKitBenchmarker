@@ -55,8 +55,7 @@ def _YumInstallVersion(vm, version):
 
 def _AptInstallVersion(vm, version):
   """Does an apt install for the version of fortran."""
-  vm.RemoteCommand('sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; '
-                   'sudo apt update')
+  vm.Install('ubuntu_toolchain')
   vm.InstallPackages(f'gfortran-{version}')
   # make symlink so that 'gfortran' will use the newly installed version
   vm.RemoteCommand('sudo update-alternatives --install /usr/bin/gfortran '
