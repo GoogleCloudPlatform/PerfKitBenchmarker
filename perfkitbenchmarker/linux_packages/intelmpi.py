@@ -42,6 +42,14 @@ def MpiVars(vm) -> str:
   return files[0]
 
 
+def SourceMpiVarsCommand(vm):
+  """Returns the command to source the mpivars.sh script."""
+  cmd = f'. {MpiVars(vm)}'
+  if FLAGS.aws_efa:  # Disable IntelMPI's libfabric to use AWS EFA's
+    cmd += ' -ofi_internal=0'
+  return cmd
+
+
 def FixEnvironment(vm):
   """Changes system settings for optimal Intel MPI conditions.
 
