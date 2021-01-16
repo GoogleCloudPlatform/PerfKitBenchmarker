@@ -673,10 +673,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.InstallPackages('curl')
       url = _EFA_URL.format(version=FLAGS.aws_efa_version)
       tarfile = posixpath.basename(url)
-      self.RemoteCommand(f'curl -O {url}; tar -xvzf {tarfile}')
+      self.RemoteCommand(f'curl -O {url}; tar -xzf {tarfile}')
       self._InstallEfa()
       # Run test program to confirm EFA working
-      self.RemoteCommand('cd aws-efa-installer; ./efa_test.sh')
+      self.RemoteCommand('cd aws-efa-installer; '
+                         'PATH=${PATH}:/opt/amazon/efa/bin ./efa_test.sh')
 
   def _ConfigureElasticIp(self, instance):
     """Create and associate Elastic IP.
@@ -1148,6 +1149,11 @@ class UbuntuBasedAwsVirtualMachine(AwsVirtualMachine):
 class Ubuntu1604BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-*64-server-20*'
+
+  def _InstallEfa(self):
+    super(Ubuntu1604BasedAwsVirtualMachine, self)._InstallEfa()
+    self.Reboot()
+    self.WaitForBootCompletion()
 
 
 class Ubuntu1710BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,

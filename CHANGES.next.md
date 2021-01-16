@@ -45,6 +45,7 @@
 -   Added ability to install gfortran 9 with --fortran_version=9
 -   Added MSS support to netperf with `--netperf_mss`.
 -   Added nfs_service.NfsExport(vm, path) to easily NFS export a directory.
+-   AWS EFA works for Ubuntu1604.
 
 ### Bug fixes and maintenance updates:
 
