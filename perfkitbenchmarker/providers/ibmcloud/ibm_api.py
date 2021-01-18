@@ -299,13 +299,16 @@ class IbmAPICommand(object):
       for item in resp[self.items]:
         item_id = item.get('id')
         if item_id and item_id == self.resource_id:
-          data_mgr.Delete(item_id)
-          logging.info('Deleted %s, id: %s', self.items, item_id)
+          try:
+            data_mgr.Delete(item_id)
+            logging.info('Deleted %s, id: %s', self.items, item_id)
+          except:
+            pass
     else:
       logging.info('No items found to delete: %s', self.items)
 
-  def ListResources(self):
-    """Returns a list of resource id's matching the resource type and prefix
+  def GetResource(self):
+    """Returns id of the found resource matching the resource type and prefix
 
     Flags:
       items: type of resource.
@@ -336,6 +339,7 @@ class IbmAPICommand(object):
           else:  # for vpc and key
             resourceid = itemid  # # for vpcs, just get the first matching
             break
+      logging.info('Resource found, id: %s', resourceid)
     else:
       logging.error('Failed to retrieve %s, no data returned', self.items)
     return resourceid

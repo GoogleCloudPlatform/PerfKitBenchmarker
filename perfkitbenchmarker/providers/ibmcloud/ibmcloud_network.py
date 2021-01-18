@@ -15,6 +15,7 @@
 
 import time
 import threading
+import re
 import json
 import logging
 
@@ -37,7 +38,10 @@ VPC_PREFIX_RANGES = ['10.101.0.0/16', '10.102.0.0/16', '10.103.0.0/16',
 VPC_SUBNETS = ['10.101.0.0/20', '10.102.0.0/20', '10.103.0.0/20',
                '10.104.0.0/20', '10.105.0.0/20']
 
-# these are used to create extra subnets for multi vnic support
+"""These constants are used to create extra subnets to support multi vnics on a vm,
+  extra subnets are created using predefined cidr's as below. 
+  Each extra vnic on a vm is on a new subnet denoted as sxs1, sxs2, sxs3 and sxs4.
+"""
 SUBNET_SUFFIX_EXTRA = 'sxs'
 SUBNETX1 = SUBNET_SUFFIX_EXTRA + '1'
 SUBNETX2 = SUBNET_SUFFIX_EXTRA + '2'
@@ -73,11 +77,10 @@ def GetSubnetIndex(ipv4_cidr_block: str) -> int:
     -1 is returned if the cidr is not known and not found 
     in the predefined list of subnets
   """
-  for name in SUBNETXS:
-    ip_list = SUBNETS_EXTRA[name]
-    for i in range(len(ip_list)):
-      if ip_list[i] == ipv4_cidr_block:
-        return i
+  for ip_list in SUBNETS_EXTRA.values():
+    for index, cidr_block in enumerate(ip_list):
+      if cidr_block == ipv4_cidr_block:
+        return index
   return -1
 
 
@@ -99,14 +102,14 @@ def GetRouteCommands(data: str, index: int, target_index: int) -> List[str]:
       subnet_cidr_block = SUBNETS_EXTRA[subnet_name][index]
       target_cidr_block = SUBNETS_EXTRA[subnet_name][target_index]
       subnet_gateway = SUBNETS_EXTRA_GATEWAY[subnet_name][index]
-      route_entry = subnet_cidr_block.split('/24')
+      route_entry = re.match('(.*)/24', subnet_cidr_block).group(1)
       interface = None
       for line in data.splitlines():
         items = line.split()
-        if len(items) > 6 and items[0] == route_entry[0]:
+        if len(items) > 6 and items[0] == route_entry:
           interface = items[7]
-          route_cmds.append('ip route add ' + target_cidr_block + ' via ' + \
-                            subnet_gateway + ' dev ' + interface)
+          route_cmds.append(f'ip route add {target_cidr_block} via '
+                            f'{subnet_gateway} dev {interface}')
   return route_cmds
 
 
@@ -153,7 +156,7 @@ class IbmCloudNetwork(resource.BaseResource):
     else:
       raise errors.Error('IBM Cloud ERROR: Failed to create vpc')
 
-  def CreateSubnet(self, vpcid):
+  def CreateSubnet(self, vpcid: str):
     """Creates a IBM Cloud subnet on the given vpc."""
     self.vpcid = vpcid
     subnet_index = int(self.zone[len(self.zone) - 1])  # get the ending -1
@@ -187,8 +190,8 @@ class IbmCloudNetwork(resource.BaseResource):
       logging.info('FIP create resp: %s', resp)
       assert resp['address'] != None
       return resp['address'], resp['id']
-    logging.error('FAILED to create FIP for instance %s', vmid)
-    return None, None
+    else:
+      raise errors.Error(f'IBM Cloud ERROR: Failed to create fip for instance {vmid}')
 
   def DeleteFip(self, vmid: str, fip_address: str, fipid: str):
     """Deletes fip in a IBM Cloud VM instance."""
@@ -206,7 +209,7 @@ class IbmCloudNetwork(resource.BaseResource):
       'zone': self.zone,
       'items': 'vpcs'
       })
-    self.vpcid = cmd.ListResources()
+    self.vpcid = cmd.GetResource()
     if self.vpcid:
       return True
     return False
@@ -214,18 +217,26 @@ class IbmCloudNetwork(resource.BaseResource):
   def _Delete(self):
     """Deletes the vpc and subnets."""
     with self._lock:
-      if IbmCloudVirtualMachine.validated_subnets > 0:
+      if IbmCloudVirtualMachine.validated_subnets > 0 and self.subnet:
         cmd = ibm.IbmAPICommand(self)
-        cmd.flags['items'] = 'subnets'
-        cmd.flags['id'] = self.subnet
-        logging.info('Waiting to delete subnet: %s', self.subnet)
-        time.sleep(30)
+        cmd.flags.update({
+          'prefix': self.prefix,
+          'zone': self.zone,
+          'id': self.subnet,
+          'items': 'subnets'
+          })
+        logging.info('Deleting subnet: %s', self.subnet)
         cmd.DeleteResource()
+        time_to_end = time.time() + _DEFAULT_TIMEOUT
+        while cmd.GetResource() is not None and time_to_end < time.time():
+          logging.info('Subnet still exists, waiting to delete subnet: %s', self.subnet)
+          time.sleep(5)
+          cmd.DeleteResource()
         IbmCloudVirtualMachine.validated_subnets -= 1
 
     # different lock so all threads get a chance to delete its subnet first
     with self._lock_vpc:
-      if self.vpcid not in IbmCloudVirtualMachine.validated_resources_set:
+      if self.subnet and self.vpcid not in IbmCloudVirtualMachine.validated_resources_set:
         cmd = ibm.IbmAPICommand(self)
         # check till all subnets are gone
         time_to_end = time.time() + _DEFAULT_TIMEOUT

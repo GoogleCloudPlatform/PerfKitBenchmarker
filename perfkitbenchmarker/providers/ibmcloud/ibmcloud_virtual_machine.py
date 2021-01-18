@@ -123,10 +123,10 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       'zone': self.zone,
       'items': 'vpcs'
       })
-    self.vpcid = cmd.ListResources()
+    self.vpcid = cmd.GetResource()
     logging.info('Vpc found: %s', self.vpcid)
     cmd.flags['items'] = 'subnets'
-    self.subnet = cmd.ListResources()
+    self.subnet = cmd.GetResource()
     logging.info('Subnet found: %s', self.subnet)
 
     if not self.vpcid:
@@ -148,7 +148,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     # look up for existing key that matches this run uri
     cmd.flags['items'] = 'keys'
     cmd.flags['prefix'] = self.prefix + FLAGS.run_uri
-    self.key = cmd.ListResources()
+    self.key = cmd.GetResource()
     logging.info('Key found: %s', self.key)
     if self.key is None:
       cmd.flags['items'] = 'keys'

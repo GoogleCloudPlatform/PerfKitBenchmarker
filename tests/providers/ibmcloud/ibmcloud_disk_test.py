@@ -26,6 +26,8 @@ from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
+DEVICE_PATH = '/dev/vde'
+
 
 class IbmcloudDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
 
@@ -36,14 +38,9 @@ class IbmcloudDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
       self.disk = ibmcloud_disk.IbmCloudDisk()
 
   def run_cmd(self, cmd, should_log=True):
-    print('Running fdisk.')
-    response_mock = mock.Mock()
-    response_mock.return_value = '\
-      Disk /dev/vde: 8589.9 GB, 8589934592000 bytes, 16777216000 sectors\n\
+    return 'Disk /dev/vde: 8589.9 GB, 8589934592000 bytes, 16777216000 sectors\n\
       Units = sectors of 1 * 512 = 512 bytes\n\
-      '
-    print('Returning\n%s' % response_mock.return_value)
-    return response_mock.return_value, None
+      ', None
 
   def testGetDeviceFromVDisk(self):
     vm = mock.Mock()
@@ -52,7 +49,7 @@ class IbmcloudDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
     self.disk.attached_vm.RemoteCommand.side_effect = self.run_cmd
     self.disk.disk_size = 8000
     self.disk._GetDeviceFromVDisk(vm)
-    self.assertEqual('/dev/vde', self.disk.device_path)
+    self.assertEqual(DEVICE_PATH, self.disk.device_path)
 
 
 if __name__ == '__main__':

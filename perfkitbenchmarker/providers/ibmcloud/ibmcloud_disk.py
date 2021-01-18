@@ -166,6 +166,7 @@ class IbmCloudDisk(disk.BaseDisk):
       logging.error('Failed to attach the volume')
       raise errors.Error('IBMCLOUD ERROR: failed to attach a volume.')
 
+  @vm_util.Retry(max_retries=3)
   def _GetDeviceFromVDisk(self, vm):
     """Gets device path for the volume """
     cmd = 'fdisk -l'
@@ -177,7 +178,7 @@ class IbmCloudDisk(disk.BaseDisk):
       disks = re.findall(r'\Disk (\S+): .* (\d+) bytes,', stdout)
       for device_path, disk_size in disks:
         logging.info('disk_path: %s, disk_size: %s', device_path, disk_size)
-        if int(disk_size) >= self.disk_size * 1000000000:
+        if int(disk_size) >= self.disk_size * 1e9:
           if device_path not in vm.device_paths_detected:
             self.device_path = device_path
             vm.device_paths_detected.add(device_path)

@@ -22,10 +22,14 @@ from absl import flags
 import mock
 
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_network
-from perfkitbenchmarker.providers.ibmcloud import ibm_api as ibm
+from perfkitbenchmarker.providers.ibmcloud import ibm_api
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+VPC_ID = 'vcpid'
+SUBNET_ID = 'subnetid'
+FIP_ID = 'fipid'
 
 
 class IbmcloudNetworkTest(pkb_common_test_case.PkbCommonTestCase):
@@ -37,20 +41,28 @@ class IbmcloudNetworkTest(pkb_common_test_case.PkbCommonTestCase):
       self.network = ibmcloud_network.IbmCloudNetwork()
 
   def get_vpc(self):
-    return 'vpc-id'
+    return VPC_ID
 
   def get_subnet(self):
-    return 'subnet-id'
+    return SUBNET_ID
+
+  def get_fip(self):
+    return FIP_ID
 
   def testCreateVpc(self):
     self.network = mock.Mock()
     self.network._Create.side_effect = self.get_vpc
-    self.assertEqual('vpc-id', self.network._Create())
+    self.assertEqual(VPC_ID, self.network._Create())
 
   def testCreateSubnet(self):
     self.network = mock.Mock()
     self.network.CreateSubnet.side_effect = self.get_subnet
-    self.assertEqual('subnet-id', self.network.CreateSubnet())
+    self.assertEqual(SUBNET_ID, self.network.CreateSubnet())
+
+  def testCreateFip(self):
+    self.network = mock.Mock()
+    self.network.CreateFip.side_effect = self.get_fip
+    self.assertEqual(FIP_ID, self.network.CreateFip())
 
 
 if __name__ == '__main__':
