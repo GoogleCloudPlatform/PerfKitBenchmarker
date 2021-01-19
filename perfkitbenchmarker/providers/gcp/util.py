@@ -28,6 +28,14 @@ import six
 FLAGS = flags.FLAGS
 
 RATE_LIMITED_MESSAGE = 'Rate Limit Exceeded'
+# regex to check API limits when tagging resources
+# matches a string like:
+# ERROR: (gcloud.compute.disks.add-labels) PERMISSION_DENIED: Quota exceeded
+# for quota group 'ReadGroup' and limit 'Read requests per 100 seconds' of
+# service 'compute.googleapis.com' for consumer 'project_number:012345678901'.
+TAGGING_RATE_LIMITED_REGEX = re.compile("Quota exceeded .*? limit '.*?"
+                                        "requests per.*?seconds' of service "
+                                        "'compute.googleapis.com'")
 RATE_LIMITED_MAX_RETRIES = 10
 # 200s is chosen because 1) quota is measured in 100s intervals and 2) fuzzing
 # causes a random number between 100 and this to be chosen.
@@ -197,6 +205,13 @@ class GcloudCommand(object):
   def __repr__(self):
     return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
+  @staticmethod
+  def _IsIssueRateLimitMessage(text):
+    return (
+        (RATE_LIMITED_MESSAGE in text) or
+        TAGGING_RATE_LIMITED_REGEX.search(text)
+        )
+
   @vm_util.Retry(
       poll_interval=RATE_LIMITED_MAX_POLLING_INTERVAL,
       max_retries=RATE_LIMITED_MAX_RETRIES,
@@ -222,13 +237,13 @@ class GcloudCommand(object):
       try:
         stdout, stderr, retcode = _issue_command_function(self, **kwargs)
       except errors.VmUtil.IssueCommandError as error:
-        if RATE_LIMITED_MESSAGE in str(error):
+        if GcloudCommand._IsIssueRateLimitMessage(str(error)):
           self.rate_limited = True
           raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(
               str(error))
         else:
           raise error
-      if retcode and RATE_LIMITED_MESSAGE in stderr:
+      if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):
         self.rate_limited = True
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
 
