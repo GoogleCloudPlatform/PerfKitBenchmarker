@@ -200,6 +200,10 @@ class Resource(object):
   class RetryableDeletionError(Error):
     pass
 
+  class GetError(Error):
+    """An error on get which is not retryable."""
+    pass
+
   class RetryableGetError(Error):
     pass
 

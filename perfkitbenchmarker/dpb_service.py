@@ -23,7 +23,7 @@ import abc
 import datetime
 import logging
 import posixpath
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from absl import flags
 from dataclasses import dataclass
@@ -67,6 +67,11 @@ HIVE = 'hive'
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
+
+
+class JobNotCompletedError(Exception):
+  """Used to signal a job is still running."""
+  pass
 
 
 class JobSubmissionError(errors.Benchmarks.RunError):
@@ -191,6 +196,37 @@ class BaseDpbService(resource.BaseResource):
     """
     pass
 
+  def _WaitForJob(self, job_id, timeout, poll_interval):
+
+    @vm_util.Retry(
+        timeout=timeout,
+        poll_interval=poll_interval,
+        fuzz=0,
+        retryable_exceptions=(JobNotCompletedError,))
+    def Poll():
+      result = self._GetCompletedJob(job_id)
+      if result is None:
+        raise JobNotCompletedError('Job {} not complete.'.format(job_id))
+      return result
+
+    return Poll()
+
+  @abc.abstractmethod
+  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+    """Get the job result if it has finished.
+
+    Args:
+      job_id: The step id to query.
+
+    Returns:
+      A dictionary describing the job if the step the step is complete,
+          None otherwise.
+
+    Raises:
+      JobSubmissionError if job fails.
+    """
+    pass
+
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     pretty_version = self.dpb_version or 'default'
@@ -293,24 +329,18 @@ class BaseDpbService(resource.BaseResource):
   def CreateBucket(self, source_bucket):
     """Creates an object-store bucket used during persistent data processing.
 
-    Default behaviour is a no-op as concrete implementations will have native
-    implementations.
-
     Args:
       source_bucket: String, name of the bucket to create.
     """
-    pass
+    self.storage_service.MakeBucket(source_bucket)
 
   def DeleteBucket(self, source_bucket):
     """Deletes an object-store bucket used during persistent data processing.
 
-    Default behaviour is a no-op as concrete implementations will have native
-    implementations.
-
     Args:
       source_bucket: String, name of the bucket to delete.
     """
-    pass
+    self.storage_service.DeleteBucket(source_bucket)
 
 
 class UnmanagedDpbService(BaseDpbService):

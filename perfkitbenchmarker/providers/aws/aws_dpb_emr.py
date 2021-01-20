@@ -236,22 +236,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     # TODO(saksena): Handle error outcomees when spinning up emr clusters
     return result['Cluster']['Status']['State'] == READY_STATE
 
-  def _IsStepDone(self, step_id):
-    """Determine whether the step is done.
-
-    Args:
-      step_id: The step id to query.
-
-    Returns:
-      A dictionary describing the step if the step the step is complete,
-          None otherwise.
-
-    Raises:
-      JobSubmissionError if job fails.
-    """
-
-    cmd = self.cmd_prefix + ['emr', 'describe-step', '--cluster-id',
-                             self.cluster_id, '--step-id', step_id]
+  def _GetCompletedJob(self, job_id):
+    """See base class."""
+    cmd = self.cmd_prefix + [
+        'emr', 'describe-step', '--cluster-id', self.cluster_id, '--step-id',
+        job_id
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
@@ -259,9 +249,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       raise dpb_service.JobSubmissionError(
           result['Step']['Status']['FailureDetails'])
     if state == 'COMPLETED':
-      return result
-    else:
-      return None
+      pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
+      start_time = result['Step']['Status']['Timeline']['StartDateTime']
+      end_time = result['Step']['Status']['Timeline']['EndDateTime']
+      return dpb_service.JobResult(
+          run_time=end_time - start_time,
+          pending_time=start_time - pending_time)
 
   def SubmitJob(self,
                 jarfile=None,
@@ -276,17 +269,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_type=None,
                 properties=None):
     """See base class."""
-    @vm_util.Retry(
-        timeout=EMR_TIMEOUT,
-        poll_interval=job_poll_interval,
-        fuzz=0,
-        retryable_exceptions=(EMRRetryableException,))
-    def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
     if job_arguments:
       # Escape commas in arguments
       job_arguments = (arg.replace(',', '\\,') for arg in job_arguments)
@@ -300,6 +282,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       if jarfile and classname:
         raise ValueError('You cannot specify both jarfile and classname.')
       arg_list = []
+      # Order is important
       if classname:
         # EMR does not support passing classnames as jobs. Instead manually
         # invoke `hadoop CLASSNAME` using command-runner.jar
@@ -360,33 +343,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(step_cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
-
-    result = WaitForStep(step_id)
-    pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
-    start_time = result['Step']['Status']['Timeline']['StartDateTime']
-    end_time = result['Step']['Status']['Timeline']['EndDateTime']
-    return dpb_service.JobResult(
-        run_time=end_time - start_time,
-        pending_time=start_time - pending_time)
-
-  def SetClusterProperty(self):
-    pass
-
-  def CreateBucket(self, source_bucket):
-    """Create a bucket on S3 for use during the persistent data processing.
-
-    Args:
-      source_bucket: String, name of the bucket to create.
-    """
-    self.storage_service.MakeBucket(source_bucket)
-
-  def DeleteBucket(self, source_bucket):
-    """Delete a bucket on S3 used during the persistent data processing.
-
-    Args:
-      source_bucket: String, name of the bucket to delete.
-    """
-    self.storage_service.DeleteBucket(source_bucket)
+    return self._WaitForJob(step_id, EMR_TIMEOUT, job_poll_interval)
 
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""

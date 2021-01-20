@@ -20,7 +20,6 @@ at https://cloud.google.com/dataproc/
 import datetime
 import json
 import logging
-
 from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -37,11 +36,6 @@ flags.DEFINE_integer('dpb_dataproc_distcp_num_maps', None,
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
-
-TESTDFSIO_JAR_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
-                          'hadoop-mapreduce-client-jobclient.jar')
-
-TESTDFSIO_PROGRAM = 'TestDFSIO'
 
 disk_to_hdfs_map = {
     'pd-standard': 'HDD',
@@ -249,28 +243,12 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds())
 
-  def SetClusterProperty(self):
-    pass
+  def _GetCompletedJob(self, job_id):
+    raise NotImplementedError('Dataproc SubmitJob uses a blocking command.')
 
   def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
-
-  def CreateBucket(self, source_bucket):
-    """Create a bucket on GCS used during the persistent data processing.
-
-    Args:
-      source_bucket: String, name of the bucket to create.
-    """
-    self.storage_service.MakeBucket(source_bucket)
-
-  def DeleteBucket(self, source_bucket):
-    """Delete a bucket on GCS used during the persistent data processing.
-
-    Args:
-      source_bucket: String, name of the bucket to delete.
-    """
-    self.storage_service.DeleteBucket(source_bucket)
 
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
