@@ -17,7 +17,6 @@ import copy
 import datetime
 import json
 import logging
-import os
 import re
 from typing import Dict, Text
 
@@ -28,6 +27,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
+
+LATEST_CLIENT_JAR = 'athena-java-client-2.0.jar'
 
 AWS_ATHENA_CMD_PREFIX = ['aws', 'athena']
 AWS_ATHENA_CMD_POSTFIX = ['--output', 'json']
@@ -92,8 +93,9 @@ class GenericClientInterface(edw_service.EdwClientInterface):
 
   def GetMetadata(self) -> Dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
+    client_workgroup = FLAGS.athena_workgroup or 'dynamic'
     return {
-        'client': FLAGS.athena_client_interface,
+        'client': f'{FLAGS.athena_client_interface}_{client_workgroup}',
         'client_region': self.region
     }
 
@@ -118,7 +120,7 @@ class JavaClientInterface(GenericClientInterface):
     self.client_vm.Install('openjdk')
     # Push the executable jar to the working directory on client vm
     self.client_vm.InstallPreprovisionedPackageData(
-        package_name, ['athena-java-client-1.0.jar'], '')
+        package_name, [LATEST_CLIENT_JAR], '')
 
   def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
     """Executes a query and returns performance details.
@@ -133,18 +135,24 @@ class JavaClientInterface(GenericClientInterface):
         successful query the value is expected to be positive.
       run_metadata: A dictionary of query execution attributes eg. script name
     """
-    query_command = (
-        'java -cp athena-java-client-1.0.jar '
-        'com.google.cloud.performance.edw.Single --region {} --database {} '
-        '--output_location {} --query_file {} --query_timeout_secs {}'
-        .format(self.region, self.database, self.output_bucket, query_name,
-                FLAGS.athena_query_timeout))
+    query_command = (f'java -cp {LATEST_CLIENT_JAR} '
+                     'com.google.cloud.performance.edw.Single '
+                     f'--region {self.region} '
+                     f'--database {self.database} '
+                     f'--output_location {self.output_bucket} '
+                     f'--query_file {query_name} '
+                     f'--query_timeout_secs {FLAGS.athena_query_timeout} '
+                     f'--collect_metrics {FLAGS.athena_metrics_collection}')
+
     if not FLAGS.athena_metrics_collection:
-      # execute the query in default primary workgroup
-      query_command = '{} --workgroup primary'.format(query_command)
-    query_command = '{} --collect_metrics {} --delete_workgroup {}'.format(
-        query_command, FLAGS.athena_metrics_collection,
-        FLAGS.athena_workgroup_delete)
+      # execute the query in requested persistent workgroup
+      query_command = f'{query_command} --workgroup {FLAGS.athena_workgroup} '
+      query_command = f'{query_command} --delete_workgroup False'
+    else:
+      # the dynamic workgroup may have to live beyond the benchmark
+      query_command = (f'{query_command} '
+                       f'--delete_workgroup {FLAGS.athena_workgroup_delete}')
+
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
@@ -152,69 +160,6 @@ class JavaClientInterface(GenericClientInterface):
     details['query_end'] = json.loads(stdout)['query_end']
     performance = json.loads(stdout)['query_wall_time_in_secs']
     return performance, details
-
-
-class CliClientInterface(GenericClientInterface):
-  """Command Line Client Interface class for Athena.
-
-  Uses the native Athena client available with the awscli
-  https://docs.aws.amazon.com/cli/latest/reference/athena/index.html.
-  """
-
-  def Prepare(self, package_name: str) -> None:
-    """Prepares the client vm to execute query.
-
-    Installs the bq tool dependencies and authenticates using a service account.
-
-    Args:
-      package_name: String name of the package defining the preprovisioned data
-        (certificates, etc.) to extract and use during client vm preparation.
-    """
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand('sudo pip install absl-py')
-    for pkg in ('aws_credentials', 'awscli'):
-      self.client_vm.Install(pkg)
-
-    # Push the framework to execute a sql query and gather performance details.
-    service_specific_dir = os.path.join('edw', Athena.SERVICE_TYPE)
-    self.client_vm.PushFile(
-        data.ResourcePath(
-            os.path.join(service_specific_dir, 'script_runner.sh')))
-    runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
-    self.client_vm.RemoteCommand(runner_permission_update_cmd)
-    self.client_vm.PushFile(
-        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
-    self.client_vm.PushFile(
-        data.ResourcePath(
-            os.path.join(service_specific_dir,
-                         'provider_specific_script_driver.py')))
-
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
-    """Executes a query and returns performance details.
-
-    Args:
-      query_name: String name of the query to execute
-
-    Returns:
-      A tuple of (execution_time, run_metadata)
-      execution_time: A Float variable set to the query's completion time in
-        secs. -1.0 is used as a sentinel value implying the query failed. For a
-        successful query the value is expected to be positive.
-      run_metadata: A dictionary of query execution attributes eg. script name
-    """
-    stdout, _ = self.client_vm.RemoteCommand(
-        'python script_driver.py --script={} --database={} --query_timeout={} '
-        '--athena_query_output_bucket={} --athena_region={}'.format(
-            query_name, self.database, FLAGS.athena_query_timeout,
-            self.output_bucket, self.region))
-    script_performance = json.loads(str(stdout))
-    execution_time = script_performance[query_name]['execution_time']
-    run_metadata = {'script': query_name}
-    if 'error_details' in script_performance[query_name]:
-      run_metadata['error_details'] = script_performance[query_name][
-          'error_details']
-    run_metadata.update(self.GetMetadata())
-    return execution_time, run_metadata
 
 
 def ReadScript(script_uri):
