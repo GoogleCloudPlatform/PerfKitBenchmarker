@@ -51,6 +51,13 @@ def _YumInstallVersion(vm, version):
   vm.InstallPackages(f'{devtoolset}-gcc-gfortran')
   # Sets the path to use the newly installed version
   vm.RemoteCommand(f'echo "source scl_source enable {devtoolset}" >> .bashrc')
+  # SCL's sudo is broken, remove it to use the normal /bin/sudo
+  vm.RemoteCommand(f'sudo rm /opt/rh/{devtoolset}/root/usr/bin/sudo')
+  # Normally a gfortran-{version} symlink is installed, create one
+  sym_link = f'/usr/bin/gfortran-{version}'
+  real_path = f'/opt/rh/{devtoolset}/root/usr/bin/gfortran'
+  vm.RemoteCommand(
+      f'sudo alternatives --install {sym_link} fortran {real_path} 100')
 
 
 def _AptInstallVersion(vm, version):
