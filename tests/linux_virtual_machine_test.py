@@ -176,6 +176,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
   LSCPU_DATA = {
       'NUMA node(s)': '1',
       'Core(s) per socket': '2',
+      'Thread(s) per core': '2',
       'Socket(s)': '3',
       'a': 'b',
   }
@@ -236,11 +237,13 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     results = vm.CheckLsCpu()
     self.assertEqual(1, results.numa_node_count)
     self.assertEqual(2, results.cores_per_socket)
+    self.assertEqual(2, results.threads_per_core)
     self.assertEqual(3, results.socket_count)
     self.assertEqual(
         {
             'NUMA node(s)': '1',
             'Core(s) per socket': '2',
+            'Thread(s) per core': '2',
             'Socket(s)': '3',
             'a': 'b'
         }, results.data)
@@ -358,6 +361,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   lscpu_output = '\n'.join([
       'NUMA node(s): 1',
       'Core(s) per socket: 1',
+      'Thread(s) per core: 1',
       'Socket(s): 1',
   ])
   normal_boot_responses = [
@@ -405,6 +409,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '/dev/sda': 1073741824,
         'kernel_release': self.kernel_release,
         'os_info': self.os_info,
+        'threads_per_core': 1,
     }
     self.assertEqual(expected_os_metadata, vm.os_metadata)
 

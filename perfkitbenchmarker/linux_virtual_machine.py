@@ -168,6 +168,10 @@ flags.DEFINE_integer(
 flags.DEFINE_boolean('gce_hpc_tools', False,
                      'Whether to apply the hpc-tools environment script.')
 
+flags.DEFINE_boolean('disable_smt', False,
+                     'Whether to disable SMT (Simultaneous Multithreading) '
+                     'in BIOS.')
+
 RETRYABLE_SSH_RETCODE = 255
 
 
@@ -709,6 +713,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.tcp_congestion_control = self.TcpCongestionControl()
     lscpu_results = self.CheckLsCpu()
     self.numa_node_count = lscpu_results.numa_node_count
+    self.os_metadata['threads_per_core'] = lscpu_results.threads_per_core
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = self.kernel_release
     self.os_metadata.update(self.partition_table)
@@ -1350,6 +1355,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     In addition, to consolidate reboots during VM prepare, this method sets the
     needs reboot bit instead of immediately rebooting.
     """
+    if FLAGS.disable_smt:
+      FLAGS.append_kernel_command_line = ' '.join(
+          (FLAGS.append_kernel_command_line,
+           'nosmt')) if FLAGS.append_kernel_command_line else 'nosmt'
     if FLAGS.append_kernel_command_line:
       self.AppendKernelCommandLine(
           FLAGS.append_kernel_command_line, reboot=False)
@@ -2213,6 +2222,7 @@ class LsCpuResults(object):
     self.numa_node_count = GetInt('NUMA node(s)')
     self.cores_per_socket = GetInt('Core(s) per socket')
     self.socket_count = GetInt('Socket(s)')
+    self.threads_per_core = GetInt('Thread(s) per core')
 
 
 class ProcCpuResults(object):
