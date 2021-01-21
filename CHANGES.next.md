@@ -75,3 +75,4 @@
     there is exception at the provision|prepare|run|cleanup stage.
 -   Updates crcmod, boto, and awscli installation to pip3.
 -   Consolidates adding Ubuntu toolchain repo.
+-   Moved stress_ng installation to a package.
