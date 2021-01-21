@@ -68,7 +68,7 @@ def _PrepareServer(vm):
   data_dir = _GetDataDir(vm)
   vm.RemoteCommand('mkdir {0} && chmod a+rwx {0}'.format(data_dir))
   vm.RemoteCommand(
-      "sudo sed -i -e '/bind_ip/ s/^/#/; s,^dbpath=.*,dbpath=%s,' %s" %
+      "sudo sed -i -e '/bind_ip/ s/^/#/; s,dbPath:.*,dbPath: %s,' %s" %
       (data_dir,
        vm.GetPathToConfig('mongodb_server')))
   if FLAGS.mongodb_readahead_kb is not None:
