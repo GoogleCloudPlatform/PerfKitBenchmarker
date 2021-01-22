@@ -13,6 +13,7 @@
 
 ### New features:
 
+-   Add ibmcloud as a new provider.
 -   Add prefix/directory support for object storage service runs.
 -   Add MaskRCNN and ReXtNet-101 to the horovod benchmark.
 -   Add Bigtable Benchmarking tutorial.
