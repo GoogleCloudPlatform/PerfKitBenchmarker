@@ -48,6 +48,7 @@ def GetConfig(user_config):
 
 def Prepare(benchmark_spec):  # pylint: disable=unused-argument
   """Install ping on the target vm.
+
   Checks that there are exactly two vms specified.
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -107,7 +108,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
   """
   if (ip_type == vm_util.IpAddressMetadata.INTERNAL and
       not sending_vm.IsReachable(receiving_vm)):
-    logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
+    logging.warning('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
   logging.info('Ping results (ip_type = %s):', ip_type)
