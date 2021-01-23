@@ -88,6 +88,9 @@ def _Install(vm):
 def _CopyTar(vm):
   """Copy the tar file for installation.
 
+  Args:
+    vm: the target vm to copy the tar file to.
+
   Tries local data directory first, then NET_PERF_URL
   """
 
@@ -113,7 +116,7 @@ def ParseHistogram(netperf_stdout):
   """Parses the histogram output from netperf.
 
   Args:
-    netperf_output: string. The stdout from netperf containing a histogram.
+    netperf_stdout: string. The stdout from netperf containing a histogram.
 
   Returns:
     A dict mapping latency to sample count or None if the output did not
