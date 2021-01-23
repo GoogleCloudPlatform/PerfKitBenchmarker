@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs plain netperf aggregate script runemomniaggdemo.sh to test packets
-per second
+"""Runs plain netperf aggregate script runemomniaggdemo.sh to test packets/sec.
 
 docs:
 https://hewlettpackard.github.io/netperf/doc/netperf.html
@@ -69,10 +68,10 @@ def PrepareNetperfAggregate(vm):
   vm.Install('python_rrdtool')
   vm.Install('netperf')
 
-  PORT_END = PORT_START
+  port_end = PORT_START
 
   if vm_util.ShouldRunOnExternalIpAddress():
-    vm.AllowPort(PORT_START, PORT_END)
+    vm.AllowPort(PORT_START, port_end)
 
   netserver_cmd = ('{netserver_path} -p {port_start}').format(
       port_start=PORT_START,
@@ -100,7 +99,6 @@ def ParseNetperfAggregateOutput(stdout):
 
   Args:
     stdout: the stdout of the netperf process
-    metadata: metadata for any sample.Sample objects we create
 
   Returns:
     A tuple containing (throughput_sample, latency_samples, latency_histogram)
@@ -137,32 +135,29 @@ def RunNetperfAggregate(vm, server_ips):
 
   Args:
     vm: The VM that the netperf TCP_RR benchmark will be run upon.
-    benchmark_name: The netperf benchmark to run, see the documentation.
-    server_ip: A machine that is running netserver.
-    num_streams: The number of netperf client threads to run.
+    server_ips: Machines that are running netserver.
 
   Returns:
     A sample.Sample object with the result.
   """
 
   # setup remote hosts file
-  vm.RemoteCommand('cd %s && rm remote_hosts' % (netperf.NETPERF_EXAMPLE_DIR))
+  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm remote_hosts')
   ip_num = 0
   for ip in server_ips:
-    vm.RemoteCommand("cd %s && echo 'REMOTE_HOSTS[%d]=%s' >> remote_hosts"
-                     % (netperf.NETPERF_EXAMPLE_DIR, ip_num, ip))
+    vm.RemoteCommand(f"echo 'REMOTE_HOSTS[{ip_num}]={ip}' >> "
+                     f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
     ip_num += 1
 
-  vm.RemoteCommand("cd %s && echo 'NUM_REMOTE_HOSTS=%d' >> remote_hosts"
-                   % (netperf.NETPERF_EXAMPLE_DIR, len(server_ips)))
-  vm.RemoteCommand('cd %s && export PATH=$PATH:.'
-                   % (netperf.NETPERF_EXAMPLE_DIR))
+  vm.RemoteCommand(f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
+                   f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
 
   # allow script to be executed and run script
   vm.RemoteCommand(
-      'cd %s && export PATH=$PATH:. && chmod '
-      '+x runemomniaggdemo.sh && '
-      './runemomniaggdemo.sh' % (netperf.NETPERF_EXAMPLE_DIR),
+      f'cd {netperf.NETPERF_EXAMPLE_DIR} && '
+      'export PATH=$PATH:. && '
+      'chmod +x runemomniaggdemo.sh && '
+      './runemomniaggdemo.sh',
       ignore_failure=True,
       should_log=True,
       login_shell=False,
@@ -170,7 +165,7 @@ def RunNetperfAggregate(vm, server_ips):
 
   # print out netperf_tps.log to log
   stdout_1, stderr_1 = vm.RemoteCommand(
-      'cd %s && cat netperf_tps.log' % (netperf.NETPERF_EXAMPLE_DIR),
+      f'cat {netperf.NETPERF_EXAMPLE_DIR}/netperf_tps.log',
       ignore_failure=True,
       should_log=True,
       login_shell=False,
@@ -181,8 +176,8 @@ def RunNetperfAggregate(vm, server_ips):
 
   # do post processing step
   proc_stdout, _ = vm.RemoteCommand(
-      'cd %s && ./post_proc.py '
-      '--intervals netperf_tps.log' % (netperf.NETPERF_EXAMPLE_DIR),
+      f'cd {netperf.NETPERF_EXAMPLE_DIR} && ./post_proc.py '
+      '--intervals netperf_tps.log',
       ignore_failure=True)
 
   samples = ParseNetperfAggregateOutput(proc_stdout)
@@ -217,13 +212,13 @@ def Run(benchmark_spec):
     results.extend(external_ip_results)
 
   # check if all server vms internal ips are reachable
-  runInternal = True
+  run_internal = True
   for tmp_vm in server_vms:
     if not vm_util.ShouldRunOnInternalIpAddress(client_vm, tmp_vm):
-      runInternal = False
+      run_internal = False
       break
 
-  if runInternal:
+  if run_internal:
     server_ips = list((vm.internal_ip for vm in server_vms))
     internal_ip_results = RunNetperfAggregate(client_vm, server_ips)
 
@@ -243,4 +238,4 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   for vm in vms:
-    vms.RemoteCommand('sudo killall netserver')
+    vm.RemoteCommand('sudo killall netserver')

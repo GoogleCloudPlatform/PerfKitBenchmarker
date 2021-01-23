@@ -55,8 +55,8 @@ def Prepare(benchmark_spec):  # pylint: disable=unused-argument
   """
   if len(benchmark_spec.vms) != 2:
     raise ValueError(
-        'Ping benchmark requires exactly two machines, found {0}'
-        .format(len(benchmark_spec.vms)))
+        'Ping benchmark requires exactly two machines, '
+        f'found {len(benchmark_spec.vms)}')
   if vm_util.ShouldRunOnExternalIpAddress():
     vms = benchmark_spec.vms
     for vm in vms:
@@ -111,7 +111,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
     return []
 
   logging.info('Ping results (ip_type = %s):', ip_type)
-  ping_cmd = 'ping -c 100 %s' % receiving_ip
+  ping_cmd = f'ping -c 100 {receiving_ip}'
   stdout, _ = sending_vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
   assert len(stats) == len(METRICS), stats
