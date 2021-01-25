@@ -67,7 +67,10 @@ def FixEnvironment(vm):
     logging.info('Rebooting to permamently set ulimit')
     vm.Reboot()
     vm.WaitForBootCompletion()
-  vm.RemoteCommand('sudo sysctl -w kernel.yama.ptrace_scope=0')
+  _, stderr, exitcode = vm.RemoteCommandWithReturnCode(
+      'sudo sysctl -w kernel.yama.ptrace_scope=0', ignore_failure=True)
+  if exitcode:
+    logging.info('Not setting yama ptrace as %s', stderr)
 
 
 def _Install(vm, mpi_version: str) -> None:
