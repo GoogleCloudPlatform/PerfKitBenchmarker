@@ -1694,6 +1694,9 @@ class Rhel8Mixin(BaseRhelMixin):
 class CentOs7Mixin(BaseRhelMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
+  # Pip version 21 drops support for py2 and py3.5
+  # https://pip.pypa.io/en/stable/news/#id119
+  PYTHON_PIP_PACKAGE_VERSION = '20.2.2'
 
 
 class CentOs8Mixin(BaseRhelMixin):
@@ -1905,6 +1908,9 @@ class BaseUbuntuMixin(BaseDebianMixin):
 class Ubuntu1604Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604
+  # Pip version 20.2.2 is the last verision before pip drops support for py3.5
+  # https://pip.pypa.io/en/stable/news/#id119
+  PYTHON_PIP_PACKAGE_VERSION = '20.2.2'
 
 
 class Ubuntu1710Mixin(BaseUbuntuMixin):
