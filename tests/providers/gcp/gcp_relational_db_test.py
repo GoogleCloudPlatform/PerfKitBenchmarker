@@ -153,8 +153,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertNotIn('--failover-replica-name', command_string)
-      self.assertNotIn('replica-pkb-db-instance-123', command_string)
+      self.assertNotIn('--availability-type=REGIONAL', command_string)
 
   def testCreate(self):
     with PatchCriticalObjects() as issue_command:
@@ -243,8 +242,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertIn('--failover-replica-name', command_string)
-      self.assertIn('replica-pkb-db-instance-123', command_string)
+      self.assertIn('--availability-type=REGIONAL', command_string)
 
   def testParseEndpoint(self):
     path = os.path.join(

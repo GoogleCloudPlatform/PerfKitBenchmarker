@@ -44,13 +44,15 @@ GCP_DATABASE_VERSION_MAPPING = {
     relational_db.MYSQL: {
         '5.5': 'MYSQL_5_5',
         '5.6': 'MYSQL_5_6',
-        '5.7': 'MYSQL_5_7'
+        '5.7': 'MYSQL_5_7',
+        '8.0': 'MYSQL_8_0'
     },
     relational_db.POSTGRES: {
         '9.6': 'POSTGRES_9_6',
         '10': 'POSTGRES_10',
         '11': 'POSTGRES_11',
-        '12': 'POSTGRES_12'
+        '12': 'POSTGRES_12',
+        '13': 'POSTGRES_13'
     },
     relational_db.SQLSERVER: {
         '2017_Standard': 'SQLSERVER_2017_Standard',
@@ -223,25 +225,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       self._ApplyMySqlFlags()
 
   def _GetHighAvailabilityFlag(self):
-    """Returns a flag that enables high-availability for the specified engine.
+    """Returns a flag that enables high-availability.
 
     Returns:
       Flag (as string) to be appended to the gcloud sql create command.
-
-    Raises:
-      UnsupportedDatabaseEngineException:
-        if engine does not support high availability.
     """
-    if self.spec.engine == relational_db.MYSQL:
-      self.replica_instance_id = 'replica-' + self.instance_id
-      return '--failover-replica-name=' + self.replica_instance_id
-    elif (self.spec.engine == relational_db.POSTGRES or
-          self.spec.engine == relational_db.SQLSERVER):
-      return '--availability-type=REGIONAL'
-    else:
-      raise UnsupportedDatabaseEngineException(
-          'High availability not supported on engine {0}'.format(
-              self.spec.engine))
+    return '--availability-type=REGIONAL'
 
   def _ValidateSpec(self):
     """Validates PostgreSQL spec for CPU and memory.
