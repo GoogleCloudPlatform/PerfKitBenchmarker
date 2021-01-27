@@ -130,9 +130,13 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
       raise errors.Benchmarks.BucketCreationError(stderr)
 
   def DeleteBucket(self, bucket):
-    if not hasattr(self, 'storage_account') or not self.storage_account:
+    if (not hasattr(self, 'storage_account') or
+        not self.storage_account or
+        not hasattr(self.storage_account, 'connection_args') or
+        not self.storage_account.connection_args):
       logging.warning(
-          'storage_account not configured. Skipping DeleteBucket %s', bucket)
+          'storage_account not properly configured. Skipping DeleteBucket %s',
+          bucket)
       return
 
     vm_util.IssueCommand(
