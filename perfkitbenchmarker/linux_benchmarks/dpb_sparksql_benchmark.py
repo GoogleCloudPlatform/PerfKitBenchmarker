@@ -179,6 +179,7 @@ def Prepare(benchmark_spec):
   bucket = 'pkb-' + benchmark_spec.uuid.split('-')[0]
   storage_service = dpb_service_instance.storage_service
   storage_service.MakeBucket(bucket)
+  benchmark_spec.bucket = bucket
   benchmark_spec.base_dir = dpb_service_instance.PERSISTENT_FS_PREFIX + bucket
   benchmark_spec.staged_queries = _LoadAndStageQueries(
       storage_service, benchmark_spec.base_dir)
@@ -369,6 +370,7 @@ def _LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
   return [query_file[query] for query in FLAGS.dpb_sparksql_order]
 
 
-def Cleanup(_):
-  """Cleans up the Spark SQL."""
-  pass
+def Cleanup(benchmark_spec):
+  """Cleans up the Benchmark."""
+  storage_service = benchmark_spec.dpb_service.storage_service
+  storage_service.DeleteBucket(benchmark_spec.bucket)
