@@ -440,6 +440,10 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
   def _Delete(self):
     pass
 
+  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+    """Submitting Job via SSH is blocking so this is not meaningful."""
+    raise NotImplementedError('Submitting Job via SSH is a blocking command.')
+
   def GetExecutionJar(self, job_category, job_type):
     """Retrieve execution jar corresponding to the job_category and job_type."""
     if (job_category not in self.JOB_JARS or
