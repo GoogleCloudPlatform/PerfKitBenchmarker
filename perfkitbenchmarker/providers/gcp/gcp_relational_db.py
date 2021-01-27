@@ -370,6 +370,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
+    self.port = self._GetDefaultPort(self.spec.engine)
     if not self.is_managed_db:
       return self._IsReadyUnmanaged()
 
@@ -384,7 +385,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     stdout, _, _ = cmd.Issue()
     json_output = json.loads(stdout)
     self.endpoint = self._ParseEndpoint(json_output)
-    self.port = self._GetDefaultPort(self.spec.engine)
     return True
 
   def _ParseEndpoint(self, describe_instance_json):

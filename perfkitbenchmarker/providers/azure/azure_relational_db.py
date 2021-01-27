@@ -482,6 +482,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """Perform general post create operations on the cluster.
 
     """
+    self.port = self.GetDefaultPort()
+
     if not self.is_managed_db:
       return
     cmd = [
@@ -497,7 +499,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--end-ip-address', '255.255.255.255'
     ]
     vm_util.IssueCommand(cmd)
-    self._AssignPortsForWriterInstance()
+    self._AssignEndpointForWriterInstance()
 
     if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
       # Azure will add @domainname after the database username
@@ -568,14 +570,13 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     json_output = json.loads(stdout)
     return json_output
 
-  def _AssignPortsForWriterInstance(self):
+  def _AssignEndpointForWriterInstance(self):
     """Assigns the ports and endpoints from the instance_id to self.
 
     These will be used to communicate with the data base
     """
     server_show_json = self._AzServerShow()
     self.endpoint = server_show_json['fullyQualifiedDomainName']
-    self.port = self.GetDefaultPort()
 
   def MakePsqlConnectionString(self, database_name):
     """Makes the connection string used to connect via PSql.

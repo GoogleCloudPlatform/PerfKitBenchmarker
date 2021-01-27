@@ -584,6 +584,21 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
     return True
 
+  def GetDefaultPort(self):
+    """Returns the default port of a given database engine.
+
+    Returns:
+      (string): Default port
+    Raises:
+      RelationalDbEngineNotFoundException: if an unknown engine is
+                                                  requested.
+    """
+    engine = self.spec.engine
+    if engine == relational_db.MYSQL:
+      return DEFAULT_MYSQL_PORT
+    raise relational_db.RelationalDbEngineNotFoundException(
+        'Unsupported engine {0}'.format(engine))
+
   def _PostCreate(self):
     """Perform general post create operations on the cluster.
 
@@ -594,6 +609,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     self._ApplyMySqlFlags()
 
     if not self.is_managed_db:
+      self.port = self.GetDefaultPort()
       return
 
     need_ha_modification = self.spec.engine in _RDS_ENGINES
