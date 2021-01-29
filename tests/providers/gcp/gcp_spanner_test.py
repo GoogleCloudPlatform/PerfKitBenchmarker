@@ -1,12 +1,20 @@
 """Tests for google3.third_party.py.perfkitbenchmarker.providers.gcp.gcp_spanner."""
 
 import unittest
+
 from absl import flags
 from absl.testing import flagsaver
+import mock
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+
+def GetTestSpannerInstance():
+  return gcp_spanner.GcpSpannerInstance(
+      name='test_instance', database='test_database')
 
 
 class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
@@ -38,6 +46,17 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spanner._nodes, 2)
     self.assertEqual(spanner.project, 'test_project')
     self.assertEqual(spanner._config, 'regional-us-east1')
+
+  def testSetNodes(self):
+    test_instance = GetTestSpannerInstance()
+    # Don't actually issue a command.
+    cmd = self.enter_context(
+        mock.patch.object(
+            vm_util, 'IssueCommand', return_value=[None, None, 0]))
+
+    test_instance._SetNodes(3)
+
+    self.assertIn('--nodes 3', ' '.join(cmd.call_args[0][0]))
 
 
 if __name__ == '__main__':

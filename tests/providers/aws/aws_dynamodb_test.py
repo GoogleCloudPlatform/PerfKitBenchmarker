@@ -1,12 +1,49 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_dynamodb."""
 
+import json
 import unittest
+
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
+import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.aws import aws_dynamodb
+from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+_DESCRIBE_TABLE_OUTPUT = """
+{
+    "Table": {
+        "AttributeDefinitions": [
+            {
+                "AttributeName": "test",
+                "AttributeType": "S"
+            }
+        ],
+        "TableName": "test",
+        "KeySchema": [
+            {
+                "AttributeName": "test",
+                "KeyType": "HASH"
+            }
+        ],
+        "TableStatus": "ACTIVE",
+        "CreationDateTime": 1611605356.518,
+        "ProvisionedThroughput": {
+            "NumberOfDecreasesToday": 0,
+            "ReadCapacityUnits": 5,
+            "WriteCapacityUnits": 0
+        },
+        "TableSizeBytes": 0,
+        "ItemCount": 0,
+        "TableArn": "arn:aws:dynamodb:us-east-2:835761027970:table/test",
+        "TableId": "ecf0a60a-f18d-4666-affc-525ca6e1d207"
+    }
+}
+"""
 
 
 @flagsaver.flagsaver
@@ -16,6 +53,11 @@ def GetTestDynamoDBInstance(table_name='test_table'):
 
 
 class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def assertArgumentInCommand(self, mock_cmd, arg):
+    """Given an AWS command, checks that the argument is present."""
+    command = ' '.join(mock_cmd.call_args[0][0])
+    self.assertIn(arg, command)
 
   @flagsaver.flagsaver
   def testInitTableName(self):
@@ -92,6 +134,98 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
         'aws_dynamodb_connectMax': 6,
     }
     self.assertEqual(actual_metadata, expected_metadata)
+
+  @parameterized.named_parameters({
+      'testcase_name': 'ValidOutput',
+      'output': json.loads(_DESCRIBE_TABLE_OUTPUT)['Table'],
+      'expected': True
+  }, {
+      'testcase_name': 'EmptyOutput',
+      'output': {},
+      'expected': False
+  })
+  def testExists(self, output, expected):
+    test_instance = GetTestDynamoDBInstance()
+    self.enter_context(
+        mock.patch.object(
+            test_instance,
+            '_DescribeTable',
+            return_value=output))
+
+    actual = test_instance._Exists()
+
+    self.assertEqual(actual, expected)
+
+  def testSetThroughput(self):
+    test_instance = GetTestDynamoDBInstance(table_name='throughput_table')
+    cmd = self.enter_context(
+        mock.patch.object(
+            util,
+            'IssueRetryableCommand'))
+
+    test_instance._SetThroughput(5, 5)
+
+    self.assertArgumentInCommand(cmd, '--table-name throughput_table')
+    self.assertArgumentInCommand(cmd, '--region us-east-1')
+    self.assertArgumentInCommand(
+        cmd,
+        '--provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5')
+
+  def testGetThroughput(self):
+    test_instance = GetTestDynamoDBInstance()
+    output = json.loads(_DESCRIBE_TABLE_OUTPUT)['Table']
+    self.enter_context(
+        mock.patch.object(
+            test_instance,
+            '_DescribeTable',
+            return_value=output))
+
+    actual_rcu, actual_wcu = test_instance._GetThroughput()
+
+    self.assertEqual(actual_rcu, 5)
+    self.assertEqual(actual_wcu, 0)
+
+  def testTagResourceFailsWithNonExistentResource(self):
+    test_instance = GetTestDynamoDBInstance()
+    # Mark instance as non-existing.
+    self.enter_context(
+        mock.patch.object(test_instance, '_Exists', return_value=False))
+
+    with self.assertRaises(errors.Resource.CreationError):
+      test_instance._GetTagResourceCommand(['test', 'tag'])
+
+  def testUpdateWithDefaultTags(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.resource_arn = 'test_arn'
+    cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
+    # Mark instance as existing.
+    self.enter_context(
+        mock.patch.object(test_instance, '_Exists', return_value=True))
+
+    test_instance.UpdateWithDefaultTags()
+
+    self.assertArgumentInCommand(cmd, '--region us-east-1')
+    self.assertArgumentInCommand(cmd, '--resource-arn test_arn')
+
+  def testUpdateTimeout(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.resource_arn = 'test_arn'
+    # Mock the aws util tags function.
+    self.enter_context(
+        mock.patch.object(
+            util,
+            'MakeDefaultTags',
+            autospec=True,
+            return_value={'timeout_utc': 60}))
+    # Mock the actual call to the CLI
+    cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
+    # Mark instance as existing.
+    self.enter_context(
+        mock.patch.object(test_instance, '_Exists', return_value=True))
+
+    test_instance.UpdateTimeout(timeout_minutes=60)
+
+    self.assertArgumentInCommand(cmd, '--tags Key=timeout_utc,Value=60')
 
 
 if __name__ == '__main__':

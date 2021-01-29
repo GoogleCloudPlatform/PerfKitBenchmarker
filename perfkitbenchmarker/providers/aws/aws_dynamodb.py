@@ -16,18 +16,15 @@
 Tables can be created and deleted.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import json
 import logging
+from typing import Any, Dict, Tuple, Sequence
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
-from six.moves import range
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('aws_dynamodb_primarykey',
@@ -159,11 +156,13 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
                             .format(FLAGS.aws_dynamodb_sortkey,
                                     FLAGS.aws_dynamodb_attributetype))
     self.table_name = table_name
+    self.rcu = FLAGS.aws_dynamodb_read_capacity
+    self.wcu = FLAGS.aws_dynamodb_write_capacity
     self.throughput = 'ReadCapacityUnits={read},WriteCapacityUnits={write}'.format(
-        read=FLAGS.aws_dynamodb_read_capacity,
-        write=FLAGS.aws_dynamodb_write_capacity)
+        read=self.rcu, write=self.wcu)
     self.lsi_indexes = _GetIndexes().CreateLocalSecondaryIndex()
     self.gsi_indexes = _GetIndexes().CreateGlobalSecondaryIndex()
+    self.resource_arn: str = None  # Set during the _Exists() call.
 
   def _Create(self):
     """Creates the dynamodb table."""
@@ -222,21 +221,17 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     result = json.loads(stdout)
     return result['Table']['TableStatus'] == 'ACTIVE'
 
-  def _Exists(self):
+  def _Exists(self) -> bool:
     """Returns true if the dynamodb table exists."""
     logging.info('Checking if table %s exists', self.table_name)
-    cmd = util.AWS_PREFIX + [
-        'dynamodb',
-        'describe-table',
-        '--region', self.region,
-        '--table-name', self.table_name]
-    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if retcode != 0:
+    result = self._DescribeTable()
+    if not result:
       return False
-    else:
-      return True
+    if not self.resource_arn:
+      self.resource_arn = result['TableArn']
+    return True
 
-  def _DescribeTable(self):
+  def _DescribeTable(self) -> Dict[Any, Any]:
     """Calls describe on dynamodb table."""
     cmd = util.AWS_PREFIX + [
         'dynamodb',
@@ -247,10 +242,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     if retcode != 0:
       logging.info('Could not find table %s, %s', self.table_name, stderr)
       return {}
-    for table_info in json.loads(stdout)['Table']:
-      if table_info[3] == self.table_name:
-        return table_info
-    return {}
+    return json.loads(stdout)['Table']
 
   def GetEndPoint(self):
     ddbep = 'http://dynamodb.{0}.amazonaws.com'.format(self.region)
@@ -275,19 +267,60 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
     }
 
+  def _SetThroughput(self, rcu: int, wcu: int) -> None:
+    """Updates the table's rcu and wcu."""
+    cmd = util.AWS_PREFIX + [
+        'dynamodb', 'update-table',
+        '--table-name', self.table_name,
+        '--region', self.region,
+        '--provisioned-throughput',
+        f'ReadCapacityUnits={rcu},WriteCapacityUnits={wcu}',
+    ]
+    logging.info('Setting %s table provisioned throughput to %s rcu and %s wcu',
+                 self.table_name, rcu, wcu)
+    util.IssueRetryableCommand(cmd)
 
-def AddTagsToExistingInstance(table_name, region):
-  """Add tags to an existing DynamoDB table."""
-  cmd = util.AWS_PREFIX + [
-      'dynamodb',
-      'describe-table',
-      '--table-name', table_name,
-      '--region', region
-  ]
-  stdout, _, _ = vm_util.IssueCommand(cmd)
-  resource_arn = json.loads(stdout)['Table']['TableArn']
-  cmd = util.AWS_PREFIX + [
-      'dynamodb', 'tag-resource', '--resource-arn', resource_arn, '--region',
-      region, '--tags'
-  ] + util.MakeFormattedDefaultTags()
-  vm_util.IssueCommand(cmd)
+  def _GetThroughput(self) -> Tuple[int, int]:
+    """Returns the current (rcu, wcu) of the table."""
+    output = self._DescribeTable()['ProvisionedThroughput']
+    return output['ReadCapacityUnits'], output['WriteCapacityUnits']
+
+  @vm_util.Retry(poll_interval=1, max_retries=3,
+                 retryable_exceptions=(errors.Resource.CreationError))
+  def _GetTagResourceCommand(self, tags: Sequence[str]) -> Sequence[str]:
+    """Returns the tag-resource command with the provided tags.
+
+    This function will retry up to max_retries to allow for instance creation to
+    finish.
+
+    Args:
+      tags: List of formatted tags to append to the instance.
+
+    Returns:
+      A list of arguments for the 'tag-resource' command.
+
+    Raises:
+      errors.Resource.CreationError: If the current instance does not exist.
+    """
+    if not self._Exists():
+      raise errors.Resource.CreationError(
+          f'Cannot get resource arn of non-existent instance {self.table_name}')
+    return util.AWS_PREFIX + [
+        'dynamodb', 'tag-resource', '--resource-arn', self.resource_arn,
+        '--region', self.region, '--tags'
+    ] + list(tags)
+
+  def UpdateWithDefaultTags(self) -> None:
+    """Adds default tags to the table."""
+    tags = util.MakeFormattedDefaultTags()
+    cmd = self._GetTagResourceCommand(tags)
+    logging.info('Setting default tags on table %s', self.table_name)
+    util.IssueRetryableCommand(cmd)
+
+  def UpdateTimeout(self, timeout_minutes: int) -> None:
+    """Updates the timeout associated with the table."""
+    tags = util.MakeFormattedDefaultTags(timeout_minutes)
+    cmd = self._GetTagResourceCommand(tags)
+    logging.info('Updating timeout tags on table %s with timeout minutes %s',
+                 self.table_name, timeout_minutes)
+    util.IssueRetryableCommand(cmd)

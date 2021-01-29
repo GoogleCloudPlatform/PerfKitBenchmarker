@@ -281,6 +281,12 @@ class GcpSpannerInstance(resource.BaseResource):
     self._end_point = json.loads(stdout)
     return self._end_point
 
+  def _SetNodes(self, nodes: int) -> None:
+    """Sets the number of nodes on the Spanner instance."""
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'update', self.name)
+    cmd.flags['nodes'] = nodes
+    cmd.Issue(raise_on_failure=True)
+
 
 def GetSpannerClass(
     service_type: str) -> Optional[resource.AutoRegisterResourceMeta]:
