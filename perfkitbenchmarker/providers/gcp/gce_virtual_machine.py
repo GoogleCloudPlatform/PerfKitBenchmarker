@@ -107,6 +107,12 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     super(GceVmSpec, self).__init__(*args, **kwargs)
     if isinstance(self.machine_type,
                   custom_virtual_machine_spec.CustomMachineTypeSpec):
+      logging.warning('Specifying a custom machine in the format of '
+                      '{cpus: [NUMBER_OF_CPUS], memory: [GB_OF_MEMORY]} '
+                      'creates a custom machine in the n1 machine family. '
+                      'To create custom machines in other machine families, '
+                      'use [MACHINE_FAMILY]-custom-[NUMBER_CPUS]-[NUMBER_MiB] '
+                      'nomaclature. e.g. n2-custom-2-4096.')
       self.cpus = self.machine_type.cpus
       self.memory = self.machine_type.memory
       self.machine_type = None
