@@ -20,7 +20,7 @@ from perfkitbenchmarker import errors
 def Install(vm):
   """Installs the awscli package on the VM."""
   vm.InstallPackages('python3-pip')
-  vm.RemoteCommand('sudo pip3 install awscli')
+  vm.RemoteCommand('sudo pip3 install awscli --upgrade')
 
 
 def YumInstall(vm):
