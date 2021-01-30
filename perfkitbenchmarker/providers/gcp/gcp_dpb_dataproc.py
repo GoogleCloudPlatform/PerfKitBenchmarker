@@ -34,9 +34,6 @@ flags.DEFINE_string('dpb_dataproc_image_version', None,
 flags.DEFINE_integer('dpb_dataproc_distcp_num_maps', None,
                      'Number of maps to copy data.')
 
-SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
-                         'spark-examples.jar')
-
 disk_to_hdfs_map = {
     'pd-standard': 'HDD',
     'pd-ssd': 'SSD'
@@ -242,9 +239,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     return dpb_service.JobResult(
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds())
-
-  def _GetCompletedJob(self, job_id):
-    raise NotImplementedError('Dataproc SubmitJob uses a blocking command.')
 
   def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property

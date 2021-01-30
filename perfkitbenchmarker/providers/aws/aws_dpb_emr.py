@@ -33,8 +33,6 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('dpb_emr_release_label', None,
                     'DEPRECATED use dpb_service.version.')
 
-SPARK_SAMPLE_LOCATION = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
-
 INVALID_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
 READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60

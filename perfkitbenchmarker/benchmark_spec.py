@@ -236,7 +236,10 @@ class BenchmarkSpec(object):
 
     # If the dpb service is un-managed, the provisioning needs to be handed
     # over to the vm creation module.
-    if dpb_service_type == dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER:
+    if dpb_service_type in [
+        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+        dpb_service.UNMANAGED_SPARK_CLUSTER
+    ]:
       # Ensure non cluster vms are not present in the spec.
       if self.vms_to_boot:
         raise Exception('Invalid Non cluster vm group {0} when benchmarking '
@@ -524,8 +527,9 @@ class BenchmarkSpec(object):
     # In the case of an un-managed yarn cluster, for hadoop software
     # installation, the dpb service instance needs access to constructed
     # master group and worker group.
-    if (self.config.dpb_service and self.config.dpb_service.service_type ==
-        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER):
+    if (self.config.dpb_service and self.config.dpb_service.service_type in [
+        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+        dpb_service.UNMANAGED_SPARK_CLUSTER]):
       self.dpb_service.vms['master_group'] = self.vm_groups['master_group']
       if self.config.dpb_service.worker_count:
         self.dpb_service.vms['worker_group'] = self.vm_groups['worker_group']

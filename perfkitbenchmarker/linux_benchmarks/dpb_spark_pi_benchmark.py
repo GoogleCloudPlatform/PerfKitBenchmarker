@@ -24,7 +24,6 @@ The benchmark reports
 The wall tme may be inflated due to the use of polling to ascertain job
 completion.
 """
-import inspect
 import logging
 from absl import flags
 from perfkitbenchmarker import configs
@@ -42,12 +41,28 @@ dpb_spark_pi_benchmark:
     service_type: dataproc
     worker_group:
       vm_spec:
+        AWS:
+          machine_type: m5.large
+        Azure:
+          machine_type: Standard_F2s_v2
         GCP:
-          machine_type: n1-standard-1
+          machine_type: n1-standard-2
       disk_spec:
+        AWS:
+          disk_type: st1
+          disk_size: 500
+          # Only used by unmanaged
+          mount_point: /scratch
+        Azure:
+          disk_type: Standard_LRS
+          disk_size: 500
+          # Only used by unmanaged
+          mount_point: /scratch
         GCP:
           disk_type: pd-standard
           disk_size: 500
+          # Only used by unmanaged
+          mount_point: /scratch
     worker_count: 2
 """
 
@@ -80,19 +95,18 @@ def Run(benchmark_spec):
   """
 
   metadata = {}
-  metadata.update(benchmark_spec.dpb_service.GetMetadata())
+  cluster = benchmark_spec.dpb_service
+  metadata.update(cluster.GetMetadata())
   num_partitions = str(FLAGS.dpb_spark_pi_partitions)
   metadata.update({'spark_pi_partitions': num_partitions})
 
   results = []
 
-  dpb_service_instance = benchmark_spec.dpb_service
-
-  result = dpb_service_instance.SubmitSparkJob(
-      spark_application_jar=inspect.getmodule(
-          benchmark_spec.dpb_service).SPARK_SAMPLE_LOCATION,
-      spark_application_classname='org.apache.spark.examples.SparkPi',
-      spark_application_args=[num_partitions])
+  result = cluster.SubmitJob(
+      job_type='spark',
+      jarfile=cluster.GetExecutionJar('spark', 'examples'),
+      classname='org.apache.spark.examples.SparkPi',
+      job_arguments=[num_partitions])
   logging.info(result)
   results.append(
       sample.Sample('wall_time', result.wall_time, 'seconds', metadata))

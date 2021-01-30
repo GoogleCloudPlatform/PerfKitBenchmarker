@@ -22,6 +22,7 @@
 -   Add UDP benchmarking to iPerf.
 -   Add ability to use Intel package repos.
 -   Add Ubuntu 20.04 to AWS, Azure, and GCP providers.
+-   Add support for running DPB Apache Spark benchmarks on PKB provisioned VMs
 
 ### Enhancements:
 

@@ -36,10 +36,10 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.dpb_service import BaseDpbService
+# For some reason removing this import breaks flags in disk_types_renaming_test
+# pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
-from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
 
 BENCHMARK_NAME = 'dpb_wordcount_benchmark'
 
@@ -66,21 +66,19 @@ dpb_wordcount_benchmark:
 
 WORD_COUNT_CONFIGURATION = dict(
     [
-        (dpb_service.DATAPROC, (gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION,
-                                'org.apache.spark.examples.JavaWordCount',
-                                BaseDpbService.SPARK_JOB_TYPE)),
-        (dpb_service.DATAFLOW, (None,
-                                'org.example.WordCount',
-                                BaseDpbService.DATAFLOW_JOB_TYPE)),
-        (dpb_service.EMR, (aws_dpb_emr.SPARK_SAMPLE_LOCATION,
-                           'org.apache.spark.examples.JavaWordCount',
-                           BaseDpbService.SPARK_JOB_TYPE))
+        (dpb_service.DATAPROC, ('org.apache.spark.examples.JavaWordCount',
+                                dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
+        (dpb_service.DATAFLOW, ('org.example.WordCount',
+                                dpb_service.BaseDpbService.DATAFLOW_JOB_TYPE)),
+        (dpb_service.EMR, ('org.apache.spark.examples.JavaWordCount',
+                           dpb_service.BaseDpbService.SPARK_JOB_TYPE))
     ]
 )
 
 flags.DEFINE_string('dpb_wordcount_input', None, 'Input for word count')
-flags.DEFINE_enum('dpb_wordcount_fs', BaseDpbService.GCS_FS,
-                  [BaseDpbService.GCS_FS, BaseDpbService.S3_FS],
+flags.DEFINE_enum('dpb_wordcount_fs', dpb_service.BaseDpbService.GCS_FS,
+                  [dpb_service.BaseDpbService.GCS_FS,
+                   dpb_service.BaseDpbService.S3_FS],
                   'File System to use for the job output')
 flags.DEFINE_string('dpb_wordcount_out_base', None,
                     'Base directory for word count output')
@@ -99,13 +97,12 @@ def CheckPrerequisites(benchmark_config):
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   if (FLAGS.dpb_wordcount_input is None and
-          FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
+      FLAGS.dpb_wordcount_fs != dpb_service.BaseDpbService.GCS_FS):
     raise errors.Config.InvalidValue('Invalid default input directory.')
   # Get handle to the dpb service
   dpb_service_class = dpb_service.GetDpbServiceClass(
       benchmark_config.dpb_service.service_type)
   dpb_service_class.CheckPrerequisites(benchmark_config)
-
 
 
 def Prepare(benchmark_spec):
@@ -133,7 +130,7 @@ def Run(benchmark_spec):
 
   # Switch the parameters for submit job function of specific dpb service
   job_arguments = []
-  jarfile, classname, job_type = _GetJobArguments(
+  classname, job_type = _GetJobArguments(
       dpb_service_instance.SERVICE_TYPE)
   if FLAGS.dpb_job_classname:
     classname = FLAGS.dpb_job_classname
@@ -149,6 +146,7 @@ def Run(benchmark_spec):
       base_out = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
     job_arguments.append('--output={}/output/'.format(base_out))
   else:
+    jarfile = dpb_service_instance.GetExecutionJarfile('spark', 'examples')
     job_arguments = [input_location]
 
   # TODO (saksena): Finalize more stats to gather
