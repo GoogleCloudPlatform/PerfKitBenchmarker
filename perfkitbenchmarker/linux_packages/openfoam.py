@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,10 +23,6 @@ Instructions for installing OpenFOAM: https://openfoam.org/download/7-ubuntu/.
 NOTE: .bashrc will be overwritten by AptInstall()
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import posixpath
 
 
@@ -50,15 +46,14 @@ def AptInstall(vm):
   """Install OpenFOAM https://openfoam.org/download/7-ubuntu/."""
   remote_key_file = '/tmp/openfoam.key'
   vm.PushDataFile(_OPENFOAM_REPOSITORY_KEY, remote_key_file)
-  vm.RemoteCommand('sudo apt-key add {0}; rm {0}'.format(remote_key_file))
-  vm.RemoteCommand('sudo add-apt-repository {}'
-                   .format(_OPENFOAM_REPOSITORY_URL))
+  vm.RemoteCommand(f'sudo apt-key add {remote_key_file}; rm {remote_key_file}')
+  vm.RemoteCommand(f'sudo add-apt-repository {_OPENFOAM_REPOSITORY_URL}')
   vm.RemoteCommand('sudo apt-get -y update')
   vm.Install('build_tools')
   vm.InstallPackages('openfoam7')
   openfoam_bash_path = posixpath.join(OPENFOAM_ROOT, 'etc/bashrc')
 
   # Separate commands since $WM_PROJECT_DIR comes from the OpenFOAM bashrc.
-  vm.RemoteCommand('cat {} | tee $HOME/.bashrc'.format(openfoam_bash_path))
-  vm.RemoteCommand('cat {} | tee -a $HOME/.bashrc'.format(
-      '$WM_PROJECT_DIR/bin/tools/RunFunctions'))
+  vm.RemoteCommand(f'cat {openfoam_bash_path} | tee $HOME/.bashrc')
+  vm.RemoteCommand('cat $WM_PROJECT_DIR/bin/tools/RunFunctions | '
+                   'tee -a $HOME/.bashrc')
