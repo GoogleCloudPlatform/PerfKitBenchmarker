@@ -45,6 +45,9 @@ cluster_boot:
           zone: us-south-1
         Kubernetes:
           image: null
+        OpenStack:
+          machine_type: t1.small
+          zone: nova
       vm_count: null
   flags:
     # We don't want boot time samples to be affected from retrying, so don't
