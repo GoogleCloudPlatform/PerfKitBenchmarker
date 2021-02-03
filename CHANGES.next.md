@@ -48,6 +48,7 @@
 -   Added MSS support to netperf with `--netperf_mss`.
 -   Added nfs_service.NfsExport(vm, path) to easily NFS export a directory.
 -   AWS EFA works for Ubuntu1604.
+-   Add ability to specify version of Intel MKL with --mkl_version
 
 ### Bug fixes and maintenance updates:
 

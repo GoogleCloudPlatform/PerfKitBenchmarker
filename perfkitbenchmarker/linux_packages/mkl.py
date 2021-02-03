@@ -1,4 +1,4 @@
-# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ from perfkitbenchmarker.linux_packages import intel_repo
 MKL_DIR = '%s/MKL' % linux_packages.INSTALL_DIR
 MKL_TAG = 'l_mkl_2018.2.199'
 MKL_TGZ = 'l_mkl_2018.2.199.tgz'
-MKL_VERSION = '2018.2.199'
 # While some of the dependencies are "-199" the intel-mkl package is "-046"
 _MKL_VERSION_REPO = '2018.2-046'
 
@@ -44,12 +43,34 @@ _MKL_ROOT_2018 = '/opt/intel/compilers_and_libraries_2018/linux/mkl'
 # Command to source for Intel64 based VMs to set environment variables
 SOURCE_MKL_INTEL64_CMD = f'MKLVARS_ARCHITECTURE=intel64 . {_MKL_VARS_FILE}'
 
+MKL_VERSION = flags.DEFINE_string('mkl_version', _MKL_VERSION_REPO,
+                                  'Version of Intel MKL to use')
+
+FLAGS = flags.FLAGS
+
+
+def _UseMklRepo():
+  """Returns whether to use the Intel MKL repo or preprovisioned data.
+
+  Steps to determine if should use the Intel repos:
+  1. If the --mkl_install_from_repo is set then use that value
+  2. Use the Intel repo if the --mkl_version is set to a version other than the
+     one in preprovisioned data.
+  """
+  if FLAGS['mkl_install_from_repo'].present:
+    return USE_MKL_REPO.value
+  return MKL_VERSION.value != MKL_VERSION.default
+
 
 def _Install(vm):
   """Installs the MKL package on the VM."""
-  if USE_MKL_REPO.value:
-    vm.InstallPackages(f'intel-mkl-{_MKL_VERSION_REPO}')
+  if _UseMklRepo():
+    vm.InstallPackages(f'intel-mkl-{MKL_VERSION.value}')
   else:
+    if MKL_VERSION.value != MKL_VERSION.default:
+      # Need to check as caller expects to use the MKL version they specified
+      raise ValueError('To use preprovisioned data do not change '
+                       f'--mkl_version={MKL_VERSION.default}')
     _InstallFromPreprovisionedData(vm)
   # Restore the /opt/intel/mkl/bin/mklvars.sh symlink that is missing if
   # Intel MPI > 2018 installed.
@@ -89,6 +110,7 @@ def _CompileInterfaces(vm):
   Args:
     vm: Virtual Machine to compile on.
   """
+  vm.Install('build_tools')
   mpi_lib = 'openmpi'
   make_options = ('PRECISION=MKL_DOUBLE '
                   'interface=ilp64 '
@@ -102,13 +124,13 @@ def _CompileInterfaces(vm):
 
 def YumInstall(vm):
   """Installs the MKL package on the VM."""
-  if USE_MKL_REPO.value:
+  if _UseMklRepo():
     intel_repo.YumPrepare(vm)
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the MKL package on the VM."""
-  if USE_MKL_REPO.value:
+  if _UseMklRepo():
     intel_repo.AptPrepare(vm)
   _Install(vm)

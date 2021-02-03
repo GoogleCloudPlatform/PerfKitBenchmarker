@@ -352,7 +352,7 @@ def BaseMetadata() -> Dict[str, str]:
   if FLAGS.hpcc_benchmarks:
     metadata['hpcc_benchmarks'] = FLAGS.hpcc_benchmarks
   if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
-    metadata['math_library_version'] = mkl.MKL_VERSION
+    metadata['math_library_version'] = mkl.MKL_VERSION.value
   elif FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_OPEN_BLAS:
     metadata['math_library_version'] = openblas.GIT_TAG
   metadata['openmpi_version'] = FLAGS.openmpi_version
