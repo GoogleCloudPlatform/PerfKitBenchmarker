@@ -139,6 +139,13 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if FLAGS.gcp_dataproc_image:
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
+    # Ideally DpbServiceSpec would have a network spec, which we would create to
+    # Resolve the name, but because EMR provisions its own VPC and we are
+    # generally happy using pre-existing networks for Dataproc. Just use the
+    # underlying flag instead.
+    if FLAGS.gce_network_name:
+      cmd.flags['network'] = FLAGS.gce_network_name
+
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min
