@@ -1355,7 +1355,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     In addition, to consolidate reboots during VM prepare, this method sets the
     needs reboot bit instead of immediately rebooting.
     """
-    if FLAGS.disable_smt:
+    if FLAGS.disable_smt and self.CheckLsCpu().threads_per_core != 1:
       FLAGS.append_kernel_command_line = ' '.join(
           (FLAGS.append_kernel_command_line,
            'nosmt')) if FLAGS.append_kernel_command_line else 'nosmt'
