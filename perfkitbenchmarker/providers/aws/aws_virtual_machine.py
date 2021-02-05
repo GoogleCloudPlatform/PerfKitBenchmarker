@@ -782,6 +782,18 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s' %
         util.FormatTagSpecifications('instance', tags)]
+    if FLAGS.disable_smt:
+      query_cmd = util.AWS_PREFIX + [
+          'ec2',
+          'describe-instance-types',
+          '--instance-types',
+          self.machine_type,
+          '--query',
+          'InstanceTypes[0].VCpuInfo.DefaultCores'
+      ]
+      stdout, _, retcode = vm_util.IssueCommand(query_cmd)
+      cores = int(json.loads(stdout))
+      create_cmd.append(f'--cpu-options=CoreCount={cores},ThreadsPerCore=1')
     if FLAGS.aws_efa:
       efas = ['--network-interfaces']
       for device_index in range(FLAGS.aws_efa_count):
