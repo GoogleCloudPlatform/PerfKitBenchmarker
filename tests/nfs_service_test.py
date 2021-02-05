@@ -144,6 +144,26 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertLen(vm.RemoteCommand.call_args_list, 1)
     vm.RemoteCommand.assert_called_with('sudo systemctl restart nfs-server')
 
+  def testNfsExportAndMount(self):
+    mock_nfs_create = self.enter_context(
+        mock.patch.object(nfs_service, 'UnmanagedNfsService'))
+    headnode = mock.Mock(internal_ip='10.0.1.11')
+    vm1 = mock.Mock(user_name='perfkit')
+    vm2 = mock.Mock(user_name='perfkit')
+
+    nfs_service.NfsExportAndMount([headnode, vm1, vm2], '/client_path',
+                                  '/server_path')
+
+    mock_nfs_create.assert_called_with(None, headnode, False, '/server_path')
+    mount_cmd = (
+        'sudo mkdir -p /client_path; '
+        'sudo chown perfkit /client_path; '
+        'echo "10.0.1.11:/server_path /client_path nfs defaults 0 0\n" '
+        '| sudo tee -a /etc/fstab; sudo mount -a')
+    for vm in (vm1, vm2):
+      vm.Install.assert_called_with('nfs_utils')
+      vm.RemoteCommand.assert_called_with(mount_cmd)
+
 
 if __name__ == '__main__':
   unittest.main()

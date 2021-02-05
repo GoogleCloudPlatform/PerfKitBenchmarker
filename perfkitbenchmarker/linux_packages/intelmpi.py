@@ -15,11 +15,15 @@
 
 import logging
 from absl import flags
+from perfkitbenchmarker import nfs_service
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import intel_repo
 
 MPI_VERSION = flags.DEFINE_string('intelmpi_version', '2019.6-088',
                                   'MPI version.')
 FLAGS = flags.FLAGS
+
+_INTEL_ROOT = '/opt/intel'
 
 
 def MpiVars(vm) -> str:
@@ -32,8 +36,9 @@ def MpiVars(vm) -> str:
   Args:
     vm: Virtual machine to look for mpivars.sh on.
   """
-  txt, _ = vm.RemoteCommand('readlink -f /opt/intel/compilers_and_libraries*/'
-                            'linux/mpi/intel64/bin/mpivars.sh | sort | uniq')
+  txt, _ = vm.RemoteCommand(
+      f'readlink -f {_INTEL_ROOT}/compilers_and_libraries*/'
+      'linux/mpi/intel64/bin/mpivars.sh | sort | uniq')
   files = txt.splitlines()
   if not files:
     raise ValueError('Could not find the mpivars.sh file')
@@ -93,3 +98,32 @@ def YumInstall(vm) -> None:
   """Installs the MPI library."""
   intel_repo.YumPrepare(vm)
   _Install(vm, MPI_VERSION.value)
+
+
+def TestInstall(vms) -> None:
+  """Tests the MPI install.
+
+  Args:
+    vms: List of VMs in the cluster.
+  """
+  hosts = ','.join([vm.internal_ip for vm in vms])
+  mpirun_cmd = f'mpirun -n {len(vms)} -ppn 1 -hosts {hosts} hostname'
+  txt, _ = vms[0].RemoteCommand(f'{SourceMpiVarsCommand(vms[0])}; {mpirun_cmd}')
+  hosts = sorted(set(txt.splitlines()))
+  expected_hosts = sorted([vm.name for vm in vms])
+  if hosts != expected_hosts:
+    raise ValueError(f'Expected hosts {expected_hosts} but have {hosts}')
+  logging.info('Hosts: %s', ','.join(hosts))
+
+
+def NfsExportIntelDirectory(vms) -> None:
+  """NFS exports the /opt/intel from the headnode to the workers.
+
+  Args:
+    vms: List of VMs.  The first one is the headnode, the remainder will NFS
+      mount the /opt/intel drive from the headnode.
+  """
+  nfs_service.NfsExportAndMount(vms, _INTEL_ROOT)
+  # Still need to have clients ulimit and ptrace fixed
+  vm_util.RunThreaded(FixEnvironment, vms[1:])
+  TestInstall(vms)

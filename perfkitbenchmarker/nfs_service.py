@@ -45,6 +45,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('nfs_tier', None, 'NFS Mode')
 flags.DEFINE_string('nfs_version', None, 'NFS Version')
@@ -214,3 +215,38 @@ def NfsExport(server_vm, local_disk_path):
   """NFS exports the directory on the VM."""
   service = UnmanagedNfsService(None, server_vm, False, local_disk_path)
   service.Create()
+
+
+def NfsMount(server_ip, client_vm, client_path, server_path=None) -> None:
+  """NFS mounts the server's path on the client.
+
+  Args:
+    server_ip: IP address of the NFS server.
+    client_vm: The VM that will mount the NFS server's exported directory.
+    client_path: The mount point on the client.
+    server_path: The NFS exported directory on the server.  Defaults to the same
+      as the client_path.
+  """
+  client_vm.Install('nfs_utils')
+  fstab_line = (f'{server_ip}:{server_path or client_path} '
+                f'{client_path} nfs defaults 0 0')
+  client_vm.RemoteCommand(f'sudo mkdir -p {client_path}; '
+                          f'sudo chown {client_vm.user_name} {client_path}; '
+                          f'echo "{fstab_line}\n" | sudo tee -a /etc/fstab; '
+                          'sudo mount -a')
+
+
+def NfsExportAndMount(vms, client_path, server_path=None) -> None:
+  """NFS exports from the first VM to the others.
+
+  Args:
+    vms: List of VMs.  First is the NFS server, the others will mount it.
+    client_path: The path on the client to mount the NFS export.
+    server_path: The path on the server to export.  Default is the same as the
+      client_path
+  """
+  nfs_server, clients = vms[0], vms[1:]
+  NfsExport(nfs_server, server_path or client_path)
+  vm_util.RunThreaded(
+      lambda vm: NfsMount(nfs_server.internal_ip, vm, client_path, server_path),
+      clients)
