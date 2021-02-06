@@ -227,6 +227,55 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertArgumentInCommand(cmd, '--tags Key=timeout_utc,Value=60')
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'OnlyRcu',
+          'rcu': 5,
+          'wcu': 500,
+      }, {
+          'testcase_name': 'OnlyWcu',
+          'rcu': 500,
+          'wcu': 5,
+      }, {
+          'testcase_name': 'Both',
+          'rcu': 500,
+          'wcu': 500,
+      })
+  def testFreezeLowersThroughputToFreeTier(self, rcu, wcu):
+    test_instance = GetTestDynamoDBInstance()
+    self.enter_context(
+        mock.patch.object(
+            test_instance, '_GetThroughput', return_value=(rcu, wcu)))
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(test_instance, '_SetThroughput', autospec=True))
+
+    test_instance._Freeze()
+
+    mock_set_throughput.assert_called_once_with(
+        rcu=aws_dynamodb._FREE_TIER_RCU, wcu=aws_dynamodb._FREE_TIER_WCU)
+
+  def testFreezeDoesNotLowerThroughputIfAlreadyAtFreeTier(self):
+    test_instance = GetTestDynamoDBInstance()
+    self.enter_context(
+        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(test_instance, '_SetThroughput', autospec=True))
+
+    test_instance._Freeze()
+
+    mock_set_throughput.assert_not_called()
+
+  def testRestoreSetsThroughputBackToOriginalLevels(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.rcu = 5000
+    test_instance.wcu = 1000
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(test_instance, '_SetThroughput', autospec=True))
+
+    test_instance._Restore()
+
+    mock_set_throughput.assert_called_once_with(
+        rcu=5000, wcu=1000)
 
 if __name__ == '__main__':
   unittest.main()

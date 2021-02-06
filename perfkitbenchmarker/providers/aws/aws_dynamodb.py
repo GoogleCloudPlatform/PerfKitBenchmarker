@@ -73,6 +73,10 @@ flags.DEFINE_integer('aws_dynamodb_connectMax', 50,
                      'Maximum number of concurrent dynamodb connections. '
                      'Defaults to 50.')
 
+# Throughput constants
+_FREE_TIER_RCU = 25
+_FREE_TIER_WCU = 25
+
 
 class _GetIndexes():
   """Used to create secondary indexes."""
@@ -324,3 +328,23 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     logging.info('Updating timeout tags on table %s with timeout minutes %s',
                  self.table_name, timeout_minutes)
     util.IssueRetryableCommand(cmd)
+
+  def _Freeze(self) -> None:
+    """See base class.
+
+    Lowers provisioned throughput to free-tier levels. There is a limit to how
+    many times throughput on a table may by lowered per day. See:
+    https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ProvisionedThroughput.html.
+    """
+    # Check that we actually need to lower before issuing command.
+    rcu, wcu = self._GetThroughput()
+    if rcu > _FREE_TIER_RCU or wcu > _FREE_TIER_WCU:
+      logging.info('(rcu=%s, wcu=%s) is higher than free tier.', rcu, wcu)
+      self._SetThroughput(rcu=_FREE_TIER_RCU, wcu=_FREE_TIER_WCU)
+
+  def _Restore(self) -> None:
+    """See base class.
+
+    Restores provisioned throughput back to benchmarking levels.
+    """
+    self._SetThroughput(self.rcu, self.wcu)

@@ -58,6 +58,24 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertIn('--nodes 3', ' '.join(cmd.call_args[0][0]))
 
+  def testFreezeUsesCorrectNodeCount(self):
+    instance = GetTestSpannerInstance()
+    mock_set_nodes = self.enter_context(
+        mock.patch.object(instance, '_SetNodes', autospec=True))
+
+    instance._Freeze()
+
+    mock_set_nodes.assert_called_once_with(gcp_spanner._FROZEN_NODE_COUNT)
+
+  def testRestoreUsesCorrectNodeCount(self):
+    instance = GetTestSpannerInstance()
+    instance._nodes = 5
+    mock_set_nodes = self.enter_context(
+        mock.patch.object(instance, '_SetNodes', autospec=True))
+
+    instance._Restore()
+
+    mock_set_nodes.assert_called_once_with(5)
 
 if __name__ == '__main__':
   unittest.main()

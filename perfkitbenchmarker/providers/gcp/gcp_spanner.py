@@ -52,6 +52,7 @@ _DEFAULT_DDL = """
   ) PRIMARY KEY(id)
   """
 _DEFAULT_NODES = 1
+_FROZEN_NODE_COUNT = 1
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -286,6 +287,27 @@ class GcpSpannerInstance(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'update', self.name)
     cmd.flags['nodes'] = nodes
     cmd.Issue(raise_on_failure=True)
+
+  def _Restore(self) -> None:
+    """See base class.
+
+    Increases the number of nodes on the instance to the specified number.  See
+    https://cloud.google.com/spanner/pricing for Spanner pricing info.
+    """
+    self._SetNodes(self._nodes)
+
+  def _Freeze(self) -> None:
+    """See base class.
+
+    Lowers the number of nodes on the instance to one. Note there are
+    restrictions to being able to lower the number of nodes on an instance. See
+    https://cloud.google.com/spanner/docs/create-manage-instances.
+    """
+    self._SetNodes(_FROZEN_NODE_COUNT)
+
+  def _UpdateTimeout(self, timeout_minutes: int) -> None:
+    """See base class."""
+    pass
 
 
 def GetSpannerClass(

@@ -18,17 +18,16 @@ The Resource class wraps unreliable create and delete commands in retry loops
 and checks for resource existence so that resources can be created and deleted
 reliably.
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import abc
+import logging
 import time
+from typing import List
 
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-import six
+
+FLAGS = flags.FLAGS
 
 _RESOURCE_REGISTRY = {}
 
@@ -56,6 +55,10 @@ def GetResourceClass(base_class, **kwargs):
 class AutoRegisterResourceMeta(abc.ABCMeta):
   """Metaclass which allows resources to automatically be registered."""
 
+  # See BaseResource
+  RESOURCE_TYPE: str
+  REQUIRED_ATTRS: List[str]
+
   def __init__(cls, name, bases, dct):
     if (all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS) and
         cls.RESOURCE_TYPE):
@@ -72,12 +75,22 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
     super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
 
 
-class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
+class BaseResource(metaclass=AutoRegisterResourceMeta):
   """An object representing a cloud resource.
 
   Attributes:
     created: True if the resource has been created.
-    pkb_managed: Whether the resource is managed (created and deleted) by PKB.
+    deleted: True if the resource has been deleted.
+    user_managed: Whether Create() and Delete() should be skipped.
+    frozen: Whether the resource is currently in a frozen state.
+    delete_on_freeze_error: Whether the resource should delete itself when
+      there is an issue during Freeze().
+    create_start_time: The start time of the last create.
+    delete_start_time: The start time of the last delete.
+    create_end_time: The end time of the last create.
+    delete_end_time: The end time of the last delete.
+    resource_ready_time: The time when the resource last became ready.
+    metadata: Dictionary of resource metadata.
   """
 
   # The name of the base class (e.g. BaseVirtualMachine) that will be extended
@@ -92,11 +105,13 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
   # Time between retries.
   POLL_INTERVAL = 5
 
-  def __init__(self, user_managed=False):
+  def __init__(self, user_managed=False, delete_on_freeze_error: bool = False):
     super(BaseResource, self).__init__()
     self.created = user_managed
     self.deleted = user_managed
     self.user_managed = user_managed
+    self.frozen: bool = False
+    self.delete_on_freeze_error: bool = delete_on_freeze_error
 
     # Creation and deletion time information
     # that we may make use of later.
@@ -114,6 +129,31 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
   @abc.abstractmethod
   def _Create(self):
     """Creates the underlying resource."""
+    raise NotImplementedError()
+
+  def _Restore(self) -> None:
+    """Restores the underlying resource from a file.
+
+    This method is required if using Restore() with a resource.
+    """
+    raise NotImplementedError()
+
+  def _Freeze(self) -> None:
+    """Freezes the underlying resource to a long-term, sustainable state.
+
+    This method is required if using Restore() with a resource.
+    """
+    raise NotImplementedError()
+
+  def _UpdateTimeout(self, timeout_minutes: int) -> None:
+    """Updates the underlying resource's timeout after a successful freeze.
+
+    This method is required if using Freeze()/Restore() with a resource.
+
+    Args:
+      timeout_minutes: The number of minutes past the current time at which the
+        resource should be considered expired.
+    """
     raise NotImplementedError()
 
   @abc.abstractmethod
@@ -241,9 +281,29 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
     except NotImplementedError:
       pass
 
-  def Create(self):
-    """Creates a resource and its dependencies."""
+  def Restore(self) -> None:
+    """Restores a resource instead of creating it.
 
+    Raises:
+      RestoreError: Generic error encompassing restore failures.
+    """
+    logging.info('Restoring resource %s.', repr(self))
+
+    try:
+      self._Restore()
+    except NotImplementedError as e:
+      raise errors.Resource.RestoreError(
+          f'Class {self.__class__} does not have _Restore() implemented but a '
+          'restore file was provided.') from e
+    except Exception as e:
+      raise errors.Resource.RestoreError('Error restoring resource '
+                                         f'{repr(self)}') from e
+
+    self.frozen = False
+    self.UpdateTimeout(FLAGS.timeout_minutes)
+
+  def Create(self, restore: bool = False) -> None:
+    """Creates a resource and its dependencies."""
     @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
                    timeout=self.READY_TIMEOUT,
                    retryable_exceptions=(
@@ -254,6 +314,11 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
 
     if self.user_managed:
       return
+
+    if restore:
+      self.Restore()
+      return
+
     self._CreateDependencies()
     self._CreateResource()
     WaitUntilReady()
@@ -261,13 +326,63 @@ class BaseResource(six.with_metaclass(AutoRegisterResourceMeta, object)):
       self.resource_ready_time = time.time()
     self._PostCreate()
 
-  def Delete(self):
-    """Deletes a resource and its dependencies."""
+  def Freeze(self) -> None:
+    """Freezes a resource instead of deleting it.
 
+    Raises:
+      FreezeError: Generic error encompassing freeze failures.
+    """
+    logging.info('Freezing resource %s.', repr(self))
+    # Attempt to call freeze, failing if unimplemented.
+    try:
+      self._Freeze()
+    except NotImplementedError as e:
+      raise errors.Resource.FreezeError(
+          f'Class {self.__class__} does not have _Freeze() implemented but '
+          'Freeze() was called.') from e
+    except Exception as e:
+      raise errors.Resource.FreezeError(
+          f'Error freezing resource {repr(self)}') from e
+
+    # If frozen successfully, attempt to update the timeout.
+    self.frozen = True
+    self.UpdateTimeout(FLAGS.persistent_timeout_minutes)
+
+  def Delete(self, freeze: bool = False) -> None:
+    """Deletes a resource and its dependencies."""
     if self.user_managed:
       return
+    if freeze:
+      try:
+        self.Freeze()
+        return
+      except errors.Resource.FreezeError:
+        logging.exception(
+            'Encountered an exception while attempting to Freeze(). '
+            'Deleting: %s', self.delete_on_freeze_error)
+        if not self.delete_on_freeze_error:
+          return
     self._PreDelete()
     self._DeleteResource()
     self.deleted = True
     self.delete_end_time = time.time()
     self._DeleteDependencies()
+
+  def UpdateTimeout(self, timeout_minutes: int) -> None:
+    """Updates the timeout of the underlying resource.
+
+    Args:
+      timeout_minutes: The number of minutes past the current time at which the
+        resource should be considered expired.
+
+    Raises:
+      NotImplementedError: If the resource has not implemented _UpdateTimeout().
+    """
+    logging.info('Updating timeout for %s.', repr(self))
+    try:
+      self._UpdateTimeout(timeout_minutes)
+    except NotImplementedError:
+      logging.exception(
+          'Class %s does not have _UpdateTimeout() implemented, which is '
+          'needed for Freeze(). Please add an implementation.', self.__class__)
+      raise

@@ -66,6 +66,7 @@ import json
 import logging
 import multiprocessing
 from os.path import isfile
+import pickle
 import random
 import re
 import sys
@@ -174,6 +175,10 @@ flags.DEFINE_boolean('always_teardown_on_exception', False, 'Whether to tear '
                      'down VMs when there is exception during the PKB run. If'
                      'enabled, VMs will be torn down even if FLAGS.run_stage '
                      'does not specify teardown.')
+_RESTORE_PATH = flags.DEFINE_string('restore', None,
+                                    'Path to restore resources from.')
+_FREEZE_PATH = flags.DEFINE_string('freeze', None,
+                                   'Path to freeze resources to.')
 
 
 def GetCurrentUser():
@@ -608,6 +613,22 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
     status_file.write(json.dumps(status_dict) + '\n')
 
 
+def _SetRestoreSpec(spec: benchmark_spec.BenchmarkSpec) -> None:
+  """Unpickles the spec to restore resources from, if provided."""
+  restore_path = _RESTORE_PATH.value
+  if restore_path:
+    logging.info('Using restore spec at path: %s', restore_path)
+    with open(restore_path, 'rb') as spec_file:
+      spec.restore_spec = pickle.load(spec_file)
+
+
+def _SetFreezePath(spec: benchmark_spec.BenchmarkSpec) -> None:
+  """Sets the path to freeze resources to if provided."""
+  if _FREEZE_PATH.value:
+    spec.freeze_path = _FREEZE_PATH.value
+    logging.info('Using freeze path, %s', spec.freeze_path)
+
+
 def DoProvisionPhase(spec, timer):
   """Performs the Provision phase of benchmark execution.
 
@@ -832,6 +853,8 @@ def DoTeardownPhase(spec, timer):
   """
   logging.info('Tearing down resources for benchmark %s', spec.name)
 
+  spec.Freeze()
+
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 
@@ -905,6 +928,10 @@ def RunBenchmark(spec, collector):
       interrupt_checker = None
       try:
         with end_to_end_timer.Measure('End to End'):
+
+          _SetRestoreSpec(spec)
+          _SetFreezePath(spec)
+
           if stages.PROVISION in FLAGS.run_stage:
             DoProvisionPhase(spec, detailed_timer)
 

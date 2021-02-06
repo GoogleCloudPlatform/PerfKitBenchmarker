@@ -210,6 +210,14 @@ class Resource(object):
   class SubclassNotFoundError(Error):
     pass
 
+  class RestoreError(Error):
+    """Errors while restoring a resource."""
+    pass
+
+  class FreezeError(Error):
+    """Errors while freezing a resource."""
+    pass
+
 
 class Config(object):
   """Errors related to configs."""
