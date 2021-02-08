@@ -111,8 +111,11 @@ def TestInstall(vms) -> None:
   txt, _ = vms[0].RemoteCommand(f'{SourceMpiVarsCommand(vms[0])}; {mpirun_cmd}')
   hosts = sorted(set(txt.splitlines()))
   expected_hosts = sorted([vm.name for vm in vms])
-  if hosts != expected_hosts:
-    raise ValueError(f'Expected hosts {expected_hosts} but have {hosts}')
+  # In AWS the hostname 'pkb-<run_uri>-0' does not match the returned hostname
+  # 'ip-<ip_addr>.<zone>.compute.internal so just check number of responses
+  if len(hosts) != len(expected_hosts):
+    raise ValueError(
+        f'Expected hosts {len(expected_hosts)} but have {len(hosts)}')
   logging.info('Hosts: %s', ','.join(hosts))
 
 
