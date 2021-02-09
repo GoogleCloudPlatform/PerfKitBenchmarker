@@ -175,6 +175,7 @@ def WarnAndCopyFlag(old_name, new_name):
 DISK_FLAGS_TO_TRANSLATE = {
     'scratch_disk_type': 'data_disk_type',
     'scratch_disk_iops': 'aws_provisioned_iops',
+    'scratch_disk_throughput': 'aws_provisioned_throughput',
     'scratch_disk_size': 'data_disk_size'
 }
 

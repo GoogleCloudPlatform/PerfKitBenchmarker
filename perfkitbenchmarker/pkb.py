@@ -231,6 +231,8 @@ flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
 flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
 flags.DEFINE_integer('scratch_disk_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
+flags.DEFINE_integer('scratch_disk_throughput', None,
+                     'Throughput (MB/s) for volumes in AWS.')
 flags.DEFINE_integer('num_striped_disks', None,
                      'The number of data disks to stripe together to form one '
                      '"logical" data disk. This defaults to 1 '

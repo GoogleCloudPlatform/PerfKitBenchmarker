@@ -33,25 +33,28 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsNone(spec.disk_size)
     self.assertIsNone(spec.disk_type)
     self.assertIsNone(spec.iops)
+    self.assertIsNone(spec.throughput)
     self.assertIsNone(spec.mount_point)
     self.assertEqual(spec.num_striped_disks, 1)
 
   def testProvidedValid(self):
     spec = aws_disk.AwsDiskSpec(
         _COMPONENT, device_path='test_device_path', disk_number=1,
-        disk_size=75, disk_type='test_disk_type', iops=1000,
+        disk_size=75, disk_type='test_disk_type', iops=1000, throughput=100,
         mount_point='/mountpoint', num_striped_disks=2)
     self.assertEqual(spec.device_path, 'test_device_path')
     self.assertEqual(spec.disk_number, 1)
     self.assertEqual(spec.disk_size, 75)
     self.assertEqual(spec.disk_type, 'test_disk_type')
     self.assertEqual(spec.iops, 1000)
+    self.assertEqual(spec.throughput, 100)
     self.assertEqual(spec.mount_point, '/mountpoint')
     self.assertEqual(spec.num_striped_disks, 2)
 
   def testProvidedNone(self):
-    spec = aws_disk.AwsDiskSpec(_COMPONENT, iops=None)
+    spec = aws_disk.AwsDiskSpec(_COMPONENT, iops=None, throughput=None)
     self.assertIsNone(spec.iops)
+    self.assertIsNone(spec.throughput)
 
   def testInvalidOptionTypes(self):
     with self.assertRaises(errors.Config.InvalidValue):
@@ -59,17 +62,23 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNonPresentFlagsDoNotOverrideConfigs(self):
     FLAGS.aws_provisioned_iops = 2000
+    FLAGS.aws_provisioned_throughput = 200
     FLAGS.data_disk_size = 100
-    spec = aws_disk.AwsDiskSpec(_COMPONENT, FLAGS, disk_size=75, iops=1000)
+    spec = aws_disk.AwsDiskSpec(
+        _COMPONENT, FLAGS, disk_size=75, iops=1000, throughput=150)
     self.assertEqual(spec.disk_size, 75)
     self.assertEqual(spec.iops, 1000)
+    self.assertEqual(spec.throughput, 150)
 
   def testPresentFlagsOverrideConfigs(self):
     FLAGS['aws_provisioned_iops'].parse(2000)
+    FLAGS['aws_provisioned_throughput'].parse(200)
     FLAGS['data_disk_size'].parse(100)
-    spec = aws_disk.AwsDiskSpec(_COMPONENT, FLAGS, disk_size=75, iops=1000)
+    spec = aws_disk.AwsDiskSpec(
+        _COMPONENT, FLAGS, disk_size=75, iops=1000, throughput=150)
     self.assertEqual(spec.disk_size, 100)
     self.assertEqual(spec.iops, 2000)
+    self.assertEqual(spec.throughput, 200)
 
 
 if __name__ == '__main__':

@@ -21,6 +21,8 @@ flags.DEFINE_string(
     'attempt to use. Defaults are OS specific.')
 flags.DEFINE_integer('aws_provisioned_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
+flags.DEFINE_integer('aws_provisioned_throughput', None,
+                     'Provisioned throughput (MB/s) for (SSD) volumes in AWS.')
 
 flags.DEFINE_string('aws_dax_node_type', 'dax.r4.large',
                     'The node type used for creating AWS DAX cluster.')

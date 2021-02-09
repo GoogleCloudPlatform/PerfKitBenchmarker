@@ -355,7 +355,7 @@ useful ones. (Many cloud providers have more disk types beyond these options.)
 Cloud name | Network-attached SSD | Network-attached HDD
 ---------- | -------------------- | --------------------
 GCP        | pd-ssd               | pd-standard
-AWS        | gp2                  | standard
+AWS        | gp3                  | st1
 Azure      | Premium_LRS          | Standard_LRS
 Rackspace  | cbs-ssd              | cbs-sata
 
