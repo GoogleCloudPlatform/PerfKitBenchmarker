@@ -30,5 +30,23 @@ eight cloud providers: Google Cloud Platform, Amazon Web Services,
 DigitalOcean, Microsoft Azure, Rackspace, Kubernetes, OpenStack, AliCloud and
 local environment.
 
+# Where is it being used?
+
+*   [Cloud Network Performance Benchmarking](https://cloud.google.com/blog/products/networking/perfkit-benchmarker-for-evaluating-cloud-network-performance)
+*   [On-prem vs Cloud benchmarking](https://cloud.google.com/solutions/resource-mappings-from-on-premises-hardware-to-gcp#end-to-end_performance_benchmarking)
+*   [GCP VM Performance](https://cloud.google.com/compute/docs/benchmarks-windows?hl=no#how_google_creates_these_benchmarks)
+    and
+    [Comparisons](https://cloud.google.com/free/docs/measure-compare-performance)
+
 ## Talk to us!
-You can open a GitHub issue [here]("https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues/new")
+
+You can open a GitHub issue
+[here](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues/new).
+
+## Contributing
+
+Thanks to our
+[contributors](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/graphs/contributors)!
+If you would like to contribute to PKB, please view
+[this](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
+document.
