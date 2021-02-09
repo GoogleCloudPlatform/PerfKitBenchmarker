@@ -348,7 +348,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
-      result = self._IsStepDone(step_id)
+      # TODO(user) force None as _IsStepDone was removed but this
+      # callsite was not updated.  Fix pending.
+      # result = self._IsStepDone(step_id)
+      result = None
       if result is None:
         raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
