@@ -14,6 +14,7 @@
 
 """Module containing Intel MKL installation and cleanup functions."""
 
+import logging
 from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import intel_repo
@@ -31,14 +32,12 @@ _MKL_VERSION_REPO = '2018.2-046'
 BENCHMARK_NAME = 'hpcc'
 
 # Default installs MKL as it was previously done via preprovisioned data
-USE_MKL_REPO = flags.DEFINE_bool('mkl_install_from_repo', False,
-                                 'Whether to install MKL from the Intel repo.')
+_USE_MKL_REPO = flags.DEFINE_bool(
+    'mkl_install_from_repo', False,
+    'Whether to install MKL from the Intel repo.')
 
 # File contains MKL specific environment variables
 _MKL_VARS_FILE = '/opt/intel/mkl/bin/mklvars.sh'
-
-# Dedicated path to the MKL 2018 root directory
-_MKL_ROOT_2018 = '/opt/intel/compilers_and_libraries_2018/linux/mkl'
 
 # Command to source for Intel64 based VMs to set environment variables
 SOURCE_MKL_INTEL64_CMD = f'MKLVARS_ARCHITECTURE=intel64 . {_MKL_VARS_FILE}'
@@ -49,7 +48,7 @@ MKL_VERSION = flags.DEFINE_string('mkl_version', _MKL_VERSION_REPO,
 FLAGS = flags.FLAGS
 
 
-def _UseMklRepo():
+def UseMklRepo():
   """Returns whether to use the Intel MKL repo or preprovisioned data.
 
   Steps to determine if should use the Intel repos:
@@ -58,26 +57,38 @@ def _UseMklRepo():
      one in preprovisioned data.
   """
   if FLAGS['mkl_install_from_repo'].present:
-    return USE_MKL_REPO.value
+    if not _USE_MKL_REPO.value and MKL_VERSION.value != MKL_VERSION.default:
+      # Need to check as caller expects to use the MKL version they specified
+      raise ValueError('To use preprovisioned data do not change '
+                       f'--mkl_version={MKL_VERSION.default}')
+    return _USE_MKL_REPO.value
   return MKL_VERSION.value != MKL_VERSION.default
 
 
 def _Install(vm):
   """Installs the MKL package on the VM."""
-  if _UseMklRepo():
+  if UseMklRepo():
     vm.InstallPackages(f'intel-mkl-{MKL_VERSION.value}')
   else:
-    if MKL_VERSION.value != MKL_VERSION.default:
-      # Need to check as caller expects to use the MKL version they specified
-      raise ValueError('To use preprovisioned data do not change '
-                       f'--mkl_version={MKL_VERSION.default}')
     _InstallFromPreprovisionedData(vm)
   # Restore the /opt/intel/mkl/bin/mklvars.sh symlink that is missing if
   # Intel MPI > 2018 installed.
   if not vm.TryRemoteCommand(f'test -e {_MKL_VARS_FILE}'):
-    if vm.TryRemoteCommand(f'test -d {_MKL_ROOT_2018}'):
-      vm.RemoteCommand(f'sudo ln -s {_MKL_ROOT_2018} /opt/intel/mkl')
+    txt, _ = vm.RemoteCommand('realpath /opt/intel/*/linux/mkl | sort | uniq')
+    vm.RemoteCommand(f'sudo ln -s {txt.strip()} /opt/intel/mkl')
+  _LogEnvVariables(vm)
   _CompileInterfaces(vm)
+
+
+def _LogEnvVariables(vm):
+  """Logs the MKL associated environment variables."""
+  env_vars = []
+  for env_var in ('CPATH', 'LD_LIBRARY_PATH', 'MKLROOT', 'NLSPATH',
+                  'PKG_CONFIG_PATH'):
+    txt, _ = vm.RemoteCommand(
+        f'{SOURCE_MKL_INTEL64_CMD}; echo ${env_var}', should_log=False)
+    env_vars.append(f'{env_var}={txt.strip()}')
+  logging.info('MKL environment variables: %s', ' '.join(env_vars))
 
 
 def _InstallFromPreprovisionedData(vm):
@@ -124,13 +135,13 @@ def _CompileInterfaces(vm):
 
 def YumInstall(vm):
   """Installs the MKL package on the VM."""
-  if _UseMklRepo():
+  if UseMklRepo():
     intel_repo.YumPrepare(vm)
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the MKL package on the VM."""
-  if _UseMklRepo():
+  if UseMklRepo():
     intel_repo.AptPrepare(vm)
   _Install(vm)
