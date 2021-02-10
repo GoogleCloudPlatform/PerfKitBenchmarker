@@ -317,9 +317,16 @@ class BaseRelationalDb(resource.BaseResource):
             self.spec.vm_groups['clients'].disk_spec.disk_type,
         'client_vm_disk_size':
             self.spec.vm_groups['clients'].disk_spec.disk_size,
-        'unmanaged_db_innodb_buffer_pool_size_gb': self.innodb_buffer_pool_size,
-        'unmanaged_db_innodb_log_file_size_mb': self.innodb_log_file_size,
     }
+
+    if not self.is_managed_db:
+      metadata.update({
+          'unmanaged_db_innodb_buffer_pool_size_gb':
+              self.innodb_buffer_pool_size,
+          'unmanaged_db_innodb_log_file_size_mb':
+              self.innodb_log_file_size,
+      })
+
     if (hasattr(self.spec.db_spec, 'machine_type') and
         self.spec.db_spec.machine_type):
       metadata.update({
