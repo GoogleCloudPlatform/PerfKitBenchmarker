@@ -119,6 +119,7 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     super(_BenchmarkSpecTestCase, self).setUp()
     FLAGS.cloud = providers.GCP
     FLAGS.temp_dir = 'tmp'
+    FLAGS.ignore_package_requirements = True
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
