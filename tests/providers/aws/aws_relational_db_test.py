@@ -336,6 +336,8 @@ class AwsRelationalDbTestCase(unittest.TestCase):
                      autospec=True)
   def testCreateUnmanagedDb(self, rule_check_mock):  # pylint: disable=unused-argument
     FLAGS['use_managed_db'].parse(False)
+    FLAGS['innodb_buffer_pool_size'].parse(100)
+    FLAGS['innodb_log_file_size'].parse(1000)
     FLAGS['default_timeout'].parse(300)
     with self._PatchCriticalObjects() as issue_command:
       db = self.CreateDbFromSpec()

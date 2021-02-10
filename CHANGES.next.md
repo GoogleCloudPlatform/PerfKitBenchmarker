@@ -49,8 +49,10 @@
 -   Added MSS support to netperf with `--netperf_mss`.
 -   Added nfs_service.NfsExport(vm, path) to easily NFS export a directory.
 -   AWS EFA works for Ubuntu1604.
+-   Added support for MySQL 8.0 on VMs and minimal innodb tuning.
 -   Add ability to specify version of Intel MKL with --mkl_version
 -   Added intelmpi.NfsExportIntelDirectory to NFS export /opt/intel
+
 
 ### Bug fixes and maintenance updates:
 

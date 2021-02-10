@@ -83,6 +83,12 @@ flags.DEFINE_list(
     'mysql_flags', '', 'Flags to apply to the implementation of '
     'MySQL on the cloud that\'s being used. Example: '
     'binlog_cache_size=4096,innodb_log_buffer_size=4294967295')
+flags.DEFINE_integer(
+    'innodb_buffer_pool_size', None,
+    'Size of the innodb buffer pool size in GB. '
+    'Defaults to #CPUs G if unset')
+flags.DEFINE_integer('innodb_log_file_size', 1000,
+                     'Size of the log file in MB. Defaults to 1000M.')
 
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
@@ -191,6 +197,8 @@ class BaseRelationalDb(resource.BaseResource):
       self.endpoint = ''
       self.spec.database_username = 'root'
       self.spec.database_password = 'perfkitbenchmarker'
+      self.innodb_buffer_pool_size = FLAGS.innodb_buffer_pool_size
+      self.innodb_log_file_size = FLAGS.innodb_log_file_size
       self.is_managed_db = False
     else:
       self.is_managed_db = True
@@ -240,6 +248,8 @@ class BaseRelationalDb(resource.BaseResource):
                                vm_groups else 'default'][0]
     if not self.is_managed_db and 'servers' in vm_groups:
       self.server_vm = vm_groups['servers'][0]
+      if not self.innodb_buffer_pool_size:
+        self.innodb_buffer_pool_size = self.server_vm.NumCpusForBenchmark()
     # TODO(jerlawson): Enable replications.
 
   def MakePsqlConnectionString(self, database_name):
@@ -307,6 +317,8 @@ class BaseRelationalDb(resource.BaseResource):
             self.spec.vm_groups['clients'].disk_spec.disk_type,
         'client_vm_disk_size':
             self.spec.vm_groups['clients'].disk_spec.disk_size,
+        'unmanaged_db_innodb_buffer_pool_size_gb': self.innodb_buffer_pool_size,
+        'unmanaged_db_innodb_log_file_size_mb': self.innodb_log_file_size,
     }
     if (hasattr(self.spec.db_spec, 'machine_type') and
         self.spec.db_spec.machine_type):
@@ -387,9 +399,12 @@ class BaseRelationalDb(resource.BaseResource):
     elif (self.spec.engine_version == '5.7' or
           self.spec.engine_version.startswith('5.7.')):
       mysql_name = 'mysql57'
+    elif (self.spec.engine_version == '8.0' or
+          self.spec.engine_version.startswith('8.0.')):
+      mysql_name = 'mysql80'
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % self.spec.engine_version)
+                      'and 8.0 are supported.' % self.spec.engine_version)
     stdout, stderr = self.server_vm.RemoteCommand(
         'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
     return stdout and not stderr
@@ -462,6 +477,9 @@ class BaseRelationalDb(resource.BaseResource):
   def _InstallMySQLServer(self):
     """Installs MySQL Server on the server vm.
 
+    https://d0.awsstatic.com/whitepapers/Database/optimizing-mysql-running-on-amazon-ec2-using-amazon-ebs.pdf
+    for minimal tuning parameters.
+
     Raises:
       Exception: If the requested engine version is unsupported, or if this
         method is called when the database is a managed one. The latter
@@ -488,15 +506,30 @@ class BaseRelationalDb(resource.BaseResource):
     elif (self.spec.engine_version == '5.7' or
           self.spec.engine_version.startswith('5.7.')):
       mysql_name = 'mysql57'
+    elif (self.spec.engine_version == '8.0' or
+          self.spec.engine_version.startswith('8.0.')):
+      mysql_name = 'mysql80'
     else:
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'are supported.' % self.spec.engine_version)
+                      'and 8.0 are supported.' % self.spec.engine_version)
     self.server_vm.Install(mysql_name)
     self.server_vm.RemoteCommand('chmod 777 %s' %
                                  self.server_vm.GetScratchDir())
     self.server_vm.RemoteCommand('sudo service %s stop' %
                                  self.server_vm.GetServiceName(mysql_name))
     self._PrepareDataDirectories(mysql_name)
+
+    # Minimal MySQL tuning; see AWS whitepaper in docstring.
+    innodb_buffer_pool_gb = self.innodb_buffer_pool_size
+    innodb_log_file_mb = self.innodb_log_file_size
+
+    self.server_vm.RemoteCommand(
+        'echo "\n'
+        f'innodb_buffer_pool_size = {innodb_buffer_pool_gb}G\n'
+        'innodb_flush_method = O_DIRECT\n'
+        'innodb_flush_neighbors = 0\n'
+        f'innodb_log_file_size = {innodb_log_file_mb}M'
+        '" | sudo tee -a %s' % self.server_vm.GetPathToConfig(mysql_name))
 
     # These (and max_connections after restarting) help avoid losing connection.
     self.server_vm.RemoteCommand(
