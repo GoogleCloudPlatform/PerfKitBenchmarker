@@ -21,13 +21,15 @@ from __future__ import print_function
 import json
 import logging
 import posixpath
+
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
+from perfkitbenchmarker import  linux_virtual_machine
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
@@ -119,8 +121,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPodBootCompletion(self):
-    """
-    Need to wait for the PODs to get up - PODs are created with a little delay.
+    """Need to wait for the PODs to get up, they're created with a little delay.
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pod', '-o=json', self.name]
@@ -158,10 +159,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     return False
 
   def _CreateVolumes(self):
-    """
-    Creates volumes for scratch disks. These volumes have to be created
-    BEFORE containers creation because Kubernetes doesn't allow to attach
-    volume to currently running containers.
+    """Creates volumes for scratch disks.
+
+    These volumes have to be created  BEFORE containers creation because
+    Kubernetes doesn't allow to attach volume to currently running containers.
     """
     self.scratch_disks = kubernetes_disk.CreateDisks(self.disk_specs, self.name)
 
@@ -187,7 +188,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ip_address = pod_ip
 
   def _ConfigureProxy(self):
-    """
+    """Configures Proxy.
+
     In Docker containers environment variables from /etc/environment
     are not sourced - this results in connection problems when running
     behind proxy. Prepending proxy environment variables to bashrc
@@ -211,9 +213,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       scratch_disk.SetDevicePath(self)
 
   def _BuildPodBody(self):
-    """
-    Builds a JSON which will be passed as a body of POST request
+    """Builds a JSON.
+
+    This is will be passed as a body of POST request
     to Kuberneres API in order to create a POD.
+
+    Returns:
+      json string for POD creation.
     """
 
     container = self._BuildContainerBody()
