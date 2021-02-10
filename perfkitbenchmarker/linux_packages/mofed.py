@@ -28,7 +28,6 @@ flags.DEFINE_string('mofed_version', '4.7-3.2.9.0', 'Mellanox OFED version')
 MOFED_OS_MAPPING = {
     os_types.UBUNTU1604: 'ubuntu16.04',
     os_types.UBUNTU1604_CUDA9: 'ubuntu16.04',
-    os_types.UBUNTU1710: 'ubuntu17.10',
     os_types.UBUNTU1804: 'ubuntu18.04',
 }
 

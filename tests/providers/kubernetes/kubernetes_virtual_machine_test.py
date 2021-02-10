@@ -289,15 +289,6 @@ class KubernetesVirtualMachineOsTypesTestCase(
       self.assertEqual(create_json['spec']['containers'][0]['image'],
                        'ubuntu:16.04')
 
-  def testCreateUbuntu1710(self):
-    with patch_critical_objects() as (_, temp_file):
-      self.create_kubernetes_vm(os_types.UBUNTU1710)
-
-      write_mock = get_write_mock_from_temp_file_mock(temp_file)
-      create_json = json.loads(write_mock.call_args[0][0])
-      self.assertEqual(create_json['spec']['containers'][0]['image'],
-                       'ubuntu:17.10')
-
 
 class KubernetesVirtualMachineTestCase(
     BaseKubernetesVirtualMachineTestCase):

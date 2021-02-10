@@ -821,11 +821,6 @@ class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
 
 
-class Ubuntu1710BasedAzureVirtualMachine(AzureVirtualMachine,
-                                         linux_virtual_machine.Ubuntu1710Mixin):
-  IMAGE_URN = 'Canonical:UbuntuServer:17.10:latest'
-
-
 class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'

@@ -1913,11 +1913,6 @@ class Ubuntu1604Mixin(BaseUbuntuMixin):
   PYTHON_PIP_PACKAGE_VERSION = '20.2.2'
 
 
-class Ubuntu1710Mixin(BaseUbuntuMixin):
-  """Class holding Ubuntu1710 specific VM methods and attributes."""
-  OS_TYPE = os_types.UBUNTU1710
-
-
 class Ubuntu1804Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804

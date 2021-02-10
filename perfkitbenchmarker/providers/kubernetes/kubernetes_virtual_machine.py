@@ -553,12 +553,6 @@ class Ubuntu1604BasedKubernetesVirtualMachine(
   CONTAINER_COMMAND = _install_sudo_command()
 
 
-class Ubuntu1710BasedKubernetesVirtualMachine(
-    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
-  DEFAULT_IMAGE = 'ubuntu:17.10'
-  CONTAINER_COMMAND = _install_sudo_command()
-
-
 class Ubuntu1604Cuda9BasedKubernetesVirtualMachine(
     DebianBasedKubernetesVirtualMachine,
     linux_virtual_machine.Ubuntu1604Cuda9Mixin):

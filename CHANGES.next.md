@@ -10,6 +10,7 @@
 -   AwsVirtualMachine.IMAGE_OWNER has been changed from a string to a list of
     strings to support images which have multiple owners e.g. AmazonLinux2 in
     opt-in regions.
+-   Remove Ubuntu1710 from `--os_types`.
 
 ### New features:
 

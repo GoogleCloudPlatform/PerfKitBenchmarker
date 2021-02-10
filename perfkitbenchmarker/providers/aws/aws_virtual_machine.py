@@ -1168,11 +1168,6 @@ class Ubuntu1604BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
     self.WaitForBootCompletion()
 
 
-class Ubuntu1710BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1710Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-*64-server-20*'
-
-
 class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
