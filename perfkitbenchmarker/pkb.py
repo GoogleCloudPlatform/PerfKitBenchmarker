@@ -104,6 +104,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
+from perfkitbenchmarker.linux_packages import build_tools
 from perfkitbenchmarker.publisher import SampleCollector
 import six
 from six.moves import zip
@@ -376,7 +377,10 @@ flags.DEFINE_boolean('record_proccpu', True,
                      'Whether to record the /proc/cpuinfo output in a sample')
 flags.DEFINE_boolean('record_cpu_vuln', True,
                      'Whether to record the CPU vulnerabilities on linux VMs')
-
+flags.DEFINE_boolean('record_gcc', True,
+                     'Whether to record the gcc version in a sample')
+flags.DEFINE_boolean('record_glibc', True,
+                     'Whether to record the glibc version in a sample')
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
                     'Specify a proxy for HTTP in the form '
@@ -804,6 +808,11 @@ def DoRunPhase(spec, collector, timer):
       samples.extend(_CreateProcCpuSamples(spec.vms))
     if FLAGS.record_cpu_vuln and run_number == 0:
       samples.extend(_CreateCpuVulnerabilitySamples(spec.vms))
+
+    if FLAGS.record_gcc:
+      samples.extend(_CreateGccSamples(spec.vms))
+    if FLAGS.record_glibc:
+      samples.extend(_CreateGlibcSamples(spec.vms))
 
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
@@ -1355,6 +1364,43 @@ def _CreateCpuVulnerabilitySamples(vms) -> List[sample.Sample]:
 
   linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
   return vm_util.RunThreaded(CreateSample, linux_vms)
+
+
+def _CreateGccSamples(vms):
+  """Creates samples from linux VMs of gcc version output."""
+
+  def _GetGccMetadata(vm):
+    return {
+        'name': vm.name,
+        'versiondump': build_tools.GetVersion(vm, 'gcc'),
+        'versioninfo': build_tools.GetVersionInfo(vm, 'gcc')
+    }
+
+  return [
+      sample.Sample('gcc_version', 0, '', metadata)
+      for metadata in vm_util.RunThreaded(_GetGccMetadata, vms)
+  ]
+
+
+def _CreateGlibcSamples(vms):
+  """Creates glibc samples from linux VMs of ldd output."""
+
+  def _GetGlibcVersionInfo(vm):
+    out, _ = vm.RemoteCommand('ldd --version', ignore_failure=True)
+    # return first line
+    return out.splitlines()[0] if out else None
+
+  def _GetGlibcMetadata(vm):
+    return {
+        'name': vm.name,
+        # TODO(user): Add glibc versiondump.
+        'versioninfo': _GetGlibcVersionInfo(vm)
+    }
+
+  return [
+      sample.Sample('glibc_version', 0, '', metadata)
+      for metadata in vm_util.RunThreaded(_GetGlibcMetadata, vms)
+  ]
 
 
 def Main():

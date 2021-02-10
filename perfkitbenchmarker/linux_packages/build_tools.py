@@ -30,11 +30,18 @@ def AptInstall(vm):
 
 
 def GetVersion(vm, pkg):
-  """Get version of package."""
-  # TODO(user): Add gcc version to all samples similar to lscpu/proccpu.
+  """Get version of package using -dumpversion."""
   out, _ = vm.RemoteCommand(
       '{pkg} -dumpversion'.format(pkg=pkg), ignore_failure=True)
   return out.rstrip()
+
+
+def GetVersionInfo(vm, pkg):
+  """Get compiler version info for package using --version."""
+  out, _ = vm.RemoteCommand(
+      '{pkg} --version'.format(pkg=pkg), ignore_failure=True)
+  # return first line of pkg --version
+  return out.splitlines()[0] if out else None
 
 
 def Reinstall(vm, version='4.7'):
