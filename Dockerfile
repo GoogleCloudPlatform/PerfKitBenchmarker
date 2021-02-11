@@ -6,10 +6,8 @@ COPY requirements.txt /pkb
 
 RUN pip install -r requirements.txt
 
-COPY requirements-testing.txt /pkb
+COPY . /pkb
 
 RUN pip install -r requirements-testing.txt
-
-COPY . /pkb
 
 CMD python -m unittest discover -s tests -p '*test.py' -v
