@@ -181,6 +181,9 @@ flags.DEFINE_boolean(  # TODO(user): Add support for simultaneous read.
     'when running fio against network mounts and rw=write.')
 flags.DEFINE_integer('fio_command_timeout_sec', None,
                      'Timeout for fio commands in seconds.')
+flags.DEFINE_enum('fio_rng', 'tausworthe64',
+                  ['tausworthe', 'lfsr', 'tausworthe64'],
+                  'Which RNG to use for 4k Random IOPS.')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -546,6 +549,7 @@ def Run(benchmark_spec):
   for item in samples:
     item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
     item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
+    item.metadata['fio_rng'] = FLAGS.fio_rng
 
   return samples
 
@@ -591,14 +595,18 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   vm.PushFile(job_file_path, remote_job_file_path)
 
   if AgainstDevice():
-    fio_command = '%s --output-format=json --filename=%s %s' % (
-        exec_path, disk.GetDevicePath(), remote_job_file_path)
+    fio_command = (f'{exec_path} --output-format=json '
+                   f'--random_generator={FLAGS.fio_rng} '
+                   f'--filename={disk.GetDevicePath()} {remote_job_file_path}')
   else:
-    fio_command = '%s --output-format=json --directory=%s %s' % (
-        exec_path, mount_point, remote_job_file_path)
+    fio_command = (f'{exec_path} --output-format=json '
+                   f'--random_generator={FLAGS.fio_rng} '
+                   f'--filename={mount_point} {remote_job_file_path}')
 
-  collect_logs = any([FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log,
-                      FLAGS.fio_hist_log])
+  collect_logs = any([
+      FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log,
+      FLAGS.fio_hist_log
+  ])
 
   log_file_base = ''
   if collect_logs:
