@@ -1,9 +1,0 @@
-language: python
-matrix:
-  include:
-  - python: 3.7
-    env: TOX_ENV=py37,flake8,scripts
-install:
-  - pip install tox
-script:
-  - tox -r -e $TOX_ENV

@@ -86,3 +86,4 @@
 -   Moved stress_ng installation to a package.
 -   Limit pip to v20.2.2 for ubuntu1604 and for
     object_storage_service_benchmark.
+-   Switch to using Google Cloud Build for continuous integration.
