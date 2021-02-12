@@ -26,6 +26,7 @@ class TensorflowServingBenchmarkTestCase(unittest.TestCase):
     flag_values = {
         'tf_serving_client_thread_count': 12,
         'tf_serving_runtime': 60,
+        'tf_serving_branch': 'r2.4',
     }
     p = mock.patch(tensorflow_serving_benchmark.__name__ + '.FLAGS')
     flags_mock = p.start()
@@ -45,6 +46,7 @@ class TensorflowServingBenchmarkTestCase(unittest.TestCase):
     expected_metadata = {
         'client_thread_count': num_client_threads,
         'scheduled_runtime': 60,
+        'tf_serving_branch': 'r2.4',
     }
 
     self.assertEqual(len(samples), 5)

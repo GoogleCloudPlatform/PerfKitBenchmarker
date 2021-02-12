@@ -25,8 +25,8 @@ TF_SERVING_BASE_DIRECTORY = posixpath.join(linux_packages.INSTALL_DIR,
 
 FLAGS = flags.FLAGS
 
-# Versions supported including TF Serving 1.
-flags.DEFINE_string('tf_serving_branch', 'r1.15', 'GitHub branch to pull from')
+# Versions supported including TF Serving 2.4.
+flags.DEFINE_string('tf_serving_branch', 'r2.4', 'GitHub branch to pull from')
 
 
 def InstallTensorFlowServingAPI(vm):
@@ -44,7 +44,8 @@ def InstallTensorFlowServingAPI(vm):
   pip_package = posixpath.join(pip_package_output_dir,
                                'tensorflow_serving_api*.whl')
 
-  vm.Install('pip')
+  vm.InstallPackages('python3-pip')
+  vm.RemoteCommand('sudo pip3 install --upgrade pip')
 
   # Build the pip package from the same source as the serving binary
   vm.RemoteCommand('sudo docker run --rm -v {0}:{0} '
@@ -54,7 +55,7 @@ def InstallTensorFlowServingAPI(vm):
                    'bazel-bin/tensorflow_serving/tools/pip_package/'
                    'build_pip_package {0}"'.format(pip_package_output_dir))
 
-  vm.RemoteCommand('sudo pip install {0}'.format(pip_package))
+  vm.RemoteCommand('sudo pip3 install {0}'.format(pip_package))
 
 
 def BuildDockerImages(vm):

@@ -102,7 +102,6 @@ tensorflow_serving:
           boot_disk_size: 200
           machine_type: n1-standard-8
           zone: us-central1-a
-          min_cpu_platform: skylake
         Azure:
           machine_type: Standard_F8s_v2
           zone: eastus2
@@ -110,7 +109,7 @@ tensorflow_serving:
           boot_disk_size: 200
           machine_type: m5.2xlarge
           zone: us-east-1f
-      os_type: ubuntu1604
+      os_type: ubuntu1804
 """
 
 flags.DEFINE_integer(
@@ -234,6 +233,7 @@ def _CreateMetadataDict(benchmark_spec, client_thread_count):
   metadata = dict()
   metadata['scheduled_runtime'] = FLAGS.tf_serving_runtime
   metadata['client_thread_count'] = client_thread_count
+  metadata['tf_serving_branch'] = FLAGS.tf_serving_branch
   return metadata
 
 
@@ -271,7 +271,7 @@ def _StartClient(vm, server_ip, client_thread_count):
       of CLIENT_SCRIPT (detected by looking at stderr).
   """
   stdout, stderr = vm.RemoteCommand(
-      'python {0} --server={1}:{2} --image_directory={3} '
+      'python3 {0} --server={1}:{2} --image_directory={3} '
       '--runtime={4} --num_threads={5}'.format(
           posixpath.join(linux_packages.INSTALL_DIR,
                          CLIENT_SCRIPT), server_ip, SERVER_PORT,
@@ -283,7 +283,10 @@ def _StartClient(vm, server_ip, client_thread_count):
   # Ensure that stderr from the client script is empty.
   # If it is, stderr from the remote command should contain a single line:
   # Warning: Permanently added {ip} (ECDSA) to the list of known hosts.
-  if len(stderr.splitlines()) > 1:
+  # However, don't raise if the following is in stderr:
+  # Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+  if len(
+      stderr.splitlines()) > 1 and 'Ignore above cudart dlerror' not in stderr:
     raise ClientWorkloadScriptExecutionError(
         'Exception occurred during execution of client script: {0}'.format(
             stderr))
