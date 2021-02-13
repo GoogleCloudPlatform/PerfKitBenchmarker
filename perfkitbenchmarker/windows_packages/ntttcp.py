@@ -80,11 +80,10 @@ _NUM_PARAMS_IN_CONFIG = 5
 CONTROL_PORT = 6001
 BASE_DATA_PORT = 5001
 NTTTCP_RETRIES = 10
-NTTTCP_DIR = 'NTttcp-v5.33'
-NTTTCP_ZIP = NTTTCP_DIR + '.zip'
-NTTTCP_URL = ('https://gallery.technet.microsoft.com/NTttcp-Version-528-'
-              'Now-f8b12769/file/159655/1/' + NTTTCP_ZIP)
-
+NTTTCP_VERSION = 'v5.36'
+NTTTCP_EXE = 'NTttcp.exe'
+NTTTCP_URL = ('https://github.com/microsoft/ntttcp/releases/download/' +
+              NTTTCP_VERSION + '/' + NTTTCP_EXE)
 TRUE_VALS = ['True', 'true', 't']
 FALSE_VALS = ['False', 'false', 'f']
 
@@ -167,9 +166,8 @@ def ParseConfigList():
 
 def Install(vm):
   """Installs the NTttcp package on the VM."""
-  zip_path = ntpath.join(vm.temp_dir, NTTTCP_ZIP)
-  vm.DownloadFile(NTTTCP_URL, zip_path)
-  vm.UnzipFile(zip_path, vm.temp_dir)
+  exe_path = ntpath.join(vm.temp_dir, NTTTCP_EXE)
+  vm.DownloadFile(NTTTCP_URL, exe_path)
 
 
 @vm_util.Retry(poll_interval=60, fuzz=1, max_retries=NTTTCP_RETRIES)
@@ -180,21 +178,23 @@ def _TaskKillNtttcp(vm):
 
 def _RunNtttcp(vm, options):
   timeout_duration = 3 * FLAGS.ntttcp_time
-  ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
-  command = 'cd {ntttcp_exe_dir}; .\\NTttcp.exe {ntttcp_options}'.format(
-      ntttcp_exe_dir=ntttcp_exe_dir, ntttcp_options=options)
+  ntttcp_exe_dir = vm.temp_dir
+  command = 'cd {ntttcp_exe_dir}; .\\{ntttcp_exe} {ntttcp_options}'.format(
+      ntttcp_exe=NTTTCP_EXE,
+      ntttcp_exe_dir=ntttcp_exe_dir,
+      ntttcp_options=options)
   vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _RemoveXml(vm):
-  ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
+  ntttcp_exe_dir = vm.temp_dir
   rm_command = 'cd {ntttcp_exe_dir}; rm xml.txt'.format(
       ntttcp_exe_dir=ntttcp_exe_dir)
   vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
 
 
 def _CatXml(vm):
-  ntttcp_exe_dir = ntpath.join(vm.temp_dir, 'x86fre')
+  ntttcp_exe_dir = vm.temp_dir
   cat_command = 'cd {ntttcp_exe_dir}; cat xml.txt'.format(
       ntttcp_exe_dir=ntttcp_exe_dir)
   ntttcp_xml, _ = vm.RemoteCommand(cat_command)
