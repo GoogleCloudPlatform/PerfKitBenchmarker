@@ -4,9 +4,6 @@ The list of profiles are passed via flag each of which are defined in the
 profile_details module.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 __author__ = 'p3rf@google.com'
 

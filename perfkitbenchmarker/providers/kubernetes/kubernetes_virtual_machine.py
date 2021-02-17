@@ -14,9 +14,6 @@
 
 """Contains code related to lifecycle management of Kubernetes Pods."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import json
 import logging

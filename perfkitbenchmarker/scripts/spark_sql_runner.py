@@ -5,9 +5,6 @@ Views can be BigQuery tables or HCFS directories containing Parquet.
 This is useful for Storage formats not expressible as External Hive Tables.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import argparse
 import json

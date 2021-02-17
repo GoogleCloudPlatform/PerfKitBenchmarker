@@ -22,10 +22,6 @@ require file copying between master and worker nodes. Server can be used on the
 master node.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 
 PACKAGE_NAME = 'nfs_server'
 

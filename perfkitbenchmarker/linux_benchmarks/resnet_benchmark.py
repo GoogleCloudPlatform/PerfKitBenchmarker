@@ -20,9 +20,6 @@ This benchmark is equivalent to tensorflow_benchmark with the resnet model
 except that this can target TPU.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import datetime
 import posixpath
 import time

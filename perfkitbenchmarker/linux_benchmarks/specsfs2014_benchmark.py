@@ -25,9 +25,6 @@ eventually become a "disk type" so that any benchmark that runs
 against a filesystem can run against Gluster.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import posixpath
 import xml.etree.ElementTree

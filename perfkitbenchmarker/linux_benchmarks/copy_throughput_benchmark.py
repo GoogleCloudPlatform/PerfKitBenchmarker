@@ -17,9 +17,6 @@
 cp and dd between two attached disks on same vm.
 scp copy across different vms using external networks.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import functools
 import logging

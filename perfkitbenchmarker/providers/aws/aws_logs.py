@@ -13,7 +13,6 @@
 # limitations under the License.
 """Module containing classes related to AWS CloudWatch Logs."""
 
-from __future__ import print_function
 import json
 import tempfile
 from perfkitbenchmarker import resource

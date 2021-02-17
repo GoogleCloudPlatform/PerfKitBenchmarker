@@ -14,9 +14,6 @@
 
 """Run nutttcp between two VMs."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util

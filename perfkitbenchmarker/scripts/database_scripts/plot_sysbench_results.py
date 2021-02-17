@@ -37,9 +37,6 @@ How to use plot_sysbench_results:
   automatically add files as runs complete and plot after last thread count call
   finishes.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import datetime
 import subprocess
 from . import plot_scatter_points

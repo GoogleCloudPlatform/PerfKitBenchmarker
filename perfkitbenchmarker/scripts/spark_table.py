@@ -10,9 +10,6 @@ sys.argv[1]: The root HCFS directory
 sys.argv[2]: A comma separated list of the subdirectories/table names
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import argparse
 import logging

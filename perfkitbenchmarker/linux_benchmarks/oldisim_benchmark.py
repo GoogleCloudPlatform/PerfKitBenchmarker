@@ -37,9 +37,6 @@ average latency target is 40ms. The root node will vary the fanout from 1 to 4
 and measure the scaling efficiency.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import logging
 import re

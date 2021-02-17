@@ -29,9 +29,6 @@ category:
   c: Single stream large object upload and download, measures throughput.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import datetime
 import enum

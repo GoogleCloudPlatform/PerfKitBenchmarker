@@ -24,9 +24,6 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import abc
 import collections

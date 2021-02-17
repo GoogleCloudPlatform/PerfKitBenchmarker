@@ -41,7 +41,6 @@ Launcher has a few defaults, listed below:
   - GCE VM Machine Type: n1-standard-16
 """
 
-from __future__ import print_function
 
 import datetime
 import logging

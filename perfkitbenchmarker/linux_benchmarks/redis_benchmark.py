@@ -21,9 +21,6 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import logging

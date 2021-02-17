@@ -22,9 +22,6 @@ remote/persistent ssd, and local ssd. The Aerospike configuration is controlled
 by the "aerospike_storage_type" and "data_disk_type" flags.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import re
 from absl import flags

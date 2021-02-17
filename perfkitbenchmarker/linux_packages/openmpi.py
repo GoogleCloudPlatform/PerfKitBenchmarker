@@ -15,7 +15,6 @@
 
 """Module containing OpenMPI installation and cleanup functions."""
 
-from __future__ import print_function
 
 import posixpath
 import re

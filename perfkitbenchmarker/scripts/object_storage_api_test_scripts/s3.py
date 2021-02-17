@@ -15,7 +15,6 @@
 
 """An interface to S3, using the boto library."""
 
-from __future__ import absolute_import
 
 import logging
 import time

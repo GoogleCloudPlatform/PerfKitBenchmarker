@@ -55,9 +55,6 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
      the run_uri.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import getpass

@@ -43,9 +43,6 @@ If not, run
 to install it. This will allow this benchmark to properly create an instance.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import logging
 import re

@@ -22,9 +22,6 @@ Users can specify additional paths to search for required data files using the
 `--data_search_paths` flag.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import abc
 import logging
 import os

@@ -19,9 +19,6 @@ See 'perfkitbenchmarker/data/cassandra/' for configuration files used.
 Cassandra homepage: http://cassandra.apache.org
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import logging
 import os

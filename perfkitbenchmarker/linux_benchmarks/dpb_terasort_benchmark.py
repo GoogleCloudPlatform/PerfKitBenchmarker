@@ -26,7 +26,6 @@ A full TeraSort benchmark run consists of the following three steps:
 
 The benchmark reports the detailed latency of executing each stage.
 """
-from __future__ import division
 
 import logging
 from typing import List

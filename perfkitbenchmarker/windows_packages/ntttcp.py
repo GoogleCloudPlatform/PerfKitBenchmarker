@@ -21,9 +21,6 @@ More information about NTttcp may be found here:
 https://gallery.technet.microsoft.com/NTttcp-Version-528-Now-f8b12769
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import ntpath

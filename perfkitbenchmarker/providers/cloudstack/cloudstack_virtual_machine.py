@@ -17,9 +17,6 @@ library which calls the cloudstack API. For more information refer to
 the Cloudstack documentation at https://github.com/syed/PerfKitBenchmarker.git
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import logging
 

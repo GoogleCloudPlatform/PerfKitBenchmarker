@@ -22,9 +22,6 @@ The following stats are reported:
   * a list of all measured latencies
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 from datetime import datetime
 import os

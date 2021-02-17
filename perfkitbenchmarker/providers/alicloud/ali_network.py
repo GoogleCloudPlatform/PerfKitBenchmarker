@@ -19,9 +19,6 @@ others in the
 same project. See https://developers.google.com/compute/docs/networking for
 more information about AliCloud VM networking.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import json
 import logging

@@ -14,9 +14,6 @@
 
 """Module containing classes for background workloads."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 import six

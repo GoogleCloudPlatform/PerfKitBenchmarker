@@ -13,9 +13,6 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.configs.benchmark_config_spec."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import os
 import unittest

@@ -17,9 +17,6 @@
 Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import abc
 import logging

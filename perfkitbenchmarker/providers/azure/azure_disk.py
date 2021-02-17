@@ -20,9 +20,6 @@ See http://msdn.microsoft.com/en-us/library/azure/dn790303.aspx for more
 information about azure disks.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import itertools
 import json

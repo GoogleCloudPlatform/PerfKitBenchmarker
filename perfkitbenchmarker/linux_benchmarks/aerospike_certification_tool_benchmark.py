@@ -17,9 +17,6 @@
 See https://github.com/aerospike/act for more info.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import math
 from absl import flags
 from perfkitbenchmarker import configs

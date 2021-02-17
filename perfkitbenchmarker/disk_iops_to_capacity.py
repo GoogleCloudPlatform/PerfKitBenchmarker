@@ -46,9 +46,6 @@ To utilize this class, initialize an instance of the DiskIOPSToCapacity class
 with the IOPS level desired and the provider you wish to use. The machine
 requirement attributes will be immediately populated.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import math
 import numpy
 

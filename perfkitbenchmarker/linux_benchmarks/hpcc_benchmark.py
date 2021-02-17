@@ -37,9 +37,6 @@ http://www.advancedclustering.com/faq/how-do-i-tune-my-hpldat-file.html
 http://www.netlib.org/benchmark/hpl/faqs.html
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import logging
 import math

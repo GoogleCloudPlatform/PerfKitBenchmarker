@@ -13,9 +13,6 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import contextlib
 import copy

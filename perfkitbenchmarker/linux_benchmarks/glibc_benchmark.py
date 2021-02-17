@@ -24,9 +24,6 @@ needs python 2.7 or later in addition to the dependencies required to build the
 GNU C Library.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import json
 import logging

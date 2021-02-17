@@ -13,9 +13,6 @@
 # limitations under the License.
 """Runs fio against a remote gluster cluster."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import json
 from absl import flags

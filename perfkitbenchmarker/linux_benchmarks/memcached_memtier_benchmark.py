@@ -27,9 +27,6 @@ Memtier_benchmark usage:
 https://redislabs.com/blog/memtier_benchmark-a-high-throughput-benchmarking-tool-for-redis-memcached/
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_packages import memcached_server

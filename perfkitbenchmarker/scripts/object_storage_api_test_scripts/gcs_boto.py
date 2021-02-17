@@ -14,7 +14,6 @@
 # limitations under the License.
 """An interface to Google Cloud Storage, using the boto library."""
 
-from __future__ import absolute_import
 
 import logging
 import time

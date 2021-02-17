@@ -44,9 +44,6 @@ For more details, see https://linux.die.net/man/1/mpstat.
 
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import logging
 import os

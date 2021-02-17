@@ -28,7 +28,6 @@ this script will block until command completion, then print
 *Runs on the guest VM. Supports Python 2.6, 2.7, and 3.x.*
 """
 
-from __future__ import print_function
 
 import errno
 import fcntl

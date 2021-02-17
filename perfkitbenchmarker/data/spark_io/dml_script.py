@@ -1,8 +1,5 @@
 """Spark application to create a Spark table for IO intensive benchmarking."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import sys
 from pyspark.sql import SparkSession

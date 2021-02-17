@@ -35,9 +35,6 @@ By default, this runs YCSB workloads A and B against the database, 32 threads
 per client VM, with an initial database size of 1GB (1k records).
 Each workload runs for at most 30 minutes.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import bisect
 import collections

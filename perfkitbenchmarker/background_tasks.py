@@ -51,9 +51,6 @@ code in this module is designed to allow interrupting parallel tasks while
 keeping the risk of deadlock low.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import abc
 from collections import deque

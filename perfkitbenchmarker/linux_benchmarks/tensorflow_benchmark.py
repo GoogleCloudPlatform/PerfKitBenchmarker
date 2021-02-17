@@ -22,9 +22,6 @@ between the workers. Each worker process runs the same model. When a worker
 needs a variable, it accesses it from the parameter server directly.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import collections
 import posixpath
 from absl import flags

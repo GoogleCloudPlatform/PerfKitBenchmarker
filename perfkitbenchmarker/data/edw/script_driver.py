@@ -4,9 +4,6 @@ Driver compiles the provider specific script execution command and returns the
 time taken to execute the script in seconds or -1 if the script fails.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import json
 import logging

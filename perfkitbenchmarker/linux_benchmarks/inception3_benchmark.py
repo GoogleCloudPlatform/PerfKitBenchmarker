@@ -22,9 +22,6 @@ except that this can target TPU.
 # TODO(tohaowu): We only measure image processing speed for now, and we will
 # measure the other metrics in the future.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import time
 from absl import flags
 from perfkitbenchmarker import configs

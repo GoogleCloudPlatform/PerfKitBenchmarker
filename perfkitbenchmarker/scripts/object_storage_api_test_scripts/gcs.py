@@ -15,7 +15,6 @@
 
 """An interface to Google Cloud Storage, using the python library."""
 
-from __future__ import absolute_import
 
 import logging
 import time

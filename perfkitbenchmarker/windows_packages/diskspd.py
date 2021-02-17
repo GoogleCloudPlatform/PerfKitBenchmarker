@@ -21,9 +21,6 @@ More information about DiskSpd may be found here:
 https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import ntpath

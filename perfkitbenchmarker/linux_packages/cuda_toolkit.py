@@ -21,9 +21,6 @@ Tesla K80 and P100 gpus are supported, provided that there is only a single
 type of gpu per system.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import posixpath
 import re

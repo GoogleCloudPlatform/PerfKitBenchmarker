@@ -19,9 +19,6 @@ cassandra-stress tool page:
 http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import functools
