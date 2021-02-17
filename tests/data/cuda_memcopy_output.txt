@@ -1,0 +1,12 @@
+[CUDA Bandwidth Test] - Starting...
+Running on...
+
+ Device 0: Tesla K80
+ Quick Mode
+
+bandwidthTest-H2D-Pinned, Bandwidth = 8494.3 MB/s, Time = 0.00377 s, Size = 33554432 bytes, NumDevsUsed = 1
+bandwidthTest-D2H-Pinned, Bandwidth = 9580.0 MB/s, Time = 0.00334 s, Size = 33554432 bytes, NumDevsUsed = 1
+bandwidthTest-D2D, Bandwidth = 155418.8 MB/s, Time = 0.00021 s, Size = 33554432 bytes, NumDevsUsed = 1
+Result = PASS
+
+NOTE: The CUDA Samples are not meant for performance measurements. Results may vary when GPU Boost is enabled.

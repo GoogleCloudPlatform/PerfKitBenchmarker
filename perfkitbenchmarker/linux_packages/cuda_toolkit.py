@@ -78,6 +78,7 @@ def GetMetadata(vm):
   metadata = nvidia_driver.GetMetadata(vm)
   metadata['cuda_toolkit_version'] = FLAGS.cuda_toolkit_version
   metadata['cuda_toolkit_home'] = CUDA_HOME
+  metadata['vm_name'] = vm.name
   return metadata
 
 
