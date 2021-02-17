@@ -14,6 +14,7 @@
 """Installs the Intel MPI library."""
 
 import logging
+import re
 from absl import flags
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import vm_util
@@ -130,3 +131,29 @@ def NfsExportIntelDirectory(vms) -> None:
   # Still need to have clients ulimit and ptrace fixed
   vm_util.RunThreaded(FixEnvironment, vms[1:])
   TestInstall(vms)
+
+
+def MpirunMpiVersion(vm, source_cmd: str = None) -> str:
+  """Returns the Intel MPI version in use.
+
+  Example output of "mpirun -V" (all on one line):
+    Intel(R) MPI Library for Linux* OS,
+    Version 2018 Update 4 Build 20180823 (id: 18555)
+  This returns as "2018.4" to be nearly the same as the "2018.4-075" reported
+  when using the Intel apt/yum repos.
+
+  Args:
+    vm: The virtual machine to run on.
+    source_cmd: A file to source before executing mpirun.  If not set will use
+      the one from SourceMpiVarsCommand.
+
+  Raises:
+    ValueError: If the MPI version could not be parsed.
+  """
+  source_cmd = source_cmd or SourceMpiVarsCommand(vm)
+  txt, _ = vm.RemoteCommand(f'{source_cmd}; mpirun -V')
+  match = re.search(r'Version (?P<year>\d+) Update (?P<update>\d+) ', txt)
+  if match:
+    return f'{match["year"]}.{match["update"]}'
+  else:
+    raise ValueError(f'Could not parse IntelMPI version from "{txt}"')
