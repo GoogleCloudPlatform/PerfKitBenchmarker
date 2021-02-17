@@ -1,4 +1,3 @@
-# Lint as: python3
 """Tests for the AWS S3 service."""
 
 

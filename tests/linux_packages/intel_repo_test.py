@@ -1,4 +1,3 @@
-# Lint as: python3
 """Tests for Intel Repo package."""
 
 import unittest

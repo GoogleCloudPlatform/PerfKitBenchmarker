@@ -1,4 +1,3 @@
-# Lint as: python3
 """Tests for Fortran package."""
 
 import unittest

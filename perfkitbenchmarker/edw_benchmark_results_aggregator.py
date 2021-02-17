@@ -1,4 +1,3 @@
-# Lint as: python3
 """Aggregates the performance results from a edw benchmark.
 
 An edw benchmark, runs multiple iterations of a suite of queries.

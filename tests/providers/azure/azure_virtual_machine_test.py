@@ -1,4 +1,3 @@
-# Lint as: python3
 """Tests for perfkitbenchmarker.tests.providers.azure.azure_virtual_machine."""
 import unittest
 from absl.testing import parameterized

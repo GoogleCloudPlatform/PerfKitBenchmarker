@@ -1,4 +1,3 @@
-# Lint as: python3
 """Tests for google3.third_party.py.perfkitbenchmarker.tests.providers.gcp.gce_placement_group."""
 
 import json

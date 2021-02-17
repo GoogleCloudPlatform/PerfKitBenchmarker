@@ -1,4 +1,3 @@
-# Lint as: python3
 """Tests for perfkitbenchmarker.providers.aws.aws_placement_group."""
 
 
