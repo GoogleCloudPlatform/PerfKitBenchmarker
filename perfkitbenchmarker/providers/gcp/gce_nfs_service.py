@@ -1,4 +1,3 @@
-# Lint as: python2, python3
 """Resource for GCE NFS service."""
 
 import json

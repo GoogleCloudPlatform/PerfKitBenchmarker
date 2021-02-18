@@ -1,4 +1,3 @@
-# Lint as: python2, python3
 """Tests the GCE NFS service."""
 
 
