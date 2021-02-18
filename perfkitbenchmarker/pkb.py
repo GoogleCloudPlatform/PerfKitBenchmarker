@@ -803,8 +803,11 @@ def DoRunPhase(spec, collector, timer):
                             spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
       samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
 
-    if FLAGS.gpu_samples and any(
-        nvidia_driver.CheckNvidiaGpuExists(vm) for vm in spec.vms):
+    # In order to collect GPU samples one of the VMs must have both an Nvidia
+    # GPU and the nvidia-smi
+    if FLAGS.gpu_samples and any(nvidia_driver.CheckNvidiaGpuExists(vm) and
+                                 nvidia_driver.CheckNvidiaSmiExists(vm) for vm
+                                 in spec.vms):
       samples.extend(cuda_memcopy_benchmark.Run(spec))
 
     if FLAGS.record_lscpu:
