@@ -19,6 +19,7 @@
 import re
 from absl import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 
 
@@ -121,6 +122,8 @@ def CheckNvidiaGpuExists(vm):
   Returns:
     True or False depending on whether NVIDIA GPU exists.
   """
+  if FLAGS.os_type not in os_types.LINUX_OS_TYPES:
+    return False
   vm.Install('pciutils')
   output, _ = vm.RemoteCommand('sudo lspci', should_log=True)
   regex = re.compile(r'3D controller: NVIDIA Corporation')
@@ -136,6 +139,8 @@ def CheckNvidiaSmiExists(vm):
   Returns:
     True or False depending on whether nvidia-smi command exists.
   """
+  if FLAGS.os_type not in os_types.LINUX_OS_TYPES:
+    return False
   resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
                                  ignore_failure=True,
                                  suppress_warning=True)

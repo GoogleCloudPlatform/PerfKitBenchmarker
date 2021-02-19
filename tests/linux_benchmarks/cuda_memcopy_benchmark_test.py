@@ -36,6 +36,10 @@ class CudaMemcopyBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.enter_context(mock.patch.object(
         nvidia_driver, 'QueryNumberOfGpus', return_value=1))
     self.enter_context(mock.patch.object(
+        nvidia_driver, 'CheckNvidiaGpuExists', return_value=True))
+    self.enter_context(mock.patch.object(
+        nvidia_driver, 'CheckNvidiaSmiExists', return_value=True))
+    self.enter_context(mock.patch.object(
         cuda_toolkit, 'GetMetadata', return_value={}))
 
   def CudaOutput(self) -> str:

@@ -113,6 +113,10 @@ def _CollectGpuSamples(
   Returns:
     A list of sample.Sample objects.
   """
+  if not nvidia_driver.CheckNvidiaGpuExists(vm):
+    return []
+  if not nvidia_driver.CheckNvidiaSmiExists(vm):
+    return []
   global_metadata = _MetadataFromFlags()
   global_metadata.update(cuda_toolkit.GetMetadata(vm))
   global_cmd = [BANDWIDTH_TEST_PATH, '--csv', f'--memory={_MEMORY.value}',
