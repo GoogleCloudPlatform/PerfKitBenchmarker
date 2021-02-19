@@ -25,6 +25,8 @@
 -   Add Ubuntu 20.04 to AWS, Azure, and GCP providers.
 -   Add support for running DPB Apache Spark benchmarks on PKB provisioned VMs
 -   Add support for AWS gp3 disks.
+-   Add ability to use Intel compiled HPCC binaries with
+    --hpcc_use_intel_compiled_hpl
 
 ### Enhancements:
 

@@ -38,9 +38,11 @@ http://www.netlib.org/benchmark/hpl/faqs.html
 """
 
 
+import inspect
 import logging
 import math
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Tuple
 from absl import flags
 import dataclasses
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -54,6 +56,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hpcc
 from perfkitbenchmarker.linux_packages import intel_repo
+from perfkitbenchmarker.linux_packages import intelmpi
 from perfkitbenchmarker.linux_packages import mkl
 from perfkitbenchmarker.linux_packages import numactl
 from perfkitbenchmarker.linux_packages import openblas
@@ -223,6 +226,10 @@ def CheckPrerequisites(_) -> None:
       raise errors.Setup.InvalidFlagConfigurationError(
           '--hpcc_dimensions must be integers like "1,2" not '
           f'"{parts[0]},{parts[1]}"')
+  if hpcc.USE_INTEL_COMPILED_HPL.value:
+    if FLAGS.hpcc_benchmarks != ['HPL']:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Intel compiled HPCC can only run linpack (--hpcc_benchmarks=HPL)')
 
 
 def _CalculateHpccDimensions(num_vms: int, num_cpus: int,
@@ -300,6 +307,10 @@ def PrepareHpcc(vm: linux_vm.BaseLinuxVirtualMachine) -> None:
 
 def PrepareBinaries(vms: List[linux_vm.BaseLinuxVirtualMachine]) -> None:
   """Prepare binaries on all vms."""
+  if hpcc.USE_INTEL_COMPILED_HPL.value:
+    intelmpi.NfsExportIntelDirectory(vms)
+    vm_util.RunThreaded(lambda vm: vm.Install('numactl'), vms)
+    return
   headnode_vm = vms[0]
   if FLAGS.hpcc_binary:
     headnode_vm.PushFile(data.ResourcePath(FLAGS.hpcc_binary), './hpcc')
@@ -332,8 +343,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   PrepareHpcc(headnode_vm)
   CreateHpccinf(headnode_vm, benchmark_spec)
   hpc_util.CreateMachineFile(vms, remote_path=MACHINEFILE)
-  PrepareBinaries(vms)
   headnode_vm.AuthenticateVm()
+  PrepareBinaries(vms)
 
 
 def BaseMetadata() -> Dict[str, str]:
@@ -355,6 +366,11 @@ def BaseMetadata() -> Dict[str, str]:
   metadata['openmpi_version'] = FLAGS.openmpi_version
   if FLAGS.hpcc_numa_binding:
     metadata['hpcc_numa_binding'] = FLAGS.hpcc_numa_binding
+  if hpcc.USE_INTEL_COMPILED_HPL.value:
+    metadata['hpcc_origin'] = 'intel'
+    metadata['intel_mpi_version'] = intelmpi.MPI_VERSION.value
+  else:
+    metadata['hpcc_origin'] = 'source'
   return metadata
 
 
@@ -403,7 +419,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   # recreate the HPL config file with each run in case parameters change
   dimensions = CreateHpccinf(benchmark_spec.vms[0], benchmark_spec)
   logging.info('HPL.dat dimensions: %s', dimensions)
-  samples = RunHpccSource(benchmark_spec.vms)
+  if hpcc.USE_INTEL_COMPILED_HPL.value:
+    samples = [RunIntelLinpack(benchmark_spec.vms, dimensions)]
+  else:
+    samples = RunHpccSource(benchmark_spec.vms)
   _AddCommonMetadata(samples, benchmark_spec, dataclasses.asdict(dimensions))
   return samples
 
@@ -494,3 +513,161 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   for vm in vms[1:]:
     vm.RemoveFile('hpcc')
     vm.RemoveFile('/usr/bin/orted')
+
+
+def RunIntelLinpack(vms: List[linux_vm.BaseLinuxVirtualMachine],
+                    dimensions: HpccDimensions) -> sample.Sample:
+  """Returns the parsed output from running the Intel compiled HPCC.
+
+  Unlike the compiled from source linpack run the Intel compiled linpack can
+  handle being cut off after --hpcc_timeout_hours as it parses the continuous
+  output of linpack, reporting the last value found as the HPL_Tflops.
+
+  The metadata argument value for "last_fraction_completed" is how much of the
+  run was completed before being cut off.
+
+  Args:
+    vms: List of VMs to run benchmark on.
+    dimensions: The HPCC configuration.
+  Returns: Sample of the HPL_Tflops for the run.
+  """
+  vm = vms[0]
+  # Compiled from source HPL uses hpccinf.txt, one from Intel uses HPL.dat
+  vm.RemoteCommand(f'cp {HPCCINF_FILE} HPL.dat')
+  mpi_cmd, num_processes = _CreateIntelMpiRunCommand(vms, dimensions)
+
+  run_cmd_txt, _ = vm.RobustRemoteCommand(
+      mpi_cmd,
+      ignore_failure=True,
+      timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
+
+  file_text, _ = vm.RemoteCommand('cat HPL.out', ignore_failure=True)
+  tflops, metadata = _ParseIntelLinpackStdout(run_cmd_txt)
+  if file_text:
+    # HPL ran to completion, use the tflops from the file output
+    tflops = _ParseIntelLinpackOutputFile(file_text)
+    metadata['full'] = True
+  else:
+    # HPL timed out but have fractional metadata
+    metadata['full'] = False
+  metadata.update({
+      'num_processes': num_processes,
+      'per_host': vm.numa_node_count,
+      'mpi_cmd': mpi_cmd,
+  })
+  return sample.Sample('HPL_Tflops', tflops, 'Tflops/s', metadata)
+
+
+def _CreateIntelMpiRunCommand(vms: List[linux_vm.BaseLinuxVirtualMachine],
+                              dimensions: HpccDimensions) -> Tuple[str, int]:
+  """Creates the command to run HPL for Intel compiled linpack.
+
+  Args:
+    vms: List of virtual machines to run on.
+    dimensions: The HpccDimensions for the run
+
+  Returns:
+    Tuple of the mpirun command and the number of processes to be used.
+  """
+  headnode = vms[0]
+  # Create the file for mpirun to execute
+  hpl_path = '/opt/intel/mkl/benchmarks/mp_linpack/xhpl_intel64_static'
+  bash_script = inspect.cleandoc(f'''
+  #!/bin/bash
+  export HPL_HOST_NODE=$((PMI_RANK % {headnode.numa_node_count}))
+  {hpl_path}
+  ''')
+  run_file = './hpl_run'
+  for vm in vms:
+    vm_util.CreateRemoteFile(vm, bash_script + '\n', run_file)
+    vm.RemoteCommand(f'chmod +x {run_file}')
+  logging.info('Using precompiled HPL at %s', hpl_path)
+
+  num_processes = dimensions.num_rows * dimensions.num_columns
+  hosts = ','.join([vm.internal_ip for vm in vms])
+  mpi_cmd = (f'{intelmpi.SourceMpiVarsCommand(headnode)}; '
+             'mpirun '
+             f'-perhost {headnode.numa_node_count} {_MpiEnv("-genv")} '
+             f'-np {num_processes} -host {hosts} {run_file}')
+  return mpi_cmd, num_processes
+
+
+def _ParseIntelLinpackOutputFile(file_text: str) -> float:
+  """Returns the tflops for the hpcc run.
+
+  The last entry that matches
+    WR11C2R4  50688   192     6    10    551.85  1.57334e+02
+   is the Gflops for the run: 157.33
+
+  Args:
+    file_text: The hpcc output file contents.
+  """
+  line_re = re.compile(r'\s+'.join([
+      r'WR\S+', r'\d+', r'\d+', r'\d+', r'\d+', r'\d+\.\d+', r'([\d\.e\+\-]+)'
+  ]))
+  gflops = None
+  for line in file_text.splitlines():
+    match = line_re.match(line)
+    if match:
+      gflops = float(match[1])
+  return gflops / 1000
+
+
+def _ParseIntelLinpackStdout(stdout: str) -> Tuple[float, Dict[str, float]]:
+  """Parse the stdout of Intel HPL returning a condensed sample of results.
+
+  Sample stdout:
+   pkb-123-0  : Column=000576 Fraction=0.005 Kernel=    0.58 Mflops=1265648.19
+   pkb-123-0  : Column=001152 Fraction=0.010 Kernel=969908.14 Mflops=1081059.81
+   pkb-123-0  : Column=001728 Fraction=0.015 Kernel=956391.64 Mflops=1040609.60
+
+  Return:
+   1.0406096,
+   {'fractions': '0.01,0.015',
+    'kernel_tflops': '0.96990814,0.95639164',
+    'last_fraction_completed': 0.015,
+    'tflops': '1.08105981,1.0406096'
+   }
+
+  Args:
+    stdout: The stdout text from running HPL
+
+  Returns:
+    Tuple of the tflops/s and a dict of the fractional run information.
+
+  Raises:
+    ValueError: If no metrics could be found.
+  """
+  line_re = re.compile(
+      r"""Column=\s*(?P<column>\d+)
+        \s*Fraction=\s*(?P<fraction>[\d\.]+)
+        \s*Kernel=\s*(?P<kernel>[\d\.]+)
+        \s*Mflops=\s*(?P<mflops>[\d\.]+)""", re.X)
+  fractions = []
+  kernel_tflops = []
+  tflops = []
+  line_matches = line_re.finditer(stdout)
+  try:
+    next(line_matches)  # first outputted values are artificially low
+  except StopIteration:
+    raise ValueError(
+        f'Could not find a line in stdout to match {line_re.pattern}: {stdout}')
+  for line_match in line_matches:
+    fractions.append(float(line_match['fraction']))
+    kernel_tflops.append(float(line_match['kernel']) / 1e6)
+    tflops.append(float(line_match['mflops']) / 1e6)
+  if not tflops:
+    raise ValueError('No metrics found in stdout')
+  # Grab all the I_MPI* environment variables in debug output to put in metadata
+  intel_env_re = re.compile(r'(.*MPI startup.*?)?\s*'
+                            r'(?P<key>I_MPI[A-Z_\d]+)=(?P<value>.*)\s*')
+  env_vars = {row['key']: row['value'] for row in intel_env_re.finditer(stdout)}
+  env_vars.pop('I_MPI_HYDRA_UUID', None)
+  metadata = {
+      'fractions': ','.join([str(x) for x in fractions]),
+      'kernel_tflops': ','.join([str(x) for x in kernel_tflops]),
+      'tflops': ','.join([str(x) for x in tflops]),
+      'last_fraction_completed': fractions[-1],
+      'intel_mpi_env': vm_util.DictionaryToEnvString(env_vars, ';')
+  }
+  return tflops[-1], metadata

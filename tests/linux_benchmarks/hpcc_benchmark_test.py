@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for HPCC benchmark."""
 
+import inspect
 import os
 from typing import Optional
 import unittest
@@ -24,7 +25,9 @@ import mock
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
+from perfkitbenchmarker.linux_packages import intelmpi
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -57,6 +60,28 @@ def DefaultHpccDimensions(problem_size: int, num_rows: int,
       l1=0,
       u=0,
       equilibration=1)
+
+# the HPL.out Intel HPL output file contents
+_INTEL_MPIRUN_FILE_OUT = '''
+ T/V       N       NB      P     Q   Time     Gflops
+---------------------------------------------------------
+WR11C2R4   81792   192     1     2   621.92   5.86567e+02
+'''
+
+_INTEL_MPIRUN_STDOUT = '''
+ I_MPI_ROOT=/opt/intel/compilers_and_libraries_2018.5.274/linux/mpi
+ I_MPI_HYDRA_UUID=9d260000-7c26-e807-8fb4-050000430af0
+ this should be ignored key=value
+ [0] MPI startup(): I_MPI_PIN_MAPPING=4:0 0,1 1,2 2,3 3,4 4
+
+ pkb-123-0  : Column=000576 Fraction=0.005 Kernel=    0.58 Mflops=1265648.19
+ pkb-123-0  : Column=001152 Fraction=0.010 Kernel=969908.14 Mflops=1081059.81
+ pkb-123-0  : Column=001728 Fraction=0.015 Kernel=956391.64 Mflops=1040609.60
+'''
+
+ENV_METADATA = (
+    'I_MPI_PIN_MAPPING=4:0 0,1 1,2 2,3 3,4 4;'
+    'I_MPI_ROOT=/opt/intel/compilers_and_libraries_2018.5.274/linux/mpi')
 
 
 class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -234,6 +259,66 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
     context = dataclasses.asdict(DefaultHpccDimensions(192, 10, 11))
     text = template.render(**context).strip()
     self.assertEqual(ReadTestDataFile('hpl.dat.txt').strip(), text)
+
+  def testParseIntelLinpackStdout(self):
+    tflops, metadata = hpcc_benchmark._ParseIntelLinpackStdout(
+        _INTEL_MPIRUN_STDOUT)
+    expected_metadata = {
+        'fractions': '0.01,0.015',
+        'kernel_tflops': '0.96990814,0.95639164',
+        'last_fraction_completed': 0.015,
+        'tflops': '1.08105981,1.0406096',
+        'intel_mpi_env': ENV_METADATA,
+    }
+    self.assertEqual(1.0406096, tflops)
+    self.assertEqual(expected_metadata, metadata)
+
+  def testCreateIntelMpiRunCommand(self):
+    mock_run_file = self.enter_context(
+        mock.patch.object(vm_util, 'CreateRemoteFile'))
+    mpivars = '/opt/intel/compilers_and_libraries/linux/mpi/bin64/mpivars.sh'
+    vm = mock.Mock(internal_ip='10.0.0.2', numa_node_count=2)
+    vm.RemoteCommand.return_value = mpivars, ''
+    num_rows, num_cols = 3, 4
+    dim = DefaultHpccDimensions(100, num_rows, num_cols)
+    mpi_cmd, num_processes = hpcc_benchmark._CreateIntelMpiRunCommand([vm], dim)
+    expected_mpi_cmd = (f'. {mpivars}; '
+                        'mpirun -perhost 2  -np 12 -host 10.0.0.2 ./hpl_run')
+    self.assertEqual(1 * num_rows * num_cols, num_processes)
+    self.assertEqual(expected_mpi_cmd, mpi_cmd)
+    run_file_text = inspect.cleandoc('''
+    #!/bin/bash
+    export HPL_HOST_NODE=$((PMI_RANK % 2))
+    /opt/intel/mkl/benchmarks/mp_linpack/xhpl_intel64_static
+    ''')
+    mock_run_file.assert_called_with(vm, run_file_text + '\n', './hpl_run')
+
+  def testRunIntelLinpack(self):
+    self.enter_context(mock.patch.object(vm_util, 'CreateRemoteFile'))
+    mock_mpivars = self.enter_context(mock.patch.object(intelmpi, 'MpiVars'))
+    vm = mock.Mock(internal_ip='10.0.0.2', numa_node_count=2)
+    vm.RobustRemoteCommand.return_value = _INTEL_MPIRUN_STDOUT, ''
+    vm.RemoteCommand.return_value = _INTEL_MPIRUN_FILE_OUT, ''
+    dim = DefaultHpccDimensions(100, 3, 4)
+    mpi_dir = '/opt/intel/compilers_and_libraries/linux/mpi'
+    mock_mpivars.return_value = f'{mpi_dir}/bin64/mpivars.sh'
+
+    hpl_sample = hpcc_benchmark.RunIntelLinpack([vm], dim)
+
+    expected_metadata = {
+        'fractions': '0.01,0.015',
+        'full': True,
+        'intel_mpi_env': ENV_METADATA,
+        'kernel_tflops': '0.96990814,0.95639164',
+        'last_fraction_completed': 0.015,
+        'mpi_cmd': f'. {mpi_dir}/bin64/mpivars.sh; '
+                   'mpirun -perhost 2  -np 12 -host 10.0.0.2 ./hpl_run',
+        'num_processes': 12,
+        'per_host': 2,
+        'tflops': '1.08105981,1.0406096',
+    }
+    self.assertAlmostEqual(0.586, hpl_sample.value, places=2)
+    self.assertEqual(expected_metadata, hpl_sample.metadata)
 
 
 if __name__ == '__main__':

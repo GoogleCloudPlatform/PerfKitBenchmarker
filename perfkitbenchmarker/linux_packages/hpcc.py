@@ -21,11 +21,13 @@ http://icl.cs.utk.edu/hpcc/
 import os
 import posixpath
 import re
+from typing import Any, Dict
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import amdblis
+from perfkitbenchmarker.linux_packages import intel_repo
 from perfkitbenchmarker.linux_packages import openblas
 
 
@@ -216,9 +218,35 @@ flags.DEFINE_list(
     'hpcc_benchmarks', [], 'A list of benchmarks in HPCC to run. If none are '
     'specified (the default), then all of the benchmarks are run. In 1.5.0, '
     'the benchmarks may include the following: %s' % ', '.join(HPCC_BENCHMARKS))
+
+USE_INTEL_COMPILED_HPL = flags.DEFINE_boolean(
+    'hpcc_use_intel_compiled_hpl', False,
+    'Whether to use the intel compiled HPL')
+
+
+def CheckUseIntelCompiled(myflags: Dict[str, Any]) -> bool:
+  """Returns if --hpcc_use_intel_compiled_hpl is used correctly.
+
+  When using --hpcc_use_intel_compiled_hpl must also set
+  --hpcc_math_library=mkl
+
+  Args:
+    myflags: Dict of flags from register_multi_flags_validator for
+      --hpcc_use_intel_compiled_hpl and --hpcc_math_library
+  """
+  if myflags['hpcc_use_intel_compiled_hpl']:
+    return myflags['hpcc_math_library'] == HPCC_MATH_LIBRARY_MKL
+  return True
+
+
 flags.register_validator(
     'hpcc_benchmarks',
     lambda hpcc_benchmarks: set(hpcc_benchmarks).issubset(set(HPCC_BENCHMARKS)))
+flags.register_multi_flags_validator(
+    ['hpcc_math_library', 'hpcc_use_intel_compiled_hpl'], CheckUseIntelCompiled,
+    'With --hpcc_use_intel_compiled_hpl must specify '
+    f'--hpcc_math_library={HPCC_MATH_LIBRARY_MKL}')
+
 FLAGS = flags.FLAGS
 
 
@@ -262,6 +290,11 @@ def _LimitBenchmarksToRun(vm, selected_hpcc_benchmarks):
 def _Install(vm):
   """Installs the HPCC package on the VM."""
   vm.Install('wget')
+  if USE_INTEL_COMPILED_HPL.value:
+    vm.Install('intelmpi')
+    vm.Install('mkl')
+    # Using a pre-compiled HPL, no need to continue
+    return
   vm.Install('openmpi')
   vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
                                       linux_packages.INSTALL_DIR)
@@ -357,9 +390,13 @@ def _CompileHpccMKL(vm):
 
 def YumInstall(vm):
   """Installs the HPCC package on the VM."""
+  if USE_INTEL_COMPILED_HPL.value:
+    intel_repo.YumPrepare(vm)
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the HPCC package on the VM."""
+  if USE_INTEL_COMPILED_HPL.value:
+    intel_repo.AptPrepare(vm)
   _Install(vm)

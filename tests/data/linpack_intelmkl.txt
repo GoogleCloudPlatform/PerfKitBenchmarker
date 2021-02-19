@@ -1,0 +1,76 @@
+host: 10.240.0.67
+
+==================================================================================================
+mpiexec options:
+----------------
+  Base path: /opt/intel/compilers_and_libraries_2018.5.274/linux/mpi/intel64/bin/
+  Launcher: ssh
+  Debug level: 1
+  Enable X: -1
+
+  Global environment:
+  -------------------
+  I_MPI_PERHOST=allcores
+  LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2018.5.274/linux/tbb/...
+
+  Hydra internal environment:
+  ---------------------------
+    MPIR_CVAR_NEMESIS_ENABLE_CKPOINT=1
+    GFORTRAN_UNBUFFERED_PRECONNECTED=y
+    I_MPI_HYDRA_UUID=9d260000-7c26-e807-8fb4-050000430af0
+    DAPL_NETWORK_PROCESS_NUM=15
+
+  Intel(R) MPI Library specific variables:
+  ----------------------------------------
+    I_MPI_PERHOST=allcores
+    I_MPI_MPIRUN=mpirun
+    I_MPI_DEBUG=6
+    I_MPI_HYDRA_DEBUG=1
+    I_MPI_ROOT=/opt/intel/compilers_and_libraries_2018.5.274/linux/mpi
+    I_MPI_HYDRA_UUID=9d260000-7c26-e807-8fb4-050000430af0
+
+
+    Proxy information:
+    *********************
+      [1] proxy: 10.240.0.67 (15 cores)
+      Exec list: /opt/intel/compilers_and_libraries/linux/mkl/benchmarks/mp_linpack/xhpl_intel64_static (15 proces
+ses);
+
+[0] MPI startup(): Intel(R) MPI Library, Version 2017  Build 20160721 (id: 15987)
+[0] MPI startup(): Copyright (C) 2003-2016 Intel Corporation.  All rights reserved.
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): shm data transfer mode
+[1] MPI startup(): shm data transfer mode
+[0] MPI startup(): Device_reset_idx=8
+[0] MPI startup(): Allgather: 1: 0-0 & 0-2147483647
+[0] MPI startup(): Allgather: 5: 1-256 & 0-2147483647
+[0] MPI startup(): Scatter: 3: 0-2147483647 & 0-2147483647
+[0] MPI startup(): Scatterv: 1: 0-2147483647 & 0-2147483647
+[1] MPI startup(): Recognition=2 Platform(code=512 ippn=6 dev=1) Fabric(intra=1 inter=1 flags=0x0)
+[8] MPI startup(): Recognition=2 Platform(code=512 ippn=6 dev=1) Fabric(intra=1 inter=1 flags=0x0)
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       6340     pkb-d1f0cae8-0  0
+[0] MPI startup(): 1       6341     pkb-d1f0cae8-0  1
+[0] MPI startup(): 2       6342     pkb-d1f0cae8-0  2
+[0] MPI startup(): 3       6343     pkb-d1f0cae8-0  3
+[0] MPI startup(): 4       6344     pkb-d1f0cae8-0  4
+[0] MPI startup(): 5       6345     pkb-d1f0cae8-0  5
+[0] MPI startup(): 6       6346     pkb-d1f0cae8-0  6
+[0] MPI startup(): 7       6347     pkb-d1f0cae8-0  7
+[0] MPI startup(): 8       6348     pkb-d1f0cae8-0  8
+[0] MPI startup(): 9       6349     pkb-d1f0cae8-0  9
+[0] MPI startup(): 10      6350     pkb-d1f0cae8-0  10
+[0] MPI startup(): 11      6351     pkb-d1f0cae8-0  11
+[0] MPI startup(): 12      6352     pkb-d1f0cae8-0  12
+[0] MPI startup(): 13      6353     pkb-d1f0cae8-0  13
+[0] MPI startup(): 14      6354     pkb-d1f0cae8-0  14
+[0] MPI startup(): I_MPI_DEBUG=6
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=15:0 0,1 1,2 2,3 3,4 4,5 5,6 6,7 7,8 8,9 9,10 10,11 11,12 12,13 13,14 14
+Number of Heterogeneous data entries for HPL.dat=0
+pkb-d1f0cae8-0  : Column=000576 Fraction=0.005 Kernel=    0.58 Mflops=1265648.19
+pkb-d1f0cae8-0  : Column=001152 Fraction=0.010 Kernel=969908.14 Mflops=1081059.81
+pkb-d1f0cae8-0  : Column=001728 Fraction=0.015 Kernel=956391.64 Mflops=1040609.60
+pkb-d1f0cae8-0  : Column=089280 Fraction=0.795 Kernel=622712.63 Mflops=935312.56
+pkb-d1f0cae8-0  : Column=100416 Fraction=0.895 Kernel=365074.07 Mflops=924846.06
+pkb-d1f0cae8-0  : Column=111744 Fraction=0.995 Kernel=105114.61 Mflops=916595.00
