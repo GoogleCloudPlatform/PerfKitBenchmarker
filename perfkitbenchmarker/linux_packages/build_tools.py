@@ -15,8 +15,14 @@
 
 """Module containing build tools installation and cleanup functions."""
 import logging
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string('gcc_version', None, 'Version of gcc to use. Benchmarks '
+                    'that utilize gcc compilation should ensure reinstallation '
+                    'of GCC. Default is set by the OS package manager.')
 
 
 def YumInstall(vm):
@@ -27,6 +33,8 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs build tools on the VM."""
   vm.InstallPackages('build-essential git libtool autoconf automake')
+  if FLAGS.gcc_version:
+    Reinstall(vm, version=FLAGS.gcc_version)
 
 
 def GetVersion(vm, pkg):
