@@ -82,7 +82,7 @@ flags.DEFINE_enum('horovod_precision', 'fp16', ['fp16', 'fp32'], 'Precision.')
 flags.DEFINE_bool('horovod_bert_finetune', True,
                   'Pretrain or finetune a BERT model.')
 
-flags.DEFINE_bool('horovod_timelime', False, 'Enable timeline in Horovod.')
+flags.DEFINE_bool('horovod_timeline', False, 'Enable timeline in Horovod.')
 
 
 class HorovodParseOutputError(errors.Benchmarks.RunError):
@@ -99,33 +99,6 @@ def GetConfig(user_config):
     loaded benchmark configuration
   """
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
-
-def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
-  """Update the benchmark_spec with supplied command line flags.
-
-  Args:
-    benchmark_spec: benchmark specification to update
-  """
-  gpus_per_node = nvidia_driver.QueryNumberOfGpus(benchmark_spec.vms[0])
-  num_vms = len(benchmark_spec.vms)
-  total_gpus = gpus_per_node * num_vms
-
-  benchmark_spec.gpus_per_node = gpus_per_node
-  benchmark_spec.num_vms = num_vms
-  benchmark_spec.total_gpus = total_gpus
-  benchmark_spec.model = FLAGS.horovod_model
-  benchmark_spec.batch_size = FLAGS.horovod_batch_size
-  benchmark_spec.num_steps = FLAGS.horovod_num_steps
-  benchmark_spec.precision = FLAGS.horovod_precision
-  benchmark_spec.max_seq_len = int(FLAGS.horovod_max_seq_len)
-  benchmark_spec.bert_finetune = FLAGS.horovod_bert_finetune
-  benchmark_spec.timeline = FLAGS.horovod_timelime
-  benchmark_spec.synthetic = FLAGS.horovod_synthetic
-  benchmark_spec.cuda_visible_devices = FLAGS.nccl_cuda_visible_devices
-  benchmark_spec.nccl_version = FLAGS.nccl_version
-  benchmark_spec.nccl_net_plugin = FLAGS.nccl_net_plugin
-  benchmark_spec.nccl_extra_params = FLAGS.nccl_extra_params
 
 
 def _CopyAndUpdateRunScripts(model, vm):
@@ -173,7 +146,7 @@ def _CopyAndUpdateRunScripts(model, vm):
         get_bert_data_cmd.format(bert=bert_base_dir, url=BERT_LARGE_URL))
 
 
-def _PrepareHorovod(vm):
+def PrepareHorovod(vm):
   """Install dependencies on a single vm.
 
   Args:
@@ -187,10 +160,9 @@ def _PrepareHorovod(vm):
   vm.Install('nccl')
 
   pip = 'pip'
-  if FLAGS.cloud == 'GCP':  # temporary fix for DLVM images
+  if FLAGS.cloud == 'GCP':
     pip = '/opt/conda/bin/pip'
     vm.RemoteCommand(f'sudo {pip} install --force-reinstall pyarrow')
-    vm.Install('openmpi')
   elif FLAGS.cloud == 'AWS':
     vm.RobustRemoteCommand('. anaconda3/bin/activate tensorflow_p37')
     pip = 'anaconda3/envs/tensorflow_p37/bin/pip'
@@ -217,6 +189,8 @@ def _PrepareHorovod(vm):
       f'[ -d "tensorpack" ] || git clone https://github.com/tensorpack/tensorpack.git && sudo {pip} install ./tensorpack'
   )
 
+  _CopyAndUpdateRunScripts(FLAGS.horovod_model, vm)
+
 
 def Prepare(benchmark_spec):
   """Install and set up Horovod on the target vms.
@@ -225,39 +199,39 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(_PrepareHorovod, vms)
-  _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  vm_util.RunThreaded(
-      lambda vm: _CopyAndUpdateRunScripts(benchmark_spec.model, vm), vms)
-  hpc_util.CreateMachineFile(vms, lambda _: benchmark_spec.gpus_per_node,
-                             MACHINEFILE)
+  vm_util.RunThreaded(PrepareHorovod, vms)
+  hpc_util.CreateMachineFile(vms, nvidia_driver.QueryNumberOfGpus, MACHINEFILE)
 
 
-def _CreateMetadataDict(benchmark_spec):
+def _CreateMetadataDict(vms):
   """Create metadata dict to be used in run results.
 
   Args:
-    benchmark_spec: benchmark spec
+    vms: A list of worker VMs.
 
   Returns:
     metadata dict
   """
-  vm = benchmark_spec.vms[0]
+  vm = vms[0]
+  gpus_per_node = nvidia_driver.QueryNumberOfGpus(vm)
+  num_vms = len(vms)
+  total_gpus = gpus_per_node * num_vms
+
   metadata = dict()
   metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['benchmark_version'] = BENCHMARK_VERSION
-  metadata['num_nodes'] = len(benchmark_spec.vms)
-  metadata['total_gpus'] = int(benchmark_spec.total_gpus)
-  metadata['model'] = benchmark_spec.model
-  metadata['batch_size'] = benchmark_spec.batch_size
-  metadata['num_steps'] = benchmark_spec.num_steps
-  metadata['synthetic'] = benchmark_spec.synthetic
-  metadata['precision'] = benchmark_spec.precision
-  metadata['max_seq_len'] = benchmark_spec.max_seq_len
-  metadata['nccl_version'] = benchmark_spec.nccl_version
-  metadata['nccl_net_plugin'] = benchmark_spec.nccl_net_plugin
-  metadata['cuda_visible_devices'] = benchmark_spec.cuda_visible_devices
-  metadata['nccl_extra_params'] = benchmark_spec.nccl_extra_params
+  metadata['num_nodes'] = len(vms)
+  metadata['total_gpus'] = int(total_gpus)
+  metadata['model'] = FLAGS.horovod_model
+  metadata['batch_size'] = FLAGS.horovod_batch_size
+  metadata['num_steps'] = FLAGS.horovod_num_steps
+  metadata['synthetic'] = FLAGS.horovod_synthetic
+  metadata['precision'] = FLAGS.horovod_precision
+  metadata['max_seq_len'] = int(FLAGS.horovod_max_seq_len)
+  metadata['nccl_version'] = FLAGS.nccl_version
+  metadata['nccl_net_plugin'] = FLAGS.nccl_net_plugin
+  metadata['cuda_visible_devices'] = FLAGS.nccl_cuda_visible_devices
+  metadata['nccl_extra_params'] = FLAGS.nccl_extra_params
   return metadata
 
 
@@ -325,18 +299,18 @@ def _ExtractMaskRCNNThroughput(output):
   return round(sum(total_xput) / len(total_xput), 1), unit
 
 
-def _MakeSamplesFromOutput(benchmark_spec, stdout, stderr):
+def _MakeSamplesFromOutput(vms, stdout, stderr):
   """Create a sample continaing the measured Horovod throughput.
 
   Args:
-    benchmark_spec: benchmark spec
+    vms: a list of worker VMs
     stdout: stdout
     stderr: stderr
 
   Returns:
     list of a Sample containing the Horovod throughput
   """
-  metadata = _CreateMetadataDict(benchmark_spec)
+  metadata = _CreateMetadataDict(vms)
   output = stdout + stderr
 
   extractor = {
@@ -347,7 +321,7 @@ def _MakeSamplesFromOutput(benchmark_spec, stdout, stderr):
       'maskrcnn': _ExtractMaskRCNNThroughput,
   }
 
-  throughput, unit = extractor[benchmark_spec.model](output)
+  throughput, unit = extractor[FLAGS.horovod_model](output)
 
   samples = []
   samples.append(
@@ -356,7 +330,7 @@ def _MakeSamplesFromOutput(benchmark_spec, stdout, stderr):
 
 
 def Run(benchmark_spec):
-  """Run Horovod on the cluster.
+  """Wrapper of RunWithVMs.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -365,10 +339,26 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  vms = benchmark_spec.vms
+
+  return RunWithVMs(benchmark_spec.vms)
+
+
+def RunWithVMs(vms, extra_envs=None):
+  """Run Horovod on the cluster.
+
+  Args:
+    vms: A list of worker VMs.
+    extra_envs: A dictionary of environment variables.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
   vm_util.RunThreaded(lambda vm: vm.RemoteCommand('rm -rf /tmp/models'), vms)
   master_vm = vms[0]
+
+  gpus_per_node = nvidia_driver.QueryNumberOfGpus(master_vm)
+  num_vms = len(vms)
+  total_gpus = gpus_per_node * num_vms
 
   # GCP should work out of the box with the deep learning image but the AWS
   # image requires us to use the correct Tensorflow Python environment.
@@ -378,42 +368,44 @@ def Run(benchmark_spec):
   else:
     python_interpreter = '/opt/conda/bin/python'
 
-  nccl_params = [
-      'TF_CPP_MIN_LOG_LEVEL=0',
-      'NCCL_SOCKET_IFNAME=^lo,docker0',
-      'NCCL_DEBUG=INFO',
-  ]
+  nccl_params = {
+      'TF_CPP_MIN_LOG_LEVEL': 0,
+      'NCCL_SOCKET_IFNAME': '^lo,docker0',
+      'NCCL_DEBUG': 'INFO',
+  }
 
-  if benchmark_spec.timeline:
-    nccl_params.extend([
-        'HOROVOD_TIMELINE={}/timeline.json'.format(vm_util.VM_TMP_DIR),
-        'HOROVOD_TIMELINE_MARK_CYCLES=1',
-    ])
+  if FLAGS.horovod_timeline:
+    nccl_params['HOROVOD_TIMELINE_MARK_CYCLES'] = 1
+    nccl_params['HOROVOD_TIMELINE'] = f'{vm_util.VM_TMP_DIR}/timeline.json'
 
-  if benchmark_spec.cuda_visible_devices:
-    nccl_params.append('CUDA_VISIBLE_DEVICES={}'.format(
-        benchmark_spec.cuda_visible_devices))
+  if FLAGS.nccl_cuda_visible_devices:
+    nccl_params['CUDA_VISIBLE_DEVICES'] = FLAGS.nccl_cuda_visible_devices
 
   if FLAGS.nccl_extra_params:
     for extra_param in FLAGS.nccl_extra_params:
-      nccl_params.append(extra_param)
+      k, v = extra_param.split('=', 1)
+      nccl_params[k] = v
 
-  run_command = ('{mpi} -np {num_gpus} -hostfile {host_file} '
-                 '-mca plm_rsh_no_tree_spawn 1 '
-                 '--allow-run-as-root '
-                 '-bind-to socket -map-by slot '
-                 '{nccl_params} '
-                 '-mca pml ob1 -mca btl ^openib '
-                 '-mca btl_tcp_if_exclude lo,docker0 '
-                 '{python} ').format(
-                     mpi=FLAGS.nccl_mpi,
-                     num_gpus=benchmark_spec.total_gpus,
-                     host_file=MACHINEFILE,
-                     python=python_interpreter,
-                     nccl_params=' '.join(
-                         ['-x {}'.format(param) for param in nccl_params]))
+  if extra_envs:
+    nccl_params.update(extra_envs)
 
-  if benchmark_spec.model == 'resnet-50':
+  run_command = (
+      '{mpi} -np {num_gpus} -hostfile {host_file} '
+      '-mca plm_rsh_no_tree_spawn 1 '
+      '--allow-run-as-root '
+      '-bind-to socket -map-by slot '
+      '{nccl_params} '
+      '-mca pml ob1 -mca btl ^openib '
+      '-mca btl_tcp_if_exclude lo,docker0 '
+      '{python} ').format(
+          mpi=FLAGS.nccl_mpi,
+          num_gpus=total_gpus,
+          host_file=MACHINEFILE,
+          python=python_interpreter,
+          nccl_params=' '.join(
+              [f'-x {key}={value}' for key, value in nccl_params.items()]))
+
+  if FLAGS.horovod_model == 'resnet-50':
     run_flags = {
         'arch': 'resnet50',
         'mode': 'training_benchmark',
@@ -429,13 +421,13 @@ def Run(benchmark_spec):
         'iter_unit': 'batch'
     }
     run_flags.update({
-        'precision': benchmark_spec.precision,
-        'batch_size': benchmark_spec.batch_size,
-        'num_iter': benchmark_spec.num_steps,
+        'precision': FLAGS.horovod_precision,
+        'batch_size': FLAGS.horovod_batch_size,
+        'num_iter': FLAGS.horovod_num_steps,
     })
 
     # Load ImageNet training data from GCS if benchmark is not in synthetic mode
-    if not benchmark_spec.synthetic:
+    if not FLAGS.horovod_synthetic:
       run_flags['data_dir'] = 'gs://cloud-ml-nas-public/classification/imagenet'
 
     run_command += 'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
@@ -443,7 +435,7 @@ def Run(benchmark_spec):
         '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
         for key, value in sorted(run_flags.items())
     ])
-  elif benchmark_spec.model == 'resnext-101':
+  elif FLAGS.horovod_model == 'resnext-101':
     run_flags = {
         'arch': 'resnext101-32x4d',
         'mode': 'training_benchmark',
@@ -460,13 +452,13 @@ def Run(benchmark_spec):
         'iter_unit': 'batch'
     }
     run_flags.update({
-        'precision': benchmark_spec.precision,
-        'batch_size': benchmark_spec.batch_size,
-        'num_iter': benchmark_spec.num_steps,
+        'precision': FLAGS.horovod_precision,
+        'batch_size': FLAGS.horovod_batch_size,
+        'num_iter': FLAGS.horovod_num_steps,
     })
 
     # Load ImageNet training data from GCS if benchmark is not in synthetic mode
-    if not benchmark_spec.synthetic:
+    if not FLAGS.horovod_synthetic:
       run_flags['data_dir'] = 'gs://cloud-ml-nas-public/classification/imagenet'
 
     run_command += 'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
@@ -474,11 +466,11 @@ def Run(benchmark_spec):
         '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
         for key, value in sorted(run_flags.items())
     ])
-  elif benchmark_spec.model.startswith('bert'):  # bert
-    if not benchmark_spec.bert_finetune:
+  elif FLAGS.horovod_model.startswith('bert'):  # bert
+    if not FLAGS.horovod_bert_finetune:
       raise NotImplementedError('BERT pretraining is not supported.')
     bert_dir = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/{}'.format(
-        'uncased_L-12_H-768_A-12' if benchmark_spec.model ==
+        'uncased_L-12_H-768_A-12' if FLAGS.horovod_model ==
         'bert-base' else 'uncased_L-24_H-1024_A-16')
     squad_train_file = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/squad/v1.1/train-v1.1.json'
     run_flags = {
@@ -491,14 +483,15 @@ def Run(benchmark_spec):
         'output_dir': '/tmp/models',
         'horovod': None,
         'dllog_path': '/tmp/bert_dllog.json',
+        'save_checkpoints_steps': 0,
     }
     run_flags.update({
-        'precision': benchmark_spec.precision,
-        'train_batch_size': benchmark_spec.batch_size,
-        'num_train_epochs': benchmark_spec.num_steps,
-        'max_seq_length': benchmark_spec.max_seq_len,
-        'doc_stride': 64 if benchmark_spec.max_seq_len == 128 else 128,
-        'amp': benchmark_spec.precision == 'fp16'
+        'precision': FLAGS.horovod_precision,
+        'train_batch_size': FLAGS.horovod_batch_size,
+        'num_train_epochs': FLAGS.horovod_num_steps,
+        'max_seq_length': FLAGS.horovod_max_seq_len,
+        'doc_stride': 64 if FLAGS.horovod_max_seq_len == 128 else 128,
+        'amp': FLAGS.horovod_precision == 'fp16'
     })
     run_command += 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py '
     run_command += ' '.join([
@@ -516,13 +509,13 @@ def Run(benchmark_spec):
         'TRAIN.LR_SCHEDULE="[{step}, {step}, {step}]" '
         '--logdir {log_dir}/maskrcnn ').format(
             log_dir=vm_util.VM_TMP_DIR,
-            step=benchmark_spec.num_steps * benchmark_spec.total_gpus // 8)
+            step=FLAGS.horovod_num_steps * total_gpus // 8)
   stdout, stderr = master_vm.RobustRemoteCommand(run_command, should_log=True)
 
-  if benchmark_spec.timeline:
+  if FLAGS.horovod_timeline:
     master_vm.PullFile(vm_util.GetTempDir(),
                        '{}/timeline.json'.format(vm_util.VM_TMP_DIR))
-  return _MakeSamplesFromOutput(benchmark_spec, stdout, stderr)
+  return _MakeSamplesFromOutput(vms, stdout, stderr)
 
 
 def Cleanup(benchmark_spec):
