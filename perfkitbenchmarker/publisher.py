@@ -368,7 +368,8 @@ class PrettyPrintStreamPublisher(SamplePublisher):
       for k in frozenset(unique_values) - frozenset(sample['metadata']):
         unique_values[k].add(None)
 
-    return frozenset(k for k, v in six.iteritems(unique_values) if len(v) == 1)
+    return frozenset(k for k, v in six.iteritems(unique_values)
+                     if len(v) == 1 and None not in v)
 
   def _FormatMetadata(self, metadata):
     """Format 'metadata' as space-delimited key="value" pairs."""

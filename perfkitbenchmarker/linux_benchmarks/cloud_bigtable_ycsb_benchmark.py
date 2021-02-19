@@ -337,7 +337,7 @@ def _GetCpuUtilizationSample(samples, instance_id):
       }
 
       cpu_utilization_sample = sample.Sample(
-          '{}_array'.format(metric), -1, metric, metadata)
+          '{}_array'.format(metric), -1, '', metadata)
 
       samples.append(cpu_utilization_sample)
   return samples
