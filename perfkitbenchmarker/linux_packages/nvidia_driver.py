@@ -122,7 +122,8 @@ def CheckNvidiaGpuExists(vm):
   Returns:
     True or False depending on whether NVIDIA GPU exists.
   """
-  if FLAGS.os_type not in os_types.LINUX_OS_TYPES:
+  # PKB only supports NVIDIA driver on DEBIAN for now.
+  if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return False
   vm.Install('pciutils')
   output, _ = vm.RemoteCommand('sudo lspci', should_log=True)
@@ -139,7 +140,8 @@ def CheckNvidiaSmiExists(vm):
   Returns:
     True or False depending on whether nvidia-smi command exists.
   """
-  if FLAGS.os_type not in os_types.LINUX_OS_TYPES:
+  # PKB only supports NVIDIA driver on DEBIAN for now.
+  if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return False
   resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
                                  ignore_failure=True,
