@@ -107,3 +107,6 @@ flags.DEFINE_boolean(
     'athena_workgroup_delete', True,
     'Should the dedicated athena workgroups be deleted or kept alive for investigations.'
 )
+flags.DEFINE_enum('aws_credit_specification', None,
+                  ['CpuCredits=unlimited', 'CpuCredits=standard'],
+                  'Credit specification for burstable vms.')

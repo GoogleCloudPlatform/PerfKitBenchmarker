@@ -36,9 +36,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-# For some reason removing this import breaks flags in disk_types_renaming_test
-# pylint: disable=unused-import
-from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 
 BENCHMARK_NAME = 'dpb_wordcount_benchmark'

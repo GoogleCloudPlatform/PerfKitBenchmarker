@@ -45,9 +45,6 @@ from perfkitbenchmarker.providers.aws import util
 from six.moves import range
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum('aws_credit_specification', None,
-                  ['CpuCredits=unlimited', 'CpuCredits=standard'],
-                  'Credit specification for burstable vms.')
 
 HVM = 'hvm'
 PV = 'paravirtual'

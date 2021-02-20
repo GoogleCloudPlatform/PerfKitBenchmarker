@@ -20,7 +20,6 @@ from absl import flags
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
-from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
