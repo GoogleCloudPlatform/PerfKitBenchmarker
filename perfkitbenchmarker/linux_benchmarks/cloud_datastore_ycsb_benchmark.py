@@ -29,14 +29,13 @@ import concurrent.futures
 import logging
 from multiprocessing import pool as pool_lib
 import time
-from absl import flags
-from perfkitbenchmarker import configs
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import ycsb
 
+from absl import flags
 from google.cloud import datastore
 from google.oauth2 import service_account
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import ycsb
 
 
 BENCHMARK_NAME = 'cloud_datastore_ycsb'
@@ -50,14 +49,16 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
+# the name of the database entity created when running datastore YCSB
+# https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
+_YCSB_COLLECTIONS = ['usertable']
+
+# constants used for cleaning up database
 _CLEANUP_THREAD_POOL_WORKERS = 30
 _CLEANUP_KIND_READ_BATCH_SIZE = 12000
 _CLEANUP_KIND_DELETE_BATCH_SIZE = 6000
 _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE = 3000
 _CLEANUP_KIND_DELETE_OP_BATCH_SIZE = 500
-# the name of the database entity created when running datastore YCSB
-# https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
-_YCSB_COLLECTIONS = ['usertable']
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('google_datastore_keyfile', None,
@@ -73,57 +74,12 @@ flags.DEFINE_string('google_datastore_datasetId', None,
                     'The project ID that has Cloud Datastore service')
 flags.DEFINE_string('google_datastore_debug', 'false',
                     'The logging level when running YCSB')
-# the JSON keyfile is needed to validate credentials in the Cleanup phase
+flags.DEFINE_boolean('google_datastore_repopulate', False,
+                     'If True, empty database & repopulate with new data.'
+                     'By default, tests are run with pre-populated data.')
+# the JSON keyfile is needed to validate credentials when cleaning up the db
 flags.DEFINE_string('google_datastore_deletion_keyfile', None,
                     'The path to Google API JSON private key file')
-
-
-class _DeletionTask(object):
-  """Represents a cleanup deletion task.
-
-  Attributes:
-    kind: Datastore kind to be deleted.
-    task_id: Task id
-    entity_deletion_count: No of entities deleted.
-    deletion_error: Set to true if deletion fails with an error.
-  """
-
-  def __init__(self, kind, task_id):
-    self.kind = kind
-    self.task_id = task_id
-    self.entity_deletion_count = 0
-    self.deletion_error = False
-
-  def DeleteEntities(self, dataset_id, credentials, delete_entities):
-    """Deletes entities in a datastore database in batches.
-
-    Args:
-      dataset_id: Cloud Datastore client dataset id.
-      credentials: Cloud Datastore client credentials.
-      delete_entities: Entities to delete.
-
-    Returns:
-      number of records deleted.
-    Raises:
-      ValueError: In case of delete failures.
-    """
-    try:
-      client = datastore.Client(project=dataset_id, credentials=credentials)
-      logging.info('Task %d - Started deletion for %s', self.task_id, self.kind)
-      while delete_entities:
-        chunk = delete_entities[:_CLEANUP_KIND_DELETE_OP_BATCH_SIZE]
-        delete_entities = delete_entities[_CLEANUP_KIND_DELETE_OP_BATCH_SIZE:]
-        client.delete_multi(chunk)
-        self.entity_deletion_count += len(chunk)
-
-      logging.info('Task %d - Completed deletion for %s - %d', self.task_id,
-                   self.kind, self.entity_deletion_count)
-      return self.entity_deletion_count
-    except ValueError as error:
-      logging.exception('Task %d - Delete entities for %s failed due to %s',
-                        self.task_id, self.kind, error)
-      self.deletion_error = True
-      raise error
 
 
 def GetConfig(user_config):
@@ -149,25 +105,19 @@ def CheckPrerequisites(_):
     raise ValueError('"google_datastore_datasetId" must be set ')
 
 
-def GetDatastoreDeleteCredentials():
-  """Returns credentials to datastore db."""
-  if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
-    # Copy private keyfile to local disk
-    cp_cmd = [
-        'gsutil', 'cp', FLAGS.google_datastore_deletion_keyfile,
-        FLAGS.private_keyfile
-    ]
-    vm_util.IssueCommand(cp_cmd)
-    credentials_path = FLAGS.private_keyfile
+def _Install(vm):
+  """Installs YCSB benchmark & copies datastore keyfile to client vm."""
+  vm.Install('ycsb')
+
+  # Copy private key file to VM
+  if FLAGS.google_datastore_keyfile.startswith('gs://'):
+    vm.Install('google_cloud_sdk')
+    vm.RemoteCommand('{cmd} {datastore_keyfile} {private_keyfile}'.format(
+        cmd='gsutil cp',
+        datastore_keyfile=FLAGS.google_datastore_keyfile,
+        private_keyfile=FLAGS.private_keyfile))
   else:
-    credentials_path = FLAGS.google_datastore_deletion_keyfile
-
-  credentials = service_account.Credentials.from_service_account_file(
-      credentials_path,
-      scopes=datastore.client.Client.SCOPE,
-  )
-
-  return credentials
+    vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)
 
 
 def Prepare(benchmark_spec):
@@ -177,24 +127,8 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  benchmark_spec.always_call_cleanup = True
-
-  # Check that the database is empty before running
-  if FLAGS.google_datastore_deletion_keyfile:
-    dataset_id = FLAGS.google_datastore_datasetId
-    credentials = GetDatastoreDeleteCredentials()
-
-    client = datastore.Client(project=dataset_id, credentials=credentials)
-
-    for kind in _YCSB_COLLECTIONS:
-      # TODO(user): Allow a small number of leftover entities until we
-      # figure out why these are not getting deleted.
-      if len(list(client.query(kind=kind).fetch(limit=200))) > 100:
-        raise errors.Benchmarks.PrepareException(
-            'Database is non-empty. Stopping test.')
-
-  else:
-    logging.warning('Test could be executed on a non-empty database.')
+  if FLAGS.google_datastore_repopulate:
+    EmptyDatabase()
 
   vms = benchmark_spec.vms
 
@@ -232,6 +166,10 @@ def Run(benchmark_spec):
 
 
 def Cleanup(_):
+  pass
+
+
+def EmptyDatabase():
   """Deletes all entries in a datastore database."""
   if FLAGS.google_datastore_deletion_keyfile:
     dataset_id = FLAGS.google_datastore_datasetId
@@ -254,6 +192,27 @@ def Cleanup(_):
 
   else:
     logging.warning('Manually delete all the entries via GCP portal.')
+
+
+def GetDatastoreDeleteCredentials():
+  """Returns credentials to datastore db."""
+  if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
+    # Copy private keyfile to local disk
+    cp_cmd = [
+        'gsutil', 'cp', FLAGS.google_datastore_deletion_keyfile,
+        FLAGS.private_keyfile
+    ]
+    vm_util.IssueCommand(cp_cmd)
+    credentials_path = FLAGS.private_keyfile
+  else:
+    credentials_path = FLAGS.google_datastore_deletion_keyfile
+
+  credentials = service_account.Credentials.from_service_account_file(
+      credentials_path,
+      scopes=datastore.client.Client.SCOPE,
+  )
+
+  return credentials
 
 
 def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
@@ -370,16 +329,49 @@ def _CreateClient(dataset_id, credentials):
   return datastore.Client(project=dataset_id, credentials=credentials)
 
 
-def _Install(vm):
-  """Installs YCSB benchmark & copies datastore keyfile to client vm."""
-  vm.Install('ycsb')
+class _DeletionTask():
+  """Represents a cleanup deletion task.
 
-  # Copy private key file to VM
-  if FLAGS.google_datastore_keyfile.startswith('gs://'):
-    vm.Install('google_cloud_sdk')
-    vm.RemoteCommand('{cmd} {datastore_keyfile} {private_keyfile}'.format(
-        cmd='gsutil cp',
-        datastore_keyfile=FLAGS.google_datastore_keyfile,
-        private_keyfile=FLAGS.private_keyfile))
-  else:
-    vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)
+  Attributes:
+    kind: Datastore kind to be deleted.
+    task_id: Task id
+    entity_deletion_count: No of entities deleted.
+    deletion_error: Set to true if deletion fails with an error.
+  """
+
+  def __init__(self, kind, task_id):
+    self.kind = kind
+    self.task_id = task_id
+    self.entity_deletion_count = 0
+    self.deletion_error = False
+
+  def DeleteEntities(self, dataset_id, credentials, delete_entities):
+    """Deletes entities in a datastore database in batches.
+
+    Args:
+      dataset_id: Cloud Datastore client dataset id.
+      credentials: Cloud Datastore client credentials.
+      delete_entities: Entities to delete.
+
+    Returns:
+      number of records deleted.
+    Raises:
+      ValueError: In case of delete failures.
+    """
+    try:
+      client = datastore.Client(project=dataset_id, credentials=credentials)
+      logging.info('Task %d - Started deletion for %s', self.task_id, self.kind)
+      while delete_entities:
+        chunk = delete_entities[:_CLEANUP_KIND_DELETE_OP_BATCH_SIZE]
+        delete_entities = delete_entities[_CLEANUP_KIND_DELETE_OP_BATCH_SIZE:]
+        client.delete_multi(chunk)
+        self.entity_deletion_count += len(chunk)
+
+      logging.info('Task %d - Completed deletion for %s - %d', self.task_id,
+                   self.kind, self.entity_deletion_count)
+      return self.entity_deletion_count
+    except ValueError as error:
+      logging.exception('Task %d - Delete entities for %s failed due to %s',
+                        self.task_id, self.kind, error)
+      self.deletion_error = True
+      raise error

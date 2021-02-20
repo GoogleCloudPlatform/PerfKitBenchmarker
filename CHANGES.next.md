@@ -55,7 +55,9 @@
 -   Added support for MySQL 8.0 on VMs and minimal innodb tuning.
 -   Add ability to specify version of Intel MKL with --mkl_version
 -   Added intelmpi.NfsExportIntelDirectory to NFS export /opt/intel
-
+-   Modify cloud_datastore_ycsb benchmark to execute YCSB on the same db entries
+    each run instead of emptying and preloading the db every time. Can set flag
+    google_datastore_repopulate=True to empty & repopulate.
 
 ### Bug fixes and maintenance updates:
 
