@@ -58,6 +58,9 @@
 -   Modify cloud_datastore_ycsb benchmark to execute YCSB on the same db entries
     each run instead of emptying and preloading the db every time. Can set flag
     google_datastore_repopulate=True to empty & repopulate.
+-   Enhance the cpu metric collection feature for cloud bigtable benchmark: as
+    long as there is a real workload (table loading is not counted), the cpu
+    metrics will be collected.
 
 ### Bug fixes and maintenance updates:
 
