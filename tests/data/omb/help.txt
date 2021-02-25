@@ -1,0 +1,805 @@
+# Results of running <program> --help
+
+Usage: osu_acc_latency [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_allgather [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_allgather [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_allreduce [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_alltoall [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_alltoallv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_barrier [options]
+Options:
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_bcast [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_bibw [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -W, --window-size SIZE      set number of messages to send before synchronization (default 64)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_bw [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -W, --window-size SIZE      set number of messages to send before synchronization (default 64)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_cas_latency [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_fop_latency [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_gather [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_gatherv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_get_bw [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -W, --window-size SIZE      set number of messages to send before synchronization (default 64)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_get_latency [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+# OSU MPI Hello World Test v5.7
+This is a test with 1 processes
+Usage: osu_iallgather [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_iallgatherv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_iallreduce [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_ialltoall [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_ialltoallv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_ialltoallw [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_ibarrier [options]
+Options:
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_ibcast [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_igather [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_igatherv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+# OSU MPI Init Test v5.7
+nprocs: 1, min: 264 ms, max: 264 ms, avg: 264 ms
+Usage: osu_reduce [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_iscatter [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_iscatterv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -t, --num_test_calls CALLS  set the number of MPI_Test() calls during the dummy computation,
+                              set CALLS to 100, 1000, or any number > 0.
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_latency [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_latency_mp [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -t, --num_processes         SEND:[RECV]  set the sender and receiver number of processes
+                              min: 1 default: (receiver processes: 2 sender processes: 1), max: 128.
+                              Examples:
+                              -t 4        // receiver processes = 4 and sender processes = 1
+                              -t 4:6      // sender processes = 4 and receiver processes = 6
+                              -t 2:       // not defined
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_latency_mt [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -t, --num_threads           SEND:[RECV]  set the sender and receiver number of threads
+                              min: 1 default: (receiver threads: 2 sender threads: 1), max: 128.
+                              Examples:
+                              -t 4        // receiver threads = 4 and sender threads = 1
+                              -t 4:6      // sender threads = 4 and receiver threads = 6
+                              -t 2:       // not defined
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_mbw_mr [options]
+Options:
+  -R=<0,1>, --print-rate         Print uni-directional message rate (default 1)
+  -p=<pairs>, --num-pairs        Number of pairs involved (default np / 2)
+  -W=<window>, --window-size     Number of messages sent before acknowledgement (default 64)
+                                 [cannot be used with -v]
+  -V, --vary-window              Vary the window size (default no)
+                                 [cannot be used with -W]
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -h, --help                     Print this help
+
+  Note: This benchmark relies on block ordering of the ranks.  Please see
+        the README for more information.
+Usage: osu_multi_lat [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_put_bibw [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -W, --window-size SIZE      set number of messages to send before synchronization (default 64)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_put_bw [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -W, --window-size SIZE      set number of messages to send before synchronization (default 64)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_put_latency [options]
+Options:
+
+  -w --win-option <win_option>
+            <win_option> can be any of the follows:
+            create            use MPI_Win_create to create an MPI Window object
+            allocate          use MPI_Win_allocate to create an MPI Window object
+            dynamic           use MPI_Win_create_dynamic to create an MPI Window object
+
+  -s, --sync-option <sync_option>
+            <sync_option> can be any of the follows:
+            pscw              use Post/Start/Complete/Wait synchronization calls
+            fence             use MPI_Win_fence synchronization call
+            lock              use MPI_Win_lock/unlock synchronizations calls
+            flush             use MPI_Win_flush synchronization call
+            flush_local       use MPI_Win_flush_local synchronization call
+            lock_all          use MPI_Win_lock_all/unlock_all synchronization calls
+
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -x, --warmup ITER           number of warmup iterations to skip before timing(default 100)
+  -i, --iterations ITER       number of iterations for timing (default 10000)
+  -h, --help                  print this help message
+Usage: osu_reduce [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_scatter [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_scatter [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info
+
+Usage: osu_scatterv [options]
+Options:
+  -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
+                              bytes respectively. Examples:
+                              -m 128      // min = default, max = 128
+                              -m 2:128    // min = 2, max = 128
+                              -m 2:       // min = 2, max = default
+  -M, --mem-limit SIZE        set per process maximum memory consumption to SIZE bytes
+                              (default 536870912)
+  -i, --iterations ITER       set iterations per message size to ITER (default 1000 for small
+                              messages, 100 for large messages)
+  -x, --warmup ITER           set number of warmup iterations to skip before timing (default 200)
+  -f, --full                  print full format listing (MIN/MAX latency and ITERATIONS
+                              displayed in addition to AVERAGE latency)
+  -h, --help                  print this help
+  -v, --version               print version info

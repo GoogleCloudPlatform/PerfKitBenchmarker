@@ -1,0 +1,3 @@
+# OSU MPI Barrier Latency Test v5.7
+# Avg Latency(us)
+             3.97

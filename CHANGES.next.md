@@ -27,6 +27,7 @@
 -   Add support for AWS gp3 disks.
 -   Add ability to use Intel compiled HPCC binaries with
     --hpcc_use_intel_compiled_hpl
+-   Add OSU MPI micro-benchmarks benchmark
 
 ### Enhancements:
 
