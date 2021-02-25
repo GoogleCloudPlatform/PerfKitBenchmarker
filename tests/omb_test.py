@@ -1,7 +1,9 @@
 """Tests for perfkitbenchmarker.linux_packages.omb."""
 
+import inspect
 import os
-import unittest
+from absl.testing import absltest
+from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 
@@ -16,13 +18,15 @@ def ReadFile(file_name):
     return reader.read()
 
 
-class OmbTest(parameterized.TestCase, unittest.TestCase):
+class OmbTest(parameterized.TestCase, absltest.TestCase):
 
   def setUp(self):
     super().setUp()
     self.enter_context(
         mock.patch.object(
             intelmpi, 'SourceMpiVarsCommand', return_value='. mpivars.sh'))
+    self.enter_context(
+        mock.patch.object(intelmpi, 'MpirunMpiVersion', return_value='2019.6'))
 
   @parameterized.parameters(
       ('acc_latency.txt', {
@@ -147,6 +151,40 @@ class OmbTest(parameterized.TestCase, unittest.TestCase):
         '. mpivars.sh; mpirun -perhost 1 -n 2 '
         '-hosts 10.0.0.1,10.0.0.2 path/to/startup/osu_hello')
 
+  @flagsaver.flagsaver(omb_iterations=10)
+  def testRunResult(self):
+    test_output = inspect.cleandoc("""
+    # OSU MPI Multiple Bandwidth / Message Rate Test v5.7
+    # [ pairs: 15 ] [ window size: 64 ]
+    # Size                  MB/s        Messages/s
+    1                       6.39        6385003.80
+    """)
+    vm = mock.Mock(internal_ip='10.0.0.1')
+    mpitest_path = 'path/to/startup/osu_mbw_mr'
+    vm.RemoteCommand.side_effect = [(mpitest_path, ''), (test_output, '')]
+    vms = [vm, mock.Mock(internal_ip='10.0.0.2')]
+
+    result = omb.RunBenchmark(vms, 'mbw_mr')
+
+    expected_result = omb.RunResult(
+        name='mbw_mr',
+        metadata={
+            'pairs': '15',
+            'window_size': '64'
+        },
+        data=[{
+            'size': 1,
+            'value': 6.39,
+            'messages_per_second': 6385003.8
+        }],
+        full_cmd=('. mpivars.sh; mpirun -perhost 1 -n 2 '
+                  f'-hosts 10.0.0.1,10.0.0.2 {mpitest_path} --iterations 10'),
+        units='MB/s',
+        params={'--iterations': 10},
+        mpi_vendor='intel',
+        mpi_version='2019.6')
+    self.assertEqual(expected_result, result)
+
 
 if __name__ == '__main__':
-  unittest.main()
+  absltest.main()

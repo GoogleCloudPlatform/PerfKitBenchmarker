@@ -34,7 +34,9 @@ _RUN_RESULT = result = omb.RunResult(
     }],
     full_cmd='mpirun path/to/acc_latency',
     units='usec',
-    params={'b': 2})
+    params={'b': 2},
+    mpi_vendor='intel',
+    mpi_version='2019.6')
 
 _EXPECTED_METADATA1 = {
     'foo': 100,
@@ -42,6 +44,8 @@ _EXPECTED_METADATA1 = {
     'metadata_a': 1,
     'param_b': 2,
     'omb_version': '5.7',
+    'mpi_vendor': 'intel',
+    'mpi_version': '2019.6',
 }
 _EXPECTED_METADATA2 = {
     'foo': 200,
@@ -49,6 +53,8 @@ _EXPECTED_METADATA2 = {
     'metadata_a': 1,
     'param_b': 2,
     'omb_version': '5.7',
+    'mpi_vendor': 'intel',
+    'mpi_version': '2019.6',
 }
 
 _EXPECTED_SAMPLES = [

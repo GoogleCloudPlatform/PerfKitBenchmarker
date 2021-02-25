@@ -98,12 +98,16 @@ def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
     row = row.copy()
     entry = sample.Sample(result.name, row.pop('value'), result.units)
     entry.metadata.update(row)
-    entry.metadata['cmd'] = result.full_cmd
     for key, value in result.metadata.items():
       entry.metadata[f'metadata_{key}'] = value
     for key, value in result.params.items():
       entry.metadata[f'param_{key}'] = value
-    entry.metadata['omb_version'] = omb.VERSION
+    entry.metadata.update({
+        'cmd': result.full_cmd,
+        'omb_version': omb.VERSION,
+        'mpi_vendor': result.mpi_vendor,
+        'mpi_version': result.mpi_version,
+    })
     yield entry
 
 

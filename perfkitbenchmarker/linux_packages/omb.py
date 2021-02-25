@@ -65,6 +65,8 @@ class RunResult:
   full_cmd: str
   units: str
   params: Dict[str, str]
+  mpi_vendor: str
+  mpi_version: str
 
 
 def Install(vm) -> None:
@@ -118,7 +120,9 @@ def RunBenchmark(vms, name) -> RunResult:
       data=_ParseBenchmarkData(txt),
       full_cmd=full_cmd,
       units='MB/s' if 'MB/s' in txt else 'usec',
-      params=params)
+      params=params,
+      mpi_vendor='intel',
+      mpi_version=intelmpi.MpirunMpiVersion(vms[0]))
 
 
 def _RunBenchmark(vm,
