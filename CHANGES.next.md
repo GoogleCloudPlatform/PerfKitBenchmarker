@@ -11,6 +11,7 @@
     strings to support images which have multiple owners e.g. AmazonLinux2 in
     opt-in regions.
 -   Remove Ubuntu1710 from `--os_types`.
+-   Remove Amazon Linux 1 from `--os_types`.
 
 ### New features:
 

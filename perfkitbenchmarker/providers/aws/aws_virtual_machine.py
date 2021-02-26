@@ -1186,18 +1186,6 @@ class AmazonLinux2BasedAwsVirtualMachine(
   IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
 
 
-class AmazonLinux1BasedAwsVirtualMachine(
-    AwsVirtualMachine, linux_virtual_machine.AmazonLinux1Mixin):
-  """Class with configuration for AWS Amazon Linux 1 virtual machines."""
-  IMAGE_NAME_FILTER = 'amzn-ami-*-*-*'
-  IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
-  # IMAGE_NAME_REGEX tightens up the image filter for Amazon Linux to avoid
-  # non-standard Amazon Linux images. This fixes a bug in which we were
-  # selecting "amzn-ami-hvm-BAD1.No.NO.DONOTUSE-x86_64-gp2" as the latest image.
-  IMAGE_NAME_REGEX = (
-      r'^amzn-ami-{virt_type}-\d+\.\d+\.\d+.\d+-{architecture}-{disk_type}$')
-
-
 class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.Rhel7Mixin):
   """Class with configuration for AWS RHEL 7 virtual machines."""

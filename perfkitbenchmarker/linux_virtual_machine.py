@@ -1676,13 +1676,6 @@ class BaseRhelMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class AmazonLinux1Mixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
-  """Class holding Amazon Linux 1 VM methods and attributes."""
-  OS_TYPE = os_types.AMAZONLINUX1
-  END_OF_LIFE = '2021-01-01'
-  ALTERNATIVE_OS = os_types.AMAZONLINUX2
-
-
 class AmazonLinux2Mixin(BaseRhelMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
   OS_TYPE = os_types.AMAZONLINUX2

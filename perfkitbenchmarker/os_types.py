@@ -15,7 +15,6 @@
 
 from absl import flags
 
-AMAZONLINUX1 = 'amazonlinux1'  # deprecated (b/148486659)
 AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
 CENTOS8 = 'centos8'
@@ -45,7 +44,6 @@ RHEL = 'rhel'
 WINDOWS = 'windows'
 
 LINUX_OS_TYPES = [
-    AMAZONLINUX1,
     AMAZONLINUX2,
     CENTOS7,
     CENTOS8,
