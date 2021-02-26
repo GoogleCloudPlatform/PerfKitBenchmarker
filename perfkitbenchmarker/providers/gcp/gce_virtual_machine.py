@@ -404,6 +404,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
+    self.gce_nic_type = FLAGS.gce_nic_type
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
 
   def _GetNetwork(self):
@@ -427,10 +428,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     args = ['compute', 'instances', 'create', self.name]
 
     cmd = util.GcloudCommand(self, *args)
+    # Bundle network-related arguments with --network-interface
+    # This flag is mutually exclusive with any of these flags:
+    # --address, --network, --network-tier, --subnet, --private-network-ip.
+    # gcloud compute instances create ... --network-interface=
+    ni_args = []
     if self.network.subnet_resource is not None:
-      cmd.flags['subnet'] = self.network.subnet_resource.name
+      ni_args.append(f'subnet={self.network.subnet_resource.name}')
     else:
-      cmd.flags['network'] = self.network.network_resource.name
+      ni_args.append(f'network={self.network.network_resource.name}')
+    ni_args.append(f'network-tier={self.gce_network_tier.upper()}')
+    ni_args.append(f'nic-type={self.gce_nic_type.upper()}')
+    cmd.flags['network-interface'] = ','.join(ni_args)
+
     if self.image:
       cmd.flags['image'] = self.image
     elif self.image_family:
@@ -523,7 +533,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
-    cmd.flags['network-tier'] = self.gce_network_tier.upper()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
@@ -800,6 +809,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
     result['gce_network_tier'] = self.gce_network_tier
+    result['gce_nic_type'] = self.gce_nic_type
     result[
         'gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     result['boot_disk_type'] = self.boot_disk_type

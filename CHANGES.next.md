@@ -29,6 +29,7 @@
 -   Add ability to use Intel compiled HPCC binaries with
     --hpcc_use_intel_compiled_hpl
 -   Add OSU MPI micro-benchmarks benchmark
+-   Add support for setting virtual NIC type for GCP VMs.
 
 ### Enhancements:
 

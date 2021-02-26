@@ -545,13 +545,25 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     """Tests that the premium network tier flag is supported."""
     cmd, call_count = self._CreateVmCommand(gce_network_tier='premium')
     self.assertEqual(call_count, 1)
-    self.assertIn('--network-tier PREMIUM', cmd)
+    self.assertIn('network-tier=PREMIUM', cmd)
 
   def testNetworkTierFlagStandard(self):
     """Tests that the standard network tier flag is supported."""
     cmd, call_count = self._CreateVmCommand(gce_network_tier='standard')
     self.assertEqual(call_count, 1)
-    self.assertIn('--network-tier STANDARD', cmd)
+    self.assertIn('network-tier=STANDARD', cmd)
+
+  def testNetworkInterfaceDefault(self):
+    """Tests that VirtIONet is selected as the default virtual NIC."""
+    cmd, call_count = self._CreateVmCommand()
+    self.assertEqual(call_count, 1)
+    self.assertIn('nic-type=VIRTIO_NET', cmd)
+
+  def testNetworkInterfaceGVNIC(self):
+    """Tests that gVNIC can be set as the virtual NIC."""
+    cmd, call_count = self._CreateVmCommand(gce_nic_type='GVNIC')
+    self.assertEqual(call_count, 1)
+    self.assertIn('nic-type=GVNIC', cmd)
 
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(

@@ -80,6 +80,9 @@ flags.DEFINE_enum('gce_boot_disk_type', None, ['pd-standard', 'pd-ssd'],
                   'The boot disk type for GCP VMs.')
 flags.DEFINE_enum('gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
                   'The ssd interface for GCE local SSD.')
+flags.DEFINE_enum('gce_nic_type', 'VIRTIO_NET', ['VIRTIO_NET', 'GVNIC'],
+                  'The virtual NIC type of GCE VMs.')
+
 flags.DEFINE_string('gcp_node_type', None,
                     'The node type of all sole tenant hosts that get created.')
 flags.DEFINE_enum(
