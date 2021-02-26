@@ -6,7 +6,6 @@ Source:
 Uses IntelMPI
 """
 
-import logging
 from typing import Any, Dict, Iterator, List
 from absl import flags
 
@@ -25,19 +24,8 @@ omb:
       vm_spec: *default_single_core
 """
 
-_BENCHMARKS = [
-    'acc_latency', 'allgather', 'allgatherv', 'allreduce', 'alltoall',
-    'alltoallv', 'barrier', 'bcast', 'bibw', 'bw', 'cas_latency', 'fop_latency',
-    'gather', 'gatherv', 'get_acc_latency', 'get_bw', 'get_latency',
-    'iallgather', 'iallgatherv', 'iallreduce', 'ialltoall', 'ialltoallv',
-    'ialltoallw', 'ibarrier', 'ibcast', 'igather', 'igatherv', 'ireduce',
-    'iscatter', 'iscatterv', 'latency', 'latency_mp', 'latency_mt', 'mbw_mr',
-    'multi_lat', 'put_bibw', 'put_bw', 'put_latency', 'reduce',
-    'reduce_scatter', 'scatter', 'scatterv'
-]
-
 _BENCHMARKS_ARG = flags.DEFINE_multi_enum(
-    'omb_benchmarks', None, _BENCHMARKS,
+    'omb_benchmarks', None, sorted(omb.BENCHMARKS),
     'OSU micro-bencmarks to run.  Default is to run all')
 _RUN_LONG_LATENCY = flags.DEFINE_bool(
     'omb_run_long_latency', False,
@@ -83,20 +71,15 @@ def _GetBenchmarks() -> List[str]:
   if _BENCHMARKS_ARG.value:
     return _BENCHMARKS_ARG.value
   if _RUN_LONG_LATENCY.value:
-    return _BENCHMARKS
-  benchmarks = _BENCHMARKS.copy()
-  # unless explicitly told to run the long latency tests skip them
-  for long_test in omb.LONG_RUNNING_TESTS:
-    logging.info('Skipping long benchmark %s', long_test)
-    benchmarks.remove(long_test)
-  return benchmarks
+    return sorted(omb.BENCHMARKS)
+  return sorted(name for name, run_type in sorted(omb.BENCHMARKS.items())
+                if not run_type.long_running)
 
 
 def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
   """Generates samples from the RunResult."""
   for row in result.data:
-    row = row.copy()
-    entry = sample.Sample(result.name, row.pop('value'), result.units)
+    entry = sample.Sample(result.name, row[result.value_column], result.units)
     entry.metadata.update(row)
     for key, value in result.metadata.items():
       entry.metadata[f'metadata_{key}'] = value

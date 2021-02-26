@@ -54,11 +54,107 @@ _NUM_SERVER_THREADS = flags.DEFINE_integer('omb_server_threads', None,
 _NUM_RECEIVER_THREADS = flags.DEFINE_integer(
     'omb_receiver_threads', None, 'Number of server threads to use.')
 
-LONG_RUNNING_TESTS = frozenset(['get_acc_latency', 'latency_mt'])
+
+@dataclasses.dataclass(frozen=True)
+class _RunType:
+  """Metadata about a benchmark.
+
+  Attributes:
+    columns: The columns in the output.
+    value_column: The column that should be use as a sample.Sample value
+    units: The units of the value_column.
+    supports_full: Whether this benchmark supports --full.
+    long_running: Whether this benchmark takes a long time to run.
+  """
+  columns: Tuple[str]
+  value_column: str
+  units: str = 'usec'
+  supports_full: bool = True
+  long_running: bool = False
+
+
+# Benchmarks that support --full
+_LATENCY = _RunType(
+    ('size', 'latency', 'min_latency', 'max_latency', 'iterations'), 'latency')
+_LATENCY_NOSIZE = _RunType(
+    ('latency', 'min_latency', 'max_latency', 'iterations'), 'latency')
+_COMPUTE = _RunType(('size', 'overall', 'compute', 'collection_init',
+                     'mpi_test', 'mpi_wait', 'pure_comm', 'overlap'),
+                    'mpi_wait')
+_COMPUTE_NOSIZE = _RunType(('overall', 'compute', 'collection_init', 'mpi_test',
+                            'mpi_wait', 'pure_comm', 'overlap'), 'mpi_wait')
+
+# Benchmarks that do not support --full
+_LATENCY_SIZE_ONLY = _RunType(('size', 'latency'), 'latency', 'usec', False)
+_BANDWIDTH = _RunType(('size', 'bandwidth'), 'bandwidth', 'MB/s', False)
+_BANDWIDTH_MESSAGES = _RunType(('size', 'bandwidth', 'messages_per_second'),
+                               'bandwidth', 'MB/s', False)
+# The get_acc_latency and latency_mt take a really long time to finish
+_LATENCY_LONG_RUNNING = _RunType(('size', 'latency'), 'latency', 'usec', False,
+                                 True)
+
+BENCHMARKS: Dict[str, _RunType] = {
+    'acc_latency': _LATENCY_SIZE_ONLY,
+    'allgather': _LATENCY,
+    'allgatherv': _LATENCY,
+    'allreduce': _LATENCY,
+    'alltoall': _LATENCY,
+    'alltoallv': _LATENCY,
+    'barrier': _LATENCY_NOSIZE,
+    'bcast': _LATENCY,
+    'bibw': _BANDWIDTH,
+    'bw': _BANDWIDTH,
+    'cas_latency': _LATENCY_SIZE_ONLY,
+    'fop_latency': _LATENCY_SIZE_ONLY,
+    'gather': _LATENCY,
+    'gatherv': _LATENCY,
+    'get_acc_latency': _LATENCY_LONG_RUNNING,
+    'get_bw': _BANDWIDTH,
+    'get_latency': _LATENCY_SIZE_ONLY,
+    'iallgather': _COMPUTE,
+    'iallgatherv': _COMPUTE,
+    'iallreduce': _COMPUTE,
+    'ialltoall': _COMPUTE,
+    'ialltoallv': _COMPUTE,
+    'ialltoallw': _COMPUTE,
+    'ibarrier': _COMPUTE_NOSIZE,
+    'ibcast': _COMPUTE,
+    'igather': _COMPUTE,
+    'igatherv': _COMPUTE,
+    'ireduce': _COMPUTE,
+    'iscatter': _COMPUTE,
+    'iscatterv': _COMPUTE,
+    'latency': _LATENCY_SIZE_ONLY,
+    'latency_mp': _LATENCY_SIZE_ONLY,
+    'latency_mt': _LATENCY_LONG_RUNNING,
+    'mbw_mr': _BANDWIDTH_MESSAGES,
+    'multi_lat': _LATENCY_SIZE_ONLY,
+    'put_bibw': _BANDWIDTH,
+    'put_bw': _BANDWIDTH,
+    'put_latency': _LATENCY_SIZE_ONLY,
+    'reduce': _LATENCY,
+    'reduce_scatter': _LATENCY,
+    'scatter': _LATENCY,
+    'scatterv': _LATENCY
+}
 
 
 @dataclasses.dataclass(frozen=True)
 class RunResult:
+  """The parsed output of a benchmark run.
+
+  Attributes:
+    name: The metric name to use in a sample.Sample.
+    metadata: Any output of the benchmark that describes the run.
+    data: The parsed output data, for example [{'size': 1, 'latency': 10.9}].
+    full_cmd: Command used to run the benchmark.
+    units: Units of the value_column in the data.
+    params: Any parameters passed along to the benchmark.
+    mpi_vendor: Name of the MPI vendor.
+    mpi_version: Version of the MPI library.
+    value_column: The name of the column in the data rows that should be used
+      for the sample.Sample value.
+  """
   name: str
   metadata: Dict[str, Any]
   data: List[Dict[str, float]]
@@ -67,6 +163,7 @@ class RunResult:
   params: Dict[str, str]
   mpi_vendor: str
   mpi_version: str
+  value_column: str
 
 
 def Install(vm) -> None:
@@ -117,12 +214,13 @@ def RunBenchmark(vms, name) -> RunResult:
   return RunResult(
       name=name,
       metadata=_ParseBenchmarkMetadata(txt),
-      data=_ParseBenchmarkData(txt),
+      data=_ParseBenchmarkData(name, txt),
       full_cmd=full_cmd,
       units='MB/s' if 'MB/s' in txt else 'usec',
       params=params,
       mpi_vendor='intel',
-      mpi_version=intelmpi.MpirunMpiVersion(vms[0]))
+      mpi_version=intelmpi.MpirunMpiVersion(vms[0]),
+      value_column=BENCHMARKS[name].value_column)
 
 
 def _RunBenchmark(vm,
@@ -157,9 +255,12 @@ def _RunBenchmark(vm,
   if options:
     for key, value in sorted(options.items()):
       mpirun_cmd.append(f'{key} {value}')
+  # _TestInstall runs the "hello" test which isn't a benchmark
+  if name in BENCHMARKS and BENCHMARKS[name].supports_full:
+    mpirun_cmd.append('--full')
   full_cmd = f'{intelmpi.SourceMpiVarsCommand(vm)}; {" ".join(mpirun_cmd)}'
 
-  if name in LONG_RUNNING_TESTS:
+  if name in BENCHMARKS and BENCHMARKS[name].long_running:
     txt, _ = vm.RobustRemoteCommand(full_cmd)
   else:
     txt, _ = vm.RemoteCommand(full_cmd)
@@ -197,46 +298,27 @@ def _ParseBenchmarkMetadata(txt: str) -> Dict[str, str]:
   return ret
 
 
-def _ParseBenchmarkData(txt: str) -> List[Dict[str, float]]:
-  data = [_ParseBenchmarkOutputLine(line) for line in txt.splitlines()]
-  return [item for item in data if item]
-
-
-def _ParseBenchmarkOutputLine(line: str) -> Dict[str, float]:
-  """Returns a parsed line from the benchmark's output.
-
-  The column names are known based on the number of items in a line.
+def _ParseBenchmarkData(benchmark_name: str,
+                        txt: str) -> List[Dict[str, float]]:
+  """Returns the parsed metrics from the benchmark stdout.
 
   Args:
-    line: A single text line from the benchmark output.
+    benchmark_name: Name of the benchmark.
+    txt: The standard output of the benchmark.
   """
-  if not line or line.startswith('#'):
-    return {}
-  if 'Overall' in line:
-    # barrier has a line ' Overall(us) Compute(us) Pure Comm.(us) Overlap(us)'
-    return {}
-  row = [float(item) for item in line.split()]
-  if len(row) == 1:
-    # barrier is just the latency
-    return {'value': row[0]}
-  if len(row) == 2:
-    return {'size': int(row[0]), 'value': row[1]}
-  if len(row) == 3:
-    return {'size': int(row[0]), 'value': row[1], 'messages_per_second': row[2]}
-  if len(row) == 4:
-    # ibarrier does not have a size
-    return {
-        'value': row[0],
-        'compute': row[1],
-        'comm': row[2],
-        'overlap': row[3],
-    }
-  if len(row) == 5:
-    return {
-        'size': int(row[0]),
-        'value': row[1],
-        'compute': row[2],
-        'comm': row[3],
-        'overlap': row[4]
-    }
-  raise ValueError(f'Output line not parseable: {row}')
+  data = []
+  for line in txt.splitlines():
+    if not line or line.startswith('#') or 'Overall' in line:
+      continue
+    columns = BENCHMARKS[benchmark_name].columns
+    row_data = [float(item) for item in line.split()]
+    if len(columns) != len(row_data):
+      raise ValueError(
+          f'Expected {len(columns)} columns ({columns}) in the '
+          f'{benchmark_name} benchmark, received {len(row_data)} ({row_data})')
+    row_with_headers = dict(zip(columns, row_data))
+    for int_column in ('size', 'iterations'):
+      if int_column in row_with_headers:
+        row_with_headers[int_column] = int(row_with_headers[int_column])
+    data.append(row_with_headers)
+  return data

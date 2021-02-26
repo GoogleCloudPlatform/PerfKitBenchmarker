@@ -1,6 +1,6 @@
-# OSU MPI_Accumulate latency Test v5.7
+# OSU MPI_Put Latency Test v5.7
 # Window creation: MPI_Win_allocate
 # Synchronization: MPI_Win_flush
 # Size          Latency (us)
-4                      90.84
-8                      91.08
+4                       3.84
+8                       3.81

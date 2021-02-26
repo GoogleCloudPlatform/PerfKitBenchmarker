@@ -1,0 +1,6 @@
+# OSU MPI Multi-process Latency Test v5.7
+# Number of forked processes in sender: 2
+# Number of forked processes in receiver: 2
+# Size          Latency (us)
+4                      47.96
+8                      47.95

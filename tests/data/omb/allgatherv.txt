@@ -1,0 +1,5 @@
+
+# OSU MPI Allgatherv Latency Test v5.7
+# Size       Avg Latency(us)   Min Latency(us)   Max Latency(us)  Iterations
+4                      61.51             61.24             61.79        1000
+8                      64.19             61.97             66.41        1000

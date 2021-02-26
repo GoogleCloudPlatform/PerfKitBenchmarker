@@ -1,0 +1,6 @@
+# OSU MPI_Get_accumulate latency Test v5.7
+# Window creation: MPI_Win_create
+# Synchronization: MPI_Win_lock/unlock
+# Size          Latency (us)
+4                     309.93
+8                     310.21

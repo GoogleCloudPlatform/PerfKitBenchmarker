@@ -26,17 +26,18 @@ _RUN_RESULT = result = omb.RunResult(
     name='acc_latency',
     metadata={'a': 1},
     data=[{
-        'value': 10,
+        'latency': 10,
         'foo': 100
     }, {
-        'value': 20,
+        'latency': 20,
         'foo': 200
     }],
     full_cmd='mpirun path/to/acc_latency',
     units='usec',
     params={'b': 2},
     mpi_vendor='intel',
-    mpi_version='2019.6')
+    mpi_version='2019.6',
+    value_column='latency')
 
 _EXPECTED_METADATA1 = {
     'foo': 100,
@@ -46,6 +47,7 @@ _EXPECTED_METADATA1 = {
     'omb_version': '5.7',
     'mpi_vendor': 'intel',
     'mpi_version': '2019.6',
+    'latency': 10,
 }
 _EXPECTED_METADATA2 = {
     'foo': 200,
@@ -55,6 +57,7 @@ _EXPECTED_METADATA2 = {
     'omb_version': '5.7',
     'mpi_vendor': 'intel',
     'mpi_version': '2019.6',
+    'latency': 20,
 }
 
 _EXPECTED_SAMPLES = [
@@ -80,7 +83,7 @@ class OmbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.assertSampleListsEqualUpToTimestamp(_EXPECTED_SAMPLES, samples[:2])
     self.assertLen(samples, 84)
     expected_calls = [
-        mock.call(bm_spec.vms, name) for name in omb_benchmark._BENCHMARKS
+        mock.call(bm_spec.vms, name) for name in omb.BENCHMARKS
     ]
     mock_run.assert_has_calls(expected_calls)
 

@@ -1,0 +1,7 @@
+
+# OSU MPI Non-blocking Scatter Latency Test v5.7
+# Overall = Coll. Init + Compute + MPI_Test + MPI_Wait
+
+# Size           Overall(us)       Compute(us)    Coll. Init(us)      MPI_Test(us)      MPI_Wait(us)    Pure Comm.(us)        Overlap(%)
+4                      20.56             11.41              2.75              0.00              6.26             10.05              9.00
+8                      18.76             10.71              2.77              0.00              5.13              9.50             15.29

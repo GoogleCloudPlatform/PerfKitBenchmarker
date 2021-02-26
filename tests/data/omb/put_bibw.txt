@@ -1,0 +1,6 @@
+# OSU MPI_Put Bi-directional Bandwidth Test v5.7
+# Window creation: MPI_Win_allocate
+# Synchronization: MPI_Win_post/start/complete/wait
+# Size      Bandwidth (MB/s)
+4                       1.95
+8                       3.82

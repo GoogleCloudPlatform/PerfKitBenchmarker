@@ -1,0 +1,6 @@
+# Number of Sender threads: 1
+# Number of Receiver threads: 2
+# OSU MPI Multi-threaded Latency Test v5.7
+# Size          Latency (us)
+4                    2768.29
+8                    2950.69

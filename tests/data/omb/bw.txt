@@ -1,0 +1,4 @@
+# OSU MPI Bandwidth Test v5.7
+# Size      Bandwidth (MB/s)
+4                       1.02
+8                       1.98

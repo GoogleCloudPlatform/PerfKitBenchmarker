@@ -1,0 +1,4 @@
+# OSU MPI Bi-Directional Bandwidth Test v5.7
+# Size      Bandwidth (MB/s)
+4                       2.37
+8                       4.66

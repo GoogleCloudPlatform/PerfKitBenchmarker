@@ -1,0 +1,6 @@
+# OSU MPI_Get Bandwidth Test v5.7
+# Window creation: MPI_Win_allocate
+# Synchronization: MPI_Win_flush
+# Size      Bandwidth (MB/s)
+4                       0.70
+8                       1.34
