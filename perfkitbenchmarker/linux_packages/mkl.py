@@ -17,7 +17,6 @@
 import logging
 from absl import flags
 from perfkitbenchmarker import linux_packages
-from perfkitbenchmarker.linux_packages import intel_repo
 
 
 MKL_DIR = '%s/MKL' % linux_packages.INSTALL_DIR
@@ -65,9 +64,10 @@ def UseMklRepo():
   return MKL_VERSION.value != MKL_VERSION.default
 
 
-def _Install(vm):
+def Install(vm):
   """Installs the MKL package on the VM."""
   if UseMklRepo():
+    vm.Install('intel_repo')
     vm.InstallPackages(f'intel-mkl-{MKL_VERSION.value}')
   else:
     _InstallFromPreprovisionedData(vm)
@@ -131,17 +131,3 @@ def _CompileInterfaces(vm):
     cmd = (f'cd /opt/intel/mkl/interfaces/{interface} && '
            f'sudo make libintel64 {make_options}')
     vm.RemoteCommand(cmd)
-
-
-def YumInstall(vm):
-  """Installs the MKL package on the VM."""
-  if UseMklRepo():
-    intel_repo.YumPrepare(vm)
-  _Install(vm)
-
-
-def AptInstall(vm):
-  """Installs the MKL package on the VM."""
-  if UseMklRepo():
-    intel_repo.AptPrepare(vm)
-  _Install(vm)

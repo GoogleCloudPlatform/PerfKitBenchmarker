@@ -52,7 +52,7 @@ _YUM_DOWNLOAD_KEY_CMD = f'curl -o {_YUM_DOWNLOAD_KEY} {_YUM_REPO_KEY}'
 _YUM_DIFF_KEY_CMD = f'diff {_REMOTE_KEY_FILE} {_YUM_DOWNLOAD_KEY}'
 
 
-def AptPrepare(vm):
+def AptInstall(vm):
   """Configuration for APT install."""
   vm.PushDataFile(_INTEL_KEY_FILE, _REMOTE_KEY_FILE)
   vm.PushDataFile(_APT_REPO_FILE, _APT_REMOTE_REPO_FILE)
@@ -60,7 +60,7 @@ def AptPrepare(vm):
   vm.InstallPackages('libgomp1')
 
 
-def YumPrepare(vm):
+def YumInstall(vm):
   """Configuration for YUM install."""
   vm.PushDataFile(_INTEL_KEY_FILE, _REMOTE_KEY_FILE)
   vm.InstallPackages('yum-utils')

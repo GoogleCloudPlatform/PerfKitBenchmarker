@@ -18,7 +18,6 @@ import re
 from absl import flags
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import intel_repo
 
 MPI_VERSION = flags.DEFINE_string('intelmpi_version', '2019.6-088',
                                   'MPI version.')
@@ -79,9 +78,10 @@ def FixEnvironment(vm):
     logging.info('Not setting yama ptrace as %s', stderr)
 
 
-def _Install(vm, mpi_version: str) -> None:
+def Install(vm) -> None:
   """Installs Intel MPI."""
-  vm.InstallPackages(f'intel-mpi-{mpi_version}')
+  vm.Install('intel_repo')
+  vm.InstallPackages(f'intel-mpi-{MPI_VERSION.value}')
   FixEnvironment(vm)
   # Log the version of MPI and other associated values for debugging
   vm.RemoteCommand(f'. {MpiVars(vm)}; mpirun -V')
@@ -89,16 +89,9 @@ def _Install(vm, mpi_version: str) -> None:
 
 def AptInstall(vm) -> None:
   """Installs the MPI library."""
-  intel_repo.AptPrepare(vm)
-  _Install(vm, MPI_VERSION.value)
+  Install(vm)
   # Ubuntu's POSIX dash shell does not have bash's "==" comparator
   vm.RemoteCommand(f'sudo sed -i "s/==/=/" {MpiVars(vm)}')
-
-
-def YumInstall(vm) -> None:
-  """Installs the MPI library."""
-  intel_repo.YumPrepare(vm)
-  _Install(vm, MPI_VERSION.value)
 
 
 def TestInstall(vms) -> None:

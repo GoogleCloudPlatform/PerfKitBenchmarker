@@ -27,7 +27,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import amdblis
-from perfkitbenchmarker.linux_packages import intel_repo
 from perfkitbenchmarker.linux_packages import openblas
 
 
@@ -287,10 +286,11 @@ def _LimitBenchmarksToRun(vm, selected_hpcc_benchmarks):
   vm.PushFile(local_hpcc_path, remote_hpcc_path)
 
 
-def _Install(vm):
+def Install(vm):
   """Installs the HPCC package on the VM."""
   vm.Install('wget')
   if USE_INTEL_COMPILED_HPL.value:
+    vm.Install('intel_repo')
     vm.Install('intelmpi')
     vm.Install('mkl')
     # Using a pre-compiled HPL, no need to continue
@@ -386,17 +386,3 @@ def _CompileHpccMKL(vm):
   vm.RemoteCommand('source /opt/intel/compilers_and_libraries/linux/bin/'
                    'compilervars.sh -arch intel64 -platform linux && '
                    'cd %s; make arch=intel64' % HPCC_DIR)
-
-
-def YumInstall(vm):
-  """Installs the HPCC package on the VM."""
-  if USE_INTEL_COMPILED_HPL.value:
-    intel_repo.YumPrepare(vm)
-  _Install(vm)
-
-
-def AptInstall(vm):
-  """Installs the HPCC package on the VM."""
-  if USE_INTEL_COMPILED_HPL.value:
-    intel_repo.AptPrepare(vm)
-  _Install(vm)
