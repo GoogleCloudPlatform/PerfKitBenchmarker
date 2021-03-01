@@ -92,6 +92,7 @@ def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
         'mpi_vendor': result.mpi_vendor,
         'mpi_version': result.mpi_version,
         'number_processes': result.number_processes,
+        'run_time': round(result.run_time, 1)
     })
     yield entry
 

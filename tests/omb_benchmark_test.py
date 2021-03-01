@@ -38,7 +38,8 @@ _RUN_RESULT = result = omb.RunResult(
     mpi_vendor='intel',
     mpi_version='2019.6',
     value_column='latency',
-    number_processes=6)
+    number_processes=6,
+    run_time=0)
 
 _COMMON_METADATA = {
     'cmd': 'mpirun path/to/acc_latency',
@@ -48,6 +49,7 @@ _COMMON_METADATA = {
     'mpi_vendor': 'intel',
     'mpi_version': '2019.6',
     'number_processes': 6,
+    'run_time': 0,
 }
 _METADATA1 = {'foo': 100, 'latency': 10, **_COMMON_METADATA}
 _METADATA2 = {'foo': 200, 'latency': 20, **_COMMON_METADATA}
@@ -60,6 +62,10 @@ _EXPECTED_SAMPLES = [
 
 class OmbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
                        test_util.SamplesTestMixin):
+
+  def setUp(self):
+    super().setUp()
+    self.enter_context(mock.patch.object(omb.time, 'time', return_value=0))
 
   def testCreateSamples(self):
     samples = list(omb_benchmark._CreateSamples(_RUN_RESULT))

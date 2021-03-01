@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 from typing import Any, Dict, Iterator, List, Tuple
 from absl import flags
 import dataclasses
@@ -166,6 +167,7 @@ class RunResult:
     value_column: The name of the column in the data rows that should be used
       for the sample.Sample value.
     number_processes: The total number of MPI processes used.
+    run_time: Time in seconds to run the test.
   """
   name: str
   metadata: Dict[str, Any]
@@ -177,6 +179,7 @@ class RunResult:
   mpi_version: str
   value_column: str
   number_processes: int
+  run_time: int
 
 
 FLAGS = flags.FLAGS
@@ -232,7 +235,9 @@ def RunBenchmark(vms, name) -> Iterator[RunResult]:
       continue
     number_processes = processes_per_host * len(vms)
     try:
+      start_time = time.time()
       txt, full_cmd = _RunBenchmark(vms[0], name, number_processes, vms, params)
+      run_time = time.time() - start_time
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception('Error running %s benchmark with %s MPI proccesses',
                         name, number_processes)
@@ -248,7 +253,8 @@ def RunBenchmark(vms, name) -> Iterator[RunResult]:
         mpi_vendor='intel',
         mpi_version=intelmpi.MpirunMpiVersion(vms[0]),
         value_column=BENCHMARKS[name].value_column,
-        number_processes=number_processes)
+        number_processes=number_processes,
+        run_time=run_time)
 
 
 def _RunBenchmark(vm,

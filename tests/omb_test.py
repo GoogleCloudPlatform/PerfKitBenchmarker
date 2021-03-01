@@ -72,6 +72,7 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
             intelmpi, 'SourceMpiVarsCommand', return_value='. mpivars.sh'))
     self.enter_context(
         mock.patch.object(intelmpi, 'MpirunMpiVersion', return_value='2019.6'))
+    self.enter_context(mock.patch.object(omb.time, 'time', return_value=0))
 
   @parameterized.parameters(
       ('acc_latency', LatencySizeOnly([4, 90.84], [8, 91.08])),
@@ -263,7 +264,8 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         mpi_vendor='intel',
         mpi_version='2019.6',
         value_column='bandwidth',
-        number_processes=2)
+        number_processes=2,
+        run_time=0)
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes
