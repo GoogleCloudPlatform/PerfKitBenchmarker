@@ -57,6 +57,12 @@ def BandwidthSizeOnly(*values):
   return MakeDataRows(('size', 'bandwidth'), values)
 
 
+def MockVm(internal_ip='10.0.0.1', mpi_proceses_per_host=4):
+  vm = mock.Mock(internal_ip=internal_ip)
+  vm.NumCpusForBenchmark.return_value = mpi_proceses_per_host
+  return vm
+
+
 class OmbTest(parameterized.TestCase, absltest.TestCase):
 
   def setUp(self):
@@ -183,30 +189,8 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     textoutput = 'textoutput'
     ls_cmd = f'ls {omb._RUN_DIR}/*/osu_{benchmark}'
     expected_full_cmd = ('. mpivars.sh; mpirun -perhost 1 -n 2 '
-                         f'-hosts 10.0.0.1,10.0.0.2 {benchmark_path} --full')
-    vm = mock.Mock(internal_ip='10.0.0.1')
-    vm.RemoteCommand.side_effect = [(benchmark_path, ''), (textoutput, '')]
-
-    txt, full_cmd = omb._RunBenchmark(
-        vm,
-        benchmark,
-        number_processes=2,
-        hosts=[vm, mock.Mock(internal_ip='10.0.0.2')])
-
-    self.assertEqual(textoutput, txt)
-    self.assertEqual(expected_full_cmd, full_cmd)
-    vm.RemoteCommand.assert_has_calls(
-        [mock.call(cmd) for cmd in (ls_cmd, expected_full_cmd)])
-
-  def testRunBenchmarkRobustCommand(self):
-    # calls done with vm.RemoteCommand and vm.RobustRemoteCommand due to
-    # the benchmark being a long running one
-    benchmark = 'get_acc_latency'
-    benchmark_path = f'path/to/osu_{benchmark}'
-    textoutput = 'textoutput'
-    ls_cmd = f'ls {omb._RUN_DIR}/*/osu_{benchmark}'
-    expected_full_cmd = ('. mpivars.sh; mpirun -perhost 1 -n 2 '
-                         f'-hosts 10.0.0.1,10.0.0.2 {benchmark_path} -t 1')
+                         f'-hosts 10.0.0.1,10.0.0.2 {benchmark_path} '
+                         '-t 1 --full')
     vm = mock.Mock(internal_ip='10.0.0.1')
     vm.RemoteCommand.side_effect = [(benchmark_path, '')]
     vm.RobustRemoteCommand.side_effect = [(textoutput, '')]
@@ -230,19 +214,20 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     # to export /usr/.../osu-microbenchmarks
     mock_nfs_osu = self.enter_context(
         mock.patch.object(nfs_service, 'NfsExportAndMount'))
+    mpi_dir = '/usr/local/libexec/osu-micro-benchmarks/mpi'
     vm = mock.Mock(internal_ip='10.0.0.1')
-    vm.RemoteCommand.side_effect = [('path/to/startup/osu_hello', ''),
-                                    ('Hello World', '')]
+    vm.RemoteCommand.side_effect = [(f'{mpi_dir}/startup/osu_hello', '')]
+    vm.RobustRemoteCommand.side_effect = [('Hello World', '')]
     vms = [vm, mock.Mock(internal_ip='10.0.0.2')]
 
     omb.PrepareWorkers(vms)
 
     mock_nfs_opt_intel.assert_called_with(vms)
-    mock_nfs_osu.assert_called_with(
-        vms, '/usr/local/libexec/osu-micro-benchmarks/mpi')
-    vm.RemoteCommand.assert_called_with(
+    mock_nfs_osu.assert_called_with(vms, mpi_dir)
+    vm.RemoteCommand.assert_called_with(f'ls {mpi_dir}/*/osu_hello')
+    vm.RobustRemoteCommand.assert_called_with(
         '. mpivars.sh; mpirun -perhost 1 -n 2 '
-        '-hosts 10.0.0.1,10.0.0.2 path/to/startup/osu_hello')
+        f'-hosts 10.0.0.1,10.0.0.2 {mpi_dir}/startup/osu_hello')
 
   @flagsaver.flagsaver(omb_iterations=10)
   def testRunResult(self):
@@ -252,12 +237,13 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     # Size                  MB/s        Messages/s
     1                       6.39        6385003.80
     """)
-    vm = mock.Mock(internal_ip='10.0.0.1')
+    vm = MockVm()
     mpitest_path = 'path/to/startup/osu_mbw_mr'
-    vm.RemoteCommand.side_effect = [(mpitest_path, ''), (test_output, '')]
+    vm.RemoteCommand.side_effect = [(mpitest_path, ''), (mpitest_path, '')]
+    vm.RobustRemoteCommand.side_effect = [(test_output, ''), (test_output, '')]
     vms = [vm, mock.Mock(internal_ip='10.0.0.2')]
 
-    result = omb.RunBenchmark(vms, 'mbw_mr')
+    results = list(omb.RunBenchmark(vms, 'mbw_mr'))
 
     expected_result = omb.RunResult(
         name='mbw_mr',
@@ -276,8 +262,12 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         params={'--iterations': 10},
         mpi_vendor='intel',
         mpi_version='2019.6',
-        value_column='bandwidth')
-    self.assertEqual(expected_result, result)
+        value_column='bandwidth',
+        number_processes=2)
+    self.assertEqual(expected_result, results[0])
+    self.assertLen(results, 2)
+    # Called twice, the second time with 4*2=8 processes
+    self.assertEqual(8, results[1].number_processes)
 
 
 if __name__ == '__main__':

@@ -37,32 +37,24 @@ _RUN_RESULT = result = omb.RunResult(
     params={'b': 2},
     mpi_vendor='intel',
     mpi_version='2019.6',
-    value_column='latency')
+    value_column='latency',
+    number_processes=6)
 
-_EXPECTED_METADATA1 = {
-    'foo': 100,
+_COMMON_METADATA = {
     'cmd': 'mpirun path/to/acc_latency',
     'metadata_a': 1,
     'param_b': 2,
     'omb_version': '5.7',
     'mpi_vendor': 'intel',
     'mpi_version': '2019.6',
-    'latency': 10,
+    'number_processes': 6,
 }
-_EXPECTED_METADATA2 = {
-    'foo': 200,
-    'cmd': 'mpirun path/to/acc_latency',
-    'metadata_a': 1,
-    'param_b': 2,
-    'omb_version': '5.7',
-    'mpi_vendor': 'intel',
-    'mpi_version': '2019.6',
-    'latency': 20,
-}
+_METADATA1 = {'foo': 100, 'latency': 10, **_COMMON_METADATA}
+_METADATA2 = {'foo': 200, 'latency': 20, **_COMMON_METADATA}
 
 _EXPECTED_SAMPLES = [
-    sample.Sample('acc_latency', 10.0, 'usec', _EXPECTED_METADATA1),
-    sample.Sample('acc_latency', 20.0, 'usec', _EXPECTED_METADATA2),
+    sample.Sample('acc_latency', 10.0, 'usec', _METADATA1),
+    sample.Sample('acc_latency', 20.0, 'usec', _METADATA2),
 ]
 
 
@@ -75,16 +67,14 @@ class OmbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.assertSampleListsEqualUpToTimestamp(_EXPECTED_SAMPLES, samples)
 
   @flagsaver.flagsaver(omb_run_long_latency=True)
-  @mock.patch.object(omb, 'RunBenchmark', return_value=_RUN_RESULT)
+  @mock.patch.object(omb, 'RunBenchmark', return_value=[_RUN_RESULT])
   def testRun(self, mock_run):
     bm_spec = MockBenchmarkSpec()
     samples = omb_benchmark.Run(bm_spec)
 
     self.assertSampleListsEqualUpToTimestamp(_EXPECTED_SAMPLES, samples[:2])
     self.assertLen(samples, 84)
-    expected_calls = [
-        mock.call(bm_spec.vms, name) for name in omb.BENCHMARKS
-    ]
+    expected_calls = [mock.call(bm_spec.vms, name) for name in omb.BENCHMARKS]
     mock_run.assert_has_calls(expected_calls)
 
 

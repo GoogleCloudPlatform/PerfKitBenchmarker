@@ -2,10 +2,12 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterator, List, Tuple
 from absl import flags
 import dataclasses
 
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker.linux_packages import intelmpi
 
@@ -16,6 +18,12 @@ _DATA_URL = ('https://mvapich.cse.ohio-state.edu/download/mvapich/'
 _SRC_DIR = f'{_PKG_NAME}-{VERSION}'
 _TARBALL = f'{_PKG_NAME}-{VERSION}.tar.gz'
 _RUN_DIR = f'/usr/local/libexec/{_PKG_NAME}/mpi'
+
+# Benchmarks that can only be run with a single thread per host
+_SINGLE_THREADED_BENCHMARKS = frozenset({
+    'acc_latency', 'bibw', 'bw', 'cas_latency', 'fop_latency', 'get_bw',
+    'get_latency'
+})
 
 PREPROVISIONED_DATA = {
     _TARBALL: '1470ebe00eb6ca7f160b2c1efda57ca0fb26b5c4c61148a3f17e8e79fbf34590'
@@ -53,6 +61,9 @@ _NUM_SERVER_THREADS = flags.DEFINE_integer('omb_server_threads', None,
                                            'Number of server threads to use.')
 _NUM_RECEIVER_THREADS = flags.DEFINE_integer(
     'omb_receiver_threads', None, 'Number of server threads to use.')
+flag_util.DEFINE_integerlist(
+    'omb_mpi_processes', flag_util.IntegerList([1, 0]),
+    'MPI processes to use per host.  1=One process, 0=only real cores')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -154,6 +165,7 @@ class RunResult:
     mpi_version: Version of the MPI library.
     value_column: The name of the column in the data rows that should be used
       for the sample.Sample value.
+    number_processes: The total number of MPI processes used.
   """
   name: str
   metadata: Dict[str, Any]
@@ -164,6 +176,10 @@ class RunResult:
   mpi_vendor: str
   mpi_version: str
   value_column: str
+  number_processes: int
+
+
+FLAGS = flags.FLAGS
 
 
 def Install(vm) -> None:
@@ -188,8 +204,8 @@ def PrepareWorkers(vms) -> None:
   _TestInstall(vms)
 
 
-def RunBenchmark(vms, name) -> RunResult:
-  """Returns the RunResult of running the microbenchmark.
+def RunBenchmark(vms, name) -> Iterator[RunResult]:
+  """Yields the RunResult of running the microbenchmark.
 
   Args:
     vms: List of VMs to use.
@@ -209,18 +225,30 @@ def RunBenchmark(vms, name) -> RunResult:
     # --num_threads errors out with 'Invalid option [-]'
     params['-t'] = value
 
-  txt, full_cmd = _RunBenchmark(vms[0], name, len(vms), vms, params)
+  for processes_per_host in FLAGS.omb_mpi_processes:
+    # special case processes_per_host=0 means use all the real cores
+    processes_per_host = processes_per_host or vms[0].NumCpusForBenchmark(True)
+    if name in _SINGLE_THREADED_BENCHMARKS and processes_per_host != 1:
+      continue
+    number_processes = processes_per_host * len(vms)
+    try:
+      txt, full_cmd = _RunBenchmark(vms[0], name, number_processes, vms, params)
+    except errors.VirtualMachine.RemoteCommandError:
+      logging.exception('Error running %s benchmark with %s MPI proccesses',
+                        name, number_processes)
+      continue
 
-  return RunResult(
-      name=name,
-      metadata=_ParseBenchmarkMetadata(txt),
-      data=_ParseBenchmarkData(name, txt),
-      full_cmd=full_cmd,
-      units='MB/s' if 'MB/s' in txt else 'usec',
-      params=params,
-      mpi_vendor='intel',
-      mpi_version=intelmpi.MpirunMpiVersion(vms[0]),
-      value_column=BENCHMARKS[name].value_column)
+    yield RunResult(
+        name=name,
+        metadata=_ParseBenchmarkMetadata(txt),
+        data=_ParseBenchmarkData(name, txt),
+        full_cmd=full_cmd,
+        units='MB/s' if 'MB/s' in txt else 'usec',
+        params=params,
+        mpi_vendor='intel',
+        mpi_version=intelmpi.MpirunMpiVersion(vms[0]),
+        value_column=BENCHMARKS[name].value_column,
+        number_processes=number_processes)
 
 
 def _RunBenchmark(vm,
@@ -260,10 +288,7 @@ def _RunBenchmark(vm,
     mpirun_cmd.append('--full')
   full_cmd = f'{intelmpi.SourceMpiVarsCommand(vm)}; {" ".join(mpirun_cmd)}'
 
-  if name in BENCHMARKS and BENCHMARKS[name].long_running:
-    txt, _ = vm.RobustRemoteCommand(full_cmd)
-  else:
-    txt, _ = vm.RemoteCommand(full_cmd)
+  txt, _ = vm.RobustRemoteCommand(full_cmd)
   return txt, full_cmd
 
 

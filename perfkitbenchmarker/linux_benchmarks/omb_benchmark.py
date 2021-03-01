@@ -62,7 +62,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   vms = bm_spec.vms
   samples = []
   for benchmark in _GetBenchmarks():
-    samples.extend(_CreateSamples(omb.RunBenchmark(vms, benchmark)))
+    for result in omb.RunBenchmark(vms, benchmark):
+      samples.extend(_CreateSamples(result))
   return samples
 
 
@@ -90,6 +91,7 @@ def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
         'omb_version': omb.VERSION,
         'mpi_vendor': result.mpi_vendor,
         'mpi_version': result.mpi_version,
+        'number_processes': result.number_processes,
     })
     yield entry
 
