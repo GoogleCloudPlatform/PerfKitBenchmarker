@@ -598,7 +598,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   else:
     fio_command = (f'{exec_path} --output-format=json '
                    f'--random_generator={FLAGS.fio_rng} '
-                   f'--filename={mount_point} {remote_job_file_path}')
+                   f'--directory={mount_point} {remote_job_file_path}')
 
   collect_logs = any([
       FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log,
