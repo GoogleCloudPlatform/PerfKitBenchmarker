@@ -95,6 +95,7 @@ def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
         'number_processes': result.number_processes,
         'run_time': round(result.run_time, 1),
         'pinning': pinning,
+        'perhost': result.perhost,
     })
     yield entry
 

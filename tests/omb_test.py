@@ -203,7 +203,8 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         benchmark,
         number_processes=2,
         hosts=[vm, mock.Mock(internal_ip='10.0.0.2')],
-        options={'-t': 1})
+        options={'-t': 1},
+        perhost=1)
 
     self.assertEqual(textoutput, txt)
     self.assertEqual(expected_full_cmd, full_cmd)
@@ -275,7 +276,8 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         pinning={
             0: 'pkb-a0b71860-0:0,1',
             1: 'pkb-a0b71860-1:0,1'
-        })
+        },
+        perhost=1)
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes
@@ -317,6 +319,15 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         3: 'pkb-a0b71860-1:2,16,17'
     }
     self.assertEqual(expected_pinning, pinning)
+
+  @flagsaver.flagsaver(omb_perhost=2)
+  @mock.patch.object(omb, '_PathToBenchmark', return_value='/igather')
+  def testPerhost(self, mock_benchmark_path):
+    del mock_benchmark_path
+    vm = MockVm()
+    vm.RobustRemoteCommand.return_value = ('', '')
+    results = list(omb.RunBenchmark([vm], 'igather'))
+    self.assertIn('-perhost 2', results[0].full_cmd)
 
 
 if __name__ == '__main__':

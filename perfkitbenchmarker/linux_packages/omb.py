@@ -77,6 +77,7 @@ flag_util.DEFINE_integerlist(
     'MPI processes to use per host.  1=One process, 0=only real cores')
 _MPI_DEBUG = flags.DEFINE_integer(
     'omb_mpi_debug', 5, 'Debug level to use.  Set to 0 for no debugging')
+_MPI_PERHOST = flags.DEFINE_integer('omb_perhost', 1, 'MPI option -perhost.')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -181,6 +182,7 @@ class RunResult:
     number_processes: The total number of MPI processes used.
     run_time: Time in seconds to run the test.
     pinning: MPI processes pinning.
+    perhost: MPI option -perhost.
   """
   name: str
   metadata: Dict[str, Any]
@@ -194,6 +196,7 @@ class RunResult:
   number_processes: int
   run_time: int
   pinning: str
+  perhost: int
 
 
 FLAGS = flags.FLAGS
@@ -250,7 +253,8 @@ def RunBenchmark(vms, name) -> Iterator[RunResult]:
     number_processes = processes_per_host * len(vms)
     try:
       start_time = time.time()
-      txt, full_cmd = _RunBenchmark(vms[0], name, number_processes, vms, params)
+      txt, full_cmd = _RunBenchmark(vms[0], name, _MPI_PERHOST.value,
+                                    number_processes, vms, params)
       run_time = time.time() - start_time
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception('Error running %s benchmark with %s MPI proccesses',
@@ -269,11 +273,13 @@ def RunBenchmark(vms, name) -> Iterator[RunResult]:
         value_column=BENCHMARKS[name].value_column,
         number_processes=number_processes,
         run_time=run_time,
-        pinning=_ParseMpiPinningInfo(txt))
+        pinning=_ParseMpiPinningInfo(txt),
+        perhost=_MPI_PERHOST.value)
 
 
 def _RunBenchmark(vm,
                   name: str,
+                  perhost: int,
                   number_processes: int = None,
                   hosts: List[Any] = None,
                   options: Dict[str, Any] = None) -> Tuple[str, str]:
@@ -282,6 +288,7 @@ def _RunBenchmark(vm,
   Args:
     vm: The headnode to run on.
     name: The name of the microbenchmark.
+    perhost: MPI option -perhost.  Use 0 to not set value.
     number_processes: The number of mpi processes to use.
     hosts: List of BaseLinuxVirtualMachines to use in the cluster.
     options: Optional dict of flags to pass into the benchmark.
@@ -290,14 +297,13 @@ def _RunBenchmark(vm,
     Tuple of the output text of mpirun and the command ran.
   """
   # Create the mpirun command
-  txt, _ = vm.RemoteCommand(f'ls {_RUN_DIR}/*/osu_{name}')
-  full_benchmark_path = txt.strip()
+  full_benchmark_path = _PathToBenchmark(vm, name)
   mpirun_cmd = []
   if _MPI_DEBUG.value:
     mpirun_cmd.append(f'I_MPI_DEBUG={_MPI_DEBUG.value}')
   mpirun_cmd.append('mpirun')
-  # TODO(user) add support for perhost / rank options
-  mpirun_cmd.append('-perhost 1')
+  if perhost:
+    mpirun_cmd.append(f'-perhost {perhost}')
   if number_processes:
     mpirun_cmd.append(f'-n {number_processes}')
   if hosts:
@@ -316,11 +322,17 @@ def _RunBenchmark(vm,
   return txt, full_cmd
 
 
+def _PathToBenchmark(vm, name: str) -> str:
+  """Returns the full path to the benchmark."""
+  txt, _ = vm.RemoteCommand(f'ls {_RUN_DIR}/*/osu_{name}')
+  return txt.strip()
+
+
 def _TestInstall(vms):
   number_processes = len(vms)
   logging.info('Running hello world on %s process(es)', number_processes)
   hosts = vms if number_processes > 1 else None
-  txt, _ = _RunBenchmark(vms[0], 'hello', number_processes, hosts=hosts)
+  txt, _ = _RunBenchmark(vms[0], 'hello', 1, number_processes, hosts=hosts)
   logging.info('Hello world output: %s', txt.splitlines()[-1])
 
 
