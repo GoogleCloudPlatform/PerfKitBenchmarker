@@ -61,17 +61,17 @@ flags.DEFINE_enum('mlperf_benchmark', 'resnet',
                   'MLPerf benchmark test to run.')
 flags.DEFINE_string(
     'mlperf_gcs_resnet_checkpoint',
-    'gs://cloud-tpu-artifacts/resnet/resnet-nhwc-2018-02-07/model.ckpt-112603',
+    'gs://p3rf-mlperf/resnet50-checkpoint-2018-02-07/model.ckpt-112603',
     'A ResNet backbone trained on the ImageNet dataset.')
 flags.DEFINE_string(
     'mlperf_transformer_decode_dir', '', 'Transformer decode directory')
 flags.DEFINE_string('wmt_data_dir',
-                    'gs://pkb-sgpyc-us-west1/mlperf_v0.6_nv_transformer/',
+                    'gs://p3rf-mlperf/mlperf_v0.6_nv_transformer/',
                     'Directory where the wmt dataset is stored')
-flags.DEFINE_string('coco_data_dir', 'gs://pkb-sgpyc-us-west1/coco2017/',
+flags.DEFINE_string('coco_data_dir', 'gs://p3rf-mlperf/coco2017/',
                     'Directory where the coco dataset is stored')
 flags.DEFINE_string('gnmt_data_dir',
-                    'gs://pkb-sgpyc-us-west1/mlperf_v0.6_nv_gnmt/',
+                    'gs://p3rf-mlperf/mlperf_v0.6_nv_gnmt/',
                     'Directory where the nv v0.6 WMT dataset is stored')
 flags.DEFINE_string('minigo_model_dir', None,
                     'Directory on GCS to copy minigo source data from. Files '
