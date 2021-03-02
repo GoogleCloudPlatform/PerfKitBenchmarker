@@ -28,7 +28,7 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
-LATEST_CLIENT_JAR = 'athena-java-client-2.0.jar'
+LATEST_CLIENT_JAR = 'athena-java-client-2.1.jar'
 
 AWS_ATHENA_CMD_PREFIX = ['aws', 'athena']
 AWS_ATHENA_CMD_POSTFIX = ['--output', 'json']
