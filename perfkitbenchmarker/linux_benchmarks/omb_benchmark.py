@@ -86,13 +86,15 @@ def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
       entry.metadata[f'metadata_{key}'] = value
     for key, value in result.params.items():
       entry.metadata[f'param_{key}'] = value
+    pinning = ';'.join(f'{k}:{v}' for k, v in sorted(result.pinning.items()))
     entry.metadata.update({
         'cmd': result.full_cmd,
         'omb_version': omb.VERSION,
         'mpi_vendor': result.mpi_vendor,
         'mpi_version': result.mpi_version,
         'number_processes': result.number_processes,
-        'run_time': round(result.run_time, 1)
+        'run_time': round(result.run_time, 1),
+        'pinning': pinning,
     })
     yield entry
 

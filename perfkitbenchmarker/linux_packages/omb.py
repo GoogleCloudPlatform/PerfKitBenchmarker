@@ -1,9 +1,10 @@
 """Installs and runs the OSU MPI micro-benchmark."""
 
+import itertools
 import logging
 import re
 import time
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, Iterator, List, Pattern, Tuple
 from absl import flags
 import dataclasses
 
@@ -51,6 +52,15 @@ _COMPUTE_RE = re.compile(
     r'(?P<comm>[\d\.]+)\s+'
     r'(?P<overlap>[\d\.]+)\s*$', re.X | re.MULTILINE)
 
+# Matches MPI debug output showing CPU pinning
+_PINNING_RE = re.compile(
+    r"""
+     MPI\s+startup\(\):\s+
+     (?P<rank>\d+)\s+
+     (?P<pid>\d+)\s+
+     (?P<node_name>\S+)\s+
+     {?(?P<cpus>[^}\s]+)""", re.X)
+
 # parameters to pass into the benchmark
 _NUMBER_ITERATIONS = flags.DEFINE_integer(
     'omb_iterations', None, 'Number of iterations to run in a test.')
@@ -65,6 +75,8 @@ _NUM_RECEIVER_THREADS = flags.DEFINE_integer(
 flag_util.DEFINE_integerlist(
     'omb_mpi_processes', flag_util.IntegerList([1, 0]),
     'MPI processes to use per host.  1=One process, 0=only real cores')
+_MPI_DEBUG = flags.DEFINE_integer(
+    'omb_mpi_debug', 5, 'Debug level to use.  Set to 0 for no debugging')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -168,6 +180,7 @@ class RunResult:
       for the sample.Sample value.
     number_processes: The total number of MPI processes used.
     run_time: Time in seconds to run the test.
+    pinning: MPI processes pinning.
   """
   name: str
   metadata: Dict[str, Any]
@@ -180,6 +193,7 @@ class RunResult:
   value_column: str
   number_processes: int
   run_time: int
+  pinning: str
 
 
 FLAGS = flags.FLAGS
@@ -254,7 +268,8 @@ def RunBenchmark(vms, name) -> Iterator[RunResult]:
         mpi_version=intelmpi.MpirunMpiVersion(vms[0]),
         value_column=BENCHMARKS[name].value_column,
         number_processes=number_processes,
-        run_time=run_time)
+        run_time=run_time,
+        pinning=_ParseMpiPinningInfo(txt))
 
 
 def _RunBenchmark(vm,
@@ -277,7 +292,10 @@ def _RunBenchmark(vm,
   # Create the mpirun command
   txt, _ = vm.RemoteCommand(f'ls {_RUN_DIR}/*/osu_{name}')
   full_benchmark_path = txt.strip()
-  mpirun_cmd = ['mpirun']
+  mpirun_cmd = []
+  if _MPI_DEBUG.value:
+    mpirun_cmd.append(f'I_MPI_DEBUG={_MPI_DEBUG.value}')
+  mpirun_cmd.append('mpirun')
   # TODO(user) add support for perhost / rank options
   mpirun_cmd.append('-perhost 1')
   if number_processes:
@@ -329,16 +347,42 @@ def _ParseBenchmarkMetadata(txt: str) -> Dict[str, str]:
   return ret
 
 
+def _LinesAfterMarker(line_re: Pattern[str], txt: str) -> List[str]:
+  r"""Returns the text lines after the matching regex.
+
+  _LinesAfterMarker(re.compile('^Hello'), "Line1\nHello\nLine2") == ['Line2']
+
+  Args:
+    line_re: Pattern to match the start of data
+    txt: Text input
+  """
+
+  def StartBlock(line: str) -> bool:
+    return not line_re.match(line)
+
+  lines = list(itertools.dropwhile(StartBlock, txt.splitlines()))
+  return lines[1:] if lines else []
+
+
 def _ParseBenchmarkData(benchmark_name: str,
                         txt: str) -> List[Dict[str, float]]:
   """Returns the parsed metrics from the benchmark stdout.
+
+  Text for benchmark_name='bw':
+
+  # OSU MPI Bandwidth Test v5.7
+  # Size      Bandwidth (MB/s)
+  1                       0.48
+  2                       0.98
+
+  Returns [{'size': 1, 'bandwidth': 0.48}, {'size': 2, 'bandwidth': 0.98}]
 
   Args:
     benchmark_name: Name of the benchmark.
     txt: The standard output of the benchmark.
   """
   data = []
-  for line in txt.splitlines():
+  for line in _LinesAfterMarker(re.compile('# OSU MPI.*'), txt):
     if not line or line.startswith('#') or 'Overall' in line:
       continue
     columns = BENCHMARKS[benchmark_name].columns
@@ -353,3 +397,41 @@ def _ParseBenchmarkData(benchmark_name: str,
         row_with_headers[int_column] = int(row_with_headers[int_column])
     data.append(row_with_headers)
   return data
+
+
+def _ParseMpiPinningInfo(txt: str) -> Dict[str, List[Tuple[int, int]]]:
+  """Returns the MPI pinning info for the run.
+
+  Example:
+    MPI startup(): libfabric provider: tcp;ofi_rxm
+    MPI startup(): Rank    Pid      Node name       Pin cpu
+    MPI startup(): 0       17077    pkb-a0b71860-0  {0,1,15}
+    MPI startup(): 1       3475     pkb-a0b71860-1  {0,
+                                       1,15}
+    MPI startup(): 2       17078    pkb-a0b71860-0  {2,16,17}
+    MPI startup(): 3       3476     pkb-a0b71860-1  {2,16,17}
+
+
+  Returns {0: 'pkb-a0b71860-0:0,1,15',  1: 'pkb-a0b71860-1:0,1,15',
+           2: 'pkb-a0b71860-0:2,16,17', 3: 'pkb-a0b71860-1:2,16,17'}
+
+  Args:
+    txt: Stdout from the run.
+  """
+  start_pinning = re.compile(
+      r'.*MPI startup.*Rank\s+Pid\s+Node name\s+Pin cpu.*')
+  ret = {}
+  rank = None
+  for line in _LinesAfterMarker(start_pinning, txt):
+    match = _PINNING_RE.search(line)
+    if match:
+      rank = int(match['rank'])
+      ret[rank] = f'{match["node_name"]}:{match["cpus"]}'
+    else:
+      # might be a line break, append to last result
+      match = re.search(r'\s+(?P<cpus>\d+[,\d]*)', line)
+      if match:
+        ret[rank] += match['cpus']
+      else:
+        break
+  return ret

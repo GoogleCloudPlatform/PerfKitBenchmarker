@@ -2,6 +2,7 @@
 
 import inspect
 import os
+import re
 from absl.testing import absltest
 from absl.testing import flagsaver
 from absl.testing import parameterized
@@ -183,6 +184,7 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
 
     self.assertEqual(expected_metadata, metadata)
 
+  @flagsaver.flagsaver(omb_mpi_debug=0)
   def testRunBenchmarkNormal(self):
     # all calls done with vm.RemoteCommand
     benchmark = 'barrier'
@@ -227,12 +229,16 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     mock_nfs_osu.assert_called_with(vms, mpi_dir)
     vm.RemoteCommand.assert_called_with(f'ls {mpi_dir}/*/osu_hello')
     vm.RobustRemoteCommand.assert_called_with(
-        '. mpivars.sh; mpirun -perhost 1 -n 2 '
+        '. mpivars.sh; I_MPI_DEBUG=5 mpirun -perhost 1 -n 2 '
         f'-hosts 10.0.0.1,10.0.0.2 {mpi_dir}/startup/osu_hello')
 
-  @flagsaver.flagsaver(omb_iterations=10)
+  @flagsaver.flagsaver(omb_iterations=10, omb_mpi_debug=0)
   def testRunResult(self):
     test_output = inspect.cleandoc("""
+    [0] MPI startup(): Rank    Pid      Node name       Pin cpu
+    [0] MPI startup(): 0       17442    pkb-a0b71860-0  {0,1}
+    [0] MPI startup(): 1       3735     pkb-a0b71860-1  {0,
+                                          1}
     # OSU MPI Multiple Bandwidth / Message Rate Test v5.7
     # [ pairs: 15 ] [ window size: 64 ]
     # Size                  MB/s        Messages/s
@@ -265,11 +271,52 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         mpi_version='2019.6',
         value_column='bandwidth',
         number_processes=2,
-        run_time=0)
+        run_time=0,
+        pinning={
+            0: 'pkb-a0b71860-0:0,1',
+            1: 'pkb-a0b71860-1:0,1'
+        })
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes
     self.assertEqual(8, results[1].number_processes)
+
+  @parameterized.parameters(
+      {
+          'lines': ('a', 'b1', 'b2', 'c'),
+          'regex_text': 'b',
+          'expected': ['b2', 'c']
+      }, {
+          'lines': ('a', 'b', 'c'),
+          'regex_text': 'd',
+          'expected': []
+      })
+  def testLinesAfterMarker(self, lines, regex_text, expected):
+    line_re = re.compile(regex_text)
+    input_text = '\n'.join(lines)
+
+    self.assertEqual(expected, omb._LinesAfterMarker(line_re, input_text))
+
+  def testParseMpiPinningInfo(self):
+    txt = """
+    MPI startup(): libfabric provider: tcp;ofi_rxm
+    MPI startup(): Rank    Pid      Node name       Pin cpu
+    MPI startup(): 0       17077    pkb-a0b71860-0  {0,1,15}
+    MPI startup(): 1       3475     pkb-a0b71860-1  {0,
+                                       1,15}
+    MPI startup(): 2       17078    pkb-a0b71860-0  {2,16,17}
+    MPI startup(): 3       3476     pkb-a0b71860-1  {2,16,17}
+    """
+
+    pinning = omb._ParseMpiPinningInfo(txt)
+
+    expected_pinning = {
+        0: 'pkb-a0b71860-0:0,1,15',
+        1: 'pkb-a0b71860-1:0,1,15',
+        2: 'pkb-a0b71860-0:2,16,17',
+        3: 'pkb-a0b71860-1:2,16,17'
+    }
+    self.assertEqual(expected_pinning, pinning)
 
 
 if __name__ == '__main__':
