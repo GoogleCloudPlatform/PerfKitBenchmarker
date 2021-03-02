@@ -449,8 +449,8 @@ class BenchmarkSpec(object):
         # In the event that we need to create multiple disks from the same
         # DiskSpec, we need to ensure that they have different mount points.
         if (disk_count > 1 and disk_spec.mount_point):
-          for i, spec in enumerate(vm.disk_specs):
-            spec.mount_point += str(i)
+          for i, vm_disk_spec in enumerate(vm.disk_specs):
+            vm_disk_spec.mount_point += str(i)
       vms.append(vm)
 
     return vms
@@ -569,12 +569,12 @@ class BenchmarkSpec(object):
     self.spark_service = spark_service_class(spark_spec)
     # If this is Pkb managed, the benchmark spec needs to adopt vms.
     if service_type == spark_service.PKB_MANAGED:
-      for name, spec in [('master_group', spark_spec.master_group),
-                         ('worker_group', spark_spec.worker_group)]:
+      for name, group_spec in [('master_group', spark_spec.master_group),
+                               ('worker_group', spark_spec.worker_group)]:
         if name in self.vms_to_boot:
           raise Exception('Cannot have a vm group {0} with a {1} spark '
                           'service'.format(name, spark_service.PKB_MANAGED))
-        self.vms_to_boot[name] = spec
+        self.vms_to_boot[name] = group_spec
 
   def ConstructVPNService(self):
     """Create the VPNService object."""
@@ -939,14 +939,14 @@ class BenchmarkSpec(object):
 
     try:
       with open(cls._GetPickleFilename(uid), 'rb') as pickle_file:
-        spec = pickle.load(pickle_file)
+        bm_spec = pickle.load(pickle_file)
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.',
                     benchmark_module.BENCHMARK_NAME)
       raise e
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
-    spec.deleted = False
-    spec.status = benchmark_status.SKIPPED
-    context.SetThreadBenchmarkSpec(spec)
-    return spec
+    bm_spec.deleted = False
+    bm_spec.status = benchmark_status.SKIPPED
+    context.SetThreadBenchmarkSpec(bm_spec)
+    return bm_spec
