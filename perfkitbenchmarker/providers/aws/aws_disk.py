@@ -180,6 +180,7 @@ NUM_LOCAL_VOLUMES = {
     'm5d.xlarge': 1,
     'm5d.2xlarge': 1,
     'm5d.4xlarge': 2,
+    'm5d.8xlarge': 2,
     'm5d.12xlarge': 2,
     'm5d.24xlarge': 4,
     'm5d.metal': 4,
