@@ -24,7 +24,7 @@ This command will fail if the status file cannot be successfully locked.
 To await completion, "wait_for_command.py" acquires a shared lock on the
 status file, which blocks until the process completes.
 
-*Runs on the guest VM. Supports Python 2.6, 2.7, and 3.x.*
+*Runs on the guest VM. Supports Python 3.x.*
 """
 
 import fcntl

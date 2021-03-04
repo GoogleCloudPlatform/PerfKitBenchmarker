@@ -289,13 +289,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         setting)
     self.os_metadata['transparent_hugepage'] = setting
 
-  def _PushRobustCommandScripts(self):
-    """Pushes the scripts required by RobustRemoteCommand to this VM.
+  def _SetupRobustCommand(self):
+    """Sets up the RobustRemoteCommand tooling.
 
-    If the scripts have already been placed on the VM, this is a noop.
+    This includes installing python3 and pushing scripts required by
+    RobustRemoteCommand to this VM.  There is a check to skip if previously
+    installed.
     """
     with self._remote_command_script_upload_lock:
       if not self._has_remote_command_script:
+        # Python3 is needed for RobustRemoteCommands
+        self.Install('python3')
+
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
           remote_path = os.path.join(vm_util.VM_TMP_DIR, os.path.basename(f))
           if os.path.basename(remote_path):
@@ -339,7 +344,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       RemoteCommandError: If there was a problem establishing the connection, or
           the command fails.
     """
-    self._PushRobustCommandScripts()
+    self._SetupRobustCommand()
 
     execute_path = os.path.join(vm_util.VM_TMP_DIR,
                                 os.path.basename(EXECUTE_COMMAND))
@@ -357,7 +362,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not isinstance(command, str):
       command = ' '.join(command)
 
-    start_command = ['nohup', 'python', execute_path,
+    start_command = ['nohup', 'python3', execute_path,
                      '--stdout', stdout_file,
                      '--stderr', stderr_file,
                      '--status', status_file,
@@ -371,7 +376,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand(start_command)
 
     def _WaitForCommand():
-      wait_command = ['python', wait_path,
+      wait_command = ['python3', wait_path,
                       '--status', status_file,
                       '--exclusive', exclusive_file]  # pyformat: disable
       stdout = ''
@@ -1986,8 +1991,6 @@ class ContainerizedDebianMixin(BaseDebianMixin):
     # Has to be done after InitDocker() because it needs docker_id.
     self._CreateVmTmpDir()
 
-    # Python is needed for RobustRemoteCommands
-    self.Install('python')
     super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
 
   def InitDocker(self):
