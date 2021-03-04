@@ -21,7 +21,6 @@ to test Spanner. Configure the number of VMs via --ycsb_client_vms.
 import logging
 from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
@@ -143,10 +142,6 @@ def Run(benchmark_spec):
 
   metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
   for sample in samples:
-    # YCSB writes error samples, there is no direct output to parse.
-    if 'Return=ERROR' in sample.metric:
-      raise errors.Benchmarks.RunError(
-          'Error running YCSB, please check the output log.')
     sample.metadata.update(metadata)
 
   return samples

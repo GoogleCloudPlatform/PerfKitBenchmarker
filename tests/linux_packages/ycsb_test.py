@@ -18,8 +18,10 @@ import copy
 import os
 import unittest
 
+from absl.testing import flagsaver
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
+from tests import pkb_common_test_case
 import six
 from six.moves import range
 
@@ -30,8 +32,7 @@ def open_data_file(filename):
     return fp.read()
 
 
-class SimpleResultParserTestCase(unittest.TestCase):
-  maxDiff = None
+class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(SimpleResultParserTestCase, self).setUp()
@@ -118,6 +119,12 @@ class BadResultParserTestCase(unittest.TestCase):
     contents = open_data_file('ycsb-test-run-3.dat')
     self.assertRaises(errors.Benchmarks.KnownIntermittentError,
                       ycsb.ParseResults, contents, 'histogram')
+
+  @flagsaver.flagsaver(ycsb_max_error_rate=0.95)
+  def testErrorRate(self):
+    contents = open_data_file('ycsb-test-run-4.dat')
+    self.assertRaises(errors.Benchmarks.RunError, ycsb.ParseResults, contents,
+                      'hdrhistogram')
 
 
 class WeightedQuantileTestCase(unittest.TestCase):

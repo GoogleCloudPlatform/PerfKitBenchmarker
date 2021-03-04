@@ -197,6 +197,9 @@ flags.DEFINE_integer('ycsb_dynamic_load_sustain_timelimit', 300,
                      'if we have already reached sustained throughput.')
 flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
                      'Sleep duration in seconds between load and run stage.')
+_ERROR_RATE_THRESHOLD = flags.DEFINE_float(
+    'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
+    'By default, this allows any number of errors.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -509,7 +512,41 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
         op_result['statistics'][name] = val
 
     result['groups'][operation] = op_result
+  _ValidateErrorRate(result)
   return result
+
+
+def _ValidateErrorRate(result):
+  """Raises an error if results contains entries with too high error rate.
+
+  Computes the error rate for each operation, example output looks like:
+
+    [INSERT], Operations, 100
+    [INSERT], AverageLatency(us), 74.92
+    [INSERT], MinLatency(us), 5
+    [INSERT], MaxLatency(us), 98495
+    [INSERT], 95thPercentileLatency(us), 42
+    [INSERT], 99thPercentileLatency(us), 1411
+    [INSERT], Return=OK, 90
+    [INSERT], Return=ERROR, 10
+
+  This function will then compute 10/100 = 0.1 error rate.
+
+  Args:
+    result: The result of running ParseResults()
+
+  Raises:
+    errors.Benchmarks.RunError: If the computed error rate is higher than the
+      threshold.
+  """
+  for operation in result['groups'].values():
+    name, stats = operation['group'], operation['statistics']
+    # These keys may be missing from the output.
+    error_rate = stats.get('Return=ERROR', 0) / stats.get('Operations', 1)
+    if error_rate > _ERROR_RATE_THRESHOLD.value:
+      raise errors.Benchmarks.RunError(
+          f'YCSB had a {error_rate} error rate for {name}, higher than '
+          f'threshold {_ERROR_RATE_THRESHOLD.value}')
 
 
 def ParseHdrLogFile(logfile):
