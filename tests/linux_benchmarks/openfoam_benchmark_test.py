@@ -38,16 +38,16 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     super(OpenfoamBenchmarkTest, self).setUp()
     self.mock_vm = mock.Mock()
     self.mock_benchmark_spec = mock.Mock(vms=[self.mock_vm])
+    self.enter_context(
+        mock.patch.object(openmpi, 'GetMpiVersion', return_value='1.10.2'))
+    self.enter_context(
+        mock.patch.object(
+            openfoam_benchmark, '_GetOpenfoamVersion', return_value='7'))
 
-  @mock.patch.object(openmpi, 'GetMpiVersion', return_value='1.10.2')
-  @mock.patch.object(openfoam_benchmark, '_GetOpenfoamVersion',
-                     return_value='7')
   @mock.patch.object(openfoam_benchmark, '_ParseRunCommands',
                      return_value=['mpirun $(getApplication)'])
   @flagsaver.flagsaver(openfoam_dimensions=['80_32_32'])
   def testRunCaseReturnsCorrectlyParsedSamples(self,
-                                               mock_getopenfoamversion,
-                                               mock_getmpiversion,
                                                mock_parseruncommands):
     # Run with mocked output data
     self.mock_vm.RemoteCommand.return_value = None, '\n'.join(
@@ -89,6 +89,52 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
       self.mock_vm.Install('openfoam')
+
+  @flagsaver.flagsaver(
+      openfoam_dimensions=['120_48_48'],
+      openfoam_num_threads_per_vm=8,
+      openfoam_mpi_mapping='hwthread',
+      openfoam_decomp_method='simple',
+      openfoam_max_global_cells=1e9)
+  @mock.patch.object(openfoam_benchmark, '_UseMpi')
+  @mock.patch.object(openfoam_benchmark, '_SetDictEntry')
+  @mock.patch.object(openfoam_benchmark, '_RunCase')
+  def testRunWithMoreFlags(self, mock_runcase, mock_setdict, mock_usempi):
+    self.mock_vm.NumCpusForBenchmark.return_value = 16
+    test_sample = sample.Sample('mock', 0, 'mock')
+    mock_runcase.return_value = [test_sample]
+
+    samples = openfoam_benchmark.Run(self.mock_benchmark_spec)
+
+    mock_runcase.assert_called_with(self.mock_vm, '120_48_48')
+
+    setdict_calls = [
+        ('method', 'simple', 'system/decomposeParDict'),
+        ('numberOfSubdomains', 8, 'system/decomposeParDict'),
+        ('hierarchicalCoeffs.n', '(8 1 1)', 'system/decomposeParDict'),
+        ('castellatedMeshControls.maxGlobalCells', float(1e9),
+         'system/snappyHexMeshDict'),
+    ]
+    mock_setdict.assert_has_calls([
+        mock.call(self.mock_vm, key, value, dict_file_name)
+        for key, value, dict_file_name in setdict_calls
+    ])
+
+    mock_usempi.assert_called_with(self.mock_vm, 8, 'hwthread')
+
+    self.assertLen(samples, 1)
+    expected_metadata = {
+        'case_name': 'motorbike',
+        'decomp_method': 'simple',
+        'max_global_cells': 1000000000.0,
+        'mpi_mapping': 'hwthread',
+        'openfoam_version': '7',
+        'openmpi_version': '1.10.2',
+        'total_cpus_available': 16,
+        'total_cpus_used': 8,
+    }
+    self.assertEqual(expected_metadata, samples[0].metadata)
+
 
 if __name__ == '__main__':
   unittest.main()

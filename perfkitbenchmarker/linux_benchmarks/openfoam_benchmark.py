@@ -44,22 +44,23 @@ _CASE_PATHS = {
 assert _DEFAULT_CASE in _CASE_PATHS
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum('openfoam_case', _DEFAULT_CASE,
-                  sorted(list(_CASE_PATHS.keys())),
-                  'Name of the OpenFOAM case to run.')
-flags.DEFINE_list('openfoam_dimensions', ['20_8_8'], 'Dimensions of the case.')
-flags.DEFINE_integer(
+_CASE = flags.DEFINE_enum('openfoam_case', _DEFAULT_CASE,
+                          sorted(list(_CASE_PATHS.keys())),
+                          'Name of the OpenFOAM case to run.')
+_DIMENSIONS = flags.DEFINE_list('openfoam_dimensions', ['20_8_8'],
+                                'Dimensions of the case.')
+_THREADS_PER_VM = flags.DEFINE_integer(
     'openfoam_num_threads_per_vm', None,
     'The number of threads per VM to run OpenFOAM with. If None, defaults to '
     'half the total number of vCPUs available.')
-flags.DEFINE_string(
+_MPI_MAPPING = flags.DEFINE_string(
     'openfoam_mpi_mapping', 'core:SPAN',
     'Mpirun process mapping to use as arguments to "mpirun --map-by".')
-flags.DEFINE_enum(
+_DECOMP = flags.DEFINE_enum(
     'openfoam_decomp_method', 'scotch', ['scotch', 'hierarchical', 'simple'],
     'Decomposition method to use in decomposePar. See: '
     'https://cfd.direct/openfoam/user-guide/v7-running-applications-parallel/')
-flags.DEFINE_integer(
+_MAX_GLOBAL_CELLS = flags.DEFINE_integer(
     'openfoam_max_global_cells', 200 * 1000 * 1000,
     'The maximum number of refinement cells to use in snappHexMeshDict. See: '
     'https://cfd.direct/openfoam/user-guide/v6-snappyhexmesh/')
@@ -221,7 +222,7 @@ def _GetOpenfoamVersion(vm):
 
 def _GetWorkingDirPath():
   """Get the base directory name of the case being run."""
-  case_dir_name = posixpath.basename(_CASE_PATHS[FLAGS.openfoam_case])
+  case_dir_name = posixpath.basename(_CASE_PATHS[_CASE.value])
   return posixpath.join(_BENCHMARK_ROOT, case_dir_name)
 
 
@@ -385,14 +386,14 @@ def Run(benchmark_spec):
 
   # Run configuration metadata:
   num_cpus_available = num_vms * master_vm.NumCpusForBenchmark()
-  if FLAGS.openfoam_num_threads_per_vm is None:
-    num_cpus_to_use = num_cpus_available // 2
+  if _THREADS_PER_VM.value:
+    num_cpus_to_use = num_vms * _THREADS_PER_VM.value
   else:
-    num_cpus_to_use = num_vms * FLAGS.openfoam_num_threads_per_vm
-  case_name = FLAGS.openfoam_case
-  mpi_mapping = FLAGS.openfoam_mpi_mapping
-  decomp_method = FLAGS.openfoam_decomp_method
-  max_global_cells = FLAGS.openfoam_max_global_cells
+    num_cpus_to_use = num_cpus_available // 2
+  case_name = _CASE.value
+  mpi_mapping = _MPI_MAPPING.value
+  decomp_method = _DECOMP.value
+  max_global_cells = _MAX_GLOBAL_CELLS.value
   openfoam_version = _GetOpenfoamVersion(master_vm)
   openmpi_version = openmpi.GetMpiVersion(master_vm)
   common_metadata = {
@@ -425,7 +426,7 @@ def Run(benchmark_spec):
 
   # Run and gather samples.
   samples = []
-  for dimensions in FLAGS.openfoam_dimensions:
+  for dimensions in _DIMENSIONS.value:
     results = _RunCase(master_vm, dimensions)
     # Update every case run with common metadata.
     for result in results:
