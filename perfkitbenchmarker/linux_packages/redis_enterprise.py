@@ -69,7 +69,7 @@ PREPROVISIONED_DATA = {
     _BIONIC_TAR:
         'ef0c58d6d11683aac07d3f2cae6b9544cb53064c9f7a7419d63b6d14cd858d53',
     _LICENSE:
-        'd336e9fb8574519ab90a54155727c5c73dda122d906a617368bdfa6a32b03a42',
+        'ae7eeae0aebffebdfd3dec7a8429513034b0d6dc5bf745abd00feb2d51f79dc5',
 }
 
 
