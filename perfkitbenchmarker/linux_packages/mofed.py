@@ -18,11 +18,10 @@
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('mofed_version', '4.7-3.2.9.0', 'Mellanox OFED version')
+flags.DEFINE_string('mofed_version', '5.0-2.1.8.0', 'Mellanox OFED version')
 
 # TODO(tohaowu) Add DEBIAN9, CENTOS7, RHEL
 MOFED_OS_MAPPING = {
@@ -31,10 +30,9 @@ MOFED_OS_MAPPING = {
     os_types.UBUNTU1804: 'ubuntu18.04',
 }
 
-
 # Mellanox OpenFabrics drivers
-MOFED_DRIVER = ('https://www.mellanox.com/downloads/ofed/MLNX_OFED-{version}/'
-                'MLNX_OFED_LINUX-{version}-{os}-x86_64.tgz')
+MLNX_OFED_DOWNLOAD_URL = ('https://www.mellanox.com/downloads/ofed/MLNX_OFED-'
+                          '{version}/MLNX_OFED_LINUX-{version}-{os}-x86_64.tgz')
 
 
 def _Install(vm):
@@ -42,17 +40,14 @@ def _Install(vm):
   if vm.OS_TYPE not in MOFED_OS_MAPPING:
     raise ValueError('OS type {} not in {}'.format(vm.OS_TYPE,
                                                    sorted(MOFED_OS_MAPPING)))
-  driver = MOFED_DRIVER.format(version=FLAGS.mofed_version,
-                               os=MOFED_OS_MAPPING[vm.OS_TYPE])
+  driver = MLNX_OFED_DOWNLOAD_URL.format(version=FLAGS.mofed_version,
+                                         os=MOFED_OS_MAPPING[vm.OS_TYPE])
   vm.InstallPackages('libdapl2 libmlx4-1')
-  try:
-    vm.RemoteCommand('curl -fSsL {} | tar -zxpf -'.format(driver))
-  except:
-    raise errors.Setup.InvalidSetupError('Failed to download {}'.format(driver))
-  stdout, _ = vm.RemoteCommand('cd MLNX_OFED_LINUX-* && sudo ./mlnxofedinstall '
-                               '--force')
-  if not regex_util.ExtractExactlyOneMatch(r'Installation passed successfully',
-                                           stdout):
+  vm.RemoteCommand(f'wget --retry-connrefused --tries=3 --waitretry=5 {driver}')
+  vm.RemoteCommand('tar zxvf MLNX_OFED_LINUX-*-x86_64.tgz')
+  stdout, _ = vm.RemoteCommand('cd MLNX_OFED_LINUX-*-x86_64 && sudo '
+                               './mlnxofedinstall --force --skip-repo')
+  if 'Installation passed successfully' not in stdout:
     raise errors.Benchmarks.PrepareException(
         'Mellanox OpenFabrics driver isn\'t installed successfully.')
   vm.RemoteCommand('sudo /etc/init.d/openibd restart')
@@ -60,13 +55,11 @@ def _Install(vm):
                    "OS.EnableRDMA=y/g' /etc/waagent.conf")
   vm.RemoteCommand("sudo sed -i -e 's/# OS.UpdateRdmaDriver=y/"
                    "OS.UpdateRdmaDriver=y/g' /etc/waagent.conf")
-  # https://docs.microsoft.com/en-us/azure/virtual-machines/linux/sizes-hpc#rdma-capable-instances
-  vm.RemoteCommand('cat << EOF | sudo tee -a /etc/security/limits.conf\n'
-                   '*               hard    memlock         unlimited\n'
-                   '*               soft    memlock         unlimited\n'
-                   '*               hard    nofile          65535\n'
-                   '*               soft    nofile          65535\n'
-                   'EOF')
+  vm.Reboot()
+  # Check IB status.
+  stdout, _ = vm.RemoteCommand('sudo ibdev2netdev -v')
+  if 'port 1 (ACTIVE) ==> ib0 (Up)' not in stdout:
+    raise errors.Benchmarks.PrepareException('Infiniband is not up.')
 
 
 def YumInstall(vm):

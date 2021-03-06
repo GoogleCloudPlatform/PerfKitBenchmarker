@@ -68,8 +68,9 @@ nccl:
           image: ami-084e787069ee27fb7
           boot_disk_size: 105
         Azure:
-          machine_type: Standard_NC24rs_v3
+          machine_type: Standard_ND40rs_v2
           zone: eastus
+          image: Canonical:UbuntuServer:18_04-lts-gen2:latest
           boot_disk_size: 105
 """
 
@@ -137,16 +138,17 @@ def PrepareVm(vm):
   Args:
     vm: virtual machine on which to install NCCL
   """
-  vm.AuthenticateVm()
-  vm.Install('openmpi')
-  vm.Install('nccl')
-
   env = ''
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
            '$LD_LIBRARY_PATH &&')
   if FLAGS.nccl_install_mofed:
     vm.Install('mofed')
+  vm.AuthenticateVm()
+  vm.Install('cuda_toolkit')
+  vm.Install('nccl')
+  vm.InstallPackages('libnuma-dev')
+  vm.Install('openmpi')
   vm.RemoteCommand('rm -rf nccl-tests')
   vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
   vm.RemoteCommand('cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
