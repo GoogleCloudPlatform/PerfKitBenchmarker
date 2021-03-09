@@ -89,7 +89,25 @@ class OmbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
 
     self.assertSampleListsEqualUpToTimestamp(_EXPECTED_SAMPLES, samples[:2])
     self.assertLen(samples, 84)
-    expected_calls = [mock.call(bm_spec.vms, name) for name in omb.BENCHMARKS]
+    expected_calls = [
+        mock.call(omb.RunRequest(name, bm_spec.vms)) for name in omb.BENCHMARKS
+    ]
+    mock_run.assert_has_calls(expected_calls)
+
+  @flagsaver.flagsaver(omb_message_sizes=[1024, 2048])
+  @mock.patch.object(omb, 'RunBenchmark', return_value=[_RUN_RESULT])
+  def testMessageSizeRequest(self, mock_run):
+    bm_spec = MockBenchmarkSpec()
+
+    omb_benchmark.Run(bm_spec)
+
+    expected_calls = []
+    for name, run_type in sorted(omb.BENCHMARKS.items()):
+      if run_type.long_running:
+        continue
+      for size in (1024, 2048):
+        expected_calls.append(
+            mock.call(omb.RunRequest(name, bm_spec.vms, size)))
     mock_run.assert_has_calls(expected_calls)
 
 

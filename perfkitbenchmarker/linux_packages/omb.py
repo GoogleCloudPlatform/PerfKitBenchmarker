@@ -4,7 +4,7 @@ import itertools
 import logging
 import re
 import time
-from typing import Any, Dict, Iterator, List, Pattern, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Pattern, Tuple
 from absl import flags
 import dataclasses
 
@@ -66,8 +66,7 @@ _NUMBER_ITERATIONS = flags.DEFINE_integer(
     'omb_iterations', None, 'Number of iterations to run in a test.')
 _SYNC_OPTION = flags.DEFINE_string('omb_sync_option', None,
                                    '--sync-option value to pass in')
-_MESSAGE_SIZE = flags.DEFINE_string('omb_message_size', None,
-                                    '--message-size value to pass in.')
+
 _NUM_SERVER_THREADS = flags.DEFINE_integer('omb_server_threads', None,
                                            'Number of server threads to use.')
 _NUM_RECEIVER_THREADS = flags.DEFINE_integer(
@@ -199,6 +198,13 @@ class RunResult:
   perhost: int
 
 
+@dataclasses.dataclass(frozen=True)
+class RunRequest:
+  test_name: str
+  vms: List[Any]  # virtual machine
+  message_size: Optional[str] = None   # default: run all message sizes
+
+
 FLAGS = flags.FLAGS
 
 
@@ -224,20 +230,27 @@ def PrepareWorkers(vms) -> None:
   _TestInstall(vms)
 
 
-def RunBenchmark(vms, name) -> Iterator[RunResult]:
+def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
   """Yields the RunResult of running the microbenchmark.
 
   Args:
-    vms: List of VMs to use.
-    name: The OSU microbenchmark to run.
+    request: Run configuration.
   """
+  vms = request.vms
+  name = request.test_name
   params = {}
   if _NUMBER_ITERATIONS.value:
     params['--iterations'] = _NUMBER_ITERATIONS.value
   if _SYNC_OPTION.value:
     params['--sync-option'] = _SYNC_OPTION.value
-  if _MESSAGE_SIZE.value:
-    params['--message-size'] = _MESSAGE_SIZE.value
+  if request.message_size:
+    # flag does not work on cas_latency and fop_latency, always runs with size=8
+    # for barrier and ibarrier does not appear to set a message size
+    if ':' in str(request.message_size):
+      params['-m'] = f'{request.message_size}'
+    else:
+      # Pass in '-m size:size' to only do one size.
+      params['-m'] = f'{request.message_size}:{request.message_size}'
   if _NUM_RECEIVER_THREADS.value:
     value = str(_NUM_RECEIVER_THREADS.value)
     if _NUM_SERVER_THREADS.value:

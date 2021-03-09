@@ -30,6 +30,9 @@ _BENCHMARKS_ARG = flags.DEFINE_multi_enum(
 _RUN_LONG_LATENCY = flags.DEFINE_bool(
     'omb_run_long_latency', False,
     'Whether to run the very long latency test get_acc_latency and latency_mt.')
+_MESSAGE_SIZES = flags.DEFINE_list(
+    'omb_message_sizes', None, '--message-size values to pass in.  Value of '
+    '"1:8,1024" will run sizes 1,2,4,8,1024.  Default is to run all sizes')
 FLAGS = flags.FLAGS
 
 
@@ -62,8 +65,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   vms = bm_spec.vms
   samples = []
   for benchmark in _GetBenchmarks():
-    for result in omb.RunBenchmark(vms, benchmark):
-      samples.extend(_CreateSamples(result))
+    for message_size in _MESSAGE_SIZES.value or [None]:
+      # Passing in message_size=None means to run all message sizes
+      request = omb.RunRequest(benchmark, vms, message_size)
+      for result in omb.RunBenchmark(request):
+        samples.extend(_CreateSamples(result))
   return samples
 
 

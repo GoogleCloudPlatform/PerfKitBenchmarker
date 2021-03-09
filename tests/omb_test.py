@@ -250,8 +250,7 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     vm.RemoteCommand.side_effect = [(mpitest_path, ''), (mpitest_path, '')]
     vm.RobustRemoteCommand.side_effect = [(test_output, ''), (test_output, '')]
     vms = [vm, mock.Mock(internal_ip='10.0.0.2')]
-
-    results = list(omb.RunBenchmark(vms, 'mbw_mr'))
+    results = list(omb.RunBenchmark(omb.RunRequest('mbw_mr', vms)))
 
     expected_result = omb.RunResult(
         name='mbw_mr',
@@ -326,8 +325,10 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     del mock_benchmark_path
     vm = MockVm()
     vm.RobustRemoteCommand.return_value = ('', '')
-    results = list(omb.RunBenchmark([vm], 'igather'))
+    results = list(
+        omb.RunBenchmark(omb.RunRequest('igather', [vm], 1024)))
     self.assertIn('-perhost 2', results[0].full_cmd)
+    self.assertIn('-m 1024:1024', results[1].full_cmd)
 
 
 if __name__ == '__main__':
