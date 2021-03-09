@@ -36,11 +36,10 @@ flags.DEFINE_boolean('act_parallel', False,
 flags.DEFINE_integer('act_duration', 86400, 'Duration of act test in seconds.')
 flags.DEFINE_integer('act_reserved_partitions', 0,
                      'Number of partitions reserved (not being used by act).')
-flags.DEFINE_integer('act_num_queues', None,
-                     'Total number of transaction queues. Default is number of'
-                     ' cores, detected by ACT at runtime.')
-flags.DEFINE_integer('act_threads_per_queue', None, 'Number of threads per '
-                     'transaction queue. Default is 4 threads/queue.')
+flags.DEFINE_integer(
+    'act_service_threads', None,
+    'Total number of service threads on which requests are '
+    'generated and done. Default is 5x the number of CPUs.')
 # TODO(user): Support user provided config file.
 ACT_CONFIG_TEMPLATE = """
 device-names: {devices}
@@ -50,7 +49,7 @@ write-reqs-per-sec: {write_iops}
 """
 _READ_1X_1D = 2000
 _WRITE_1X_1D = 1000
-ACT_COMMIT = 'db9961ff7e0ad2691ddb41fb080561f6a1cdcdc9'  # ACT 5.1
+ACT_COMMIT = 'ac10c0cc2880ef8542af03296b15f85182943ad6'  # ACT 6.2
 
 
 def _Install(vm):
@@ -58,13 +57,8 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('openssl')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, ACT_DIR))
-  # In certain system, O_DSYNC resulting 10x slow down.
-  # Patching O_DSYNC to speed up salting process.
-  # https://github.com/aerospike/act/issues/39
-  vm.RemoteCommand(
-      'cd {0} && git checkout {1} && '
-      'sed -i "s/O_DSYNC |//" src/prep/act_prep.c && make'.format(
-          ACT_DIR, ACT_COMMIT))
+  vm.RemoteCommand('cd {0} && git checkout {1} && make'.format(
+      ACT_DIR, ACT_COMMIT))
 
 
 def YumInstall(vm):
@@ -115,10 +109,8 @@ def PrepActConfig(vm, load, index=None):
       duration=FLAGS.act_duration,
       read_iops=_CalculateReadIops(num_disk, load),
       write_iops=_CalculateWriteIops(num_disk, load))
-  if FLAGS.act_num_queues:
-    content += 'num-queues: %d\n' % FLAGS.act_num_queues
-  if FLAGS.act_threads_per_queue:
-    content += 'threads-per-queue: %d\n' % FLAGS.act_threads_per_queue
+  if FLAGS.act_service_threads:
+    content += 'service-threads: %d\n' % FLAGS.act_service_threads
   logging.info('ACT config: %s', content)
   with tempfile.NamedTemporaryFile(delete=False, mode='w+') as tf:
     tf.write(content)
@@ -162,16 +154,16 @@ def ParseRunAct(out):
   """Parse act output.
 
   Raw output format:
-          reads                             device-reads
-          %>(ms)                            %>(ms)
-  slice        1      2      4       rate        1      2      4       rate
-  -----   ------ ------ ------ ----------   ------ ------ ------ ----------
-      1     0.00   0.00   0.00     6000.0     0.00   0.00   0.00     6000.0
-      2     0.00   0.00   0.00     6000.0     0.00   0.00   0.00     6000.0
-      3     0.01   0.00   0.00     6000.0     0.01   0.00   0.00     6000.0
-  -----   ------ ------ ------ ----------   ------ ------ ------ ----------
-    avg     0.00   0.00   0.00     6000.0     0.00   0.00   0.00     6000.0
-    max     0.01   0.00   0.00     6000.0     0.01   0.00   0.00     6000.0
+          reads
+          %>(ms)
+  slice        1      2      4       rate
+  -----   ------ ------ ------ ----------
+      1     0.00   0.00   0.00     6000.0
+      2     0.00   0.00   0.00     6000.0
+      3     0.01   0.00   0.00     6000.0
+  -----   ------ ------ ------ ----------
+    avg     0.00   0.00   0.00     6000.0
+    max     0.01   0.00   0.00     6000.0
 
   Args:
     out: string. Output from act test.
@@ -199,25 +191,15 @@ def ParseRunAct(out):
     matrix = ''
     if vals[0] in ('avg', 'max'):
       matrix = '_' + vals[0]
-    num_buckets = (len(vals) - 1) // 2
+    num_buckets = len(vals) - 1
     for i in range(num_buckets - 1):
-      assert buckets[i] == buckets[i + num_buckets]
       ret.append(
           sample.Sample('reads' + matrix, float(vals[i + 1]), '%>(ms)',
                         {'slice': vals[0],
                          'bucket': int(buckets[i])}))
-      ret.append(
-          sample.Sample('device_reads' + matrix,
-                        float(vals[i + num_buckets + 1]), '%>(ms)',
-                        {'slice': vals[0],
-                         'bucket': int(buckets[i + num_buckets])}))
     ret.append(
         sample.Sample('read_rate' + matrix,
                       float(vals[num_buckets]), 'iops',
-                      {'slice': vals[0]}))
-    ret.append(
-        sample.Sample('device_read_rate' + matrix,
-                      float(vals[-1]), 'iops',
                       {'slice': vals[0]}))
   return ret
 
@@ -226,7 +208,7 @@ def GetActMetadata(num_disk, load):
   """Returns metadata for act test."""
   # TODO(user): Expose more stats and flags.
   metadata = {
-      'act-version': '5.0',
+      'act-version': '6.2',
       'act-parallel': FLAGS.act_parallel,
       'reserved_partition': FLAGS.act_reserved_partitions,
       'device-count': num_disk,
@@ -237,9 +219,13 @@ def GetActMetadata(num_disk, load):
       'read-reqs-per-sec': _CalculateReadIops(num_disk, load),
       'write-reqs-per-sec': _CalculateWriteIops(num_disk, load),
       'microsecond-histograms': 'no',
-      'scheduler-mode': 'noop'}
-  metadata['num-queues'] = FLAGS.act_num_queues or 'default'
-  metadata['threads-per-queues'] = FLAGS.act_threads_per_queue or 'default'
+      'scheduler-mode': 'noop'
+  }
+  metadata['service-threads'] = FLAGS.act_service_threads or 'default'
+  # num-queues & threads-per-queues are deprecated in act v6+,
+  # leaving as "default" for backward compatibility.
+  metadata['num-queues'] = 'default'
+  metadata['threads-per-queues'] = 'default'
   return metadata
 
 
