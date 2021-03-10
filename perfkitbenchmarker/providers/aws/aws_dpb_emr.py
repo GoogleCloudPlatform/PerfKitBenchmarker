@@ -16,6 +16,7 @@
 Clusters can be created and deleted.
 """
 
+import collections
 import json
 import logging
 
@@ -44,6 +45,35 @@ disk_to_hdfs_map = {
     'st1': 'HDD',
     'gp2': 'SSD'
 }
+
+DATAPROC_TO_EMR_CONF_FILES = {
+    # https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-configure-apps.html
+    'core': 'core-site',
+    'hdfs': 'hdfs-site',
+    # https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-configure.html
+    'spark': 'spark-defaults',
+}
+
+
+def _GetClusterConfiguration():
+  """Return a JSON string containing dpb_cluster_properties."""
+  properties = collections.defaultdict(lambda: {})
+  for entry in FLAGS.dpb_cluster_properties:
+    file, kv = entry.split(':')
+    key, value = kv.split('=')
+    if file not in DATAPROC_TO_EMR_CONF_FILES:
+      raise errors.Config.InvalidValue(
+          'Unsupported EMR configuration file "{}". '.format(file) +
+          'Please add it to aws_dpb_emr.DATAPROC_TO_EMR_CONF_FILES.')
+    properties[DATAPROC_TO_EMR_CONF_FILES[file]][key] = value
+  json_conf = []
+  for file, props in properties.items():
+    json_conf.append({
+        # https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-configure-apps.html
+        'Classification': file,
+        'Properties': props,
+    })
+  return json.dumps(json_conf)
 
 
 class EMRRetryableException(Exception):
@@ -179,6 +209,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         'EmrManagedSlaveSecurityGroup=' + self.security_group_id,
     ]
     cmd += ['--ec2-attributes', ','.join(ec2_attributes)]
+
+    if FLAGS.dpb_cluster_properties:
+      cmd += ['--configurations', _GetClusterConfiguration()]
 
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)

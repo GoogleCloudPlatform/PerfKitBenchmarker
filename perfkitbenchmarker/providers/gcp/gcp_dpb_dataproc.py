@@ -139,6 +139,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if FLAGS.gcp_dataproc_image:
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
 
+    if FLAGS.dpb_cluster_properties:
+      cmd.flags['properties'] = ','.join(FLAGS.dpb_cluster_properties)
+
     # Ideally DpbServiceSpec would have a network spec, which we would create to
     # Resolve the name, but because EMR provisions its own VPC and we are
     # generally happy using pre-existing networks for Dataproc. Just use the

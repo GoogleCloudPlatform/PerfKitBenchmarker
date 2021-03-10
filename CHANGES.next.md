@@ -64,6 +64,8 @@
 -   Enhance the cpu metric collection feature for cloud bigtable benchmark: as
     long as there is a real workload (table loading is not counted), the cpu
     metrics will be collected.
+-   Support wiring properties into DPB clusters with `--dpb_clusters_properties`
+    in addition to `--dpb_job_properties`.
 
 ### Bug fixes and maintenance updates:
 

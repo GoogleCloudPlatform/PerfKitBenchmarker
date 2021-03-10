@@ -46,6 +46,11 @@ flags.DEFINE_string('dpb_service_zone', None, 'The zone for provisioning the '
                     'dpb_service instance.')
 flags.DEFINE_list('dpb_job_properties', [], 'A list of strings of the form '
                   '"key=vale" to be passed into DBP jobs.')
+flags.DEFINE_list(
+    'dpb_cluster_properties', [], 'A list of strings of the form '
+    '"type:key=vale" to be passed into DPB jobs. See '
+    'https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties.'
+)
 
 
 FLAGS = flags.FLAGS
@@ -244,6 +249,7 @@ class BaseDpbService(resource.BaseResource):
         'dpb_service_zone': self.dpb_service_zone,
         'dpb_job_properties': ','.join(
             '{}={}'.format(k, v) for k, v in self.GetJobProperties().items()),
+        'dpb_cluster_properties': ','.join(FLAGS.dpb_cluster_properties),
     }
     return basic_data
 

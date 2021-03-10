@@ -38,16 +38,12 @@ dpb_cluster_boot_benchmark:
           machine_type: m5.large
       disk_spec:
         GCP:
-          disk_type: nodisk
+          disk_type: pd-standard
         AWS:
           disk_size: 1500
           disk_type: gp2
     worker_count: 2
 """
-
-flags.DEFINE_enum('dpb_cluster_boot_fs_type', 'ephemeral',
-                  ['ephemeral', 'persistent'],
-                  'File System to use in dpb cluster boot benchmark')
 
 flags.DEFINE_enum(
     'dpb_cluster_boot_fs', BaseDpbService.GCS_FS,
