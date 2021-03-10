@@ -103,7 +103,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.linux_benchmarks import cuda_memcopy_benchmark
 from perfkitbenchmarker.linux_packages import build_tools
-from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.publisher import SampleCollector
 import six
 from six.moves import zip
@@ -805,9 +804,7 @@ def DoRunPhase(spec, collector, timer):
 
     # In order to collect GPU samples one of the VMs must have both an Nvidia
     # GPU and the nvidia-smi
-    if FLAGS.gpu_samples and any(nvidia_driver.CheckNvidiaGpuExists(vm) and
-                                 nvidia_driver.CheckNvidiaSmiExists(vm) for vm
-                                 in spec.vms):
+    if FLAGS.gpu_samples:
       samples.extend(cuda_memcopy_benchmark.Run(spec))
 
     if FLAGS.record_lscpu:

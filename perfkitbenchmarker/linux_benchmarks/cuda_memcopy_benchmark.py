@@ -113,8 +113,6 @@ def _CollectGpuSamples(
   Returns:
     A list of sample.Sample objects.
   """
-  if not nvidia_driver.CheckNvidiaGpuExists(vm):
-    return []
   if not nvidia_driver.CheckNvidiaSmiExists(vm):
     return []
   global_metadata = _MetadataFromFlags()
