@@ -36,10 +36,6 @@ class CudaMemcopyBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     self.enter_context(mock.patch.object(
         nvidia_driver, 'QueryNumberOfGpus', return_value=1))
     self.enter_context(mock.patch.object(
-        nvidia_driver, 'CheckNvidiaGpuExists', return_value=True))
-    self.enter_context(mock.patch.object(
-        nvidia_driver, 'CheckNvidiaSmiExists', return_value=True))
-    self.enter_context(mock.patch.object(
         cuda_toolkit, 'GetMetadata', return_value={}))
 
   def CudaOutput(self) -> str:
@@ -53,14 +49,16 @@ class CudaMemcopyBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     vm.RemoteCommandWithReturnCode.return_value = self.CudaOutput(), '', 0
     return vm
 
-  def testCmd(self) -> None:
+  @mock.patch.object(nvidia_driver, 'CheckNvidiaSmiExists', return_value=True)
+  def testCmd(self, check_nvidia_smi_exists: mock.Mock) -> None:
     vm = self.MockVm()
     cuda_memcopy_benchmark.Run(mock.Mock(vms=[vm]))
     vm.RemoteCommandWithReturnCode.assert_called_with(
         '/usr/local/cuda/extras/demo_suite/bandwidthTest --csv --memory=pinned '
         '--mode=quick --htod --dtoh --dtod --device=0', ignore_failure=True)
 
-  def testSample(self) -> None:
+  @mock.patch.object(nvidia_driver, 'CheckNvidiaSmiExists', return_value=True)
+  def testSample(self, check_nvidia_smi_exists: mock.Mock) -> None:
     samples = cuda_memcopy_benchmark.Run(mock.Mock(vms=[self.MockVm()]))
     expected = sample.Sample(
         'H2D-Pinned', 8494.3, 'MB/s',
@@ -81,6 +79,11 @@ class CudaMemcopyBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         }
     )
     self.assertSamplesEqualUpToTimestamp(expected, samples[0])
+
+  @mock.patch.object(nvidia_driver, 'CheckNvidiaSmiExists', return_value=False)
+  def testEmptySample(self, check_nvidia_smi_exists: mock.Mock) -> None:
+    samples = cuda_memcopy_benchmark.Run(mock.Mock(vms=[self.MockVm()]))
+    self.assertLen(samples, 0)
 
 
 if __name__ == '__main__':
