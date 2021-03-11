@@ -48,7 +48,7 @@ flags.DEFINE_list('dpb_job_properties', [], 'A list of strings of the form '
                   '"key=vale" to be passed into DBP jobs.')
 flags.DEFINE_list(
     'dpb_cluster_properties', [], 'A list of strings of the form '
-    '"type:key=vale" to be passed into DPB jobs. See '
+    '"type:key=value" to be passed into DBP jobs. See '
     'https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties.'
 )
 
@@ -233,6 +233,29 @@ class BaseDpbService(resource.BaseResource):
     """
     raise NotImplementedError('You need to implement _GetCompletedJob if you '
                               'use _WaitForJob')
+
+  def DistributedCopy(self,
+                      source: str,
+                      destination: str,
+                      properties: Optional[Dict[str, str]] = None) -> JobResult:
+    """Method to copy data using a distributed job on the cluster.
+
+    Args:
+      source: HCFS directory to copy data from.
+      destination: name of new HCFS directory to copy data into.
+      properties: properties to add to the job. Not supported on EMR.
+
+    Returns:
+      A JobResult with the timing of the successful job.
+
+    Raises:
+      JobSubmissionError if job fails.
+    """
+    return self.SubmitJob(
+        classname='org.apache.hadoop.tools.DistCp',
+        job_arguments=[source, destination],
+        job_type=BaseDpbService.HADOOP_JOB_TYPE,
+        properties=properties)
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""

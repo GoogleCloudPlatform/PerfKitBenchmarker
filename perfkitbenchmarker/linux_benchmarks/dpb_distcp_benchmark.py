@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Perform distributed copy of data on data processing backends.
+
 Apache Hadoop MapReduce distcp is an open-source tool used to copy large
 amounts of data. DistCp is very efficient because it uses MapReduce to copy the
 files or datasets and this means the copy operation is distributed across
@@ -22,13 +23,13 @@ of various cloud providers.
 """
 
 import copy
-import datetime
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
+from perfkitbenchmarker.linux_benchmarks import dpb_testdfsio_benchmark
 
 BENCHMARK_NAME = 'dpb_distcp_benchmark'
 
@@ -70,7 +71,10 @@ flags.DEFINE_integer('distcp_num_files', 10, 'Number of distcp source files')
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
+SUPPORTED_DPB_BACKENDS = [
+    dpb_service.DATAPROC,
+    dpb_service.EMR,
+    dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER]
 
 
 def GetConfig(user_config):
@@ -79,6 +83,10 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
+
+
+  Args:
+    benchmark_config: Configu to validate.
 
   Raises:
     perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid
@@ -91,44 +99,50 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  del benchmark_spec  # Unused.
+  if (FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS
+      or FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS):
+    run_uri = benchmark_spec.uuid.split('-')[0]
+    benchmark_spec.dpb_service.CreateBucket('pkb-' + run_uri)
 
 
 def Run(benchmark_spec):
   """Runs distributed_copy benchmark and reports the results.
 
   Args:
-    benchmark_spec: Spec needed to run the distributed synth benchmark
+    benchmark_spec: Spec needed to run the benchmark
 
   Returns:
     A list of samples
   """
   run_uri = benchmark_spec.uuid.split('-')[0]
-  source = '{}'.format(run_uri)
-  update_source_default_fs = False
+  base_dir = 'pkb-' + run_uri
+  service = benchmark_spec.dpb_service
 
-  if FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS:
-    benchmark_spec.dpb_service.CreateBucket(source)
-    source = '{}://{}'.format(FLAGS.distcp_source_fs, source)
-    update_source_default_fs = True
+  if FLAGS.distcp_source_fs == BaseDpbService.HDFS_FS:
+    source_dir = '/{}/'.format(base_dir)
+  else:
+    source_dir = '{}://{}/'.format(FLAGS.distcp_source_fs, base_dir)
 
-  source_dir = '{}{}'.format(source, '/dfsio')
-  source_data_dir = '{}{}'.format(source_dir, '/io_data')
+  # Subdirectory TestDFSO writes data to
+  source_data_dir = source_dir + 'io_data'
 
-  # TODO(saksena): Respond to data generation failure
-  benchmark_spec.dpb_service.generate_data(source_dir, update_source_default_fs,
-                                           FLAGS.distcp_num_files,
-                                           FLAGS.distcp_file_size_mbs)
+  # Generate data to copy
+  # TODO(saksena): Add a generic GenerateData method to dpb_service.
+  dpb_testdfsio_benchmark.RunTestDfsio(
+      service,
+      dpb_testdfsio_benchmark.WRITE,
+      source_dir,
+      FLAGS.distcp_num_files,
+      FLAGS.distcp_file_size_mbs)
 
-  destination_dir = ('{}://{}{}'.format(FLAGS.distcp_source_fs, run_uri,
-                                        '/dfsio_destination')
-                     if (FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS) else
-                     '/{}{}'.format(run_uri, '/dfsio_destination'))
+  if FLAGS.distcp_dest_fs == BaseDpbService.HDFS_FS:
+    destination_dir = '/{}/dfsio_destination/'.format(base_dir)
+  else:
+    destination_dir = '{}://{}/dfsio_destination/'.format(
+        FLAGS.distcp_source_fs, base_dir)
 
-  start = datetime.datetime.now()
-  benchmark_spec.dpb_service.distributed_copy(source_data_dir, destination_dir)
-  end_time = datetime.datetime.now()
-  run_time = (end_time - start).total_seconds()
+  result = benchmark_spec.dpb_service.DistributedCopy(
+      source_data_dir, destination_dir)
 
   results = []
   metadata = copy.copy(benchmark_spec.dpb_service.GetMetadata())
@@ -145,11 +159,14 @@ def Run(benchmark_spec):
     metadata.update({'regional': True})
     metadata.update({'region': 'aws_default'})
 
-  results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
-  benchmark_spec.dpb_service.cleanup_data(source, update_source_default_fs)
+  results.append(sample.Sample(
+      'run_time', result.run_time, 'seconds', metadata))
   return results
 
 
 def Cleanup(benchmark_spec):
-  """Cleans up the distcp benchmark"""
-  del benchmark_spec  # Unused.
+  """Cleans up the distcp benchmark."""
+  if (FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS
+      or FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS):
+    run_uri = benchmark_spec.uuid.split('-')[0]
+    benchmark_spec.dpb_service.DeleteBucket('pkb-' + run_uri)

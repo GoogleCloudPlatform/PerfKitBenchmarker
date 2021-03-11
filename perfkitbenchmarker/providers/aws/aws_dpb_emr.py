@@ -376,50 +376,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     step_id = result['StepIds'][0]
     return self._WaitForJob(step_id, EMR_TIMEOUT, job_poll_interval)
 
-  def distributed_copy(self, source_location, destination_location):
+  def DistributedCopy(self, source, destination):
     """Method to copy data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=EMR_TIMEOUT,
-                   poll_interval=5, fuzz=0)
-    def WaitForStep(step_id):
-      # TODO(user) force None as _IsStepDone was removed but this
-      # callsite was not updated.  Fix pending.
-      # result = self._IsStepDone(step_id)
-      result = None
-      if result is None:
-        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
-      return result
-
-    job_arguments = ['s3-dist-cp', '--s3Endpoint=s3.amazonaws.com']
-    job_arguments.append('--src={}'.format(source_location))
-    job_arguments.append('--dest={}'.format(destination_location))
-    arg_spec = '[' + ','.join(job_arguments) + ']'
-
-    step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = 'Name="S3DistCp"'
-    step_action_on_failure = 'ActionOnFailure=CONTINUE'
-    jar_spec = 'Jar=command-runner.jar'
-
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
-    step_list.append('Args=' + arg_spec)
-    step_string = ','.join(step_list)
-
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
-    stdout, _, _ = vm_util.IssueCommand(step_cmd)
-    result = json.loads(stdout)
-    step_id = result['StepIds'][0]
-    metrics = {}
-
-    result = WaitForStep(step_id)
-    pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
-    start_time = result['Step']['Status']['Timeline']['StartDateTime']
-    end_time = result['Step']['Status']['Timeline']['EndDateTime']
-    metrics[dpb_service.WAITING] = start_time - pending_time
-    metrics[dpb_service.RUNTIME] = end_time - start_time
-    step_state = result['Step']['Status']['State']
-    metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
-    return metrics
+    job_arguments = ['s3-dist-cp']
+    job_arguments.append('--src={}'.format(source))
+    job_arguments.append('--dest={}'.format(destination))
+    return self.SubmitJob(
+        'command-runner.jar',
+        job_arguments=job_arguments,
+        job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
