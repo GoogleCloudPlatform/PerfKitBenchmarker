@@ -241,9 +241,10 @@ def Run(benchmark_spec):
       '--report-dir',
       report_dir,
   ]
-  table_metadata = _GetTableMetadata(benchmark_spec.table_subdirs)
-  if table_metadata:
-    args += ['--table-metadata', json.dumps(table_metadata)]
+  table_metadata_file = _GetStagedTableMetadata(
+      storage_service, benchmark_spec.base_dir, benchmark_spec.table_subdirs)
+  if table_metadata_file:
+    args += ['--table-metadata', table_metadata_file]
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)
@@ -297,8 +298,9 @@ def Run(benchmark_spec):
   return results
 
 
-def _GetTableMetadata(table_subdirs=None):
-  """Compute map of table metadata for spark_sql_runner --table_metadata."""
+def _GetStagedTableMetadata(
+    storage_service, base_dir: str, table_subdirs=None) -> Optional[str]:
+  """Write JSON map of table metadata for spark_sql_runner --table_metadata."""
   metadata = {}
   if not FLAGS.dpb_sparksql_create_hive_tables:
     for subdir in table_subdirs or []:
@@ -312,7 +314,15 @@ def _GetTableMetadata(table_subdirs=None):
     if FLAGS.bigquery_record_format:
       bq_options['readDataFormat'] = FLAGS.bigquery_record_format
     metadata[name] = (FLAGS.dpb_sparksql_data_format or 'bigquery', bq_options)
-  return metadata
+  if metadata:
+    # Write computed metadata to object storage.
+    temp_run_dir = temp_dir.GetRunDirPath()
+    local_file = os.path.join(temp_run_dir, 'metadata.json')
+    staged_file = '/'.join((base_dir, 'metadata.json'))
+    with open(local_file, 'w') as f:
+      json.dump(metadata, f)
+    storage_service.Copy(local_file, staged_file)
+    return staged_file
 
 
 def _GetQueryId(filename: str) -> Optional[str]:

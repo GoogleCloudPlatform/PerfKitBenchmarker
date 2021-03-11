@@ -25,12 +25,11 @@ def parse_args():
       help='List of SQL scripts staged in object storage to run')
   parser.add_argument(
       '--table-metadata',
-      metavar='METADATA',
-      type=lambda s: json.loads(s).items(),
-      default={},
+      metavar='METADATA_FILE',
       help="""\
-JSON Object mappiing table names to arrays of length 2. The arrays contain  the
-format of the data and the options to pass to the dataframe reader. e.g.:
+HCFS file containing JSON Object mapping table names to arrays of length 2.
+The arrays contain the format of the data and the options to pass to the
+dataframe reader. e.g.:
 {
 
   "my_bq_table": ["bigquery", {"table": "bigquery_public_data:dataset.table"}],
@@ -43,19 +42,27 @@ format of the data and the options to pass to the dataframe reader. e.g.:
   return parser.parse_args()
 
 
+def load_file(spark, object_path):
+  """Load an HCFS file into a string."""
+  return '\n'.join(spark.sparkContext.textFile(object_path).collect())
+
+
 def main(args):
   spark = (sql.SparkSession.builder
            .appName('Spark SQL Query')
            .enableHiveSupport()
            .getOrCreate())
-  for name, (fmt, options) in args.table_metadata:
+  table_metadata = []
+  if args.table_metadata:
+    table_metadata = json.loads(load_file(spark, args.table_metadata)).items()
+  for name, (fmt, options) in table_metadata:
     logging.info('Loading %s', name)
     spark.read.format(fmt).options(**options).load().createTempView(name)
 
   results = []
   for script in args.sql_scripts:
     # Read script from object storage using rdd API
-    query = '\n'.join(spark.sparkContext.textFile(script).collect())
+    query = load_file(spark, script)
 
     try:
       logging.info('Running %s', script)
