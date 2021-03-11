@@ -313,6 +313,7 @@ class BaseRelationalDb(resource.BaseResource):
         'engine_version': self.spec.engine_version,
         'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
         'use_managed_db': self.is_managed_db,
+        'instance_id': self.instance_id,
         'client_vm_disk_type':
             self.spec.vm_groups['clients'].disk_spec.disk_type,
         'client_vm_disk_size':
