@@ -161,7 +161,8 @@ def _CollectGpuSamples(
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   sample_lists = vm_util.RunThreaded(_CollectGpuSamples, bm_spec.vms)
-  return functools.reduce(lambda a, b: a + b, sample_lists)
+  return (functools.reduce(lambda a, b: a + b, sample_lists) if sample_lists
+          else [])
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
