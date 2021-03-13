@@ -113,7 +113,9 @@ def Run(benchmark_spec):
   service = benchmark_spec.dpb_service
   source = '{}'.format(benchmark_spec.uuid.split('-')[0])
 
-  if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
+  if FLAGS.dfsio_fs == BaseDpbService.HDFS_FS:
+    source = 'hdfs:/' + source
+  else:
     source = '{}://{}'.format(FLAGS.dfsio_fs, source)
 
   source_dir = '{}{}'.format(source, '/dfsio')
