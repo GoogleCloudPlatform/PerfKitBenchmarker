@@ -200,9 +200,6 @@ flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
 _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.')
-_MAX_INSTALL_RETRIES = flags.DEFINE_integer(
-    'ycsb_max_install_retries', 2,
-    'The number of times to retry installation of YCSB.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -307,7 +304,7 @@ def CheckPrerequisites():
         'To apply dynamic load, set --ycsb_dynamic_load.')
 
 
-@vm_util.Retry(max_retries=_MAX_INSTALL_RETRIES)
+@vm_util.Retry(max_retries=5, poll_interval=1)
 def _Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
