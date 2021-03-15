@@ -309,7 +309,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self.bootable_time = None
     self.port_listening_time = None
     self.hostname = None
-    self.is_failed_run = False
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []

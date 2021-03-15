@@ -248,6 +248,42 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(min_cpu_platform_in_command,
                      gcloud_cmd.flags.get('min-cpu-platform'))
 
+  def testUpdateInterruptibleVmStatus(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='test_machine_type', preemptible=True,
+        project='p')
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    vm.created = True
+    vm.name = 'pkb-1234-0'
+    vm.zone = 'asia-northeast2-a'
+    stdout = """
+    [{
+        "endTime": "2021-03-12T10:38:00.048-08:00",
+        "id": "5583038217590279140",
+        "insertTime": "2021-03-12T10:38:00.048-08:00",
+        "kind": "compute#operation",
+        "name": "systemevent-1615574280048-5bd5b33121158-c654ffc9-0ff0dc28",
+        "operationType": "compute.instances.preempted",
+        "progress": 100,
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/asia-northeast2-a/operations/systemevent-1615574280048-5bd5b33121158-c654ffc9-0ff0dc28",
+        "startTime": "2021-03-12T10:38:00.048-08:00",
+        "status": "DONE",
+        "statusMessage": "Instance was preempted.",
+        "targetId": "3533220210345905302",
+        "targetLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/asia-northeast2-a/instances/pkb-1234-0",
+        "user": "system",
+        "zone": "https://www.googleapis.com/compute/v1/projects/my-project/zones/asia-northeast2-a"
+    }]
+    """
+    fake_rets = [(stdout, 'stderr', 0)]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      vm.UpdateInterruptibleVmStatus()
+      command_string = ' '.join(issue_command.call_args[0][0])
+      self.assertRegex(command_string, 'gcloud compute operations list --filter'
+                       fr' targetLink.scope\(\):{vm.name} --format json '
+                       f'--project p --quiet --zones {vm.zone}')
+      self.assertTrue(vm.spot_early_termination)
+
 
 def _CreateFakeDiskMetadata(image):
   fake_disk = copy.copy(_FAKE_DISK_METADATA)

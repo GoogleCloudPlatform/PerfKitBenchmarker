@@ -1069,11 +1069,6 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
 
   # Check for preempted VMs
   def UpdateVmStatus(vm):
-    # Setting vm.is_failed_run to True, UpdateInterruptibleVmStatus knows this
-    # is the final interruption checking. GCP only needs to check interruption
-    # when fail happens. For the the other clouds, PKB needs to check while vm
-    # is alive.
-    vm.is_failed_run = True
     vm.UpdateInterruptibleVmStatus()
   vm_util.RunThreaded(UpdateVmStatus, spec.vms)
 
