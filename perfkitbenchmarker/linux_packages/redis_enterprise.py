@@ -25,34 +25,47 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean('enterprise_redis_tune_on_startup', True,
-                     'Whether to tune core config during startup.')
-flags.DEFINE_integer('enterprise_redis_proxy_threads', 24,
-                     'Number of redis proxy threads to use.')
-flags.DEFINE_integer('enterprise_redis_shard_count', 6,
-                     'Number of redis shard. Each shard is a redis thread.')
-flags.DEFINE_integer('enterprise_redis_load_records', 1000000,
-                     'Number of keys to pre-load into Redis.')
-flags.DEFINE_integer('enterprise_redis_run_records', 1000000,
-                     'Number of requests per loadgen client to send to the '
-                     'Redis server.')
-flags.DEFINE_integer('enterprise_redis_pipeline', 9,
-                     'Number of pipelines to use.')
-flags.DEFINE_integer('enterprise_redis_loadgen_clients', 24,
-                     'Number of clients per loadgen vm.')
-flags.DEFINE_integer('enterprise_redis_max_threads', 40,
-                     'Maximum number of memtier threads to use.')
-flags.DEFINE_integer('enterprise_redis_min_threads', 18,
-                     'Minimum number of memtier threads to use.')
-flags.DEFINE_integer('enterprise_redis_thread_increment', 1,
-                     'Number of memtier threads to increment by.')
-flags.DEFINE_integer('enterprise_redis_latency_threshold', 1100,
-                     'The latency threshold in microseconds '
-                     'until the test stops.')
-flags.DEFINE_boolean('enterprise_redis_pin_workers', False,
-                     'Whether to pin the proxy threads after startup.')
-flags.DEFINE_list('enterprise_redis_disable_cpu_ids', None,
-                  'List of cpus to disable by id.')
+_TUNE_ON_STARTUP = flags.DEFINE_boolean(
+    'enterprise_redis_tune_on_startup', True,
+    'Whether to tune core config during startup.')
+_PROXY_THREADS = flags.DEFINE_integer(
+    'enterprise_redis_proxy_threads', 24,
+    'Number of redis proxy threads to use.')
+_SHARDS = flags.DEFINE_integer(
+    'enterprise_redis_shard_count', 6,
+    'Number of redis shard. Each shard is a redis thread.')
+_LOAD_RECORDS = flags.DEFINE_integer(
+    'enterprise_redis_load_records', 1000000,
+    'Number of keys to pre-load into Redis.')
+_RUN_RECORDS = flags.DEFINE_integer(
+    'enterprise_redis_run_records', 1000000,
+    'Number of requests per loadgen client to send to the '
+    'Redis server.')
+_PIPELINES = flags.DEFINE_integer(
+    'enterprise_redis_pipeline', 9,
+    'Number of pipelines to use.')
+_LOADGEN_CLIENTS = flags.DEFINE_integer(
+    'enterprise_redis_loadgen_clients', 24,
+    'Number of clients per loadgen vm.')
+_MAX_THREADS = flags.DEFINE_integer(
+    'enterprise_redis_max_threads', 40,
+    'Maximum number of memtier threads to use.')
+_MIN_THREADS = flags.DEFINE_integer(
+    'enterprise_redis_min_threads', 18,
+    'Minimum number of memtier threads to use.')
+_THREAD_INCREMENT = flags.DEFINE_integer(
+    'enterprise_redis_thread_increment', 1,
+    'Number of memtier threads to increment by.')
+_LATENCY_THRESHOLD = flags.DEFINE_integer(
+    'enterprise_redis_latency_threshold', 1100,
+    'The latency threshold in microseconds '
+    'until the test stops.')
+_PIN_WORKERS = flags.DEFINE_boolean(
+    'enterprise_redis_pin_workers', False,
+    'Whether to pin the proxy threads after startup.')
+_DISABLE_CPU_IDS = flags.DEFINE_list(
+    'enterprise_redis_disable_cpu_ids', None,
+    'List of cpus to disable by id.')
 
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
@@ -105,7 +118,7 @@ def Install(vm):
         'sudo ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf')
     vm.RemoteCommand('sudo service systemd-resolved restart')
   install_cmd = './install.sh -y'
-  if not FLAGS.enterprise_redis_tune_on_startup:
+  if not _TUNE_ON_STARTUP.value:
     install_cmd = 'CONFIG_systune=no ./install.sh -y -n'
   vm.RemoteCommand('cd {dir} && sudo {install}'.format(
       dir=_WORKING_DIR, install=install_cmd))
@@ -126,7 +139,7 @@ def CreateCluster(vm):
 
 def OfflineCores(vm):
   """Offline specific cores."""
-  for cpu_id in FLAGS.enterprise_redis_disable_cpu_ids or []:
+  for cpu_id in _DISABLE_CPU_IDS.value or []:
     vm.RemoteCommand('sudo bash -c '
                      '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' % cpu_id)
 
@@ -138,7 +151,7 @@ def TuneProxy(vm):
       'proxy all '
       'max_threads {proxy_threads} '
       'threads {proxy_threads} '.format(
-          proxy_threads=str(FLAGS.enterprise_redis_proxy_threads)))
+          proxy_threads=str(_PROXY_THREADS.value)))
   vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
 
 
@@ -150,11 +163,11 @@ def PinWorkers(vm):
   Args:
     vm: The VM with the Redis workers to pin.
   """
-  if not FLAGS.enterprise_redis_pin_workers:
+  if not _PIN_WORKERS.value:
     return
 
   numa_nodes = vm.CheckLsCpu().numa_node_count
-  proxies_per_node = FLAGS.enterprise_redis_proxy_threads // numa_nodes
+  proxies_per_node = _PROXY_THREADS.value // numa_nodes
   for node in range(numa_nodes):
     node_cpu_list = vm.RemoteCommand(
         'cat /sys/devices/system/node/node%d/cpulist' % node)[0].strip()
@@ -184,10 +197,10 @@ def SetUpCluster(vm, redis_port):
       'sharding': False,
       'authentication_redis_pass': FLAGS.run_uri,
   }
-  if FLAGS.enterprise_redis_shard_count > 1:
+  if _SHARDS.value > 1:
     content.update({
         'sharding': True,
-        'shards_count': FLAGS.enterprise_redis_shard_count,
+        'shards_count': _SHARDS.value,
         'shards_placement': 'sparse',
         'oss_cluster': True,
         'shard_key_regex':
@@ -236,7 +249,7 @@ def LoadCluster(vm, redis_port):
       '--cluster-mode '.format(
           password=FLAGS.run_uri,
           port=str(redis_port),
-          load_records=str(FLAGS.enterprise_redis_load_records)))
+          load_records=str(_LOAD_RECORDS.value)))
 
 
 def BuildRunCommand(redis_vm, threads, port):
@@ -270,10 +283,10 @@ def BuildRunCommand(redis_vm, threads, port):
               password=FLAGS.run_uri,
               port=str(port),
               threads=str(threads),
-              pipeline=str(FLAGS.enterprise_redis_pipeline),
-              clients=str(FLAGS.enterprise_redis_loadgen_clients),
-              key_maximum=str(FLAGS.enterprise_redis_load_records),
-              run_records=str(FLAGS.enterprise_redis_run_records)))
+              pipeline=str(_PIPELINES.value),
+              clients=str(_LOADGEN_CLIENTS.value),
+              key_maximum=str(_LOAD_RECORDS.value),
+              run_records=str(_RUN_RECORDS.value)))
 
 
 def Run(redis_vm, load_vms, redis_port):
@@ -294,12 +307,12 @@ def Run(redis_vm, load_vms, redis_port):
   """
   results = []
   cur_max_latency = 0.0
-  latency_threshold = FLAGS.enterprise_redis_latency_threshold
-  threads = FLAGS.enterprise_redis_min_threads
+  latency_threshold = _LATENCY_THRESHOLD.value
+  threads = _MIN_THREADS.value
+  max_threads = _MAX_THREADS.value
   max_throughput_for_completion_latency_under_1ms = 0.0
 
-  while (cur_max_latency < latency_threshold
-         and threads <= FLAGS.enterprise_redis_max_threads):
+  while (cur_max_latency < latency_threshold and threads <= max_threads):
     load_command = BuildRunCommand(redis_vm, threads, redis_port)
     # 1min for throughput to stabilize and 10sec of data.
     measurement_command = (
@@ -320,17 +333,17 @@ def Run(redis_vm, load_vms, redis_port):
       cur_max_latency = max(cur_max_latency, latency)
       sample_metadata = interval
       sample_metadata['redis_tune_on_startup'] = (
-          FLAGS.enterprise_redis_tune_on_startup)
+          _TUNE_ON_STARTUP.value)
       sample_metadata['redis_pipeline'] = (
-          FLAGS.enterprise_redis_pipeline)
+          _PIPELINES.value)
       sample_metadata['threads'] = threads
-      sample_metadata['shard_count'] = FLAGS.enterprise_redis_shard_count
+      sample_metadata['shard_count'] = _SHARDS.value
       sample_metadata['redis_proxy_threads'] = (
-          FLAGS.enterprise_redis_proxy_threads)
+          _PROXY_THREADS.value)
       sample_metadata['redis_loadgen_clients'] = (
-          FLAGS.enterprise_redis_loadgen_clients)
-      sample_metadata['pin_workers'] = FLAGS.enterprise_redis_pin_workers
-      sample_metadata['disable_cpus'] = FLAGS.enterprise_redis_disable_cpu_ids
+          _LOADGEN_CLIENTS.value)
+      sample_metadata['pin_workers'] = _PIN_WORKERS.value
+      sample_metadata['disable_cpus'] = _DISABLE_CPU_IDS.value
       results.append(sample.Sample('throughput', throughput, 'ops/s',
                                    sample_metadata))
       if latency < 1000:
@@ -340,7 +353,7 @@ def Run(redis_vm, load_vms, redis_port):
       logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
                    latency_threshold)
 
-    threads += FLAGS.enterprise_redis_thread_increment
+    threads += _THREAD_INCREMENT.value
 
   if cur_max_latency >= 1000:
     results.append(sample.Sample(
