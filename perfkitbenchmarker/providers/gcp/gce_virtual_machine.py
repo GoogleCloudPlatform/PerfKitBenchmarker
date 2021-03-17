@@ -859,7 +859,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       Seconds between polls
     """
-    return 300
+    return 3600
 
 
 class Debian9BasedGceVirtualMachine(
