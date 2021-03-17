@@ -25,3 +25,7 @@ export SPARK_SSH_OPTS="-o IdentitiesOnly=yes \
 # anything weird with machine_type.
 export SPARK_WORKER_MEMORY={{ worker_memory_mb }}m
 export SPARK_WORKER_CORES={{ worker_vcpus }}
+# Add Hadoop jars to Spark
+# https://spark.apache.org/docs/latest/hadoop-provided.html
+export SPARK_DIST_CLASSPATH="$({{ hadoop_cmd }} classpath)"
+export PYSPARK_PYTHON={{ python_cmd }}

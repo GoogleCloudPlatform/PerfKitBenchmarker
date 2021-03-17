@@ -77,9 +77,18 @@ dpb_sparksql_benchmark:
         GCP:
           disk_size: 1000
           disk_type: pd-standard
+          # Only used by unmanaged
+          mount_point: /scratch
         AWS:
           disk_size: 1000
           disk_type: gp2
+          # Only used by unmanaged
+          mount_point: /scratch
+        Azure:
+          disk_size: 1000
+          disk_type: Standard_LRS
+          # Only used by unmanaged
+          mount_point: /scratch
     worker_count: 2
 """
 
@@ -183,7 +192,7 @@ def Prepare(benchmark_spec):
   storage_service = dpb_service_instance.storage_service
   storage_service.MakeBucket(bucket)
   benchmark_spec.bucket = bucket
-  benchmark_spec.base_dir = dpb_service_instance.PERSISTENT_FS_PREFIX + bucket
+  benchmark_spec.base_dir = dpb_service_instance.persistent_fs_prefix + bucket
   benchmark_spec.staged_queries = _LoadAndStageQueries(
       storage_service, benchmark_spec.base_dir)
 
@@ -252,6 +261,11 @@ def Run(benchmark_spec):
   table_metadata_file = _GetStagedTableMetadata(storage_service, benchmark_spec)
   if table_metadata_file:
     args += ['--table-metadata', table_metadata_file]
+  else:
+    # If we don't pass in tables, we must be reading from hive.
+    # Note you can even read from Hive without --create_hive_tables if they
+    # were precreated.
+    args += ['--enable-hive', 'True']
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)

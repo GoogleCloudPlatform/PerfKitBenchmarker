@@ -66,6 +66,7 @@
     metrics will be collected.
 -   Support wiring properties into DPB clusters with `--dpb_clusters_properties`
     in addition to `--dpb_job_properties`.
+-   Add support for GCS and S3 I/O in PKB managed Spark and Hadoop clusters.
 
 ### Bug fixes and maintenance updates:
 

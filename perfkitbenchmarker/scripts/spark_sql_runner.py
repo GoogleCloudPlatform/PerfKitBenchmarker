@@ -1,9 +1,13 @@
+# Lint as: python2, python3
 """Runs a Spark SQL query with preloaded temp views.
 
 Views can be BigQuery tables or HCFS directories containing Parquet.
 This is useful for Storage formats not expressible as External Hive Tables.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import argparse
 import json
@@ -36,6 +40,11 @@ dataframe reader. e.g.:
   "my_parquet_table": ["parquet", {"path": "gs://some/directory"}]
 }""")
   parser.add_argument(
+      '--enable-hive',
+      type=bool,
+      default=False,
+      help='Whether to try to read data from Hive.')
+  parser.add_argument(
       '--report-dir',
       required=True,
       help='Directory to write out query timings to.')
@@ -48,10 +57,10 @@ def load_file(spark, object_path):
 
 
 def main(args):
-  spark = (sql.SparkSession.builder
-           .appName('Spark SQL Query')
-           .enableHiveSupport()
-           .getOrCreate())
+  builder = sql.SparkSession.builder.appName('Spark SQL Query')
+  if args.enable_hive:
+    builder = builder.enableHiveSupport()
+  spark = builder.getOrCreate()
   table_metadata = []
   if args.table_metadata:
     table_metadata = json.loads(load_file(spark, args.table_metadata)).items()

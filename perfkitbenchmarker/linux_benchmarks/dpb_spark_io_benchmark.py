@@ -91,7 +91,7 @@ def ManageLifecycleResources(base_folder, dpb_service_instance,
     dpb_service_instance.CreateBucket(lifecycle_bucket_name)
 
     lifecycle_folder_uri = '{}{}'.format(
-        dpb_service_instance.PERSISTENT_FS_PREFIX, lifecycle_bucket_name)
+        dpb_service_instance.persistent_fs_prefix, lifecycle_bucket_name)
     if 'prefix' in artifact_details.keys():
       lifecycle_folder_uri = '{}{}'.format(lifecycle_folder_uri,
                                            artifact_details['prefix'])

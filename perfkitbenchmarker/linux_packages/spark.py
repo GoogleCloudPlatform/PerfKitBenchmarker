@@ -25,11 +25,12 @@ from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.linux_packages import hadoop
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('spark_version', '3.0.1', 'Version of spark.')
+flags.DEFINE_string('spark_version', '3.1.1', 'Version of spark.')
 
 DATA_FILES = [
     'spark/spark-defaults.conf.j2', 'spark/spark-env.sh.j2', 'spark/workers.j2'
@@ -40,6 +41,8 @@ SPARK_BIN = posixpath.join(SPARK_DIR, 'bin')
 SPARK_SBIN = posixpath.join(SPARK_DIR, 'sbin')
 SPARK_CONF_DIR = posixpath.join(SPARK_DIR, 'conf')
 SPARK_PRIVATE_KEY = posixpath.join(SPARK_CONF_DIR, 'spark_keyfile')
+
+SPARK_SUBMIT = posixpath.join(SPARK_BIN, 'spark-submit')
 
 
 def CheckPrerequisites():
@@ -54,12 +57,13 @@ def CheckPrerequisites():
 
 def Install(vm):
   vm.Install('openjdk')
+  vm.Install('python3')
   vm.Install('curl')
   # Needed for HDFS not as a dependency (our Spark ships with Hadoop 3.2 client
   # libraries)
   vm.Install('hadoop')
   spark_url = ('https://downloads.apache.org/spark/spark-{0}/'
-               'spark-{0}-bin-hadoop3.2.tgz').format(FLAGS.spark_version)
+               'spark-{0}-bin-without-hadoop.tgz').format(FLAGS.spark_version)
   vm.RemoteCommand(
       ('mkdir {0} && curl -L {1} | '
        'tar -C {0} --strip-components=1 -xzf -').format(SPARK_DIR, spark_url))
@@ -71,7 +75,11 @@ def Install(vm):
 SPARK_MEMORY_FRACTION = 0.9
 
 
-def _RenderConfig(vm, leader, workers, memory_fraction=SPARK_MEMORY_FRACTION):
+def _RenderConfig(vm,
+                  leader,
+                  workers,
+                  memory_fraction=SPARK_MEMORY_FRACTION,
+                  configure_s3=False):
   """Load Spark Condfiguration on VM."""
   # Use first worker to get worker configuration
   worker = workers[0]
@@ -85,6 +93,12 @@ def _RenderConfig(vm, leader, workers, memory_fraction=SPARK_MEMORY_FRACTION):
     scratch_dir = posixpath.join(vm.GetScratchDir(), 'spark')
   else:
     scratch_dir = posixpath.join('/tmp/pkb/local_scratch', 'spark')
+
+  aws_access_key = None
+  aws_secret_key = None
+  if configure_s3:
+    aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
+
   context = {
       'leader_ip': leader.internal_ip,
       'worker_ips': [vm.internal_ip for vm in workers],
@@ -93,6 +107,10 @@ def _RenderConfig(vm, leader, workers, memory_fraction=SPARK_MEMORY_FRACTION):
       'spark_private_key': SPARK_PRIVATE_KEY,
       'worker_memory_mb': worker_memory_mb,
       'driver_memory_mb': driver_memory_mb,
+      'hadoop_cmd': hadoop.HADOOP_CMD,
+      'python_cmd': 'python3',
+      'aws_access_key': aws_access_key,
+      'aws_secret_key': aws_secret_key,
   }
 
   for file_name in DATA_FILES:
@@ -116,12 +134,13 @@ def _GetOnlineWorkerCount(leader):
   return int(stdout)
 
 
-def ConfigureAndStart(leader, workers):
+def ConfigureAndStart(leader, workers, configure_s3=False):
   """Run Spark Standalone and HDFS on a cluster.
 
   Args:
     leader: VM. leader VM - will be the HDFS NameNode, Spark Master.
     workers: List of VMs. Each VM will run an HDFS DataNode, Spark Worker.
+    configure_s3: Whether to configure Spark to access S3.
   """
   # Start HDFS
   hadoop.ConfigureAndStart(leader, workers, start_yarn=False)
@@ -130,7 +149,8 @@ def ConfigureAndStart(leader, workers):
   # If there are no workers set up in pseudo-distributed mode, where the leader
   # node runs the worker daemons.
   workers = workers or [leader]
-  fn = functools.partial(_RenderConfig, leader=leader, workers=workers)
+  fn = functools.partial(
+      _RenderConfig, leader=leader, workers=workers, configure_s3=configure_s3)
   vm_util.RunThreaded(fn, vms)
 
   leader.RemoteCommand("rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(

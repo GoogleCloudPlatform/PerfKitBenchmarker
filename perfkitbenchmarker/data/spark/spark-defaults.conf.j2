@@ -22,3 +22,10 @@ spark.worker.dir={{ scratch_dir }}
 
 # Hadoop configs prefixed with spark.hadoop
 spark.hadoop.fs.defaultFS=hdfs://{{ leader_ip }}/
+{% if aws_access_key %}
+# Configure S3A Hadoop's S3 filesystem
+# Use s3:// scheme to be consistent with EMR
+spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+spark.hadoop.fs.s3a.access.key={{ aws_access_key }}
+spark.hadoop.fs.s3a.secret.key={{ aws_secret_key }}
+{% endif %}

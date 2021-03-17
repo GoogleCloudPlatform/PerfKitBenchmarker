@@ -116,11 +116,6 @@ def CheckPrerequisites(benchmark_config):
         'Invalid backend {} for terasort. Not in:{}'.format(
             dpb_service_type, str(SUPPORTED_DPB_BACKENDS)))
 
-  if (dpb_service_type == dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER and
-      FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT):
-    raise errors.Config.InvalidValue(
-        '{} only supports ephemral terasort.'.format(dpb_service_type))
-
   if (FLAGS.dpb_terasort_block_size_mb and
       FLAGS.dpb_terasort_storage_type != _FS_TYPE_PERSISTENT):
     raise errors.Config.InvalidValue('You cannot set HDFS block size.')
@@ -160,7 +155,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
 
   if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
     run_uri = spec.uuid.split('-')[0]
-    base_dir = service.PERSISTENT_FS_PREFIX + run_uri + '/'
+    base_dir = service.persistent_fs_prefix + run_uri + '/'
   else:
     base_dir = '/'
 

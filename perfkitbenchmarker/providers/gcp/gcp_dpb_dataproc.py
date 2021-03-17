@@ -47,7 +47,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
   CLOUD = gcp.CLOUD
   SERVICE_TYPE = 'dataproc'
-  PERSISTENT_FS_PREFIX = 'gs://'
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
@@ -61,6 +60,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
+    self.persistent_fs_prefix = 'gs://'
 
   @staticmethod
   def _ParseTime(state_time: str) -> datetime:

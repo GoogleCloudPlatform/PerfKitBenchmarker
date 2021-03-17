@@ -27,6 +27,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import aws_credentials
 
 FLAGS = flags.FLAGS
 
@@ -42,6 +43,12 @@ HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
 HADOOP_SBIN = posixpath.join(HADOOP_DIR, 'sbin')
 HADOOP_CONF_DIR = posixpath.join(HADOOP_DIR, 'etc', 'hadoop')
 HADOOP_PRIVATE_KEY = posixpath.join(HADOOP_CONF_DIR, 'hadoop_keyfile')
+HADOOP_LIB_DIR = posixpath.join(HADOOP_DIR, 'share', 'hadoop', 'common', 'lib')
+HADOOP_TOOLS_DIR = posixpath.join(HADOOP_DIR, 'share', 'hadoop', 'tools', 'lib')
+
+HADOOP_CMD = posixpath.join(HADOOP_BIN, 'hadoop')
+HDFS_CMD = posixpath.join(HADOOP_BIN, 'hdfs')
+YARN_CMD = posixpath.join(HADOOP_BIN, 'yarn')
 
 
 def CheckPrerequisites():
@@ -80,6 +87,19 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
+  """Install the GCS connector for Hadoop, which allows I/O to GCS."""
+  connector_url = ('https://storage.googleapis.com/hadoop-lib/gcs/'
+                   'gcs-connector-hadoop{}-latest.jar'.format(
+                       FLAGS.hadoop_version[0]))
+  vm.RemoteCommand('cd {0} && curl -O {1}'.format(install_dir, connector_url))
+
+
+def InstallS3Connector(vm, install_dir=HADOOP_LIB_DIR):
+  """Copy the S3 connector onto Hadoop's classpath."""
+  vm.RemoteCommand('cp {0}/*aws*.jar {1}'.format(HADOOP_TOOLS_DIR, install_dir))
+
+
 # Scheduling constants.
 # Give 90% of VM memory to YARN for scheduling.
 # This is roguhly consistent with Dataproc 2.0+
@@ -97,11 +117,11 @@ MAP_SLOTS_PER_CORE = 1.5
 REDUCE_SLOTS_PER_CORE = 4 / 3
 
 
-def _RenderConfig(
-    vm,
-    master,
-    workers,
-    memory_fraction=YARN_MEMORY_FRACTION):
+def _RenderConfig(vm,
+                  master,
+                  workers,
+                  memory_fraction=YARN_MEMORY_FRACTION,
+                  configure_s3=False):
   """Load Hadoop Condfiguration on VM."""
   # Use first worker to get worker configuration
   worker = workers[0]
@@ -136,6 +156,12 @@ def _RenderConfig(
     scratch_dir = posixpath.join(vm.GetScratchDir(), 'hadoop')
   else:
     scratch_dir = posixpath.join('/tmp/pkb/local_scratch', 'hadoop')
+
+  aws_access_key = None
+  aws_secret_key = None
+  if configure_s3:
+    aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
+
   context = {
       'master_ip': master.internal_ip,
       'worker_ips': [vm.internal_ip for vm in workers],
@@ -150,6 +176,8 @@ def _RenderConfig(
       'reduce_memory_mb': reduce_memory_mb,
       'reduce_heap_mb': reduce_heap_mb,
       'num_reduce_tasks': num_reduce_tasks,
+      'aws_access_key': aws_access_key,
+      'aws_secret_key': aws_secret_key,
   }
 
   for file_name in DATA_FILES:
@@ -166,19 +194,19 @@ def _RenderConfig(
 
 
 def _GetHDFSOnlineNodeCount(master):
-  cmd = '{0} dfsadmin -report'.format(posixpath.join(HADOOP_BIN, 'hdfs'))
+  cmd = HDFS_CMD + ' dfsadmin -report'
   stdout = master.RemoteCommand(cmd)[0]
   avail_str = regex_util.ExtractGroup(r'Live datanodes\s+\((\d+)\):', stdout)
   return int(avail_str)
 
 
 def _GetYARNOnlineNodeCount(master):
-  cmd = '{0} node -list -all'.format(posixpath.join(HADOOP_BIN, 'yarn'))
+  cmd = YARN_CMD + ' node -list -all'
   stdout = master.RemoteCommand(cmd)[0]
   return len(re.findall(r'RUNNING', stdout))
 
 
-def ConfigureAndStart(master, workers, start_yarn=True):
+def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   """Configure hadoop on a cluster.
 
   Args:
@@ -186,15 +214,14 @@ def ConfigureAndStart(master, workers, start_yarn=True):
     workers: List of VMs. Each VM will run an HDFS DataNode, YARN node.
     start_yarn: bool. Start YARN and JobHistory server? Set to False if HDFS is
         the only service required. Default: True.
+    configure_s3: Whether to configure Hadoop to access S3.
   """
   vms = [master] + workers
   # If there are no workers set up in pseudo-distributed mode, where the master
   # node runs the worker daemons.
   workers = workers or [master]
   fn = functools.partial(
-      _RenderConfig,
-      master=master,
-      workers=workers)
+      _RenderConfig, master=master, workers=workers, configure_s3=configure_s3)
   vm_util.RunThreaded(fn, vms)
 
   master.RemoteCommand(
@@ -236,36 +263,3 @@ def ConfigureAndStart(master, workers, start_yarn=True):
           yarn_online_count, len(workers)))
     else:
       logging.info('YARN running on all %d workers', len(workers))
-
-
-def StopYARN(master):
-  """Stop YARN on all nodes."""
-  master.RemoteCommand(posixpath.join(HADOOP_SBIN, 'stop-yarn.sh'))
-
-
-def StopHDFS(master):
-  """Stop HDFS on all nodes."""
-  master.RemoteCommand(posixpath.join(HADOOP_SBIN, 'stop-dfs.sh'))
-
-
-def StopHistoryServer(master):
-  """Stop the MapReduce JobHistory daemon."""
-  master.RemoteCommand('{0} stop historyserver'.format(
-      posixpath.join(HADOOP_SBIN, 'mr-jobhistory-daemon.sh')))
-
-
-def StopAll(master):
-  """Stop HDFS and YARN.
-
-  Args:
-    master: VM. HDFS NameNode/YARN ResourceManager.
-  """
-  StopHistoryServer(master)
-  StopYARN(master)
-  StopHDFS(master)
-
-
-def CleanDatanode(vm):
-  """Delete Hadoop data from 'vm'."""
-  vm.RemoteCommand('rm -rf {0}'.format(
-      posixpath.join(vm.GetScratchDir(), 'hadoop')))

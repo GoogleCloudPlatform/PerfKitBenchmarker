@@ -96,7 +96,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   CLOUD = aws.CLOUD
   SERVICE_TYPE = 'emr'
-  PERSISTENT_FS_PREFIX = 's3://'
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
@@ -113,6 +112,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
+    self.persistent_fs_prefix = 's3://'
     self.bucket_to_delete = None
     self.dpb_version = FLAGS.dpb_emr_release_label or self.dpb_version
     if not self.dpb_version:
