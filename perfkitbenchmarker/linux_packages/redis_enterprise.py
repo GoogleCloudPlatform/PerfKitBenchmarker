@@ -232,11 +232,11 @@ def WaitForClusterUp(vm, redis_port):
 
 def LoadCluster(vm, redis_port):
   """Load the cluster before performing tests."""
-  vm.RemoteCommand(
+  command = (
       '/opt/redislabs/bin/memtier_benchmark '
       '-s localhost '
-      '-a {password} '
-      '-p {port} '
+      f'-a {FLAGS.run_uri} '
+      f'-p {str(redis_port)} '
       '-t 1 '  # Set -t and -c to 1 to avoid duplicated work in writing the same
       '-c 1 '  # key/value pairs repeatedly.
       '--ratio 1:0 '
@@ -244,12 +244,11 @@ def LoadCluster(vm, redis_port):
       '-d 100 '
       '--key-pattern S:S '
       '--key-minimum 1 '
-      '--key-maximum {load_records} '
-      '-n allkeys '
-      '--cluster-mode '.format(
-          password=FLAGS.run_uri,
-          port=str(redis_port),
-          load_records=str(_LOAD_RECORDS.value)))
+      f'--key-maximum {str(_LOAD_RECORDS.value)} '
+      '-n allkeys ')
+  if _SHARDS.value > 1:
+    command += '--cluster-mode'
+  vm.RemoteCommand(command)
 
 
 def BuildRunCommand(redis_vm, threads, port):
@@ -266,27 +265,21 @@ def BuildRunCommand(redis_vm, threads, port):
   if threads == 0:
     return None
 
-  return ('/opt/redislabs/bin/memtier_benchmark '
-          '-s {ip_address} '
-          '-a {password} '
-          '-p {port} '
-          '-t {threads} '
-          '--ratio 1:1 '
-          '--pipeline {pipeline} '
-          '-c {clients} '
-          '-d 100 '
-          '--key-minimum 1 '
-          '--key-maximum {key_maximum} '
-          '-n {run_records} '
-          '--cluster-mode '.format(
-              ip_address=redis_vm.internal_ip,
-              password=FLAGS.run_uri,
-              port=str(port),
-              threads=str(threads),
-              pipeline=str(_PIPELINES.value),
-              clients=str(_LOADGEN_CLIENTS.value),
-              key_maximum=str(_LOAD_RECORDS.value),
-              run_records=str(_RUN_RECORDS.value)))
+  result = ('/opt/redislabs/bin/memtier_benchmark '
+            f'-s {redis_vm.internal_ip} '
+            f'-a {FLAGS.run_uri} '
+            f'-p {str(port)} '
+            f'-t {str(threads)} '
+            '--ratio 1:1 '
+            f'--pipeline {str(_PIPELINES.value)} '
+            f'-c {str(_LOADGEN_CLIENTS.value)} '
+            '-d 100 '
+            '--key-minimum 1 '
+            f'--key-maximum {str(_LOAD_RECORDS.value)} '
+            f'-n {_RUN_RECORDS.value} ')
+  if _SHARDS.value > 1:
+    result += '--cluster-mode'
+  return result
 
 
 def Run(redis_vm, load_vms, redis_port):
