@@ -29,7 +29,6 @@ FLAGS = flags.FLAGS
 TIMEOUT = 900
 EXISTS_RETRY_TIMES = 3
 EXISTS_RETRY_POLL = 30
-REDIS_VERSION = '3.2'
 
 
 class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
@@ -51,6 +50,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       self.azure_tier = 'Premium'
     else:
       self.azure_tier = 'Basic'
+    self.redis_version = None
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.
@@ -63,7 +63,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_region': self.redis_region,
         'cloud_redis_azure_tier': self.azure_tier,
         'cloud_redis_azure_redis_size': self.azure_redis_size,
-        'cloud_redis_version': REDIS_VERSION,
+        'cloud_redis_version': self.redis_version,
     }
     return result
 
@@ -79,8 +79,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     """
     if FLAGS.managed_memory_store_version:
       raise errors.Config.InvalidValue(
-          'Custom Redis version not supported on Azure Redis. '
-          'Redis version is {0}.'.format(REDIS_VERSION))
+          'Custom Redis version not supported on Azure Redis. ')
     if FLAGS.redis_failover_style in [
         managed_memory_store.Failover.FAILOVER_SAME_ZONE]:
       raise errors.Config.InvalidValue(
@@ -146,6 +145,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     stdout, _, retcode = self.DescribeCache()
     if (retcode == 0 and
         json.loads(stdout).get('provisioningState', None) == 'Succeeded'):
+      self.redis_version = json.loads(stdout).get('redisVersion', 'unspecified')
       return True
     return False
 
