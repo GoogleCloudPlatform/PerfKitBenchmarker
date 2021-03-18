@@ -14,12 +14,17 @@
 
 """Tests for pkb.py."""
 
+import textwrap
 import unittest
 from absl import flags
+from absl.testing import flagsaver
+
 import mock
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
+from perfkitbenchmarker import test_util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -35,6 +40,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     return mock_function
 
   def setUp(self):
+    super().setUp()
     self.flags_mock = self.PatchPkbFunction('FLAGS')
     self.provision_mock = self.PatchPkbFunction('DoProvisionPhase')
     self.prepare_mock = self.PatchPkbFunction('DoPreparePhase')
@@ -142,7 +148,9 @@ class TestMakeFailedRunSample(unittest.TestCase):
     })
 
 
-class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase):
+class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
+                        test_util.SamplesTestMixin):
+
   """Testing for various functions in pkb.py."""
 
   def _MockVm(
@@ -197,6 +205,77 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(expected_metadata0, samples[0].metadata)
     self.assertEqual(expected_metadata1, samples[1].metadata)
     self.assertLen(samples, 2)
+
+  def testParseMeminfo(self):
+    meminfo_text = textwrap.dedent("""
+    MemTotal:       16429552 kB
+    MemFree:        13772912 kB
+    HugePages_Free: 0
+    BadValue1:      a
+    BadValue2:      1 mB
+    BadValue3:      1 kB extra""").strip()
+
+    parsed, unparsed = pkb._ParseMeminfo(meminfo_text)
+
+    expected_parsed = {
+        'HugePages_Free': 0,
+        'MemFree': 13772912,
+        'MemTotal': 16429552,
+    }
+    expected_unparsed = [
+        'BadValue1:      a',
+        'BadValue2:      1 mB',
+        'BadValue3:      1 kB extra',
+    ]
+    self.assertEqual(expected_parsed, parsed)
+    self.assertEqual(expected_unparsed, unparsed)
+
+  def testCollectMeminfoHandlerDefault(self):
+    # must set --collect_meminfo to collect samples
+    vm = mock.Mock()
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectMeminfoHandler(None, benchmark_spec, samples)
+
+    self.assertEmpty(samples)
+    vm.RemoteCommand.assert_not_called()
+
+  @flagsaver.flagsaver(collect_meminfo=True)
+  def testCollectMeminfoHandlerIgnoreWindows(self):
+    vm = mock.Mock()
+    vm.OS_TYPE = 'windows2019_desktop'
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectMeminfoHandler(None, benchmark_spec, samples)
+
+    self.assertEmpty(samples)
+
+  @flagsaver.flagsaver(collect_meminfo=True)
+  def testCollectMeminfoHandler(self):
+    vm = mock.Mock()
+    vm.RemoteCommand.return_value = 'b: 100\na: 10\nbadline', ''
+    vm.name = 'pkb-1234-0'
+    vm.OS_TYPE = 'ubuntu1804'
+    vm.machine_type = 'n1-standard-2'
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectMeminfoHandler(None, benchmark_spec, samples)
+
+    expected_metadata = {
+        'a': 10,
+        'b': 100,
+        'meminfo_keys': 'a,b',
+        'meminfo_malformed': 'badline',
+        'meminfo_machine_type': 'n1-standard-2',
+        'meminfo_os_type': 'ubuntu1804',
+        'meminfo_vmname': 'pkb-1234-0',
+    }
+    expected_sample = sample.Sample('meminfo', 0, '', expected_metadata)
+    self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
+    vm.RemoteCommand.assert_called_with('cat /proc/meminfo')
 
 
 if __name__ == '__main__':

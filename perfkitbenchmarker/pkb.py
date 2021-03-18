@@ -69,7 +69,7 @@ import re
 import sys
 import threading
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 import uuid
 
 from absl import flags
@@ -77,7 +77,7 @@ from perfkitbenchmarker import archive
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import benchmark_sets
-from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -178,6 +178,8 @@ _RESTORE_PATH = flags.DEFINE_string('restore', None,
                                     'Path to restore resources from.')
 _FREEZE_PATH = flags.DEFINE_string('freeze', None,
                                    'Path to freeze resources to.')
+_COLLECT_MEMINFO = flags.DEFINE_bool('collect_meminfo', False,
+                                     'Whether to collect /proc/meminfo stats.')
 
 
 def GetCurrentUser():
@@ -584,8 +586,8 @@ def _CreateBenchmarkSpecs():
         logging.exception('Prerequisite check failed for %s', name)
         raise
 
-    specs.append(benchmark_spec.BenchmarkSpec.GetBenchmarkSpec(
-        benchmark_module, config, uid))
+    specs.append(
+        bm_spec.BenchmarkSpec.GetBenchmarkSpec(benchmark_module, config, uid))
 
   return specs
 
@@ -620,7 +622,7 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
     status_file.write(json.dumps(status_dict) + '\n')
 
 
-def _SetRestoreSpec(spec: benchmark_spec.BenchmarkSpec) -> None:
+def _SetRestoreSpec(spec: bm_spec.BenchmarkSpec) -> None:
   """Unpickles the spec to restore resources from, if provided."""
   restore_path = _RESTORE_PATH.value
   if restore_path:
@@ -629,7 +631,7 @@ def _SetRestoreSpec(spec: benchmark_spec.BenchmarkSpec) -> None:
       spec.restore_spec = pickle.load(spec_file)
 
 
-def _SetFreezePath(spec: benchmark_spec.BenchmarkSpec) -> None:
+def _SetFreezePath(spec: bm_spec.BenchmarkSpec) -> None:
   """Sets the path to freeze resources to if provided."""
   if _FREEZE_PATH.value:
     spec.freeze_path = _FREEZE_PATH.value
@@ -1402,6 +1404,78 @@ def _CreateGlibcSamples(vms):
       sample.Sample('glibc_version', 0, '', metadata)
       for metadata in vm_util.RunThreaded(_GetGlibcMetadata, vms)
   ]
+
+
+def _ParseMeminfo(meminfo_txt: str) -> Tuple[Dict[str, int], List[str]]:
+  """Returns the parsed /proc/meminfo data.
+
+  Response has entries such as {'MemTotal' : 32887056, 'Inactive': 4576524}. If
+  the /proc/meminfo entry has two values such as
+    MemTotal: 32887056 kB
+  checks that the last value is 'kB' If it is not then adds that line to the
+  2nd value in the tuple.
+
+  Args:
+    meminfo_txt: contents of /proc/meminfo
+
+  Returns:
+    Tuple where the first entry is a dict of the parsed keys and the second
+    are unparsed lines.
+  """
+  data: Dict[str, int] = {}
+  malformed: List[str] = []
+  for line in meminfo_txt.splitlines():
+    try:
+      key, full_value = re.split(r':\s+', line)
+      parts = full_value.split()
+      if len(parts) == 1 or (len(parts) == 2 and parts[1] == 'kB'):
+        data[key] = int(parts[0])
+      else:
+        malformed.append(line)
+    except ValueError:
+      # If the line does not match "key: value" or if the value is not an int
+      malformed.append(line)
+  return data, malformed
+
+
+@events.samples_created.connect
+def _CollectMeminfoHandler(sender: str, benchmark_spec: bm_spec.BenchmarkSpec,
+                           samples: List[sample.Sample]) -> None:
+  """Optionally creates /proc/meminfo samples.
+
+  If the flag --collect_meminfo is set appends a sample.Sample of /proc/meminfo
+  data for every VM in the run.
+
+  Parameter names cannot be changed as the method is called by events.send with
+  keyword arguments.
+
+  Args:
+    sender: Unused sender.
+    benchmark_spec: The benchmark spec.
+    samples: Generated samples that can be appended to.
+  """
+  del sender  # Unused as appending to samples with VMs from benchmark_spec
+  if not _COLLECT_MEMINFO.value:
+    return
+
+  def CollectMeminfo(vm):
+    txt, _ = vm.RemoteCommand('cat /proc/meminfo')
+    meminfo, malformed = _ParseMeminfo(txt)
+    meminfo.update({
+        'meminfo_keys': ','.join(sorted(meminfo)),
+        'meminfo_vmname': vm.name,
+        'meminfo_machine_type': vm.machine_type,
+        'meminfo_os_type': vm.OS_TYPE,
+    })
+    if malformed:
+      meminfo['meminfo_malformed'] = ','.join(sorted(malformed))
+    return sample.Sample('meminfo', 0, '', meminfo)
+
+  linux_vms = [
+      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES
+  ]
+
+  samples.extend(vm_util.RunThreaded(CollectMeminfo, linux_vms))
 
 
 def Main():
