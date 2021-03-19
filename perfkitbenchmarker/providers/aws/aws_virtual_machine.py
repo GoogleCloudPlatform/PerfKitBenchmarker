@@ -1210,8 +1210,8 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
   """Class with configuration for AWS CentOS 7 virtual machines."""
   # Documentation on finding the CentOS 7 image:
   # https://wiki.centos.org/Cloud/AWS#x86_64
-  IMAGE_NAME_FILTER = 'CentOS*Linux*7*ENA*'
-  IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
+  IMAGE_NAME_FILTER = 'CentOS 7*'
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'centos'
 
   def _InstallEfa(self):
