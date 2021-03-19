@@ -82,6 +82,9 @@ flags.DEFINE_enum('gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
                   'The ssd interface for GCE local SSD.')
 flags.DEFINE_enum('gce_nic_type', 'VIRTIO_NET', ['VIRTIO_NET', 'GVNIC'],
                   'The virtual NIC type of GCE VMs.')
+EGRESS_BANDWIDTH_TIER = flags.DEFINE_enum(
+    'gce_egress_bandwidth_tier', None, ['TIER_1'],
+    'Egress bandwidth tier of the GCE VMs.')
 
 flags.DEFINE_string('gcp_node_type', None,
                     'The node type of all sole tenant hosts that get created.')

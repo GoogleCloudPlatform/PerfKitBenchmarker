@@ -165,6 +165,7 @@ class GcloudCommand(object):
     additional_flags: list of strings. Additional flags to append unmodified to
         the end of the gcloud command (e.g. ['--metadata', 'color=red']).
     rate_limited: boolean. True if rate limited, False otherwise.
+    use_alpha_gcloud: boolean. Defaults to False.
   """
 
   def __init__(self, resource, *args):
@@ -181,6 +182,7 @@ class GcloudCommand(object):
     self.additional_flags = []
     self._AddCommonFlags(resource)
     self.rate_limited = False
+    self.use_alpha_gcloud = False
 
   def GetCommand(self):
     """Generates the gcloud command.
@@ -200,6 +202,8 @@ class GcloudCommand(object):
           cmd.append(flag_name_str)
           cmd.append(str(value))
     cmd.extend(self.additional_flags)
+    if self.use_alpha_gcloud and len(cmd) > 1 and cmd[1] != 'alpha':
+      cmd.insert(1, 'alpha')
     return cmd
 
   def __repr__(self):

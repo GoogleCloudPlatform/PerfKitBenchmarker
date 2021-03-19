@@ -601,6 +601,12 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('nic-type=GVNIC', cmd)
 
+  def testEgressBandwidthTier(self):
+    """Tests that egress bandwidth can be set as tier 1."""
+    cmd, call_count = self._CreateVmCommand(gce_egress_bandwidth_tier='TIER_1')
+    self.assertEqual(call_count, 1)
+    self.assertIn('total-egress-bandwidth-tier=TIER_1', cmd)
+
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(
         gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')

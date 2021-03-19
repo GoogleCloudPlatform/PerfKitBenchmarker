@@ -400,6 +400,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
+    self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
 
   def _GetNetwork(self):
@@ -476,6 +477,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       self.metadata[
           'placement_group_style'] = placement_group.PLACEMENT_GROUP_NONE
+
+    if self.gce_egress_bandwidth_tier:
+      cmd.use_alpha_gcloud = True
+      network_performance_configs = f'total-egress-bandwidth-tier={self.gce_egress_bandwidth_tier}'
+      cmd.flags['network-performance-configs'] = network_performance_configs
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
@@ -775,6 +781,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
+    if self.gce_egress_bandwidth_tier:
+      result['gce_egress_bandwidth_tier'] = self.gce_egress_bandwidth_tier
     result[
         'gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     result['boot_disk_type'] = self.boot_disk_type
