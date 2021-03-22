@@ -138,6 +138,11 @@ def PrepareVm(vm):
   Args:
     vm: virtual machine on which to install NCCL
   """
+  vm.AuthenticateVm()
+  vm.Install('cuda_toolkit')
+  vm.Install('openmpi')
+  vm.Install('nccl')
+
   env = ''
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'

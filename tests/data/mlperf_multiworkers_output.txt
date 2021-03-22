@@ -1,0 +1,376 @@
+cat: /etc/dgx-release: No such file or directory
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 19.05 (build 6411784)
+PyTorch Version 1.1.0a0+828a6a3
+
+Container image Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved.
+
+Copyright (c) 2014-2019 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
+NVIDIA modifications are covered by the license terms that apply to the underlying project or file.
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 19.05 (build 6411784)
+PyTorch Version 1.1.0a0+828a6a3
+
+Container image Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved.
+
+Copyright (c) 2014-2019 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
+NVIDIA modifications are covered by the license terms that apply to the underlying project or file.
+
+NOTE: Legacy NVIDIA Driver detected.  Compatibility mode ENABLED.
+
+NOTE: MOFED driver for multi-node communication was not detected.
+      Multi-node communication performance may be reduced.
+
+
+NOTE: Legacy NVIDIA Driver detected.  Compatibility mode ENABLED.
+
+NOTE: MOFED driver for multi-node communication was not detected.
+      Multi-node communication performance may be reduced.
+
+Found 8 CUDA GPUs
+Found 8 CUDA GPUs
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 19.05 (build 6411784)
+PyTorch Version 1.1.0a0+828a6a3
+
+Container image Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved.
+
+Copyright (c) 2014-2019 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
+NVIDIA modifications are covered by the license terms that apply to the underlying project or file.
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 19.05 (build 6411784)
+PyTorch Version 1.1.0a0+828a6a3
+
+Container image Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved.
+
+Copyright (c) 2014-2019 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
+NVIDIA modifications are covered by the license terms that apply to the underlying project or file.
+
+NOTE: Legacy NVIDIA Driver detected.  Compatibility mode ENABLED.
+
+NOTE: MOFED driver for multi-node communication was not detected.
+      Multi-node communication performance may be reduced.
+
+
+NOTE: Legacy NVIDIA Driver detected.  Compatibility mode ENABLED.
+
+NOTE: MOFED driver for multi-node communication was not detected.
+      Multi-node communication performance may be reduced.
+
+Beginning trial 1 of 1
+Clearing caches
+vm.drop_caches = 3
+vm.drop_caches = 3
+:::MLL 1570748200.738 cache_clear: {"value": true, "metadata": {"file": "<string>", "lineno": 1}}
+:::MLL 1570748201.349 cache_clear: {"value": true, "metadata": {"file": "<string>", "lineno": 1}}
+Launching on node 10.138.0.5
++ pids+=($!)
++ set +x
+Launching on node 10.138.15.205
++ pids+=($!)
++ set +x
+++ eval echo mpirun -N 1 -n 1 -H '$hostn'
++++ echo mpirun -N 1 -n 1 -H 10.138.0.5
++ mpirun -N 1 -n 1 -H 10.138.0.5 docker exec -e DGXSYSTEM=DGX1_multi -e 'MULTI_NODE= --nnodes=2 --node_rank=0 --master_addr=10.138.0.5 --master_port=4279' -e 'SEED=    11911858' -e SLURM_JOB_ID=fabe5cd6 -e SLURM_NTASKS_PER_NODE= -e SLURM_NNODES=2 -e MODE=TRAIN cont_fabe5cd6 ./run_and_time1.sh
+++ eval echo mpirun -N 1 -n 1 -H '$hostn'
++++ echo mpirun -N 1 -n 1 -H 10.138.15.205
++ mpirun -N 1 -n 1 -H 10.138.15.205 docker exec -e DGXSYSTEM=DGX1_multi -e 'MULTI_NODE= --nnodes=2 --node_rank=1 --master_addr=10.138.0.5 --master_port=4279' -e 'SEED=    11911858' -e SLURM_JOB_ID=fabe5cd6 -e SLURM_NTASKS_PER_NODE= -e SLURM_NNODES=2 -e MODE=TRAIN cont_fabe5cd6 ./run_and_time1.sh
+Run vars: id fabe5cd6 gpus 8 mparams  --nnodes=2 --node_rank=0 --master_addr=10.138.0.5 --master_port=4279
++ SEED='    11911858'
++ MAX_TOKENS=8192
++ DATASET_DIR=/data
++ MODE=TRAIN
++ NUMEPOCHS=30
++ case "$MODE" in
++ source run_training1.sh
++++ date +%s
+++ START=1570748201
++++ date '+%Y-%m-%d %r'
+STARTING TIMING RUN AT 2019-10-10 10:56:41 PM
+++ START_FMT='2019-10-10 10:56:41 PM'
+++ echo 'STARTING TIMING RUN AT 2019-10-10 10:56:41 PM'
+++ [[ 8 -ne 1 ]]
+++ DISTRIBUTED_INIT_METHOD='--distributed-init-method env://'
+++ export DGXSYSTEM
+++ export SLURM_NTASKS_PER_NODE
+++ export SLURM_NNODES
+++ export MLPERF_HOST_OS
+++ python -m bind_launch --nsockets_per_node 2 --ncores_per_socket 24 --nproc_per_node 8 --nnodes=2 --node_rank=0 --master_addr=10.138.0.5 --master_port=4279 train.py /data --seed 11911858 --arch transformer_wmt_en_de_big_t2t --share-all-embeddings --optimizer adam --adam-betas '(0.9, 0.997)' --adam-eps 1e-9 --clip-norm 0.0 --lr-scheduler inverse_sqrt --warmup-init-lr 0.0 --warmup-updates 550 --lr 1.732e-3 --min-lr 0.0 --dropout 0.1 --weight-decay 0.0 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --max-tokens 8192 --max-epoch 30 --target-bleu 25.0 --ignore-case --no-save --update-freq 1 --fp16 --seq-len-multiple 2 --softmax-type fast_fill --source_lang en --target_lang de --bucket_growth_factor 1.035 --batching_scheme v0p5_better --batch_multiple_strategy dynamic --fast-xentropy --max-len-a 1 --max-len-b 50 --lenpen 0.6 --distributed-init-method env:// --enable-parallel-backward-allred-opt --parallel-backward-allred-opt-threshold 10540442 --parallel-backward-allred-cuda-nstreams 2 --max-source-positions 80 --max-target-positions 80 --adam-betas '(0.86,0.92)'
+Run vars: id fabe5cd6 gpus 8 mparams  --nnodes=2 --node_rank=1 --master_addr=10.138.0.5 --master_port=4279
++ SEED='    11911858'
++ MAX_TOKENS=8192
++ DATASET_DIR=/data
++ MODE=TRAIN
++ NUMEPOCHS=30
++ case "$MODE" in
++ source run_training1.sh
++++ date +%s
+++ START=1570748202
++++ date '+%Y-%m-%d %r'
+STARTING TIMING RUN AT 2019-10-10 10:56:42 PM
+++ START_FMT='2019-10-10 10:56:42 PM'
+++ echo 'STARTING TIMING RUN AT 2019-10-10 10:56:42 PM'
+++ [[ 8 -ne 1 ]]
+++ DISTRIBUTED_INIT_METHOD='--distributed-init-method env://'
+++ export DGXSYSTEM
+++ export SLURM_NTASKS_PER_NODE
+++ export SLURM_NNODES
+++ export MLPERF_HOST_OS
+++ python -m bind_launch --nsockets_per_node 2 --ncores_per_socket 24 --nproc_per_node 8 --nnodes=2 --node_rank=1 --master_addr=10.138.0.5 --master_port=4279 train.py /data --seed 11911858 --arch transformer_wmt_en_de_big_t2t --share-all-embeddings --optimizer adam --adam-betas '(0.9, 0.997)' --adam-eps 1e-9 --clip-norm 0.0 --lr-scheduler inverse_sqrt --warmup-init-lr 0.0 --warmup-updates 550 --lr 1.732e-3 --min-lr 0.0 --dropout 0.1 --weight-decay 0.0 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --max-tokens 8192 --max-epoch 30 --target-bleu 25.0 --ignore-case --no-save --update-freq 1 --fp16 --seq-len-multiple 2 --softmax-type fast_fill --source_lang en --target_lang de --bucket_growth_factor 1.035 --batching_scheme v0p5_better --batch_multiple_strategy dynamic --fast-xentropy --max-len-a 1 --max-len-b 50 --lenpen 0.6 --distributed-init-method env:// --enable-parallel-backward-allred-opt --parallel-backward-allred-opt-threshold 10540442 --parallel-backward-allred-cuda-nstreams 2 --max-source-positions 80 --max-target-positions 80 --adam-betas '(0.86,0.92)'
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 7
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 6
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 4
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 5
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 0
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 3
+| distributed init done!
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 2
+| distributed init done!
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 1
+| distributed init done!
+:::MLL 1570748207.763 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748207.763 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748207.769 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+| distributed init done!
+| distributed init done!
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 13
+| distributed init done!
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 12
+| distributed init done!
+| distributed init done!
+| distributed init done!
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 14
+| distributed init done!
+:::MLL 1570748208.702 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.702 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 11
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 15
+| distributed init done!
+| distributed init done!
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 10
+| distributed init done!
+:::MLL 1570748208.718 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 9
+| distributed init done!
+:::MLL 1570748208.721 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+| distributed init (rank 0): env://
+| distributed env init. MASTER_ADDR: 10.138.0.5, MASTER_PORT: 4279, WORLD_SIZE: 16, RANK: 8
+| distributed init done!
+:::MLL 1570748208.723 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.724 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.725 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+| distributed init done!
+| initialized host pkb-fabe5cd6-0 as rank 0 and device id 0
+:::MLL 1570748208.742 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.743 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.746 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.751 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.755 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+:::MLL 1570748208.762 init_start: {"value": null, "metadata": {"file": "train.py", "lineno": 57}}
+Namespace(adam_betas='(0.86,0.92)', adam_eps=1e-09, adaptive_softmax_cutoff=None, arch='transformer_wmt_en_de_big_t2t', attention_dropout=0.1, batch_multiple_strategy='dynamic', batching_scheme='v0p5_better', beam=4, bucket_growth_factor=1.035, clip_norm=0.0, cpu=False, criterion='label_smoothed_cross_entropy', data='/data', dataloader_num_workers=1, decoder_attention_heads=16, decoder_embed_dim=1024, decoder_embed_path=None, decoder_ffn_embed_dim=4096, decoder_layers=6, decoder_learned_pos=False, decoder_normalize_before=True, device_id=0, distributed_backend='nccl', distributed_init_method='env://', distributed_port=-1, distributed_rank=0, distributed_world_size=16, dropout=0.1, enable_dataloader_pin_memory=False, enable_parallel_backward_allred_opt=True, enable_parallel_backward_allred_opt_correctness_check=False, encoder_attention_heads=16, encoder_embed_dim=1024, encoder_embed_path=None, encoder_ffn_embed_dim=4096, encoder_layers=6, encoder_learned_pos=False, encoder_normalize_before=True, fast_xentropy=True, fp16=True, fuse_dropout_add=False, fuse_relu_dropout=False, gen_subset='test', ignore_case=True, keep_interval_updates=-1, label_smoothing=0.1, left_pad_source='True', left_pad_target='False', lenpen=0.6, local_rank=0, log_format=None, log_interval=1000, log_translations=False, lr=[0.001732], lr_scheduler='inverse_sqrt', lr_shrink=0.1, max_epoch=30, max_len_a=1.0, max_len_b=50, max_sentences=None, max_sentences_valid=None, max_source_positions=80, max_target_positions=80, max_tokens=8192, max_update=0, min_len=1, min_loss_scale=0.0001, min_lr=0.0, model_overrides='{}', momentum=0.99, nbest=1, no_beamable_mm=False, no_early_stop=False, no_epoch_checkpoints=False, no_progress_bar=False, no_save=True, no_token_positional_embeddings=False, num_shards=1, online_eval=False, optimizer='adam', parallel_backward_allred_cuda_nstreams=2, parallel_backward_allred_opt_threshold=10540442, path=None, prefix_size=0, print_alignment=False, profile=None, quiet=False, raw_text=False, relu_dropout=0.1, remove_bpe=None, replace_unk=None, restore_file='checkpoint_last.pt', sampling=False, sampling_temperature=1, sampling_topk=-1, save_dir='checkpoints', save_interval=1, save_interval_updates=0, score_reference=False, seed=11911858, sentence_avg=False, seq_len_multiple=2, shard_id=0, share_all_embeddings=True, share_decoder_input_output_embed=False, skip_invalid_size_inputs_valid_test=False, softmax_type='fast_fill', source_lang='en', target_bleu=25.0, target_lang='de', task='translation', train_subset='train', unkpen=0, unnormalized=False, update_freq=[1], valid_subset='valid', validate_interval=1, warmup_init_lr=0.0, warmup_updates=550, weight_decay=0.0)
+:::MLL 1570748215.875 global_batch_size: {"value": 131072, "metadata": {"file": "train.py", "lineno": 74}}
+:::MLL 1570748215.875 opt_name: {"value": "adam", "metadata": {"file": "train.py", "lineno": 75}}
+:::MLL 1570748215.875 opt_base_learning_rate: {"value": 0.001732, "metadata": {"file": "train.py", "lineno": 77}}
+:::MLL 1570748215.876 opt_learning_rate_warmup_steps: {"value": 550, "metadata": {"file": "train.py", "lineno": 78}}
+:::MLL 1570748215.876 max_sequence_length: {"value": 80, "metadata": {"file": "train.py", "lineno": 80}}
+:::MLL 1570748215.877 opt_adam_beta_1: {"value": 0.86, "metadata": {"file": "train.py", "lineno": 81}}
+:::MLL 1570748215.877 opt_adam_beta_2: {"value": 0.92, "metadata": {"file": "train.py", "lineno": 82}}
+:::MLL 1570748215.877 opt_adam_epsilon: {"value": 1e-09, "metadata": {"file": "train.py", "lineno": 83}}
+| [en] dictionary: 33712 types
+| [de] dictionary: 33712 types
+| model transformer_wmt_en_de_big_t2t, criterion LabelSmoothedCrossEntropyCriterion
+| num. model params: 210808832
+| parallel all-reduce ENABLED. all-reduce threshold: 10540442
+| # of parallel all-reduce cuda streams: 2
+| training on 16 GPUs
+| max tokens per GPU = 8192 and max sentences per GPU = None
+:::MLL 1570748222.766 init_stop: {"value": null, "metadata": {"file": "train.py", "lineno": 140}}
+:::MLL 1570748222.766 run_start: {"value": null, "metadata": {"file": "train.py", "lineno": 142}}
+filename: /data/train.en-de.en
+raw_text: False
+| /data train 4590101 examples
+filename: /data/train1.en-de.en
+raw_text: False
+filename: /data/train1.de-en.en
+raw_text: False
+srcline: tensor([  185,   460,  1806,    59,    26, 19367, 16802,  1150,   440,  3608,    14,  1967,  5249,  6127,  1296,   245,     5,  6621,  6991, 29941,     3,     5, 22009, 15958,     9,     5, 32980,     6,   137, 32090,     3,   178,  3570,     6,  6621,  6991, 29941, 10931,    73,     7,   113,     8,     5,   202,  4864, 17907,     8,  1352,     4,     2])
+| Sentences are being padded to multiples of: 2
+filename: /data/test.en-de.en
+raw_text: False
+| /data test 3003 examples
+srcline: tensor([ 7549,  4344,    64, 32364,  1259,    20, 13504,  8959,  3868,     2])
+| Sentences are being padded to multiples of: 2
+filename: /data/test1.en-de.en
+raw_text: False
+filename: /data/test1.de-en.en
+raw_text: False
+:::MLL 1570748227.376 block_start: {"value": null, "metadata": {"first_epoch_num": 1, "epoch_count": 1, "file": "train.py", "lineno": 162}}
+:::MLL 1570748227.376 epoch_start: {"value": null, "metadata": {"epoch_num": 1, "file": "train.py", "lineno": 163}}
+generated 18213 batches in 2.966602s
+got epoch iterator 2.9685800075531006
+| WARNING: overflow detected, setting loss scale to: 64.0
+| WARNING: overflow detected, setting loss scale to: 32.0
+| WARNING: overflow detected, setting loss scale to: 16.0
+| WARNING: overflow detected, setting loss scale to: 8.0
+| WARNING: overflow detected, setting loss scale to: 4.0
+| epoch 001:   1000 / 1139 loss=7.151, nll_loss=0.000, ppl=1.00, wps=196673, ups=1.6, wpb=118905, bsz=3912, num_updates=996, lr=0.00128706, gnorm=41079.756, clip=100%, oom=0, loss_scale=4.000, wall=614
+| epoch 001 | loss 6.883 | nll_loss 0.000 | ppl 1.00 | wps 196540 | ups 1.6 | wpb 118868 | bsz 3906 | num_updates 1134 | lr 0.00120621 | gnorm 36785.215 | clip 100% | oom 0 | loss_scale 4.000 | wall 697
+epoch time  686.5335175991058
+:::MLL 1570748916.891 epoch_stop: {"value": null, "metadata": {"epoch_num": 1, "file": "train.py", "lineno": 201}}
+:::MLL 1570748916.891 eval_start: {"value": null, "metadata": {"epoch_num": 1, "file": "train.py", "lineno": 547}}
+generated 58 batches in 0.000936s
+| Translated 217 sentences (5352 tokens) in 2.2s (100.23 sentences/s, 2471.93 tokens/s)
+| Generate test with beam=4: bleu_score=21.5026
+| Eval completed in: 3.91s
+:::MLL 1570748920.801 eval_stop: {"value": null, "metadata": {"epoch_num": 1, "file": "train.py", "lineno": 658}}
+:::MLL 1570748920.805 eval_accuracy: {"value": "21.502649784088135", "metadata": {"epoch_num": 1, "file": "train.py", "lineno": 211}}
+validation and scoring  3.9263525009155273
+:::MLL 1570748920.890 block_stop: {"value": null, "metadata": {"first_epoch_num": 1, "file": "train.py", "lineno": 226}}
+:::MLL 1570748920.890 block_start: {"value": null, "metadata": {"first_epoch_num": 2, "epoch_count": 1, "file": "train.py", "lineno": 162}}
+:::MLL 1570748920.891 epoch_start: {"value": null, "metadata": {"epoch_num": 2, "file": "train.py", "lineno": 163}}
+generated 18213 batches in 2.879019s
+got epoch iterator 2.9802184104919434
+| WARNING: overflow detected, setting loss scale to: 2.0
+| epoch 002:   1000 / 1139 loss=4.676, nll_loss=0.000, ppl=1.00, wps=203225, ups=1.7, wpb=118876, bsz=3905, num_updates=2134, lr=0.00087929, gnorm=21058.658, clip=100%, oom=0, loss_scale=2.000, wall=1289
+| epoch 002 | loss 4.655 | nll_loss 0.000 | ppl 1.00 | wps 202769 | ups 1.7 | wpb 118870 | bsz 3907 | num_updates 2272 | lr 0.000852168 | gnorm 19899.622 | clip 100% | oom 0 | loss_scale 2.000 | wall 1372
+epoch time  667.3969085216522
+:::MLL 1570749591.279 epoch_stop: {"value": null, "metadata": {"epoch_num": 2, "file": "train.py", "lineno": 201}}
+:::MLL 1570749591.280 eval_start: {"value": null, "metadata": {"epoch_num": 2, "file": "train.py", "lineno": 547}}
+generated 58 batches in 0.000828s
+| Translated 217 sentences (5643 tokens) in 2.2s (100.11 sentences/s, 2603.39 tokens/s)
+| Generate test with beam=4: bleu_score=23.8835
+| Eval completed in: 4.15s
+:::MLL 1570749595.432 eval_stop: {"value": null, "metadata": {"epoch_num": 2, "file": "train.py", "lineno": 658}}
+:::MLL 1570749595.435 eval_accuracy: {"value": "23.88354390859604", "metadata": {"epoch_num": 2, "file": "train.py", "lineno": 211}}
+validation and scoring  4.16714334487915
+:::MLL 1570749595.519 block_stop: {"value": null, "metadata": {"first_epoch_num": 2, "file": "train.py", "lineno": 226}}
+:::MLL 1570749595.519 block_start: {"value": null, "metadata": {"first_epoch_num": 3, "epoch_count": 1, "file": "train.py", "lineno": 162}}
+:::MLL 1570749595.520 epoch_start: {"value": null, "metadata": {"epoch_num": 3, "file": "train.py", "lineno": 163}}
+generated 18213 batches in 2.871624s
+got epoch iterator 2.9681737422943115
+| epoch 003:   1000 / 1139 loss=4.406, nll_loss=0.000, ppl=1.00, wps=198987, ups=1.7, wpb=118896, bsz=3901, num_updates=3273, lr=0.000709997, gnorm=14343.851, clip=100%, oom=0, loss_scale=2.000, wall=1977
+| epoch 003 | loss 4.399 | nll_loss 0.000 | ppl 1.00 | wps 198998 | ups 1.7 | wpb 118868 | bsz 3911 | num_updates 3411 | lr 0.000695486 | gnorm 13829.214 | clip 100% | oom 0 | loss_scale 2.000 | wall 2059
+epoch time  680.641907453537
+:::MLL 1570750279.144 epoch_stop: {"value": null, "metadata": {"epoch_num": 3, "file": "train.py", "lineno": 201}}
+:::MLL 1570750279.145 eval_start: {"value": null, "metadata": {"epoch_num": 3, "file": "train.py", "lineno": 547}}
+generated 58 batches in 0.000814s
+| Translated 217 sentences (5542 tokens) in 2.3s (93.21 sentences/s, 2380.39 tokens/s)
+| Generate test with beam=4: bleu_score=25.7316
+| Eval completed in: 3.92s
+:::MLL 1570750283.064 eval_stop: {"value": null, "metadata": {"epoch_num": 3, "file": "train.py", "lineno": 658}}
+:::MLL 1570750283.067 eval_accuracy: {"value": "25.73164999485016", "metadata": {"epoch_num": 3, "file": "train.py", "lineno": 211}}
+validation and scoring  3.937588930130005
+:::MLL 1570750283.153 block_stop: {"value": null, "metadata": {"first_epoch_num": 3, "file": "train.py", "lineno": 226}}
+:::MLL 1570750283.153 run_stop: {"value": null, "metadata": {"status": "success", "file": "train.py", "lineno": 231}}
+| done training in 2061.7 seconds
+++ ret_code=0
+++ sleep 3
+++ ret_code=0
+++ sleep 3
+++ [[ 0 != 0 ]]
++++ date +%s
+++ END=1570750288
++++ date '+%Y-%m-%d %r'
+ENDING TIMING RUN AT 2019-10-10 11:31:28 PM
+RESULT,transformer,    11911858,2087,,2019-10-10 10:56:41 PM
+++ END_FMT='2019-10-10 11:31:28 PM'
+++ echo 'ENDING TIMING RUN AT 2019-10-10 11:31:28 PM'
+++ RESULT=2087
+++ RESULT_NAME=transformer
+++ echo 'RESULT,transformer,    11911858,2087,,2019-10-10 10:56:41 PM'
++ set +x
+++ [[ 0 != 0 ]]
++++ date +%s
+++ END=1570750288
++++ date '+%Y-%m-%d %r'
+++ END_FMT='2019-10-10 11:31:28 PM'
+++ echo 'ENDING TIMING RUN AT 2019-10-10 11:31:28 PM'
+++ RESULT=2086
+++ RESULT_NAME=transformer
+++ echo 'RESULT,transformer,    11911858,2086,,2019-10-10 10:56:42 PM'
++ set +x
+ENDING TIMING RUN AT 2019-10-10 11:31:28 PM
+RESULT,transformer,    11911858,2086,,2019-10-10 10:56:42 PM

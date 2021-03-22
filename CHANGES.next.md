@@ -32,6 +32,7 @@
 -   Add support for setting virtual NIC type for GCP VMs.
 -   Add ability to collect /proc/meminfo data with --collect_meminfo
 -   Add support for setting egress bandwidth tier for GCP VMs.
+-   Add MLPerf multiworker benchmark based on NVIDIA's v0.6 submission
 
 ### Enhancements:
 

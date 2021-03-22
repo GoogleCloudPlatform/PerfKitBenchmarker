@@ -113,7 +113,7 @@ def _Install(vm):
 
 
 def GetMpiDir():
-  """Returns the installation dirtory of OpenMPI."""
+  """Returns the installation directory of OpenMPI."""
   mpi_dir = posixpath.join(
       linux_packages.INSTALL_DIR,
       'openmpi-{version}'.format(version=FLAGS.openmpi_version))
