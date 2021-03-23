@@ -61,6 +61,9 @@ flags.DEFINE_string('managed_db_memory', None,
 flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
 flags.DEFINE_string('managed_db_disk_type', None, 'Disk type of the database.')
+flags.DEFINE_integer('managed_db_disk_iops', None,
+                     'Disk iops of the database on AWS io1 disks.')
+
 flags.DEFINE_integer('managed_db_azure_compute_units', None,
                      'Number of Dtus in the database.')
 flags.DEFINE_string('managed_db_tier', None,
@@ -75,6 +78,8 @@ flags.DEFINE_string(
 flags.DEFINE_integer('client_vm_disk_size', None,
                      'Size of the client vm disk in GB.')
 flags.DEFINE_string('client_vm_disk_type', None, 'Disk type of the client vm.')
+flags.DEFINE_integer('client_vm_disk_iops', None,
+                     'Disk iops of the database on AWS for client vm.')
 flags.DEFINE_boolean(
     'use_managed_db', True, 'If true, uses the managed MySql '
     'service for the requested cloud provider. If false, uses '
