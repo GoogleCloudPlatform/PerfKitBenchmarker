@@ -51,9 +51,10 @@ mlperf:
           boot_disk_size: 105
           image: ami-0a4a0d42e3b855a2c
         Azure:
-          machine_type: Standard_ND40s_v2
+          machine_type: Standard_ND40rs_v2
           zone: eastus
           boot_disk_size: 105
+          image: Canonical:UbuntuServer:18_04-lts-gen2:latest
 """
 
 flags.DEFINE_enum('mlperf_benchmark', 'resnet',
