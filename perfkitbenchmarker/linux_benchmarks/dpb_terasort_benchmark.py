@@ -155,7 +155,8 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
 
   if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
     run_uri = spec.uuid.split('-')[0]
-    base_dir = service.persistent_fs_prefix + run_uri + '/'
+    # Bucket must start with a string
+    base_dir = '{}pkb-{}/'.format(service.persistent_fs_prefix, run_uri)
   else:
     base_dir = '/'
 
