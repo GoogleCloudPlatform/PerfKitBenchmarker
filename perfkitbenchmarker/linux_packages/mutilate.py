@@ -142,11 +142,13 @@ def GetMetadata():
 
 def BuildCmd(server_ip, server_port, options):
   """Build base mutilate command in a list."""
-  cmd = [MUTILATE_BIN,
-         '--server=%s:%s' % (server_ip, server_port),
-         '--keysize=%s' % FLAGS.mutilate_keysize,
-         '--valuesize=%s' % FLAGS.mutilate_valuesize,
-         '--records=%s' % FLAGS.mutilate_records] + options
+  cmd = [
+      'ulimit -n 32768; ', MUTILATE_BIN,
+      '--server=%s:%s' % (server_ip, server_port),
+      '--keysize=%s' % FLAGS.mutilate_keysize,
+      '--valuesize=%s' % FLAGS.mutilate_valuesize,
+      '--records=%s' % FLAGS.mutilate_records
+  ] + options
   if FLAGS.mutilate_protocol == 'binary':
     cmd.append('--binary')
   return cmd
@@ -156,14 +158,12 @@ def RestartAgent(vm, threads):
   logging.info('Restarting mutilate remote agent on %s', vm.internal_ip)
   # Kill existing mutilate agent threads
   vm.RemoteCommand('pkill -9 mutilate', ignore_failure=True)
-  vm.RemoteCommand(' '.join(
-      ['nohup',
-       MUTILATE_BIN,
-       '--threads=%s' % threads,
-       '--agentmode',
-       '1>/dev/null',
-       '2>/dev/null',
-       '&']))
+  # Make sure have enough file descriptor for the agent process.
+  vm.RemoteCommand(' '.join([
+      'ulimit -n 32768; '
+      'nohup', MUTILATE_BIN,
+      '--threads=%s' % threads, '--agentmode', '&> log', '&'
+  ]))
 
 
 def Load(client_vm, server_ip, server_port):
@@ -262,8 +262,10 @@ def ParseResults(result, metadata):
     List of sample.Sample objects.
   """
   samples = []
-  misses = regex_util.ExtractGroup(MISS_REGEX, result)
-  metadata['miss_rate'] = float(misses)
+  if FLAGS.mutilate_ratio < 1.0:
+    # N/A for write only workloads.
+    misses = regex_util.ExtractGroup(MISS_REGEX, result)
+    metadata['miss_rate'] = float(misses)
 
   latency_stats = regex_util.ExtractGroup(LATENCY_HEADER_REGEX, result).split()
   # parse latency

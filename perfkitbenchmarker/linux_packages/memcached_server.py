@@ -116,8 +116,14 @@ def ConfigureAndStart(vm, smp_affinity=False):
       'echo "-t {threads}" | sudo tee -a /etc/memcached.conf'.format(
           threads=FLAGS.memcached_num_threads))
 
+  # Increase maximum memcached server connections
+  vm.RemoteCommand('echo "-c 32768" | sudo tee -a /etc/memcached.conf')
+
+  # Dump conf for debugging.
+  vm.RemoteCommand('cat /etc/memcached.conf')
+
   # restart the default running memcached to run it with custom configurations.
-  vm.RemoteCommand('sudo service memcached restart')
+  vm.RemoteCommand('ulimit -n 32768; sudo service memcached restart')
 
   _WaitForServerUp(vm)
   logging.info('memcached server configured and started.')
