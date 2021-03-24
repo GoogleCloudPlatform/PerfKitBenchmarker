@@ -78,7 +78,6 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
         'size': '8',
         'count': '2',
         'nccl_type': 'float',
-        'redop': 'sum',
         'out_of_place_time': '58.10',
         'out_of_place_algbw': '0.00',
         'out_of_place_busbw': '0.00',

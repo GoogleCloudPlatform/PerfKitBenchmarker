@@ -43,6 +43,10 @@ flags.DEFINE_integer('nccl_seconds_between_runs', 10,
 flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
 flags.DEFINE_boolean('nccl_install_mofed', False,
                      'Install Mellanox OpenFabrics drivers')
+flags.DEFINE_multi_enum(
+    'nccl_operations', ['all_reduce', 'all_gather', 'alltoall'],
+    ['all_reduce', 'all_gather', 'broadcast', 'reduce_scatter', 'reduce',
+     'alltoall'], 'The NCCL collective operation.')
 
 FLAGS = flags.FLAGS
 
@@ -96,7 +100,7 @@ RUN_CMD = ('{mpi} '
            '--bind-to none '
            '-N {slots} '
            '{env} '
-           'nccl-tests/build/all_reduce_perf '
+           'nccl-tests/build/{operation}_perf '
            '--minbytes {minbytes} '
            '--maxbytes {maxbytes} '
            '--stepfactor {stepfactor} '
@@ -107,7 +111,7 @@ RUN_CMD = ('{mpi} '
 
 _DEFAULT = 'DEFAULT'
 
-_METADATA_COLUMNS = ('size', 'count', 'nccl_type', 'redop', 'out_of_place_time',
+_METADATA_COLUMNS = ('size', 'count', 'nccl_type', 'out_of_place_time',
                      'out_of_place_algbw', 'out_of_place_busbw',
                      'out_of_place_error', 'in_place_time', 'in_place_algbw',
                      'in_place_busbw', 'in_place_error')
@@ -217,14 +221,13 @@ def MakeSamplesFromOutput(metadata, output):
   samples = []
   metadata.update(_SAMPLE_LINE_RE.match(output).groupdict())
   results = regex_util.ExtractAllMatches(r'(Rank\s+\d+) (.*)', output)
-  for rank, device in results:
-    metadata[rank] = device
+  metadata.update({rank: device for rank, device in results})
   results = regex_util.ExtractAllMatches(
       r'^\s*'
       r'(\d+)\s+'
       r'(\d+)\s+'
       r'(\w+)\s+'
-      r'(\w+)\s+'
+      r'[^1-9]+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
@@ -235,15 +238,15 @@ def MakeSamplesFromOutput(metadata, output):
       r'(\S+)', output, re.MULTILINE)
   max_out_of_place_algbw = 0
   for row in results:
-    metadata_copy = metadata.copy()
-    metadata_copy.update(zip(_METADATA_COLUMNS, row))
+    row_metadata = dict(zip(_METADATA_COLUMNS, row))
+    row_metadata.update(metadata)
     for metric, metadata_key in sorted(_SAMPLE_NAMES.items()):
       samples.append(
-          sample.Sample(metric, float(metadata_copy[metadata_key]), 'GB/s',
-                        metadata_copy))
+          sample.Sample(metric, float(row_metadata[metadata_key]), 'GB/s',
+                        row_metadata))
     # Gbps is gigaBIT per second and GB/s is gigaBYTE per second
     max_out_of_place_algbw = max(max_out_of_place_algbw,
-                                 float(metadata_copy['out_of_place_algbw']))
+                                 float(row_metadata['out_of_place_algbw']))
 
   avg_bus_bandwidth = regex_util.ExtractExactlyOneMatch(
       r'Avg bus bandwidth\s+: ([0-9\.]+)', output)
@@ -303,55 +306,61 @@ def Run(benchmark_spec):
   if FLAGS.nccl_cuda_visible_devices:
     env.append(('CUDA_VISIBLE_DEVICES', FLAGS.nccl_cuda_visible_devices))
   extra_params = collections.defaultdict(list)
-  metadata = CreateMetadataDict()
+  base_metadata = CreateMetadataDict()
   sample_results = []
   for extra_param in FLAGS.nccl_extra_params:
     param_key, param_value = extra_param.split('=', 1)
     extra_params[param_key].append(param_value)
 
   for extra_param in TuningParameters(list(extra_params.items())):
-    metadata_copy = metadata.copy()
-    for param_key, param_value in extra_param:
-      metadata_copy[param_key] = param_value
-    cmd = RUN_CMD.format(
-        mpi=FLAGS.nccl_mpi,
-        hostfile=HOSTFILE,
-        slots=FLAGS.nccl_slots,
-        env=' '.join('-x {key}={value}'.format(key=key, value=value)
-                     for key, value in env + extra_param),
-        minbytes=FLAGS.nccl_minbytes,
-        maxbytes=FLAGS.nccl_maxbytes,
-        stepfactor=FLAGS.nccl_stepfactor,
-        ngpus=FLAGS.nccl_ngpus,
-        check=int(FLAGS.nccl_check),
-        nthreads=FLAGS.nccl_nthreads,
-        iters=FLAGS.nccl_iters)
-    max_out_of_place_algbw_results = []
+    param_metadata = {
+        param_key: param_value for param_key, param_value in extra_param}
+    param_metadata.update(base_metadata)
 
-    for iteration in range(FLAGS.nccl_num_runs):
-      metadata_copy['run_iteration'] = iteration
-      stdout, _ = master.RobustRemoteCommand(cmd)
-      samples, max_out_of_place_algbw = MakeSamplesFromOutput(
-          metadata_copy, stdout)
-      sample_results.extend(samples)
-      max_out_of_place_algbw_results.append(max_out_of_place_algbw)
-      time.sleep(FLAGS.nccl_seconds_between_runs)
-    metadata_copy.pop('run_iteration')
-    avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
-    sample_results.append(
-        sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s',
-                      metadata_copy))
-    sample_results.append(
-        sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s',
-                      metadata_copy))
-    sample_results.append(
-        sample.Sample('max_out_of_place_algbw_mean',
-                      np.mean(max_out_of_place_algbw_results), 'Gbps',
-                      metadata_copy))
-    sample_results.append(
-        sample.Sample('max_out_of_place_algbw_std',
-                      np.std(max_out_of_place_algbw_results), 'Gbps',
-                      metadata_copy))
+    for operation in FLAGS.nccl_operations:
+      metadata = {'operation': operation}
+      metadata.update(param_metadata)
+      cmd = RUN_CMD.format(
+          mpi=FLAGS.nccl_mpi,
+          hostfile=HOSTFILE,
+          slots=FLAGS.nccl_slots,
+          env=' '.join('-x {key}={value}'.format(key=key, value=value)
+                       for key, value in env + extra_param),
+          minbytes=FLAGS.nccl_minbytes,
+          maxbytes=FLAGS.nccl_maxbytes,
+          stepfactor=FLAGS.nccl_stepfactor,
+          ngpus=FLAGS.nccl_ngpus,
+          check=int(FLAGS.nccl_check),
+          nthreads=FLAGS.nccl_nthreads,
+          iters=FLAGS.nccl_iters,
+          operation=operation)
+      max_out_of_place_algbw_results = []
+
+      for iteration in range(FLAGS.nccl_num_runs):
+        run_metadata = {'run_iteration': iteration}
+        run_metadata.update(metadata)
+        stdout, _ = master.RobustRemoteCommand(cmd)
+        samples, max_out_of_place_algbw = MakeSamplesFromOutput(
+            run_metadata.copy(), stdout)
+        sample_results.extend(samples)
+        max_out_of_place_algbw_results.append(max_out_of_place_algbw)
+        time.sleep(FLAGS.nccl_seconds_between_runs)
+
+      avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
+      sample_results.append(
+          sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s',
+                        metadata))
+      sample_results.append(
+          sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s',
+                        metadata))
+      sample_results.append(
+          sample.Sample('max_out_of_place_algbw_mean',
+                        np.mean(max_out_of_place_algbw_results), 'Gbps',
+                        metadata))
+      sample_results.append(
+          sample.Sample('max_out_of_place_algbw_std',
+                        np.std(max_out_of_place_algbw_results), 'Gbps',
+                        metadata))
   return sample_results
 
 
