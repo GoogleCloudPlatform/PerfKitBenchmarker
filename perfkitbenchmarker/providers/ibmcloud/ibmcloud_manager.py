@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import time
+from typing import Any, Dict
 import urllib.parse
 
 from perfkitbenchmarker import vm_util
@@ -178,7 +179,7 @@ class IbmCloud:
     Returns:
       request response.
     """
-    path = f'/{self._version}/{path}'
+    path = f'/{self.version}/{path}'
 
     if 'limit' in path:
       path += '&' + self._generation
@@ -319,13 +320,13 @@ class BaseManager:
 
     Use the derived classes for each resource type.
   """
+  # This value should be overwritten by derived classes.
+  _type = 'base'
 
   def __init__(self, genesis):
     self._g = genesis
-    # This value should be overwritten by derived classes.
-    self._type = 'base'
 
-  def GetUri(self, item):
+  def GetUri(self, item) -> str:
     return '%ss' % self._type + '/' + item
 
   def GetUris(self, item):
@@ -364,7 +365,8 @@ class InstanceManager(BaseManager):
 
   def Create(self, name, imageid, profile, vpcid, zone=None, key=None,
              subnet=None, networks=None, resource_group=None,
-             iops=None, capacity=None, user_data=None, session=None, **kwargs):
+             iops=None, capacity=None, user_data=None,
+             session=None, **kwargs) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -438,12 +440,12 @@ class InstanceManager(BaseManager):
       raise IbmCloudRequestError('Failed to create instance')
     return instance
 
-  def Start(self, instance):
+  def Start(self, instance) -> Dict[str, Any]:
     """Send a vm start request."""
     inst_uri = self.GetUri(instance) + '/actions'
     return self._g.Request('POST', inst_uri, {'type': 'start'})
 
-  def Show(self, instance):
+  def Show(self, instance) -> Dict[str, Any]:
     """Send a vm get request."""
     inst_uri = self.GetUri(instance)
     return self._g.Request('GET', inst_uri)
@@ -451,13 +453,13 @@ class InstanceManager(BaseManager):
   def ShowPolling(self,
                   instance,
                   timeout_polling=HTTP_TIMEOUT_CONNECT,
-                  session=None):
+                  session=None) -> Dict[str, Any]:
     """Send a vm get request."""
     inst_uri = self.GetUri(instance)
     return self._g.Request(
         'GET', inst_uri, timeout=timeout_polling, session=session)
 
-  def ShowInitialization(self, instance):
+  def ShowInitialization(self, instance) -> Dict[str, Any]:
     """Send a vm get initialization request."""
     inst_uri = self.GetUri(instance) + '/initialization'
     return self._g.Request('GET', inst_uri)
@@ -467,24 +469,24 @@ class InstanceManager(BaseManager):
     inst_uri = self.GetUri(instance)
     return self._g.Request('DELETE', inst_uri)
 
-  def Stop(self, instance, force=False):
+  def Stop(self, instance, force=False) -> Dict[str, Any]:
     """Send a vm stop request."""
     inst_uri = self.GetUri(instance) + '/actions'
     req_data = {'type': 'stop', 'force': force}
     return self._g.Request('POST', '%s' % inst_uri, req_data)
 
-  def Reboot(self, instance, force=False):
+  def Reboot(self, instance, force=False) -> Dict[str, Any]:
     """Send a vm reboot request."""
     inst_uri = self.GetUri(instance) + '/actions'
     req_data = {'type': 'reboot', 'force': force}
     return self._g.Request('POST', inst_uri, req_data)
 
-  def ShowVnic(self, instance, vnicid):
+  def ShowVnic(self, instance, vnicid) -> Dict[str, Any]:
     """Send a vm vnic get request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces/' + vnicid
     return self._g.Request('GET', inst_uri)
 
-  def CreateVnic(self, instance, name, subnet):
+  def CreateVnic(self, instance, name, subnet) -> Dict[str, Any]:
     """Send a vm vnic create request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces'
     return self._g.Request('POST', inst_uri, {
@@ -494,7 +496,7 @@ class InstanceManager(BaseManager):
         }
     })
 
-  def ListVnics(self, instance):
+  def ListVnics(self, instance) -> Dict[str, Any]:
     """Send a vm vnic list request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces'
     return self._g.Request('GET', inst_uri)
@@ -504,7 +506,7 @@ class InstanceManager(BaseManager):
     inst_uri = self.GetUri(instance) + '/network_interfaces/' + vnicid
     return self._g.Request('DELETE', inst_uri)
 
-  def CreateVolume(self, instance, name, volume, delete):
+  def CreateVolume(self, instance, name, volume, delete) -> Dict[str, Any]:
     """Send a volume create request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments'
     return self._g.Request(
@@ -516,12 +518,12 @@ class InstanceManager(BaseManager):
             }
         })
 
-  def ListVolumes(self, instance):
+  def ListVolumes(self, instance) -> Dict[str, Any]:
     """Send a volume list request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments'
     return self._g.Request('GET', inst_uri)
 
-  def ShowVolume(self, instance, volume_attachment):
+  def ShowVolume(self, instance, volume_attachment) -> Dict[str, Any]:
     """Send a volume get request on a vm."""
     inst_uri = (
         self.GetUri(instance) + '/volume_attachments/' + volume_attachment)
@@ -533,11 +535,11 @@ class InstanceManager(BaseManager):
         self.GetUri(instance) + '/volume_attachments/' + volume_attachment)
     return self._g.Request('DELETE', inst_uri)
 
-  def ListProfiles(self):
+  def ListProfiles(self) -> Dict[str, Any]:
     """Send a vm profiles list request."""
     return self._g.Request('GET', '%s' % self.GetProfileUri())
 
-  def List(self, next_start=None, session=None):
+  def List(self, next_start=None, session=None) -> Dict[str, Any]:
     """Send a vm list request."""
     inst_uri = '/' + self._g.version + '/instances?limit=100'
     if next_start:
@@ -550,7 +552,7 @@ class VolumeManager(BaseManager):
 
   _type = 'volume'
 
-  def Create(self, zone, **kwargs):
+  def Create(self, zone, **kwargs) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -586,7 +588,7 @@ class VolumeManager(BaseManager):
       req_data['encryption_key'] = {'crn': kwargs.get('encryption_key')}
     return self._g.create_volume(req_data)
 
-  def Show(self, vol_id):
+  def Show(self, vol_id) -> Dict[str, Any]:
     """Send a volume get request."""
     return self._g.Request('GET', 'volumes/%s' % vol_id)
 
@@ -594,14 +596,14 @@ class VolumeManager(BaseManager):
     """Send a volume delete request."""
     return self._g.Request('DELETE', 'volumes/%s' % vol_id)
 
-  def List(self, next_start=None):
+  def List(self, next_start=None) -> Dict[str, Any]:
     """Send a volume list request."""
     uri = '/' + self._g.version + '/volumes?limit=100'
     if next_start:
       uri += '&start=' + next_start
     return self._g.Request('GET', uri)
 
-  def ListProfiles(self):
+  def ListProfiles(self) -> Dict[str, Any]:
     """Send a volume profile list request."""
     return self._g.Request('GET', 'volume/profiles')
 
@@ -611,7 +613,7 @@ class VPCManager(BaseManager):
 
   _type = 'vpc'
 
-  def Create(self, name):
+  def Create(self, name) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -623,7 +625,7 @@ class VPCManager(BaseManager):
     req_data = {'name': name}
     return self._g.create_vpc(req_data)
 
-  def Show(self, vpc):
+  def Show(self, vpc) -> Dict[str, Any]:
     """Send a vpc get request."""
     return self._g.Request('GET', 'vpcs/%s' % vpc)
 
@@ -631,7 +633,7 @@ class VPCManager(BaseManager):
     """Send a vpc delete request."""
     return self._g.Request('DELETE', 'vpcs/%s' % vpc)
 
-  def CreatePrefix(self, vpc, zone, cidr, name=None):
+  def CreatePrefix(self, vpc, zone, cidr, name=None) -> Dict[str, Any]:
     """Send a vpc address prefix create request."""
     req_data = {'zone': {'name': zone}, 'cidr': cidr}
     if name:
@@ -639,7 +641,7 @@ class VPCManager(BaseManager):
     vpc_uri = self.GetUri(vpc) + '/address_prefixes'
     return self._g.Request('POST', '%s' % vpc_uri, req_data)
 
-  def ListPrefix(self, vpc):
+  def ListPrefix(self, vpc) -> Dict[str, Any]:
     """Send a vpc address prefix list request."""
     return self._g.Request('GET', 'vpcs/%s/address_prefixes' % vpc)
 
@@ -648,7 +650,11 @@ class VPCManager(BaseManager):
     return self._g.Request('DELETE',
                            'vpcs/%s/address_prefixes/%s' % (vpc, prefix))
 
-  def PatchPrefix(self, vpc, prefix, default=False, name=None):
+  def PatchPrefix(self,
+                  vpc,
+                  prefix,
+                  default=False,
+                  name=None) -> Dict[str, Any]:
     """Send a vpc address prefix patch request."""
     req_data = {'is_default': default}
     if name:
@@ -657,7 +663,11 @@ class VPCManager(BaseManager):
                            'vpcs/%s/address_prefixes/%s' % (vpc, prefix),
                            req_data)
 
-  def CreateRoutingTable(self, vpc, name, routes=None, session=None):
+  def CreateRoutingTable(self,
+                         vpc,
+                         name,
+                         routes=None,
+                         session=None) -> Dict[str, Any]:
     """Send a vpc routing table create request."""
     req_data = {'name': name}
     if routes:
@@ -665,12 +675,17 @@ class VPCManager(BaseManager):
     vpc_uri = self.GetUri(vpc) + '/routing_tables'
     return self._g.Request('POST', '%s' % vpc_uri, req_data, session=session)
 
-  def ShowRoutingTable(self, vpc, routing, session=None):
+  def ShowRoutingTable(self, vpc, routing, session=None) -> Dict[str, Any]:
     """Send a vpc routing table get request."""
     return self._g.Request(
         'GET', 'vpcs/%s/routing_tables/%s' % (vpc, routing), session=session)
 
-  def PatchRoutingTable(self, vpc, routing, ingress, flag, session=None):
+  def PatchRoutingTable(self,
+                        vpc,
+                        routing,
+                        ingress,
+                        flag,
+                        session=None) -> Dict[str, Any]:
     """Send a vpc routing table patch request."""
     vpc_uri = self.GetUri(vpc) + '/routing_tables/' + routing
     return self._g.Request('PATCH', vpc_uri, {ingress: flag}, session=session)
@@ -680,7 +695,7 @@ class VPCManager(BaseManager):
     vpc_uri = self.GetUri(vpc) + '/routing_tables/' + routing
     return self._g.Request('DELETE', '%s' % vpc_uri, session=session)
 
-  def ListRoutingTable(self, vpc, session=None):
+  def ListRoutingTable(self, vpc, session=None) -> Dict[str, Any]:
     """Send a vpc routing table list request."""
     return self._g.Request(
         'GET', 'vpcs/%s/routing_tables?limit=100' % vpc, session=session)
@@ -693,7 +708,7 @@ class VPCManager(BaseManager):
                   action,
                   destination,
                   nexthop=None,
-                  session=None):
+                  session=None) -> Dict[str, Any]:
     """Send a vpc route create request."""
     req_data = {
         'name': name,
@@ -714,7 +729,7 @@ class VPCManager(BaseManager):
         vpc) + '/routing_tables/' + routing + '/routes/' + route
     return self._g.Request('DELETE', '%s' % vpc_uri, session=session)
 
-  def ListRoute(self, vpc, routing, session=None):
+  def ListRoute(self, vpc, routing, session=None) -> Dict[str, Any]:
     """Send a vpc route list request."""
     return self._g.Request(
         'GET',
@@ -727,7 +742,7 @@ class SGManager(BaseManager):
 
   _type = 'security_groups'
 
-  def Create(self, resource_group, vpcid, **kwargs):
+  def Create(self, resource_group, vpcid, **kwargs) -> Dict[str, Any]:
     """Construct and send a security group create request.
 
     Args:
@@ -749,11 +764,11 @@ class SGManager(BaseManager):
 
     return self._g.create_security_groups(req_data)
 
-  def List(self):
+  def List(self) -> Dict[str, Any]:
     """Send a security group list request."""
     return self._g.Request('GET', self._type)
 
-  def Show(self, sg):
+  def Show(self, sg) -> Dict[str, Any]:
     """Send a security group get request."""
     sg_id = self.GetUris(sg)
     return self._g.Request('GET', sg_id)
@@ -763,12 +778,12 @@ class SGManager(BaseManager):
     sg_id = self.GetUris(sg)
     return self._g.Request('DELETE', sg_id)
 
-  def ShowRule(self, sg, ruleid):
+  def ShowRule(self, sg, ruleid) -> Dict[str, Any]:
     """Send a security group rule get request."""
     sg_uri = self.GetUris(sg) + '/rules/' + ruleid
     return self._g.Request('GET', sg_uri)
 
-  def ListRules(self, sg):
+  def ListRules(self, sg) -> Dict[str, Any]:
     """Send a security group rule list request."""
     sg_uri = self.GetUris(sg) + '/rules'
     return self._g.Request('GET', sg_uri)
@@ -781,7 +796,7 @@ class SGManager(BaseManager):
                  protocol,
                  port,
                  port_min=None,
-                 port_max=None):
+                 port_max=None) -> Dict[str, Any]:
     """Send a security group rule create request.
 
     Args:
@@ -825,7 +840,7 @@ class PGManager(BaseManager):
 
   _type = 'public_gateways'
 
-  def Create(self, resource_group, vpcid, zone, **kwargs):
+  def Create(self, resource_group, vpcid, zone, **kwargs) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -850,11 +865,11 @@ class PGManager(BaseManager):
       req_data['floating_ip'] = {'id': kwargs.get('floating_ip')}
     return self._g.create_public_gateways(req_data)
 
-  def List(self):
+  def List(self) -> Dict[str, Any]:
     """Send a public gateway list request."""
     return self._g.Request('GET', self._type)
 
-  def Show(self, pg):
+  def Show(self, pg) -> Dict[str, Any]:
     """Send a public gateway get request."""
     pg_id = self.GetUris(pg)
     return self._g.Request('GET', pg_id)
@@ -870,7 +885,7 @@ class RegionManager(BaseManager):
 
   _type = 'region'
 
-  def Show(self, region):
+  def Show(self, region) -> Dict[str, Any]:
     """Send a region get request."""
     return self._g.Request('GET', 'regions/%s' % region)
 
@@ -880,7 +895,7 @@ class KeyManager(BaseManager):
 
   _type = 'keys'
 
-  def Create(self, key, key_type, **kwargs):
+  def Create(self, key, key_type, **kwargs) -> Dict[str, Any]:
     """Construct and send a ssh key create request.
 
     Args:
@@ -900,11 +915,11 @@ class KeyManager(BaseManager):
       req_data['resource_group'] = {'id': kwargs.get('resource_group', None)}
     return self._g.create_key(req_data)
 
-  def List(self):
+  def List(self) -> Dict[str, Any]:
     """Send a key list request."""
     return self._g.Request('GET', self._type)
 
-  def Show(self, key):
+  def Show(self, key) -> Dict[str, Any]:
     """Send a key get request."""
     key_id = self.GetUris(key)
     return self._g.Request('GET', key_id)
@@ -920,7 +935,7 @@ class NetworkAclManager(BaseManager):
 
   _type = 'network_acls'
 
-  def Create(self, name):
+  def Create(self, name) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -932,11 +947,11 @@ class NetworkAclManager(BaseManager):
     req_data = {'name': name}
     return self._g.create_network_acls(req_data)
 
-  def List(self):
+  def List(self) -> Dict[str, Any]:
     """Send a network_acl list request."""
     return self._g.Request('GET', 'network_acls')
 
-  def Show(self, network_acl):
+  def Show(self, network_acl) -> Dict[str, Any]:
     """Send a network_acl get request."""
     network_acl_id = self.GetUris(network_acl)
     return self._g.Request('GET', network_acl_id)
@@ -952,7 +967,7 @@ class SubnetManager(BaseManager):
 
   _type = 'subnet'
 
-  def Create(self, subnet, vpcid, **kwargs):
+  def Create(self, subnet, vpcid, **kwargs) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -980,7 +995,7 @@ class SubnetManager(BaseManager):
       req_data['zone'] = {'name': kwargs.get('zone')}
     return self._g.create_subnet(req_data)
 
-  def Show(self, subnet):
+  def Show(self, subnet) -> Dict[str, Any]:
     """Send a subnet get request."""
     subnet_id = self.GetUri(subnet)
     return self._g.Request('GET', subnet_id)
@@ -990,17 +1005,17 @@ class SubnetManager(BaseManager):
     subnet_id = self.GetUri(subnet)
     return self._g.Request('DELETE', subnet_id)
 
-  def Patch(self, **kwargs):
+  def Patch(self, **kwargs) -> Dict[str, Any]:
     """Send a subnet patch request."""
     subnet_id = self.GetUri(kwargs.get('subnet'))
     return self._g.Request('PATCH', subnet_id, kwargs)
 
-  def ShowPg(self, subnet):
+  def ShowPg(self, subnet) -> Dict[str, Any]:
     """Send a subnet public gateway get request."""
     uri = self.GetUri(subnet) + '/public_gateway'
     return self._g.Request('GET', uri)
 
-  def AttachPg(self, subnet, pgid):
+  def AttachPg(self, subnet, pgid) -> Dict[str, Any]:
     """Send a subnet public gateway attach request."""
     uri = self.GetUri(subnet) + '/public_gateway'
     req_data = {'id': pgid}
@@ -1017,7 +1032,7 @@ class ImageManager(BaseManager):
 
   _type = 'image'
 
-  def Create(self, href, osname, name=None):
+  def Create(self, href, osname, name=None) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -1035,7 +1050,7 @@ class ImageManager(BaseManager):
       req_data['operating_system'] = {'name': osname}
     return self._g.create_image(req_data)
 
-  def Show(self, img):
+  def Show(self, img) -> Dict[str, Any]:
     """Send a image get request."""
     img_id = self.GetUri(img)
     return self._g.Request('GET', img_id)
@@ -1051,7 +1066,7 @@ class FipManager(BaseManager):
 
   _type = 'floating_ips'
 
-  def Create(self, resource_group, target, **kwargs):
+  def Create(self, resource_group, target, **kwargs) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -1074,11 +1089,11 @@ class FipManager(BaseManager):
 
     return self._g.create_floating_ips(req_data)
 
-  def List(self):
+  def List(self) -> Dict[str, Any]:
     """Send a fip list request."""
     return self._g.Request('GET', self._type)
 
-  def Show(self, fip):
+  def Show(self, fip) -> Dict[str, Any]:
     """Send a fip get request."""
     fip_id = self.GetUris(fip)
     return self._g.Request('GET', fip_id)
