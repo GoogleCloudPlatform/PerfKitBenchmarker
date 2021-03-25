@@ -139,8 +139,10 @@ FLAGS = flags.FLAGS
 # Args:
 # argv[1]: string, The table name in the dataset that this script will create.
 # argv[2]: string, The data path of the table.
-SPARK_TABLE_SCRIPT = 'spark_table.py'
-SPARK_SQL_RUNNER_SCRIPT = 'spark_sql_runner.py'
+SCRIPT_DIR = 'spark_sql_test_scripts'
+SPARK_SQL_DISTCP_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_distcp.py')
+SPARK_TABLE_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_table.py')
+SPARK_SQL_RUNNER_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_runner.py')
 SPARK_SQL_PERF_GIT = 'https://github.com/databricks/spark-sql-perf.git'
 SPARK_SQL_PERF_GIT_COMMIT = '6b2bf9f9ad6f6c2f620062fda78cded203f619c8'
 
@@ -196,7 +198,10 @@ def Prepare(benchmark_spec):
   benchmark_spec.staged_queries = _LoadAndStageQueries(
       storage_service, benchmark_spec.base_dir)
 
-  for script in [SPARK_TABLE_SCRIPT, SPARK_SQL_RUNNER_SCRIPT]:
+  for script in [
+      SPARK_SQL_DISTCP_SCRIPT,
+      SPARK_TABLE_SCRIPT,
+      SPARK_SQL_RUNNER_SCRIPT]:
     src_url = data.ResourcePath(script)
     storage_service.CopyToBucket(src_url, bucket, script)
 
@@ -212,8 +217,29 @@ def Prepare(benchmark_spec):
 
     benchmark_spec.data_dir = FLAGS.dpb_sparksql_data
     if FLAGS.dpb_sparksql_copy_to_hdfs:
-      benchmark_spec.data_dir = 'hdfs:/tmp/spark_sql/'
-      dpb_service_instance.DistributedCopy(table_dir, benchmark_spec.data_dir)
+      job_arguments = []
+      copy_dirs = {
+          'source': benchmark_spec.data_dir,
+          'destination': 'hdfs:/tmp/spark_sql/',
+      }
+      for flag, data_dir in copy_dirs.items():
+        staged_file = os.path.join(benchmark_spec.base_dir,
+                                   flag + '-metadata.json')
+        metadata = _GetDistCpMetadata(data_dir, benchmark_spec.table_subdirs)
+        _StageMetadata(metadata, storage_service, staged_file)
+        job_arguments += ['--{}-metadata'.format(flag), staged_file]
+      try:
+        result = dpb_service_instance.SubmitJob(
+            pyspark_file=os.path.join(benchmark_spec.base_dir,
+                                      SPARK_SQL_DISTCP_SCRIPT),
+            job_type=BaseDpbService.PYSPARK_JOB_TYPE,
+            job_arguments=job_arguments)
+        logging.info(result)
+        # Tell the benchmark to read from HDFS instead.
+        benchmark_spec.data_dir = copy_dirs['destination']
+      except dpb_service.JobSubmissionError as e:
+        raise errors.Benchmarks.PrepareException(
+            'Copying tables into HDFS failed') from e
 
   # Create external Hive tables
   if FLAGS.dpb_sparksql_create_hive_tables:
@@ -258,8 +284,10 @@ def Run(benchmark_spec):
       '--report-dir',
       report_dir,
   ]
-  table_metadata_file = _GetStagedTableMetadata(storage_service, benchmark_spec)
-  if table_metadata_file:
+  table_metadata = _GetTableMetadata(benchmark_spec)
+  if table_metadata:
+    table_metadata_file = os.path.join(benchmark_spec.base_dir, 'metadata.json')
+    _StageMetadata(table_metadata, storage_service, table_metadata_file)
     args += ['--table-metadata', table_metadata_file]
   else:
     # If we don't pass in tables, we must be reading from hive.
@@ -319,8 +347,8 @@ def Run(benchmark_spec):
   return results
 
 
-def _GetStagedTableMetadata(storage_service, benchmark_spec) -> Optional[str]:
-  """Write JSON map of table metadata for spark_sql_runner --table_metadata."""
+def _GetTableMetadata(benchmark_spec):
+  """Compute map of table metadata for spark_sql_runner --table_metadata."""
   metadata = {}
   if not FLAGS.dpb_sparksql_create_hive_tables:
     for subdir in benchmark_spec.table_subdirs or []:
@@ -334,15 +362,27 @@ def _GetStagedTableMetadata(storage_service, benchmark_spec) -> Optional[str]:
     if FLAGS.bigquery_record_format:
       bq_options['readDataFormat'] = FLAGS.bigquery_record_format
     metadata[name] = (FLAGS.dpb_sparksql_data_format or 'bigquery', bq_options)
-  if metadata:
-    # Write computed metadata to object storage.
-    temp_run_dir = temp_dir.GetRunDirPath()
-    local_file = os.path.join(temp_run_dir, 'metadata.json')
-    staged_file = '/'.join((benchmark_spec.base_dir, 'metadata.json'))
-    with open(local_file, 'w') as f:
-      json.dump(metadata, f)
-    storage_service.Copy(local_file, staged_file)
-    return staged_file
+  return metadata
+
+
+def _GetDistCpMetadata(base_dir: str, subdirs: List[str]):
+  """Compute list of table metadata for spark_sql_distcp metadata flags."""
+  metadata = []
+  for subdir in subdirs or []:
+    metadata += [(FLAGS.dpb_sparksql_data_format or 'parquet', {
+        'path': os.path.join(base_dir, subdir)
+    })]
+  return metadata
+
+
+def _StageMetadata(json_metadata, storage_service, staged_file: str):
+  """Write JSON metadata to object storage."""
+  # Write computed metadata to object storage.
+  temp_run_dir = temp_dir.GetRunDirPath()
+  local_file = os.path.join(temp_run_dir, os.path.basename(staged_file))
+  with open(local_file, 'w') as f:
+    json.dump(json_metadata, f)
+  storage_service.Copy(local_file, staged_file)
 
 
 def _GetQueryId(filename: str) -> Optional[str]:
