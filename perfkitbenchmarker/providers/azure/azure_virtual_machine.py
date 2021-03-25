@@ -510,6 +510,7 @@ class AzureVirtualMachine(
     self.low_priority = vm_spec.low_priority
     self.low_priority_status_code = None
     self.spot_early_termination = False
+    self.ultra_ssd_enabled = False
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     disk_spec.disk_type = (
@@ -518,9 +519,7 @@ class AzureVirtualMachine(
       disk_spec.disk_size = vm_spec.boot_disk_size
     self.os_disk = azure_disk.AzureDisk(
         disk_spec,
-        self.name,
-        self.machine_type,
-        self.storage_account,
+        self,
         None,
         is_image=True)
 
@@ -551,6 +550,10 @@ class AzureVirtualMachine(
         if self.num_vms_per_host:
           self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
+  def _RequiresUltraDisk(self):
+    return any(disk_spec.disk_type == azure_disk.ULTRA_STORAGE
+               for disk_spec in self.disk_specs)
+
   def _Create(self):
     """See base class."""
     if self.os_disk.disk_size:
@@ -569,6 +572,10 @@ class AzureVirtualMachine(
         self.user_name, '--storage-sku', self.os_disk.disk_type, '--name',
         self.name
     ] + disk_size_args + self.resource_group.args + self.nic.args + tag_args)
+
+    if self._RequiresUltraDisk():
+      self.ultra_ssd_enabled = True
+      create_cmd.extend(['--ultra-ssd-enabled'])
 
     if self.availability_zone:
       create_cmd.extend(['--zone', self.availability_zone])
@@ -700,8 +707,7 @@ class AzureVirtualMachine(
         disk_number = self.remote_disk_counter + 1 + self.max_local_disks
         self.remote_disk_counter += 1
       lun = next(self._lun_counter)
-      data_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type,
-                                       self.storage_account, lun)
+      data_disk = azure_disk.AzureDisk(disk_spec, self, lun)
       data_disk.disk_number = disk_number
       disks.append(data_disk)
 

@@ -41,6 +41,7 @@ MAX_DRIVE_SUFFIX_LENGTH = 2  # Last allowable device is /dev/sdzz.
 
 PREMIUM_STORAGE = 'Premium_LRS'
 STANDARD_DISK = 'Standard_LRS'
+ULTRA_STORAGE = 'UltraSSD_LRS'
 
 DISK_TYPE = {disk.STANDARD: STANDARD_DISK, disk.REMOTE_SSD: PREMIUM_STORAGE}
 
@@ -127,22 +128,21 @@ class AzureDisk(disk.BaseDisk):
 
   def __init__(self,
                disk_spec,
-               vm_name,
-               machine_type,
-               storage_account,
+               vm,
                lun,
                is_image=False):
     super(AzureDisk, self).__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
-    self.name = vm_name + str(lun)
-    self.vm_name = vm_name
+    self.vm = vm
+    self.vm_name = vm.name
+    self.name = self.vm_name + str(lun)
     self.resource_group = azure_network.GetResourceGroup()
-    self.storage_account = storage_account
+    self.storage_account = vm.storage_account
     # lun is Azure's abbreviation for "logical unit number"
     self.lun = lun
     self.is_image = is_image
     self._deleted = False
-    self.machine_type = machine_type
+    self.machine_type = vm.machine_type
     if self.disk_type == PREMIUM_STORAGE:
       self.metadata.update({
           disk.MEDIA: disk.SSD,
@@ -156,7 +156,7 @@ class AzureDisk(disk.BaseDisk):
           HOST_CACHING: self.host_caching,
       })
     elif self.disk_type == disk.LOCAL:
-      media = disk.SSD if LocalDiskIsSSD(machine_type) else disk.HDD
+      media = disk.SSD if LocalDiskIsSSD(self.machine_type) else disk.HDD
 
       self.metadata.update({
           disk.MEDIA: media,
@@ -167,6 +167,11 @@ class AzureDisk(disk.BaseDisk):
     """Creates the disk."""
     assert not self.is_image
 
+    if self.disk_type == ULTRA_STORAGE and not self.vm.availability_zone:
+      raise Exception(f'Azure Ultradisk is being created in zone "{self.zone}"'
+                      'which was not specified to have an availability zone. '
+                      'Availability zones are specified with zone-\\d  e.g. '
+                      'eastus1-2 for availability zone 2 in zone eastus1')
     with self._lock:
       _, _, retcode = vm_util.IssueCommand([
           azure.AZURE_PATH, 'vm', 'disk', 'attach', '--new', '--caching',

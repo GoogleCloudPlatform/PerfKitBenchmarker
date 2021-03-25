@@ -27,6 +27,7 @@ flags.DEFINE_enum(
 # http://azure.microsoft.com/en-us/pricing/details/storage/ for more information
 # about the different types.
 LRS = 'Standard_LRS'
+ULRS = 'UltraSSD_LRS'
 PLRS = 'Premium_LRS'
 ZRS = 'Standard_ZRS'
 GRS = 'Standard_GRS'
@@ -43,7 +44,7 @@ VALID_CACHE_SIZES = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6',
 
 flags.DEFINE_enum(
     'azure_storage_type', LRS,
-    [LRS, PLRS, ZRS, GRS, RAGRS],
+    [LRS, PLRS, ULRS, ZRS, GRS, RAGRS],
     'The type of storage account to create. See '
     'http://azure.microsoft.com/en-us/pricing/details/storage/ for more '
     'information. To use remote ssd scratch disks, you must use Premium_LRS. '
