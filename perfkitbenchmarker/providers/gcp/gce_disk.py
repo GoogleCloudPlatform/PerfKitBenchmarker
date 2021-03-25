@@ -32,6 +32,8 @@ PD_SSD = 'pd-ssd'
 
 DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
 
+REGIONAL_DISK_SCOPE = 'regional'
+
 DISK_METADATA = {
     PD_STANDARD: {
         disk.MEDIA: disk.HDD,
@@ -56,8 +58,14 @@ disk.RegisterDiskTypeMap(GCP, DISK_TYPE)
 class GceDisk(disk.BaseDisk):
   """Object representing an GCE Disk."""
 
-  def __init__(self, disk_spec, name, zone, project,
-               image=None, image_project=None):
+  def __init__(self,
+               disk_spec,
+               name,
+               zone,
+               project,
+               image=None,
+               image_project=None,
+               replica_zones=None):
     super(GceDisk, self).__init__(disk_spec)
     self.attached_vm_name = None
     self.image = image
@@ -65,6 +73,12 @@ class GceDisk(disk.BaseDisk):
     self.name = name
     self.zone = zone
     self.project = project
+    self.replica_zones = replica_zones
+    self.region = util.GetRegionFromZone(self.zone)
+
+    disk_metadata = DISK_METADATA[disk_spec.disk_type]
+    if self.replica_zones:
+      disk_metadata[disk.REPLICATION] = disk.REGION
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
     if self.disk_type == disk.LOCAL:
       self.metadata['interface'] = FLAGS.gce_ssd_interface
@@ -79,17 +93,31 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['image'] = self.image
     if self.image_project:
       cmd.flags['image-project'] = self.image_project
+
+    if self.replica_zones:
+      cmd.flags['region'] = self.region
+      cmd.flags['replica-zones'] = ','.join(self.replica_zones)
+      del cmd.flags['zone']
+
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _Delete(self):
     """Deletes the disk."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'delete', self.name)
+    if self.replica_zones:
+      cmd.flags['region'] = self.region
+      del cmd.flags['zone']
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the disk exists."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'describe', self.name)
+
+    if self.replica_zones:
+      cmd.flags['region'] = self.region
+      del cmd.flags['zone']
+
     stdout, _, _ = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     try:
       json.loads(stdout)
@@ -109,6 +137,10 @@ class GceDisk(disk.BaseDisk):
                              self.attached_vm_name)
     cmd.flags['device-name'] = self.name
     cmd.flags['disk'] = self.name
+
+    if self.replica_zones:
+      cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
+
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     # Gcloud attach-disk commands may still attach disks despite being rate
     # limited.
@@ -126,6 +158,9 @@ class GceDisk(disk.BaseDisk):
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'detach-disk',
                              self.attached_vm_name)
     cmd.flags['device-name'] = self.name
+
+    if self.replica_zones:
+      cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
     cmd.IssueRetryable()
     self.attached_vm_name = None
 

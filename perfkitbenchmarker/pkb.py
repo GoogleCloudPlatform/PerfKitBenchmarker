@@ -229,6 +229,11 @@ flags.DEFINE_string(
     'that disk.')
 flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
                      'disks.')
+flags.DEFINE_list(
+    'data_disk_zones', [],
+    'The zone of the data disk. This is only used to provision regional pd with'
+    ' multiple zones on GCP.'
+    )
 flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
 flags.DEFINE_integer('scratch_disk_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')

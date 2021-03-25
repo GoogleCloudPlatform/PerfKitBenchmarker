@@ -695,6 +695,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     disks = []
+    replica_zones = FLAGS.data_disk_zones
 
     for i in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
@@ -710,7 +711,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           disk_number = self.local_disk_counter + self.NVME_START_INDEX
         else:
           raise errors.Error('Unknown Local SSD Interface.')
-        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
+                                     replica_zones=replica_zones)
         data_disk.disk_number = disk_number
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
@@ -719,7 +721,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         data_disk = self._GetNfsService().CreateNfsDisk()
       else:
         name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
-        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
+                                     replica_zones=replica_zones)
         # Remote disk numbers start at 1+max_local_disks (0 is the system disk
         # and local disks occupy 1-max_local_disks).
         data_disk.disk_number = (self.remote_disk_counter +
