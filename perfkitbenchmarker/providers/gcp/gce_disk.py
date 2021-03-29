@@ -79,6 +79,7 @@ class GceDisk(disk.BaseDisk):
     disk_metadata = DISK_METADATA[disk_spec.disk_type]
     if self.replica_zones:
       disk_metadata[disk.REPLICATION] = disk.REGION
+      self.metadata['replica_zones'] = replica_zones
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
     if self.disk_type == disk.LOCAL:
       self.metadata['interface'] = FLAGS.gce_ssd_interface
