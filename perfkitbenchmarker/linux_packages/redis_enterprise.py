@@ -19,12 +19,16 @@ import json
 import logging
 import posixpath
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
+_LICENSE_PATH = flags.DEFINE_string(
+    'enterprise_redis_license_path', None,
+    'If none, defaults to the local data directory.')
 _TUNE_ON_STARTUP = flags.DEFINE_boolean(
     'enterprise_redis_tune_on_startup', True,
     'Whether to tune core config during startup.')
@@ -67,22 +71,24 @@ _DISABLE_CPU_IDS = flags.DEFINE_list(
     'enterprise_redis_disable_cpu_ids', None,
     'List of cpus to disable by id.')
 
+_VERSION = '6.0.12-58'
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
 _WORKING_DIR = '~/redislabs'
-_RHEL_TAR = 'redislabs-5.4.2-24-rhel7-x86_64.tar'
-_XENIAL_TAR = 'redislabs-5.4.2-24-xenial-amd64.tar'
-_BIONIC_TAR = 'redislabs-5.4.2-24-bionic-amd64.tar'
+_RHEL_TAR = f'redislabs-{_VERSION}-rhel7-x86_64.tar'
+_XENIAL_TAR = f'redislabs-{_VERSION}-xenial-amd64.tar'
+_BIONIC_TAR = f'redislabs-{_VERSION}-bionic-amd64.tar'
 _USERNAME = 'user@google.com'
 PREPROVISIONED_DATA = {
+    # These checksums correspond to version 6.0.12-58. To update, run
+    # 'sha256sum <redislabs-{VERSION}-rhel7-x86_64.tar>' and replace the values
+    # below.
     _RHEL_TAR:
-        '8db83074b3e4e6de9c249ce34b6bb899ed158a6a4801f36c530e79bdb97a4c20',
+        '743995f4ddf797cb1286dee4d51171df4c376530b97581efae63b0ead692fc2f',
     _XENIAL_TAR:
-        'ef2da8b5eaa02b53488570392df258c0d5d3890a9085c2495aeb5c96f336e639',
+        'a7802b059dce6512be249462be43120a5fc156125ff0151ce66463e2abf52a6c',
     _BIONIC_TAR:
-        'ef0c58d6d11683aac07d3f2cae6b9544cb53064c9f7a7419d63b6d14cd858d53',
-    _LICENSE:
-        'ae7eeae0aebffebdfd3dec7a8429513034b0d6dc5bf745abd00feb2d51f79dc5',
+        'a50accab0e23ecd9b0544f4810240dadeac73e566c1f11f573186bd824edba1e',
 }
 
 
@@ -103,8 +109,16 @@ def _GetTarName():
 def Install(vm):
   """Installs Redis Enterprise package on the VM."""
   vm.InstallPackages('wget')
-  vm.InstallPreprovisionedPackageData(_PACKAGE_NAME,
-                                      [_GetTarName(), _LICENSE],
+  vm.RemoteCommand(f'mkdir -p {_WORKING_DIR}')
+
+  # Check for the license in the data directory if a path isn't specified.
+  license_path = _LICENSE_PATH.value
+  if not license_path:
+    license_path = data.ResourcePath(_LICENSE)
+  vm.PushFile(license_path, posixpath.join(_WORKING_DIR, _LICENSE))
+
+  # Check for the tarfile in the data directory first.
+  vm.InstallPreprovisionedPackageData(_PACKAGE_NAME, [_GetTarName()],
                                       _WORKING_DIR)
   vm.RemoteCommand('cd {dir} && sudo tar xvf {tar}'.format(
       dir=_WORKING_DIR, tar=_GetTarName()))
@@ -219,7 +233,7 @@ def SetUpCluster(vm, redis_port):
 def WaitForClusterUp(vm, redis_port):
   """Waits for the Redis Enterprise cluster to respond to commands."""
   stdout, _ = vm.RemoteCommand(
-      '/opt/redislabs/bin/redis-cli '
+      'sudo /opt/redislabs/bin/redis-cli '
       '-h localhost '
       '-p {port} '
       '-a {password} '
@@ -233,7 +247,7 @@ def WaitForClusterUp(vm, redis_port):
 def LoadCluster(vm, redis_port):
   """Load the cluster before performing tests."""
   command = (
-      '/opt/redislabs/bin/memtier_benchmark '
+      'sudo /opt/redislabs/bin/memtier_benchmark '
       '-s localhost '
       f'-a {FLAGS.run_uri} '
       f'-p {str(redis_port)} '
@@ -265,7 +279,7 @@ def BuildRunCommand(redis_vm, threads, port):
   if threads == 0:
     return None
 
-  result = ('/opt/redislabs/bin/memtier_benchmark '
+  result = ('sudo /opt/redislabs/bin/memtier_benchmark '
             f'-s {redis_vm.internal_ip} '
             f'-a {FLAGS.run_uri} '
             f'-p {str(port)} '
@@ -337,6 +351,7 @@ def Run(redis_vm, load_vms, redis_port):
           _LOADGEN_CLIENTS.value)
       sample_metadata['pin_workers'] = _PIN_WORKERS.value
       sample_metadata['disable_cpus'] = _DISABLE_CPU_IDS.value
+      sample_metadata['redis_enterprise_version'] = _VERSION
       results.append(sample.Sample('throughput', throughput, 'ops/s',
                                    sample_metadata))
       if latency < 1000:

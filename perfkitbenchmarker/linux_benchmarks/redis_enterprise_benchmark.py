@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Benchmark for Redis Enterprise database."""
+"""Benchmark for Redis Enterprise database.
+
+To run this benchmark:
+1) Ensure your Redis Enterprise keyfile is at
+   'perfkitbenchmarker/data/enterprise_redis_license', or specify its location
+   with --enterprise_redis_license_path.
+2) Ensure your Redis Enterprise software installation package is under the data
+   directory as well, or under the cloud-specific preprovisioned data bucket.
+   The package name and version must match the version specified by
+   --enterprise_redis_version.
+3) If using a different version, update the PREPROVISIONED_DATA checksum at
+   perfkitbenchmarker/linux_packages/redis_enterprise by running
+   `sha256sum <redislabs_tarfile>`.
+"""
 
 from absl import flags
 from perfkitbenchmarker import configs
