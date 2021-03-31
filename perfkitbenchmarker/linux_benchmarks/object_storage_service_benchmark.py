@@ -1373,7 +1373,11 @@ def PrepareVM(vm, service):
   # https://pip.pypa.io/en/stable/news/#id119
   vm.RemoteCommand('sudo pip3 install --upgrade "pip<=20.2.2"')
   vm.RemoteCommand('sudo pip3 install absl-py')
-  vm.RemoteCommand('sudo pip3 install pyyaml')
+  # awscli 0.18 depends on a specific PyYAML version, and the AWS Ubuntu 16 AMI
+  # ships with an old python-yaml Deb package that pip3 can't upgrade so we
+  # ignore it.
+  # TODO(user): remove version when we update AWS-cli
+  vm.RemoteCommand('sudo pip3 install --ignore-installed "pyyaml<5.4"')
 
   vm.Install('openssl')
 
