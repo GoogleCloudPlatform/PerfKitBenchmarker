@@ -159,10 +159,15 @@ class BaseDpbService(resource.BaseResource):
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
+    self.bucket = 'pkb-' + FLAGS.run_uri
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_version = dpb_service_spec.version
     self.dpb_service_type = 'unknown'
     self.storage_service = None
+
+  @property
+  def base_dir(self):
+    return self.persistent_fs_prefix + self.bucket
 
   @abc.abstractmethod
   def SubmitJob(self,
@@ -279,9 +284,17 @@ class BaseDpbService(resource.BaseResource):
     }
     return basic_data
 
+  def _CreateDependencies(self):
+    """Creates a bucket to use with the cluster."""
+    self.storage_service.MakeBucket(self.bucket)
+
   def _Create(self):
     """Creates the underlying resource."""
     raise NotImplementedError()
+
+  def _DeleteDependencies(self):
+    """Deletes the bucket used with the cluster."""
+    self.storage_service.DeleteBucket(self.bucket)
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -334,22 +347,6 @@ class BaseDpbService(resource.BaseResource):
       raise NotImplementedError()
 
     return self.JOB_JARS[job_category][job_type]
-
-  def CreateBucket(self, source_bucket):
-    """Creates an object-store bucket used during persistent data processing.
-
-    Args:
-      source_bucket: String, name of the bucket to create.
-    """
-    self.storage_service.MakeBucket(source_bucket)
-
-  def DeleteBucket(self, source_bucket):
-    """Deletes an object-store bucket used during persistent data processing.
-
-    Args:
-      source_bucket: String, name of the bucket to delete.
-    """
-    self.storage_service.DeleteBucket(source_bucket)
 
 
 class UnmanagedDpbService(BaseDpbService):

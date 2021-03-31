@@ -128,23 +128,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """Returns the security group ID of this Cluster."""
     return self.network.regional_network.vpc.default_security_group_id
 
-  def _CreateLogBucket(self):
-    """Create the s3 bucket for the EMR cluster's logs."""
-    log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
-    self.storage_service.MakeBucket(log_bucket_name)
-    return 's3://{}'.format(log_bucket_name)
-
-  def _DeleteLogBucket(self):
-    """Delete the s3 bucket holding the EMR cluster's logs.
-
-    This method is part of the Delete lifecycle of the resource.
-    """
-    # TODO(saksena): Deprecate the use of FLAGS.run_uri and plumb as argument.
-    log_bucket_name = 'pkb-{0}-emr'.format(FLAGS.run_uri)
-    self.storage_service.DeleteBucket(log_bucket_name)
-
   def _CreateDependencies(self):
     """Set up the ssh key."""
+    super(AwsDpbEmr, self)._CreateDependencies()
     aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
 
   def _Create(self):
@@ -185,11 +171,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     instance_groups.append(core_instances)
     instance_groups.append(master_instance)
 
-    # Create the log bucket to hold job's log output
-    # TODO(saksena): Deprecate aws_emr_loguri flag and move
-    # the log bucket creation to Create dependencies.
-    logs_bucket = self._CreateLogBucket()
-
     # Spark SQL needs to access Hive
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
                              '--release-label', self.dpb_version,
@@ -198,7 +179,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                              json.dumps(instance_groups),
                              '--application', 'Name=Spark',
                              'Name=Hadoop', 'Name=Hive',
-                             '--log-uri', logs_bucket]
+                             '--log-uri', self.base_dir]
 
     ec2_attributes = [
         'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
@@ -236,7 +217,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
-    self._DeleteLogBucket()
+    super(AwsDpbEmr, self)._DeleteDependencies()
     aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
   def _Exists(self):

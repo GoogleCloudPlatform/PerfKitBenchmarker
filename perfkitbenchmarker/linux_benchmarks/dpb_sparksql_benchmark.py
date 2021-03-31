@@ -188,22 +188,17 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification
   """
-  dpb_service_instance = benchmark_spec.dpb_service
-  # buckets must start with a letter
-  bucket = 'pkb-' + benchmark_spec.uuid.split('-')[0]
-  storage_service = dpb_service_instance.storage_service
-  storage_service.MakeBucket(bucket)
-  benchmark_spec.bucket = bucket
-  benchmark_spec.base_dir = dpb_service_instance.persistent_fs_prefix + bucket
+  cluster = benchmark_spec.dpb_service
+  storage_service = cluster.storage_service
   benchmark_spec.staged_queries = _LoadAndStageQueries(
-      storage_service, benchmark_spec.base_dir)
+      storage_service, cluster.base_dir)
 
   for script in [
       SPARK_SQL_DISTCP_SCRIPT,
       SPARK_TABLE_SCRIPT,
       SPARK_SQL_RUNNER_SCRIPT]:
     src_url = data.ResourcePath(script)
-    storage_service.CopyToBucket(src_url, bucket, script)
+    storage_service.CopyToBucket(src_url, cluster.bucket, script)
 
   benchmark_spec.table_subdirs = []
   if FLAGS.dpb_sparksql_data:
@@ -223,15 +218,13 @@ def Prepare(benchmark_spec):
           'destination': 'hdfs:/tmp/spark_sql/',
       }
       for flag, data_dir in copy_dirs.items():
-        staged_file = os.path.join(benchmark_spec.base_dir,
-                                   flag + '-metadata.json')
+        staged_file = os.path.join(cluster.base_dir, flag + '-metadata.json')
         metadata = _GetDistCpMetadata(data_dir, benchmark_spec.table_subdirs)
         _StageMetadata(metadata, storage_service, staged_file)
         job_arguments += ['--{}-metadata'.format(flag), staged_file]
       try:
-        result = dpb_service_instance.SubmitJob(
-            pyspark_file=os.path.join(benchmark_spec.base_dir,
-                                      SPARK_SQL_DISTCP_SCRIPT),
+        result = cluster.SubmitJob(
+            pyspark_file='/'.join([cluster.base_dir, SPARK_SQL_DISTCP_SCRIPT]),
             job_type=BaseDpbService.PYSPARK_JOB_TYPE,
             job_arguments=job_arguments)
         logging.info(result)
@@ -244,9 +237,8 @@ def Prepare(benchmark_spec):
   # Create external Hive tables
   if FLAGS.dpb_sparksql_create_hive_tables:
     try:
-      result = dpb_service_instance.SubmitJob(
-          pyspark_file=os.path.join(benchmark_spec.base_dir,
-                                    SPARK_TABLE_SCRIPT),
+      result = cluster.SubmitJob(
+          pyspark_file='/'.join([cluster.base_dir, SPARK_TABLE_SCRIPT]),
           job_type=BaseDpbService.PYSPARK_JOB_TYPE,
           job_arguments=[
               benchmark_spec.data_dir, ','.join(benchmark_spec.table_subdirs)
@@ -270,14 +262,14 @@ def Run(benchmark_spec):
   Raises:
     Benchmarks.RunError if no query succeeds.
   """
-  dpb_service_instance = benchmark_spec.dpb_service
-  storage_service = dpb_service_instance.storage_service
+  cluster = benchmark_spec.dpb_service
+  storage_service = cluster.storage_service
   metadata = benchmark_spec.dpb_service.GetMetadata()
 
   metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
 
   # Run PySpark Spark SQL Runner
-  report_dir = os.path.join(benchmark_spec.base_dir, 'report')
+  report_dir = '/'.join([cluster.base_dir, 'report'])
   args = [
       '--sql-scripts',
       ','.join(benchmark_spec.staged_queries),
@@ -286,7 +278,7 @@ def Run(benchmark_spec):
   ]
   table_metadata = _GetTableMetadata(benchmark_spec)
   if table_metadata:
-    table_metadata_file = os.path.join(benchmark_spec.base_dir, 'metadata.json')
+    table_metadata_file = '/'.join([cluster.base_dir, 'metadata.json'])
     _StageMetadata(table_metadata, storage_service, table_metadata_file)
     args += ['--table-metadata', table_metadata_file]
   else:
@@ -297,9 +289,8 @@ def Run(benchmark_spec):
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)
-  job_result = dpb_service_instance.SubmitJob(
-      pyspark_file=os.path.join(
-          benchmark_spec.base_dir, SPARK_SQL_RUNNER_SCRIPT),
+  job_result = cluster.SubmitJob(
+      pyspark_file='/'.join([cluster.base_dir, SPARK_SQL_RUNNER_SCRIPT]),
       job_arguments=args,
       job_jars=jars,
       job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
@@ -370,7 +361,7 @@ def _GetDistCpMetadata(base_dir: str, subdirs: List[str]):
   metadata = []
   for subdir in subdirs or []:
     metadata += [(FLAGS.dpb_sparksql_data_format or 'parquet', {
-        'path': os.path.join(base_dir, subdir)
+        'path': '/'.join([base_dir, subdir])
     })]
   return metadata
 
@@ -442,5 +433,4 @@ def _LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
 
 def Cleanup(benchmark_spec):
   """Cleans up the Benchmark."""
-  storage_service = benchmark_spec.dpb_service.storage_service
-  storage_service.DeleteBucket(benchmark_spec.bucket)
+  del benchmark_spec  # unused

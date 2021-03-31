@@ -122,11 +122,7 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
-  service = spec.dpb_service
-
-  if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
-    run_uri = spec.uuid.split('-')[0]
-    service.CreateBucket(run_uri)
+  del spec  # unused
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec):
@@ -154,9 +150,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
   service = spec.dpb_service
 
   if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
-    run_uri = spec.uuid.split('-')[0]
-    # Bucket must start with a string
-    base_dir = '{}pkb-{}/'.format(service.persistent_fs_prefix, run_uri)
+    base_dir = service.base_dir + '/'
   else:
     base_dir = '/'
 
@@ -214,15 +208,8 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
 
 
 def Cleanup(spec: benchmark_spec.BenchmarkSpec):
-  """Cleans up the terasort benchmark.
-
-  Args:
-    spec: Spec needed to run the terasort benchmark
-  """
-  service = spec.dpb_service
-  if FLAGS.dpb_terasort_storage_type == _FS_TYPE_PERSISTENT:
-    run_uri = spec.uuid.split('-')[0]
-    service.DeleteBucket(run_uri)
+  """Cleans up the terasort benchmark."""
+  del spec  # unused
 
 
 def RunStage(spec: benchmark_spec.BenchmarkSpec, stage: str,

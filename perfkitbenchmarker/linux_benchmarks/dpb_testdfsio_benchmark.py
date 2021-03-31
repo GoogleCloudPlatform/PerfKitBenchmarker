@@ -97,8 +97,7 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
-    benchmark_spec.dpb_service.CreateBucket(benchmark_spec.uuid.split('-')[0])
+  del benchmark_spec  # unused
 
 
 def Run(benchmark_spec):
@@ -111,14 +110,14 @@ def Run(benchmark_spec):
     A list of samples
   """
   service = benchmark_spec.dpb_service
-  source = '{}'.format(benchmark_spec.uuid.split('-')[0])
 
   if FLAGS.dfsio_fs == BaseDpbService.HDFS_FS:
-    source = 'hdfs:/' + source
+    base_dir = 'hdfs:/dfsio'
+  elif service.base_dir.startswith(FLAGS.dfsio_fs):
+    base_dir = service.base_dir + '/dfsio'
   else:
-    source = '{}://{}'.format(FLAGS.dfsio_fs, source)
-
-  source_dir = '{}{}'.format(source, '/dfsio')
+    raise errors.Config.InvalidValue('Service type {} cannot use dfsio_fs: {}'
+                                     .format(service.type, FLAGS.dfsio_fs))
 
   results = []
   for file_size in FLAGS.dfsio_file_sizes_list:
@@ -141,7 +140,7 @@ def Run(benchmark_spec):
       # deletes it for the next write.
       for command in (WRITE, READ, CLEAN):
         result = RunTestDfsio(
-            service, command, source_dir, num_files, file_size)
+            service, command, base_dir, num_files, file_size)
         results.append(
             sample.Sample(command + '_run_time', result.run_time, 'seconds',
                           metadata))
@@ -167,6 +166,4 @@ def RunTestDfsio(service, command, data_dir, num_files, file_size):
 
 
 def Cleanup(benchmark_spec):
-  """Cleans up the testdfsio benchmark."""
-  if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
-    benchmark_spec.dpb_service.DeleteBucket(benchmark_spec.uuid.split('-')[0])
+  del benchmark_spec  # unused

@@ -15,9 +15,7 @@
 
 import unittest
 from absl import flags
-import mock
 
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
@@ -44,60 +42,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.dpb_service_zone = AWS_ZONE_US_EAST_1A
     FLAGS.zones = [AWS_ZONE_US_EAST_1A]
 
-  def testCreateLogBucket(self):
-    local_emr = LocalAwsDpbEmr()
-    with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
-      local_emr._CreateLogBucket()
-      self.assertEqual(mock_issue.call_count, 2)
-      call_arg_list, _ = mock_issue.call_args
-      self.assertListEqual([
-          'aws', 's3api', 'put-bucket-tagging', '--bucket',
-          'pkb-{0}-emr'.format(
-              FLAGS.run_uri), '--tagging', 'TagSet=[]', '--region=us-east-1'
-      ], call_arg_list[0])
-
-  def testDeleteLogBucket(self):
-    local_emr = LocalAwsDpbEmr()
-    with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
-      local_emr._DeleteLogBucket()
-      self.assertEqual(mock_issue.call_count, 1)
-      call_arg_list, _ = mock_issue.call_args
-      self.assertListEqual([
-          'aws', 's3', 'rb',
-          's3://%s' % 'pkb-{0}-emr'.format(FLAGS.run_uri), '--region',
-          util.GetRegionFromZone(FLAGS.dpb_service_zone), '--force'
-      ], call_arg_list[0])
-
-  def testCreateBucket(self):
-    local_emr = LocalAwsDpbEmr()
-    with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
-      local_emr.CreateBucket('foo')
-      self.assertEqual(mock_issue.call_count, 2)
-      call_arg_list, _ = mock_issue.call_args
-      self.assertListEqual([
-          'aws', 's3api', 'put-bucket-tagging', '--bucket', 'foo', '--tagging',
-          'TagSet=[]', '--region=us-east-1'
-      ], call_arg_list[0])
-
-  def testDeleteBucket(self):
-    local_emr = LocalAwsDpbEmr()
-    with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
-      local_emr.DeleteBucket('foo')
-      self.assertEqual(mock_issue.call_count, 1)
-      call_arg_list, _ = mock_issue.call_args
-      self.assertListEqual([
-          'aws', 's3', 'rb', 's3://{}'.format('foo'), '--region',
-          util.GetRegionFromZone(FLAGS.dpb_service_zone), '--force'
-      ], call_arg_list[0])
-
+  # TODO(saksena): Test Create
 
 if __name__ == '__main__':
   unittest.main()
