@@ -51,7 +51,7 @@ flags.DEFINE_list('dpb_job_properties', [], 'A list of strings of the form '
                   '"key=vale" to be passed into DBP jobs.')
 flags.DEFINE_list(
     'dpb_cluster_properties', [], 'A list of strings of the form '
-    '"type:key=value" to be passed into DBP jobs. See '
+    '"type:key=value" to be passed into DBP clusters. See '
     'https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties.'
 )
 
