@@ -19,15 +19,16 @@ from absl import flags
 from perfkitbenchmarker import linux_packages
 from six.moves import range
 
-
-flags.DEFINE_integer('redis_total_num_processes', 1,
-                     'Total number of redis server processes.',
-                     lower_bound=1)
-flags.DEFINE_boolean('redis_enable_aof', False,
-                     'Enable append-only file (AOF) with appendfsync always.')
-flags.DEFINE_string('redis_server_version', '5.0.5',
-                    'Version of redis server to use.')
-
+_NUM_PROCESSES = flags.DEFINE_integer(
+    'redis_total_num_processes',
+    1,
+    'Total number of redis server processes.',
+    lower_bound=1)
+_ENABLE_AOF = flags.DEFINE_boolean(
+    'redis_enable_aof', False,
+    'Enable append-only file (AOF) with appendfsync always.')
+_VERSION = flags.DEFINE_string('redis_server_version', '5.0.5',
+                               'Version of redis server to use.')
 
 REDIS_FIRST_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
@@ -35,78 +36,77 @@ FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
 
 
-def _GetRedisTarName():
-  return 'redis-%s.tar.gz' % FLAGS.redis_server_version
+def _GetRedisTarName() -> str:
+  return f'redis-{_VERSION.value}.tar.gz'
 
 
-def GetRedisDir():
-  return '%s/redis' % linux_packages.INSTALL_DIR
+def GetRedisDir() -> str:
+  return f'{linux_packages.INSTALL_DIR}/redis'
 
 
-def _Install(vm):
+def _Install(vm) -> None:
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand('cd %s; git clone %s' %
-                   (linux_packages.INSTALL_DIR, REDIS_GIT))
-  vm.RemoteCommand('cd %s && git checkout %s && make' % (
-      GetRedisDir(), FLAGS.redis_server_version))
+  vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; git clone {REDIS_GIT}')
+  vm.RemoteCommand(
+      f'cd {GetRedisDir()} && git checkout {_VERSION.value} && make')
 
 
-def YumInstall(vm):
+def YumInstall(vm) -> None:
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-devel')
   _Install(vm)
 
 
-def AptInstall(vm):
+def AptInstall(vm) -> None:
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-dev')
   _Install(vm)
 
 
-def Configure(vm):
+def Configure(vm) -> None:
   """Configure redis server."""
+  redis_dir = GetRedisDir()
+  vm.RemoteCommand(
+      f'sudo sed -i "s/bind/#bind/g" {redis_dir}/redis.conf')
+  vm.RemoteCommand(
+      'sudo sed -i "s/protected-mode yes/protected-mode no/g" '
+      f'{redis_dir}/redis.conf')
   sed_cmd = (
       r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-      "{0}/redis.conf").format(GetRedisDir())
-  vm.RemoteCommand(
-      'sudo sed -i "s/bind/#bind/g" {0}/redis.conf'.format(GetRedisDir()))
-  vm.RemoteCommand(
-      'sudo sed -i "s/protected-mode yes/protected-mode no/g" {0}/redis.conf'.
-      format(GetRedisDir()))
+      f"{redis_dir}/redis.conf")
   vm.RemoteCommand(sed_cmd)
-  if FLAGS.redis_enable_aof:
+  if _ENABLE_AOF.value:
     vm.RemoteCommand(
-        r'sed -i -e "s/appendonly no/appendonly yes/g" {0}/redis.conf'.format(
-            GetRedisDir()))
-    vm.RemoteCommand((
+        r'sed -i -e "s/appendonly no/appendonly yes/g" '
+        f'{redis_dir}/redis.conf')
+    vm.RemoteCommand(
         r'sed -i -e "s/appendfsync everysec/# appendfsync everysec/g" '
-        r'{0}/redis.conf'
-    ).format(GetRedisDir()))
-    vm.RemoteCommand((
+        rf'{redis_dir}/redis.conf')
+    vm.RemoteCommand(
         r'sed -i -e "s/# appendfsync always/appendfsync always/g" '
-        r'{0}/redis.conf'
-    ).format(GetRedisDir()))
-  for i in range(FLAGS.redis_total_num_processes):
+        rf'{redis_dir}/redis.conf')
+  for i in range(_NUM_PROCESSES.value):
     port = REDIS_FIRST_PORT + i
     vm.RemoteCommand(
-        ('cp {0}/redis.conf {0}/redis-{1}.conf').format(GetRedisDir(), port))
+        f'cp {redis_dir}/redis.conf {redis_dir}/redis-{port}.conf')
     vm.RemoteCommand(
-        r'sed -i -e "s/port %d/port %d/g" %s/redis-%d.conf' %
-        (REDIS_FIRST_PORT, port, GetRedisDir(), port))
+        rf'sed -i -e "s/port {REDIS_FIRST_PORT}/port {port}/g" '
+        f'{redis_dir}/redis-{port}.conf')
 
 
-def Start(vm):
+def Start(vm) -> None:
   """Start redis server process."""
-  for i in range(FLAGS.redis_total_num_processes):
+  for i in range(_NUM_PROCESSES.value):
     port = REDIS_FIRST_PORT + i
+    redis_dir = GetRedisDir()
     vm.RemoteCommand(
-        ('nohup sudo {0}/src/redis-server {0}/redis-{1}.conf '
-         '&> /dev/null & echo $! > {0}/{2}-{1}').format(
-             GetRedisDir(), port, REDIS_PID_FILE))
+        f'nohup sudo {redis_dir}/src/redis-server '
+        f'{redis_dir}/redis-{port}.conf '
+        f'&> /dev/null & echo $! > {redis_dir}/{REDIS_PID_FILE}-{port}')
 
 
-def Cleanup(vm):
+def Cleanup(vm) -> None:
   """Remove redis."""
   vm.RemoteCommand('sudo pkill redis-server')
