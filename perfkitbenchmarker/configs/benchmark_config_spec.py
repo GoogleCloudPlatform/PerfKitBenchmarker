@@ -528,7 +528,11 @@ class _RelationalDbSpec(spec.BaseSpec):
         'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'vm_groups': (_VmGroupsDecoder, {
             'default': {}
-        })
+        }),
+        'mysql_flags': (option_decoders.ListDecoder, {
+            'item_decoder': option_decoders.StringDecoder(),
+            'default': None
+        }),
     })
     return result
 
@@ -605,7 +609,8 @@ class _RelationalDbSpec(spec.BaseSpec):
     if flag_values['managed_db_backup_start_time'].present:
       config_values['backup_start_time'] = (
           flag_values.managed_db_backup_start_time)
-
+    if flag_values['mysql_flags'].present:
+      config_values['mysql_flags'] = flag_values.mysql_flags
     cloud = config_values['cloud']
     has_unmanaged_dbs = ('vm_groups' in config_values
                          and 'servers' in config_values['vm_groups'])
@@ -655,8 +660,6 @@ class _RelationalDbSpec(spec.BaseSpec):
           'cpus': flag_values.client_vm_cpus,
           'memory': flag_values.client_vm_memory
       }
-    if flag_values['mysql_flags'].present:
-      config_values['db_spec'][cloud]['mysql_flags'] = flag_values.mysql_flags
     if flag_values['managed_db_disk_size'].present:
       config_values['db_disk_spec'][cloud]['disk_size'] = (
           flag_values.managed_db_disk_size)
