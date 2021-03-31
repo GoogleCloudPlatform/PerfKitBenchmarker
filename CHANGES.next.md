@@ -33,6 +33,7 @@
 -   Add ability to collect /proc/meminfo data with --collect_meminfo
 -   Add support for setting egress bandwidth tier for GCP VMs.
 -   Add support for Azure Ultra Disk
+-   Add `cloudharmony_network` benchmark
 
 ### Enhancements:
 
