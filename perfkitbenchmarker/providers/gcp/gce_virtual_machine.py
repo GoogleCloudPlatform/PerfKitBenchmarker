@@ -824,7 +824,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
-  def UpdateInterruptibleVmStatus(self):
+  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
     """Updates the interruptible status if the VM was preempted."""
     if not self.preemptible:  # Only do checks on preemptible VMs
       return
@@ -836,7 +836,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                         'operations', 'list')
     gcloud_command.flags['filter'] = f'targetLink.scope():{self.name}'
     gcloud_command.flags['zones'] = self.zone
-    stdout, _, _ = gcloud_command.Issue(suppress_warning=True)
+    if is_failed_run:
+      # If the run has failed then do a check that could throw an exception.
+      stdout, _, _ = gcloud_command.Issue(suppress_warning=True)
+    else:
+      # Stop retrying 'gcloud compute operations list' command when it has rate
+      # limit error. PKB will check preemption when it has connect error.
+      gcloud_command.rate_limited = False
+      stdout, _, _ = gcloud_command.Issue(suppress_warning=True,
+                                          raise_on_failure=False)
     self.spot_early_termination = any(
         operation['operationType'] == 'compute.instances.preempted'
         for operation in json.loads(stdout))

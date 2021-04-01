@@ -905,7 +905,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                               f'--region={self.region}',
                               f'--allocation-id={self.allocation_id}'])
 
-  def UpdateInterruptibleVmStatus(self):
+  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
     if self.spot_early_termination:
       return
     if hasattr(self, 'spot_instance_request_id'):

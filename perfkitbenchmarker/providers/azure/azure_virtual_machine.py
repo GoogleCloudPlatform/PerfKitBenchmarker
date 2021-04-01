@@ -885,7 +885,7 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         '--protected-settings=%s' % config
     ] + self.resource_group.args)
 
-  def UpdateInterruptibleVmStatus(self):
+  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
     """Updates the interruptible status if the VM was preempted."""
     if self.spot_early_termination:
       return

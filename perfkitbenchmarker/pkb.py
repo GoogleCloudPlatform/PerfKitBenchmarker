@@ -1074,10 +1074,7 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
 
-  # Check for preempted VMs
-  def UpdateVmStatus(vm):
-    vm.UpdateInterruptibleVmStatus()
-  vm_util.RunThreaded(UpdateVmStatus, spec.vms)
+  vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(True), spec.vms)
 
   interruptible_vm_count = 0
   interrupted_vm_count = 0

@@ -1252,8 +1252,11 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """
     return False
 
-  def UpdateInterruptibleVmStatus(self):
+  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
     """Updates the status of the discounted vm.
+
+    Args:
+      is_failed_run: boolean, is the test run already failed.
     """
     # TODO(tohaowu) Set it to pure virtual function after finishing it on all
     # the providers.
