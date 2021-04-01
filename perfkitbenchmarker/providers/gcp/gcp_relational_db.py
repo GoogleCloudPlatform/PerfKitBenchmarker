@@ -193,6 +193,13 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       cmd = util.GcloudCommand(*cmd_string)
       _, stderr, _ = cmd.Issue()
       if stderr:
+        # sql instance patch outputs information to stderr
+        # Reference to GCP documentation
+        # https://cloud.google.com/sdk/gcloud/reference/sql/instances/patch
+        # Example output
+        # Updated [https://sqladmin.googleapis.com/].
+        if 'Updated' in stderr:
+          return
         raise Exception('Invalid MySQL flags: %s' % stderr)
 
   def _Create(self):
