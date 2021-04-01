@@ -18,12 +18,11 @@ import posixpath
 from absl import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
-from perfkitbenchmarker.linux_packages import google_cloud_sdk
 
 flags.DEFINE_string('nccl_version', '2.7.8-1',
                     'NCCL version to install. '
                     'Input "None" to bypass installation.')
-flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin path')
+flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin name')
 flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
                     'MPI home')
@@ -68,13 +67,16 @@ def AptInstall(vm):
                          cuda=FLAGS.cuda_toolkit_version))
 
   if FLAGS.nccl_net_plugin:
-    vm.Install('google_cloud_sdk')
-    vm.RemoteCommand('sudo {gsutil_path} cp {nccl_net_plugin_path} '
-                     '/usr/lib/x86_64-linux-gnu/libnccl-net.so'.format(
-                         gsutil_path=google_cloud_sdk.GSUTIL_PATH,
-                         nccl_net_plugin_path=FLAGS.nccl_net_plugin))
-  else:
-    vm.RemoteCommand('sudo rm -rf /usr/lib/x86_64-linux-gnu/libnccl-net.so')
+    vm.RemoteCommand(
+        'echo "deb https://packages.cloud.google.com/apt google-fast-socket main" '
+        '| sudo tee /etc/apt/sources.list.d/google-fast-socket.list'
+    )
+    vm.RemoteCommand(
+        'curl -s -L https://packages.cloud.google.com/apt/doc/apt-key.gpg '
+        '| sudo apt-key add -'
+    )
+    vm.AptUpdate()
+    vm.InstallPackages(f'{FLAGS.nccl_net_plugin}')
 
   vm.RemoteCommand('sudo rm -rf /usr/local/nccl2')  # Preexisting NCCL in DLVM
   vm.RemoteCommand('sudo ldconfig')  # Refresh LD cache

@@ -106,3 +106,4 @@
 -   Switch to using Google Cloud Build for continuous integration.
 -   Fix PrettyPrintStreamPublisher to make "cpu_utilization_per_minute" show up
     in the PKB results summary for cloud bigtable benchmark.
+-   Added an option to install GCP NCCL plugins.
