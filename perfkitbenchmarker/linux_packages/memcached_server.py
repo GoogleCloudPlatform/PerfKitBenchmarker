@@ -18,6 +18,7 @@
 import logging
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -31,11 +32,21 @@ flags.DEFINE_integer('memcached_size_mb', 64,
 flags.DEFINE_integer('memcached_num_threads', 4,
                      'Number of worker threads.')
 
+VERSION = '1.6.9'
+DIR = linux_packages.INSTALL_DIR
+
 
 def _Install(vm):
   """Installs the memcached server on the VM."""
-  vm.InstallPackages('memcached')
-  vm.InstallPackages('libmemcached-tools')
+  vm.InstallPackages('wget')
+  vm.Install('build_tools')
+  vm.Install('event')
+  vm.RemoteCommand(
+      f'cd {DIR}; '
+      f'wget https://www.memcached.org/files/memcached-{VERSION}.tar.gz; '
+      f'tar -zxvf memcached-{VERSION}.tar.gz; '
+      f'cd memcached-{VERSION}; '
+      './configure && make && sudo make install')
 
 
 def YumInstall(vm):
@@ -50,7 +61,7 @@ def AptInstall(vm):
 
 @vm_util.Retry(poll_interval=5, timeout=300,
                retryable_exceptions=(errors.Resource.RetryableCreationError))
-def _WaitForServerUp(vm):
+def _WaitForServerUp(vm, port=MEMCACHED_PORT):
   """Block until the memcached server is up and responsive.
 
   Will timeout after 5 minutes, and raise an exception. Before the timeout
@@ -62,6 +73,7 @@ def _WaitForServerUp(vm):
 
   Args:
     vm: VirtualMachine memcached has been installed on.
+    port: int. Memcached port to use.
 
   Raises:
     errors.Resource.RetryableCreationError when response is not as expected or
@@ -69,7 +81,6 @@ def _WaitForServerUp(vm):
       remote check command.
   """
   address = vm.internal_ip
-  port = MEMCACHED_PORT
 
   logging.info('Trying to connect to memcached at %s:%s', address, port)
   try:
@@ -86,11 +97,12 @@ def _WaitForServerUp(vm):
         'memcached server not up yet. Expected "STAT" but got "%s".' % out)
 
 
-def ConfigureAndStart(vm, smp_affinity=False):
+def ConfigureAndStart(vm, port=MEMCACHED_PORT, smp_affinity=False):
   """Prepare the memcached server on a VM.
 
   Args:
     vm: VirtualMachine to install and start memcached on.
+    port: int. Memcached port to use.
     smp_affinity: Boolean. Whether or not to set smp_affinity.
   """
   vm.Install('memcached_server')
@@ -100,30 +112,18 @@ def ConfigureAndStart(vm, smp_affinity=False):
   for scratch_disk in vm.scratch_disks:
     vm.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
 
-  # update security config to allow incoming network
   vm.RemoteCommand(
-      'sudo sed -i "s/-l .*/-l 0.0.0.0/g" /etc/memcached.conf')
-  # update memory size
-  vm.RemoteCommand(
-      'sudo sed -i "s/-m .*/-m {size}/g" /etc/memcached.conf'.format(
-          size=FLAGS.memcached_size_mb))
-  # update default port
-  vm.RemoteCommand(
-      'sudo sed -i "s/-p .*/-p {port}/g" /etc/memcached.conf'.format(
-          port=MEMCACHED_PORT))
-
-  vm.RemoteCommand(
-      'echo "-t {threads}" | sudo tee -a /etc/memcached.conf'.format(
-          threads=FLAGS.memcached_num_threads))
-
-  # Increase maximum memcached server connections
-  vm.RemoteCommand('echo "-c 32768" | sudo tee -a /etc/memcached.conf')
-
-  # Dump conf for debugging.
-  vm.RemoteCommand('cat /etc/memcached.conf')
-
-  # restart the default running memcached to run it with custom configurations.
-  vm.RemoteCommand('ulimit -n 32768; sudo service memcached restart')
+      'ulimit -n 32768; '
+      'sudo nohup memcached '
+      # Increase maximum memcached server connections
+      '-u $USER -c 32768 '
+      f'-t {FLAGS.memcached_num_threads} '
+      # update default port
+      f'-p {port} '
+      # update memory size
+      f'-m {FLAGS.memcached_size_mb} '
+      # update security config to allow incoming network
+      '-l 0.0.0.0 -v &> log &')
 
   _WaitForServerUp(vm)
   logging.info('memcached server configured and started.')
@@ -137,7 +137,7 @@ def GetVersion(vm):
 
 
 def StopMemcached(vm):
-  vm.RemoteCommand('sudo service memcached stop')
+  vm.RemoteCommand('sudo pkill -9 memcached')
 
 
 def FlushMemcachedServer(ip, port):
@@ -147,4 +147,4 @@ def FlushMemcachedServer(ip, port):
 
 def AptUninstall(vm):
   """Removes the memcache package on the VM."""
-  vm.RemoteCommand('sudo apt-get --purge autoremove -y memcached')
+  del vm
