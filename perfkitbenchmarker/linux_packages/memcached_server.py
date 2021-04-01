@@ -23,7 +23,6 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-
 MEMCACHED_PORT = 11211
 
 flags.DEFINE_integer('memcached_size_mb', 64,
@@ -31,8 +30,9 @@ flags.DEFINE_integer('memcached_size_mb', 64,
 
 flags.DEFINE_integer('memcached_num_threads', 4,
                      'Number of worker threads.')
+flags.DEFINE_string('memcached_version', '1.6.9',
+                    'Memcached version to use.')
 
-VERSION = '1.6.9'
 DIR = linux_packages.INSTALL_DIR
 
 
@@ -43,9 +43,10 @@ def _Install(vm):
   vm.Install('event')
   vm.RemoteCommand(
       f'cd {DIR}; '
-      f'wget https://www.memcached.org/files/memcached-{VERSION}.tar.gz; '
-      f'tar -zxvf memcached-{VERSION}.tar.gz; '
-      f'cd memcached-{VERSION}; '
+      'wget https://www.memcached.org/files/'
+      f'memcached-{FLAGS.memcached_version}.tar.gz; '
+      f'tar -zxvf memcached-{FLAGS.memcached_version}.tar.gz; '
+      f'cd memcached-{FLAGS.memcached_version}; '
       './configure && make && sudo make install')
 
 
@@ -125,7 +126,7 @@ def ConfigureAndStart(vm, port=MEMCACHED_PORT, smp_affinity=False):
       # update security config to allow incoming network
       '-l 0.0.0.0 -v &> log &')
 
-  _WaitForServerUp(vm)
+  _WaitForServerUp(vm, port)
   logging.info('memcached server configured and started.')
 
 
@@ -137,7 +138,7 @@ def GetVersion(vm):
 
 
 def StopMemcached(vm):
-  vm.RemoteCommand('sudo pkill -9 memcached')
+  vm.RemoteCommand('sudo pkill -9 memcached', ignore_failure=True)
 
 
 def FlushMemcachedServer(ip, port):

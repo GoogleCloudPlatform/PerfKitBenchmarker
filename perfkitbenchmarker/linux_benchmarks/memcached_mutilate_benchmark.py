@@ -35,6 +35,8 @@ delay.
 
 
 import functools
+import time
+
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
@@ -44,16 +46,23 @@ from perfkitbenchmarker.linux_packages import mutilate
 FLAGS = flags.FLAGS
 
 
-flags.DEFINE_string('memcached_mutilate_server_machine_type', None,
-                    'Machine type to use for the memcached server if different '
-                    'from memcached client machine type.')
-flags.DEFINE_string('memcached_mutilate_client_machine_type', None,
-                    'Machine type to use for the mutilate client if different '
-                    'from memcached server machine type.')
-flags.DEFINE_integer('memcached_mutilate_num_client_vms', 1,
-                     'Number of mutilate client machines to use.')
-flags.DEFINE_boolean('set_smp_affinity', False,
-                     'Manually set smp affinity.')
+_SERVER_VM_TYPE = flags.DEFINE_string(
+    'memcached_mutilate_server_machine_type', None,
+    'Machine type to use for the memcached server if different '
+    'from memcached client machine type.')
+_CLIENT_VM_TYPE = flags.DEFINE_string(
+    'memcached_mutilate_client_machine_type', None,
+    'Machine type to use for the mutilate client if different '
+    'from memcached server machine type.')
+_CLIENT_COUNT = flags.DEFINE_integer(
+    'memcached_mutilate_num_client_vms', 1,
+    'Number of mutilate client machines to use.')
+_SMP = flags.DEFINE_boolean(
+    'set_smp_affinity', False,
+    'Manually set smp affinity.')
+_NUM_INSTANCES = flags.DEFINE_integer(
+    'memcached_num_local_instances', 1,
+    'Number of memcached instancs to launch locally.')
 
 BENCHMARK_NAME = 'memcached_mutilate'
 BENCHMARK_CONFIG = """
@@ -92,19 +101,16 @@ def GetConfig(user_config):
     loaded benchmark configuration
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.memcached_mutilate_client_machine_type:
+  if _CLIENT_VM_TYPE.value:
     vm_spec = config['vm_groups']['client']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.memcached_mutilate_client_machine_type)
-  if FLAGS.memcached_mutilate_server_machine_type:
+      vm_spec[cloud]['machine_type'] = _CLIENT_VM_TYPE.value
+  if _SERVER_VM_TYPE.value:
     vm_spec = config['vm_groups']['server']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.memcached_mutilate_server_machine_type)
+      vm_spec[cloud]['machine_type'] = _SERVER_VM_TYPE.value
   if FLAGS['memcached_mutilate_num_client_vms'].present:
-    config['vm_groups']['client']['vm_count'] = (
-        FLAGS.memcached_mutilate_num_client_vms)
+    config['vm_groups']['client']['vm_count'] = _CLIENT_COUNT.value
   return config
 
 
@@ -124,16 +130,11 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   clients = benchmark_spec.vm_groups['client']
-  master = clients[0]
   server = benchmark_spec.vm_groups['server'][0]
   client_install_fns = [
       functools.partial(vm.Install, 'mutilate') for vm in clients]
   server_install_fns = [functools.partial(server.Install, 'memcached_server')]
   vm_util.RunThreaded(lambda f: f(), client_install_fns + server_install_fns)
-
-  memcached_server.ConfigureAndStart(
-      server, smp_affinity=FLAGS.set_smp_affinity)
-  mutilate.Load(master, server.internal_ip, memcached_server.MEMCACHED_PORT)
 
 
 def Run(benchmark_spec):
@@ -148,14 +149,24 @@ def Run(benchmark_spec):
   """
   clients = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
-  server_ip = server.internal_ip
-  metadata = {'memcached_version': memcached_server.GetVersion(server),
-              'memcached_server_size': FLAGS.memcached_size_mb,
-              'memcached_server_threads': FLAGS.memcached_num_threads,
-              'smp_affinity': FLAGS.set_smp_affinity}
+  memcached_server.StopMemcached(server)
+  time.sleep(60)
+  for idx in range(_NUM_INSTANCES.value):
+    port = memcached_server.MEMCACHED_PORT + idx
+    memcached_server.ConfigureAndStart(
+        server, port=port, smp_affinity=_SMP.value)
 
-  samples = mutilate.Run(
-      clients, server_ip, memcached_server.MEMCACHED_PORT)
+  server_ip = server.internal_ip
+  metadata = {
+      'memcached_version': memcached_server.GetVersion(server),
+      'memcached_server_size': FLAGS.memcached_size_mb,
+      'memcached_server_threads': FLAGS.memcached_num_threads,
+      'memcached_local_instances': _NUM_INSTANCES.value,
+      'smp_affinity': _SMP.value
+  }
+
+  samples = mutilate.Run(clients, server_ip, memcached_server.MEMCACHED_PORT,
+                         _NUM_INSTANCES.value)
   for sample in samples:
     sample.metadata.update(metadata)
 

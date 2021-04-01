@@ -120,6 +120,8 @@ def AptInstall(vm):
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MUTILATE_DIR))
+  vm.RemoteCommand(
+      f'sed -i "s|int total|long total|g" {MUTILATE_DIR}/mutilate.cc')
   vm.RemoteCommand('cd {0} && sudo scons'.format(MUTILATE_DIR))
 
 
@@ -140,15 +142,17 @@ def GetMetadata():
   return metadata
 
 
-def BuildCmd(server_ip, server_port, options):
+def BuildCmd(server_ip, server_port, num_instances, options):
   """Build base mutilate command in a list."""
+  server_ips = []
+  for idx in range(num_instances):
+    server_ips.append(f'--server={server_ip}:{server_port + idx}')
   cmd = [
       'ulimit -n 32768; ', MUTILATE_BIN,
-      '--server=%s:%s' % (server_ip, server_port),
       '--keysize=%s' % FLAGS.mutilate_keysize,
       '--valuesize=%s' % FLAGS.mutilate_valuesize,
-      '--records=%s' % FLAGS.mutilate_records
-  ] + options
+      '--records=%s' % FLAGS.mutilate_records, '--roundrobin'
+  ] + server_ips + options
   if FLAGS.mutilate_protocol == 'binary':
     cmd.append('--binary')
   return cmd
@@ -166,22 +170,14 @@ def RestartAgent(vm, threads):
   ]))
 
 
-def Load(client_vm, server_ip, server_port):
-  """Preload the server with data."""
-  logging.info('Loading memcached server.')
-  cmd = BuildCmd(
-      server_ip, server_port,
-      ['--loadonly'])
-  client_vm.RemoteCommand(' '.join(cmd))
-
-
-def Run(vms, server_ip, server_port):
+def Run(vms, server_ip, server_port, num_instances):
   """Runs the mutilate benchmark on the vm."""
   samples = []
   master = vms[0]
   runtime_options = {}
   samples = []
   measure_flags = []
+  loaded = False
   additional_flags = ['--%s' % option for option in FLAGS.mutilate_options]
 
   if FLAGS.mutilate_measure_connections:
@@ -210,20 +206,18 @@ def Run(vms, server_ip, server_port):
         for qps in FLAGS.mutilate_qps or [0]:  # 0 indicates peak target QPS.
           runtime_options['qps'] = int(qps) or 'peak'
           remote_agents = ['--agent=%s' % vm.internal_ip for vm in vms[1:]]
-          cmd = BuildCmd(
-              server_ip, server_port,
-              [
-                  '--noload',
-                  '--qps=%s' % qps,
-                  '--time=%s' % FLAGS.mutilate_time,
-                  '--update=%s' % FLAGS.mutilate_ratio,
-                  '--threads=%s' % (
-                      FLAGS.mutilate_measure_threads or thread_count),
-                  '--connections=%s' % connection_count,
-                  '--depth=%s' % depth,
-              ] + remote_agents + measure_flags + additional_flags)
+          cmd = BuildCmd(server_ip, server_port, num_instances, [
+              '--noload' if loaded else '',
+              '--qps=%s' % qps,
+              '--time=%s' % FLAGS.mutilate_time,
+              '--update=%s' % FLAGS.mutilate_ratio,
+              '--threads=%s' % (FLAGS.mutilate_measure_threads or thread_count),
+              '--connections=%s' % connection_count,
+              '--depth=%s' % depth,
+          ] + remote_agents + measure_flags + additional_flags)
 
           stdout, _ = master.RemoteCommand(' '.join(cmd))
+          loaded = True
           metadata = GetMetadata()
           metadata.update(runtime_options)
           samples.extend(ParseResults(stdout, metadata))
