@@ -101,7 +101,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
-from perfkitbenchmarker.linux_benchmarks import cuda_memcopy_benchmark
+from perfkitbenchmarker.linux_benchmarks import cuda_memcpy_benchmark
 from perfkitbenchmarker.linux_packages import build_tools
 from perfkitbenchmarker.publisher import SampleCollector
 import six
@@ -297,7 +297,7 @@ flags.DEFINE_boolean(
     'Whether to publish boot time samples for all tests.')
 flags.DEFINE_boolean(
     'gpu_samples', False,
-    'Whether to publish GPU memcopy bandwidth samples for GPU tests.')
+    'Whether to publish GPU memcpy bandwidth samples for GPU tests.')
 flags.DEFINE_integer(
     'run_processes', None,
     'The number of parallel processes to use to run benchmarks.',
@@ -812,7 +812,7 @@ def DoRunPhase(spec, collector, timer):
     # In order to collect GPU samples one of the VMs must have both an Nvidia
     # GPU and the nvidia-smi
     if FLAGS.gpu_samples:
-      samples.extend(cuda_memcopy_benchmark.Run(spec))
+      samples.extend(cuda_memcpy_benchmark.Run(spec))
 
     if FLAGS.record_lscpu:
       samples.extend(_CreateLscpuSamples(spec.vms))

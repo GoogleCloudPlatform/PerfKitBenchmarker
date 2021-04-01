@@ -28,11 +28,11 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 
 
-class CudaMemcopyBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
-                               test_util.SamplesTestMixin):
+class XgboostBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
+                           test_util.SamplesTestMixin):
 
   def setUp(self) -> None:
-    super(CudaMemcopyBenchmarkTest, self).setUp()
+    super(XgboostBenchmarkTest, self).setUp()
     self.enter_context(mock.patch.object(
         nvidia_driver, 'QueryNumberOfGpus', return_value=1))
     self.enter_context(mock.patch.object(

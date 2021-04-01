@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run CUDA memcopy benchmarks."""
+"""Run CUDA memcpy benchmarks."""
 
 import functools
 import logging
@@ -27,31 +27,31 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 _MEMORY = flags.DEFINE_enum(
-    'cuda_memcopy_memory', 'pinned', ['pageable', 'pinned'],
+    'cuda_memcpy_memory', 'pinned', ['pageable', 'pinned'],
     'Specify which memory mode to use. pageable memory or non-pageable system '
     'memory.')
 _MODE = flags.DEFINE_enum(
-    'cuda_memcopy_mode', 'quick', ['quick', 'shamoo'],
+    'cuda_memcpy_mode', 'quick', ['quick', 'shamoo'],
     'Specify the mode to use. performs a quick measurement, or measures a '
     'user-specified range of values, or performs an intense shmoo of a large '
     'range of values.')
 _HTOD = flags.DEFINE_boolean(
-    'cuda_memcopy_htod', True, 'Measure host to device transfers.')
+    'cuda_memcpy_htod', True, 'Measure host to device transfers.')
 _DTOH = flags.DEFINE_boolean(
-    'cuda_memcopy_dtoh', True, 'Measure device to host transfers.')
+    'cuda_memcpy_dtoh', True, 'Measure device to host transfers.')
 _DTOD = flags.DEFINE_boolean(
-    'cuda_memcopy_dtod', True, 'Measure device to device transfers.')
+    'cuda_memcpy_dtod', True, 'Measure device to device transfers.')
 _WC = flags.DEFINE_boolean(
-    'cuda_memcopy_wc', False, 'Allocate pinned memory as write-combined.')
+    'cuda_memcpy_wc', False, 'Allocate pinned memory as write-combined.')
 
 BANDWIDTH_TEST_PATH = '/usr/local/cuda/extras/demo_suite/bandwidthTest'
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'cuda_memcopy'
+BENCHMARK_NAME = 'cuda_memcpy'
 BENCHMARK_CONFIG = """
-cuda_memcopy:
-  description: Runs CUDA memcopy Benchmark.
+cuda_memcpy:
+  description: Runs CUDA memcpy Benchmark.
   vm_groups:
     default:
       vm_spec:
@@ -83,7 +83,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
-  """Install and set up CUDA memcopy on the target vm.
+  """Install and set up CUDA memcpy on the target vm.
 
   Args:
     bm_spec: The benchmark specification
@@ -105,7 +105,7 @@ def _MetadataFromFlags() -> [str, Any]:
 
 def _CollectGpuSamples(
     vm: virtual_machine.BaseVirtualMachine) -> List[sample.Sample]:
-  """Run CUDA memcopy on the cluster.
+  """Run CUDA memcpy on the cluster.
 
   Args:
     vm: The virtual machine to run the benchmark.
@@ -166,7 +166,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
-  """Cleanup CUDA memcopy on the cluster.
+  """Cleanup CUDA memcpy on the cluster.
 
   Args:
     bm_spec: The benchmark specification. Contains all data that
