@@ -529,7 +529,7 @@ class _RelationalDbSpec(spec.BaseSpec):
         'vm_groups': (_VmGroupsDecoder, {
             'default': {}
         }),
-        'mysql_flags': (option_decoders.ListDecoder, {
+        'db_flags': (option_decoders.ListDecoder, {
             'item_decoder': option_decoders.StringDecoder(),
             'default': None
         }),
@@ -609,8 +609,8 @@ class _RelationalDbSpec(spec.BaseSpec):
     if flag_values['managed_db_backup_start_time'].present:
       config_values['backup_start_time'] = (
           flag_values.managed_db_backup_start_time)
-    if flag_values['mysql_flags'].present:
-      config_values['mysql_flags'] = flag_values.mysql_flags
+    if flag_values['db_flags'].present:
+      config_values['db_flags'] = flag_values.db_flags
     cloud = config_values['cloud']
     has_unmanaged_dbs = ('vm_groups' in config_values
                          and 'servers' in config_values['vm_groups'])

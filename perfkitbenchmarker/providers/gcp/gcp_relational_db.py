@@ -185,10 +185,10 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
-    if FLAGS.mysql_flags:
+    if FLAGS.db_flags:
       cmd_string = [
           self, 'sql', 'instances', 'patch', self.instance_id,
-          '--database-flags=%s' % ','.join(FLAGS.mysql_flags)
+          '--database-flags=%s' % ','.join(FLAGS.db_flags)
       ]
       cmd = util.GcloudCommand(*cmd_string)
       _, stderr, _ = cmd.Issue()

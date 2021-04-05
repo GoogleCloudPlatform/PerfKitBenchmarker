@@ -85,7 +85,7 @@ flags.DEFINE_boolean(
     'service for the requested cloud provider. If false, uses '
     'MySql installed on a VM.')
 flags.DEFINE_list(
-    'mysql_flags', '', 'Flags to apply to the implementation of '
+    'db_flags', '', 'Flags to apply to the implementation of '
     'MySQL on the cloud that\'s being used. Example: '
     'binlog_cache_size=4096,innodb_log_buffer_size=4294967295')
 flags.DEFINE_integer(
@@ -376,9 +376,9 @@ class BaseRelationalDb(resource.BaseResource):
       raise RelationalDbPropertyNotSet(
           'Machine type of the client VM must be set.')
 
-    if FLAGS.mysql_flags:
+    if FLAGS.db_flags:
       metadata.update({
-          'mysql_flags': FLAGS.mysql_flags,
+          'db_flags': FLAGS.db_flags,
       })
 
     return metadata
@@ -591,8 +591,8 @@ class BaseRelationalDb(resource.BaseResource):
         self.MakeMysqlConnectionString(use_localhost=True))
 
   def _ApplyMySqlFlags(self):
-    if FLAGS.mysql_flags:
-      for flag in FLAGS.mysql_flags:
+    if FLAGS.db_flags:
+      for flag in FLAGS.db_flags:
         cmd = 'mysql %s -e \'SET %s;\'' % self.MakeMysqlConnectionString(), flag
         _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
         if stderr:

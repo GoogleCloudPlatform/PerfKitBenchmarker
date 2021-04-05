@@ -237,7 +237,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def _ApplyManagedMysqlFlags(self):
     """Applies the MySqlFlags to a managed instance."""
-    for flag in FLAGS.mysql_flags:
+    for flag in FLAGS.db_flags:
       name_and_value = flag.split('=')
       cmd = [
           azure.AZURE_PATH,

@@ -744,7 +744,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
   def _ApplyManagedMySqlFlags(self):
     """Apply managed mysql flags."""
-    if self.spec.mysql_flags:
+    if self.spec.db_flags:
       self.parameter_group = 'pkb-parameter-group-' + FLAGS.run_uri
       cmd = util.AWS_PREFIX + [
           'rds', 'create-db-parameter-group',
@@ -764,7 +764,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
       vm_util.IssueCommand(cmd, suppress_warning=True)
 
-      for flag in self.spec.mysql_flags:
+      for flag in self.spec.db_flags:
         key_value_pair = flag.split('=')
         if len(key_value_pair) != 2:
           raise AwsRelationalDbParameterException('Malformed parameter %s' %
