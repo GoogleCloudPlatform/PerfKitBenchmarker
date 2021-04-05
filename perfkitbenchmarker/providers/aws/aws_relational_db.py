@@ -70,8 +70,16 @@ _RDS_ENGINES = (
     relational_db.SQLSERVER_STANDARD,
     relational_db.SQLSERVER_ENTERPRISE)
 
+MYSQL5_7_PARAM_GROUP_FAMILY = 'mysql5.7'
+MYSQL8_0_PARAM_GROUP_FAMILY = 'mysql8.0'
+
 
 class AwsRelationalDbCrossRegionException(Exception):
+  pass
+
+
+class AwsRelationalDbParameterException(Exception):
+  """Exceptions for invalid Db parameters."""
   pass
 
 
@@ -121,6 +129,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     self.all_instance_ids = []
     self.primary_zone = None
     self.secondary_zone = None
+    self.parameter_group = None
 
     if hasattr(self.spec, 'zones') and self.spec.zones is not None:
       self.zones = self.spec.zones
@@ -298,6 +307,16 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
     for subnet_for_db in self.subnets_owned_by_db:
       subnet_for_db.Delete()
+
+  def _TeardownParameterGroup(self):
+    """Tears down all parameter group that were created for the database."""
+    if self.parameter_group:
+      delete_db_parameter_group_cmd = util.AWS_PREFIX + [
+          'rds', 'delete-db-parameter-group', '--db-parameter-group-name',
+          self.parameter_group, '--region', self.region
+      ]
+      vm_util.IssueCommand(
+          delete_db_parameter_group_cmd, raise_on_failure=False)
 
   def _CreateAwsSqlInstance(self):
     if self.spec.engine in _RDS_ENGINES:
@@ -606,10 +625,12 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
        Exception:  If could not ready the instance after modification to
                    multi-az.
     """
-    self._ApplyMySqlFlags()
+    if self.is_managed_db:
+      self._ApplyManagedMySqlFlags()
 
     if not self.is_managed_db:
       self.port = self.GetDefaultPort()
+      self._ApplyMySqlFlags()
       return
 
     need_ha_modification = self.spec.engine in _RDS_ENGINES
@@ -703,6 +724,75 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     json_output = json.loads(stdout)
     return json_output
 
+  def _Reboot(self):
+    """Reboot the database and wait until the database is in ready state."""
+    # Can only reboot when the instance is in ready state
+    if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
+      raise Exception('Instance is not in a state that can reboot')
+
+    cmd = util.AWS_PREFIX + [
+        'rds', 'reboot-db-instance',
+        '--db-instance-identifier=%s' % self.instance_id,
+        '--region=%s' % self.region
+    ]
+
+    vm_util.IssueCommand(cmd, suppress_warning=True)
+
+    if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
+      raise Exception('Instance could not be set to ready after '
+                      'reboot')
+
+  def _ApplyManagedMySqlFlags(self):
+    """Apply managed mysql flags."""
+    if self.spec.mysql_flags:
+      self.parameter_group = 'pkb-parameter-group-' + FLAGS.run_uri
+      cmd = util.AWS_PREFIX + [
+          'rds', 'create-db-parameter-group',
+          '--db-parameter-group-name=%s' % self.parameter_group,
+          '--db-parameter-group-family=%s' % self._GetParameterGroupFamily(),
+          '--region=%s' % self.region, '--description="AWS pkb option group"'
+      ]
+
+      vm_util.IssueCommand(cmd, suppress_warning=True)
+
+      cmd = util.AWS_PREFIX + [
+          'rds', 'modify-db-instance',
+          '--db-instance-identifier=%s' % self.instance_id,
+          '--db-parameter-group-name=%s' % self.parameter_group,
+          '--region=%s' % self.region, '--apply-immediately'
+      ]
+
+      vm_util.IssueCommand(cmd, suppress_warning=True)
+
+      for flag in self.spec.mysql_flags:
+        key_value_pair = flag.split('=')
+        if len(key_value_pair) != 2:
+          raise AwsRelationalDbParameterException('Malformed parameter %s' %
+                                                  flag)
+        cmd = util.AWS_PREFIX + [
+            'rds', 'modify-db-parameter-group',
+            '--db-parameter-group-name=%s' % self.parameter_group,
+            '--parameters=ParameterName=%s,ParameterValue=%s,ApplyMethod=pending-reboot'
+            % (key_value_pair[0], key_value_pair[1]),
+            '--region=%s' % self.region
+        ]
+
+        vm_util.IssueCommand(cmd, suppress_warning=True)
+
+      self._Reboot()
+
+  def _GetParameterGroupFamily(self):
+    """Get the parameter group family string."""
+    if self.spec.engine == relational_db.MYSQL:
+      if self.spec.engine_version.startswith('5.7'):
+        return MYSQL5_7_PARAM_GROUP_FAMILY
+      elif self.spec.engine_version.startswith('8.0'):
+        return MYSQL8_0_PARAM_GROUP_FAMILY
+
+    raise NotImplementedError('The parameter group of engine %s,'
+                              ' version %s is not supported' %
+                              (self.spec.engine, self.spec.engine_version))
+
   def _GetPortsForWriterInstance(self, instance_id):
     """Assigns the ports and endpoints from the instance_id to self.
 
@@ -751,6 +841,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     """
     if self.is_managed_db:
       self._TeardownNetworking()
+      self._TeardownParameterGroup()
 
   def _FailoverHA(self):
     """Fail over from master to replica."""
