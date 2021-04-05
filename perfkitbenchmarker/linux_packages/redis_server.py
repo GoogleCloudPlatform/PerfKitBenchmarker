@@ -73,10 +73,14 @@ def Configure(vm) -> None:
   vm.RemoteCommand(
       'sudo sed -i "s/protected-mode yes/protected-mode no/g" '
       f'{redis_dir}/redis.conf')
-  sed_cmd = (
+  vm.RemoteCommand(
       r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
       f"{redis_dir}/redis.conf")
-  vm.RemoteCommand(sed_cmd)
+  # Remove snapshotting
+  vm.RemoteCommand(
+      r"sed -i -e '/save 900/d' -e '/save 300/d' -e '/save 60/d' -e 's/#"
+      f"   save \"\"/save \"\"/g' {redis_dir}/redis.conf")
+  # Persistence configuration, see https://redis.io/topics/persistence.
   if _ENABLE_AOF.value:
     vm.RemoteCommand(
         r'sed -i -e "s/appendonly no/appendonly yes/g" '
@@ -89,8 +93,10 @@ def Configure(vm) -> None:
         rf'{redis_dir}/redis.conf')
   for i in range(_NUM_PROCESSES.value):
     port = REDIS_FIRST_PORT + i
+    # Copy configuration to each redis process.
     vm.RemoteCommand(
         f'cp {redis_dir}/redis.conf {redis_dir}/redis-{port}.conf')
+    # Set the port
     vm.RemoteCommand(
         rf'sed -i -e "s/port {REDIS_FIRST_PORT}/port {port}/g" '
         f'{redis_dir}/redis-{port}.conf')

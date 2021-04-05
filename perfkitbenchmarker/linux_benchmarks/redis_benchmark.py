@@ -33,6 +33,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
 _NUM_PROCESSES = flags.DEFINE_integer(
@@ -46,12 +47,7 @@ _SET_GET_RATIO = flags.DEFINE_string(
     '\'1:0\', ie: writes only.')
 FLAGS = flags.FLAGS
 
-FIRST_PORT = 6379
-LOAD_THREAD = 1
-LOAD_CLIENT = 1
-LOAD_PIPELINE = 100
 START_KEY = 1
-
 BENCHMARK_NAME = 'redis'
 BENCHMARK_CONFIG = """
 redis:
@@ -93,31 +89,12 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   redis_server.Configure(redis_vm)
   redis_server.Start(redis_vm)
 
-  # Remove snapshotting
-  redis_dir = redis_server.GetRedisDir()
-  sed_cmd = (
-      r"sed -i -e '/save 900/d' -e '/save 300/d' -e '/save 60/d' -e 's/#"
-      f"   save \"\"/save \"\"/g' {redis_dir}/redis.conf")
-  redis_vm.RemoteCommand(sed_cmd)
-
   vm_util.RunThreaded(PrepareLoadgen, vms)
 
+  # Pre-populate the redis server(s) with data
   for i in range(GetNumRedisServers(redis_vm)):
-    port = FIRST_PORT + i
-    redis_vm.RemoteCommand(
-        f'cp {redis_dir}/redis.conf {redis_dir}/redis-{port}.conf')
-    redis_vm.RemoteCommand(
-        rf'sed -i -e "s/port 6379/port {port}/g" {redis_dir}/redis-{port}.conf')
-    redis_vm.RemoteCommand(
-        f'nohup sudo {redis_dir}/src/redis-server '
-        f'{redis_dir}/redis-{port}.conf &> /dev/null &')
-    # Pre-populate the redis server(s) with data
-    redis_vm.RemoteCommand(
-        f'memtier_benchmark -s localhost -p {port} '
-        f'-d {FLAGS.memtier_data_size} -t {LOAD_THREAD} -c {LOAD_CLIENT} '
-        f'--ratio 1:0 --key-pattern {FLAGS.memtier_key_pattern} '
-        f'--pipeline {LOAD_PIPELINE} --key-minimum {START_KEY} '
-        f'--key-maximum {FLAGS.memtier_requests} -n allkeys ')
+    port = redis_server.REDIS_FIRST_PORT + i
+    memtier.Load(redis_vm, 'localhost', port)
 
 
 RedisResult = collections.namedtuple('RedisResult',
@@ -193,11 +170,18 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   while latency < latency_threshold:
     threads += max(1, int(threads * .15))
     num_loaders = len(load_vms) * num_servers
-    args = [((redis_vm, load_vms[i % len(load_vms)], threads // num_loaders +
-              (0 if (i + 1) > threads % num_loaders else 1),
-              FIRST_PORT + i % num_servers, i), {}) for i in range(num_loaders)]
-    client_results = [i for i in vm_util.RunThreaded(RunLoad, args)
-                      if i is not None]
+    args = []
+    for i in range(num_loaders):
+      load_vm = load_vms[i % len(load_vms)]
+      run_threads = threads // num_loaders + (0 if
+                                              (i + 1) > threads % num_loaders
+                                              else 1)
+      port = redis_server.REDIS_FIRST_PORT + i % num_servers
+      test_id = i
+      args.append(((redis_vm, load_vm, run_threads, port, test_id), {}))
+    client_results = [
+        i for i in vm_util.RunThreaded(RunLoad, args) if i is not None
+    ]
     logging.info('Redis results by client: %s', client_results)
     throughput = sum(r.throughput for r in client_results)
 
