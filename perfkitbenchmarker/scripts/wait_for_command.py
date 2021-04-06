@@ -42,6 +42,16 @@ WAIT_SLEEP_IN_SEC = 5.0
 RETRYABLE_SSH_RETCODE = 255
 
 
+def signal_handler(signum, frame):
+  # Pre python3.5 the interruption of a system call would automatically raise
+  # an InterruptedError exception, but since PEP 475 was implemented for fcntl
+  # interruptions are automatically retried; this implementation depends on
+  # interrupting the attempt to acquire a lock on the status file, so we can
+  # ensure this in all python3 versions by raising it explicitly in the signal
+  # handler.
+  raise InterruptedError()
+
+
 def main():
   p = optparse.OptionParser()
   p.add_option('-o', '--stdout', dest='stdout',
@@ -88,16 +98,25 @@ def main():
       print('WARNING: file doesn\'t exist, retrying: %s' % e, file=sys.stderr)
       time.sleep(WAIT_SLEEP_IN_SEC)
 
-  signal.signal(signal.SIGALRM, lambda signum, frame: None)
+  # Set a signal handler to raise an InterruptedError on SIGALRM (this is no
+  # longer done automatically after PEP 475).
+  signal.signal(signal.SIGALRM, signal_handler)
+  # Send a SIGALRM signal after WAIT_TIMEOUT_IN_SEC seconds
   signal.alarm(int(WAIT_TIMEOUT_IN_SEC))
   with open(options.status, 'r') as status:
     try:
+      # If we can acquire the lock on status, the command we're waiting on is
+      # done; if we can't acquire it for the next WAIT_TIMEOUT_IN_SEC seconds
+      # this attempt will be interrupted and we'll catch an InterruptedError.
       fcntl.lockf(status, fcntl.LOCK_SH)
-    except IOError as e:
-      if e.errno == errno.EINTR:
-        print('Wait timed out. This will be retried with a subsequent wait.')
-        return 0
-      elif e.errno == errno.ECONNREFUSED:
+    except InterruptedError:
+      print('Wait timed out. This will be retried with a subsequent wait.')
+      return 0
+    # OSError and IOError have similar interfaces, and later versions of fcntl
+    # will raise OSError where earlier versions raised IOError--we catch both
+    # here for compatibility.
+    except (OSError, IOError) as e:
+      if e.errno == errno.ECONNREFUSED:
         print('Connection refused during wait. '
               'This will be retried with a subsequent wait.')
         return 0
