@@ -393,6 +393,9 @@ class BaseRelationalDb(resource.BaseResource):
     Returns: default version as a string for the given engine.
     """
 
+  def _PostCreate(self):
+    self._ApplyDbFlags()
+
   def _IsReadyUnmanaged(self):
     """Return true if the underlying resource is ready.
 
@@ -589,6 +592,23 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm.RemoteCommand(
         'mysql %s -e "FLUSH PRIVILEGES;"' %
         self.MakeMysqlConnectionString(use_localhost=True))
+
+  def _ApplyDbFlags(self):
+    """Apply Flags on the database."""
+    if FLAGS.db_flags:
+      if self.is_managed_db:
+        self._ApplyManagedDbFlags()
+      else:
+        if self.spec.engine == MYSQL:
+          self._ApplyMySqlFlags()
+        else:
+          raise NotImplementedError('Flags is not supported on %s' %
+                                    self.spec.engine)
+
+  def _ApplyManagedDbFlags(self):
+    """Apply flags on the managed database."""
+    raise NotImplementedError('Managed Db flags is not supported for %s' %
+                              type(self).__name__)
 
   def _ApplyMySqlFlags(self):
     if FLAGS.db_flags:

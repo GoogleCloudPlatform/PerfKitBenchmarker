@@ -185,23 +185,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
-    if FLAGS.db_flags:
-      cmd_string = [
-          self, 'sql', 'instances', 'patch', self.instance_id,
-          '--database-flags=%s' % ','.join(FLAGS.db_flags)
-      ]
-      cmd = util.GcloudCommand(*cmd_string)
-      _, stderr, _ = cmd.Issue()
-      if stderr:
-        # sql instance patch outputs information to stderr
-        # Reference to GCP documentation
-        # https://cloud.google.com/sdk/gcloud/reference/sql/instances/patch
-        # Example output
-        # Updated [https://sqladmin.googleapis.com/].
-        if 'Updated' in stderr:
-          return
-        raise Exception('Invalid MySQL flags: %s' % stderr)
-
   def _Create(self):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere.
 
@@ -226,7 +209,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       self.firewall.AllowPort(
           self.server_vm, 3306, source_range=[self.client_vm.ip_address])
       self.unmanaged_db_exists = True
-      self._ApplyMySqlFlags()
 
   def _GetHighAvailabilityFlag(self):
     """Returns a flag that enables high-availability.
@@ -411,6 +393,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   def _PostCreate(self):
     """Creates the PKB user and sets the password.
     """
+    super()._PostCreate()
+
     if not self.is_managed_db:
       return
 
@@ -430,6 +414,36 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           '--host=dummy_host', '--instance={0}'.format(self.instance_id),
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
+
+  def _ApplyManagedDbFlags(self):
+    cmd_string = [
+        self, 'sql', 'instances', 'patch', self.instance_id,
+        '--database-flags=%s' % ','.join(FLAGS.db_flags)
+    ]
+    cmd = util.GcloudCommand(*cmd_string)
+    _, stderr, _ = cmd.Issue()
+    if stderr:
+      # sql instance patch outputs information to stderr
+      # Reference to GCP documentation
+      # https://cloud.google.com/sdk/gcloud/reference/sql/instances/patch
+      # Example output
+      # Updated [https://sqladmin.googleapis.com/].
+      if 'Updated' in stderr:
+        return
+      raise Exception('Invalid flags: %s' % stderr)
+
+    self._Reboot()
+
+  def _Reboot(self):
+    cmd_string = [
+        self, 'sql', 'instances', 'restart', self.instance_id
+    ]
+    cmd = util.GcloudCommand(*cmd_string)
+    cmd.Issue()
+
+    if not self._IsReady():
+      raise Exception('Instance could not be set to ready after '
+                      'reboot')
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

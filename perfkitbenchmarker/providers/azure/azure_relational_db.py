@@ -235,7 +235,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       raise relational_db.RelationalDbEngineNotFoundException(
           'Unsupported engine {0}'.format(engine))
 
-  def _ApplyManagedMysqlFlags(self):
+  def _ApplyManagedDbFlags(self):
     """Applies the MySqlFlags to a managed instance."""
     for flag in FLAGS.db_flags:
       name_and_value = flag.split('=')
@@ -250,6 +250,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       if stderr:
         raise Exception('Invalid MySQL flags: {0}.  Error {1}'.format(
             name_and_value, stderr))
+
+    self._Reboot()
 
   def _CreateMySqlOrPostgresInstance(self):
     """Creates a managed MySql or Postgres instance."""
@@ -382,7 +384,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       self._CreateMySqlOrPostgresInstance()
     elif self.spec.engine == relational_db.MYSQL:
       self._CreateMySqlOrPostgresInstance()
-      self._ApplyManagedMysqlFlags()
     elif self.spec.engine == relational_db.SQLSERVER:
       self._CreateSqlServerInstance()
     else:
@@ -482,6 +483,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """Perform general post create operations on the cluster.
 
     """
+    super()._PostCreate()
     self.port = self.GetDefaultPort()
 
     if not self.is_managed_db:
@@ -505,6 +507,22 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       # Azure will add @domainname after the database username
       self.spec.database_username = (self.spec.database_username + '@' +
                                      self.endpoint.split('.')[0])
+
+  def _Reboot(self):
+    """Reboot the managed db."""
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        'server',
+        'restart',
+        '--resource-group', self.resource_group.name,
+        '--name', self.instance_id
+    ]
+    vm_util.IssueCommand(cmd)
+
+    if not self._IsInstanceReady():
+      raise Exception('Instance could not be set to ready after '
+                      'reboot')
 
   def _IsInstanceReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.

@@ -625,12 +625,10 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
        Exception:  If could not ready the instance after modification to
                    multi-az.
     """
-    if self.is_managed_db:
-      self._ApplyManagedMySqlFlags()
+    super()._PostCreate()
 
     if not self.is_managed_db:
       self.port = self.GetDefaultPort()
-      self._ApplyMySqlFlags()
       return
 
     need_ha_modification = self.spec.engine in _RDS_ENGINES
@@ -685,11 +683,16 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
           state = json_output['DBInstances'][0]['DBInstanceStatus']
           pending_values = (
               json_output['DBInstances'][0]['PendingModifiedValues'])
+          waiting_param = json_output['DBInstances'][0]['DBParameterGroups'][0][
+              'ParameterApplyStatus'] == 'applying'
           logging.info('Instance state: %s', state)
           if pending_values:
             logging.info('Pending values: %s', (str(pending_values)))
 
-          if state == 'available' and not pending_values:
+          if waiting_param:
+            logging.info('Applying parameter')
+
+          if state == 'available' and not pending_values and not waiting_param:
             break
         except:
           logging.exception(
@@ -742,7 +745,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       raise Exception('Instance could not be set to ready after '
                       'reboot')
 
-  def _ApplyManagedMySqlFlags(self):
+  def _ApplyManagedDbFlags(self):
     """Apply managed mysql flags."""
     if self.spec.db_flags:
       self.parameter_group = 'pkb-parameter-group-' + FLAGS.run_uri
