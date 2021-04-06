@@ -29,6 +29,7 @@ FLAGS = flags.FLAGS
 
 PD_STANDARD = 'pd-standard'
 PD_SSD = 'pd-ssd'
+PD_BALANCED = 'pd-balanced'
 
 DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
 
@@ -37,6 +38,10 @@ REGIONAL_DISK_SCOPE = 'regional'
 DISK_METADATA = {
     PD_STANDARD: {
         disk.MEDIA: disk.HDD,
+        disk.REPLICATION: disk.ZONE,
+    },
+    PD_BALANCED: {
+        disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
     },
     PD_SSD: {
