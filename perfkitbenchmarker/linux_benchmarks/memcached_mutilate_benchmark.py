@@ -149,14 +149,15 @@ def Run(benchmark_spec):
   """
   clients = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
+  server_ip = server.internal_ip
   memcached_server.StopMemcached(server)
   time.sleep(60)
   for idx in range(_NUM_INSTANCES.value):
     port = memcached_server.MEMCACHED_PORT + idx
     memcached_server.ConfigureAndStart(
         server, port=port, smp_affinity=_SMP.value)
+    mutilate.Load(clients[0], server_ip, port)
 
-  server_ip = server.internal_ip
   metadata = {
       'memcached_version': memcached_server.GetVersion(server),
       'memcached_server_size': FLAGS.memcached_size_mb,

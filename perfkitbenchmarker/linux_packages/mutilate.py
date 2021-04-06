@@ -151,11 +151,21 @@ def BuildCmd(server_ip, server_port, num_instances, options):
       'ulimit -n 32768; ', MUTILATE_BIN,
       '--keysize=%s' % FLAGS.mutilate_keysize,
       '--valuesize=%s' % FLAGS.mutilate_valuesize,
-      '--records=%s' % FLAGS.mutilate_records, '--roundrobin'
+      '--records=%s' % FLAGS.mutilate_records,
+      '--roundrobin' if len(server_ips) > 1 else ''
   ] + server_ips + options
   if FLAGS.mutilate_protocol == 'binary':
     cmd.append('--binary')
   return cmd
+
+
+def Load(client_vm, server_ip, server_port):
+  """Preload the server with data."""
+  logging.info('Loading memcached server.')
+  cmd = BuildCmd(
+      server_ip, server_port, 1,
+      ['--loadonly'])
+  client_vm.RemoteCommand(' '.join(cmd))
 
 
 def RestartAgent(vm, threads):
@@ -177,7 +187,6 @@ def Run(vms, server_ip, server_port, num_instances):
   runtime_options = {}
   samples = []
   measure_flags = []
-  loaded = False
   additional_flags = ['--%s' % option for option in FLAGS.mutilate_options]
 
   if FLAGS.mutilate_measure_connections:
@@ -207,7 +216,7 @@ def Run(vms, server_ip, server_port, num_instances):
           runtime_options['qps'] = int(qps) or 'peak'
           remote_agents = ['--agent=%s' % vm.internal_ip for vm in vms[1:]]
           cmd = BuildCmd(server_ip, server_port, num_instances, [
-              '--noload' if loaded else '',
+              '--noload',
               '--qps=%s' % qps,
               '--time=%s' % FLAGS.mutilate_time,
               '--update=%s' % FLAGS.mutilate_ratio,
@@ -217,7 +226,6 @@ def Run(vms, server_ip, server_port, num_instances):
           ] + remote_agents + measure_flags + additional_flags)
 
           stdout, _ = master.RemoteCommand(' '.join(cmd))
-          loaded = True
           metadata = GetMetadata()
           metadata.update(runtime_options)
           samples.extend(ParseResults(stdout, metadata))
