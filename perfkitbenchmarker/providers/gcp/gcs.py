@@ -51,6 +51,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   STORAGE_NAME = gcp.CLOUD
 
+  location: str
+
   def PrepareService(self, location):
     self.location = location or DEFAULT_GCP_REGION
 
