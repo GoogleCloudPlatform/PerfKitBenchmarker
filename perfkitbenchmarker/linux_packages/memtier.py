@@ -18,7 +18,10 @@
 
 import json
 import logging
+import pathlib
 import re
+from typing import Union
+
 from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
@@ -34,6 +37,8 @@ APT_PACKAGES = ('autoconf automake libpcre3-dev '
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
 MEMTIER_RESULTS = 'memtier_results'
 
+_LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
+_WRITE_ONLY = '1:0'
 
 FLAGS = flags.FLAGS
 
@@ -46,6 +51,7 @@ flags.DEFINE_integer('memtier_run_count', 1,
                      'Number of full-test iterations to perform. '
                      'Defaults to 1.')
 flags.DEFINE_integer('memtier_run_duration', None,
+                     'Mutually exclusive with memtier_requests.'
                      'Duration for each client count in seconds. '
                      'By default, test length is set '
                      'by memtier_requests, the number of requests sent by each '
@@ -55,6 +61,7 @@ flags.DEFINE_integer('memtier_run_duration', None,
                      'Total test duration = run_duration * runs * '
                      'len(memtier_clients).')
 flags.DEFINE_integer('memtier_requests', 10000,
+                     'Mutually exclusive with memtier_run_duration. '
                      'Number of total requests per client. Defaults to 10000.')
 flags.DEFINE_list('memtier_clients', [50],
                   'Comma separated list of number of clients per thread. '
@@ -118,22 +125,74 @@ def AptUninstall(vm):
   _Uninstall(vm)
 
 
+def BuildMemtierCommand(
+    server: str = None,
+    port: str = None,
+    protocol: str = None,
+    clients: int = None,
+    threads: int = None,
+    ratio: str = None,
+    data_size: int = None,
+    pipeline: int = None,
+    key_minimum: int = None,
+    key_maximum: int = None,
+    key_pattern: str = None,
+    requests: Union[str, int] = None,
+    run_count: int = None,
+    random_data: bool = None,
+    test_time: int = None,
+    outfile: pathlib.Path = None,
+) -> str:
+  """Returns command arguments used to run memtier."""
+  # Arguments passed with a parameter
+  args = {
+      'server': server,
+      'port': port,
+      'protocol': protocol,
+      'clients': clients,
+      'threads': threads,
+      'ratio': ratio,
+      'data-size': data_size,
+      'pipeline': pipeline,
+      'key-minimum': key_minimum,
+      'key-maximum': key_maximum,
+      'key-pattern': key_pattern,
+      'requests': requests,
+      'run-count': run_count,
+      'test-time': test_time,
+  }
+  # Arguments passed without a parameter
+  no_param_args = {
+      'random-data': random_data
+  }
+  # Build the command
+  cmd = ['memtier_benchmark']
+  for arg, value in args.items():
+    if value is not None:
+      cmd.extend([f'--{arg}', str(value)])
+  for no_param_arg, value in no_param_args.items():
+    if value:
+      cmd.append(f'--{no_param_arg}')
+  if outfile:
+    cmd.extend(['>', outfile])
+  return ' '.join(cmd)
+
+
 def Load(client_vm, server_ip, server_port):
   """Preload the server with data."""
-  cmd = [
-      'memtier_benchmark',
-      '-s', server_ip,
-      '-p', str(server_port),
-      '-P', FLAGS.memtier_protocol,
-      '--clients', '1',
-      '--threads', '1',
-      '--ratio', '1:0',
-      '--data-size', str(FLAGS.memtier_data_size),
-      '--pipeline', '100',
-      '--key-minimum', '1',
-      '--key-maximum', str(FLAGS.memtier_requests),
-      '-n', 'allkeys']
-  client_vm.RemoteCommand(' '.join(cmd))
+  cmd = BuildMemtierCommand(
+      server=server_ip,
+      port=server_port,
+      protocol=FLAGS.memtier_protocol,
+      clients=1,
+      threads=1,
+      ratio=_WRITE_ONLY,
+      data_size=FLAGS.memtier_data_size,
+      pipeline=_LOAD_NUM_PIPELINES,
+      key_minimum=1,
+      key_maximum=FLAGS.memtier_requests,
+      requests='allkeys')
+  client_vm.RemoteCommand(cmd)
 
 
 def RunOverAllThreadsAndPipelines(client_vm, server_ip, server_port):
@@ -160,27 +219,27 @@ def Run(vm, server_ip, server_port, threads, pipeline):
 
   for client_count in FLAGS.memtier_clients:
     vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
-    cmd = [
-        'memtier_benchmark',
-        '-s', server_ip,
-        '-p', str(server_port),
-        '-P', FLAGS.memtier_protocol,
-        '--run-count', str(FLAGS.memtier_run_count),
-        '--clients', str(client_count),
-        '--threads', str(threads),
-        '--ratio', memtier_ratio,
-        '--data-size', str(FLAGS.memtier_data_size),
-        '--key-pattern', FLAGS.memtier_key_pattern,
-        '--pipeline', str(pipeline),
-        '--key-minimum', '1',
-        '--key-maximum', str(FLAGS.memtier_requests),
-        '--random-data']
-    if FLAGS.memtier_run_duration:
-      cmd.extend(['--test-time', str(FLAGS.memtier_run_duration)])
-    else:
-      cmd.extend(['--requests', str(FLAGS.memtier_requests)])
-    cmd.extend(['>', MEMTIER_RESULTS])
-    vm.RemoteCommand(' '.join(cmd))
+    # Specify one of run requests or run duration.
+    requests = (
+        FLAGS.memtier_requests if FLAGS.memtier_run_duration is None else None)
+    cmd = BuildMemtierCommand(
+        server=server_ip,
+        port=server_port,
+        protocol=FLAGS.memtier_protocol,
+        run_count=FLAGS.memtier_run_count,
+        clients=client_count,
+        threads=threads,
+        ratio=memtier_ratio,
+        data_size=FLAGS.memtier_data_size,
+        key_pattern=FLAGS.memtier_key_pattern,
+        pipeline=pipeline,
+        key_minimum=1,
+        key_maximum=FLAGS.memtier_requests,
+        random_data=True,
+        test_time=FLAGS.memtier_run_duration,
+        requests=requests,
+        outfile=MEMTIER_RESULTS)
+    vm.RemoteCommand(cmd)
 
     results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
     metadata = GetMetadata(threads, pipeline)

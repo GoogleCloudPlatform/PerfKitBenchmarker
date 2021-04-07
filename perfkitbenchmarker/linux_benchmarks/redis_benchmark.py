@@ -47,7 +47,6 @@ _SET_GET_RATIO = flags.DEFINE_string(
     '\'1:0\', ie: writes only.')
 FLAGS = flags.FLAGS
 
-START_KEY = 1
 BENCHMARK_NAME = 'redis'
 BENCHMARK_CONFIG = """
 redis:
@@ -124,22 +123,31 @@ def RunLoad(redis_vm: _LinuxVirtualMachine, load_vm: _LinuxVirtualMachine,
                     f'Passed in {FLAGS.memtier_pipeline}.')
   memtier_pipeline = FLAGS.memtier_pipeline[0]
 
-  base_cmd = ('memtier_benchmark -s %s  -p %d  -d %s '
-              '--ratio %s --key-pattern %s --pipeline %d -c 1 -t %d '
-              '--test-time %d --random-data --key-minimum %d '
-              '--key-maximum %d > %s ;')
-  final_cmd = (
-      base_cmd %
-      (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
-       _SET_GET_RATIO.value, FLAGS.memtier_key_pattern, memtier_pipeline,
-       threads, 10, START_KEY, FLAGS.memtier_requests, '/dev/null') + base_cmd %
-      (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
-       _SET_GET_RATIO.value, FLAGS.memtier_key_pattern, memtier_pipeline,
-       threads, 20, START_KEY, FLAGS.memtier_requests, 'outfile-%d' % test_id) +
-      base_cmd %
-      (redis_vm.internal_ip, port, FLAGS.memtier_data_size,
-       _SET_GET_RATIO.value, FLAGS.memtier_key_pattern, memtier_pipeline,
-       threads, 10, START_KEY, FLAGS.memtier_requests, '/dev/null'))
+  measurement_cmd = memtier.BuildMemtierCommand(
+      server=redis_vm.internal_ip,
+      port=port,
+      data_size=FLAGS.memtier_data_size,
+      ratio=_SET_GET_RATIO.value,
+      key_pattern=FLAGS.memtier_key_pattern,
+      pipeline=memtier_pipeline,
+      threads=threads,
+      test_time=20,
+      key_minimum=1,
+      key_maximum=FLAGS.memtier_requests,
+      outfile=f'outfile-{test_id}')
+  no_output_cmd = memtier.BuildMemtierCommand(
+      server=redis_vm.internal_ip,
+      port=port,
+      data_size=FLAGS.memtier_data_size,
+      ratio=_SET_GET_RATIO.value,
+      key_pattern=FLAGS.memtier_key_pattern,
+      pipeline=memtier_pipeline,
+      threads=threads,
+      test_time=10,
+      key_minimum=1,
+      key_maximum=FLAGS.memtier_requests,
+      outfile='/dev/null')
+  final_cmd = f'{no_output_cmd}; {measurement_cmd}; {no_output_cmd}'
 
   load_vm.RemoteCommand(final_cmd)
   output, _ = load_vm.RemoteCommand(f'cat outfile-{test_id} | grep Totals | '
