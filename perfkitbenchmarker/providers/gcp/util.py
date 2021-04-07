@@ -234,33 +234,47 @@ class GcloudCommand(object):
       A tuple of stdout, stderr, and retcode from running the gcloud command.
     Raises:
       RateLimitExceededError: if command fails with Rate Limit Exceeded.
+      QuotaFailure: if command fails without Rate Limit Exceeded and
+      retry_on_rate_limited is set to false
       IssueCommandError: if command fails without Rate Limit Exceeded.
 
     """
-    if FLAGS.retry_on_rate_limited:
-      try:
-        stdout, stderr, retcode = _issue_command_function(self, **kwargs)
-      except errors.VmUtil.IssueCommandError as error:
-        if GcloudCommand._IsIssueRateLimitMessage(str(error)):
-          self.rate_limited = True
-          raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(
-              str(error))
-        else:
-          raise error
-      if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):
-        self.rate_limited = True
-        raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
+    try:
+      stdout, stderr, retcode = _issue_command_function(self, **kwargs)
+    except errors.VmUtil.IssueCommandError as error:
+      error_message = str(error)
+      if GcloudCommand._IsIssueRateLimitMessage(error_message):
+        self._RaiseRateLimitedException(error_message)
+      else:
+        raise error
+    if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):
+      self._RaiseRateLimitedException(stderr)
 
-      return stdout, stderr, retcode
-    else:
-      return _issue_command_function(self, **kwargs)
+    return stdout, stderr, retcode
+
+  def _RaiseRateLimitedException(self, error):
+    """Raise rate limited exception based on the retry_on_rate_limited flag.
+
+    Args:
+      error: Error message to raise
+
+    Raises:
+      RateLimitExceededError: if command fails with Rate Limit Exceeded and
+      retry_on_rate_limited is set to true
+      QuotaFailure: if command fails without Rate Limit Exceeded and
+      retry_on_rate_limited is set to false
+    """
+    self.rate_limited = True
+    if FLAGS.retry_on_rate_limited:
+      raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(error)
+    raise errors.Benchmarks.QuotaFailure(error)
 
   def IssueRetryable(self, **kwargs):
     """Tries running the gcloud command until it succeeds or times out.
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueRetryableCommand
-          when issuing the gcloud command.
+        when issuing the gcloud command.
 
     Returns:
       (stdout, stderr) pair of strings from running the gcloud command.
