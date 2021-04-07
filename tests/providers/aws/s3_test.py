@@ -6,9 +6,10 @@ import mock
 
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import s3
+from tests import pkb_common_test_case
 
 
-class S3Test(unittest.TestCase):
+class S3Test(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(S3Test, self).setUp()

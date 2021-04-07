@@ -36,6 +36,8 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   STORAGE_NAME = aws.CLOUD
 
+  region: str
+
   def PrepareService(self, location):
     self.region = location or DEFAULT_AWS_REGION
 
