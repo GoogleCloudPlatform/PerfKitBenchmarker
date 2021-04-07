@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import re
-from typing import Dict, List, Text
+from typing import Dict, List, Text, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -123,7 +123,7 @@ class CliClientInterface(GenericClientInterface):
             os.path.join(service_specific_dir,
                          'provider_specific_script_driver.py')))
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -186,7 +186,7 @@ class JdbcClientInterface(GenericClientInterface):
         package_name, ['bq-jdbc-client-1.0.jar', 'GoogleBigQueryJDBC42.jar'],
         '')
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -242,7 +242,7 @@ class JavaClientInterface(GenericClientInterface):
                                                     ['bq-java-client-2.3.jar'],
                                                     '')
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
