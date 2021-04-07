@@ -760,7 +760,7 @@ class AzureVirtualMachine(
       result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
-  def UpdateInterruptibleVmStatus(self):
+  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
     """Updates the interruptible status if the VM was preempted."""
     if self.spot_early_termination:
       return
