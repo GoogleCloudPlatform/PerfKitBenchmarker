@@ -18,11 +18,12 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 """
 
 import json
+
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import GCP
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -57,7 +58,7 @@ DISK_METADATA = {
 SCSI = 'SCSI'
 NVME = 'NVME'
 
-disk.RegisterDiskTypeMap(GCP, DISK_TYPE)
+disk.RegisterDiskTypeMap(providers.GCP, DISK_TYPE)
 
 
 class GceDisk(disk.BaseDisk):
