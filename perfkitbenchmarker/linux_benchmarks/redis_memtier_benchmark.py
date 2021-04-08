@@ -47,9 +47,9 @@ _SET_GET_RATIO = flags.DEFINE_string(
     '\'1:0\', ie: writes only.')
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'redis'
-BENCHMARK_CONFIG = """
-redis:
+BENCHMARK_NAME = 'redis_memtier'
+BENCHMARK_CONFIG = f"""
+{BENCHMARK_NAME}:
   description: >
       Run memtier_benchmark against Redis.
       Specify the number of client VMs with --redis_clients.
