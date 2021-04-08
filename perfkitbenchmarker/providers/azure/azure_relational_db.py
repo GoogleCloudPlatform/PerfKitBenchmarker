@@ -74,6 +74,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   """
   CLOUD = azure.CLOUD
 
+  database_name: str
+
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
