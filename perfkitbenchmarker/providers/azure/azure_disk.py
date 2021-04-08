@@ -63,6 +63,11 @@ AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+s_v2)',
 ]
 
+# https://docs.microsoft.com/en-us/azure/virtual-machines/azure-vms-no-temp-disk
+AZURE_NO_TMP_DISK_TYPES = [
+    r'(Standard_D[0-9]+s_v4)', r'(Standard_E[0-9]+s_v4)',
+]
+
 
 def _ProductWithIncreasingLength(iterable, max_length):
   """Yields increasing length cartesian products of iterable."""
@@ -74,13 +79,10 @@ def _ProductWithIncreasingLength(iterable, max_length):
 def _GenerateDrivePathSuffixes():
   """Yields drive path suffix strings.
 
-  Drive path suffixes in the form 'c', 'd', ..., 'z', 'aa', 'ab', etc.
-  Note that because we need the first suffix to be 'c', we need to
-  fast-forward the iterator by two before yielding. Why start at 'c'?
-  The os-disk will be /dev/sda, and the temporary disk will be /dev/sdb:
+  Drive path suffixes in the form 'a', 'b', 'c', 'd', ..., 'z', 'aa', 'ab', etc.
+  Note: the os-disk will be /dev/sda, and the temporary disk will be /dev/sdb:
   https://docs.microsoft.com/en-us/azure/virtual-machines/linux/faq#can-i-use-the-temporary-disk-devsdb1-to-store-data
-
-  Therefore, any additional remote disks will need to begin at 'c'.
+  Some newer VMs (e.g. Dsv4 VMs) do not have temporary disks.
 
   The linux kernel code that determines this naming can be found here:
   https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/scsi/sd.c?h=v2.6.37#n2262
@@ -93,9 +95,6 @@ def _GenerateDrivePathSuffixes():
   products = _ProductWithIncreasingLength(
       character_range, MAX_DRIVE_SUFFIX_LENGTH)
 
-  # We want to start at 'c', so fast-forward the iterator by two.
-  next(products)
-  next(products)
   for p in products:
     yield ''.join(chr(c) for c in p)
 
@@ -119,6 +118,13 @@ def LocalDriveIsNvme(machine_type):
   return any(
       re.search(machine_series, machine_type)
       for machine_series in AZURE_NVME_TYPES)
+
+
+def HasTempDrive(machine_type):
+  """Check if the machine type has the temp drive (sdb)."""
+  return not any(
+      re.search(machine_series, machine_type)
+      for machine_series in AZURE_NO_TMP_DISK_TYPES)
 
 
 class AzureDisk(disk.BaseDisk):
@@ -238,6 +244,9 @@ class AzureDisk(disk.BaseDisk):
       return '/dev/sdb'
     else:
       try:
-        return '/dev/sd%s' % REMOTE_DRIVE_PATH_SUFFIXES[self.lun]
+        start_index = 1  # the os drive is always at index 0; skip the OS drive.
+        if HasTempDrive(self.machine_type):
+          start_index += 1
+        return '/dev/sd%s' % REMOTE_DRIVE_PATH_SUFFIXES[start_index + self.lun]
       except IndexError:
         raise TooManyAzureDisksError()
