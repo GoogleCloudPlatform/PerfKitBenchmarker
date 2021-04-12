@@ -141,7 +141,7 @@ def _PrepareServer(vm):
   vm.Install(NGINX)
 
   # Required to make uplink test function properly
-  vm.RemoteCommand('sudo sed -i "/server_name _;/a error_page  405 =200 $uri;" /etc/nginx/sites-enabled/default')
+  vm.RemoteCommand('sudo sed -i "/server_name _;/a error_page  405 =200 \$uri;" /etc/nginx/sites-enabled/default')
   vm.RemoteCommand('sudo sed -i "/server_name _;/a client_max_body_size 100M;" /etc/nginx/sites-enabled/default')
   vm.RemoteCommand('sudo systemctl restart nginx')
 
