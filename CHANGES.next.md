@@ -34,6 +34,7 @@
 -   Add support for setting egress bandwidth tier for GCP VMs.
 -   Add support for Azure Ultra Disk
 -   Add `cloudharmony_network` benchmark
+-   Add GPU PingPong benchmark.
 
 ### Enhancements:
 
