@@ -20,9 +20,12 @@ import json
 import logging
 import pathlib
 import re
-from typing import Union
+from typing import Any, Dict, List, Text, Tuple, Union
 
 from absl import flags
+import dataclasses
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 
@@ -35,51 +38,58 @@ MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = ('autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev')
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
-MEMTIER_RESULTS = 'memtier_results'
+MEMTIER_RESULTS = pathlib.PosixPath('memtier_results')
 
 _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
 _WRITE_ONLY = '1:0'
 
+MemtierHistogram = List[Dict[str, Union[float, int]]]
+
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('memtier_protocol', 'memcache_binary',
-                  ['memcache_binary', 'redis', 'memcache_text'],
-                  'Protocol to use. Supported protocols are redis, '
-                  'memcache_text, and memcache_binary. '
-                  'Defaults to memcache_binary.')
-flags.DEFINE_integer('memtier_run_count', 1,
-                     'Number of full-test iterations to perform. '
-                     'Defaults to 1.')
-flags.DEFINE_integer('memtier_run_duration', None,
-                     'Mutually exclusive with memtier_requests.'
-                     'Duration for each client count in seconds. '
-                     'By default, test length is set '
-                     'by memtier_requests, the number of requests sent by each '
-                     'client. By specifying run_duration, key space remains '
-                     'the same (from 1 to memtier_requests), but test stops '
-                     'once run_duration is passed. '
-                     'Total test duration = run_duration * runs * '
-                     'len(memtier_clients).')
-flags.DEFINE_integer('memtier_requests', 10000,
-                     'Mutually exclusive with memtier_run_duration. '
-                     'Number of total requests per client. Defaults to 10000.')
-flags.DEFINE_list('memtier_clients', [50],
-                  'Comma separated list of number of clients per thread. '
-                  'Specify more than 1 value to vary the number of clients. '
-                  'Defaults to [50].')
-flags.DEFINE_list('memtier_threads', [4],
-                  'Number of threads. Defaults to 4.')
-flags.DEFINE_integer('memtier_ratio', 9,
-                     'Set:Get ratio. Defaults to 9x Get versus Sets (9 Gets to '
-                     '1 Set in 10 total requests).')
+flags.DEFINE_enum(
+    'memtier_protocol', 'memcache_binary',
+    ['memcache_binary', 'redis', 'memcache_text'],
+    'Protocol to use. Supported protocols are redis, '
+    'memcache_text, and memcache_binary. '
+    'Defaults to memcache_binary.')
+flags.DEFINE_integer(
+    'memtier_run_count', 1, 'Number of full-test iterations to perform. '
+    'Defaults to 1.')
+flags.DEFINE_integer(
+    'memtier_run_duration', None, 'Mutually exclusive with memtier_requests.'
+    'Duration for each client count in seconds. '
+    'By default, test length is set '
+    'by memtier_requests, the number of requests sent by each '
+    'client. By specifying run_duration, key space remains '
+    'the same (from 1 to memtier_requests), but test stops '
+    'once run_duration is passed. '
+    'Total test duration = run_duration * runs * '
+    'len(memtier_clients).')
+flags.DEFINE_integer(
+    'memtier_requests', 10000, 'Mutually exclusive with memtier_run_duration. '
+    'Number of total requests per client. Defaults to 10000.')
+flag_util.DEFINE_integerlist(
+    'memtier_clients', [50],
+    'Comma separated list of number of clients per thread. '
+    'Specify more than 1 value to vary the number of clients. '
+    'Defaults to [50].')
+flag_util.DEFINE_integerlist('memtier_threads', [4],
+                             'Number of threads. Defaults to 4.')
+flags.DEFINE_integer(
+    'memtier_ratio', 9,
+    'Set:Get ratio. Defaults to 9x Get versus Sets (9 Gets to '
+    '1 Set in 10 total requests).')
 flags.DEFINE_integer('memtier_data_size', 32,
                      'Object data size. Defaults to 32 bytes.')
-flags.DEFINE_string('memtier_key_pattern', 'R:R',
-                    'Set:Get key pattern. G for Gaussian distribution, R for '
-                    'uniform Random, S for Sequential. Defaults to R:R.')
-flags.DEFINE_list('memtier_pipeline', [1],
-                  'Number of pipelines to use for memtier. Defaults to 1, '
-                  'i.e. no pipelining.')
+flags.DEFINE_string(
+    'memtier_key_pattern', 'R:R',
+    'Set:Get key pattern. G for Gaussian distribution, R for '
+    'uniform Random, S for Sequential. Defaults to R:R.')
+flag_util.DEFINE_integerlist(
+    'memtier_pipeline', [1],
+    'Number of pipelines to use for memtier. Defaults to 1, '
+    'i.e. no pipelining.')
 
 
 def YumInstall(vm):
@@ -141,7 +151,7 @@ def BuildMemtierCommand(
     run_count: int = None,
     random_data: bool = None,
     test_time: int = None,
-    outfile: pathlib.Path = None,
+    outfile: pathlib.PosixPath = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
@@ -174,7 +184,7 @@ def BuildMemtierCommand(
     if value:
       cmd.append(f'--{no_param_arg}')
   if outfile:
-    cmd.extend(['>', outfile])
+    cmd.extend(['>', str(outfile)])
   return ' '.join(cmd)
 
 
@@ -241,10 +251,12 @@ def Run(vm, server_ip, server_port, threads, pipeline):
         outfile=MEMTIER_RESULTS)
     vm.RemoteCommand(cmd)
 
-    results, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
+    output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
     metadata = GetMetadata(threads, pipeline)
     metadata['memtier_clients'] = client_count
-    samples.extend(ParseResults(results, metadata))
+    results = MemtierResult.Parse(output)
+    run_samples = results.GetSamples(metadata)
+    samples.extend(run_samples)
 
   return samples
 
@@ -265,43 +277,77 @@ def GetMetadata(threads, pipeline):
   return meta
 
 
-def ParseResults(memtier_results, meta):
-  """Parse memtier_benchmark result textfile into samples.
+@dataclasses.dataclass
+class MemtierResult:
+  """Class that represents memtier results."""
+  ops_per_sec: float
+  kb_per_sec: float
+  latency_ms: float
+  get_latency_histogram: MemtierHistogram
+  set_latency_histogram: MemtierHistogram
 
-  Args:
-    memtier_results: Text output of running Memtier benchmark.
-    meta: metadata associated with the results.
-  Yields:
-    List of sample.Sample objects.
+  @classmethod
+  def Parse(cls, memtier_results: Text) -> 'MemtierResult':
+    """Parse memtier_benchmark result textfile and return results.
 
-  Example memtier_benchmark output, note Hits/sec and Misses/sec are displayed
-  in error for version 1.2.8+ due to bug:
-  https://github.com/RedisLabs/memtier_benchmark/issues/46
+    Args:
+      memtier_results: Text output of running Memtier benchmark.
+    Returns:
+      MemtierResult object.
 
-  4         Threads
-  50        Connections per thread
-  20        Seconds
-  Type        Ops/sec     Hits/sec   Misses/sec      Latency       KB/sec
-  ------------------------------------------------------------------------
-  Sets        4005.50          ---          ---      4.50600       308.00
-  Gets       40001.05         0.00     40001.05      4.54300      1519.00
-  Totals     44006.55         0.00     40001.05      4.54000      1828.00
+    Example memtier_benchmark output, note Hits/sec and Misses/sec are displayed
+    in error for version 1.2.8+ due to bug:
+    https://github.com/RedisLabs/memtier_benchmark/issues/46
 
-  Request Latency Distribution
-  Type        <= msec      Percent
-  ------------------------------------------------------------------------
-  SET               0         9.33
-  SET               1        71.07
-  ...
-  SET              33       100.00
-  SET              36       100.00
-  ---
-  GET               0        10.09
-  GET               1        70.88
-  ..
-  GET              40       100.00
-  GET              41       100.00
-  """
+    4         Threads
+    50        Connections per thread
+    20        Seconds
+    Type        Ops/sec     Hits/sec   Misses/sec      Latency       KB/sec
+    ------------------------------------------------------------------------
+    Sets        4005.50          ---          ---      4.50600       308.00
+    Gets       40001.05         0.00     40001.05      4.54300      1519.00
+    Totals     44006.55         0.00     40001.05      4.54000      1828.00
+
+    Request Latency Distribution
+    Type        <= msec      Percent
+    ------------------------------------------------------------------------
+    SET               0         9.33
+    SET               1        71.07
+    ...
+    SET              33       100.00
+    SET              36       100.00
+    ---
+    GET               0        10.09
+    GET               1        70.88
+    ..
+    GET              40       100.00
+    GET              41       100.00
+    """
+    ops_per_sec, latency_ms, kb_per_sec = _ParseTotalThroughputAndLatency(
+        memtier_results)
+    set_histogram, get_histogram = _ParseHistogram(memtier_results)
+    return cls(ops_per_sec, kb_per_sec, latency_ms, get_histogram,
+               set_histogram)
+
+  def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
+    """Return this result as a list of samples."""
+    samples = [
+        sample.Sample('Ops Throughput', self.ops_per_sec, 'ops/s', metadata),
+        sample.Sample('KB Throughput', self.kb_per_sec, 'KB/s', metadata),
+        sample.Sample('Latency', self.latency_ms, 'ms', metadata),
+    ]
+    for name, histogram in [('get', self.get_latency_histogram),
+                            ('set', self.set_latency_histogram)]:
+      hist_meta = metadata.copy()
+      hist_meta.update({'histogram': json.dumps(histogram)})
+      samples.append(
+          sample.Sample(f'{name} latency histogram', 0, '', hist_meta))
+    return samples
+
+
+def _ParseHistogram(
+    memtier_results: Text) -> Tuple[MemtierHistogram, MemtierHistogram]:
+  """Parses the 'Request Latency Distribution' section of memtier output."""
   set_histogram = []
   get_histogram = []
   total_requests = FLAGS.memtier_requests
@@ -311,30 +357,30 @@ def ParseResults(memtier_results, meta):
   last_total_gets = 0
   for raw_line in memtier_results.splitlines():
     line = raw_line.strip()
-
-    if re.match(r'^Totals', line):
-      _, ops, _, _, _, kilobyte = line.split()
-      yield sample.Sample('Ops Throughput', float(ops), 'ops/s', meta)
-      yield sample.Sample('KB Throughput', float(kilobyte), 'KB/s', meta)
-
     last_total_sets = _ParseLine(
         r'^SET',
         line,
         approx_total_sets,
         last_total_sets,
         set_histogram)
-
     last_total_gets = _ParseLine(
         r'^GET',
         line,
         approx_total_gets,
         last_total_gets,
         get_histogram)
+  return set_histogram, get_histogram
 
-  for name, histogram in [('get', get_histogram), ('set', set_histogram)]:
-    hist_meta = meta.copy()
-    hist_meta.update({'histogram': json.dumps(histogram)})
-    yield sample.Sample('{0} latency histogram'.format(name), 0, '', hist_meta)
+
+def _ParseTotalThroughputAndLatency(
+    memtier_results: Text) -> Tuple[float, float, float]:
+  """Parses the 'TOTALS' output line and return throughput and latency."""
+  for raw_line in memtier_results.splitlines():
+    line = raw_line.strip()
+    if re.match(r'^Totals', line):
+      _, ops_per_sec, _, _, latency_ms, kb_per_sec = line.split()
+      return float(ops_per_sec), float(latency_ms), float(kb_per_sec)
+  raise errors.Benchmarks.RunError('No "TOTALS" line in memtier output.')
 
 
 def _ParseLine(pattern, line, approx_total, last_total, histogram):

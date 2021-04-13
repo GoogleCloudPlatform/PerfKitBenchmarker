@@ -76,6 +76,11 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             unit='KB/s',
             metadata=METADATA),
         sample.Sample(
+            metric='Latency',
+            value=4.54,
+            unit='ms',
+            metadata=METADATA),
+        sample.Sample(
             metric='get latency histogram',
             value=0,
             unit='',
@@ -87,7 +92,8 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata=set_metadata),
     ]
     samples = []
-    samples.extend(memtier.ParseResults(TEST_OUTPUT, METADATA))
+    results = memtier.MemtierResult.Parse(TEST_OUTPUT)
+    samples.extend(results.GetSamples(METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
 
 
