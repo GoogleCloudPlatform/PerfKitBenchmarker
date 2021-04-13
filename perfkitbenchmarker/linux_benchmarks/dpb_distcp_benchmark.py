@@ -99,10 +99,7 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  if (FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS
-      or FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS):
-    run_uri = benchmark_spec.uuid.split('-')[0]
-    benchmark_spec.dpb_service.CreateBucket('pkb-' + run_uri)
+  del benchmark_spec  # unused
 
 
 def Run(benchmark_spec):
@@ -115,16 +112,28 @@ def Run(benchmark_spec):
     A list of samples
   """
   run_uri = benchmark_spec.uuid.split('-')[0]
-  base_dir = 'pkb-' + run_uri
   service = benchmark_spec.dpb_service
 
   if FLAGS.distcp_source_fs == BaseDpbService.HDFS_FS:
-    source_dir = '/{}/'.format(base_dir)
+    source_dir = '/pkb-{}/distcp_source/'.format(run_uri)
+  elif service.base_dir.startswith(FLAGS.distcp_source_fs):
+    source_dir = service.base_dir + '/distcp_source/'
   else:
-    source_dir = '{}://{}/'.format(FLAGS.distcp_source_fs, base_dir)
+    raise errors.Config.InvalidValue(
+        'Service type {} cannot use distcp_source_fs: {}'.format(
+            service.type, FLAGS.distcp_source_fs))
 
   # Subdirectory TestDFSO writes data to
   source_data_dir = source_dir + 'io_data'
+
+  if FLAGS.distcp_dest_fs == BaseDpbService.HDFS_FS:
+    destination_dir = '/pkb-{}/distcp_destination/'.format(run_uri)
+  elif service.base_dir.startswith(FLAGS.distcp_dest_fs):
+    destination_dir = service.base_dir + '/distcp_destination/'
+  else:
+    raise errors.Config.InvalidValue(
+        'Service type {} cannot use distcp_dest_fs: {}'.format(
+            service.type, FLAGS.distcp_destination_fs))
 
   # Generate data to copy
   # TODO(saksena): Add a generic GenerateData method to dpb_service.
@@ -134,12 +143,6 @@ def Run(benchmark_spec):
       source_dir,
       FLAGS.distcp_num_files,
       FLAGS.distcp_file_size_mbs)
-
-  if FLAGS.distcp_dest_fs == BaseDpbService.HDFS_FS:
-    destination_dir = '/{}/dfsio_destination/'.format(base_dir)
-  else:
-    destination_dir = '{}://{}/dfsio_destination/'.format(
-        FLAGS.distcp_source_fs, base_dir)
 
   result = benchmark_spec.dpb_service.DistributedCopy(
       source_data_dir, destination_dir)
@@ -166,7 +169,4 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
   """Cleans up the distcp benchmark."""
-  if (FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS
-      or FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS):
-    run_uri = benchmark_spec.uuid.split('-')[0]
-    benchmark_spec.dpb_service.DeleteBucket('pkb-' + run_uri)
+  del benchmark_spec  # unused
