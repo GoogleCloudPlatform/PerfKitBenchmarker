@@ -86,6 +86,9 @@ flags.DEFINE_string(
     'memtier_key_pattern', 'R:R',
     'Set:Get key pattern. G for Gaussian distribution, R for '
     'uniform Random, S for Sequential. Defaults to R:R.')
+flags.DEFINE_integer(
+    'memtier_key_maximum', 10000000, 'Key ID maximum value. The range of keys '
+    'will be from 1 (min) to this specified max key value.')
 flag_util.DEFINE_integerlist(
     'memtier_pipeline', [1],
     'Number of pipelines to use for memtier. Defaults to 1, '
@@ -200,7 +203,7 @@ def Load(client_vm, server_ip, server_port):
       data_size=FLAGS.memtier_data_size,
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=1,
-      key_maximum=FLAGS.memtier_requests,
+      key_maximum=FLAGS.memtier_key_maximum,
       requests='allkeys')
   client_vm.RemoteCommand(cmd)
 
@@ -244,7 +247,7 @@ def Run(vm, server_ip, server_port, threads, pipeline):
         key_pattern=FLAGS.memtier_key_pattern,
         pipeline=pipeline,
         key_minimum=1,
-        key_maximum=FLAGS.memtier_requests,
+        key_maximum=FLAGS.memtier_key_maximum,
         random_data=True,
         test_time=FLAGS.memtier_run_duration,
         requests=requests,
@@ -268,6 +271,7 @@ def GetMetadata(threads, pipeline):
           'memtier_requests': FLAGS.memtier_requests,
           'memtier_threads': threads,
           'memtier_ratio': FLAGS.memtier_ratio,
+          'memtier_key_maximum': FLAGS.memtier_key_maximum,
           'memtier_data_size': FLAGS.memtier_data_size,
           'memtier_key_pattern': FLAGS.memtier_key_pattern,
           'memtier_pipeline': pipeline,
