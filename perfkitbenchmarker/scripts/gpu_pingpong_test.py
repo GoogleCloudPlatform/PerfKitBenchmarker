@@ -22,20 +22,17 @@ def Run(server: str) -> None:
 
       with tf.device(recver.name):
         recv_tensor = tf.multiply(tensor, 2.0)
-        print(recv_tensor.device)
 
       with tf.device(sender.name):
         send_tensor = tf.multiply(recv_tensor, 2.0)
-        print(send_tensor.device)
 
       return send_tensor, tf.add(iteration, 1)
 
     with tf.device(sender.name):
       send_tensor = tf.constant(1.0)
-      print(send_tensor.device)
 
     recv_pong, _ = tf.while_loop(
-        lambda recv_tensor, iteration: tf.less(iteration, 100),
+        lambda recv_tensor, iteration: tf.less(iteration, 1000),
         Connect,
         [send_tensor, 0])
 

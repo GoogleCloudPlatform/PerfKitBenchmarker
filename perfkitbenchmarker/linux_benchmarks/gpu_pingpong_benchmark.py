@@ -42,17 +42,18 @@ gpu_pingpong:
       vm_count: 2
       vm_spec:
         GCP:
-          machine_type: a2-highgpu-1g
-          zone: us-central1-a
+          machine_type: a2-highgpu-8g
+          zone: us-central1-c
           image_family: tf2-2-4-cu110-debian-10
           image_project: deeplearning-platform-release
         AWS:
           machine_type: p4d.24xlarge
           zone: us-east-1a
-          image: ami-084e787069ee27fb7
+          image: ami-0e956fe81fa11d0a9
         Azure:
-          machine_type: Standard_NC6s_v3
+          machine_type: Standard_ND40rs_v2
           zone: eastus
+          image: microsoft-dsvm:ubuntu-1804:1804-gen2:21.01.21
 """
 _TEST_SCRIPT = 'gpu_pingpong_test.py'
 _SERVER_SCRIPT = 'gpu_pingpong_server.py'
