@@ -506,6 +506,7 @@ class NfsDisk(NetworkDisk):
     for key, value in six.iteritems(self._GetNetworkDiskMountOptionsDict()):
       self.metadata['nfs_{}'.format(key)] = value
     if nfs_tier:
+      self.nfs_tier = nfs_tier
       self.metadata['nfs_tier'] = nfs_tier
     super(NfsDisk, self).GetResourceMetadata()
 
