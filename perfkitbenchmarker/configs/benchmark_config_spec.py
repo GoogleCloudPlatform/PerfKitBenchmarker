@@ -565,25 +565,25 @@ class _RelationalDbSpec(spec.BaseSpec):
     has_client_custom_machine_type = has_client_vm_cpus and has_client_vm_memory
 
     if has_custom_machine_type and has_db_machine_type:
-      raise errors.config.UnrecognizedOption(
+      raise errors.Config.UnrecognizedOption(
           'db_cpus/db_memory can not be specified with '
           'db_machine_type.   Either specify a custom machine '
           'with cpus and memory or specify a predefined machine type.')
 
     if (not has_custom_machine_type and (has_db_cpus or has_db_memory)):
-      raise errors.config.MissingOption(
+      raise errors.Config.MissingOption(
           'To specify a custom database machine instance, both managed_db_cpus '
           'and managed_db_memory must be specified.')
 
     if has_client_custom_machine_type and has_client_machine_type:
-      raise errors.config.UnrecognizedOption(
+      raise errors.Config.UnrecognizedOption(
           'client_vm_cpus/client_vm_memory can not be specified with '
           'client_vm_machine_type.   Either specify a custom machine '
           'with cpus and memory or specify a predefined machine type.')
 
     if (not has_client_custom_machine_type and
         (has_client_vm_cpus or has_client_vm_memory)):
-      raise errors.config.MissingOption(
+      raise errors.Config.MissingOption(
           'To specify a custom client VM, both client_vm_cpus '
           'and client_vm_memory must be specified.')
 
