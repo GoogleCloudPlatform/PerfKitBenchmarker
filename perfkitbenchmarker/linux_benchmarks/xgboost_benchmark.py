@@ -55,17 +55,20 @@ xgboost:
     default:
       vm_spec:
         GCP:
-          machine_type: a2-highgpu-1g
-          zone: us-central1-a
+          machine_type: n1-standard-4
+          gpu_type: t4
+          gpu_count: 1
+          zone: us-east1-c
           image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
         AWS:
-          machine_type: p4d.24xlarge
+          machine_type: g4dn.xlarge
           zone: us-east-1a
-          image: ami-084e787069ee27fb7
+          image: ami-0e956fe81fa11d0a9
         Azure:
-          machine_type: Standard_NC6s_v3
+          machine_type: Standard_NC4as_T4_v3
           zone: eastus
+          image: microsoft-dsvm:ubuntu-1804:1804-gen2:21.01.21
 """
 
 
