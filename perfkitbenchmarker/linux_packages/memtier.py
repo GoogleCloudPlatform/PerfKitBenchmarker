@@ -208,74 +208,77 @@ def Load(client_vm, server_ip, server_port):
   client_vm.RemoteCommand(cmd)
 
 
-def RunOverAllThreadsAndPipelines(client_vm, server_ip, server_port):
+def RunOverAllThreadsPipelinesAndClients(
+    client_vm, server_ip: str, server_port: str) -> List[sample.Sample]:
   """Runs memtier over all pipeline and thread combinations."""
   samples = []
   for pipeline in FLAGS.memtier_pipeline:
     for client_thread in FLAGS.memtier_threads:
-      logging.info(
-          'Start benchmarking memcached using memtier:\n'
-          '\tmemtier threads: %s'
-          '\tmemtier pipeline, %s',
-          client_thread, pipeline)
-      tmp_samples = Run(
-          client_vm, server_ip, server_port,
-          client_thread, pipeline)
-      samples.extend(tmp_samples)
+      for client in FLAGS.memtier_clients:
+        logging.info(
+            'Start benchmarking memcached using memtier:\n'
+            '\tmemtier client: %s'
+            '\tmemtier threads: %s'
+            '\tmemtier pipeline, %s', client, client_thread, pipeline)
+        results = _Run(
+            vm=client_vm,
+            server_ip=server_ip,
+            server_port=server_port,
+            threads=client_thread,
+            pipeline=pipeline,
+            clients=client)
+        metadata = GetMetadata(
+            clients=client, threads=client_thread, pipeline=pipeline)
+        samples.extend(results.GetSamples(metadata))
   return samples
 
 
-def Run(vm, server_ip, server_port, threads, pipeline):
+def _Run(vm, server_ip: str, server_port: str, threads: int, pipeline: int,
+         clients: int) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
-  samples = []
+  vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
+  # Specify one of run requests or run duration.
+  requests = (
+      FLAGS.memtier_requests if FLAGS.memtier_run_duration is None else None)
+  cmd = BuildMemtierCommand(
+      server=server_ip,
+      port=server_port,
+      protocol=FLAGS.memtier_protocol,
+      run_count=FLAGS.memtier_run_count,
+      clients=clients,
+      threads=threads,
+      ratio=memtier_ratio,
+      data_size=FLAGS.memtier_data_size,
+      key_pattern=FLAGS.memtier_key_pattern,
+      pipeline=pipeline,
+      key_minimum=1,
+      key_maximum=FLAGS.memtier_key_maximum,
+      random_data=True,
+      test_time=FLAGS.memtier_run_duration,
+      requests=requests,
+      outfile=MEMTIER_RESULTS)
+  vm.RemoteCommand(cmd)
 
-  for client_count in FLAGS.memtier_clients:
-    vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
-    # Specify one of run requests or run duration.
-    requests = (
-        FLAGS.memtier_requests if FLAGS.memtier_run_duration is None else None)
-    cmd = BuildMemtierCommand(
-        server=server_ip,
-        port=server_port,
-        protocol=FLAGS.memtier_protocol,
-        run_count=FLAGS.memtier_run_count,
-        clients=client_count,
-        threads=threads,
-        ratio=memtier_ratio,
-        data_size=FLAGS.memtier_data_size,
-        key_pattern=FLAGS.memtier_key_pattern,
-        pipeline=pipeline,
-        key_minimum=1,
-        key_maximum=FLAGS.memtier_key_maximum,
-        random_data=True,
-        test_time=FLAGS.memtier_run_duration,
-        requests=requests,
-        outfile=MEMTIER_RESULTS)
-    vm.RemoteCommand(cmd)
-
-    output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
-    metadata = GetMetadata(threads, pipeline)
-    metadata['memtier_clients'] = client_count
-    results = MemtierResult.Parse(output)
-    run_samples = results.GetSamples(metadata)
-    samples.extend(run_samples)
-
-  return samples
+  output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
+  return MemtierResult.Parse(output)
 
 
-def GetMetadata(threads, pipeline):
+def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
   """Metadata for memtier test."""
-  meta = {'memtier_protocol': FLAGS.memtier_protocol,
-          'memtier_run_count': FLAGS.memtier_run_count,
-          'memtier_requests': FLAGS.memtier_requests,
-          'memtier_threads': threads,
-          'memtier_ratio': FLAGS.memtier_ratio,
-          'memtier_key_maximum': FLAGS.memtier_key_maximum,
-          'memtier_data_size': FLAGS.memtier_data_size,
-          'memtier_key_pattern': FLAGS.memtier_key_pattern,
-          'memtier_pipeline': pipeline,
-          'memtier_version': GIT_TAG}
+  meta = {
+      'memtier_protocol': FLAGS.memtier_protocol,
+      'memtier_run_count': FLAGS.memtier_run_count,
+      'memtier_requests': FLAGS.memtier_requests,
+      'memtier_threads': threads,
+      'memtier_clients': clients,
+      'memtier_ratio': FLAGS.memtier_ratio,
+      'memtier_key_maximum': FLAGS.memtier_key_maximum,
+      'memtier_data_size': FLAGS.memtier_data_size,
+      'memtier_key_pattern': FLAGS.memtier_key_pattern,
+      'memtier_pipeline': pipeline,
+      'memtier_version': GIT_TAG
+  }
   if FLAGS.memtier_run_duration:
     meta['memtier_run_duration'] = FLAGS.memtier_run_duration
   return meta
