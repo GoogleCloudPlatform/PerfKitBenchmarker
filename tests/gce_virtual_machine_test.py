@@ -232,7 +232,6 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
           'memory': '1.0GiB'
       }, 'skylake', 'skylake'),
       ('n1', 'n1-standard-2', 'skylake', 'skylake'),
-      ('n2', 'n2-standard-4', 'skylake', None),
   )
   def testGenerateCreateCommand(self, machine_type, min_cpu_platform_flag,
                                 min_cpu_platform_in_command):

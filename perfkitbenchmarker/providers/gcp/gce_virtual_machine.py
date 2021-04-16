@@ -455,10 +455,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         cmd.flags['min-cpu-platform'] = self.min_cpu_platform
     else:
       cmd.flags['machine-type'] = self.machine_type
-      if self.min_cpu_platform and 'n1-' in self.machine_type:
+      if self.min_cpu_platform:
         cmd.flags['min-cpu-platform'] = self.min_cpu_platform
-      elif self.min_cpu_platform:
-        logging.warning('Cannot set min-cpu-platform for %s', self.machine_type)
     if self.gpu_count and self.machine_type and 'a2-' not in self.machine_type:
       # A2 machine type already has predefined GPU type and count.
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
