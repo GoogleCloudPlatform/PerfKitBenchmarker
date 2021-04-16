@@ -41,8 +41,6 @@ flags.DEFINE_integer(
 flags.DEFINE_integer('nccl_seconds_between_runs', 10,
                      'Sleep between consecutive run.')
 flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
-flags.DEFINE_boolean('nccl_install_mofed', False,
-                     'Install Mellanox OpenFabrics drivers')
 flags.DEFINE_multi_enum(
     'nccl_operations', ['all_reduce', 'all_gather', 'alltoall'],
     ['all_reduce', 'all_gather', 'broadcast', 'reduce_scatter', 'reduce',
@@ -146,7 +144,7 @@ def PrepareVm(vm):
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
            '$LD_LIBRARY_PATH &&')
-  if FLAGS.nccl_install_mofed:
+  if FLAGS.mofed_install:
     vm.Install('mofed')
   vm.AuthenticateVm()
   vm.Install('cuda_toolkit')
@@ -201,7 +199,7 @@ def CreateMetadataDict():
       'nccl_extra_params': FLAGS.nccl_extra_params,
       'extra_params': FLAGS.nccl_extra_params
   }
-  if FLAGS.nccl_install_mofed:
+  if FLAGS.mofed_install:
     metadata['mofed_version'] = FLAGS.mofed_version
   return metadata
 

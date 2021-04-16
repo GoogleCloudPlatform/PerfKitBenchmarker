@@ -171,6 +171,8 @@ def _PrepareHpcg(vm):
   Args:
     vm: vm to operate on
   """
+  if FLAGS.mofed_install:
+    vm.Install('mofed')
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')
   vm.AuthenticateVm()

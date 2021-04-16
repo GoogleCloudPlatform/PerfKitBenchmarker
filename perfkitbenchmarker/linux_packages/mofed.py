@@ -22,6 +22,8 @@ from perfkitbenchmarker import os_types
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('mofed_version', '5.0-2.1.8.0', 'Mellanox OFED version')
+flags.DEFINE_boolean('mofed_install', False,
+                     'Install Mellanox OpenFabrics drivers')
 
 # TODO(tohaowu) Add DEBIAN9, CENTOS7, RHEL
 MOFED_OS_MAPPING = {
