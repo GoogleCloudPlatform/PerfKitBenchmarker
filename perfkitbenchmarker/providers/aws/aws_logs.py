@@ -98,4 +98,4 @@ def GetLogStreamAsString(region, stream_name, log_group):
     token = response['nextForwardToken']
     for event in events:
       log_lines.append(event['message'])
-  return ''.join(log_lines)
+  return '\n'.join(log_lines)
