@@ -188,3 +188,20 @@ class Snowflake(edw_service.EdwService):
     basic_data['schema'] = self.schema
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
+
+
+class Snowflakeexternal(Snowflake):
+  """Class representing Snowflake External Warehouses."""
+
+  SERVICE_TYPE = 'snowflakeexternal'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the Snowflake External service.
+
+    Returns:
+      A dictionary set to service details.
+    """
+    basic_data = super(Snowflakeexternal, self).GetMetadata()
+    basic_data['edw_service_type'] = Snowflakeexternal.SERVICE_TYPE
+    basic_data.update(self.client_interface.GetMetadata())
+    return basic_data
