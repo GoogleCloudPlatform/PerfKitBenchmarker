@@ -193,7 +193,7 @@ class Snowflake(edw_service.EdwService):
 class Snowflakeexternal(Snowflake):
   """Class representing Snowflake External Warehouses."""
 
-  SERVICE_TYPE = 'snowflakeexternal'
+  SERVICE_TYPE = 'snowflakeexternal_aws'
 
   def GetMetadata(self) -> Dict[str, str]:
     """Return a dictionary of the metadata for the Snowflake External service.
