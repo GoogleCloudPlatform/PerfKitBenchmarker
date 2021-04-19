@@ -87,6 +87,8 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'mutilate_measure_depth', None,
     'Master client connection depth.')
+_INCREMENTAL_LOAD = flags.DEFINE_float(
+    'mutilate_incremental_load', None, 'Increments target qps until hits peak.')
 # To use remote agent mode, we need at least 2 VMs.
 AGENT_MODE_MIN_CLIENT_VMS = 2
 
@@ -108,6 +110,11 @@ def CheckPrerequisites():
   if any(agent_mode_flags) and (
       FLAGS.memcached_mutilate_num_client_vms < AGENT_MODE_MIN_CLIENT_VMS):
     raise errors.Setup.InvalidFlagConfigurationError(error_message)
+  if _INCREMENTAL_LOAD.value and (len(FLAGS.mutilate_qps) != 1 or
+                                  int(FLAGS.mutilate_qps[0]) == 0):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'To use dynamic load, set inital target qps with --mutilate_qps '
+        'and incremental with --mutilate_incremental_load.')
 
 
 def YumInstall(vm):
@@ -212,12 +219,15 @@ def Run(vms, server_ip, server_port, num_instances):
       runtime_options['connections'] = connection_count
       for depth in FLAGS.mutilate_depths:
         runtime_options['depth'] = depth
-        for qps in FLAGS.mutilate_qps or [0]:  # 0 indicates peak target QPS.
-          runtime_options['qps'] = int(qps) or 'peak'
+
+        target_qps_list = FLAGS.mutilate_qps or [0]
+        while True:
+          target_qps = int(target_qps_list[0])
+          runtime_options['qps'] = target_qps or 'peak'
           remote_agents = ['--agent=%s' % vm.internal_ip for vm in vms[1:]]
           cmd = BuildCmd(server_ip, server_port, num_instances, [
               '--noload',
-              '--qps=%s' % qps,
+              '--qps=%s' % target_qps,
               '--time=%s' % FLAGS.mutilate_time,
               '--update=%s' % FLAGS.mutilate_ratio,
               '--threads=%s' % (FLAGS.mutilate_measure_threads or thread_count),
@@ -225,11 +235,26 @@ def Run(vms, server_ip, server_port, num_instances):
               '--depth=%s' % depth,
           ] + remote_agents + measure_flags + additional_flags)
 
-          stdout, _ = master.RemoteCommand(' '.join(cmd))
+          try:
+            stdout, _, retcode = master.RemoteHostCommandWithReturnCode(
+                ' '.join(cmd), timeout=FLAGS.mutilate_time * 2,
+                ignore_failure=True)
+          except errors.VmUtil.IssueCommandTimeoutError:
+            break
+          if retcode:
+            break
           metadata = GetMetadata()
           metadata.update(runtime_options)
-          samples.extend(ParseResults(stdout, metadata))
+          run_samples, actual_qps = ParseResults(stdout, metadata)
+          samples.extend(run_samples)
 
+          if _INCREMENTAL_LOAD.value and (actual_qps / target_qps >
+                                          (1 - _INCREMENTAL_LOAD.value * 2)):
+            target_qps_list.append(
+                int(target_qps) * (1 + _INCREMENTAL_LOAD.value))
+          target_qps_list.pop(0)
+          if not target_qps_list:
+            break
   return samples
 
 
@@ -261,7 +286,7 @@ def ParseResults(result, metadata):
     metadata: metadata associated with the results.
 
   Returns:
-    List of sample.Sample objects.
+    List of sample.Sample objects and actual qps.
   """
   samples = []
   if FLAGS.mutilate_ratio < 1.0:
@@ -292,4 +317,4 @@ def ParseResults(result, metadata):
 
   qps = regex_util.ExtractFloat(QPS_REGEX, result)
   samples.append(sample.Sample('qps', qps, 'ops/s', metadata))
-  return samples
+  return samples, qps
