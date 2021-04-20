@@ -220,7 +220,7 @@ def Run(vms, server_ip, server_port, num_instances):
       for depth in FLAGS.mutilate_depths:
         runtime_options['depth'] = depth
 
-        target_qps_list = FLAGS.mutilate_qps or [0]
+        target_qps_list = FLAGS.mutilate_qps[:] or [0]
         while True:
           target_qps = int(target_qps_list[0])
           runtime_options['qps'] = target_qps or 'peak'
