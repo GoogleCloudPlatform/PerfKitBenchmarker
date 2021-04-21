@@ -24,6 +24,10 @@ import re
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 
+# Pip version 20.2.2 is the last verision before pip drops support for Python
+# 3.5 and 2.7 https://pip.pypa.io/en/stable/news/#id119
+MAX_PYTHON_2_PIP_PACKAGE_VERSION = '20.2.2'
+
 # Version of python to match with pip.
 _EXPECTED_PIP_PYTHON_VERSION = 2
 
@@ -54,12 +58,10 @@ def Install(vm, package_name='python-pip'):
   # Make sure pip is available as the PKB user and as root.
   _MakePipSymlink(vm, as_root=False)
   _MakePipSymlink(vm, as_root=True)
-  if vm.PYTHON_PIP_PACKAGE_VERSION:
-    vm.RemoteCommand(
-        'sudo pip install --upgrade '
-        '--force-reinstall pip=={0}'.format(vm.PYTHON_PIP_PACKAGE_VERSION))
-  else:
-    vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
+  upgrade_version = (
+      vm.PYTHON_PIP_PACKAGE_VERSION or MAX_PYTHON_2_PIP_PACKAGE_VERSION)
+  vm.RemoteCommand('sudo pip install --upgrade '
+                   '--force-reinstall pip=={0}'.format(upgrade_version))
 
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
       linux_packages.INSTALL_DIR))

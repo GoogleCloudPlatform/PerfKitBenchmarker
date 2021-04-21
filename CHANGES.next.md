@@ -102,8 +102,9 @@
 -   Updates crcmod, boto, and awscli installation to pip3.
 -   Consolidates adding Ubuntu toolchain repo.
 -   Moved stress_ng installation to a package.
--   Limit pip to v20.2.2 for ubuntu1604 and for
-    object_storage_service_benchmark.
+-   Limit pip2 to v20.2.2.
+-   Limit pip3 to v20.2.2 object_storage_service_benchmark to maintain support
+    for Python 3.5.
 -   Switch to using Google Cloud Build for continuous integration.
 -   Fix PrettyPrintStreamPublisher to make "cpu_utilization_per_minute" show up
     in the PKB results summary for cloud bigtable benchmark.
