@@ -72,6 +72,8 @@
 -   Support wiring properties into DPB clusters with `--dpb_clusters_properties`
     in addition to `--dpb_job_properties`.
 -   Add support for GCS and S3 I/O in PKB managed Spark and Hadoop clusters.
+-   Update FIO workload to support extraction of common benchmark parameters
+    from the scenario string.
 
 ### Bug fixes and maintenance updates:
 

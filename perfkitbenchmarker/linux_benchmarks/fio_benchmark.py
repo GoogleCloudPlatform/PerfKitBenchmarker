@@ -108,7 +108,9 @@ flags.DEFINE_list('fio_generate_scenarios', [],
                   'scenario \'all\' generates all scenarios. Available '
                   'scenarios are sequential_write, sequential_read, '
                   'random_write, and random_read. Cannot use with '
-                  '--fio_jobfile.')
+                  '--fio_jobfile.   You can also specify a scenario in the '
+                  'format accesspattern_blocksize_operation_workingset '
+                  'for a custom workload.')
 flags.DEFINE_enum('fio_target_mode', AGAINST_FILE_WITHOUT_FILL_MODE,
                   [AGAINST_DEVICE_WITH_FILL_MODE,
                    AGAINST_DEVICE_WITHOUT_FILL_MODE,
@@ -260,13 +262,12 @@ rw={{scenario['rwkind']}}
 {%- if scenario['rwmixread'] is defined %}
 rwmixread={{scenario['rwmixread']}}
 {%- endif%}
+{%- if scenario['rwmixwrite'] is defined %}
+rwmixwrite={{scenario['rwmixwrite']}}
+{%- endif%}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
-{%- if scenario['size'] is defined %}
 size={{scenario['size']}}
-{%- else %}
-size={{size}}
-{%- endif%}
 numjobs={{numjob}}
 {%- endfor %}
 {%- endfor %}
@@ -274,6 +275,115 @@ numjobs={{numjob}}
 """
 
 SECONDS_PER_MINUTE = 60
+
+# known rwkind fio parameters
+RWKIND_SEQUENTIAL_READ = 'read'
+RWKIND_SEQUENTIAL_WRITE = 'write'
+RWKIND_RANDOM_READ = 'randread'
+RWKIND_RANDOM_WRITE = 'randwrite'
+RWKIND_SEQUENTIAL_READ_WRITE = 'rw'  # 'readwrite' is also valid
+RWKIND_RANDOM_READ_WRITE = 'randrw'
+RWKIND_SEQUENTIAL_TRIM = 'trim'
+
+# define fragments from scenario_strings
+OPERATION_READ = 'read'
+OPERATION_WRITE = 'write'
+OPERATION_TRIM = 'trim'
+OPERATION_READWRITE = 'readwrite'   # mixed read and writes
+ALL_OPERATIONS = frozenset([
+    OPERATION_READ, OPERATION_WRITE, OPERATION_TRIM, OPERATION_READWRITE])
+
+ACCESS_PATTERN_SEQUENTIAL = 'seq'
+ACCESS_PATTERN_RANDOM = 'rand'
+ALL_ACCESS_PATTERNS = frozenset([
+    ACCESS_PATTERN_SEQUENTIAL, ACCESS_PATTERN_RANDOM])
+
+# map from scenario_string fragments to rwkind fio parameter
+MAP_ACCESS_OP_TO_RWKIND = {
+    (ACCESS_PATTERN_SEQUENTIAL, OPERATION_READ): RWKIND_SEQUENTIAL_READ,
+    (ACCESS_PATTERN_SEQUENTIAL, OPERATION_WRITE): RWKIND_SEQUENTIAL_WRITE,
+    (ACCESS_PATTERN_RANDOM, OPERATION_READ): RWKIND_RANDOM_READ,
+    (ACCESS_PATTERN_RANDOM, OPERATION_WRITE): RWKIND_RANDOM_WRITE,
+    (ACCESS_PATTERN_SEQUENTIAL, OPERATION_READWRITE):
+        RWKIND_SEQUENTIAL_READ_WRITE,
+    (ACCESS_PATTERN_RANDOM, OPERATION_READWRITE): RWKIND_RANDOM_READ_WRITE,
+    (ACCESS_PATTERN_SEQUENTIAL, RWKIND_SEQUENTIAL_TRIM): RWKIND_SEQUENTIAL_TRIM,
+}
+
+# check for known fields, as the JOB_FILE_TEMPLATE looks for these
+# fields explicitly and needs to be updated
+FIO_KNOWN_FIELDS_IN_JINJA = [
+    'rwmixread',
+    'rwmixwrite'
+]
+
+
+def GetScenarioFromScenarioString(scenario_string):
+  """Extract rwkind,blocksize,size from scenario string."""
+  # look for legacy entries in the scenario map first
+  result = SCENARIOS.get(scenario_string, None)
+  if result:
+    # return a copy so that the scenario can be mutated further if needed
+    # without modifying the SCENARIO map
+    return result.copy()
+
+  # decode the parameters from the scenario name
+  # in the format accesspattern_blocksize_operation_workingset
+  # example pattern would be:
+  #    rand_16k_write_100%
+  #    seq_1M_write_100%
+  fields = scenario_string.split('_')
+  if len(fields) < 4:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        f'Unexpected Scenario string format: {scenario_string}')
+  (access_pattern, blocksize_str, operation, workingset_str) = fields[0:4]
+
+  if access_pattern not in ALL_ACCESS_PATTERNS:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        f'Unexpected access pattern {access_pattern} '
+        f'in scenario {scenario_string}')
+
+  if operation not in ALL_OPERATIONS:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        f'Unexpected operation {operation}'
+        f'in scenario {scenario_string}')
+
+  access_op = (access_pattern, operation)
+  rwkind = MAP_ACCESS_OP_TO_RWKIND.get(access_op, None)
+  if not rwkind:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        f'{access_pattern} and {operation} could not be mapped '
+        f'to a rwkind fio parameter from '
+        f'scenario {scenario_string}')
+
+  # required fields of JOB_FILE_TEMPLATE
+  result = {
+      'name': scenario_string,
+      'rwkind': rwkind,
+      'blocksize': blocksize_str,
+      'size': workingset_str
+    }
+
+  # The first four fields are well defined - after that, we use
+  # key value pairs to encode any extra fields we need
+  # The format is key-value for any additional fields appended
+  # e.g. rand_16k_readwrite_5TB_rwmixread-65
+  #          random access pattern
+  #          16k block size
+  #          readwrite operation
+  #          5 TB working set
+  #          rwmixread of 65. (so 65% reads and 35% writes)
+  for extra_fields in fields[4:]:
+    key_value = extra_fields.split('-')
+    key = key_value[0]
+    value = key_value[1]
+    if key not in FIO_KNOWN_FIELDS_IN_JINJA:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Unregonzied FIO parameter {0} out of scenario {1}'.format(
+              key, scenario_string))
+    result[key] = value
+
+  return result
 
 
 def GenerateJobFileString(filename, scenario_strings,
@@ -298,26 +408,34 @@ def GenerateJobFileString(filename, scenario_strings,
   if 'all' in scenario_strings:
     scenarios = six.itervalues(SCENARIOS)
   else:
-    for name in scenario_strings:
-      if name not in SCENARIOS:
-        logging.error('Unknown scenario name %s', name)
-    scenarios = (SCENARIOS[name] for name in scenario_strings)
+    scenarios = [GetScenarioFromScenarioString(scenario_string)
+                 for scenario_string in scenario_strings]
 
-  size_string = str(working_set_size) + 'G' if working_set_size else '100%'
-  if block_size is not None:
-    # If we don't make a copy here, this will modify the global
-    # SCENARIOS variable.
-    scenarios = [scenario.copy() for scenario in scenarios]
-    for scenario in scenarios:
-      scenario['blocksize'] = str(int(block_size.m_as(units.byte))) + 'B'
+  default_size_string = (str(working_set_size) + 'G'
+                         if working_set_size else '100%')
+  blocksize_override = (str(int(block_size.m_as(units.byte))) + 'B'
+                        if block_size else None)
+
+  for scenario in scenarios:
+    # per legacy behavior, the block size parameter
+    # overrides what is defined in the scenario string
+    if blocksize_override:
+      scenario['blocksize'] = blocksize_override
+
+    # per legacy behavior, the size in the scenario_string overrides
+    # size defined on the command line
+    if 'size' not in scenario:
+      scenario['size'] = default_size_string
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
 
+  # the template creates a cross product of all
+  # (scenario X io_depths X num_jobs)
+  # which allows a single run to produce all of these metrics
   return str(job_file_template.render(
       runtime=runtime,
       filename=filename,
-      size=size_string,
       scenarios=scenarios,
       iodepths=io_depths,
       numjobs=num_jobs,

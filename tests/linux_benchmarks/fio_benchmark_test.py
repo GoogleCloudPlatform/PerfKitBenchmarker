@@ -126,6 +126,45 @@ numjobs=1"""
     self.assertEqual(fio_benchmark.SCENARIOS['sequential_write']['blocksize'],
                      orig_blocksize)
 
+  def testParseGenerateScenario(self):
+    expected_jobfile = """
+[global]
+ioengine=libaio
+invalidate=1
+direct=1
+runtime=600
+time_based
+filename=/test/filename
+do_verify=0
+verify_fatal=0
+group_reporting=1
+randrepeat=0
+
+[seq_64M_read_10TB-io-depth-1-num-jobs-1]
+stonewall
+rw=read
+blocksize=64M
+iodepth=1
+size=10TB
+numjobs=1
+
+[rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-1]
+stonewall
+rw=randrw
+rwmixread=65
+blocksize=16k
+iodepth=1
+size=5TB
+numjobs=1"""
+
+    self.assertEqual(
+        fio_benchmark.GenerateJobFileString(
+            self.filename,
+            ['seq_64M_read_10TB', 'rand_16k_readwrite_5TB_rwmixread-65'],
+            [1], [1],
+            None, None, 600, ['randrepeat=0']),
+        expected_jobfile)
+
 
 class TestProcessedJobFileString(pkb_common_test_case.PkbCommonTestCase):
 
