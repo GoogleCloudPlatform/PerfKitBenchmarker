@@ -52,10 +52,12 @@ def _Install(vm):
 
 
 def YumInstall(vm):
+  vm.InstallPackages('zlib-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
+  vm.InstallPackages('zlib1g-dev')
   _Install(vm)
 
 
