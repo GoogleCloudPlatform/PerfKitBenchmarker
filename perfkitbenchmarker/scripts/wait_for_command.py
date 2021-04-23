@@ -132,8 +132,10 @@ def main():
     print('Command finished.')
     return 0
 
-  with open(options.stdout, 'r') as stdout:
-    with open(options.stderr, 'r') as stderr:
+  # Some commands write out non UTF-8 control characters. Replace them with '?'
+  # to make Python 3.6+ happy.
+  with open(options.stdout, 'r', errors='backslashreplace') as stdout:
+    with open(options.stderr, 'r', errors='backslashreplace') as stderr:
       if return_code_str:
         return_code = int(return_code_str)
       else:
