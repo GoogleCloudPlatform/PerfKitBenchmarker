@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Module containing Intel MKL installation and cleanup functions."""
 
 import logging
 from absl import flags
 from perfkitbenchmarker import linux_packages
-
+from perfkitbenchmarker.linux_packages import intel_repo
 
 MKL_DIR = '%s/MKL' % linux_packages.INSTALL_DIR
 MKL_TAG = 'l_mkl_2018.2.199'
@@ -33,18 +32,24 @@ BENCHMARK_NAME = 'hpcc'
 # Default installs MKL as it was previously done via preprovisioned data
 _USE_MKL_REPO = flags.DEFINE_bool(
     'mkl_install_from_repo', False,
-    'Whether to install MKL from the Intel repo.')
+    'Whether to install MKL from the Intel repo.  Default is to use '
+    'preprovisioned data.  Passing in True uses the Intel MPI repo or the '
+    'Intel oneAPI repo if --mkl_version is 2021 or later.')
 
 # File contains MKL specific environment variables
 _MKL_VARS_FILE = '/opt/intel/mkl/bin/mklvars.sh'
-
-# Command to source for Intel64 based VMs to set environment variables
-SOURCE_MKL_INTEL64_CMD = f'MKLVARS_ARCHITECTURE=intel64 . {_MKL_VARS_FILE}'
 
 MKL_VERSION = flags.DEFINE_string('mkl_version', _MKL_VERSION_REPO,
                                   'Version of Intel MKL to use')
 
 FLAGS = flags.FLAGS
+
+
+def SourceVarsCommand():
+  if intel_repo.UseOneApi():
+    return f'. {intel_repo.ONEAPI_VARS_FILE}'
+  else:
+    return f'MKLVARS_ARCHITECTURE=intel64 . {_MKL_VARS_FILE}'
 
 
 def UseMklRepo():
@@ -68,6 +73,10 @@ def Install(vm):
   """Installs the MKL package on the VM."""
   if UseMklRepo():
     vm.Install('intel_repo')
+    if intel_repo.UseOneApi():
+      vm.InstallPackages(f'intel-oneapi-mkl-{MKL_VERSION.value}')
+      # do not need to symlink the vars file
+      return
     vm.InstallPackages(f'intel-mkl-{MKL_VERSION.value}')
   else:
     _InstallFromPreprovisionedData(vm)
@@ -86,7 +95,7 @@ def _LogEnvVariables(vm):
   for env_var in ('CPATH', 'LD_LIBRARY_PATH', 'MKLROOT', 'NLSPATH',
                   'PKG_CONFIG_PATH'):
     txt, _ = vm.RemoteCommand(
-        f'{SOURCE_MKL_INTEL64_CMD}; echo ${env_var}', should_log=False)
+        f'{SourceVarsCommand()}; echo ${env_var}', should_log=False)
     env_vars.append(f'{env_var}={txt.strip()}')
   logging.info('MKL environment variables: %s', ' '.join(env_vars))
 
@@ -94,13 +103,12 @@ def _LogEnvVariables(vm):
 def _InstallFromPreprovisionedData(vm):
   """Installs the MKL package from preprovisioned data on the VM."""
   vm.RemoteCommand('cd {0} && mkdir MKL'.format(linux_packages.INSTALL_DIR))
-  vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, [MKL_TGZ], MKL_DIR)
+  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [MKL_TGZ], MKL_DIR)
   vm.RemoteCommand('cd {0} && tar zxvf {1}'.format(MKL_DIR, MKL_TGZ))
-  vm.RemoteCommand(('cd {0}/{1} && '
-                    'sed -i "s/decline/accept/g" silent.cfg && '
-                    'sudo ./install.sh --silent ./silent.cfg').format(
-                        MKL_DIR, MKL_TAG))
+  vm.RemoteCommand(
+      ('cd {0}/{1} && '
+       'sed -i "s/decline/accept/g" silent.cfg && '
+       'sudo ./install.sh --silent ./silent.cfg').format(MKL_DIR, MKL_TAG))
   vm.RemoteCommand('sudo chmod +w /etc/bash.bashrc && '
                    'sudo chmod 777 /etc/bash.bashrc && '
                    'echo "source /opt/intel/mkl/bin/mklvars.sh intel64" '
