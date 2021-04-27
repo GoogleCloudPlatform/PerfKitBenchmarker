@@ -1,4 +1,4 @@
-# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Installs the Intel apt/yum repo for MKL and other packages."""
 
 import posixpath
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
@@ -25,7 +25,6 @@ from perfkitbenchmarker import vm_util
 _INTEL_KEY_FILE = 'intel_repo_key.txt'
 _REMOTE_KEY_FILE = posixpath.join(vm_util.VM_TMP_DIR, _INTEL_KEY_FILE)
 
-
 # APT constants
 # The local text file of the Intel repo entries.
 _APT_REPO_FILE = 'intel_repo_list.txt'
@@ -35,6 +34,14 @@ _APT_REMOTE_REPO_FILE = posixpath.join(vm_util.VM_TMP_DIR, 'intel.list')
 _APT_INSTALL_REPO_CMD = ';'.join([
     f'sudo apt-key add {_REMOTE_KEY_FILE}', f'rm {_REMOTE_KEY_FILE}',
     f'sudo mv {_APT_REMOTE_REPO_FILE} /etc/apt/sources.list.d/',
+    'sudo apt-get update'
+])
+# APT constants for Intel oneAPI
+_ONEAPI_APT_URL = 'https://apt.repos.intel.com/oneapi'
+_ONEAPI_APT_FILE = '/etc/apt/sources.list.d/oneAPI.list'
+_ONEAPI_APT_INSTALL_REPO_CMD = ';'.join([
+    f'sudo apt-key add {_REMOTE_KEY_FILE}', f'rm {_REMOTE_KEY_FILE}',
+    f'echo "deb {_ONEAPI_APT_URL} all main" | sudo tee {_ONEAPI_APT_FILE}',
     'sudo apt-get update'
 ])
 
@@ -51,12 +58,24 @@ _YUM_DOWNLOAD_KEY_CMD = f'curl -o {_YUM_DOWNLOAD_KEY} {_YUM_REPO_KEY}'
 # Command to compare the current Intel key to our copy in the data/ directory.
 _YUM_DIFF_KEY_CMD = f'diff {_REMOTE_KEY_FILE} {_YUM_DOWNLOAD_KEY}'
 
+ONEAPI_VARS_FILE = '/opt/intel/oneapi/setvars.sh'
+
+FLAGS = flags.FLAGS
+
+
+def UseOneApi():
+  return FLAGS.intelmpi_version.startswith(
+      '2021') or FLAGS.mkl_version.startswith('2021')
+
 
 def AptInstall(vm):
   """Configuration for APT install."""
   vm.PushDataFile(_INTEL_KEY_FILE, _REMOTE_KEY_FILE)
-  vm.PushDataFile(_APT_REPO_FILE, _APT_REMOTE_REPO_FILE)
-  vm.RemoteCommand(_APT_INSTALL_REPO_CMD)
+  if UseOneApi():
+    vm.RemoteCommand(_ONEAPI_APT_INSTALL_REPO_CMD)
+  else:
+    vm.PushDataFile(_APT_REPO_FILE, _APT_REMOTE_REPO_FILE)
+    vm.RemoteCommand(_APT_INSTALL_REPO_CMD)
   vm.InstallPackages('libgomp1')
 
 
