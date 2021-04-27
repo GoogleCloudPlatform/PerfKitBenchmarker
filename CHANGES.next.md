@@ -74,6 +74,7 @@
 -   Add support for GCS and S3 I/O in PKB managed Spark and Hadoop clusters.
 -   Update FIO workload to support extraction of common benchmark parameters
     from the scenario string.
+-   Added Intel oneAPI BaseKit to packages.
 
 ### Bug fixes and maintenance updates:
 
