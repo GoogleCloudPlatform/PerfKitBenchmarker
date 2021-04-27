@@ -153,7 +153,8 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
                           '--account-name', self.storage_account.name,
                           '--file', src_path,
                           '--container', bucket,
-                          '--name', object_path])
+                          '--name', object_path] +
+                         self.storage_account.connection_args)
 
   def _GenerateDownloadToken(self, bucket, object_path):
     blob_store_expiry = datetime.datetime.utcnow() + datetime.timedelta(
@@ -165,7 +166,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         '--name', object_path,
         '--expiry', blob_store_expiry.strftime('%Y-%m-%dT%H:%M:%SZ'),
         '--permissions', 'r'
-    ])
+    ] + self.storage_account.connection_args)
     token = stdout.strip('\n').strip('"')
     return token
 
