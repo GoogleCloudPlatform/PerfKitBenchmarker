@@ -21,203 +21,84 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-
-import collections
-import logging
 from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
-_NUM_PROCESSES = flags.DEFINE_integer(
-    'redis_numprocesses', 1, 'Number of Redis processes to '
-    'spawn per processor.')
-_NUM_CLIENTS = flags.DEFINE_integer('redis_clients', 5,
-                                    'Number of redis loadgen clients')
-_SET_GET_RATIO = flags.DEFINE_string(
-    'redis_setgetratio', '1:0', 'Ratio of reads to write '
-    'performed by the memtier benchmark, default is '
-    '\'1:0\', ie: writes only.')
 FLAGS = flags.FLAGS
-
+flags.DEFINE_string('redis_memtier_client_machine_type', None,
+                    'If provided, overrides the memtier client machine type.')
+flags.DEFINE_string('redis_memtier_server_machine_type', None,
+                    'If provided, overrides the redis server machine type.')
 BENCHMARK_NAME = 'redis_memtier'
-BENCHMARK_CONFIG = f"""
-{BENCHMARK_NAME}:
+BENCHMARK_CONFIG = """
+redis_memtier:
   description: >
       Run memtier_benchmark against Redis.
       Specify the number of client VMs with --redis_clients.
   vm_groups:
-    default:
-      vm_spec: *default_single_core
+    servers:
+      vm_spec: *default_dual_core
+      vm_count: 1
+    clients:
+      vm_spec: *default_dual_core
+      vm_count: 1
 """
 
-_LinuxVirtualMachine = linux_virtual_machine.BaseLinuxVirtualMachine
 _BenchmarkSpec = benchmark_spec.BenchmarkSpec
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
+  """Load and return benchmark config spec."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  config['vm_groups']['default']['vm_count'] = 1 + _NUM_CLIENTS.value
+  if FLAGS.redis_memtier_client_machine_type:
+    vm_spec = config['vm_groups']['clients']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = (
+          FLAGS.redis_memtier_client_machine_type)
+  if FLAGS.redis_memtier_server_machine_type:
+    vm_spec = config['vm_groups']['servers']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = (
+          FLAGS.redis_memtier_server_machine_type)
   return config
-
-
-def PrepareLoadgen(load_vm: _LinuxVirtualMachine) -> None:
-  load_vm.Install('memtier')
-
-
-def GetNumRedisServers(redis_vm: _LinuxVirtualMachine) -> int:
-  """Get the number of redis servers to install/use for this test."""
-  if FLAGS.num_cpus_override:
-    return FLAGS.num_cpus_override * _NUM_PROCESSES.value
-  return redis_vm.NumCpusForBenchmark() * _NUM_PROCESSES.value
 
 
 def Prepare(bm_spec: _BenchmarkSpec) -> None:
   """Install Redis on one VM and memtier_benchmark on another."""
-  vms = bm_spec.vms
-  redis_vm = vms[0]
-  # Install latest redis on the 1st machine.
-  redis_vm.Install('redis_server')
-  redis_server.Configure(redis_vm)
-  redis_server.Start(redis_vm)
+  server_count = len(bm_spec.vm_groups['servers'])
+  if server_count != 1:
+    raise errors.Benchmarks.PrepareException(
+        f'Expected servers vm count to be 1, got {server_count}')
+  client_vms = bm_spec.vm_groups['clients']
+  server_vm = bm_spec.vm_groups['servers'][0]
 
-  vm_util.RunThreaded(PrepareLoadgen, vms)
+  # Install memtier
+  vm_util.RunThreaded(lambda client: client.Install('memtier'),
+                      client_vms + [server_vm])
 
-  # Pre-populate the redis server(s) with data
-  for i in range(GetNumRedisServers(redis_vm)):
-    port = redis_server.REDIS_FIRST_PORT + i
-    memtier.Load(redis_vm, 'localhost', port)
-
-
-RedisResult = collections.namedtuple('RedisResult',
-                                     ['throughput', 'average_latency'])
-
-
-def RunLoad(redis_vm: _LinuxVirtualMachine, load_vm: _LinuxVirtualMachine,
-            threads: int, port: str, test_id: str) -> RedisResult:
-  """Spawn a memtier_benchmark on the load_vm against the redis_vm:port.
-
-  Args:
-    redis_vm: The target of the memtier_benchmark
-    load_vm: The vm that will run the memtier_benchmark.
-    threads: The number of threads to run in this memtier_benchmark process.
-    port: the port to target on the redis_vm.
-    test_id: test id to differentiate between tests.
-  Returns:
-    A throughput, latency tuple, or None if threads was 0.
-  Raises:
-    Exception:  If an invalid combination of FLAGS is specified.
-  """
-  if threads == 0:
-    return None
-
-  if len(FLAGS.memtier_pipeline) != 1:
-    raise Exception('Only one memtier pipeline is supported.  '
-                    f'Passed in {FLAGS.memtier_pipeline}.')
-  memtier_pipeline = FLAGS.memtier_pipeline[0]
-
-  measurement_cmd = memtier.BuildMemtierCommand(
-      server=redis_vm.internal_ip,
-      port=port,
-      data_size=FLAGS.memtier_data_size,
-      ratio=_SET_GET_RATIO.value,
-      key_pattern=FLAGS.memtier_key_pattern,
-      pipeline=memtier_pipeline,
-      threads=threads,
-      test_time=20,
-      key_minimum=1,
-      key_maximum=FLAGS.memtier_requests,
-      outfile=f'outfile-{test_id}')
-  no_output_cmd = memtier.BuildMemtierCommand(
-      server=redis_vm.internal_ip,
-      port=port,
-      data_size=FLAGS.memtier_data_size,
-      ratio=_SET_GET_RATIO.value,
-      key_pattern=FLAGS.memtier_key_pattern,
-      pipeline=memtier_pipeline,
-      threads=threads,
-      test_time=10,
-      key_minimum=1,
-      key_maximum=FLAGS.memtier_requests,
-      outfile='/dev/null')
-  final_cmd = f'{no_output_cmd}; {measurement_cmd}; {no_output_cmd}'
-
-  load_vm.RemoteCommand(final_cmd)
-  output, _ = load_vm.RemoteCommand(f'cat outfile-{test_id} | grep Totals | '
-                                    'tr -s \' \' | cut -d \' \' -f 2')
-  throughput = float(output)
-  output, _ = load_vm.RemoteCommand(f'cat outfile-{test_id} | grep Totals | '
-                                    'tr -s \' \' | cut -d \' \' -f 5')
-  latency = float(output)
-
-  output, _ = load_vm.RemoteCommand(f'cat outfile-{test_id}')
-  logging.info(output)
-
-  return RedisResult(throughput, latency)
+  # Install redis on the 1st machine.
+  server_vm.Install('redis_server')
+  redis_server.Start(server_vm)
+  memtier.Load(server_vm, 'localhost', str(redis_server.DEFAULT_PORT))
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
-  vms = bm_spec.vms
-  redis_vm = vms[0]
-  load_vms = vms[1:]
-  latency = 0.0
-  latency_threshold = 1000000.0
-  threads = 0
-  results = []
-  num_servers = GetNumRedisServers(redis_vm)
-  max_throughput_for_completion_latency_under_1ms = 0.0
-
-  while latency < latency_threshold:
-    threads += max(1, int(threads * .15))
-    num_loaders = len(load_vms) * num_servers
-    args = []
-    for i in range(num_loaders):
-      load_vm = load_vms[i % len(load_vms)]
-      run_threads = threads // num_loaders + (0 if
-                                              (i + 1) > threads % num_loaders
-                                              else 1)
-      port = redis_server.REDIS_FIRST_PORT + i % num_servers
-      test_id = i
-      args.append(((redis_vm, load_vm, run_threads, port, test_id), {}))
-    client_results = [
-        i for i in vm_util.RunThreaded(RunLoad, args) if i is not None
-    ]
-    logging.info('Redis results by client: %s', client_results)
-    throughput = sum(r.throughput for r in client_results)
-
-    if not throughput:
-      raise errors.Benchmarks.RunError(
-          f'Zero throughput for {threads} threads: {client_results}')
-
-    # Average latency across clients
-    latency = (sum(client_latency * client_throughput
-                   for client_latency, client_throughput in client_results) /
-               throughput)
-
-    if latency < 1.0:
-      max_throughput_for_completion_latency_under_1ms = max(
-          max_throughput_for_completion_latency_under_1ms,
-          throughput)
-    results.append(sample.Sample('throughput', throughput, 'req/s',
-                                 {'latency': latency, 'threads': threads}))
-    logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
-                 latency_threshold)
-    if threads == 1:
-      latency_threshold = latency * 20
-
-  results.append(sample.Sample(
-      'max_throughput_for_completion_latency_under_1ms',
-      max_throughput_for_completion_latency_under_1ms,
-      'req/s'))
-
+  client_vms = bm_spec.vm_groups['clients']
+  server_vm = bm_spec.vm_groups['servers'][0]
+  results = memtier.RunOverAllThreadsPipelinesAndClients(
+      client_vms[0], server_vm.internal_ip, str(redis_server.DEFAULT_PORT))
+  redis_metadata = redis_server.GetMetadata()
+  for result_sample in results:
+    result_sample.metadata.update(redis_metadata)
   return results
 
 

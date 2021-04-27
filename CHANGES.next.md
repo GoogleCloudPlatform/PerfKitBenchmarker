@@ -12,6 +12,8 @@
     opt-in regions.
 -   Remove Ubuntu1710 from `--os_types`.
 -   Remove Amazon Linux 1 from `--os_types`.
+-   Changed redis_memtier_benchmark to use redis version 6 and above. Redis
+    versions less than 6 are no longer supported.
 
 ### New features:
 

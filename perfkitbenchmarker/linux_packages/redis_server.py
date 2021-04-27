@@ -15,22 +15,25 @@
 
 """Module containing redis installation and cleanup functions."""
 
+from typing import Any, Dict
 from absl import flags
 from perfkitbenchmarker import linux_packages
-from six.moves import range
 
-_NUM_PROCESSES = flags.DEFINE_integer(
-    'redis_total_num_processes',
-    1,
-    'Total number of redis server processes.',
-    lower_bound=1)
-_ENABLE_AOF = flags.DEFINE_boolean(
-    'redis_enable_aof', False,
-    'Enable append-only file (AOF) with appendfsync always.')
-_VERSION = flags.DEFINE_string('redis_server_version', '5.0.5',
+_VERSION = flags.DEFINE_string('redis_server_version', '6.2.1',
                                'Version of redis server to use.')
+flags.register_validator(
+    'redis_server_version',
+    lambda version: int(version.split('.')[0]) >= 6,
+    message='Redis version must be 6 or greater.')
+_IO_THREADS = flags.DEFINE_integer(
+    'redis_server_io_threads', 4, 'Only supported for redis version >= 6, the '
+    'number of redis server IO threads to use.')
+_IO_THREADS_DO_READS = flags.DEFINE_bool(
+    'redis_memtier_io_threads_do_reads', False,
+    'If true, makes both reads and writes use IO threads instead of just '
+    'writes.')
 
-REDIS_FIRST_PORT = 6379
+DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
@@ -65,54 +68,36 @@ def AptInstall(vm) -> None:
   _Install(vm)
 
 
-def Configure(vm) -> None:
-  """Configure redis server."""
+def _BuildStartCommand() -> str:
+  """Returns the run command used to start the redis server."""
   redis_dir = GetRedisDir()
-  vm.RemoteCommand(
-      f'sudo sed -i "s/bind/#bind/g" {redis_dir}/redis.conf')
-  vm.RemoteCommand(
-      'sudo sed -i "s/protected-mode yes/protected-mode no/g" '
-      f'{redis_dir}/redis.conf')
-  vm.RemoteCommand(
-      r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-      f"{redis_dir}/redis.conf")
-  # Remove snapshotting
-  vm.RemoteCommand(
-      r"sed -i -e '/save 900/d' -e '/save 300/d' -e '/save 60/d' -e 's/#"
-      f"   save \"\"/save \"\"/g' {redis_dir}/redis.conf")
-  # Persistence configuration, see https://redis.io/topics/persistence.
-  if _ENABLE_AOF.value:
-    vm.RemoteCommand(
-        r'sed -i -e "s/appendonly no/appendonly yes/g" '
-        f'{redis_dir}/redis.conf')
-    vm.RemoteCommand(
-        r'sed -i -e "s/appendfsync everysec/# appendfsync everysec/g" '
-        rf'{redis_dir}/redis.conf')
-    vm.RemoteCommand(
-        r'sed -i -e "s/# appendfsync always/appendfsync always/g" '
-        rf'{redis_dir}/redis.conf')
-  for i in range(_NUM_PROCESSES.value):
-    port = REDIS_FIRST_PORT + i
-    # Copy configuration to each redis process.
-    vm.RemoteCommand(
-        f'cp {redis_dir}/redis.conf {redis_dir}/redis-{port}.conf')
-    # Set the port
-    vm.RemoteCommand(
-        rf'sed -i -e "s/port {REDIS_FIRST_PORT}/port {port}/g" '
-        f'{redis_dir}/redis-{port}.conf')
+  cmd = 'nohup sudo {redis_dir}/src/redis-server {args} &> /dev/null &'
+  cmd_args = [
+      '--protected-mode no',
+      '--save ""',
+      f'--io-threads {_IO_THREADS.value}',
+  ]
+  do_reads = 'yes' if _IO_THREADS_DO_READS.value else 'no'
+  cmd_args.append(f'--io-threads-do-reads {do_reads}')
+  return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
 
 def Start(vm) -> None:
   """Start redis server process."""
-  for i in range(_NUM_PROCESSES.value):
-    port = REDIS_FIRST_PORT + i
-    redis_dir = GetRedisDir()
-    vm.RemoteCommand(
-        f'nohup sudo {redis_dir}/src/redis-server '
-        f'{redis_dir}/redis-{port}.conf '
-        f'&> /dev/null & echo $! > {redis_dir}/{REDIS_PID_FILE}-{port}')
+  # Redis tuning parameters, see
+  # https://www.techandme.se/performance-tips-for-redis-cache-server/.
+  vm.RemoteCommand(
+      'echo "'
+      'vm.overcommit_memory = 1\n'
+      'net.core.somaxconn = 65535\n'
+      '" | sudo tee -a /etc/sysctl.conf')
+  vm.RemoteCommand('sudo sysctl -p')
+  vm.RemoteCommand(_BuildStartCommand())
 
 
-def Cleanup(vm) -> None:
-  """Remove redis."""
-  vm.RemoteCommand('sudo pkill redis-server')
+def GetMetadata() -> Dict[str, Any]:
+  return {
+      'redis_server_version': _VERSION.value,
+      'redis_server_io_threads': _IO_THREADS.value,
+      'redis_server_io_threads_do_reads': _IO_THREADS_DO_READS.value,
+  }
