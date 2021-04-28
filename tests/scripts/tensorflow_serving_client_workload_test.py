@@ -18,7 +18,7 @@ import sys
 import unittest
 
 import mock
-from six import StringIO
+import six
 
 # These imports are mocked so that we don't need to add them to the
 # test dependencies. The script under test for this test module is
@@ -80,7 +80,7 @@ Latency:
 2.2
 3.3""".strip()
 
-    out = StringIO()
+    out = six.StringIO()
     self.client_workload.print_results(out=out)
     actual_output = out.getvalue().strip()
     self.assertEqual(expected_output, actual_output)

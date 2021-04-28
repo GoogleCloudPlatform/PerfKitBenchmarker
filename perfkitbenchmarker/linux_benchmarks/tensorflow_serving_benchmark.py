@@ -190,7 +190,7 @@ def _PrepareServer(vm):
       BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY)
 
   extract_dir = posixpath.join(
-      TF_SERVING_BASE_DIRECTORY, "resnet")
+      TF_SERVING_BASE_DIRECTORY, 'resnet')
   vm.RemoteCommand('mkdir {0}'.format(extract_dir))
 
   vm.RemoteCommand('cd {0} && tar --strip-components=2 --directory {1} -xvzf '

@@ -34,8 +34,14 @@ from absl import flags
 import grpc
 from grpc.framework.interfaces.face.face import ExpirationError
 import tensorflow as tf
-from tensorflow_serving.apis import predict_pb2
-from tensorflow_serving.apis import prediction_service_pb2_grpc
+
+try:
+  # imports when running on the VM
+  from tensorflow_serving.apis import predict_pb2
+  from tensorflow_serving.apis import prediction_service_pb2_grpc
+except ImportError:
+  # when running tests these are mocked
+  pass
 
 ILSVRC_VALIDATION_IMAGES = 'ILSVRC2012_img_val'
 MODEL_NAME = 'resnet'
