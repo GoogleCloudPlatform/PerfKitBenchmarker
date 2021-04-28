@@ -488,7 +488,7 @@ def _CreateHpccWrapper(vm: linux_vm.BaseLinuxVirtualMachine) -> None:
   Args:
     vm: Virtual machine to put file on.
   """
-  text = ['#!/bin/bash', mkl.SOURCE_MKL_INTEL64_CMD, './hpcc']
+  text = ['#!/bin/bash', mkl.SourceVarsCommand(), './hpcc']
   vm_util.CreateRemoteFile(vm, '\n'.join(text), HPCC_WRAPPER)
   vm.RemoteCommand(f'chmod +x {HPCC_WRAPPER}')
 

@@ -1,4 +1,4 @@
-# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import re
 from absl import flags
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import intel_repo
 
 MPI_VERSION = flags.DEFINE_string('intelmpi_version', '2019.6-088',
                                   'MPI version.')
@@ -36,6 +37,8 @@ def MpiVars(vm) -> str:
   Args:
     vm: Virtual machine to look for mpivars.sh on.
   """
+  if intel_repo.UseOneApi():
+    return intel_repo.ONEAPI_VARS_FILE
   txt, _ = vm.RemoteCommand(
       f'readlink -f {_INTEL_ROOT}/compilers_and_libraries*/'
       'linux/mpi/intel64/bin/mpivars.sh | sort | uniq')
@@ -81,7 +84,8 @@ def FixEnvironment(vm):
 def Install(vm) -> None:
   """Installs Intel MPI."""
   vm.Install('intel_repo')
-  vm.InstallPackages(f'intel-mpi-{MPI_VERSION.value}')
+  package_name = 'intel-oneapi-mpi' if intel_repo.UseOneApi() else 'intel-mpi'
+  vm.InstallPackages(f'{package_name}-{MPI_VERSION.value}')
   FixEnvironment(vm)
   # Log the version of MPI and other associated values for debugging
   vm.RemoteCommand(f'. {MpiVars(vm)}; mpirun -V')
