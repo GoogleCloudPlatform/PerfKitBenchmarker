@@ -34,7 +34,7 @@ CUDA_HOME = '/usr/local/cuda'
 
 flags.DEFINE_enum(
     'cuda_toolkit_version',
-    '9.0', ['9.0', '10.0', '10.1', '10.2', '11.0', 'None', ''],
+    '11.0', ['9.0', '10.0', '10.1', '10.2', '11.0', 'None', ''],
     'Version of CUDA Toolkit to install. '
     'Input "None" or empty string to skip installation',
     module_name=__name__)

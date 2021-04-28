@@ -77,6 +77,7 @@
 -   Update FIO workload to support extraction of common benchmark parameters
     from the scenario string.
 -   Added Intel oneAPI BaseKit to packages.
+-   Upgrade default CUDA version to 11.0.
 
 ### Bug fixes and maintenance updates:
 

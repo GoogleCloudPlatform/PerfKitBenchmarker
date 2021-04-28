@@ -87,7 +87,7 @@ def AptInstall(vm):
   vm.Install('openmpi')
 
   if FLAGS.cuda_toolkit_version not in CUDA_FILES:
-    raise cuda_toolkit.UnsupportedCudaVersionException(
+    raise cuda_toolkit.UnsupportedCudaVersionError(
         f'HPCG only supports CUDA {sorted(CUDA_FILES)}')
   hpcg_tar, hpcg_binary = CUDA_FILES[FLAGS.cuda_toolkit_version]
   vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [hpcg_tar],

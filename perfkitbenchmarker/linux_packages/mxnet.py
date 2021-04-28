@@ -64,22 +64,13 @@ def Install(vm):
   vm.InstallPackages('libatlas-base-dev')
   if FLAGS.mx_device == 'gpu':
     vm.Install('cuda_toolkit')
-    if FLAGS.cuda_toolkit_version == '8.0':
-      vm.RemoteCommand('sudo pip install mxnet-cu80=={}'.format(
-          FLAGS.mx_version), should_log=True)
-    elif FLAGS.cuda_toolkit_version == '9.0':
-      vm.RemoteCommand('sudo pip install mxnet-cu90=={}'.format(
-          FLAGS.mx_version), should_log=True)
-    elif FLAGS.cuda_toolkit_version == '10.0':
-      vm.RemoteCommand('sudo pip install mxnet-cu100=={}'.format(
-          FLAGS.mx_version), should_log=True)
-    elif FLAGS.cuda_toolkit_version == '10.1':
-      vm.RemoteCommand('sudo pip install mxnet-cu101=={}'.format(
-          FLAGS.mx_version), should_log=True)
-    elif FLAGS.cuda_toolkit_version == '10.2':
-      vm.RemoteCommand('sudo pip install mxnet-cu102=={}'.format(
-          FLAGS.mx_version), should_log=True)
+    if float(FLAGS.cuda_toolkit_version) < 11:
+      cuda_version = FLAGS.cuda_toolkit_version.replace('.', '')
+      vm.RemoteCommand('sudo pip install mxnet-cu{}=={}'.format(
+          cuda_version, FLAGS.mx_version), should_log=True)
     else:
+      # mxnet-cu110 starts in version 1.8, which requires Python 3.
+      # TODO(tohaowu). Migrate mxnet to version 1.8 and Python 3.
       raise cuda_toolkit.UnsupportedCudaVersionError()
   elif FLAGS.mx_device == 'cpu':
     vm.RemoteCommand('sudo pip install mxnet=={}'.format(
