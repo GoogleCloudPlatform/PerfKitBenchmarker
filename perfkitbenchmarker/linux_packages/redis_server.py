@@ -29,9 +29,15 @@ _IO_THREADS = flags.DEFINE_integer(
     'redis_server_io_threads', 4, 'Only supported for redis version >= 6, the '
     'number of redis server IO threads to use.')
 _IO_THREADS_DO_READS = flags.DEFINE_bool(
-    'redis_memtier_io_threads_do_reads', False,
+    'redis_server_io_threads_do_reads', False,
     'If true, makes both reads and writes use IO threads instead of just '
     'writes.')
+_IO_THREAD_AFFINITY = flags.DEFINE_bool(
+    'redis_server_io_threads_cpu_affinity', False,
+    'If true, attempts to pin IO threads to CPUs.')
+_ENABLE_SNAPSHOTS = flags.DEFINE_bool(
+    'redis_server_enable_snapshots', False,
+    'If true, uses the default redis snapshot policy.')
 
 DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
@@ -68,17 +74,34 @@ def AptInstall(vm) -> None:
   _Install(vm)
 
 
-def _BuildStartCommand() -> str:
-  """Returns the run command used to start the redis server."""
+def _BuildStartCommand(vm) -> str:
+  """Returns the run command used to start the redis server.
+
+  See https://raw.githubusercontent.com/redis/redis/6.0/redis.conf
+  for the default redis configuration.
+
+  Args:
+    vm: The redis server VM.
+
+  Returns:
+    A command that can be used to start redis in the background.
+  """
   redis_dir = GetRedisDir()
   cmd = 'nohup sudo {redis_dir}/src/redis-server {args} &> /dev/null &'
   cmd_args = [
       '--protected-mode no',
-      '--save ""',
       f'--io-threads {_IO_THREADS.value}',
   ]
+  # Snapshotting
+  if not _ENABLE_SNAPSHOTS.value:
+    cmd_args.append('--save ""')
+  # IO thread reads
   do_reads = 'yes' if _IO_THREADS_DO_READS.value else 'no'
   cmd_args.append(f'--io-threads-do-reads {do_reads}')
+  # IO thread affinity
+  if _IO_THREAD_AFFINITY.value:
+    cpu_affinity = f'0-{vm.num_cpus-1}'
+    cmd_args.append(f'--server_cpulist {cpu_affinity}')
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
 
@@ -92,7 +115,7 @@ def Start(vm) -> None:
       'net.core.somaxconn = 65535\n'
       '" | sudo tee -a /etc/sysctl.conf')
   vm.RemoteCommand('sudo sysctl -p')
-  vm.RemoteCommand(_BuildStartCommand())
+  vm.RemoteCommand(_BuildStartCommand(vm))
 
 
 def GetMetadata() -> Dict[str, Any]:
@@ -100,4 +123,6 @@ def GetMetadata() -> Dict[str, Any]:
       'redis_server_version': _VERSION.value,
       'redis_server_io_threads': _IO_THREADS.value,
       'redis_server_io_threads_do_reads': _IO_THREADS_DO_READS.value,
+      'redis_server_io_threads_cpu_affinity': _IO_THREAD_AFFINITY.value,
+      'redis_server_enable_snapshots': _ENABLE_SNAPSHOTS.value,
   }
