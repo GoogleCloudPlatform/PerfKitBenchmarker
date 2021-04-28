@@ -30,6 +30,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
@@ -198,16 +199,21 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if self.is_managed_db:
       self._CreateGcloudSqlInstance()
     else:
-      self.endpoint = self.server_vm.ip_address
+      if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
+        self.endpoint = self.server_vm.internal_ip
+      else:
+        self.endpoint = self.server_vm.ip_address
       if self.spec.engine == relational_db.MYSQL:
         self._InstallMySQLServer()
       else:
         raise UnsupportedDatabaseEngineException(
             'Engine {0} not supported for unmanaged databases.'.format(
                 self.spec.engine))
-      self.firewall = gce_network.GceFirewall()
-      self.firewall.AllowPort(
-          self.server_vm, 3306, source_range=[self.client_vm.ip_address])
+
+      if FLAGS.ip_addresses != vm_util.IpAddressSubset.INTERNAL:
+        self.firewall = gce_network.GceFirewall()
+        self.firewall.AllowPort(
+            self.server_vm, 3306, source_range=[self.client_vm.ip_address])
       self.unmanaged_db_exists = True
 
   def _GetHighAvailabilityFlag(self):

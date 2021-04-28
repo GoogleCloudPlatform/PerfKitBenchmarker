@@ -580,15 +580,18 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm.RemoteCommand(
         'mysql %s -e "SET GLOBAL max_connections=8000;"' %
         self.MakeMysqlConnectionString(use_localhost=True))
+    if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
+      client_ip = self.client_vm.internal_ip
+    else:
+      client_ip = self.client_vm.ip_address
     self.server_vm.RemoteCommand(
         ('mysql %s -e "CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';"') %
         (self.MakeMysqlConnectionString(use_localhost=True),
-         self.spec.database_username, self.client_vm.ip_address,
-         self.spec.database_password))
+         self.spec.database_username, client_ip, self.spec.database_password))
     self.server_vm.RemoteCommand(
         ('mysql %s -e "GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';"') %
         (self.MakeMysqlConnectionString(use_localhost=True),
-         self.spec.database_username, self.client_vm.ip_address))
+         self.spec.database_username, client_ip))
     self.server_vm.RemoteCommand(
         'mysql %s -e "FLUSH PRIVILEGES;"' %
         self.MakeMysqlConnectionString(use_localhost=True))
