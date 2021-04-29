@@ -14,6 +14,7 @@
 """Installs the Intel MPI library."""
 
 import logging
+import posixpath
 import re
 from absl import flags
 from perfkitbenchmarker import nfs_service
@@ -25,6 +26,17 @@ MPI_VERSION = flags.DEFINE_string('intelmpi_version', '2019.6-088',
 FLAGS = flags.FLAGS
 
 _INTEL_ROOT = '/opt/intel'
+
+PREPROVISIONED_DATA = {
+    'intel-mpi-2018.4-057.rpm.tar.gz':
+        'fbcf98d246760330ef7dd661d2b75e7f90783943dfea1285e5aaeb4f0e1abf9e',
+    'intel-mpi-2018.4-057.deb.tar.gz':
+        '9603b9241287874b5d4fe3ba806d1b672b1da576406a4c6dcd86e9d84e341bd1',
+    'intel-mpi-2019.6-088.rpm.tar.gz':
+        'a4683ff1bd66b57f9002ad63208a77aee172b5b1dc365d892af8d468d96ad8d5',
+    'intel-mpi-2019.6-088.deb.tar.gz':
+        'e5a8126dbc2d1aca889f987117be00dffe4344c58f8e622d3b8f5809cb5493e6',
+}
 
 
 def MpiVars(vm) -> str:
@@ -81,11 +93,32 @@ def FixEnvironment(vm):
     logging.info('Not setting yama ptrace as %s', stderr)
 
 
+def _InstallViaPreprovisionedData(vm, version: str) -> bool:
+  """Returns whether Intel MPI was installed via preprovisioned data."""
+  packaging = 'rpm' if vm.BASE_OS_TYPE == 'rhel' else 'deb'
+  tarball = f'intel-mpi-{version}.{packaging}.tar.gz'
+  # if the tarball is not in preprovisioned data return False
+  if tarball not in PREPROVISIONED_DATA:
+    return False
+  if not vm.ShouldDownloadPreprovisionedData('intelmpi', tarball):
+    return False
+  vm.InstallPreprovisionedPackageData('intelmpi', [tarball], '.')
+  extract_dir = posixpath.join(vm_util.VM_TMP_DIR, 'packages')
+  vm.RemoteCommand(f'mkdir -p {extract_dir}; '
+                   f'tar -C {extract_dir} -xvzf {tarball}; '
+                   f'rm {tarball}')
+  vm.InstallPackages(f'{extract_dir}/*')
+  return True
+
+
 def Install(vm) -> None:
   """Installs Intel MPI."""
-  vm.Install('intel_repo')
-  package_name = 'intel-oneapi-mpi' if intel_repo.UseOneApi() else 'intel-mpi'
-  vm.InstallPackages(f'{package_name}-{MPI_VERSION.value}')
+  if _InstallViaPreprovisionedData(vm, MPI_VERSION.value):
+    logging.info('Installed MPI %s via preprovisioned data', MPI_VERSION.value)
+  else:
+    vm.Install('intel_repo')
+    package_name = 'intel-oneapi-mpi' if intel_repo.UseOneApi() else 'intel-mpi'
+    vm.InstallPackages(f'{package_name}-{MPI_VERSION.value}')
   FixEnvironment(vm)
   # Log the version of MPI and other associated values for debugging
   vm.RemoteCommand(f'. {MpiVars(vm)}; mpirun -V')
