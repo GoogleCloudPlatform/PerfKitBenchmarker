@@ -550,6 +550,12 @@ def _install_sudo_command():
 # sudo in the container startup script.
 
 
+class Ubuntu1804BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin):
+  DEFAULT_IMAGE = 'ubuntu:18.04'
+  CONTAINER_COMMAND = _install_sudo_command()
+
+
 class Ubuntu1604BasedKubernetesVirtualMachine(
     DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
   DEFAULT_IMAGE = 'ubuntu:16.04'

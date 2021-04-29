@@ -1914,9 +1914,11 @@ class BaseUbuntuMixin(BaseDebianMixin):
       self.Reboot()
 
 
-class Ubuntu1604Mixin(BaseUbuntuMixin):
+class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604
+  END_OF_LIFE = '2021-05-01'
+  ALTERNATIVE_OS = os_types.UBUNTU1804
 
 
 class Ubuntu1804Mixin(BaseUbuntuMixin):
