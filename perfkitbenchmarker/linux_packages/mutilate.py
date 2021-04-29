@@ -26,7 +26,7 @@ from perfkitbenchmarker import sample
 GIT_REPO = 'https://github.com/leverich/mutilate'
 MUTILATE_DIR = '%s/mutilate_benchmark' % linux_packages.INSTALL_DIR
 MUTILATE_BIN = '%s/mutilate' % MUTILATE_DIR
-APT_PACKAGES = 'scons libevent-dev gengetopt libzmq-dev'
+APT_PACKAGES = 'scons libevent-dev gengetopt libzmq3-dev'
 
 
 FLAGS = flags.FLAGS
@@ -54,7 +54,7 @@ flags.DEFINE_float(
     'mutilate_ratio', 0.0,
     'Ratio of set:get. By default, read only.')
 flags.DEFINE_list(
-    'mutilate_options', [],
+    'mutilate_options', ['iadist=exponential:0.0'],
     'Additional mutilate long-form options (--) in comma separated form. e.g.'
     '--mutilate_options=blocking,search=99:1000.'
     'See https://github.com/leverich/mutilate for all available options.')
