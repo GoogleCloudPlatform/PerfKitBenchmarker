@@ -25,7 +25,7 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 
-MEMCACHED_VERSION = '1.5.10'
+MEMCACHED_VERSIONS = ['1.5.10', '1.5.16', '1.6.6']
 FLAGS = flags.FLAGS
 
 
@@ -41,13 +41,13 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     self.zone = self.spec.vms[0].zone
     self.region = util.GetRegionFromZone(self.zone)
     self.node_type = FLAGS.cache_node_type
+    self.version = FLAGS.managed_memory_store_version
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
-    if FLAGS.managed_memory_store_version:
-      raise errors.Config.InvalidValue('Custom Memcached version not '
-                                       'supported. Version is {}.'.format(
-                                           MEMCACHED_VERSION))
+    if (FLAGS.managed_memory_store_version and
+        FLAGS.managed_memory_store_version not in MEMCACHED_VERSIONS):
+      raise errors.Config.InvalidValue('Invalid Memcached version.')
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache cluster.
@@ -56,7 +56,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
       dict mapping string property key to value.
     """
     result = {
-        'cloud_memcached_version': MEMCACHED_VERSION,
+        'cloud_memcached_version': self.version,
         'cloud_memcached_node_type': self.node_type,
     }
     return result
@@ -87,9 +87,11 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
            '--cache-cluster-id', self.name,
            '--preferred-availability-zone', self.zone,
            '--num-cache-nodes', str(managed_memory_store.MEMCACHED_NODE_COUNT),
-           '--engine-version', MEMCACHED_VERSION,
            '--cache-node-type', self.node_type,
            '--cache-subnet-group-name', self.subnet_group_name]
+
+    if self.version:
+      cmd += ['--engine-version', self.version]
 
     cmd += ['--tags']
     cmd += util.MakeFormattedDefaultTags()
@@ -110,7 +112,10 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
   def _IsReady(self):
     """Returns True if cluster is ready and false otherwise."""
     cluster_info = self._DescribeInstance()
-    return cluster_info.get('CacheClusterStatus', '') == 'available'
+    if cluster_info.get('CacheClusterStatus', '') == 'available':
+      self.version = cluster_info.get('EngineVersion')
+      return True
+    return False
 
   def _Exists(self):
     """Returns true if the cluster exists and is not being deleted."""
