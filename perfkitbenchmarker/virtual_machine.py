@@ -26,6 +26,7 @@ import os.path
 import socket
 import threading
 import time
+import typing
 
 from absl import flags
 import jinja2
@@ -1295,3 +1296,6 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   def _PreDelete(self):
     """See base class."""
     self.LogVmDebugInfo()
+
+
+VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)
