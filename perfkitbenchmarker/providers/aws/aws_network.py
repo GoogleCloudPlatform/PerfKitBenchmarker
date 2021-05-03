@@ -528,6 +528,7 @@ class AwsRouteTable(resource.BaseResource):
     super(AwsRouteTable, self).__init__()
     self.region = region
     self.vpc_id = vpc_id
+    self.id: str = None  # set by _PostCreate
 
   def _Create(self):
     """Creates the route table.

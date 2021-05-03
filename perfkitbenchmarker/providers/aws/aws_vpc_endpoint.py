@@ -62,6 +62,7 @@ class AwsVpcEndpoint(resource.BaseResource):
   REQUIRED_ATTRS = ['CLOUD', 'AWS_SERVICE']
   RESOURCE_TYPE = 'AwsVpcEndpoint'
   CLOUD = aws.CLOUD
+  AWS_SERVICE: str  # must be set by derived classes
 
   def __init__(self, vpc):
     super(AwsVpcEndpoint, self).__init__()

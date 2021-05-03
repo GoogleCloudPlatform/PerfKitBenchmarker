@@ -15,7 +15,7 @@
 
 import copy
 import json
-from typing import Dict, List, Text
+from typing import Dict, List, Text, Tuple
 from absl import flags
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.providers import aws
@@ -76,7 +76,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(
         package_name, ['snowflake-jdbc-client-2.0.jar'], '')
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:

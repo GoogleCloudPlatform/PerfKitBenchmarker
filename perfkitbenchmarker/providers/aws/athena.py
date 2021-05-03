@@ -18,7 +18,7 @@ import datetime
 import json
 import logging
 import re
-from typing import Dict, Text
+from typing import Dict, Text, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -122,7 +122,7 @@ class JavaClientInterface(GenericClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(
         package_name, [LATEST_CLIENT_JAR], '')
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:

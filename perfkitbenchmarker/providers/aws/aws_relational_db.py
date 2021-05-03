@@ -142,6 +142,10 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
     self.unmanaged_db_exists = None if self.is_managed_db else False
 
+    # dependencies which will be created
+    self.db_subnet_group_name: str = None
+    self.security_group_id: str = None
+
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 
