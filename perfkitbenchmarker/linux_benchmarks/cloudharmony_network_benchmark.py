@@ -47,6 +47,7 @@ cloudharmony_network:
 # network test service types
 COMPUTE = 'compute'
 STORAGE = 'storage'
+DNS = 'dns'
 # network compute server type
 NGINX = 'nginx'
 # tests accepted by the --test flag of the gartner network benchmark
@@ -57,7 +58,7 @@ NGINX = 'nginx'
 # tcp: rtt, ssl, ttfb
 NETWORK_TESTS = ['latency', 'downlink', 'uplink', 'dns', 'rtt', 'ssl', 'ttfb']
 
-flags.DEFINE_enum('ch_network_test_service_type', COMPUTE, [COMPUTE, STORAGE],
+flags.DEFINE_enum('ch_network_test_service_type', COMPUTE, [COMPUTE, STORAGE, DNS],
                   'The service type to host the website.')
 flags.DEFINE_enum('ch_network_test', 'latency', NETWORK_TESTS,
                   'Test supported by CloudHarmony network benchmark as defined'
@@ -110,6 +111,12 @@ def CheckPrerequisites(_):
   # TODO(user): add AWS & Azure support for object storage
   if FLAGS.ch_network_test_service_type == STORAGE and FLAGS.cloud != 'GCP':
     raise NotImplementedError('Benchmark only supports GCS object storage.')
+  elif FLAGS.ch_network_test_service_type == DNS and FLAGS.ch_network_test != 'dns':
+    raise InvalidConfigurationError('If ch_network_test_service_type flag is set to dns, ch_network_test flag must also be dns')
+  elif FLAGS.ch_network_test_service_type != DNS and FLAGS.ch_network_test == 'dns':
+    raise InvalidConfigurationError('If ch_network_test flag is set to dns, ch_network_test_service_type flag must also be dns')
+  elif FLAGS.ch_network_test_service_type == DNS and FLAGS.cloud != 'GCP':
+    raise NotImplementedError('DNS Benchmark not implemented for this cloud type')
 
 
 def GetConfig(user_config):
@@ -229,6 +236,8 @@ def Prepare(benchmark_spec):
     vm_util.RunThreaded(_PrepareServer, vm_groups['server'])
   elif FLAGS.ch_network_test_service_type == STORAGE:
     _PrepareBucket(benchmark_spec)
+  elif FLAGS.ch_network_test_service_type == DNS:
+    pass
   else:
     raise NotImplementedError()
 
@@ -306,6 +315,15 @@ def _Run(benchmark_spec, test):
     http_url = f'http://{benchmark_spec.bucket}.storage.googleapis.com/probe'
     endpoints = f'--test_endpoint={http_url}'
     _AddStorageMetadata(client, metadata)
+  elif FLAGS.ch_network_test_service_type == DNS:
+    vms = vm_groups['server']
+    # use GCP zonal internal DNS, but maybe should add domain to vm's data attributes?
+    endpoints = ''
+    if FLAGS.cloud == 'GCP':
+      endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
+    else:
+      raise NotImplementedError('DNS not implemented for this cloud type')
+    _AddComputeMetadata(client, vms[0], metadata)
 
   if FLAGS.ch_network_throughput_https:
     metadata['throughput_https'] = True
@@ -315,6 +333,8 @@ def _Run(benchmark_spec, test):
     metadata['throughput_time'] = True
   if FLAGS.ch_network_throughput_slowest_thread:
     metadata['throughput_slowest_thread'] = True
+  if FLAGS.ch_network_test == 'dns':
+    metadata['dns_recursive'] = True
 
   metadata = cloud_harmony_util.GetCommonMetadata(metadata)
   cmd_path = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'run.sh')
