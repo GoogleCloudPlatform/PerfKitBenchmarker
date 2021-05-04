@@ -13,7 +13,10 @@
 # limitations under the License.
 
 
-"""Module containing redis enterprise installation and cleanup functions."""
+"""Module containing redis enterprise installation and cleanup functions.
+
+TODO(user): Flags should be unified with memtier.py.
+"""
 
 import json
 import logging
@@ -70,6 +73,9 @@ _PIN_WORKERS = flags.DEFINE_boolean(
 _DISABLE_CPU_IDS = flags.DEFINE_list(
     'enterprise_redis_disable_cpu_ids', None,
     'List of cpus to disable by id.')
+_DATA_SIZE = flags.DEFINE_integer(
+    'enterprise_redis_data_size_bytes', 100,
+    'The size of the data to write to redis enterprise.')
 
 _VERSION = '6.0.12-58'
 _PACKAGE_NAME = 'redis_enterprise'
@@ -255,7 +261,7 @@ def LoadCluster(vm, redis_port):
       '-c 1 '  # key/value pairs repeatedly.
       '--ratio 1:0 '
       '--pipeline 100 '
-      '-d 100 '
+      f'-d {str(_DATA_SIZE.value)} '
       '--key-pattern S:S '
       '--key-minimum 1 '
       f'--key-maximum {str(_LOAD_RECORDS.value)} '
@@ -287,7 +293,7 @@ def BuildRunCommand(redis_vm, threads, port):
             '--ratio 1:1 '
             f'--pipeline {str(_PIPELINES.value)} '
             f'-c {str(_LOADGEN_CLIENTS.value)} '
-            '-d 100 '
+            f'-d {str(_DATA_SIZE.value)} '
             '--key-minimum 1 '
             f'--key-maximum {str(_LOAD_RECORDS.value)} '
             f'-n {_RUN_RECORDS.value} ')
@@ -352,6 +358,8 @@ def Run(redis_vm, load_vms, redis_port):
       sample_metadata['pin_workers'] = _PIN_WORKERS.value
       sample_metadata['disable_cpus'] = _DISABLE_CPU_IDS.value
       sample_metadata['redis_enterprise_version'] = _VERSION
+      sample_metadata['memtier_data_size'] = _DATA_SIZE.value
+      sample_metadata['memtier_key_maximum'] = _LOAD_RECORDS.value
       results.append(sample.Sample('throughput', throughput, 'ops/s',
                                    sample_metadata))
       if latency < 1000:
