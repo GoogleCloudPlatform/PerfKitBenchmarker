@@ -1253,15 +1253,30 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """
     return False
 
-  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
+  def _UpdateInterruptibleVmStatusThroughMetadataService(self):
+    raise NotImplementedError()
+
+  def _UpdateInterruptibleVmStatusThroughApi(self):
+    # Azure do not support detecting through api
+    pass
+
+  def UpdateInterruptibleVmStatus(self, use_api=False):
     """Updates the status of the discounted vm.
 
     Args:
-      is_failed_run: boolean, is the test run already failed.
+      use_api: boolean, If use_api is false, method will attempt to query
+      metadata service to check vm preemption. If use_api is true, method will
+      attempt to use API to detect vm preemption query if metadata service
+      detecting fails.
     """
-    # TODO(tohaowu) Set it to pure virtual function after finishing it on all
-    # the providers.
-    pass
+    if not self.preemptible:
+      return
+    if self.spot_early_termination:
+      return
+    try:
+      self._UpdateInterruptibleVmStatusThroughMetadataService()
+    except (NotImplementedError, errors.VirtualMachine.RemoteCommandError):
+      self._UpdateInterruptibleVmStatusThroughApi()
 
   def WasInterrupted(self):
     """Returns whether this interruptible vm was terminated early.

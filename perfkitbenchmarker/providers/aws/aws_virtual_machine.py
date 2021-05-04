@@ -495,6 +495,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.use_spot_instance = vm_spec.use_spot_instance
+    self.preemptible = self.use_spot_instance
     self.spot_price = vm_spec.spot_price
     self.spot_block_duration_minutes = vm_spec.spot_block_duration_minutes
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -905,9 +906,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                               f'--region={self.region}',
                               f'--allocation-id={self.allocation_id}'])
 
-  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
-    if self.spot_early_termination:
-      return
+  def _UpdateInterruptibleVmStatusThroughApi(self):
     if hasattr(self, 'spot_instance_request_id'):
       describe_cmd = util.AWS_PREFIX + [
           '--region=%s' % self.region,

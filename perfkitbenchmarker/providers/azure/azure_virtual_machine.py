@@ -508,6 +508,7 @@ class AzureVirtualMachine(
       self.host_series_sku = _GetSkuType(self.machine_type)
       self.host_list = None
     self.low_priority = vm_spec.low_priority
+    self.preemptible = self.low_priority
     self.low_priority_status_code = None
     self.spot_early_termination = False
     self.ultra_ssd_enabled = False
@@ -760,21 +761,17 @@ class AzureVirtualMachine(
       result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
-  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
-    """Updates the interruptible status if the VM was preempted."""
-    if self.spot_early_termination:
-      return
-    if self.low_priority and self._Exists():
-      stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
-          _SCHEDULED_EVENTS_CMD)
-      if return_code:
-        logging.error('Checking Interrupt Error: %s', stderr)
-      else:
-        events = json.loads(stdout).get('Events', [])
-        self.spot_early_termination = any(
-            event.get('EventType') == 'Preempt' for event in events)
-        if self.spot_early_termination:
-          logging.info('Spotted early termination on %s', self)
+  def _UpdateInterruptibleVmStatusThroughMetadataService(self):
+    stdout, stderr, return_code = self.RemoteCommandWithReturnCode(
+        _SCHEDULED_EVENTS_CMD)
+    if return_code:
+      logging.error('Checking Interrupt Error: %s', stderr)
+    else:
+      events = json.loads(stdout).get('Events', [])
+      self.spot_early_termination = any(
+          event.get('EventType') == 'Preempt' for event in events)
+      if self.spot_early_termination:
+        logging.info('Spotted early termination on %s', self)
 
   def IsInterruptible(self):
     """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
@@ -885,17 +882,13 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         '--protected-settings=%s' % config
     ] + self.resource_group.args)
 
-  def UpdateInterruptibleVmStatus(self, is_failed_run=False):
-    """Updates the interruptible status if the VM was preempted."""
+  def _UpdateInterruptibleVmStatusThroughMetadataService(self):
+    stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
+    events = json.loads(stdout).get('Events', [])
+    self.spot_early_termination = any(
+        event.get('EventType') == 'Preempt' for event in events)
     if self.spot_early_termination:
-      return
-    if self.low_priority and self._Exists():
-      stdout, _ = self.RemoteCommand(_SCHEDULED_EVENTS_CMD_WIN)
-      events = json.loads(stdout).get('Events', [])
-      self.spot_early_termination = any(
-          event.get('EventType') == 'Preempt' for event in events)
-      if self.spot_early_termination:
-        logging.info('Spotted early termination on %s', self)
+      logging.info('Spotted early termination on %s', self)
 
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:

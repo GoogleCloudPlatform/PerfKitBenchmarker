@@ -714,7 +714,7 @@ class InterruptChecker():
       None
     """
     while not self.phase_status.isSet():
-      vm.UpdateInterruptibleVmStatus()
+      vm.UpdateInterruptibleVmStatus(use_api=False)
       if vm.WasInterrupted():
         return
       else:
@@ -1073,8 +1073,8 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
       'run_stage': run_stage_that_failed,
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
-
-  vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(True), spec.vms)
+  vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(use_api=True),
+                      spec.vms)
 
   interruptible_vm_count = 0
   interrupted_vm_count = 0

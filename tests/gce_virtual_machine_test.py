@@ -276,7 +276,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     """
     fake_rets = [(stdout, 'stderr', 0)]
     with PatchCriticalObjects(fake_rets) as issue_command:
-      vm.UpdateInterruptibleVmStatus()
+      vm.UpdateInterruptibleVmStatus(True)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertRegex(command_string, 'gcloud compute operations list --filter'
                        fr' targetLink.scope\(\):{vm.name} --format json '
