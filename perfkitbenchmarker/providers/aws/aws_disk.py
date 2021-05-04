@@ -40,6 +40,7 @@ STANDARD = 'standard'
 GP2 = 'gp2'
 GP3 = 'gp3'
 IO1 = 'io1'
+IO2 = 'io2'
 ST1 = 'st1'
 SC1 = 'sc1'
 
@@ -63,6 +64,10 @@ DISK_METADATA = {
         disk.REPLICATION: disk.ZONE,
     },
     IO1: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE,
+    },
+    IO2: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
     },
@@ -344,7 +349,7 @@ class AwsDisk(disk.BaseDisk):
         '--volume-type=%s' % self.disk_type]
     if not util.IsRegion(self.zone):
       create_cmd.append('--availability-zone=%s' % self.zone)
-    if self.disk_type == IO1:
+    if self.disk_type in [IO1, IO2]:
       create_cmd.append('--iops=%s' % self.iops)
     if self.disk_type == GP3 and self.iops:
       create_cmd.append('--iops=%s' % self.iops)
