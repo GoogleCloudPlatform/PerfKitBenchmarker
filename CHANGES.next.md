@@ -81,6 +81,7 @@
 -   Added Intel oneAPI BaseKit to packages.
 -   Upgrade default CUDA version to 11.0.
 -   Add support for AWS IO2 EBS instances.
+
 ### Bug fixes and maintenance updates:
 
 -   Tuned entity cleanup parameters.
@@ -117,3 +118,5 @@
 -   Fix PrettyPrintStreamPublisher to make "cpu_utilization_per_minute" show up
     in the PKB results summary for cloud bigtable benchmark.
 -   Added an option to install GCP NCCL plugins.
+-   Updated hbase binding (from hbase10 to hbase12) for cloud bigtable ycsb
+    benchmark and hbase ycsb benchmark.

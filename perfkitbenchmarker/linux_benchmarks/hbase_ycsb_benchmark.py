@@ -199,14 +199,14 @@ def Prepare(benchmark_spec):
       posixpath.join(hbase.HBASE_CONF_DIR, HBASE_SITE))
 
   def PushHBaseSite(vm):
-    conf_dir = posixpath.join(ycsb.YCSB_DIR, 'hbase10-binding', 'conf')
+    conf_dir = posixpath.join(ycsb.YCSB_DIR, 'hbase12-binding', 'conf')
     vm.RemoteCommand('mkdir -p {}'.format(conf_dir))
     vm.PushFile(
         os.path.join(vm_util.GetTempDir(), HBASE_SITE),
         posixpath.join(conf_dir, HBASE_SITE))
 
   vm_util.RunThreaded(PushHBaseSite, loaders)
-  benchmark_spec.executor = ycsb.YCSBExecutor('hbase10')
+  benchmark_spec.executor = ycsb.YCSBExecutor('hbase12')
 
 
 def Run(benchmark_spec):

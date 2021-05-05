@@ -115,7 +115,7 @@ DROPWIZARD_METRICS_CORE_URL = posixpath.join(
     'io/dropwizard/metrics/metrics-core/3.1.2/', METRICS_CORE_JAR)
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
-HBASE_BINDING = 'hbase10-binding'
+HBASE_BINDING = 'hbase12-binding'
 YCSB_HBASE_LIB = posixpath.join(ycsb.YCSB_DIR, HBASE_BINDING, 'lib')
 YCSB_HBASE_CONF = posixpath.join(ycsb.YCSB_DIR, HBASE_BINDING, 'conf')
 
@@ -387,7 +387,7 @@ def Prepare(benchmark_spec):
       'jvm-args': jvm_args,
       'table': table_name}
 
-  benchmark_spec.executor = ycsb.YCSBExecutor('hbase10', **executor_flags)
+  benchmark_spec.executor = ycsb.YCSBExecutor('hbase12', **executor_flags)
 
 
 def Run(benchmark_spec):
