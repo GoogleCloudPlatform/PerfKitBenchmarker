@@ -63,7 +63,7 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.')
-_GCE_VM_CREATE_TIMEOUT = 600
+_GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 
 
