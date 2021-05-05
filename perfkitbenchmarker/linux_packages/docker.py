@@ -23,7 +23,7 @@ and not within a container running on that VM.
 from absl import flags
 from perfkitbenchmarker import linux_packages
 
-VERSION = flags.DEFINE_string('docker_version', '19.03.15',
+VERSION = flags.DEFINE_string('docker_version', None,
                               'Version of docker to install.')
 
 DOCKER_RPM_URL = ('https://get.docker.com/rpm/1.7.0/centos-6/'
@@ -79,7 +79,7 @@ def CreateImagePackages():
 def YumInstall(vm):
   """Installs the docker package on the VM."""
   vm.RemoteHostCommand('VERSION=%s curl -o %s/docker.rpm -sSL %s' %
-                       (VERSION.value, linux_packages.INSTALL_DIR,
+                       (VERSION.value or '', linux_packages.INSTALL_DIR,
                         DOCKER_RPM_URL))
   vm.RemoteHostCommand('sudo yum localinstall '
                        '--nogpgcheck %s/docker.rpm -y' %
@@ -89,7 +89,8 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the docker package on the VM."""
-  vm.RemoteHostCommand('curl -sSL https://get.docker.com/ | sh')
+  vm.RemoteHostCommand(f'VERSION={VERSION.value or ""} '
+                       'curl -sSL https://get.docker.com/ | sh')
 
 
 def IsInstalled(vm):
