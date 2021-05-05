@@ -23,6 +23,7 @@ This package copies the credentials file to the remote VM to make them available
 for calls from the VM to other AWS services, such as SQS or Kinesis.
 """
 
+import configparser
 import logging
 import os
 from absl import flags
@@ -72,9 +73,11 @@ def GetCredentials(credentials_file_name='credentials'):
   Returns:
     A string, string tuple of access_key and secret_access_key
   """
-  with open(os.path.join(_GetLocalPath(), credentials_file_name)) as fp:
-    text = fp.read().split('\n')
-  return (text[1].split(' = ')[1]), (text[2].split(' = ')[1])
+  config = configparser.ConfigParser()
+  config.read(os.path.join(_GetLocalPath(), credentials_file_name))
+  key_id = config['default']['aws_access_key_id']
+  key = config['default']['aws_secret_access_key']
+  return key_id, key
 
 
 def CheckPrerequisites():
