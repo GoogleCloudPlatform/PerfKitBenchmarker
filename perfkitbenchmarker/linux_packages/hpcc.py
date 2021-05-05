@@ -290,7 +290,6 @@ def Install(vm):
   """Installs the HPCC package on the VM."""
   vm.Install('wget')
   if USE_INTEL_COMPILED_HPL.value:
-    vm.Install('intel_repo')
     vm.Install('intelmpi')
     vm.Install('mkl')
     # Using a pre-compiled HPL, no need to continue
