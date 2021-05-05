@@ -441,10 +441,11 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     cmd_string = ' '.join(cmd_list)
 
     start_time = datetime.datetime.now()
-    stdout, stderr, retcode = self.leader.RemoteCommandWithReturnCode(
-        cmd_string, should_log=True, ignore_failure=True)
-    if retcode:
-      raise JobSubmissionError(stderr)
+    try:
+      stdout, _ = self.leader.RobustRemoteCommand(
+          cmd_string, should_log=True)
+    except errors.VirtualMachine.RemoteCommandError as e:
+      raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
@@ -537,10 +538,11 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
       cmd += job_arguments
 
     start_time = datetime.datetime.now()
-    stdout, stderr, retcode = self.leader.RemoteCommandWithReturnCode(
-        ' '.join(cmd), should_log=True, ignore_failure=True)
-    if retcode:
-      raise JobSubmissionError(stderr)
+    try:
+      stdout, _ = self.leader.RobustRemoteCommand(
+          ' '.join(cmd), should_log=True)
+    except errors.VirtualMachine.RemoteCommandError as e:
+      raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
