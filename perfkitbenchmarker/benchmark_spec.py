@@ -87,7 +87,7 @@ flags.DEFINE_string('startup_script', None,
                     'Script to run right after vm boot.')
 flags.DEFINE_string('postrun_script', None,
                     'Script to run right after run stage.')
-flags.DEFINE_integer('create_and_boot_post_task_delay', None,
+flags.DEFINE_integer('create_and_boot_post_task_delay', 2,
                      'Delay in seconds to delay in between boot tasks.')
 # pyformat: disable
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,

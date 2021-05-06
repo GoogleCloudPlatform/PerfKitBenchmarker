@@ -120,3 +120,5 @@
 -   Added an option to install GCP NCCL plugins.
 -   Updated hbase binding (from hbase10 to hbase12) for cloud bigtable ycsb
     benchmark and hbase ycsb benchmark.
+-   Set a default `--create_and_boot_post_task_delay` of 2 seconds to fix EC2
+    clustered placement groups.
