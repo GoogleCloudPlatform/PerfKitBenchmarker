@@ -38,6 +38,12 @@ _IO_THREAD_AFFINITY = flags.DEFINE_bool(
 _ENABLE_SNAPSHOTS = flags.DEFINE_bool(
     'redis_server_enable_snapshots', False,
     'If true, uses the default redis snapshot policy.')
+_NUM_PROCESSES = flags.DEFINE_integer(
+    'redis_total_num_processes', 1,
+    'Total number of redis server processes. Useful when running with a redis '
+    'version lower than 6.',
+    lower_bound=1)
+
 
 DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
@@ -74,7 +80,7 @@ def AptInstall(vm) -> None:
   _Install(vm)
 
 
-def _BuildStartCommand(vm) -> str:
+def _BuildStartCommand(vm, port: int) -> str:
   """Returns the run command used to start the redis server.
 
   See https://raw.githubusercontent.com/redis/redis/6.0/redis.conf
@@ -82,6 +88,7 @@ def _BuildStartCommand(vm) -> str:
 
   Args:
     vm: The redis server VM.
+    port: The port to start redis on.
 
   Returns:
     A command that can be used to start redis in the background.
@@ -89,6 +96,7 @@ def _BuildStartCommand(vm) -> str:
   redis_dir = GetRedisDir()
   cmd = 'nohup sudo {redis_dir}/src/redis-server {args} &> /dev/null &'
   cmd_args = [
+      f'--port {port}',
       '--protected-mode no',
       f'--io-threads {_IO_THREADS.value}',
   ]
@@ -115,7 +123,9 @@ def Start(vm) -> None:
       'net.core.somaxconn = 65535\n'
       '" | sudo tee -a /etc/sysctl.conf')
   vm.RemoteCommand('sudo sysctl -p')
-  vm.RemoteCommand(_BuildStartCommand(vm))
+  for i in range(_NUM_PROCESSES.value):
+    port = DEFAULT_PORT + i
+    vm.RemoteCommand(_BuildStartCommand(vm, port))
 
 
 def GetMetadata() -> Dict[str, Any]:

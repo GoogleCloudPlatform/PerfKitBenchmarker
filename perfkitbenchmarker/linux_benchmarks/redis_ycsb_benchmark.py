@@ -15,6 +15,10 @@
 """Run YCSB against Redis.
 
 Redis homepage: http://redis.io/
+
+Note: this benchmark was written for redis versions < 6. It should probably
+be updated to use the newest redis version, and remove usages of multiple redis
+processes.
 """
 
 import functools
@@ -58,7 +62,6 @@ def PrepareLoadgen(load_vm):
 
 def PrepareServer(redis_vm):
   redis_vm.Install('redis_server')
-  redis_server.Configure(redis_vm)
   redis_server.Start(redis_vm)
 
 
@@ -84,7 +87,7 @@ def Prepare(benchmark_spec):
   # be at least as large as number of server processes, use round-robin
   # to assign target server process to each ycsb process
   server_metadata = [
-      {'redis.port': redis_server.REDIS_FIRST_PORT + i % num_server}
+      {'redis.port': redis_server.DEFAULT_PORT + i % num_server}
       for i in range(num_ycsb)]
 
   benchmark_spec.executor = ycsb.YCSBExecutor(
