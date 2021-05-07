@@ -85,6 +85,7 @@ _RHEL_TAR = f'redislabs-{_VERSION}-rhel7-x86_64.tar'
 _XENIAL_TAR = f'redislabs-{_VERSION}-xenial-amd64.tar'
 _BIONIC_TAR = f'redislabs-{_VERSION}-bionic-amd64.tar'
 _USERNAME = 'user@google.com'
+_ONE_KILOBYTE = 1000
 PREPROVISIONED_DATA = {
     # These checksums correspond to version 6.0.12-58. To update, run
     # 'sha256sum <redislabs-{VERSION}-rhel7-x86_64.tar>' and replace the values
@@ -210,7 +211,7 @@ def SetUpCluster(vm, redis_port):
   """Set up the details of the cluster."""
   content = {
       'name': 'redisdb',
-      'memory_size': 10000000000,
+      'memory_size': int(vm.total_memory_kb * _ONE_KILOBYTE / 2),
       'type': 'redis',
       'proxy_policy': 'all-master-shards',
       'port': redis_port,
