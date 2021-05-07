@@ -129,6 +129,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
+        # This will actually be used for storage
+        self.dpb_hdfs_type = 'Local SSD'
     # Set zone
     cmd.flags['zone'] = self.dpb_service_zone
     if self.dpb_version:

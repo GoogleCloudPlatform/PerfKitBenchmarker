@@ -21,10 +21,12 @@ import json
 import logging
 
 from absl import flags
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import aws
+from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
@@ -42,8 +44,9 @@ JOB_WAIT_SLEEP = 30
 EMR_TIMEOUT = 14400
 
 disk_to_hdfs_map = {
-    'st1': 'HDD',
-    'gp2': 'SSD'
+    aws_disk.ST1: 'HDD',
+    aws_disk.GP2: 'SSD',
+    disk.LOCAL: 'Local SSD',
 }
 
 DATAPROC_TO_EMR_CONF_FILES = {
@@ -137,20 +140,21 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """Creates the cluster."""
     name = 'pkb_' + FLAGS.run_uri
 
-    # Set up ebs details if disk_spec is present int he config
+    # Set up ebs details if disk_spec is present in the config
     ebs_configuration = None
     if self.spec.worker_group.disk_spec:
       # Make sure nothing we are ignoring is included in the disk spec
       assert self.spec.worker_group.disk_spec.device_path is None
       assert self.spec.worker_group.disk_spec.disk_number is None
       assert self.spec.worker_group.disk_spec.iops is None
-      ebs_configuration = {'EbsBlockDeviceConfigs': [
-          {'VolumeSpecification': {
-              'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
-              'VolumeType': self.spec.worker_group.disk_spec.disk_type},
-           'VolumesPerInstance': self.spec.worker_group.disk_count}]}
       self.dpb_hdfs_type = disk_to_hdfs_map[
           self.spec.worker_group.disk_spec.disk_type]
+      if self.spec.worker_group.disk_spec.disk_type != disk.LOCAL:
+        ebs_configuration = {'EbsBlockDeviceConfigs': [
+            {'VolumeSpecification': {
+                'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
+                'VolumeType': self.spec.worker_group.disk_spec.disk_type},
+             'VolumesPerInstance': self.spec.worker_group.disk_count}]}
 
     # Create the specification for the master and the worker nodes
     instance_groups = []
