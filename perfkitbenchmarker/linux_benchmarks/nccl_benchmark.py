@@ -19,9 +19,11 @@ import time
 from absl import flags
 import numpy as np
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import nvidia_driver
 
 flags.DEFINE_integer('nccl_slots', 8,
                      'Launch n processes per node on all allocated nodes')
@@ -45,6 +47,8 @@ flags.DEFINE_multi_enum(
     'nccl_operations', ['all_reduce', 'all_gather', 'alltoall'],
     ['all_reduce', 'all_gather', 'broadcast', 'reduce_scatter', 'reduce',
      'alltoall'], 'The NCCL collective operation.')
+_NCCL_TESTS = flags.DEFINE_boolean('nccl_install_tests', True,
+                                   'Install NCCL tests benchmarks.')
 
 FLAGS = flags.FLAGS
 
@@ -169,13 +173,10 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   benchmark_spec.always_call_cleanup = True
-  vm_util.RunThreaded(PrepareVm, benchmark_spec.vms)
-  host = benchmark_spec.vms[0]
-  host.RemoteCommand('rm -rf {hostfile}'.format(hostfile=HOSTFILE))
-  for vm in benchmark_spec.vms:
-    cmd = 'echo "{ip} slots={slots}" >> {hostfile}'.format(
-        ip=vm.internal_ip, hostfile=HOSTFILE, slots=FLAGS.nccl_slots)
-    host.RemoteCommand(cmd)
+  hpc_util.CreateMachineFile(
+      benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE)
+  if _NCCL_TESTS.value:
+    vm_util.RunThreaded(PrepareVm, benchmark_spec.vms)
 
 
 def CreateMetadataDict():
