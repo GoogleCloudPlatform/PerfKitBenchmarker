@@ -532,6 +532,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'Tenancy=host is not supported for Spot Instances')
     self.allocation_id = None
     self.association_id = None
+    self.aws_tags = {}
 
   @property
   def host_list(self):
@@ -764,9 +765,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                          self.boot_disk_size,
                                          self.image,
                                          self.region)
-    tags = {}
-    tags.update(self.vm_metadata)
-    tags.update(util.MakeDefaultTags())
+    if not self.aws_tags:
+      # Set tags for the AWS VM. If we are retrying the create, we have to use
+      # the same tags from the previous call.
+      self.aws_tags.update(self.vm_metadata)
+      self.aws_tags.update(util.MakeDefaultTags())
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
@@ -776,7 +779,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--instance-type=%s' % self.machine_type,
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s' %
-        util.FormatTagSpecifications('instance', tags)]
+        util.FormatTagSpecifications('instance', self.aws_tags)]
     if FLAGS.disable_smt:
       query_cmd = util.AWS_PREFIX + [
           'ec2',
@@ -871,6 +874,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'InstanceLimitExceeded' in stderr or 'VcpuLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
     if 'RequestLimitExceeded' in stderr and FLAGS.retry_on_rate_limited:
+      raise errors.Resource.RetryableCreationError(stderr)
+    # When launching more than 1 VM into the same placement group, there is an
+    # occasional error that the placement group has already been used in a
+    # separate zone. Retrying fixes this error.
+    if 'InvalidPlacementGroup.InUse' in stderr:
       raise errors.Resource.RetryableCreationError(stderr)
     if retcode:
       raise errors.Resource.CreationError(
