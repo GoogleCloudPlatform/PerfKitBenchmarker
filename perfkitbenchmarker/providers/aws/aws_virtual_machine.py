@@ -75,7 +75,7 @@ AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
 USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
     ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
-ARM_PROCESSOR_PREFIXES = ['a1', 'm6g', 'c6g', 'r6g', 'm6gd']
+ARM_PROCESSOR_PREFIXES = ['a1', 'm6g', 'c6g', 'r6g']
 
 # Processor architectures
 ARM = 'arm64'
@@ -113,7 +113,6 @@ _MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
     'm6g': 'graviton2',
-    'm6gd': 'graviton2',
     'r6g': 'graviton2',
 }
 
@@ -238,7 +237,7 @@ def IsPlacementGroupCompatible(machine_type):
 
 def GetProcessorArchitecture(machine_type):
   """Returns the processor architecture of the VM."""
-  prefix = machine_type.split('.')[0]
+  prefix = re.split(r'[dn]?\.', machine_type)[0]
   if prefix in ARM_PROCESSOR_PREFIXES:
     return ARM
   else:
