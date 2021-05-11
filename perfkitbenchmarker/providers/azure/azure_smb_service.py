@@ -38,6 +38,8 @@ Lifecycle:
 
 import json
 import logging
+from typing import List
+
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
@@ -70,6 +72,11 @@ class AzureSmbService(smb_service.BaseSmbService):
     self.name = 'azure-smb-fs-%s' % FLAGS.run_uri
     self.location = util.GetLocationFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.location)
+
+    # set during _Create()
+    self.connection_args: List[str] = None
+    self.storage_account_key: str = None
+    self.storage_account_name: str = None
 
   @property
   def network(self):

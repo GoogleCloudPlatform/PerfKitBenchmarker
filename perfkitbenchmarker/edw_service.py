@@ -112,10 +112,14 @@ class EdwClientInterface(object):
   Attributes:
     client_vm: An instance of virtual_machine.BaseVirtualMachine used to
       interface with the edw service.
+    whitelist_ip: The IP to whitelist.
   """
 
   def __init__(self):
     self.client_vm = None
+
+    # set by derived classes
+    self.whitelist_ip = None
 
   def SetProvisionedAttributes(self, benchmark_spec):
     """Sets any attributes that were unknown during initialization."""
