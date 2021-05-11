@@ -121,3 +121,4 @@
 -   Updated hbase binding (from hbase10 to hbase12) for cloud bigtable ycsb
     benchmark and hbase ycsb benchmark.
 -   Added retries around spurious InvalidPlacementGroup.InUse on AWS VM create.
+-   Support Redis version 6 on managed Redis datastores.

@@ -45,8 +45,8 @@ flags.DEFINE_enum(
 REDIS_3_2 = 'redis_3_2'
 REDIS_4_0 = 'redis_4_0'
 REDIS_5_0 = 'redis_5_0'
-REDIS_6_0 = 'redis_6_0'
-REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_0]
+REDIS_6_X = 'redis_6_x'
+REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X]
 
 flags.DEFINE_string('managed_memory_store_version',
                     None,
