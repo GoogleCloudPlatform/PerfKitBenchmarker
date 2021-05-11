@@ -39,6 +39,7 @@
 -   Add support for Azure Ultra Disk
 -   Add `cloudharmony_network` benchmark
 -   Add GPU PingPong benchmark.
+-   Added lmod linux package.
 
 ### Enhancements:
 
