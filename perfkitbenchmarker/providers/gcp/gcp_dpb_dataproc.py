@@ -63,7 +63,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.persistent_fs_prefix = 'gs://'
 
   @staticmethod
-  def _ParseTime(state_time: str) -> datetime:
+  def _ParseTime(state_time: str) -> datetime.datetime:
     """Parses time from json output.
 
     Args:

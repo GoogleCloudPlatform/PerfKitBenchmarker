@@ -162,7 +162,7 @@ def GetClustersDecription(instance_name, project):
       suppress_warning=True, raise_on_failure=False)
   if retcode:
     logging.error('Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
-                  ' '.join(cmd), stdout, stderr)
+                  repr(cmd), stdout, stderr)
   output = json.loads(stdout)
 
   result = []
