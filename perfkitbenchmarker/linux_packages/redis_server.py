@@ -71,6 +71,15 @@ def _Install(vm) -> None:
 def YumInstall(vm) -> None:
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-devel')
+  vm.InstallPackages('scl-utils centos-release-scl')
+  vm.InstallPackages('devtoolset-7 libuuid-devel')
+  vm.InstallPackages('openssl openssl-devel curl-devel '
+                     'devtoolset-7-libatomic-devel tcl '
+                     'tcl-devel git wget epel-release')
+  vm.InstallPackages('tcltls libzstd procps-ng')
+  vm.RemoteCommand(
+      'echo "source scl_source enable devtoolset-7" | sudo tee -a $HOME/.bashrc'
+  )
   _Install(vm)
 
 
@@ -99,6 +108,7 @@ def _BuildStartCommand(vm, port: int) -> str:
       f'--port {port}',
       '--protected-mode no',
       f'--io-threads {_IO_THREADS.value}',
+      '--ignore-warnings ARM64-COW-BUG',
   ]
   # Snapshotting
   if not _ENABLE_SNAPSHOTS.value:
@@ -122,7 +132,7 @@ def Start(vm) -> None:
       'vm.overcommit_memory = 1\n'
       'net.core.somaxconn = 65535\n'
       '" | sudo tee -a /etc/sysctl.conf')
-  vm.RemoteCommand('sudo sysctl -p')
+  vm.RemoteCommand('sudo /usr/sbin/sysctl -p')
   for i in range(_NUM_PROCESSES.value):
     port = DEFAULT_PORT + i
     vm.RemoteCommand(_BuildStartCommand(vm, port))
