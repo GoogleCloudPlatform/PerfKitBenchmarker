@@ -173,10 +173,10 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   benchmark_spec.always_call_cleanup = True
-  hpc_util.CreateMachineFile(
-      benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE)
   if _NCCL_TESTS.value:
     vm_util.RunThreaded(PrepareVm, benchmark_spec.vms)
+  hpc_util.CreateMachineFile(
+      benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE)
 
 
 def CreateMetadataDict():
