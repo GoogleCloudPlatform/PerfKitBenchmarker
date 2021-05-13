@@ -58,6 +58,11 @@ flags.DEFINE_enum(
     'will let you use ZRS storage. Choosing BlobStorage will give you access '
     'to Hot and Cold storage tiers.')
 
+flags.DEFINE_integer('azure_provisioned_iops', None,
+                     'IOPS for Provisioned IOPS volumes in Azure.')
+flags.DEFINE_integer('azure_provisioned_throughput', None,
+                     'Provisioned throughput (MB/s) for volumes in Azure.')
+
 flags.DEFINE_string('azure_preprovisioned_data_bucket', None,
                     'Azure blob storage account where pre-provisioned data '
                     'has been copied.')

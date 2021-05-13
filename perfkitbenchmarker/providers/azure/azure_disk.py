@@ -201,6 +201,20 @@ class AzureDisk(disk.BaseDisk):
         raise errors.Resource.RetryableCreationError(
             'Error tagging Azure disk.')
 
+      if (self.disk_type == ULTRA_STORAGE and (
+          FLAGS.azure_provisioned_iops or FLAGS.azure_provisioned_throughput)):
+        args = ([azure.AZURE_PATH, 'disk', 'update', '--name', self.name] +
+                self.resource_group.args)
+
+        if FLAGS.azure_provisioned_iops:
+          args = args + ['--disk-iops-read-write',
+                         str(FLAGS.azure_provisioned_iops)]
+        if FLAGS.azure_provisioned_throughput:
+          args = args + ['--disk-mbps-read-write',
+                         str(FLAGS.azure_provisioned_throughput)]
+
+        _, _, _ = vm_util.IssueCommand(args, raise_on_failure=True)
+
   def _Delete(self):
     """Deletes the disk."""
     assert not self.is_image
