@@ -148,7 +148,8 @@ def _InstallCuda9Point0(vm):
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y cuda-9-0')
+  vm.InstallPackages('cuda-toolkit-9-0 cuda-tools-9-0 cuda-libraries-9-0 '
+                     'cuda-libraries-dev-9-0')
   _InstallCudaPatch(vm, CUDA_9_0_PATCH.format(os=vm.OS_TYPE))
 
 
@@ -166,8 +167,8 @@ def _InstallCuda10Point0(vm):
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-0-local-10.0.130-410.48/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackages('cuda-10-0 cuda-toolkit-10-0 cuda-tools-10-0 '
-                     'cuda-libraries-10-0 cuda-libraries-dev-10-0')
+  vm.InstallPackages('cuda-toolkit-10-0 cuda-tools-10-0 cuda-libraries-10-0 '
+                     'cuda-libraries-dev-10-0')
 
 
 def _InstallCuda10Point1(vm):
@@ -185,8 +186,8 @@ def _InstallCuda10Point1(vm):
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-1-local-10.1.243-418.87.00/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackages('cuda-10-1 cuda-toolkit-10-1 cuda-tools-10-1 '
-                     'cuda-libraries-10-1 cuda-libraries-dev-10-1')
+  vm.InstallPackages('cuda-toolkit-10-1 cuda-tools-10-1 cuda-libraries-10-1 '
+                     'cuda-libraries-dev-10-1')
 
 
 def _InstallCuda10Point2(vm):
@@ -204,8 +205,8 @@ def _InstallCuda10Point2(vm):
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-2-local-10.2.89-440.33.01/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackages('cuda-10-2 cuda-toolkit-10-2 cuda-tools-10-2 '
-                     'cuda-libraries-10-2 cuda-libraries-dev-10-2')
+  vm.InstallPackages('cuda-toolkit-10-2 cuda-tools-10-2 cuda-libraries-10-2 '
+                     'cuda-libraries-dev-10-2')
 
 
 def _InstallCuda11Point0(vm):
@@ -223,8 +224,8 @@ def _InstallCuda11Point0(vm):
   vm.RemoteCommand('sudo apt-key add '
                    f'/var/cuda-repo-{vm.OS_TYPE}-11-0-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackages('cuda-11-0 cuda-toolkit-11-0 cuda-tools-11-0 '
-                     'cuda-libraries-11-0 cuda-libraries-dev-11-0')
+  vm.InstallPackages('cuda-toolkit-11-0 cuda-tools-11-0 cuda-libraries-11-0 '
+                     'cuda-libraries-dev-11-0')
 
 
 def AptInstall(vm):
