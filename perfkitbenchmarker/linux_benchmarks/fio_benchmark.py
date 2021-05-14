@@ -111,6 +111,9 @@ flags.DEFINE_list('fio_generate_scenarios', [],
                   '--fio_jobfile.   You can also specify a scenario in the '
                   'format accesspattern_blocksize_operation_workingset '
                   'for a custom workload.')
+flags.DEFINE_bool('fio_use_default_scenarios', True,
+                  'Use the legacy scenario tables defined in fio_benchmark.py '
+                  'to resolve the scenario name in generate scenarios')
 flags.DEFINE_enum('fio_target_mode', AGAINST_FILE_WITHOUT_FILL_MODE,
                   [AGAINST_DEVICE_WITH_FILL_MODE,
                    AGAINST_DEVICE_WITHOUT_FILL_MODE,
@@ -321,7 +324,8 @@ FIO_KNOWN_FIELDS_IN_JINJA = [
 def GetScenarioFromScenarioString(scenario_string):
   """Extract rwkind,blocksize,size from scenario string."""
   # look for legacy entries in the scenario map first
-  result = SCENARIOS.get(scenario_string, None)
+  result = (SCENARIOS.get(scenario_string, None)
+            if FLAGS.fio_use_default_scenarios else None)
   if result:
     # return a copy so that the scenario can be mutated further if needed
     # without modifying the SCENARIO map
@@ -405,7 +409,7 @@ def GenerateJobFileString(filename, scenario_strings,
     The contents of a fio job file, as a string.
   """
 
-  if 'all' in scenario_strings:
+  if 'all' in scenario_strings and FLAGS.fio_use_default_scenarios:
     scenarios = six.itervalues(SCENARIOS)
   else:
     scenarios = [GetScenarioFromScenarioString(scenario_string)
