@@ -40,6 +40,7 @@
 -   Add `cloudharmony_network` benchmark
 -   Add GPU PingPong benchmark.
 -   Added lmod linux package.
+-   Support IntelMPI 2021.x on RedHat.
 
 ### Enhancements:
 

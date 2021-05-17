@@ -58,6 +58,9 @@ _YUM_DOWNLOAD_KEY_CMD = f'curl -o {_YUM_DOWNLOAD_KEY} {_YUM_REPO_KEY}'
 # Command to compare the current Intel key to our copy in the data/ directory.
 _YUM_DIFF_KEY_CMD = f'diff {_REMOTE_KEY_FILE} {_YUM_DOWNLOAD_KEY}'
 
+_ONEAPI_YUM_INSTALL_REPO_FILE = 'intel_repo_yum.txt'
+_ONEAPI_YUM_INSTALL_REPO_REMOTE_FILE = '/etc/yum.repos.d/oneAPI.repo'
+
 ONEAPI_VARS_FILE = '/opt/intel/oneapi/setvars.sh'
 
 FLAGS = flags.FLAGS
@@ -83,7 +86,13 @@ def YumInstall(vm):
   """Configuration for YUM install."""
   vm.PushDataFile(_INTEL_KEY_FILE, _REMOTE_KEY_FILE)
   vm.InstallPackages('yum-utils')
-  vm.RemoteCommand(_YUM_INSTALL_REPO_CMD)
+  if UseOneApi():
+    tmp_remote_file = posixpath.basename(_ONEAPI_YUM_INSTALL_REPO_REMOTE_FILE)
+    vm.PushDataFile(_ONEAPI_YUM_INSTALL_REPO_FILE, tmp_remote_file)
+    vm.RemoteCommand(
+        f'sudo mv {tmp_remote_file} {_ONEAPI_YUM_INSTALL_REPO_REMOTE_FILE}')
+  else:
+    vm.RemoteCommand(_YUM_INSTALL_REPO_CMD)
   # the /etc/yum.repos.d/intelproducts.repo file has the gpgkey listed as the
   # _YUM_REPO_KEY, confirm that it is the same as our local copy
   vm.RemoteCommand(_YUM_DOWNLOAD_KEY_CMD)
