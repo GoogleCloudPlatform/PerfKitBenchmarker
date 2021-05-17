@@ -44,9 +44,13 @@ For more details, see https://linux.die.net/man/1/mpstat.
 
 """
 
+# TODO(user) Refactor to output and read JSON
 
+import datetime
 import logging
 import os
+from typing import Any, Callable, Dict, List, Optional
+
 from absl import flags
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
@@ -54,35 +58,91 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.traces import base_collector
 import six
 
-flags.DEFINE_boolean(
+_MPSTAT = flags.DEFINE_boolean(
     'mpstat', False, 'Run mpstat (https://linux.die.net/man/1/mpstat) '
     'to collect system performance metrics during benchmark run.')
-flags.DEFINE_enum(
+_MPSTAT_BREAKDOWN = flags.DEFINE_enum(
     'mpstat_breakdown', 'SUM', ['SUM', 'CPU', 'ALL'],
     'Level of aggregation for statistics. Accepted '
     'values are "SUM", "CPU", "ALL". Defaults to SUM. See '
     'https://linux.die.net/man/1/mpstat for details.')
-flags.DEFINE_string(
+_MPSTAT_CPUS = flags.DEFINE_string(
     'mpstat_cpus', 'ALL', 'Comma delimited string of CPU ids or ALL. '
     'Defaults to ALL.')
-flags.DEFINE_integer(
+_MPSTAT_INTERVAL = flags.DEFINE_integer(
     'mpstat_interval', 1,
     'The amount of time in seconds between each mpstat report.'
     'Defaults to 1.')
-flags.DEFINE_integer(
+_MPSTAT_COUNT = flags.DEFINE_integer(
     'mpstat_count', 1, 'The number of reports generated at interval apart.'
     'Defaults to 1.')
-flags.DEFINE_boolean('mpstat_publish', False,
-                     'Whether to publish mpstat statistics.')
+_MPSTAT_PUBLISH = flags.DEFINE_boolean(
+    'mpstat_publish', False,
+    'Whether to publish mpstat statistics.')
+_MPSTAT_PUBLISH_PER_INTERVAL_SAMPLES = flags.DEFINE_boolean(
+    'mpstat_publish_per_interval_samples', False,
+    'Whether to publish a separate mpstat statistics sample '
+    'for each interval. If True, --mpstat_publish must be True.')
+
 FLAGS = flags.FLAGS
 
+_TWENTY_THREE_HOURS_IN_SECONDS = 23 * 60 * 60
 
-def _ParsePercentageUse(rows, metadata):
+flags.register_validator(
+    _MPSTAT_INTERVAL.name,
+    lambda value: value < _TWENTY_THREE_HOURS_IN_SECONDS,
+    message=('If --mpstat_interval must be less than 23 hours (if it\'s set '
+             'near or above 24 hours, it becomes hard to infer sample '
+             'timestamp from mpstat output.'))
+
+flags.register_validator(
+    _MPSTAT_PUBLISH_PER_INTERVAL_SAMPLES.name,
+    lambda value: FLAGS.mpstat_publish or not value,
+    message=('If --mpstat_publish_per_interval is True, --mpstat_publish must '
+             'be True.'))
+
+
+def _ParseStartTime(output: str) -> float:
+  """Parse the start time of the mpstat report.
+
+  Args:
+    output: output of mpstat
+
+  Returns:
+    An integer representing the unix time at which the first sample in the
+      report was run.
+
+  Example input:
+  Linux 5.10.26-1rodete1-amd64 (wlifferth.c.googlers.com)         2021-05-13
+      _x86_64_        (8 CPU)
+
+  16:44:16     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal
+      %guest  %gnice   %idle
+  16:44:17     all   13.03    0.73   10.96    0.85    0.00    4.99    0.24
+      0.00    0.00   69.18
+
+  """
+  lines = output.split('\n')
+  date = lines[0].split()[3]
+  time = lines[2].split()[0]
+  start_datetime_string = ' '.join([date, time])
+  # As a sysstat utility, this is printed in UTC by default
+  start_datetime = datetime.datetime.strptime(
+      start_datetime_string,
+      '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
+  return start_datetime.timestamp()
+
+
+def _ParsePercentageUse(
+    rows: List[str],
+    metadata: Dict[str, Any],
+    timestamp: Optional[float] = None):
   """Parse a CPU percentage use data chunk.
 
   Args:
     rows: List of mpstat CPU percentage lines.
     metadata: metadata of the sample.
+    timestamp: timestamp of the sample.
 
   Yields:
     List of samples
@@ -110,15 +170,24 @@ def _ParsePercentageUse(rows, metadata):
         cpu_id = int(cpu_id_pair[1])
       meta['mpstat_cpu_id'] = cpu_id
       yield sample.Sample(
-          metric=metric_name, value=float(value), unit='%', metadata=meta)
+          metric=metric_name,
+          value=float(value),
+          unit='%',
+          metadata=meta,
+          timestamp=timestamp,
+          )
 
 
-def _ParseInterruptsPerSec(rows, metadata):
+def _ParseInterruptsPerSec(
+    rows: List[str],
+    metadata: Dict[str, Any],
+    timestamp: Optional[float] = None):
   """Parse a interrput/sec data chunk.
 
   Args:
     rows: List of mpstat interrupts per second lines.
     metadata: metadata of the sample.
+    timestamp: timestamp of the sample.
 
   Yields:
     List of samples
@@ -140,31 +209,109 @@ def _ParseInterruptsPerSec(rows, metadata):
       metric_name = 'mpstat_intr'
       cpu_id = int(data[1])
     meta['mpstat_cpu_id'] = cpu_id
-    yield sample.Sample(metric=metric_name, value=float(data[2]),
-                        unit='interrupts/sec', metadata=meta)
+    yield sample.Sample(
+        metric=metric_name,
+        value=float(data[2]),
+        unit='interrupts/sec',
+        metadata=meta,
+        timestamp=timestamp,
+        )
 
 
-def _MpstatResults(metadata, output):
+def _GetPerIntervalSamples(
+    per_interval_paragraphs: List[List[str]],
+    metadata: Dict[str, Any],
+    start_timestamp: int,
+    interval: int,
+    parse_function: Callable[[List[str], Dict[str, Any]],
+                             sample.Sample]) -> List[sample.Sample]:
+  """Generate samples from a list of list of lines of mpstat output.
+
+  Args:
+    per_interval_paragraphs: A list of lists of strings, where each string
+      is a line of mpstat output, and each list of strings is a single mpstat
+      report.
+    metadata: a dictionary of metadata for the sample.
+    start_timestamp: a unix timestamp representing the start of the first
+      reporting period.
+    interval: the interval between mpstat reports
+    parse_function: a function that accepts a single mpstat report (list of
+      strings) along with metadata and returns a sample generate from that
+      report. Should be one of {_ParsePercentageUse, _ParseInterruptsPerSec}.
+
+  Returns:
+    a list of samples to publish
+
+  Because individual reports only have time (without a date), here we generate
+  the timestamp based on the number of intervals that have passed in order to
+  guarantee correct behavior if mpstat is run for more than 1 day.
+  """
+  samples = []
+  # TODO(user) Refactor to read times from mpstat output
+  for ordinal, paragraph in enumerate(per_interval_paragraphs):
+    sample_timestamp = start_timestamp + (ordinal * interval)
+    metadata = metadata.copy()
+    metadata['ordinal'] = ordinal
+    samples += parse_function(
+        paragraph,
+        metadata,
+        timestamp=sample_timestamp)
+  return samples
+
+
+def _MpstatResults(
+    metadata: Dict[str, Any],
+    output: str,
+    interval: int,
+    per_interval_samples: bool = False,
+    ):
   """Parses and appends mpstat results to the samples list.
 
   Args:
     metadata: metadata of the sample.
     output: output of mpstat
+    interval: the interval between mpstat reports; required if
+      per_interval_samples is True
+    per_interval_samples: whether a sample per interval should be published
 
   Returns:
     List of samples.
   """
+
+  start_timestamp = _ParseStartTime(output)
   samples = []
+  percentage_usage_lines_list = []
+  interrupts_per_sec_lines_list = []
   paragraphs = output.split('\n\n')
 
   for paragraph in paragraphs:
     lines = paragraph.rstrip().split('\n')
-    if lines and 'Average' in lines[0] and '%irq' in lines[0]:
-      samples += _ParsePercentageUse(lines, metadata)
+    if lines and '%irq' in lines[0]:
+      if 'Average' in lines[0]:
+        samples += _ParsePercentageUse(lines, metadata)
+      elif per_interval_samples:
+        percentage_usage_lines_list.append(lines)
     elif lines and 'Average' in lines[0] and 'intr/s' in lines[0]:
-      samples += _ParseInterruptsPerSec(lines, metadata)
+      if 'Average' in lines[0]:
+        samples += _ParseInterruptsPerSec(lines, metadata)
+      elif per_interval_samples:
+        interrupts_per_sec_lines_list.append(lines)
     elif lines and 'Average' in lines[0]:
       logging.debug('Skipping aggregated metrics: %s', lines[0])
+
+  samples += _GetPerIntervalSamples(
+      percentage_usage_lines_list,
+      metadata=metadata,
+      start_timestamp=start_timestamp,
+      interval=interval,
+      parse_function=_ParsePercentageUse)
+
+  samples += _GetPerIntervalSamples(
+      interrupts_per_sec_lines_list,
+      metadata=metadata,
+      start_timestamp=start_timestamp,
+      interval=interval,
+      parse_function=_ParseInterruptsPerSec)
 
   return samples
 
@@ -175,6 +322,14 @@ class MpstatCollector(base_collector.BaseCollector):
   Installs and runs mpstat on a collection of VMs.
   """
 
+  def __init__(
+      self,
+      interval=None,
+      output_directory=None,
+      per_interval_samples=False):
+    super().__init__(interval, output_directory=output_directory)
+    self.per_interval_samples = per_interval_samples
+
   def _CollectorName(self):
     return 'mpstat'
 
@@ -182,8 +337,10 @@ class MpstatCollector(base_collector.BaseCollector):
     vm.InstallPackages('sysstat')
 
   def _CollectorRunCommand(self, vm, collector_file):
-    return ('mpstat -I {breakdown} -u -P {processor_number} {interval} {count} '
-            '> {output} 2>&1 &'.format(
+    # We set the environment variable S_TIME_FORMAT=ISO to ensure consistent
+    # time formatting from mpstat
+    return ('export S_TIME_FORMAT=ISO; mpstat -I {breakdown} -u -P '
+            '{processor_number} {interval} {count} > {output} 2>&1 &'.format(
                 breakdown=FLAGS.mpstat_breakdown,
                 processor_number=FLAGS.mpstat_cpus,
                 interval=self.interval,
@@ -210,7 +367,13 @@ class MpstatCollector(base_collector.BaseCollector):
             'sender': 'run',
             'role': role,
         }
-        samples.extend(_MpstatResults(metadata, output))
+        samples.extend(
+            _MpstatResults(
+                metadata,
+                output,
+                self.interval,
+                per_interval_samples=self.per_interval_samples,
+                ))
 
     vm_util.RunThreaded(
         _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)])
@@ -223,7 +386,9 @@ def Register(parsed_flags):
 
   logging.debug('Registering mpstat collector.')
 
-  collector = MpstatCollector(interval=parsed_flags.mpstat_interval)
+  collector = MpstatCollector(
+      interval=parsed_flags.mpstat_interval,
+      per_interval_samples=parsed_flags.mpstat_publish_per_interval_samples)
   events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
   events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
   if parsed_flags.mpstat_publish:
