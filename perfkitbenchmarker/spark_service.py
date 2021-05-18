@@ -31,6 +31,7 @@ import datetime
 import posixpath
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
@@ -73,6 +74,10 @@ class BaseSparkService(resource.BaseResource):
   """Object representing a Spark Service."""
 
   RESOURCE_TYPE = 'BaseSparkService'
+
+  # Set by derived classes
+  CLOUD = None
+  SERVICE_NAME = None
 
   SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                            'spark-examples.jar')
@@ -121,6 +126,7 @@ class BaseSparkService(resource.BaseResource):
       job_arguments: Arguments to pass to class_name.  These are
         not the arguments passed to the wrapper that submits the
         job.
+      job_type: The type of the job.
 
     Returns:
       dictionary, where success is true if the job succeeded,
@@ -172,7 +178,7 @@ class BaseSparkService(resource.BaseResource):
     elif job_type == HADOOP_JOB_TYPE:
       return cls.HADOOP_SAMPLE_LOCATION
     else:
-      raise NotImplemented()
+      raise NotImplementedError()
 
 
 class PkbSparkService(BaseSparkService):
@@ -191,6 +197,9 @@ class PkbSparkService(BaseSparkService):
     assert self.cluster_id is None
     self.vms = {}
 
+    # set by _Create
+    self.leader = None
+
   def _Create(self):
     """Create an Apache Spark cluster."""
 
@@ -198,8 +207,11 @@ class PkbSparkService(BaseSparkService):
     def InstallHadoop(vm):
       vm.Install('hadoop')
 
-    vm_util.RunThreaded(InstallHadoop, self.vms['worker_group'] +
-                        self.vms['master_group'])
+    if 'worker_group' not in self.vms:
+      raise errors.Resource.CreationError(
+          'PkbSparkService requires worker_group VMs.')
+    vm_util.RunThreaded(InstallHadoop,
+                        self.vms['worker_group'] + self.vms['master_group'])
     self.leader = self.vms['master_group'][0]
     hadoop.ConfigureAndStart(self.leader,
                              self.vms['worker_group'])
@@ -212,7 +224,7 @@ class PkbSparkService(BaseSparkService):
                 job_type=SPARK_JOB_TYPE):
     """Submit the jar file."""
     if job_type == SPARK_JOB_TYPE:
-      raise NotImplemented()
+      raise NotImplementedError()
 
     cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'),
                 'jar', jar_file]
@@ -237,7 +249,7 @@ class PkbSparkService(BaseSparkService):
           hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
           'hadoop-mapreduce-examples-{0}.jar'.format(FLAGS.hadoop_version))
     else:
-      raise NotImplemented()
+      raise NotImplementedError()
 
   def ExecuteOnMaster(self, script_path, script_args):
     pass
