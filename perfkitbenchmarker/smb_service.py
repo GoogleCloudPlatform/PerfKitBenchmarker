@@ -69,11 +69,13 @@ def GetSmbServiceClass(cloud):
 class BaseSmbService(resource.BaseResource):
   """Object representing an SMB Service."""
 
-  # subclasses must override this with a list or tuple
-  SMB_TIERS = None
   RESOURCE_TYPE = 'BaseSmbService'
+
+  # subclasses must override these defaults
+  CLOUD = None
+  DEFAULT_TIER = None
+  SMB_TIERS = None
   DEFAULT_SMB_VERSION = None
-  VOLUME_NAME = ''
 
   def __init__(self, disk_spec, zone):
     super(BaseSmbService, self).__init__()

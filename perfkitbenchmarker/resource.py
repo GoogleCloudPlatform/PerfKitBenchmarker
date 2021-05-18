@@ -60,8 +60,11 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
   REQUIRED_ATTRS: List[str]
 
   def __init__(cls, name, bases, dct):
-    if (all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS) and
-        cls.RESOURCE_TYPE):
+    if cls.RESOURCE_TYPE == cls.__name__:
+      # Do not register the RESOURCE_TYPE base class
+      pass
+    elif (all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS) and
+          cls.RESOURCE_TYPE):
       unset_attrs = [
           attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None]
       if unset_attrs:
