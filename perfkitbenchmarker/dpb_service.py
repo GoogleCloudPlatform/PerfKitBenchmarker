@@ -25,7 +25,7 @@ import logging
 from typing import Dict, List, Optional
 
 from absl import flags
-from dataclasses import dataclass
+import dataclasses
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -89,7 +89,7 @@ class JobSubmissionError(errors.Benchmarks.RunError):
   pass
 
 
-@dataclass
+@dataclasses.dataclass
 class JobResult:
   """Data class for the timing of a successful DPB job."""
   # Service reported execution time
@@ -171,17 +171,17 @@ class BaseDpbService(resource.BaseResource):
 
   @abc.abstractmethod
   def SubmitJob(self,
-                jarfile: str = None,
-                classname: str = None,
-                pyspark_file: str = None,
-                query_file: str = None,
-                job_poll_interval: float = None,
-                job_stdout_file: str = None,
-                job_arguments: List[str] = None,
-                job_files: List[str] = None,
-                job_jars: List[str] = None,
-                job_type: str = None,
-                properties: Dict[str, str] = None) -> JobResult:
+                jarfile: Optional[str] = None,
+                classname: Optional[str] = None,
+                pyspark_file: Optional[str] = None,
+                query_file: Optional[str] = None,
+                job_poll_interval: Optional[float] = None,
+                job_stdout_file: Optional[str] = None,
+                job_arguments: Optional[List[str]] = None,
+                job_files: Optional[List[str]] = None,
+                job_jars: Optional[List[str]] = None,
+                job_type: Optional[str] = None,
+                properties: Optional[Dict[str, str]] = None) -> JobResult:
     """Submit a data processing job to the backend.
 
     Args:
@@ -373,6 +373,9 @@ class UnmanagedDpbService(BaseDpbService):
     if self.storage_service:
       self.storage_service.PrepareService(location=self.region)
 
+    # set in _Create of derived classes
+    self.leader = None
+
 
 class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
   """Object representing an un-managed dpb service yarn cluster."""
@@ -404,6 +407,9 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
       if self.cloud == 'AWS':
         hadoop.InstallS3Connector(vm)
 
+    if 'worker_group' not in self.vms:
+      raise errors.Resource.CreationError(
+          'UnmanagedDpbServiceYarnCluster requires VMs in a worker_group.')
     vm_util.RunThreaded(InstallHadoop,
                         self.vms['worker_group'] + self.vms['master_group'])
     self.leader = self.vms['master_group'][0]
@@ -491,6 +497,10 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
         hadoop.InstallGcsConnector(vm)
       if self.cloud == 'AWS':
         hadoop.InstallS3Connector(vm)
+
+    if 'worker_group' not in self.vms:
+      raise errors.Resource.CreationError(
+          'UnmanagedDpbSparkCluster requires VMs in a worker_group.')
 
     vm_util.RunThreaded(InstallSpark,
                         self.vms['worker_group'] + self.vms['master_group'])

@@ -18,7 +18,7 @@ Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
 import os
-from typing import Dict, List, Text
+from typing import Dict, List, Text, Tuple
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -139,7 +139,7 @@ class EdwClientInterface(object):
     """
     raise NotImplementedError
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
