@@ -199,18 +199,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if self.is_managed_db:
       self._CreateGcloudSqlInstance()
     else:
+      self._SetupUnmanagedDatabase()
+
       if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
         self.endpoint = self.server_vm.internal_ip
       else:
         self.endpoint = self.server_vm.ip_address
-      if self.spec.engine == relational_db.MYSQL:
-        self._InstallMySQLServer()
-      else:
-        raise UnsupportedDatabaseEngineException(
-            'Engine {0} not supported for unmanaged databases.'.format(
-                self.spec.engine))
-
-      if FLAGS.ip_addresses != vm_util.IpAddressSubset.INTERNAL:
         self.firewall = gce_network.GceFirewall()
         self.firewall.AllowPort(
             self.server_vm, 3306, source_range=[self.client_vm.ip_address])
@@ -290,13 +284,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       if hasattr(self, 'firewall'):
         self.firewall.DisallowAllPorts()
       self.unmanaged_db_exists = False
-      self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
-      self.server_vm.RemoteCommand(
-          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_connects\';"' %
-          self.MakeMysqlConnectionString(use_localhost=True))
-      self.server_vm.RemoteCommand(
-          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_clients\';"' %
-          self.MakeMysqlConnectionString(use_localhost=True))
+      self.PrintUnmanagedDbStats()
       return
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',

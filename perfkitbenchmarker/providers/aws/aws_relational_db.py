@@ -426,17 +426,14 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       self._CreateAwsSqlInstance()
     else:
       self.endpoint = self.server_vm.ip_address
-      if self.spec.engine == relational_db.MYSQL:
-        self._InstallMySQLServer()
-      else:
-        raise Exception(
-            'Engine {0} not supported for unmanaged databases.'.format(
-                self.spec.engine))
+      self._SetupUnmanagedDatabase()
       self.firewall = aws_network.AwsFirewall()
       self.firewall.AllowPortInSecurityGroup(
           self.server_vm.region,
           self.server_vm.network.regional_network.vpc.default_security_group_id,
-          '3306', '3306', ['%s/32' % self.client_vm.ip_address])
+          self.GetDefaultPort(),
+          self.GetDefaultPort(),
+          ['%s/32' % self.client_vm.ip_address])
       self.unmanaged_db_exists = True
 
   def _IsDeleting(self):
@@ -462,13 +459,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       if hasattr(self, 'firewall'):
         self.firewall.DisallowAllPorts()
       self.unmanaged_db_exists = False
-      self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
-      self.server_vm.RemoteCommand(
-          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_connects\';"' %
-          self.MakeMysqlConnectionString(use_localhost=True))
-      self.server_vm.RemoteCommand(
-          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_clients\';"' %
-          self.MakeMysqlConnectionString(use_localhost=True))
+      self.PrintUnmanagedDbStats()
       return
 
     for current_instance_id in self.all_instance_ids:
@@ -619,6 +610,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     engine = self.spec.engine
     if engine == relational_db.MYSQL:
       return DEFAULT_MYSQL_PORT
+    if engine == relational_db.POSTGRES:
+      return DEFAULT_POSTGRES_PORT
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 

@@ -395,18 +395,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   def _CreateAzureUnmanagedSqlInstance(self):
     """Creates an Azure Sql Instance hosted inside of a VM."""
     self.endpoint = self.server_vm.ip_address
-    if self.spec.engine == relational_db.MYSQL:
-      self._InstallMySQLServer()
-      self._ApplyMySqlFlags()
-    else:
-      raise Exception(
-          'Engine {0} not supported for unmanaged databases.'.format(
-              self.spec.engine))
-
+    self._SetupUnmanagedDatabase()
     self.firewall = azure_network.AzureFirewall()
     self.firewall.AllowPort(
         self.server_vm,
-        '3306',
+        self.GetDefaultPort(),
         source_range=['%s/32' % self.client_vm.ip_address])
 
   def _Create(self):
@@ -436,7 +429,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       if hasattr(self, 'firewall'):
         self.firewall.DisallowAllPorts()
       self.unmanaged_db_exists = False
-      self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
+      self.PrintUnmanagedDbStats()
       return
 
     cmd = [

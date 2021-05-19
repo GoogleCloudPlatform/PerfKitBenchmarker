@@ -14,12 +14,14 @@
 
 
 from abc import abstractmethod
+import posixpath
 import random
 import re
 import string
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 import six
@@ -130,6 +132,13 @@ ALL_ENGINES = [
 ]
 
 FLAGS = flags.FLAGS
+
+POSTGRES_13_VERSION = '13'
+POSTGRES_RESOURCE_PATH = 'database_configurations/postgres'
+
+POSTGRES_HBA_CONFIG = 'pg_hba.conf'
+POSTGRES_CONFIG = 'postgresql.conf'
+POSTGRES_CONFIG_PATH = '/etc/postgresql/{0}/main/'
 
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
@@ -432,21 +441,30 @@ class BaseRelationalDb(resource.BaseResource):
     if self.is_managed_db:
       raise Exception('Checking state of unmanaged database when the database '
                       'is managed.')
-    if (self.spec.engine_version == '5.6' or
-        self.spec.engine_version.startswith('5.6.')):
-      mysql_name = 'mysql56'
-    elif (self.spec.engine_version == '5.7' or
-          self.spec.engine_version.startswith('5.7.')):
-      mysql_name = 'mysql57'
-    elif (self.spec.engine_version == '8.0' or
-          self.spec.engine_version.startswith('8.0.')):
-      mysql_name = 'mysql80'
-    else:
-      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'and 8.0 are supported.' % self.spec.engine_version)
-    stdout, stderr = self.server_vm.RemoteCommand(
-        'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
-    return stdout and not stderr
+
+    if self.spec.engine == 'mysql':
+      if (self.spec.engine_version == '5.6' or
+          self.spec.engine_version.startswith('5.6.')):
+        mysql_name = 'mysql56'
+      elif (self.spec.engine_version == '5.7' or
+            self.spec.engine_version.startswith('5.7.')):
+        mysql_name = 'mysql57'
+      elif (self.spec.engine_version == '8.0' or
+            self.spec.engine_version.startswith('8.0.')):
+        mysql_name = 'mysql80'
+      else:
+        raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
+                        'and 8.0 are supported.' % self.spec.engine_version)
+      stdout, stderr = self.server_vm.RemoteCommand(
+          'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
+      return stdout and not stderr
+    elif self.spec.engine == 'postgres':
+      stdout, stderr = self.server_vm.RemoteCommand(
+          'sudo service postgresql status')
+      return stdout and not stderr
+
+    raise UnsupportedError('%s engine is not supported '
+                           'for unmanaged database.' % self.spec.engine)
 
   def _InstallMySQLClient(self):
     """Installs MySQL Client on the client vm.
@@ -513,20 +531,10 @@ class BaseRelationalDb(resource.BaseResource):
         '"s|tmpdir\t\t= /tmp|tmpdir\t\t= /scratch/tmp|g" '
         '%s' % self.server_vm.GetPathToConfig(mysql_name))
 
-  def _InstallMySQLServer(self):
-    """Installs MySQL Server on the server vm.
+  def _SetupUnmanagedDatabase(self):
+    """Installs unmanaged databases on server vm."""
+    db_engine = self.spec.engine
 
-    https://d0.awsstatic.com/whitepapers/Database/optimizing-mysql-running-on-amazon-ec2-using-amazon-ebs.pdf
-    for minimal tuning parameters.
-
-    Raises:
-      Exception: If the requested engine version is unsupported, or if this
-        method is called when the database is a managed one. The latter
-        shouldn't happen.
-    """
-    if self.is_managed_db:
-      raise Exception('Can\'t install MySQL Server when using a managed '
-                      'database.')
     if self.client_vm.IS_REBOOTABLE:
       self.client_vm.ApplySysctlPersistent({
           'net.ipv4.tcp_keepalive_time': 100,
@@ -539,6 +547,75 @@ class BaseRelationalDb(resource.BaseResource):
           'net.ipv4.tcp_keepalive_intvl': 100,
           'net.ipv4.tcp_keepalive_probes': 10
       })
+
+    if db_engine == 'mysql':
+      self._InstallMySQLServer()
+    elif db_engine == 'postgres':
+      self._InstallPostgresServer()
+    else:
+      raise Exception(
+          'Engine {0} not supported for unmanaged databases.'.format(
+              self.spec.engine))
+
+  def _InstallPostgresServer(self):
+    if self.spec.engine_version == POSTGRES_13_VERSION:
+      self.server_vm.Install('postgres13')
+    else:
+      raise UnsupportedError('Only postgres version 13 is currently supported')
+
+    vm = self.server_vm
+    version = self.spec.engine_version
+    postgres_conf_path = POSTGRES_CONFIG_PATH.format(version)
+    postgres_conf_file = postgres_conf_path + POSTGRES_CONFIG
+    postgres_hba_conf_file = postgres_conf_path + POSTGRES_HBA_CONFIG
+    vm.PushFile(data.ResourcePath(
+        posixpath.join(POSTGRES_RESOURCE_PATH, POSTGRES_HBA_CONFIG)))
+    vm.RemoteCommand('sudo -u postgres psql postgres -c '
+                     '"ALTER USER postgres PASSWORD \'%s\';"'
+                     % self.spec.database_password)
+    vm.RemoteCommand('sudo -u postgres psql postgres -c '
+                     '"CREATE ROLE %s LOGIN SUPERUSER PASSWORD \'%s\';"' %
+                     (self.spec.database_username,
+                      self.spec.database_password))
+
+    # Change the directory to scratch
+    vm.RemoteCommand(
+        'sudo sed -i.bak '
+        '"s:\'/var/lib/postgresql/{0}/main\':\'{1}/postgresql/{0}/main\':" '
+        '/etc/postgresql/{0}/main/postgresql.conf'.format(
+            version, self.server_vm.GetScratchDir()))
+
+    # Accept remote connection
+    vm.RemoteCommand(
+        'sudo sed -i.bak '
+        r'"s:\#listen_addresses ='
+        ' \'localhost\':listen_addresses = \'*\':" '
+        '{}'.format(postgres_conf_file))
+    # Update data path to new location
+    vm.RemoteCommand('sudo rsync -av /var/lib/postgresql /scratch')
+
+    # # Use cat to move files because mv will override file permissions
+    self.server_vm.RemoteCommand(
+        "sudo bash -c "
+        "'cat pg_hba.conf > "
+        "{}'".format(postgres_hba_conf_file))
+
+    self.server_vm.RemoteCommand(
+        'sudo cat {}'.format(postgres_conf_file))
+    self.server_vm.RemoteCommand(
+        'sudo cat {}'.format(postgres_hba_conf_file))
+    vm.RemoteCommand('sudo systemctl restart postgresql')
+
+  def _InstallMySQLServer(self):
+    """Installs MySQL Server on the server vm.
+
+    https://d0.awsstatic.com/whitepapers/Database/optimizing-mysql-running-on-amazon-ec2-using-amazon-ebs.pdf
+    for minimal tuning parameters.
+    Raises:
+      Exception: If the requested engine version is unsupported, or if this
+        method is called when the database is a managed one. The latter
+        shouldn't happen.
+    """
     if (self.spec.engine_version == '5.6' or
         self.spec.engine_version.startswith('5.6.')):
       mysql_name = 'mysql56'
@@ -655,6 +732,17 @@ class BaseRelationalDb(resource.BaseResource):
         _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
+
+  def PrintUnmanagedDbStats(self):
+    """Print server logs on unmanaged db."""
+    if self.spec.engine == 'mysql':
+      self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
+      self.server_vm.RemoteCommand(
+          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_connects\';"' %
+          self.MakeMysqlConnectionString(use_localhost=True))
+      self.server_vm.RemoteCommand(
+          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_clients\';"' %
+          self.MakeMysqlConnectionString(use_localhost=True))
 
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""

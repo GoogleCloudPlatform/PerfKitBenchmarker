@@ -83,6 +83,7 @@
 -   Added Intel oneAPI BaseKit to packages.
 -   Upgrade default CUDA version to 11.0.
 -   Add support for AWS IO2 EBS instances.
+-   Add support for Postgres 13 on VMs.
 
 ### Bug fixes and maintenance updates:
 
