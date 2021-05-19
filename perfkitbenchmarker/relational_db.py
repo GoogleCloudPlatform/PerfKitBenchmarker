@@ -92,6 +92,11 @@ flags.DEFINE_integer(
     'innodb_buffer_pool_size', None,
     'Size of the innodb buffer pool size in GB. '
     'Defaults to #CPUs G if unset')
+
+flags.DEFINE_bool(
+    'mysql_bin_log', False,
+    'Flag to turn binary logging on. '
+    'Defaults to False')
 flags.DEFINE_integer('innodb_log_file_size', 1000,
                      'Size of the log file in MB. Defaults to 1000M.')
 
@@ -203,6 +208,7 @@ class BaseRelationalDb(resource.BaseResource):
       self.spec.database_username = 'root'
       self.spec.database_password = 'perfkitbenchmarker'
       self.innodb_buffer_pool_size = FLAGS.innodb_buffer_pool_size
+      self.mysql_bin_log = FLAGS.mysql_bin_log
       self.innodb_log_file_size = FLAGS.innodb_log_file_size
       self.is_managed_db = False
     else:
@@ -346,6 +352,8 @@ class BaseRelationalDb(resource.BaseResource):
               self.innodb_buffer_pool_size,
           'unmanaged_db_innodb_log_file_size_mb':
               self.innodb_log_file_size,
+          'unmanaged_db_mysql_bin_log':
+              self.mysql_bin_log
       })
 
     if (hasattr(self.spec.db_spec, 'machine_type') and
@@ -561,6 +569,13 @@ class BaseRelationalDb(resource.BaseResource):
         'innodb_flush_neighbors = 0\n'
         f'innodb_log_file_size = {innodb_log_file_mb}M'
         '" | sudo tee -a %s' % self.server_vm.GetPathToConfig(mysql_name))
+
+    if self.mysql_bin_log:
+      self.server_vm.RemoteCommand('echo "\n'
+                                   'server-id  = 1\n'
+                                   'log_bin = /var/log/mysql/mysql-bin.log\n'
+                                   '" | sudo tee -a %s' %
+                                   self.server_vm.GetPathToConfig(mysql_name))
 
     # These (and max_connections after restarting) help avoid losing connection.
     self.server_vm.RemoteCommand(
