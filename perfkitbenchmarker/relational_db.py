@@ -257,12 +257,10 @@ class BaseRelationalDb(resource.BaseResource):
         self.innodb_buffer_pool_size = self.server_vm.NumCpusForBenchmark()
     # TODO(jerlawson): Enable replications.
 
-  def MakePsqlConnectionString(self, database_name):
+  def MakePsqlConnectionString(self, database_name, use_localhost=False):
     return '\'host={0} user={1} password={2} dbname={3}\''.format(
-        self.endpoint,
-        self.spec.database_username,
-        self.spec.database_password,
-        database_name)
+        self.endpoint if not use_localhost else 'localhost',
+        self.spec.database_username, self.spec.database_password, database_name)
 
   def MakeMysqlConnectionString(self, use_localhost=False):
     return '-h {0}{1} -u {2} -p{3}'.format(
@@ -276,6 +274,23 @@ class BaseRelationalDb(resource.BaseResource):
             self.endpoint,
             ' --mysql-port=3306' if not self.is_managed_db else '',
             self.spec.database_username, self.spec.database_password)
+
+  def MakeMysqlCommand(self, command, use_localhost=False):
+    """Return Mysql Command with correct credentials."""
+    return 'mysql %s -e "%s"' % (self.MakeMysqlConnectionString(
+        use_localhost=use_localhost), command)
+
+  def MakeSqlserverCommand(self, command, use_localhost=False):
+    """Return Sql server command with correct credentials."""
+    return '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s -Q "%s"' % (
+        self.endpoint if not use_localhost else 'localhost',
+        self.spec.database_username, self.spec.database_password, command)
+
+  def MakePostgresCommand(self, db_name, command, use_localhost=False):
+    """Return Postgres command vm with correct credentials."""
+
+    return 'psql %s -c "%s"' % (self.MakePsqlConnectionString(
+        db_name, use_localhost), command)
 
   @property
   def endpoint(self):
@@ -578,23 +593,28 @@ class BaseRelationalDb(resource.BaseResource):
         should_log=True)
 
     self.server_vm.RemoteCommand(
-        'mysql %s -e "SET GLOBAL max_connections=8000;"' %
-        self.MakeMysqlConnectionString(use_localhost=True))
+        self.MakeMysqlCommand(
+            'SET GLOBAL max_connections=8000;', use_localhost=True))
+
     if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
       client_ip = self.client_vm.internal_ip
     else:
       client_ip = self.client_vm.ip_address
+
     self.server_vm.RemoteCommand(
-        ('mysql %s -e "CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';"') %
-        (self.MakeMysqlConnectionString(use_localhost=True),
-         self.spec.database_username, client_ip, self.spec.database_password))
+        self.MakeMysqlCommand(
+            'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %
+            (self.spec.database_username, client_ip,
+             self.spec.database_password),
+            use_localhost=True))
+
     self.server_vm.RemoteCommand(
-        ('mysql %s -e "GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';"') %
-        (self.MakeMysqlConnectionString(use_localhost=True),
-         self.spec.database_username, client_ip))
+        self.MakeMysqlCommand(
+            'GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';' %
+            (self.spec.database_username, client_ip),
+            use_localhost=True))
     self.server_vm.RemoteCommand(
-        'mysql %s -e "FLUSH PRIVILEGES;"' %
-        self.MakeMysqlConnectionString(use_localhost=True))
+        self.MakeMysqlCommand('FLUSH PRIVILEGES;', use_localhost=True))
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
@@ -616,7 +636,7 @@ class BaseRelationalDb(resource.BaseResource):
   def _ApplyMySqlFlags(self):
     if FLAGS.db_flags:
       for flag in FLAGS.db_flags:
-        cmd = 'mysql %s -e \'SET %s;\'' % self.MakeMysqlConnectionString(), flag
+        cmd = self.MakeMysqlCommand('SET %s;' % flag)
         _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
