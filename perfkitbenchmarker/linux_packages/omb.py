@@ -13,12 +13,12 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker.linux_packages import intelmpi
 
-VERSION = '5.7'
+VERSION = '5.7.1'
 _PKG_NAME = 'osu-micro-benchmarks'
-_DATA_URL = ('https://mvapich.cse.ohio-state.edu/download/mvapich/'
-             f'{_PKG_NAME}-{VERSION}.tar.gz')
+_DATA_URL = ('http://mvapich.cse.ohio-state.edu/download/mvapich/'
+             f'{_PKG_NAME}-{VERSION}.tgz')
 _SRC_DIR = f'{_PKG_NAME}-{VERSION}'
-_TARBALL = f'{_PKG_NAME}-{VERSION}.tar.gz'
+_TARBALL = f'{_PKG_NAME}-{VERSION}.tgz'
 _RUN_DIR = f'/usr/local/libexec/{_PKG_NAME}/mpi'
 
 # Benchmarks that can only be run with a single thread per host
@@ -28,7 +28,7 @@ _SINGLE_THREADED_BENCHMARKS = frozenset({
 })
 
 PREPROVISIONED_DATA = {
-    _TARBALL: '1470ebe00eb6ca7f160b2c1efda57ca0fb26b5c4c61148a3f17e8e79fbf34590'
+    _TARBALL: 'cb5ce4e2e68ed012d9952e96ef880a802058c87a1d840a2093b19bddc7faa165'
 }
 PACKAGE_DATA_URL = {_TARBALL: _DATA_URL}
 

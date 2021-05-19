@@ -52,7 +52,7 @@ _COMMON_METADATA = {
     'cmd': 'mpirun path/to/acc_latency',
     'metadata_a': 1,
     'param_b': 2,
-    'omb_version': '5.7',
+    'omb_version': '5.7.1',
     'mpi_vendor': 'intel',
     'mpi_version': '2019.6',
     'number_processes': 6,
