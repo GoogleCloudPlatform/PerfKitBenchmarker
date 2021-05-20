@@ -93,7 +93,7 @@ flags.DEFINE_list(
 flags.DEFINE_integer(
     'innodb_buffer_pool_size', None,
     'Size of the innodb buffer pool size in GB. '
-    'Defaults to #CPUs G if unset')
+    'Defaults to 25% of VM memory if unset')
 
 flags.DEFINE_bool(
     'mysql_bin_log', False,
@@ -101,6 +101,10 @@ flags.DEFINE_bool(
     'Defaults to False')
 flags.DEFINE_integer('innodb_log_file_size', 1000,
                      'Size of the log file in MB. Defaults to 1000M.')
+flags.DEFINE_integer(
+    'postgres_shared_buffer_size', None,
+    'Size of the shared buffer size in GB. '
+    'Defaults to 25% of VM memory if unset')
 
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
@@ -219,6 +223,7 @@ class BaseRelationalDb(resource.BaseResource):
       self.innodb_buffer_pool_size = FLAGS.innodb_buffer_pool_size
       self.mysql_bin_log = FLAGS.mysql_bin_log
       self.innodb_log_file_size = FLAGS.innodb_log_file_size
+      self.postgres_shared_buffer_size = FLAGS.postgres_shared_buffer_size
       self.is_managed_db = False
     else:
       self.is_managed_db = True
@@ -268,8 +273,14 @@ class BaseRelationalDb(resource.BaseResource):
                                vm_groups else 'default'][0]
     if not self.is_managed_db and 'servers' in vm_groups:
       self.server_vm = vm_groups['servers'][0]
+      kb_to_gb = 1.0 / 1000000
       if not self.innodb_buffer_pool_size:
-        self.innodb_buffer_pool_size = self.server_vm.NumCpusForBenchmark()
+        self.innodb_buffer_pool_size = int(self.server_vm.total_memory_kb *
+                                           kb_to_gb / 4)
+
+      if not self.postgres_shared_buffer_size:
+        self.postgres_shared_buffer_size = int(self.server_vm.total_memory_kb *
+                                               kb_to_gb / 4)
     # TODO(jerlawson): Enable replications.
 
   def MakePsqlConnectionString(self, database_name, use_localhost=False):
@@ -355,7 +366,7 @@ class BaseRelationalDb(resource.BaseResource):
             self.spec.vm_groups['clients'].disk_spec.disk_size,
     }
 
-    if not self.is_managed_db:
+    if not self.is_managed_db and self.spec.engine == 'mysql':
       metadata.update({
           'unmanaged_db_innodb_buffer_pool_size_gb':
               self.innodb_buffer_pool_size,
@@ -363,6 +374,12 @@ class BaseRelationalDb(resource.BaseResource):
               self.innodb_log_file_size,
           'unmanaged_db_mysql_bin_log':
               self.mysql_bin_log
+      })
+
+    if not self.is_managed_db and self.spec.engine == 'postgres':
+      metadata.update({
+          'postgres_shared_buffer_size':
+              self.postgres_shared_buffer_size
       })
 
     if (hasattr(self.spec.db_spec, 'machine_type') and
@@ -591,6 +608,11 @@ class BaseRelationalDb(resource.BaseResource):
         r'"s:\#listen_addresses ='
         ' \'localhost\':listen_addresses = \'*\':" '
         '{}'.format(postgres_conf_file))
+
+    # Set the size of the shared buffer
+    vm.RemoteCommand(
+        'sudo sed -i.bak "s:#shared_buffers = 128MB:shared_buffers = {}GB:" '
+        '{}'.format(self.postgres_shared_buffer_size, postgres_conf_file))
     # Update data path to new location
     vm.RemoteCommand('sudo rsync -av /var/lib/postgresql /scratch')
 

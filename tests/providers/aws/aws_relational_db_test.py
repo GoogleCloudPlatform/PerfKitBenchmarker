@@ -341,6 +341,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     FLAGS['default_timeout'].parse(300)
     FLAGS['mysql_bin_log'].parse(False)
     FLAGS['ip_addresses'].parse('REACHABLE')
+    FLAGS['postgres_shared_buffer_size'].parse(100)
     with self._PatchCriticalObjects() as issue_command:
       db = self.CreateDbFromSpec()
       self.CreateMockServerVM(db)
