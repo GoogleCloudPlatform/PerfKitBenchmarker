@@ -1269,9 +1269,9 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       attempt to use API to detect vm preemption query if metadata service
       detecting fails.
     """
-    if not self.preemptible:
+    if not self.IsInterruptible():
       return
-    if self.spot_early_termination:
+    if self.WasInterrupted():
       return
     try:
       self._UpdateInterruptibleVmStatusThroughMetadataService()

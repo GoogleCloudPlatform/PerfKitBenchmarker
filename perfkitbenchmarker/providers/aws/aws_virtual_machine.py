@@ -494,7 +494,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.use_spot_instance = vm_spec.use_spot_instance
-    self.preemptible = self.use_spot_instance
     self.spot_price = vm_spec.spot_price
     self.spot_block_duration_minutes = vm_spec.spot_block_duration_minutes
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -1094,14 +1093,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns: Early termination code.
     """
     return self.spot_status_code
-
-  def GetPreemptibleStatusPollSeconds(self):
-    """Get seconds between preemptible status polls.
-
-    Returns:
-      Seconds between polls
-    """
-    return 5
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.

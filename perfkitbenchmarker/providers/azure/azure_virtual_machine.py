@@ -508,7 +508,6 @@ class AzureVirtualMachine(
       self.host_series_sku = _GetSkuType(self.machine_type)
       self.host_list = None
     self.low_priority = vm_spec.low_priority
-    self.preemptible = self.low_priority
     self.low_priority_status_code = None
     self.spot_early_termination = False
     self.ultra_ssd_enabled = False
@@ -794,14 +793,6 @@ class AzureVirtualMachine(
     Returns: Early termination code.
     """
     return self.low_priority_status_code
-
-  def GetPreemptibleStatusPollSeconds(self):
-    """Get seconds between preemptible status polls.
-
-    Returns:
-      Seconds between polls
-    """
-    return 5
 
 
 class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,

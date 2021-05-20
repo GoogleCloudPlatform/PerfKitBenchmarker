@@ -868,7 +868,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return self.preemptible_status_code
 
-  def GetPreemptibleStatusPollSeconds(self):
+  def GetInterruptableStatusPollSeconds(self):
     """Get seconds between preemptible status polls.
 
     Returns:

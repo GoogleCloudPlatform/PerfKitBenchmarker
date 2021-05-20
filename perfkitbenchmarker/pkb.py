@@ -718,7 +718,7 @@ class InterruptChecker():
       if vm.WasInterrupted():
         return
       else:
-        self.phase_status.wait(vm.GetPreemptibleStatusPollSeconds())
+        self.phase_status.wait(vm.GetInterruptableStatusPollSeconds())
 
   def EndCheckInterruptThread(self):
     """End check interrupt thread."""
