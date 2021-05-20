@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for mpstat utility."""
 import datetime
+import json
 import os
 from typing import List
 import unittest
@@ -22,7 +23,7 @@ import freezegun
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.traces import mpstat
 
-FAKE_DATETIME = datetime.datetime(2021, 5, 10)
+FAKE_DATETIME = datetime.datetime(2021, 5, 19)
 
 MPSTAT_METADATA = {
     'event': 'mpstat',
@@ -55,7 +56,7 @@ def _SampleMatchesExpected(actual_sample: sample.Sample,
   if actual_sample.timestamp != expected_sample.timestamp:
     return False
   for key, value in expected_sample.metadata.items():
-    if actual_sample.metadata[key] != value:
+    if key not in actual_sample.metadata or actual_sample.metadata[key] != value:
       return False
   return True
 
@@ -74,14 +75,15 @@ def _ActualSamplesIncludesExpectedSample(
 _AGGREGATE_SAMPLES = [
     sample.Sample(
         metric='mpstat_avg_intr',
-        value=145.88,
+        value=274.26,
         unit='interrupts/sec',
         metadata={
             'event': 'mpstat',
             'sender': 'run',
-            'mpstat_cpu_id': -1
+            'mpstat_cpu_id': -1,
+            'nodename': 'instance-3'
         },
-        timestamp=1620604800.0),
+        timestamp=1621447265.0),
     sample.Sample(
         metric='mpstat_avg_irq',
         value=0.0,
@@ -89,39 +91,43 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'event': 'mpstat',
             'sender': 'run',
-            'mpstat_cpu_id': -1
+            'mpstat_cpu_id': -1,
+            'nodename': 'instance-3'
         },
-        timestamp=1620604800.0),
+        timestamp=1621447265.0),
     sample.Sample(
         metric='mpstat_avg_soft',
-        value=0.02,
+        value=0.01,
         unit='%',
         metadata={
             'event': 'mpstat',
             'sender': 'run',
-            'mpstat_cpu_id': -1
+            'mpstat_cpu_id': -1,
+            'nodename': 'instance-3'
         },
-        timestamp=1620604800.0),
+        timestamp=1621447265.0),
     sample.Sample(
-        metric='mpstat_intr',
-        value=112.8,
+        metric='mpstat_avg_intr',
+        value=264.5,
         unit='interrupts/sec',
         metadata={
             'event': 'mpstat',
             'sender': 'run',
-            'mpstat_cpu_id': 0
+            'mpstat_cpu_id': 0,
+            'nodename': 'instance-3'
         },
-        timestamp=1620604800.0),
+        timestamp=1621447265.0),
     sample.Sample(
-        metric='mpstat_intr',
-        value=39.65,
+        metric='mpstat_avg_intr',
+        value=14.375,
         unit='interrupts/sec',
         metadata={
             'event': 'mpstat',
             'sender': 'run',
-            'mpstat_cpu_id': 1
+            'mpstat_cpu_id': 1,
+            'nodename': 'instance-3'
         },
-        timestamp=1620604800.0)
+        timestamp=1621447265.0)
 ]
 
 # Besides verifying that per-interval samples are produced, the
@@ -131,26 +137,28 @@ _AGGREGATE_SAMPLES = [
 _PER_INTERVAL_SAMPLES = [
     sample.Sample(
         metric='mpstat_avg_idle',
-        value=65.76,
+        value=49.98,
         unit='%',
         metadata={
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': -1,
-            'ordinal': 0
+            'ordinal': 0,
+            'nodename': 'instance-3'
         },
-        timestamp=1620841340.0),
+        timestamp=1621447265.0),
     sample.Sample(
         metric='mpstat_avg_idle',
-        value=65.74,
+        value=49.98,
         unit='%',
         metadata={
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': -1,
-            'ordinal': 1
+            'ordinal': 1,
+            'nodename': 'instance-3'
         },
-        timestamp=1620841400.0)
+        timestamp=1621447325.0)
 ]
 
 
@@ -163,11 +171,11 @@ class MpstatTestCase(parameterized.TestCase):
     # e2-standard-2:
     # stress -c 1 &
     # export S_TIME_FORMAT=ISO
-    # mpstat -I ALL -u -P ALL 2 2
+    # mpstat -I ALL -u -P ALL 60 2 -o JSON
     path = os.path.join(
-        os.path.dirname(__file__), '../data', 'mpstat_output.txt')
+        os.path.dirname(__file__), '../data', 'mpstat_output.json')
     with open(path) as fp:
-      self.contents = fp.read()
+      self.contents = json.loads(fp.read())
 
   @parameterized.named_parameters(
       ('averages_only', False, None, 33, _AGGREGATE_SAMPLES),

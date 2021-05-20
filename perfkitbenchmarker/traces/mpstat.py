@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,12 +44,12 @@ For more details, see https://linux.die.net/man/1/mpstat.
 
 """
 
-# TODO(user) Refactor to output and read JSON
 
 import datetime
+import json
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from absl import flags
 from perfkitbenchmarker import events
@@ -113,18 +113,13 @@ def _ParseStartTime(output: str) -> float:
       report was run.
 
   Example input:
-  Linux 5.10.26-1rodete1-amd64 (wlifferth.c.googlers.com)         2021-05-13
-      _x86_64_        (8 CPU)
-
-  16:44:16     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal
-      %guest  %gnice   %idle
-  16:44:17     all   13.03    0.73   10.96    0.85    0.00    4.99    0.24
-      0.00    0.00   69.18
+    third_party/py/perfkitbenchmarker/tests/data/mpstat_output.json
 
   """
-  lines = output.split('\n')
-  date = lines[0].split()[3]
-  time = lines[2].split()[0]
+  hosts = output['sysstat']['hosts']
+  date = hosts[0]['date']
+  time = hosts[0]['statistics'][0]['timestamp']
+  # TODO(user): handle malformed json output from mpstat
   start_datetime_string = ' '.join([date, time])
   # As a sysstat utility, this is printed in UTC by default
   start_datetime = datetime.datetime.strptime(
@@ -133,111 +128,163 @@ def _ParseStartTime(output: str) -> float:
   return start_datetime.timestamp()
 
 
-def _ParsePercentageUse(
-    rows: List[str],
-    metadata: Dict[str, Any],
-    timestamp: Optional[float] = None):
-  """Parse a CPU percentage use data chunk.
+def _GetCPUMetrics(host_stats):
+  """Generate list of metrics that we want to publish.
 
   Args:
-    rows: List of mpstat CPU percentage lines.
+    host_stats: List of mpstat reports.
+
+  Returns:
+    List of metrics that we want to publish.
+  """
+  cpu_metrics = []
+  for cpu_metric in host_stats[0]['cpu-load'][0]:
+    # we don't want to generate a sample for cpu - cpu_id.
+    if cpu_metric == 'cpu':
+      continue
+    cpu_metrics.append(cpu_metric)
+  return cpu_metrics
+
+
+def _GetCPUAverageMetrics(
+    host_stats: List[Dict[str, Any]],
+    number_of_cpus: int,
+    metadata: Dict[str, Any],
+    timestamp: Optional[float] = None):
+  """Get average metrics for all CPUs.
+
+  Args:
+    host_stats: List of mpstat reports.
+    number_of_cpus: how many CPUs are being used.
     metadata: metadata of the sample.
     timestamp: timestamp of the sample.
 
-  Yields:
-    List of samples
+  Returns:
+    List of samples - containing the average metrics for all CPUs.
 
   input data:
-  Average: CPU %usr %nice %sys %iowait %irq %soft %steal %guest %gnice %idle
-  Average: all 1.82 0.11  0.84 0.05    0.00  0.31  0.00   0.00   0.00   96.88
-  Average:   0 1.77 0.09  0.82 0.07    0.00  2.21  0.00   0.00   0.00   95.04
-  Average:   1 1.85 0.12  0.83 0.06    0.00  0.65  0.00   0.00   0.00   96.49
-  ...
+  [
+    {
+      "timestamp": "22:05:29",
+      "cpu-load": [
+        {"cpu": "-1", "usr": 100.00, "nice": 0.00, "sys": 0.00, "iowait": 0.00,
+        "irq": 0.00, "soft": 0.00, "steal": 0.00, "guest": 0.00, "gnice": 0.00,
+        "idle": 0.00},
+        {"cpu": "0", "usr": 100.00, "nice": 0.00, "sys": 0.00, "iowait": 0.00,
+        "irq": 0.00, "soft": 0.00, "steal": 0.00, "guest": 0.00, "gnice": 0.00,
+        "idle": 0.00},
+        {"cpu": "1", "usr": 100.00, "nice": 0.00, "sys": 0.00, "iowait": 0.00,
+        "irq": 0.00, "soft": 0.00, "steal": 0.00, "guest": 0.00, "gnice": 0.00,
+        "idle": 0.00}
+      ]
+      ...
+    }, {
+      "timestamp": "22:05:31",
+      "cpu-load": [
+        {"cpu": "-1", "usr": 100.00, "nice": 0.00, "sys": 0.00, "iowait": 0.00,
+        "irq": 0.00, "soft": 0.00, "steal": 0.00, "guest": 0.00, "gnice": 0.00,
+        "idle": 0.00},
+        {"cpu": "0", "usr": 100.00, "nice": 0.00, "sys": 0.00, "iowait": 0.00,
+        "irq": 0.00, "soft": 0.00, "steal": 0.00, "guest": 0.00, "gnice": 0.00,
+        "idle": 0.00},
+        {"cpu": "1", "usr": 100.00, "nice": 0.00, "sys": 0.00, "iowait": 0.00,
+        "irq": 0.00, "soft": 0.00, "steal": 0.00, "guest": 0.00, "gnice": 0.00,
+        "idle": 0.00}
+      ]
+      ...
+    }
+  ]
   """
-  header_row = rows[0]
-  headers = [header.strip('%') for header in header_row.split()]
-  for row in rows[1:]:
-    data = row.split()
-    name_value_pairs = list(zip(headers, data))
-    cpu_id_pair = name_value_pairs[1]
-    for header, value in name_value_pairs[2:]:
+  samples = []
+  cpu_metrics = _GetCPUMetrics(host_stats)
+  for cpu_id in range(-1, number_of_cpus):
+    for cpu_metric in cpu_metrics:
+      measurements = []
+      for report in host_stats:
+        value = report['cpu-load'][cpu_id + 1][cpu_metric]
+        measurements.append(value)
+      average = sum(measurements) / len(measurements)
+      metric_name = 'mpstat_avg_' + cpu_metric
       meta = metadata.copy()
-      if 'all' in cpu_id_pair:
-        metric_name = 'mpstat_avg_' + header
-        cpu_id = -1
-      else:
-        metric_name = 'mpstat_' + header
-        cpu_id = int(cpu_id_pair[1])
       meta['mpstat_cpu_id'] = cpu_id
-      yield sample.Sample(
+      samples.append(sample.Sample(
           metric=metric_name,
-          value=float(value),
+          value=average,
           unit='%',
           metadata=meta,
-          timestamp=timestamp,
-          )
+          timestamp=timestamp))
+  return samples
 
 
-def _ParseInterruptsPerSec(
-    rows: List[str],
+def _GetCPUAverageInterruptions(
+    host_stats: List[Dict[str, Any]],
+    number_of_cpus: int,
     metadata: Dict[str, Any],
     timestamp: Optional[float] = None):
-  """Parse a interrput/sec data chunk.
+  """Get average interruption for all CPUs.
 
   Args:
-    rows: List of mpstat interrupts per second lines.
+    host_stats: List of mpstat reports.
+    number_of_cpus: how many CPUs are being used.
     metadata: metadata of the sample.
     timestamp: timestamp of the sample.
 
-  Yields:
-    List of samples
+  Returns:
+    List of samples - containing the average metrics for all CPUs.
 
   input data:
-  Average:  CPU    intr/s
-  Average:  all   3371.98
-  Average:    0    268.54
-  Average:    1    265.59
-  ...
+  [
+    {
+      "timestamp": "22:05:29",
+      "sum-interrupts": [
+        {"cpu": "all", "intr": 274.77},
+        {"cpu": "0", "intr": 264.27},
+        {"cpu": "1", "intr": 15.45}
+      ],
+      ...
+    }, {
+      "timestamp": "22:05:31",
+      "sum-interrupts": [
+        {"cpu": "all", "intr": 273.75},
+        {"cpu": "0", "intr": 264.73},
+        {"cpu": "1", "intr": 13.30}
+      ],
+      ...
+    }
+  ]
   """
-  for row in rows[1:]:  # skipping first header row
-    data = row.split()
+  samples = []
+  for cpu_id in range(number_of_cpus+1):
+    measurements = []
+    for report in host_stats:
+      value = report['sum-interrupts'][cpu_id]['intr']
+      measurements.append(value)
+    average = sum(measurements)/len(measurements)
+    metric_name = 'mpstat_avg_intr'
     meta = metadata.copy()
-    if 'all' in data:
-      metric_name = 'mpstat_avg_intr'
-      cpu_id = -1
-    else:
-      metric_name = 'mpstat_intr'
-      cpu_id = int(data[1])
-    meta['mpstat_cpu_id'] = cpu_id
-    yield sample.Sample(
+    meta['mpstat_cpu_id'] = cpu_id-1
+    samples.append(sample.Sample(
         metric=metric_name,
-        value=float(data[2]),
+        value=average,
         unit='interrupts/sec',
         metadata=meta,
-        timestamp=timestamp,
-        )
+        timestamp=timestamp))
+  return samples
 
 
 def _GetPerIntervalSamples(
-    per_interval_paragraphs: List[List[str]],
+    host_stats: List[Dict[str, Any]],
     metadata: Dict[str, Any],
     start_timestamp: int,
-    interval: int,
-    parse_function: Callable[[List[str], Dict[str, Any]],
-                             sample.Sample]) -> List[sample.Sample]:
-  """Generate samples from a list of list of lines of mpstat output.
+    interval: int) -> List[sample.Sample]:
+  """Generate samples for all CPU related metrics in every run of mpstat.
 
   Args:
-    per_interval_paragraphs: A list of lists of strings, where each string
-      is a line of mpstat output, and each list of strings is a single mpstat
-      report.
-    metadata: a dictionary of metadata for the sample.
+    host_stats: List of mpstat reports.
+    metadata: metadata of the sample.
     start_timestamp: a unix timestamp representing the start of the first
       reporting period.
     interval: the interval between mpstat reports
-    parse_function: a function that accepts a single mpstat report (list of
-      strings) along with metadata and returns a sample generate from that
-      report. Should be one of {_ParsePercentageUse, _ParseInterruptsPerSec}.
 
   Returns:
     a list of samples to publish
@@ -247,21 +294,29 @@ def _GetPerIntervalSamples(
   guarantee correct behavior if mpstat is run for more than 1 day.
   """
   samples = []
-  # TODO(user) Refactor to read times from mpstat output
-  for ordinal, paragraph in enumerate(per_interval_paragraphs):
+  cpu_metrics = _GetCPUMetrics(host_stats)
+  for ordinal, host_stat in enumerate(host_stats):
     sample_timestamp = start_timestamp + (ordinal * interval)
-    metadata = metadata.copy()
-    metadata['ordinal'] = ordinal
-    samples += parse_function(
-        paragraph,
-        metadata,
-        timestamp=sample_timestamp)
+    for cpu_metric in cpu_metrics:
+      for cpu in host_stat['cpu-load']:
+        metric_name = 'mpstat_avg_' + cpu_metric
+        cpu_id = int(cpu['cpu'])
+        metric_value = cpu[cpu_metric]
+        meta = metadata.copy()
+        meta['mpstat_cpu_id'] = cpu_id
+        meta['ordinal'] = ordinal
+        samples.append(sample.Sample(
+            metric=metric_name,
+            value=metric_value,
+            unit='%',
+            metadata=meta,
+            timestamp=sample_timestamp))
   return samples
 
 
 def _MpstatResults(
     metadata: Dict[str, Any],
-    output: str,
+    output: Dict[str, Any],
     interval: int,
     per_interval_samples: bool = False,
     ):
@@ -269,7 +324,7 @@ def _MpstatResults(
 
   Args:
     metadata: metadata of the sample.
-    output: output of mpstat
+    output: output of mpstat in JSON format
     interval: the interval between mpstat reports; required if
       per_interval_samples is True
     per_interval_samples: whether a sample per interval should be published
@@ -277,41 +332,33 @@ def _MpstatResults(
   Returns:
     List of samples.
   """
-
   start_timestamp = _ParseStartTime(output)
   samples = []
-  percentage_usage_lines_list = []
-  interrupts_per_sec_lines_list = []
-  paragraphs = output.split('\n\n')
+  hosts = output['sysstat']['hosts']
 
-  for paragraph in paragraphs:
-    lines = paragraph.rstrip().split('\n')
-    if lines and '%irq' in lines[0]:
-      if 'Average' in lines[0]:
-        samples += _ParsePercentageUse(lines, metadata)
-      elif per_interval_samples:
-        percentage_usage_lines_list.append(lines)
-    elif lines and 'Average' in lines[0] and 'intr/s' in lines[0]:
-      if 'Average' in lines[0]:
-        samples += _ParseInterruptsPerSec(lines, metadata)
-      elif per_interval_samples:
-        interrupts_per_sec_lines_list.append(lines)
-    elif lines and 'Average' in lines[0]:
-      logging.debug('Skipping aggregated metrics: %s', lines[0])
+  for host in hosts:
+    host_stats = host['statistics']
+    number_of_cpus = host['number-of-cpus']
+    metadata['nodename'] = host['nodename']
 
-  samples += _GetPerIntervalSamples(
-      percentage_usage_lines_list,
-      metadata=metadata,
-      start_timestamp=start_timestamp,
-      interval=interval,
-      parse_function=_ParsePercentageUse)
+    samples += _GetCPUAverageMetrics(
+        host_stats,
+        number_of_cpus,
+        metadata,
+        start_timestamp)
 
-  samples += _GetPerIntervalSamples(
-      interrupts_per_sec_lines_list,
-      metadata=metadata,
-      start_timestamp=start_timestamp,
-      interval=interval,
-      parse_function=_ParseInterruptsPerSec)
+    samples += _GetCPUAverageInterruptions(
+        host_stats,
+        number_of_cpus,
+        metadata,
+        start_timestamp)
+
+    if per_interval_samples:
+      samples += _GetPerIntervalSamples(
+          host_stats,
+          metadata,
+          start_timestamp,
+          interval)
 
   return samples
 
@@ -340,7 +387,8 @@ class MpstatCollector(base_collector.BaseCollector):
     # We set the environment variable S_TIME_FORMAT=ISO to ensure consistent
     # time formatting from mpstat
     return ('export S_TIME_FORMAT=ISO; mpstat -I {breakdown} -u -P '
-            '{processor_number} {interval} {count} > {output} 2>&1 &'.format(
+            '{processor_number} {interval} {count} -o JSON > {output} 2>&1 &'
+            .format(
                 breakdown=FLAGS.mpstat_breakdown,
                 processor_number=FLAGS.mpstat_cpus,
                 interval=self.interval,
@@ -361,7 +409,7 @@ class MpstatCollector(base_collector.BaseCollector):
       with open(
           os.path.join(self.output_directory, os.path.basename(output)),
           'r') as fp:
-        output = fp.read()
+        output = json.loads(fp.read())
         metadata = {
             'event': 'mpstat',
             'sender': 'run',
