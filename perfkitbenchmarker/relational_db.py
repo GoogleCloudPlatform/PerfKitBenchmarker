@@ -670,11 +670,13 @@ class BaseRelationalDb(resource.BaseResource):
         '" | sudo tee -a %s' % self.server_vm.GetPathToConfig(mysql_name))
 
     if self.mysql_bin_log:
-      self.server_vm.RemoteCommand('echo "\n'
-                                   'server-id  = 1\n'
-                                   'log_bin = /var/log/mysql/mysql-bin.log\n'
-                                   '" | sudo tee -a %s' %
-                                   self.server_vm.GetPathToConfig(mysql_name))
+      bin_log_path = self.server_vm.GetScratchDir() + '/mysql/mysql-bin.log'
+      self.server_vm.RemoteCommand(
+          'echo "\n'
+          'server-id  = 1\n'
+          'log_bin = %s\n'
+          '" | sudo tee -a %s' %
+          (bin_log_path, self.server_vm.GetPathToConfig(mysql_name)))
 
     # These (and max_connections after restarting) help avoid losing connection.
     self.server_vm.RemoteCommand(
