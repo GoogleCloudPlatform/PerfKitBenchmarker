@@ -16,7 +16,6 @@
 """Module containing build tools installation and cleanup functions."""
 import logging
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
@@ -28,6 +27,8 @@ flags.DEFINE_string('gcc_version', None, 'Version of gcc to use. Benchmarks '
 def YumInstall(vm):
   """Installs build tools on the VM."""
   vm.InstallPackageGroup('Development Tools')
+  if FLAGS.gcc_version:
+    Reinstall(vm, version=FLAGS.gcc_version)
 
 
 def AptInstall(vm):
@@ -35,6 +36,39 @@ def AptInstall(vm):
   vm.InstallPackages('build-essential git libtool autoconf automake')
   if FLAGS.gcc_version:
     Reinstall(vm, version=FLAGS.gcc_version)
+
+
+def BuildGccFromSource(vm, gcc_version):
+  """Install a specific version of gcc by compiling from source.
+
+  Args:
+    vm: VirtualMachine object.
+    gcc_version: string. GCC version.
+
+  Taken from: https://gist.github.com/nchaigne/ad06bc867f911a3c0d32939f1e930a11
+  """
+  if gcc_version == '9' or gcc_version == '9.2':
+    gcc_version = '9.2.0'
+  logging.info('Compiling GCC %s', gcc_version)
+
+  # build GCC on scratch disks for speed if possible
+  build_dir = vm.GetScratchDir() if vm.scratch_disks else 'build_tools'
+  vm.RemoteCommand(f'cd {build_dir} && wget https://ftp.gnu.org/gnu/gcc/gcc-'
+                   f'{gcc_version}/gcc-{gcc_version}.tar.gz')
+  vm.RemoteCommand(f'cd {build_dir} && tar xzvf gcc-{gcc_version}.tar.gz')
+  vm.RemoteCommand(f'cd {build_dir} && mkdir -p obj.gcc-{gcc_version}')
+  vm.RemoteCommand(f'cd {build_dir}/gcc-{gcc_version} && '
+                   './contrib/download_prerequisites')
+  vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && '
+                   f'../gcc-{gcc_version}/configure '
+                   '--disable-multilib --enable-languages=c,c++')
+  vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && '
+                   f'make -j {vm.NumCpusForBenchmark()}')
+  vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && sudo make install')
+  vm.RemoteCommand('sudo rm -rf /usr/bin/gcc && '
+                   'sudo ln -s /usr/local/bin/gcc /usr/bin/gcc')
+  vm.RemoteCommand('sudo rm -rf /usr/bin/g++ && '
+                   'sudo ln -s /usr/local/bin/g++ /usr/bin/g++')
 
 
 def GetVersion(vm, pkg):
@@ -58,12 +92,11 @@ def Reinstall(vm, version='4.7'):
   Args:
     vm: VirtualMachine object.
     version: string. GCC version.
-  Raises:
-    Error: If this is ran on a non debian based system.
   """
-  # TODO(user): Make this work on yum based systems.
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
-    raise errors.Error('Updating GCC only works on Debian based systems.')
+    BuildGccFromSource(vm, version)
+    logging.info('GCC info: %s', GetVersion(vm, 'gcc'))
+    return
   vm.Install('ubuntu_toolchain')
   for pkg in ('gcc', 'gfortran', 'g++'):
     version_string = GetVersion(vm, pkg)

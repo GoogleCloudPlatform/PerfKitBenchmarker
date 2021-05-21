@@ -1608,7 +1608,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   # yum talks to the network on each request so transient issues may fix
   # themselves on retry
-  @vm_util.Retry()
+  @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""
     self.RemoteCommand('sudo yum install -y %s' % packages)

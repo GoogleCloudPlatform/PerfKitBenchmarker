@@ -84,6 +84,7 @@
 -   Upgrade default CUDA version to 11.0.
 -   Add support for AWS IO2 EBS instances.
 -   Add support for Postgres 13 on VMs.
+-   Add support to compile GCC versions on non Debian systems.
 
 ### Bug fixes and maintenance updates:
 
