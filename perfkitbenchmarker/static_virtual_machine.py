@@ -137,6 +137,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.password = vm_spec.password
     self.disk_specs = vm_spec.disk_specs
     self.from_pool = False
+    self.preemptible = False
 
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""

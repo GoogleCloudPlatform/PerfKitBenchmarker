@@ -19,7 +19,7 @@ from perfkitbenchmarker import data
 
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
-CLIENT_VERSION = '4.0.4'
+CLIENT_VERSION = '4.6.21'
 PATCH_FILE = 'aerospike.patch'
 
 
@@ -47,7 +47,7 @@ def _Install(vm):
 
 def AptInstall(vm):
   """Installs the aerospike client on the VM."""
-  vm.InstallPackages('netcat-openbsd')
+  vm.InstallPackages('netcat-openbsd zlib1g-dev')
   _Install(vm)
 
 

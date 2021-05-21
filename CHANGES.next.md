@@ -125,3 +125,6 @@
     benchmark and hbase ycsb benchmark.
 -   Added retries around spurious InvalidPlacementGroup.InUse on AWS VM create.
 -   Support Redis version 6 on managed Redis datastores.
+-   Updated Aerospike server release version to 4.9.0.31.
+-   Updated Aerospike client release version to 4.6.21.
+-   Install zlib1g-dev dependency for Aerospike client.
