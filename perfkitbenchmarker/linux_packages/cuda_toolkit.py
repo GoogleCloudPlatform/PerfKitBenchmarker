@@ -39,6 +39,9 @@ flags.DEFINE_enum(
     'Input "None" or empty string to skip installation',
     module_name=__name__)
 
+_INSTALL_DEMO_SUITE = flags.DEFINE_boolean(
+    'cuda_install_demo_suite', False, 'Install CUDA demo suite.')
+
 FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/x86_64/cuda-{os}.pin'
@@ -259,6 +262,9 @@ def AptInstall(vm):
     _InstallCuda11Point0(vm)
   else:
     raise UnsupportedCudaVersionError()
+  if _INSTALL_DEMO_SUITE.value:
+    vm.InstallPackages(
+        f'cuda-demo-suite-{FLAGS.cuda_toolkit_version.replace(".", "-")}')
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
   # This library provides advanced profiling support
