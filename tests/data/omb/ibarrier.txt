@@ -1,6 +1,20 @@
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       1976     pkb-6da5644b-0  {0,4}
+[0] MPI startup(): 1       4020     pkb-6da5644b-1  {0,4}
+[0] MPI startup(): 2       1977     pkb-6da5644b-0  {1,5}
+[0] MPI startup(): 3       4021     pkb-6da5644b-1  {1,5}
+[0] MPI startup(): 4       1978     pkb-6da5644b-0  {2,6}
+[0] MPI startup(): 5       4022     pkb-6da5644b-1  {2,6}
+[0] MPI startup(): 6       1979     pkb-6da5644b-0  {3,7}
+[0] MPI startup(): 7       4023     pkb-6da5644b-1  {3,7}
+[0] MPI startup(): I_MPI_DEBUG=5
+[0] MPI startup(): I_MPI_HYDRA_UUID=b2070000-7a11-afc1-e0c2-050000630af0
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=4:0 0,2 1,4 2,6 3
 
-# OSU MPI Non-blocking Barrier Latency Test v5.7
+# OSU MPI Non-blocking Barrier Latency Test v5.7.1
 # Overall = Coll. Init + Compute + MPI_Test + MPI_Wait
 
-       Overall(us)       Compute(us)    Coll. Init(us)      MPI_Test(us)      MPI_Wait(us)    Pure Comm.(us)        Overlap(%)
-            112.28             91.34              4.06              0.00             16.71             88.42             76.32
+       Overall(us)       Compute(us)    Coll. Init(us)      MPI_Test(us)      MPI_Wait(us)    Pure Comm.(us)     Min Comm.(us)     Max Comm.(us)        Overlap(%)
+             89.72             68.02              5.67              0.00             15.91             63.15             63.12             63.21             65.64

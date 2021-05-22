@@ -1,0 +1,12 @@
+[
+    {
+        "bandwidth": 126.43,
+        "messages_per_second": 31608531.76,
+        "size": 4
+    },
+    {
+        "bandwidth": 252.65,
+        "messages_per_second": 31580641.88,
+        "size": 8
+    }
+]

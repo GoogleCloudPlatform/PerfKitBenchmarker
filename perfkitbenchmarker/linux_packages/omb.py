@@ -102,11 +102,12 @@ _LATENCY = _RunType(
     ('size', 'latency', 'min_latency', 'max_latency', 'iterations'), 'latency')
 _LATENCY_NOSIZE = _RunType(
     ('latency', 'min_latency', 'max_latency', 'iterations'), 'latency')
-_COMPUTE = _RunType(('size', 'overall', 'compute', 'collection_init',
-                     'mpi_test', 'mpi_wait', 'pure_comm', 'overlap'),
-                    'mpi_wait')
-_COMPUTE_NOSIZE = _RunType(('overall', 'compute', 'collection_init', 'mpi_test',
-                            'mpi_wait', 'pure_comm', 'overlap'), 'mpi_wait')
+_COMPUTE = _RunType(
+    ('size', 'overall', 'compute', 'collection_init', 'mpi_test', 'mpi_wait',
+     'min_comm', 'max_comm', 'pure_comm', 'overlap'), 'mpi_wait')
+_COMPUTE_NOSIZE = _RunType(
+    ('overall', 'compute', 'collection_init', 'mpi_test', 'mpi_wait',
+     'pure_comm', 'min_comm', 'max_comm', 'overlap'), 'mpi_wait')
 
 # Benchmarks that do not support --full
 _LATENCY_SIZE_ONLY = _RunType(('size', 'latency'), 'latency', 'usec', False)
@@ -202,7 +203,7 @@ class RunResult:
 class RunRequest:
   test_name: str
   vms: List[Any]  # virtual machine
-  message_size: Optional[str] = None   # default: run all message sizes
+  message_size: Optional[str] = None  # default: run all message sizes
 
 
 FLAGS = flags.FLAGS

@@ -1,5 +1,19 @@
-# OSU MPI Multiple Bandwidth / Message Rate Test v5.7
-# [ pairs: 1 ] [ window size: 64 ]
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       4271     pkb-6da5644b-0  {0,4}
+[0] MPI startup(): 1       4414     pkb-6da5644b-1  {0,4}
+[0] MPI startup(): 2       4272     pkb-6da5644b-0  {1,5}
+[0] MPI startup(): 3       4415     pkb-6da5644b-1  {1,5}
+[0] MPI startup(): 4       4273     pkb-6da5644b-0  {2,6}
+[0] MPI startup(): 5       4416     pkb-6da5644b-1  {2,6}
+[0] MPI startup(): 6       4274     pkb-6da5644b-0  {3,7}
+[0] MPI startup(): 7       4417     pkb-6da5644b-1  {3,7}
+[0] MPI startup(): I_MPI_DEBUG=5
+[0] MPI startup(): I_MPI_HYDRA_UUID=a9100000-d7ff-a7c3-e0c2-050000630af0
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=4:0 0,2 1,4 2,6 3
+# OSU MPI Multiple Bandwidth / Message Rate Test v5.7.1
+# [ pairs: 4 ] [ window size: 64 ]
 # Size                  MB/s        Messages/s
-4                       0.95         238253.89
-8                       1.78         222293.85
+4                     126.43       31608531.76
+8                     252.65       31580641.88

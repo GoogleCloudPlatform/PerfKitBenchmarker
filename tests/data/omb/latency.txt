@@ -1,4 +1,14 @@
-# OSU MPI Latency Test v5.7
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): tcp data transfer mode
+[1] MPI startup(): tcp data transfer mode
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       3518     pkb-6da5644b-0  {0,1,2,3,4,5,6,7}
+[0] MPI startup(): 1       4277     pkb-6da5644b-1  {0,1,2,3,4,5,6,7}
+[0] MPI startup(): I_MPI_DEBUG=5
+[0] MPI startup(): I_MPI_HYDRA_UUID=b80d0000-2c24-efc2-e0c2-050000630af0
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=1:0 0
+# OSU MPI Latency Test v5.7.1
 # Size          Latency (us)
-4                      57.29
-8                      56.51
+4                      25.21
+8                      25.03

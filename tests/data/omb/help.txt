@@ -625,9 +625,7 @@ Options:
   -R=<0,1>, --print-rate         Print uni-directional message rate (default 1)
   -p=<pairs>, --num-pairs        Number of pairs involved (default np / 2)
   -W=<window>, --window-size     Number of messages sent before acknowledgement (default 64)
-                                 [cannot be used with -v]
   -V, --vary-window              Vary the window size (default no)
-                                 [cannot be used with -W]
   -m, --message-size          [MIN:]MAX  set the minimum and/or the maximum message size to MIN and/or MAX
                               bytes respectively. Examples:
                               -m 128      // min = default, max = 128

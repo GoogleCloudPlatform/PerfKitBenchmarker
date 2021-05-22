@@ -1,0 +1,16 @@
+[
+    {
+        "iterations": 1000,
+        "latency": 47.93,
+        "max_latency": 78.69,
+        "min_latency": 17.12,
+        "size": 4
+    },
+    {
+        "iterations": 1000,
+        "latency": 47.26,
+        "max_latency": 76.19,
+        "min_latency": 18.16,
+        "size": 8
+    }
+]

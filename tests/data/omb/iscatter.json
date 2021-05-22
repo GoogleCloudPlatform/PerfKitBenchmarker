@@ -1,0 +1,26 @@
+[
+    {
+        "collection_init": 0.57,
+        "compute": 39.53,
+        "max_comm": 8.27,
+        "min_comm": 36.61,
+        "mpi_test": 0.0,
+        "mpi_wait": 108.96,
+        "overall": 149.19,
+        "overlap": 0.0,
+        "pure_comm": 62.25,
+        "size": 4
+    },
+    {
+        "collection_init": 0.6,
+        "compute": 254.49,
+        "max_comm": 8.52,
+        "min_comm": 239.05,
+        "mpi_test": 0.0,
+        "mpi_wait": 8.12,
+        "overall": 263.34,
+        "overlap": 96.3,
+        "pure_comm": 464.46,
+        "size": 8
+    }
+]

@@ -1,5 +1,19 @@
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       5852     pkb-6da5644b-0  {0,4}
+[0] MPI startup(): 1       4687     pkb-6da5644b-1  {0,4}
+[0] MPI startup(): 2       5853     pkb-6da5644b-0  {1,5}
+[0] MPI startup(): 3       4688     pkb-6da5644b-1  {1,5}
+[0] MPI startup(): 4       5854     pkb-6da5644b-0  {2,6}
+[0] MPI startup(): 5       4689     pkb-6da5644b-1  {2,6}
+[0] MPI startup(): 6       5855     pkb-6da5644b-0  {3,7}
+[0] MPI startup(): 7       4690     pkb-6da5644b-1  {3,7}
+[0] MPI startup(): I_MPI_DEBUG=5
+[0] MPI startup(): I_MPI_HYDRA_UUID=d6160000-953c-9fc4-e0c2-050000630af0
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=4:0 0,2 1,4 2,6 3
 
-# OSU MPI Scatter Latency Test v5.7
+# OSU MPI Scatter Latency Test v5.7.1
 # Size       Avg Latency(us)   Min Latency(us)   Max Latency(us)  Iterations
-4                       8.36              5.04             11.69        1000
-8                       7.54              4.75             10.33        1000
+4                      32.98              4.60             61.45        1000
+8                      33.43              4.72             62.23        1000

@@ -1,6 +1,16 @@
-# OSU MPI_Get_accumulate latency Test v5.7
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): tcp data transfer mode
+[1] MPI startup(): tcp data transfer mode
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       1648     pkb-6da5644b-0  {0,1,2,3,4,5,6,7}
+[0] MPI startup(): 1       3962     pkb-6da5644b-1  {0,1,2,3,4,5,6,7}
+[0] MPI startup(): I_MPI_DEBUG=5
+[0] MPI startup(): I_MPI_HYDRA_UUID=6a060000-34b6-68c1-e0c2-050000630af0
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=1:0 0
+# OSU MPI_Get_accumulate latency Test v5.7.1
 # Window creation: MPI_Win_create
 # Synchronization: MPI_Win_lock/unlock
 # Size          Latency (us)
-4                     309.93
-8                     310.21
+4                      92.06
+8                      91.27

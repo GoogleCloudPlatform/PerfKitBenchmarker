@@ -129,3 +129,4 @@
 -   Updated Aerospike server release version to 4.9.0.31.
 -   Updated Aerospike client release version to 4.6.21.
 -   Install zlib1g-dev dependency for Aerospike client.
+-   Use OMB version 4.7.1 and parse new min/max columns.

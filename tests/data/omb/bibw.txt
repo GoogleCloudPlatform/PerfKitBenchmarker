@@ -1,4 +1,14 @@
-# OSU MPI Bi-Directional Bandwidth Test v5.7
+[0] MPI startup(): Multi-threaded optimized library
+[0] MPI startup(): tcp data transfer mode
+[1] MPI startup(): tcp data transfer mode
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       31332    pkb-6da5644b-0  {0,1,2,3,4,5,6,7}
+[0] MPI startup(): 1       3499     pkb-6da5644b-1  {0,1,2,3,4,5,6,7}
+[0] MPI startup(): I_MPI_DEBUG=5
+[0] MPI startup(): I_MPI_HYDRA_UUID=5e7a0000-1c73-60a7-e0c2-050000630af0
+[0] MPI startup(): I_MPI_INFO_NUMA_NODE_NUM=1
+[0] MPI startup(): I_MPI_PIN_MAPPING=1:0 0
+# OSU MPI Bi-Directional Bandwidth Test v5.7.1
 # Size      Bandwidth (MB/s)
-4                       2.37
-8                       4.66
+4                       1.89
+8                       3.84

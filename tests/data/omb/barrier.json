@@ -1,0 +1,8 @@
+[
+    {
+        "iterations": 1000,
+        "latency": 41.14,
+        "max_latency": 41.15,
+        "min_latency": 41.11
+    }
+]
