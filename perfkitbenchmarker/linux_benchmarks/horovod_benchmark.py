@@ -188,6 +188,7 @@ def PrepareHorovod(vm):
   vm.RemoteCommand(
       f'[ -d "tensorpack" ] || git clone https://github.com/tensorpack/tensorpack.git && sudo {pip} install ./tensorpack'
   )
+  vm.RemoteCommand(f'sudo {pip} install pynvml')
 
   _CopyAndUpdateRunScripts(FLAGS.horovod_model, vm)
 
