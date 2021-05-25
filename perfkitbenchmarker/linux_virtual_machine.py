@@ -174,6 +174,9 @@ flags.DEFINE_boolean('disable_smt', False,
                      'Whether to disable SMT (Simultaneous Multithreading) '
                      'in BIOS.')
 
+_DISABLE_YUM_CRON = flags.DEFINE_boolean(
+    'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
+
 RETRYABLE_SSH_RETCODE = 255
 
 
@@ -1570,6 +1573,9 @@ class BaseRhelMixin(BaseLinuxMixin):
                            login_shell=True)
     if FLAGS.gce_hpc_tools:
       self.InstallGcpHpcTools()
+    if _DISABLE_YUM_CRON.value:
+      # yum cron can stall causing yum commands to hang
+      self.RemoteHostCommand('sudo systemctl disable yum-cron.service')
 
   def InstallGcpHpcTools(self):
     """Installs the GCP HPC tools."""

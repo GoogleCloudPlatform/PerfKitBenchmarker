@@ -17,7 +17,9 @@
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
+
 import mock
 
 from perfkitbenchmarker import linux_virtual_machine
@@ -39,6 +41,11 @@ def CreateTestLinuxVm():
 _CENTOS7_KERNEL_COMMAND_LINE = (
     'BOOT_IMAGE=/boot/vmlinuz-3.10.0-1127.13.1.el7.x86_64 '
     'root=UUID=1-2-3-4-5 ro crashkernel=auto console=ttyS0,38400n8')
+
+
+class TestCentos7VirtualMachine(pkb_common_test_case.TestVirtualMachine,
+                                linux_virtual_machine.CentOs7Mixin):
+  user_name = 'perfkit'
 
 
 class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
@@ -483,6 +490,30 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'vulnerability_mds': 'Clear CPU buffers attempted, no microcode',
     }
     self.assertEqual(expected_asdict, cpu_vuln.asdict)
+
+  @parameterized.named_parameters(
+      ('flag_true', True, 'sudo systemctl disable yum-cron.service'),
+      ('default_flag', None, 'sudo systemctl disable yum-cron.service'),
+      ('flag_false', False, None))
+  def testCentos7OnStartup(self, flag_disable_yum_cron, additional_command):
+    vm_spec = pkb_common_test_case.CreateTestVmSpec()
+    vm = TestCentos7VirtualMachine(vm_spec)
+    mock_remote = mock.Mock(return_value=('', ''))
+    vm.RemoteHostCommand = mock_remote  # pylint: disable=invalid-name
+
+    if flag_disable_yum_cron is not None:
+      with flagsaver.flagsaver(disable_yum_cron=flag_disable_yum_cron):
+        vm.OnStartup()
+    else:
+      # tests the default value of the flag
+      vm.OnStartup()
+
+    common_call = ("echo 'Defaults:perfkit !requiretty' | "
+                   'sudo tee /etc/sudoers.d/pkb')
+    calls = [mock.call(common_call, login_shell=True)]
+    if additional_command:
+      calls.append(mock.call(additional_command))
+    mock_remote.assert_has_calls(calls)
 
 
 if __name__ == '__main__':
