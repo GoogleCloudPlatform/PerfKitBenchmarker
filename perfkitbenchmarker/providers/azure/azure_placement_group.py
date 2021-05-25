@@ -76,7 +76,7 @@ class AzurePlacementGroup(placement_group.BasePlacementGroup):
     super(AzurePlacementGroup, self).__init__(azure_placement_group_spec)
     self.resource_group = azure_placement_group_spec.resource_group
     self.name = '%s-%s' % (self.resource_group, self.zone)
-    self.location = util.GetLocationFromZone(self.zone)
+    self.region = util.GetRegionFromZone(self.zone)
     self.strategy = azure_placement_group_spec.placement_group_style
 
   @abc.abstractmethod
@@ -94,8 +94,8 @@ class AzureAvailSet(AzurePlacementGroup):
         azure.AZURE_PATH, 'vm', 'availability-set', 'create',
         '--resource-group', self.resource_group, '--name', self.name
     ]
-    if self.location:
-      create_cmd.extend(['--location', self.location])
+    if self.region:
+      create_cmd.extend(['--location', self.region])
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
@@ -125,8 +125,8 @@ class AzureProximityGroup(AzurePlacementGroup):
         azure.AZURE_PATH, 'ppg', 'create',
         '--resource-group', self.resource_group, '--name', self.name
     ]
-    if self.location:
-      create_cmd.extend(['--location', self.location])
+    if self.region:
+      create_cmd.extend(['--location', self.region])
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):

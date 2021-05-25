@@ -34,8 +34,8 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def __init__(self, registry_spec):
     super(AzureContainerRegistry, self).__init__(registry_spec)
-    self.location = util.GetLocationFromZone(self.zone)
-    self.resource_group = azure_network.GetResourceGroup(self.location)
+    self.region = util.GetRegionFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.region)
     self.login_server = None
     self.sku = 'Basic'
     self._deleted = False
@@ -117,8 +117,8 @@ class AksCluster(container_service.KubernetesCluster):
     if util.IsZone(spec.vm_spec.zone):
       raise errors.Config.InvalidValue(
           'Availability zones are currently not supported by Aks Cluster')
-    self.location = util.GetLocationFromZone(self.zone)
-    self.resource_group = azure_network.GetResourceGroup(self.location)
+    self.region = util.GetRegionFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.region)
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
@@ -149,7 +149,7 @@ class AksCluster(container_service.KubernetesCluster):
         '--name', self.name,
         '--node-vm-size', self.vm_config.machine_type,
         '--node-count', str(self.num_nodes),
-        '--location', self.location,
+        '--location', self.region,
         '--dns-name-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
         '--service-principal', self.service_principal.app_id,

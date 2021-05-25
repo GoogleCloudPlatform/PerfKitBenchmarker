@@ -121,8 +121,8 @@ class AciCluster(container_service.BaseContainerCluster):
 
   def __init__(self, cluster_spec):
     super(AciCluster, self).__init__(cluster_spec)
-    self.location = util.GetLocationFromZone(self.zone)
-    self.resource_group = azure_network.GetResourceGroup(self.location)
+    self.region = util.GetRegionFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.region)
 
   def _Create(self):
     """ACI has no cluster."""

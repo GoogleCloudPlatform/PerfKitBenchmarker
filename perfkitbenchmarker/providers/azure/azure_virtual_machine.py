@@ -151,9 +151,9 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
 class AzurePublicIPAddress(resource.BaseResource):
   """Class to represent an Azure Public IP Address."""
 
-  def __init__(self, location, availability_zone, name, dns_name=None):
+  def __init__(self, region, availability_zone, name, dns_name=None):
     super(AzurePublicIPAddress, self).__init__()
-    self.location = location
+    self.region = region
     self.availability_zone = availability_zone
     self.name = name
     self._deleted = False
@@ -163,7 +163,7 @@ class AzurePublicIPAddress(resource.BaseResource):
   def _Create(self):
     cmd = [
         azure.AZURE_PATH, 'network', 'public-ip', 'create', '--location',
-        self.location, '--name', self.name
+        self.region, '--name', self.name
     ] + self.resource_group.args
 
     if self.availability_zone:
@@ -221,14 +221,14 @@ class AzureNIC(resource.BaseResource):
     self.private_ip = private_ip
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
-    self.location = self.subnet.vnet.location
+    self.region = self.subnet.vnet.region
     self.args = ['--nics', self.name]
     self.accelerated_networking = accelerated_networking
 
   def _Create(self):
     cmd = [
         azure.AZURE_PATH, 'network', 'nic', 'create', '--location',
-        self.location, '--vnet-name', self.subnet.vnet.name, '--subnet',
+        self.region, '--vnet-name', self.subnet.vnet.name, '--subnet',
         self.subnet.name, '--public-ip-address', self.public_ip, '--name',
         self.name
     ] + self.resource_group.args
@@ -294,10 +294,10 @@ class AzureDedicatedHostGroup(resource.BaseResource):
     resource_group: The group of resources for the host group.
   """
 
-  def __init__(self, name, location, resource_group, availability_zone):
+  def __init__(self, name, region, resource_group, availability_zone):
     super(AzureDedicatedHostGroup, self).__init__()
     self.name = name + 'Group'
-    self.location = location
+    self.region = region
     self.resource_group = resource_group
     self.availability_zone = availability_zone
 
@@ -312,7 +312,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
         '--name',
         self.name,
         '--location',
-        self.location,
+        self.region,
         # number of fault domains (physical racks) to span across
         # TODO(buggay): add support for multiple fault domains
         # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts#high-availability-considerations
@@ -373,18 +373,18 @@ class AzureDedicatedHost(resource.BaseResource):
   Attributes:
     host_group: The required host group to which the host will belong.
     name: The name of the vm - to be part of the host name.
-    location: The region the host will exist in.
+    region: The region the host will exist in.
     resource_group: The group of resources for the host.
   """
   _lock = threading.Lock()
   # globals guarded by _lock
   host_group_map = {}
 
-  def __init__(self, name, location, resource_group, sku_type,
+  def __init__(self, name, region, resource_group, sku_type,
                availability_zone):
     super(AzureDedicatedHost, self).__init__()
     self.name = name + '-Host'
-    self.location = location
+    self.region = region
     self.resource_group = resource_group
     self.sku_type = sku_type
     self.availability_zone = availability_zone
@@ -394,13 +394,13 @@ class AzureDedicatedHost(resource.BaseResource):
   def _CreateDependencies(self):
     """See base class."""
     with self._lock:
-      if self.location not in self.host_group_map:
-        new_host_group = AzureDedicatedHostGroup(self.name, self.location,
+      if self.region not in self.host_group_map:
+        new_host_group = AzureDedicatedHostGroup(self.name, self.region,
                                                  self.resource_group,
                                                  self.availability_zone)
         new_host_group.Create()
-        self.host_group_map[self.location] = new_host_group.name
-      self.host_group = self.host_group_map[self.location]
+        self.host_group_map[self.region] = new_host_group.name
+      self.host_group = self.host_group_map[self.region]
 
   def _Create(self):
     """See base class."""
@@ -416,7 +416,7 @@ class AzureDedicatedHost(resource.BaseResource):
         '--sku',
         self.sku_type,
         '--location',
-        self.location,
+        self.region,
         # the specific fault domain (physical rack) for the host dependent on
         # the number (count) of fault domains of the host group
         # TODO(buggay): add support for specifying multiple fault domains if
@@ -482,11 +482,11 @@ class AzureVirtualMachine(
     """
     super(AzureVirtualMachine, self).__init__(vm_spec)
 
-    # PKB zone can be either a location or a location with an availability zone.
-    # Format for Azure availability zone support is "location-availability_zone"
-    # Example: eastus2-1 is Azure location eastus2 with availability zone 1.
+    # PKB zone can be either a region or a region with an availability zone.
+    # Format for Azure availability zone support is "region-availability_zone"
+    # Example: eastus2-1 is Azure region eastus2 with availability zone 1.
 
-    self.location = util.GetLocationFromZone(self.zone)
+    self.region = util.GetRegionFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
@@ -497,7 +497,7 @@ class AzureVirtualMachine(
     self._deleted = False
 
     self.resource_group = azure_network.GetResourceGroup()
-    self.public_ip = AzurePublicIPAddress(self.location, self.availability_zone,
+    self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
                                           self.name + '-public-ip')
     self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
                         self.public_ip.name, vm_spec.accelerated_networking)
@@ -536,11 +536,11 @@ class AzureVirtualMachine(
 
     if self.use_dedicated_host:
       with self._lock:
-        self.host_list = self.host_map[(self.host_series_sku, self.location)]
+        self.host_list = self.host_map[(self.host_series_sku, self.region)]
         if (not self.host_list or (self.num_vms_per_host and
                                    self.host_list[-1].fill_fraction +
                                    1.0 / self.num_vms_per_host > 1.0)):
-          new_host = AzureDedicatedHost(self.name, self.location,
+          new_host = AzureDedicatedHost(self.name, self.region,
                                         self.resource_group,
                                         self.host_series_sku,
                                         self.availability_zone)
@@ -567,7 +567,7 @@ class AzureVirtualMachine(
     tag_args = ['--tags'] + util.FormatTags(tags)
 
     create_cmd = ([
-        azure.AZURE_PATH, 'vm', 'create', '--location', self.location,
+        azure.AZURE_PATH, 'vm', 'create', '--location', self.region,
         '--image', self.image, '--size', self.machine_type, '--admin-username',
         self.user_name, '--storage-sku', self.os_disk.disk_type, '--name',
         self.name
@@ -624,7 +624,7 @@ class AzureVirtualMachine(
             'be created and instance creation will be retried.')
         with self._lock:
           if num_hosts == len(self.host_list):
-            new_host = AzureDedicatedHost(self.name, self.location,
+            new_host = AzureDedicatedHost(self.name, self.region,
                                           self.resource_group,
                                           self.host_series_sku,
                                           self.availability_zone)

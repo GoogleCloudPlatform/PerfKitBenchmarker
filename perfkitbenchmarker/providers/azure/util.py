@@ -111,39 +111,39 @@ def GetTagsJson(timeout_minutes):
   return 'tags={}'.format(json.dumps(GetResourceTags(timeout_minutes)))
 
 
-def _IsLocation(zone_or_location):
-  """Returns whether "zone_or_location" is a location."""
-  return re.match(r'[a-z]+[0-9]?$', zone_or_location)
+def _IsRegion(zone_or_region):
+  """Returns whether "zone_or_region" is a region."""
+  return re.match(r'[a-z]+[0-9]?$', zone_or_region)
 
 
-def IsZone(zone_or_location):
-  """Returns whether "zone_or_location" is a zone.
+def IsZone(zone_or_region):
+  """Returns whether "zone_or_region" is a zone.
 
   Args:
-    zone_or_location: string, Azure zone or location. Format for Azure
+    zone_or_region: string, Azure zone or region. Format for Azure
       availability
-      zone support is "location-availability_zone". Example: eastus2-1 specifies
-        Azure location eastus2 with availability zone 1.
+      zone support is "region-availability_zone". Example: eastus2-1 specifies
+        Azure region eastus2 with availability zone 1.
   """
 
-  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_location)
+  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_region)
 
 
-def GetLocationFromZone(zone_or_location):
-  """Returns the location a zone is in (or "zone_or_location" if it's a location)."""
-  if _IsLocation(zone_or_location):
-    return zone_or_location
-  if IsZone(zone_or_location):
-    return zone_or_location[:-2]
+def GetRegionFromZone(zone_or_region):
+  """Returns the region a zone is in (or "zone_or_region" if it's a region)."""
+  if _IsRegion(zone_or_region):
+    return zone_or_region
+  if IsZone(zone_or_region):
+    return zone_or_region[:-2]
 
-  raise ValueError('%s is not a valid Azure zone or location name' %
-                   zone_or_location)
+  raise ValueError('%s is not a valid Azure zone or region name' %
+                   zone_or_region)
 
 
-def GetAvailabilityZoneFromZone(zone_or_location):
+def GetAvailabilityZoneFromZone(zone_or_region):
   """Returns the Availability Zone from a zone."""
-  if IsZone(zone_or_location):
-    return zone_or_location[-1]
-  if _IsLocation(zone_or_location):
+  if IsZone(zone_or_region):
+    return zone_or_region[-1]
+  if _IsRegion(zone_or_region):
     return None
-  raise ValueError('%s is not a valid Azure zone' % zone_or_location)
+  raise ValueError('%s is not a valid Azure zone' % zone_or_region)

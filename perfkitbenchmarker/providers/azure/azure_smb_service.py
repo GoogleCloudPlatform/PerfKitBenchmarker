@@ -70,8 +70,8 @@ class AzureSmbService(smb_service.BaseSmbService):
   def __init__(self, disk_spec, zone):
     super(AzureSmbService, self).__init__(disk_spec, zone)
     self.name = 'azure-smb-fs-%s' % FLAGS.run_uri
-    self.location = util.GetLocationFromZone(self.zone)
-    self.resource_group = azure_network.GetResourceGroup(self.location)
+    self.region = util.GetRegionFromZone(self.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.region)
 
     # set during _Create()
     self.connection_args: List[str] = None
@@ -118,7 +118,7 @@ class AzureSmbService(smb_service.BaseSmbService):
       # See links in description for more details.
       self.storage_account = azure_network.AzureStorageAccount(
           storage_type='Premium_LRS',
-          location=FLAGS.zone[0] or 'westus2',
+          region=FLAGS.zone[0] or 'westus2',
           name=self.storage_account_name,
           kind='FileStorage',
           resource_group=self.resource_group,

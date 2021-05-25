@@ -43,7 +43,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   STORAGE_NAME = azure.CLOUD
 
   def PrepareService(self,
-                     location,
+                     region,
                      existing_storage_account_and_resource_group=None,
                      try_to_create_storage_account_and_resource_group=False):
     """See base class (without additional args).
@@ -52,7 +52,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     additional arguments.
 
     Args:
-      location: where to place our data.
+      region: where to place our data.
       existing_storage_account_and_resource_group: An existing storage account
         and resource group for reading objects that may have already been
         created.
@@ -106,7 +106,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     # VM-related account.
     self.storage_account = azure_network.AzureStorageAccount(
         FLAGS.azure_storage_type,
-        location or DEFAULT_AZURE_REGION,
+        region or DEFAULT_AZURE_REGION,
         storage_account_name,
         kind=FLAGS.azure_blob_account_kind,
         resource_group=self.resource_group,

@@ -37,15 +37,15 @@ from perfkitbenchmarker.providers.azure import util
 FLAGS = flags.FLAGS
 SSH_PORT = 22
 
-DEFAULT_LOCATION = 'eastus2'
+DEFAULT_REGION = 'eastus2'
 
-LOCATION = 'location'
+REGION = 'region'
 ZONE = 'zone'
 
 # https://azure.microsoft.com/en-us/blog/announcing-the-general-availability-of-proximity-placement-groups/
 # Central India does not support proximity placement groups.
 # Last Verified: 1/15/20
-UNSUPPORTED_PROXIMIY_PG_LOCATIONS = ['centralindia']
+UNSUPPORTED_PROXIMITY_PG_REGIONS = ['centralindia']
 
 
 def GetResourceGroup(zone=None):
@@ -63,9 +63,9 @@ def GetResourceGroup(zone=None):
     return group
 
 
-def IsProximityPlacementGroupCompatible(location):
-  """Returns True if location supports Azure proximity placement groups."""
-  return location not in UNSUPPORTED_PROXIMIY_PG_LOCATIONS
+def IsProximityPlacementGroupCompatible(region):
+  """Returns True if region supports Azure proximity placement groups."""
+  return region not in UNSUPPORTED_PROXIMITY_PG_REGIONS
 
 
 class AzureResourceGroup(resource.BaseResource):
@@ -82,11 +82,11 @@ class AzureResourceGroup(resource.BaseResource):
     self.use_existing = use_existing
     self.timeout_minutes = timeout_minutes
     self.raise_on_create_failure = raise_on_create_failure
-    # A resource group's location doesn't affect the location of
-    # actual resources, but we need to choose *some* location for every
+    # A resource group's region doesn't affect the region of
+    # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
-    self.location = util.GetLocationFromZone(
-        FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_LOCATION)
+    self.region = util.GetRegionFromZone(
+        FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_REGION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
@@ -94,12 +94,12 @@ class AzureResourceGroup(resource.BaseResource):
   def _Create(self):
     if not self.use_existing:
       # A resource group can own resources in multiple zones, but the
-      # group itself needs to have a location. Therefore,
+      # group itself needs to have a region. Therefore,
       # FLAGS.zones[0].
       _, _, retcode = vm_util.IssueCommand(
           [
               azure.AZURE_PATH, 'group', 'create', '--name', self.name,
-              '--location', self.location, '--tags'
+              '--location', self.region, '--tags'
           ] + util.GetTags(self.timeout_minutes),
           raise_on_failure=False)
 
@@ -153,7 +153,7 @@ class AzureStorageAccount(resource.BaseResource):
 
   def __init__(self,
                storage_type,
-               location,
+               region,
                name,
                kind=None,
                access_tier=None,
@@ -164,7 +164,7 @@ class AzureStorageAccount(resource.BaseResource):
     self.storage_type = storage_type
     self.name = name
     self.resource_group = resource_group or GetResourceGroup()
-    self.location = location
+    self.region = region
     self.kind = kind or 'Storage'
     self.use_existing = use_existing
     self.raise_on_create_failure = raise_on_create_failure
@@ -186,8 +186,8 @@ class AzureStorageAccount(resource.BaseResource):
           '--sku', self.storage_type, '--name', self.name, '--tags'
       ] + util.GetTags(
           self.resource_group.timeout_minutes) + self.resource_group.args
-      if self.location:
-        create_cmd.extend(['--location', self.location])
+      if self.region:
+        create_cmd.extend(['--location', self.region])
       if self.kind == 'BlobStorage':
         create_cmd.extend(['--access-tier', self.access_tier])
       vm_util.IssueCommand(
@@ -230,12 +230,12 @@ class AzureVirtualNetwork(network.BaseNetwork):
   """Object representing an Azure Virtual Network.
 
   The benchmark spec contains one instance of this class per region, which an
-  AzureNetwork may retrieve or create via AzureVirtualNetwork.GetForLocation.
+  AzureNetwork may retrieve or create via AzureVirtualNetwork.GetForRegion.
 
   Attributes:
     name: string. Name of the virtual network.
     resource_group: Resource Group instance that network belongs to.
-    location: string. Azure location of the network.
+    region: string. Azure region of the network.
   """
 
   # Initializes an address space for a new AzureVirtualNetwork
@@ -244,11 +244,11 @@ class AzureVirtualNetwork(network.BaseNetwork):
 
   CLOUD = azure.CLOUD
 
-  def __init__(self, spec, location, name, number_subnets):
+  def __init__(self, spec, region, name, number_subnets):
     super(AzureVirtualNetwork, self).__init__(spec)
     self.name = name
     self.resource_group = GetResourceGroup()
-    self.location = location
+    self.region = region
     self.args = ['--vnet-name', self.name]
     self.address_index = 0
     self.regional_index = AzureVirtualNetwork._regional_network_count
@@ -259,12 +259,12 @@ class AzureVirtualNetwork(network.BaseNetwork):
     self.is_created = False
 
   @classmethod
-  def GetForLocation(cls, spec, location, name, number_subnets=1):
+  def GetForRegion(cls, spec, region, name, number_subnets=1):
     """Retrieves or creates an AzureVirtualNetwork.
 
     Args:
       spec: BaseNetworkSpec. Spec for Azure Network.
-      location: string. Azure region name.
+      region: string. Azure region name.
       name: string. Azure Network Name.
       number_subnets: int. Optional. Number of subnets that network will
         contain.
@@ -278,13 +278,13 @@ class AzureVirtualNetwork(network.BaseNetwork):
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    key = cls.CLOUD, LOCATION, location
+    key = cls.CLOUD, REGION, region
     # Because this method is only called from the AzureNetwork constructor,
     # which is only called from AzureNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
     number_subnets = max(number_subnets, len(FLAGS.zones))
     if key not in benchmark_spec.regional_networks:
-      benchmark_spec.regional_networks[key] = cls(spec, location, name,
+      benchmark_spec.regional_networks[key] = cls(spec, region, name,
                                                   number_subnets)
       AzureVirtualNetwork._regional_network_count += 1
     return benchmark_spec.regional_networks[key]
@@ -306,10 +306,10 @@ class AzureVirtualNetwork(network.BaseNetwork):
         return
 
       logging.info('Creating %d Azure subnets in %s', len(self.address_spaces),
-                   self.location)
+                   self.region)
       vm_util.IssueRetryableCommand([
           azure.AZURE_PATH, 'network', 'vnet', 'create', '--location', self
-          .location, '--name', self.name, '--address-prefixes'
+          .region, '--name', self.name, '--address-prefixes'
       ] + self.address_spaces + self.resource_group.args)
 
       self.is_created = True
@@ -373,10 +373,10 @@ class AzureSubnet(resource.BaseResource):
 class AzureNetworkSecurityGroup(resource.BaseResource):
   """Object representing an Azure Network Security Group."""
 
-  def __init__(self, location, subnet, name):
+  def __init__(self, region, subnet, name):
     super(AzureNetworkSecurityGroup, self).__init__()
 
-    self.location = location
+    self.region = region
     self.subnet = subnet
     self.name = name
     self.resource_group = GetResourceGroup()
@@ -394,7 +394,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
   def _Create(self):
     vm_util.IssueCommand([
         azure.AZURE_PATH, 'network', 'nsg', 'create', '--location',
-        self.location, '--name', self.name
+        self.region, '--name', self.name
     ] + self.resource_group.args)
 
   @vm_util.Retry()
@@ -522,7 +522,7 @@ class AzureNetwork(network.BaseNetwork):
   """Locational network components.
 
   A container object holding all of the network-related objects that
-  we need for an Azure zone (aka location).
+  we need for an Azure zone (aka region).
   """
 
   CLOUD = azure.CLOUD
@@ -530,7 +530,7 @@ class AzureNetwork(network.BaseNetwork):
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
-    self.location = util.GetLocationFromZone(self.zone)
+    self.region = util.GetRegionFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
 
     placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(
@@ -547,7 +547,7 @@ class AzureNetwork(network.BaseNetwork):
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD)
 
     if cluster_placement_group and IsProximityPlacementGroupCompatible(
-        self.location):
+        self.region):
       self.placement_group = azure_placement_group.AzureProximityGroup(
           placement_group_spec)
     # With dedicated hosting and/or an availability zone, an availability set
@@ -567,22 +567,21 @@ class AzureNetwork(network.BaseNetwork):
     # awful naming scheme.
     suffix = 'storage%d' % AzureStorageAccount.total_storage_accounts
     self.storage_account = AzureStorageAccount(
-        FLAGS.azure_storage_type, self.location,
+        FLAGS.azure_storage_type, self.region,
         storage_account_prefix[:24 - len(suffix)] + suffix)
 
     # Length restriction from https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftnetwork  pylint: disable=line-too-long
-    prefix = '%s-%s' % (self.resource_group.name, self.location)
+    prefix = '%s-%s' % (self.resource_group.name, self.region)
     vnet_name = prefix + '-vnet'
     if len(vnet_name) > 64:
       vnet_name = prefix[:59] + '-vnet'
-    self.vnet = AzureVirtualNetwork.GetForLocation(spec, self.location,
-                                                   vnet_name)
+    self.vnet = AzureVirtualNetwork.GetForRegion(spec, self.region, vnet_name)
     subnet_name = self.vnet.name
     if self.availability_zone:
       subnet_name += '-' + self.availability_zone
     subnet_name += '-subnet'
     self.subnet = AzureSubnet(self.vnet, subnet_name)
-    self.nsg = AzureNetworkSecurityGroup(self.location, self.subnet,
+    self.nsg = AzureNetworkSecurityGroup(self.region, self.subnet,
                                          self.subnet.name + '-nsg')
 
   @vm_util.Retry()
@@ -644,7 +643,7 @@ class AzureVpcPeering(network.BaseVPCPeering):
   def _Create(self):
     """Creates the peering object."""
     self.name = '%s-%s-%s' % (self.network_a.resource_group.name,
-                              self.network_a.location, self.network_b.location)
+                              self.network_a.region, self.network_b.region)
 
     # Creates Peering Connection
     create_cmd = [

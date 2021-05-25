@@ -11,32 +11,32 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AzureUtilTest, self).setUp()
-    self.expected_location = 'eastus2'
+    self.expected_region = 'eastus2'
     self.expected_availability_zone = '1'
 
-  def test_get_location_from_zone_valid_location(self):
-    valid_location = 'eastus2'
-    self.assertEqual(self.expected_location,
-                     util.GetLocationFromZone(valid_location))
+  def test_get_region_from_zone_valid_region(self):
+    valid_region = 'eastus2'
+    self.assertEqual(self.expected_region,
+                     util.GetRegionFromZone(valid_region))
 
-  def test_get_location_from_zone_valid_zone(self):
+  def test_get_region_from_zone_valid_zone(self):
     valid_zone = 'eastus2-1'
-    self.assertEqual(self.expected_location,
-                     util.GetLocationFromZone(valid_zone))
+    self.assertEqual(self.expected_region,
+                     util.GetRegionFromZone(valid_zone))
 
-  def test_get_location_from_zone_invalid_location(self):
-    valid_location = 'us-east2'
+  def test_get_region_from_zone_invalid_region(self):
+    valid_region = 'us-east2'
     with self.assertRaises(ValueError):
-      util.GetLocationFromZone(valid_location)
+      util.GetRegionFromZone(valid_region)
 
-  def test_get_location_from_zone_invalid_zone(self):
-    valid_location = 'eastus2-1a'
+  def test_get_region_from_zone_invalid_zone(self):
+    valid_region = 'eastus2-1a'
     with self.assertRaises(ValueError):
-      util.GetLocationFromZone(valid_location)
+      util.GetRegionFromZone(valid_region)
 
-  def test_get_availability_zone_from_zone_valid_location(self):
-    valid_location = 'eastus2'
-    self.assertEqual(None, util.GetAvailabilityZoneFromZone(valid_location))
+  def test_get_availability_zone_from_zone_valid_region(self):
+    valid_region = 'eastus2'
+    self.assertIsNone(util.GetAvailabilityZoneFromZone(valid_region))
 
   def test_get_availability_zone_from_zone_valid_zone(self):
     valid_zone = 'eastus2-1'
@@ -44,9 +44,9 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
                      util.GetAvailabilityZoneFromZone(valid_zone))
 
   def test_get_availability_zone_from_zone_invalid_zone(self):
-    valid_location = 'eastus2-1a'
+    valid_region = 'eastus2-1a'
     with self.assertRaises(ValueError):
-      util.GetAvailabilityZoneFromZone(valid_location)
+      util.GetAvailabilityZoneFromZone(valid_region)
 
 
 if __name__ == '__main__':

@@ -61,14 +61,14 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   called, which is the current behavior of PKB. This is necessary to setup the
   networking correctly. The following steps are performed to provision the
   database:
-    1. create the RDS instance in the requested location.
+    1. create the RDS instance in the requested region.
 
   Instructions from:
   https://docs.microsoft.com/en-us/azure/postgresql/quickstart-create-server-database-azure-cli
 
   On teardown, all resources are deleted.
 
-  Note that the client VM's location and the location requested for the database
+  Note that the client VM's region and the region requested for the database
   must be the same.
 
   """
@@ -82,8 +82,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     if util.IsZone(self.spec.db_spec.zone):
       raise errors.Config.InvalidValue(
           'Availability zones are currently not supported by Azure DBs')
-    self.location = util.GetLocationFromZone(self.spec.db_spec.zone)
-    self.resource_group = azure_network.GetResourceGroup(self.location)
+    self.region = util.GetRegionFromZone(self.spec.db_spec.zone)
+    self.resource_group = azure_network.GetResourceGroup(self.region)
 
     self.unmanaged_db_exists = None if self.is_managed_db else False
 
@@ -289,7 +289,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--name',
         self.instance_id,
         '--location',
-        self.location,
+        self.region,
         '--admin-user',
         self.spec.database_username,
         '--admin-password',
@@ -316,7 +316,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--name',
         self.instance_id,
         '--location',
-        self.location,
+        self.region,
         '--admin-user',
         self.spec.database_username,
         '--admin-password',
