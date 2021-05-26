@@ -34,6 +34,7 @@ import posixpath
 import re
 import threading
 
+from typing import Tuple
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -50,6 +51,7 @@ from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 import six
 from six.moves import range
@@ -65,6 +67,12 @@ _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.')
 _GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
+_SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
+_WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gsutil cp - {preempt_marker}'
+_METADATA_PREEMPT_URI = 'http://metadata.google.internal/computeMetadata/v1/instance/preempted'
+_METADATA_PREEMPT_CMD = f'curl {_METADATA_PREEMPT_URI} -H "Metadata-Flavor: Google"'
+_METADATA_PREEMPT_CMD_WIN = (f'Invoke-RestMethod -Uri {_METADATA_PREEMPT_URI} '
+                             '-Headers @{"Metadata-Flavor"="Google"}')
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -512,6 +520,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.preemptible:
       cmd.flags['preemptible'] = True
+      self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
+      metadata.update([self._PreemptibleMetadataKeyValue()])
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
@@ -531,6 +541,33 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
+
+  def _AddShutdownScript(self):
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'add-metadata', self.name)
+    key, value = self._PreemptibleMetadataKeyValue()
+    cmd.flags['metadata'] = f'{key}={value}'
+    cmd.Issue()
+
+  def _RemoveShutdownScript(self):
+    # Removes shutdown script which copies status when it is interrupted
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'remove-metadata', self.name)
+    key, _ = self._PreemptibleMetadataKeyValue()
+    cmd.flags['keys'] = key
+    cmd.Issue(raise_on_failure=False)
+
+  def Reboot(self):
+    if self.preemptible:
+      self._RemoveShutdownScript()
+    super().Reboot()
+    if self.preemptible:
+      self._AddShutdownScript()
+
+  def _PreDelete(self):
+    super()._PreDelete()
+    if self.preemptible:
+      self._RemoveShutdownScript()
 
   def _Create(self):
     """Create a GCE VM instance."""
@@ -822,6 +859,36 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
+  def _UpdateInterruptibleVmStatusThroughMetadataService(self):
+    _, _, retcode = vm_util.IssueCommand(
+        [FLAGS.gsutil_path, 'stat', self.preempt_marker],
+        raise_on_failure=False, suppress_warning=True)
+    # The VM is preempted if the command exits without an error
+    self.spot_early_termination = not bool(retcode)
+    if self.WasInterrupted():
+      return
+    stdout, _ = self.RemoteCommand(self._MetadataPreemptCmd)
+    self.spot_early_termination = stdout.strip().lower() == 'true'
+
+  @property
+  def _MetadataPreemptCmd(self):
+    return _METADATA_PREEMPT_CMD
+
+  def _PreemptibleMetadataKeyValue(self) -> Tuple[str, str]:
+    """See base class."""
+    return 'shutdown-script', _SHUTDOWN_SCRIPT.format(
+        preempt_marker=self.preempt_marker, user=self.user_name)
+
+  def _AcquireWritePermissionsLinux(self):
+    gcs.GoogleCloudStorageService.AcquireWritePermissionsLinux(self)
+
+  def OnStartup(self):
+    super().OnStartup()
+    if self.preemptible:
+      # Prepare VM to use GCS. When an instance is interrupt, the shutdown
+      # script will copy the status a GCS bucket.
+      self._AcquireWritePermissionsLinux()
+
   def _UpdateInterruptibleVmStatusThroughApi(self):
     # If the run has failed then do a check that could throw an exception.
     vm_without_zone = copy.copy(self)
@@ -837,14 +904,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def UpdateInterruptibleVmStatus(self, use_api=False):
     """Updates the interruptible status if the VM was preempted."""
-    if not self.preemptible:  # Only do checks on preemptible VMs
+    if not self.IsInterruptible():
       return
-    if self.spot_early_termination:  # VM already marked as preemptedor
+    if self.WasInterrupted():
       return
     try:
       self._UpdateInterruptibleVmStatusThroughMetadataService()
-    except NotImplementedError:
-      if use_api:
+    except errors.VirtualMachine.RemoteCommandError as error:
+      if use_api and 'connection timed out' in str(error).lower():
         self._UpdateInterruptibleVmStatusThroughApi()
 
   def IsInterruptible(self):
@@ -985,6 +1052,11 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     response = json.loads(stdout)
     self.password = response['password']
 
+  def _PreemptibleMetadataKeyValue(self) -> Tuple[str, str]:
+    """See base class."""
+    return 'windows-shutdown-script-ps1', _WINDOWS_SHUTDOWN_SCRIPT_PS1.format(
+        preempt_marker=self.preempt_marker)
+
   @vm_util.Retry(
       max_retries=10,
       retryable_exceptions=(GceUnexpectedWindowsAdapterOutputError,
@@ -1027,6 +1099,13 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = self.RemoteCommand('netsh int tcp show global')
     if 'Receive-Side Scaling State          : enabled' in stdout:
       raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
+
+  def _AcquireWritePermissionsLinux(self):
+    gcs.GoogleCloudStorageService.AcquireWritePermissionsWindows(self)
+
+  @property
+  def _MetadataPreemptCmd(self):
+    return _METADATA_PREEMPT_CMD_WIN
 
 
 class Windows2012CoreGceVirtualMachine(
