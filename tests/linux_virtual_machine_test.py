@@ -22,6 +22,7 @@ from absl.testing import parameterized
 
 import mock
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
@@ -37,14 +38,19 @@ def CreateTestLinuxVm():
   return pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
 
 
+def CreateCentos7Vm():
+  vm_spec = pkb_common_test_case.CreateTestVmSpec()
+  return TestCentos7VirtualMachine(vm_spec)
+
+
 # /proc/cmdline on a GCP CentOS7 vm
 _CENTOS7_KERNEL_COMMAND_LINE = (
     'BOOT_IMAGE=/boot/vmlinuz-3.10.0-1127.13.1.el7.x86_64 '
     'root=UUID=1-2-3-4-5 ro crashkernel=auto console=ttyS0,38400n8')
 
 
-class TestCentos7VirtualMachine(pkb_common_test_case.TestVirtualMachine,
-                                linux_virtual_machine.CentOs7Mixin):
+class TestCentos7VirtualMachine(linux_virtual_machine.CentOs7Mixin,
+                                pkb_common_test_case.TestVirtualMachine):
   user_name = 'perfkit'
 
 
@@ -496,8 +502,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('default_flag', None, 'sudo systemctl disable yum-cron.service'),
       ('flag_false', False, None))
   def testCentos7OnStartup(self, flag_disable_yum_cron, additional_command):
-    vm_spec = pkb_common_test_case.CreateTestVmSpec()
-    vm = TestCentos7VirtualMachine(vm_spec)
+    vm = CreateCentos7Vm()
     mock_remote = mock.Mock(return_value=('', ''))
     vm.RemoteHostCommand = mock_remote  # pylint: disable=invalid-name
 
@@ -514,6 +519,27 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     if additional_command:
       calls.append(mock.call(additional_command))
     mock_remote.assert_has_calls(calls)
+
+  def testRebootCommandNonRebootable(self):
+    vm = CreateTestLinuxVm()
+    vm.IS_REBOOTABLE = False
+    with self.assertRaises(errors.VirtualMachine.VirtualMachineError):
+      vm._Reboot()
+
+  @parameterized.named_parameters(
+      ('regular', CreateTestLinuxVm, False))
+  def testRebootCommand(self, vm_create_function, ignore_ssh_error):
+    vm = vm_create_function()
+    mock_remote = mock.Mock(return_value=('', ''))
+    vm.RemoteCommand = mock_remote  # pylint: disable=invalid-name
+
+    vm._Reboot()
+
+    if ignore_ssh_error:
+      mock_remote.assert_called_with(
+          'sudo reboot', ignore_failure=True, ignore_ssh_error=True)
+    else:
+      mock_remote.assert_called_with('sudo reboot', ignore_failure=True)
 
 
 if __name__ == '__main__':

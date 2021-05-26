@@ -1019,11 +1019,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
 
-  def _Reboot(self):
-    """OS-specific implementation of reboot command."""
+  def _CheckRebootability(self):
     if not self.IS_REBOOTABLE:
       raise errors.VirtualMachine.VirtualMachineError(
           "Trying to reboot a VM that isn't rebootable.")
+
+  def _Reboot(self):
+    """OS-specific implementation of reboot command."""
+    self._CheckRebootability()
     self.RemoteCommand('sudo reboot', ignore_failure=True)
 
   def _AfterReboot(self):
