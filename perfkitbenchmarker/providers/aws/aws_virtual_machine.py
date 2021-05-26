@@ -649,8 +649,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
     if FLAGS.aws_efa:
       self._ConfigureEfa(instance)
-    else:
+    elif 'PublicIpAddress' in instance:
       self.ip_address = instance['PublicIpAddress']
+    else:
+      raise errors.Resource.RetryableCreationError('Public IP not ready.')
 
   def _ConfigureEfa(self, instance):
     """Configuare EFA and associate Elastic IP.
