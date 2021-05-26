@@ -75,12 +75,6 @@ AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
 USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
     ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
-ARM_PROCESSOR_PREFIXES = ['a1', 'm6g', 'c6g', 'r6g']
-
-# Processor architectures
-ARM = 'arm64'
-X86 = 'x86_64'
-
 # These are the project numbers of projects owning common images.
 # Some numbers have corresponding owner aliases, but they are not used here.
 AMAZON_LINUX_IMAGE_PROJECT = [
@@ -108,8 +102,12 @@ UBUNTU_IMAGE_PROJECT = ['099720109477']  # Owned by canonical
 # one selected by the AWS console.
 WINDOWS_IMAGE_PROJECT = ['801119661308']  # alias amazon
 
-# Machine type to host architecture.
-_MACHINE_TYPE_PREFIX_TO_HOST_ARCH = {
+# Processor architectures
+ARM = 'arm64'
+X86 = 'x86_64'
+
+# Machine type to ARM architecture.
+_MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
     'm6g': 'graviton2',
@@ -235,10 +233,16 @@ def IsPlacementGroupCompatible(machine_type):
   return prefix not in NON_PLACEMENT_GROUP_PREFIXES
 
 
+def GetArmArchitecture(machine_type):
+  """Returns the specific ARM processor architecture of the VM."""
+  # c6g.medium -> c6g, m6gd.large -> m6g, c5n.18xlarge -> c5
+  prefix = re.split(r'[dn]?\.', machine_type)[0]
+  return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
+
+
 def GetProcessorArchitecture(machine_type):
   """Returns the processor architecture of the VM."""
-  prefix = re.split(r'[dn]?\.', machine_type)[0]
-  if prefix in ARM_PROCESSOR_PREFIXES:
+  if GetArmArchitecture(machine_type):
     return ARM
   else:
     return X86
@@ -839,10 +843,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     _, stderr, retcode = vm_util.IssueCommand(create_cmd,
                                               raise_on_failure=False)
 
-    machine_type_prefix = self.machine_type.split('.')[0]
-    host_arch = _MACHINE_TYPE_PREFIX_TO_HOST_ARCH.get(machine_type_prefix)
-    if host_arch:
-      self.host_arch = host_arch
+    arm_arch = GetArmArchitecture(self.machine_type)
+    if arm_arch:
+      self.host_arch = arm_arch
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       if self.num_vms_per_host:
