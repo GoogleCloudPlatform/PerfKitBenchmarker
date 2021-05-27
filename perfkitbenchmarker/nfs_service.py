@@ -202,6 +202,8 @@ class UnmanagedNfsService(BaseNfsService):
     assert self.server_vm, 'NFS server VM not created.'
     self.server_vm.Install('nfs_server')
     self._ExportNfsDir(self.server_directory)
+    # Restart NFS service upon reboot
+    self.server_vm.RemoteCommand('sudo systemctl enable nfs')
 
   def _Delete(self):
     pass

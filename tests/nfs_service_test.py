@@ -129,11 +129,13 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     vm.TryRemoteCommand.return_value = False
     nfs_service.NfsExport(vm, '/foo/bar')
     # /etc/exports updated
-    self.assertLen(vm.RemoteCommand.call_args_list, 2)
+    self.assertLen(vm.RemoteCommand.call_args_list, 3)
     exportfs_cmd = vm.RemoteCommand.call_args_list[0][0][0]
     self.assertRegex(exportfs_cmd, 'tee -a /etc/exports')
-    vm.RemoteCommand.assert_called_with(
-        'sudo systemctl restart nfs-kernel-server')
+    vm.RemoteCommand.has_calls([
+        mock.call('sudo systemctl enable nfs'),
+        mock.call('sudo systemctl restart nfs-kernel-server')
+    ])
 
   def testNfsExportDirectoryAlreadyExported(self):
     # Testing when NfsExport called twice with the same path.
@@ -141,8 +143,11 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     vm.TryRemoteCommand.return_value = True
     nfs_service.NfsExport(vm, '/foo/bar')
     # RemoteCommand not called with the mkdir ... echo calls
-    self.assertLen(vm.RemoteCommand.call_args_list, 1)
-    vm.RemoteCommand.assert_called_with('sudo systemctl restart nfs-server')
+    self.assertLen(vm.RemoteCommand.call_args_list, 2)
+    vm.RemoteCommand.has_calls([
+        mock.call('sudo systemctl enable nfs'),
+        mock.call('sudo systemctl restart nfs-kernel-server')
+    ])
 
   def testNfsExportAndMount(self):
     mock_nfs_create = self.enter_context(
