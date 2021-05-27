@@ -130,3 +130,5 @@
 -   Updated Aerospike client release version to 4.6.21.
 -   Install zlib1g-dev dependency for Aerospike client.
 -   Use OMB version 4.7.1 and parse new min/max columns.
+-   Added --application_default_credential_file as an alternative way to
+    authenticate with Bigquery.

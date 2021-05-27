@@ -158,6 +158,21 @@ class BigQueryPublisherTestCase(unittest.TestCase):
     instance.PublishSamples(self.samples)  # No error
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(mock.ANY)
 
+  def testApplicationCredentialsFlag_FlagsConflict(self):
+    self.assertRaises(
+        ValueError,
+        publisher.BigQueryPublisher,
+        self.table,
+        service_account=mock.MagicMock(),
+        service_account_private_key_file=mock.MagicMock(),
+        application_default_credential_file=mock.MagicMock())
+
+  def testApplicationCredentialsFlag_WorkingNormal(self):
+    instance = publisher.BigQueryPublisher(
+        self.table, application_default_credential_file=mock.MagicMock())
+    instance.PublishSamples(self.samples)  # No error
+    self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(mock.ANY)
+
 
 class CloudStoragePublisherTestCase(unittest.TestCase):
 

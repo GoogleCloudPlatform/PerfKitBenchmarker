@@ -95,6 +95,9 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'service_account_private_key', None,
     'Service private key for authenticating with BQ.')
+flags.DEFINE_string(
+    'application_default_credential_file', None,
+    'Application default credentials file for authenticating with BQ.')
 
 flags.DEFINE_string(
     'gsutil_path', 'gsutil', 'path to the "gsutil" executable')
@@ -509,10 +512,17 @@ class BigQueryPublisher(SamplePublisher):
       authorization. For example, 1234567890@developer.gserviceaccount.com
     service_account_private_key: Filename that contains the service account
       private key. Must be specified if service_account is specified.
+    application_default_credential_file: Filename that holds Google applciation
+      default credentials. Cannot be set alongside service_account.
   """
 
-  def __init__(self, bigquery_table, project_id=None, bq_path='bq',
-               service_account=None, service_account_private_key_file=None):
+  def __init__(self,
+               bigquery_table,
+               project_id=None,
+               bq_path='bq',
+               service_account=None,
+               service_account_private_key_file=None,
+               application_default_credential_file=None):
     super().__init__()
     self.bigquery_table = bigquery_table
     self.project_id = project_id
@@ -520,11 +530,17 @@ class BigQueryPublisher(SamplePublisher):
     self.service_account = service_account
     self.service_account_private_key_file = service_account_private_key_file
     self._credentials_file = vm_util.PrependTempDir(DEFAULT_CREDENTIALS_JSON)
+    self.application_default_credential_file = (
+        application_default_credential_file)
 
     if ((self.service_account is None) !=
         (self.service_account_private_key_file is None)):
       raise ValueError('service_account and service_account_private_key '
                        'must be specified together.')
+    if (application_default_credential_file is not None and
+        self.service_account is not None):
+      raise ValueError('application_default_credential_file cannot be used '
+                       'alongside service_account.')
 
   def __repr__(self):
     return '<{0} table="{1}">'.format(type(self).__name__, self.bigquery_table)
@@ -553,6 +569,9 @@ class BigQueryPublisher(SamplePublisher):
                          self._credentials_file,
                          '--service_account_private_key_file=' +
                          self.service_account_private_key_file])
+      elif self.application_default_credential_file is not None:
+        load_cmd.append('--application_default_credential_file=' +
+                        self.application_default_credential_file)
       load_cmd.extend(['load',
                        '--autodetect',
                        '--source_format=NEWLINE_DELIMITED_JSON',
@@ -904,12 +923,16 @@ class SampleCollector(object):
           collapse_labels=FLAGS.collapse_labels))
 
     if FLAGS.bigquery_table:
-      publishers.append(BigQueryPublisher(
-          FLAGS.bigquery_table,
-          project_id=FLAGS.bq_project,
-          bq_path=FLAGS.bq_path,
-          service_account=FLAGS.service_account,
-          service_account_private_key_file=FLAGS.service_account_private_key))
+      publishers.append(
+          BigQueryPublisher(
+              FLAGS.bigquery_table,
+              project_id=FLAGS.bq_project,
+              bq_path=FLAGS.bq_path,
+              service_account=FLAGS.service_account,
+              service_account_private_key_file=FLAGS
+              .service_account_private_key,
+              application_default_credential_file=FLAGS
+              .application_default_credential_file))
 
     if FLAGS.cloud_storage_bucket:
       publishers.append(CloudStoragePublisher(FLAGS.cloud_storage_bucket,
