@@ -231,7 +231,8 @@ class BenchmarkSpec(object):
     providers.LoadProvider(dpb_service_cloud)
 
     dpb_service_type = dpb_service_spec.service_type
-    dpb_service_class = dpb_service.GetDpbServiceClass(dpb_service_type)
+    dpb_service_class = dpb_service.GetDpbServiceClass(dpb_service_cloud,
+                                                       dpb_service_type)
     self.dpb_service = dpb_service_class(dpb_service_spec)
 
     # If the dpb service is un-managed, the provisioning needs to be handed

@@ -27,6 +27,7 @@ def parse_args():
       type=lambda csv: csv.split(','),
       required=True,
       help='List of SQL scripts staged in object storage to run')
+  parser.add_argument('--database', help='Hive database to look for data in.')
   parser.add_argument(
       '--table-metadata',
       metavar='METADATA_FILE',
@@ -61,6 +62,8 @@ def main(args):
   if args.enable_hive:
     builder = builder.enableHiveSupport()
   spark = builder.getOrCreate()
+  if args.database:
+    spark.catalog.setCurrentDatabase(args.database)
   table_metadata = []
   if args.table_metadata:
     table_metadata = json.loads(load_file(spark, args.table_metadata)).items()

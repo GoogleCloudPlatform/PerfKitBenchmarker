@@ -106,6 +106,10 @@ flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
                   'Whether to load dpb_sparksql_data into external hive tables '
                   'or not.')
 flags.DEFINE_string(
+    'dpb_sparksql_database', None,
+    'Name of preprovisioned Hive database to look for data in '
+    '(https://spark.apache.org/docs/latest/sql-data-sources-hive-tables.html).')
+flags.DEFINE_string(
     'dpb_sparksql_data_format', None,
     "Format of data to load. Assumed to be 'parquet' for HCFS "
     "and 'bigquery' for bigquery if unspecified.")
@@ -164,16 +168,20 @@ def CheckPrerequisites(benchmark_config):
   if not FLAGS.dpb_sparksql_data and FLAGS.dpb_sparksql_create_hive_tables:
     raise errors.Config.InvalidValue(
         'You must pass dpb_sparksql_data with dpb_sparksql_create_hive_tables')
+  if FLAGS.dpb_sparksql_database and FLAGS.dpb_sparksql_create_hive_tables:
+    raise errors.Config.InvalidValue(
+        'You cannot create hive tables in a custom database.')
   if FLAGS.bigquery_tables and not FLAGS.spark_bigquery_connector:
     # Remove if Dataproc ever bundles BigQuery connector
     raise errors.Config.InvalidValue(
         'You must provide the BigQuery connector using '
         '--spark_bigquery_connector.')
-  if not (FLAGS.dpb_sparksql_data or FLAGS.bigquery_tables):
+  if not (FLAGS.dpb_sparksql_data or FLAGS.bigquery_tables or
+          FLAGS.dpb_sparksql_database):
     # In the case of a static dpb_service, data could pre-exist
     logging.warning(
-        'You did not specify --dpb_sparksql_data or --bigquery_tables. '
-        'You will probably not have data to query!')
+        'You did not specify --dpb_sparksql_data, --bigquery_tables, '
+        'or dpb_sparksql_database. You will probably not have data to query!')
   if not FLAGS.dpb_sparksql_order:
     raise errors.Config.InvalidValue(
         'You must specify the queries to run with --dpb_sparksql_order')
@@ -276,6 +284,8 @@ def Run(benchmark_spec):
       '--report-dir',
       report_dir,
   ]
+  if FLAGS.dpb_sparksql_database:
+    args += ['--database', FLAGS.dpb_sparksql_database]
   table_metadata = _GetTableMetadata(benchmark_spec)
   if table_metadata:
     table_metadata_file = '/'.join([cluster.base_dir, 'metadata.json'])

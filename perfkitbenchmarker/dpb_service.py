@@ -22,7 +22,7 @@ the corresponding provider directory as a subclass of BaseDpbService.
 import abc
 import datetime
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Type
 
 from absl import flags
 import dataclasses
@@ -64,6 +64,10 @@ DATAFLOW = 'dataflow'
 EMR = 'emr'
 UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
 UNMANAGED_SPARK_CLUSTER = 'unmanaged_spark_cluster'
+UNMANAGED_SERVICES = [
+    UNMANAGED_DPB_SVC_YARN_CLUSTER,
+    UNMANAGED_SPARK_CLUSTER,
+]
 
 # Default number of workers to be used in the dpb service implementation
 DEFAULT_WORKER_COUNT = 2
@@ -103,27 +107,12 @@ class JobResult:
     return self.run_time + self.pending_time
 
 
-def GetDpbServiceClass(dpb_service_type):
-  """Gets the Data Processing Backend class corresponding to 'service_type'.
-
-  Args:
-    dpb_service_type: String service type as specified in configuration
-
-  Returns:
-    Implementation class corresponding to the argument dpb_service_type
-
-  Raises:
-    Exception: An invalid data processing backend service type was provided
-  """
-  return resource.GetResourceClass(
-      BaseDpbService, SERVICE_TYPE=dpb_service_type)
-
-
 class BaseDpbService(resource.BaseResource):
   """Object representing a Data Processing Backend Service."""
 
-  REQUIRED_ATTRS = ['SERVICE_TYPE']
+  REQUIRED_ATTRS = ['CLOUD', 'SERVICE_TYPE']
   RESOURCE_TYPE = 'BaseDpbService'
+  CLOUD = 'abstract'
   SERVICE_TYPE = 'abstract'
   HDFS_FS = 'hdfs'
   GCS_FS = 'gs'
@@ -286,6 +275,7 @@ class BaseDpbService(resource.BaseResource):
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
+    print(self, self.storage_service, self.CLOUD)
     self.storage_service.MakeBucket(self.bucket)
 
   def _Create(self):
@@ -380,6 +370,7 @@ class UnmanagedDpbService(BaseDpbService):
 class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
   """Object representing an un-managed dpb service yarn cluster."""
 
+  CLOUD = 'Unmanaged'
   SERVICE_TYPE = UNMANAGED_DPB_SVC_YARN_CLUSTER
   JOB_JARS = {
       'hadoop': {
@@ -470,6 +461,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
 class UnmanagedDpbSparkCluster(UnmanagedDpbService):
   """Object representing an un-managed dpb service spark cluster."""
 
+  CLOUD = 'Unmanaged'
   SERVICE_TYPE = UNMANAGED_SPARK_CLUSTER
   JOB_JARS = {
       'spark': {
@@ -566,3 +558,23 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
   def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
     """Submitting Job via SSH is blocking so this is not meaningful."""
     raise NotImplementedError('Submitting Job via SSH is a blocking command.')
+
+
+def GetDpbServiceClass(cloud: str,
+                       dpb_service_type: str) -> Optional[Type[BaseDpbService]]:
+  """Gets the Data Processing Backend class corresponding to 'service_type'.
+
+  Args:
+    cloud: String name of cloud of the service
+    dpb_service_type: String service type as specified in configuration
+
+  Returns:
+    Implementation class corresponding to the argument dpb_service_type
+
+  Raises:
+    Exception: An invalid data processing backend service type was provided
+  """
+  if dpb_service_type in UNMANAGED_SERVICES:
+    cloud = 'Unmanaged'
+  return resource.GetResourceClass(
+      BaseDpbService, CLOUD=cloud, SERVICE_TYPE=dpb_service_type)
