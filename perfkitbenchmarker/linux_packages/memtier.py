@@ -20,7 +20,7 @@ import json
 import logging
 import pathlib
 import re
-from typing import Any, Dict, List, Text, Tuple, Union
+from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
 import dataclasses
@@ -139,22 +139,22 @@ def AptUninstall(vm):
 
 
 def BuildMemtierCommand(
-    server: str = None,
-    port: str = None,
-    protocol: str = None,
-    clients: int = None,
-    threads: int = None,
-    ratio: str = None,
-    data_size: int = None,
-    pipeline: int = None,
-    key_minimum: int = None,
-    key_maximum: int = None,
-    key_pattern: str = None,
-    requests: Union[str, int] = None,
-    run_count: int = None,
-    random_data: bool = None,
-    test_time: int = None,
-    outfile: pathlib.PosixPath = None,
+    server: Optional[str] = None,
+    port: Optional[str] = None,
+    protocol: Optional[str] = None,
+    clients: Optional[int] = None,
+    threads: Optional[int] = None,
+    ratio: Optional[str] = None,
+    data_size: Optional[int] = None,
+    pipeline: Optional[int] = None,
+    key_minimum: Optional[int] = None,
+    key_maximum: Optional[int] = None,
+    key_pattern: Optional[str] = None,
+    requests: Optional[Union[str, int]] = None,
+    run_count: Optional[int] = None,
+    random_data: Optional[bool] = None,
+    test_time: Optional[int] = None,
+    outfile: Optional[pathlib.PosixPath] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
