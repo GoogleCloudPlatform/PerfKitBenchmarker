@@ -1578,7 +1578,8 @@ class BaseRhelMixin(BaseLinuxMixin):
       self.InstallGcpHpcTools()
     if _DISABLE_YUM_CRON.value:
       # yum cron can stall causing yum commands to hang
-      self.RemoteHostCommand('sudo systemctl disable yum-cron.service')
+      self.RemoteHostCommand('sudo systemctl disable yum-cron.service',
+                             ignore_failure=True)
 
   def InstallGcpHpcTools(self):
     """Installs the GCP HPC tools."""
