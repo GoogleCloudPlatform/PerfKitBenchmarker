@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for AliCloud
-
-"""
+"""Provider info for AliCloud."""
 
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers

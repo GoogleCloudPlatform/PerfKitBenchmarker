@@ -103,7 +103,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=1, log_errors=False)
   def _WaitForInstanceStatus(self, status_list):
-    """Waits until the instance's status is in status_list"""
+    """Waits until the instance's status is in status_list."""
     logging.info('Waits until the instance\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
@@ -121,7 +121,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForEipStatus(self, status_list):
-    """Waits until the instance's status is in status_list"""
+    """Waits until the instance's status is in status_list."""
     logging.info('Waits until the eip\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
@@ -138,7 +138,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert status in status_list
 
   def _AllocatePubIp(self, region, instance_id):
-    """Allocate a public ip address and associate it to the instance"""
+    """Allocate a public ip address and associate it to the instance."""
     if FLAGS.ali_use_vpc:
       allocatip_cmd = util.ALI_PREFIX + [
           'ecs',
@@ -174,7 +174,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, _ = vm_util.IssueRetryableCommand(allocatip_cmd)
       response = json.loads(stdout)
       self.ip_address = response['IpAddress']
-
 
   @classmethod
   def _GetDefaultImage(cls, region):
