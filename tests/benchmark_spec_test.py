@@ -14,9 +14,9 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
+
 from absl import flags
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -28,6 +28,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.providers.gcp import gcp_spanner
 from tests import pkb_common_test_case
 
 
@@ -112,6 +113,16 @@ edw_benchmark:
       vm_spec: *default_single_core
 """
 
+_SIMPLE_SPANNER_CONFIG = """
+cloud_spanner_ycsb:
+  description: Sample spanner ycsb benchmark
+  spanner:
+    service_type: default
+  vm_groups:
+    client:
+      vm_spec: *default_single_core
+"""
+
 
 class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -132,6 +143,17 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
                              if b.BENCHMARK_NAME == benchmark_name))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, UID)
+
+
+class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
+
+  def testSimpleConfig(self):
+    spec = self._CreateBenchmarkSpecFromYaml(
+        yaml_string=_SIMPLE_SPANNER_CONFIG, benchmark_name='cloud_spanner_ycsb')
+    spec.ConstructSpanner()
+    self.assertEqual('default', spec.spanner.SERVICE_TYPE)
+    self.assertIsInstance(spec.spanner,
+                          gcp_spanner.GcpSpannerInstance)
 
 
 class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
