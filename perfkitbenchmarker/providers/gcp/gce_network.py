@@ -152,6 +152,8 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     # configure routing
     # requires: next_hop_tunnel_id, target_cidr,
+    # TODO(dlott) Should be Optional[str], but that requires making endpoints a
+    # proper class rather than a dictionary of string and bool. See TunnelConfig
     dest_cidr: Optional[Any] = tunnel_config.endpoints[target_endpoint].get(
         'cidr')
     if not dest_cidr or not dest_cidr.strip():

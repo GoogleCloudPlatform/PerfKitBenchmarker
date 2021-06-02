@@ -116,7 +116,7 @@ class BaseVpnGateway(object):
       cidr: The cidr for the VpnGateway.
     """
     self.zone = zone
-    self.cidr = cidr
+    self.cidr: str = cidr
     # Set to True if we need target Gateway up front (AWS)
     self.require_target_to_init = False
 
