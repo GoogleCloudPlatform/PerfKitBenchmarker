@@ -29,6 +29,7 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 REDIS_VERSION_MAPPING = {'redis_3_2': '3.2.10',
                          'redis_4_0': '4.0.10',
+                         'redis_5_0': '5.0.6',
                          'redis_6_x': '6.x'}
 
 
@@ -76,12 +77,18 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
       dict mapping string property key to value.
     """
     result = {
-        'cloud_redis_failover_style': self.failover_style,
-        'cloud_redis_version': self.version,
-        'cloud_redis_node_type': self.node_type,
-        'cloud_redis_region': self.redis_region,
-        'cloud_redis_primary_zone': self.spec.vms[0].zone,
-        'cloud_redis_failover_zone': self.failover_zone,
+        'cloud_redis_failover_style':
+            self.failover_style,
+        'cloud_redis_version':
+            managed_memory_store.ParseReadableVersion(self.version),
+        'cloud_redis_node_type':
+            self.node_type,
+        'cloud_redis_region':
+            self.redis_region,
+        'cloud_redis_primary_zone':
+            self.spec.vms[0].zone,
+        'cloud_redis_failover_zone':
+            self.failover_zone,
     }
     return result
 

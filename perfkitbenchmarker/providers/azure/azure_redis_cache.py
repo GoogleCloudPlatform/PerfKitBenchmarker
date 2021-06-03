@@ -59,11 +59,16 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       dict mapping string property key to value.
     """
     result = {
-        'cloud_redis_failover_style': self.failover_style,
-        'cloud_redis_region': self.redis_region,
-        'cloud_redis_azure_tier': self.azure_tier,
-        'cloud_redis_azure_redis_size': self.azure_redis_size,
-        'cloud_redis_version': self.redis_version,
+        'cloud_redis_failover_style':
+            self.failover_style,
+        'cloud_redis_region':
+            self.redis_region,
+        'cloud_redis_azure_tier':
+            self.azure_tier,
+        'cloud_redis_azure_redis_size':
+            self.azure_redis_size,
+        'cloud_redis_version':
+            managed_memory_store.ParseReadableVersion(self.redis_version),
     }
     return result
 

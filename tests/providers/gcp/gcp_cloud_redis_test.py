@@ -55,5 +55,15 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
                            return_value=('{}', '', 1)):
       self.assertFalse(self.redis._Exists())
 
+  def testReadableVersion(self):
+    self.assertEqual(self.redis.ParseReadableVersion('redis_6_x'), '6.x')
+    self.assertEqual(self.redis.ParseReadableVersion('redis_5_0'), '5.0')
+
+  def testReadableVersionExtraneous(self):
+    self.assertEqual(self.redis.ParseReadableVersion('redis_8'), 'redis_8')
+    self.assertEqual(
+        self.redis.ParseReadableVersion('redis 9.7.5'), 'redis 9.7.5')
+
+
 if __name__ == '__main__':
   unittest.main()

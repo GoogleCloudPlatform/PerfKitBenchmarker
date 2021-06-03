@@ -54,8 +54,8 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       raise errors.Config.InvalidValue(
           'GCP cloud redis does not support same zone failover')
     if (FLAGS.managed_memory_store_version and
-        FLAGS.managed_memory_store_version not in
-        managed_memory_store.REDIS_VERSIONS):
+        FLAGS.managed_memory_store_version
+        not in managed_memory_store.REDIS_VERSIONS):
       raise errors.Config.InvalidValue('Invalid Redis version.')
 
   def GetResourceMetadata(self):
@@ -69,14 +69,23 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_size': self.size,
         'cloud_redis_tier': self.tier,
         'cloud_redis_region': self.redis_region,
-        'cloud_redis_version': self.redis_version,
+        'cloud_redis_version': self.ParseReadableVersion(self.redis_version),
     }
     return result
 
+  @staticmethod
+  def ParseReadableVersion(version):
+    """Parses Redis major and minor version number."""
+    if version.count('_') < 2:
+      logging.info(
+          'Could not parse version string correctly, '
+          'full Redis version returned: %s', version)
+      return version
+    return '.'.join(version.split('_')[1:])
+
   def _Create(self):
     """Creates the instance."""
-    cmd = util.GcloudCommand(self, 'redis', 'instances', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(self, 'redis', 'instances', 'create', self.name)
     cmd.flags['region'] = self.redis_region
     cmd.flags['zone'] = FLAGS.zones[0]
     cmd.flags['network'] = FLAGS.gce_network_name
@@ -93,8 +102,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
 
   def _Delete(self):
     """Deletes the instance."""
-    cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete', self.name)
     cmd.flags['region'] = self.redis_region
     cmd.Issue(timeout=COMMAND_TIMEOUT, raise_on_failure=False)
 
@@ -109,8 +117,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       stdout, stderr, and retcode.
     """
-    cmd = util.GcloudCommand(self, 'redis', 'instances', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(self, 'redis', 'instances', 'describe', self.name)
     cmd.flags['region'] = self.redis_region
     stdout, stderr, retcode = cmd.Issue(
         suppress_warning=True, raise_on_failure=False)

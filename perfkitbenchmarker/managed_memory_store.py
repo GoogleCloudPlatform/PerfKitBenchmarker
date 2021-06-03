@@ -14,14 +14,13 @@
 """Module containing class for cloud managed memory stores."""
 
 import abc
+import logging
 from absl import flags
 from perfkitbenchmarker import resource
-
 
 # List of memory store types
 REDIS = 'REDIS'
 MEMCACHED = 'MEMCACHED'
-
 
 FLAGS = flags.FLAGS
 
@@ -32,13 +31,12 @@ class Failover(object):
   FAILOVER_SAME_ZONE = 'failover_same_zone'
   FAILOVER_SAME_REGION = 'failover_same_region'
 
+
 flags.DEFINE_enum(
-    'redis_failover_style',
-    Failover.FAILOVER_NONE,
-    [Failover.FAILOVER_NONE,
-     Failover.FAILOVER_SAME_ZONE,
-     Failover.FAILOVER_SAME_REGION],
-    'Failover behavior of cloud redis cluster. Acceptable values are:'
+    'redis_failover_style', Failover.FAILOVER_NONE, [
+        Failover.FAILOVER_NONE, Failover.FAILOVER_SAME_ZONE,
+        Failover.FAILOVER_SAME_REGION
+    ], 'Failover behavior of cloud redis cluster. Acceptable values are:'
     'failover_none, failover_same_zone, and failover_same_region')
 
 # List of redis versions
@@ -48,12 +46,12 @@ REDIS_5_0 = 'redis_5_0'
 REDIS_6_X = 'redis_6_x'
 REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X]
 
-flags.DEFINE_string('managed_memory_store_version',
-                    None,
-                    'The version of managed memory store to use. This flag '
-                    'overrides Redis or Memcached version defaults that is set '
-                    'in benchmark config. Defaults to None so that benchmark '
-                    'config defaults are used.')
+flags.DEFINE_string(
+    'managed_memory_store_version', None,
+    'The version of managed memory store to use. This flag '
+    'overrides Redis or Memcached version defaults that is set '
+    'in benchmark config. Defaults to None so that benchmark '
+    'config defaults are used.')
 
 MEMCACHED_NODE_COUNT = 1
 
@@ -71,9 +69,27 @@ def GetManagedMemoryStoreClass(cloud, memory_store):
   Raises:
     Exception: An invalid cloud was provided
   """
-  return resource.GetResourceClass(BaseManagedMemoryStore,
-                                   CLOUD=cloud,
-                                   MEMORY_STORE=memory_store)
+  return resource.GetResourceClass(
+      BaseManagedMemoryStore, CLOUD=cloud, MEMORY_STORE=memory_store)
+
+
+def ParseReadableVersion(version):
+  """Parses Redis major and minor version number.
+
+  Used for Azure and AWS versions.
+
+  Args:
+    version: String. Version string to get parsed.
+
+  Returns:
+    Parsed version
+  """
+  if version.count('.') < 2:
+    logging.info(
+        'Could not parse version string correctly,'
+        'full Redis version returned: %s', version)
+    return version
+  return '.'.join(version.split('.', 2)[:2])
 
 
 class BaseManagedMemoryStore(resource.BaseResource):
