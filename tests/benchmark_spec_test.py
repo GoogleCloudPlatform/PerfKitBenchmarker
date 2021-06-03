@@ -20,7 +20,6 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -133,22 +132,11 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.ignore_package_requirements = True
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
-  def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
-    config = configs.LoadConfig(yaml_string, {}, benchmark_name)
-    return self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
-
-  def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
-    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name, flag_values=FLAGS, **config_dict)
-    benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
-                             if b.BENCHMARK_NAME == benchmark_name))
-    return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, UID)
-
 
 class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
 
   def testSimpleConfig(self):
-    spec = self._CreateBenchmarkSpecFromYaml(
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         yaml_string=_SIMPLE_SPANNER_CONFIG, benchmark_name='cloud_spanner_ycsb')
     spec.ConstructSpanner()
     self.assertEqual('default', spec.spanner.SERVICE_TYPE)
@@ -159,7 +147,7 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
 class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
 
   def testSimpleConfig(self):
-    spec = self._CreateBenchmarkSpecFromYaml(
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         yaml_string=_SIMPLE_EDW_CONFIG, benchmark_name='edw_benchmark')
     spec.ConstructEdwService()
     self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)
@@ -169,7 +157,7 @@ class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):
 
   def testSimpleConfig(self):
-    spec = self._CreateBenchmarkSpecFromYaml(SIMPLE_CONFIG)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(SIMPLE_CONFIG)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 1)
@@ -181,7 +169,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     self.assertEqual(vm.disk_specs, [])
 
   def testMultiCloud(self):
-    spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 2)
@@ -189,7 +177,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     self.assertIsInstance(spec.vm_groups['group2'][0], gce_vm.GceVirtualMachine)
 
   def testStaticVms(self):
-    spec = self._CreateBenchmarkSpecFromYaml(STATIC_VM_CONFIG)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(STATIC_VM_CONFIG)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 4)
@@ -205,7 +193,8 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     self.assertEqual(vm2.disk_specs[0].mount_point, '/scratch')
 
   def testValidConfigWithDiskSpec(self):
-    spec = self._CreateBenchmarkSpecFromYaml(VALID_CONFIG_WITH_DISK_SPEC)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        VALID_CONFIG_WITH_DISK_SPEC)
     spec.ConstructVirtualMachines()
     vms = spec.vm_groups['default']
     self.assertEqual(len(vms), 2)
@@ -217,7 +206,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
   def testZonesFlag(self):
     FLAGS.zones = ['us-east-1b', 'zone2']
     FLAGS.extra_zones = []
-    spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
     self.assertEqual(len(spec.vms), 2)
     self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
@@ -227,7 +216,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     FLAGS.zones = ['us-east-1b']
     FLAGS.extra_zones = []
     FLAGS.zone = ['us-west-2b']
-    spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
     self.assertEqual(len(spec.vms), 2)
     self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
@@ -237,7 +226,8 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
 class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
 
   def createBenchmarkSpec(self, config, benchmark):
-    spec = self._CreateBenchmarkSpecFromConfigDict(config, benchmark)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromConfigDict(
+        config, benchmark)
     spec.ConstructVirtualMachines()
     return True
 

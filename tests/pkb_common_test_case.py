@@ -14,18 +14,21 @@
 """Common base class for PKB unittests."""
 
 import subprocess
+from typing import Any, Dict
 
 from absl import flags
 from absl.testing import absltest
 from absl.testing import flagsaver
 from absl.testing import parameterized
-
 import mock
-
+from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 
@@ -118,6 +121,35 @@ class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
 
   def _PreemptibleMetadataKeyValue(self):
     return '', ''
+
+
+SIMPLE_CONFIG = """
+cluster_boot:
+  vm_groups:
+    default:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          zone: us-central1-c
+          project: my-project
+"""
+
+
+def CreateBenchmarkSpecFromYaml(
+    yaml_string: str = SIMPLE_CONFIG,
+    benchmark_name: str = 'cluster_boot') -> benchmark_spec.BenchmarkSpec:
+  config = configs.LoadConfig(yaml_string, {}, benchmark_name)
+  return CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
+
+
+def CreateBenchmarkSpecFromConfigDict(
+    config_dict: Dict[str, Any],
+    benchmark_name: str) -> benchmark_spec.BenchmarkSpec:
+  config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+      benchmark_name, flag_values=FLAGS, **config_dict)
+  benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
+                           if b.BENCHMARK_NAME == benchmark_name))
+  return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, 'name0')
 
 
 class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):

@@ -26,8 +26,7 @@ _COL_SEPARATOR = '  '
 
 
 class FailedSubstatus(object):
-  """Known failure modes for benchmarks."""
-
+  """Failure modes for benchmarks."""
   # Failure due to insufficient quota, user preventable
   QUOTA = 'QUOTA_EXCEEDED'
 
@@ -43,6 +42,15 @@ class FailedSubstatus(object):
   # Failure due to an interruptible vm being interrupted before the benchmark
   # completes. User non-preventable.
   INTERRUPTED = 'INTERRUPTED'
+
+  # General failure that don't fit in the above categories.
+  UNCATEGORIZED = 'UNCATEGORIZED'
+
+  # List of valid substatuses
+  VALID_SUBSTATUSES = [
+      QUOTA, INSUFFICIENT_CAPACITY, KNOWN_INTERMITTENT, INTERRUPTED,
+      UNCATEGORIZED
+  ]
 
 
 def _CreateSummaryTable(benchmark_specs):

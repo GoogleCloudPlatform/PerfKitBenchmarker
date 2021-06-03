@@ -16,7 +16,13 @@
 import os
 import unittest
 
+from absl.testing import parameterized
+
+import mock
 from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import pkb
+from tests import pkb_common_test_case
 
 
 class MockSpec(object):
@@ -74,6 +80,52 @@ class CreateSummaryTestCase(unittest.TestCase):
   def testCreateSummary(self):
     result = benchmark_status.CreateSummary(_BENCHMARK_SPECS)
     self.assertEqual(result, _STATUS_SUMMARY)
+
+
+class FailedSubstatusTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'Quota',
+          'exception_class': errors.Benchmarks.QuotaFailure,
+          'expected_substatus': benchmark_status.FailedSubstatus.QUOTA,
+      },
+      {
+          'testcase_name':
+              'Capacity',
+          'exception_class':
+              errors.Benchmarks.InsufficientCapacityCloudFailure,
+          'expected_substatus':
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
+      },
+      {
+          'testcase_name':
+              'KnownIntermittent',
+          'exception_class':
+              errors.Benchmarks.KnownIntermittentError,
+          'expected_substatus':
+              benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT,
+      },
+      {
+          'testcase_name': 'Uncategorized',
+          'exception_class': Exception,
+          'expected_substatus': benchmark_status.FailedSubstatus.UNCATEGORIZED,
+      },
+  )
+  def testRunBenchmarkExceptionHasCorrectFailureStatus(self, exception_class,
+                                                       expected_substatus):
+    self.enter_context(
+        mock.patch.object(
+            pkb, 'DoProvisionPhase', side_effect=[exception_class()]))
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    # Skip pickling the spec.
+    self.enter_context(mock.patch.object(test_spec, 'Pickle'))
+
+    with self.assertRaises(exception_class):
+      pkb.RunBenchmark(spec=test_spec, collector=mock.Mock())
+
+    self.assertEqual(test_spec.status, benchmark_status.FAILED)
+    self.assertEqual(test_spec.failed_substatus, expected_substatus)
 
 
 if __name__ == '__main__':

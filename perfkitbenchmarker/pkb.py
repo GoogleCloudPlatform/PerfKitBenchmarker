@@ -1003,15 +1003,16 @@ def RunBenchmark(spec, collector):
             or 'InsufficientCapacityCloudFailure' in str(e)):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
-          spec.status_detail = str(e)
         elif (isinstance(e, errors.Benchmarks.QuotaFailure)
               or 'QuotaFailure' in str(e)):
           spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
-          spec.status_detail = str(e)
         elif isinstance(e, errors.Benchmarks.KnownIntermittentError):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT)
-          spec.status_detail = str(e)
+        else:
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.UNCATEGORIZED)
+        spec.status_detail = str(e)
 
         # Resource cleanup (below) can take a long time. Log the error to give
         # immediate feedback, then re-throw.
