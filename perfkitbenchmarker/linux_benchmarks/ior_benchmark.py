@@ -80,10 +80,9 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  master_vm = vms[0]
-  vm_util.RunThreaded(lambda vm: vm.Install('ior'), benchmark_spec.vms)
+  vm_util.RunThreaded(lambda vm: vm.Install('ior'), vms)
+  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
   hpc_util.CreateMachineFile(vms)
-  master_vm.AuthenticateVm()
 
 
 def Run(benchmark_spec):
