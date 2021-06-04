@@ -168,6 +168,13 @@ $ cd $HOME/PerfKitBenchmarker/perfkitbenchmarker/providers/aws
 $ pip install -r requirements.txt
 ```
 
+Note on MacOS: it may be helpful to override the default tmp directory to be a
+shorter string:
+
+```bash
+$ export TMPDIR=/tmp
+```
+
 ## Preprovisioned data
 
 Some benchmarks may require data to be preprovisioned in a cloud. To
