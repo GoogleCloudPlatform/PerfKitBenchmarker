@@ -738,8 +738,11 @@ class BaseRelationalDb(resource.BaseResource):
       if self.is_managed_db:
         self._ApplyManagedDbFlags()
       else:
+        # TODO(chunla): Refactor this into a separate engine module.
         if self.spec.engine == MYSQL:
           self._ApplyMySqlFlags()
+        elif self.spec.engine == POSTGRES:
+          self._ApplyPostgresFlags()
         else:
           raise NotImplementedError('Flags is not supported on %s' %
                                     self.spec.engine)
@@ -756,6 +759,17 @@ class BaseRelationalDb(resource.BaseResource):
         _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
+
+  def _ApplyPostgresFlags(self):
+    """Add postgres flags to postgres config file."""
+    if FLAGS.db_flags:
+      version = self.spec.engine_version
+      postgres_conf_path = POSTGRES_CONFIG_PATH.format(version)
+      postgres_conf_file = postgres_conf_path + POSTGRES_CONFIG
+      for flag in FLAGS.db_flags:
+        self.server_vm.RemoteCommand('sudo sh -c \'echo %s >> %s\'' %
+                                     (flag, postgres_conf_file))
+      self.server_vm.RemoteCommand('sudo systemctl restart postgresql')
 
   def PrintUnmanagedDbStats(self):
     """Print server logs on unmanaged db."""
