@@ -44,7 +44,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     self.subnet_group_name = 'subnet-%s' % self.name
     self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
     self.node_type = FLAGS.cache_node_type
-    self.redis_region = FLAGS.redis_region
+    self.redis_region = FLAGS.cloud_redis_region
     self.failover_zone = FLAGS.aws_elasticache_failover_zone
     self.failover_subnet = None
     self.failover_style = FLAGS.redis_failover_style

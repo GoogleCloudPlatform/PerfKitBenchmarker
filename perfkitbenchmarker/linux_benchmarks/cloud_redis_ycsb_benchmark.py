@@ -25,10 +25,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('redis_region',
-                    'us-central1',
-                    'The region to spin up cloud redis in.')
-
 BENCHMARK_NAME = 'cloud_redis_ycsb'
 
 BENCHMARK_CONFIG = """
