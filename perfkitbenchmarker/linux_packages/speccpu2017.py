@@ -47,6 +47,7 @@ PREPROVISIONED_DATA = {
     _SPECCPU2017_TAR: None,  # x86-default
     'cpu2017-optimized.tgz': None,  # Optimized
     'cpu2017-gcc-arm.tgz': None,  # ARM-optimized
+    'cpu2017-1.1.8_aocc.tar.gz': None,  # AOCC
 }
 
 

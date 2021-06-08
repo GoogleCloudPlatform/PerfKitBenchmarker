@@ -140,6 +140,20 @@ def _Prepare(vm):
   # even with --install_packages=False.
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
   setattr(vm, speccpu.VM_STATE_ATTR, config)
+  _GenIncFile(vm)
+
+
+def _GenIncFile(vm):
+  """Generates .inc files when not already included in tarballs."""
+  if FLAGS.runspec_config == 'amd_rate_aocc300_milan_A1.cfg':
+    # python script requires stdin
+    vm.RemoteCommand("printf 'yes\nyes\nyes\n' > yes.txt")
+
+    # run_amd_rate_aocc300_milan_A1.py is in the AOCC tarball.
+    cmd = (
+        'cd /scratch/cpu2017 && sudo ./run_amd_rate_aocc300_milan_A1.py '
+        '--tuning=base --exit_after_inc_gen < ~/yes.txt')
+    vm.RemoteCommand(cmd)
 
 
 def Run(benchmark_spec):
