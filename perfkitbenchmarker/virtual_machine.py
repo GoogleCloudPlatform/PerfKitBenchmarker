@@ -298,10 +298,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   # container can have side effects in certain situations.
   IS_REBOOTABLE = True
 
-  # Supports overriding the PIP package version based on the provider image.
-  # By default, the latest PIP version is used.
-  PYTHON_PIP_PACKAGE_VERSION = None
-
   def __init__(self):
     super(BaseOsMixin, self).__init__()
     self._installed_packages = set()

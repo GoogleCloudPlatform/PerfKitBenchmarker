@@ -101,7 +101,6 @@
 -   Fixed string encoding bug in netperf_pps benchmark.
 -   Fix installing RedHat EPEL on GCP (rhel8,centos8) and AWS (rhel7,rhel8,
     centos8, amazonlinux2)
--   Correctly install pip rhel8,centos8 all os types.
 -   Fixed a bug in leftover entity deletion logic.
 -   Use absl parameterized test case.
 -   Error out if AWS EFA install fails (centos8,rhel8)
@@ -116,9 +115,6 @@
 -   Updates crcmod, boto, and awscli installation to pip3.
 -   Consolidates adding Ubuntu toolchain repo.
 -   Moved stress_ng installation to a package.
--   Limit pip2 to v20.2.2.
--   Limit pip3 to v20.2.2 object_storage_service_benchmark to maintain support
-    for Python 3.5.
 -   Switch to using Google Cloud Build for continuous integration.
 -   Fix PrettyPrintStreamPublisher to make "cpu_utilization_per_minute" show up
     in the PKB results summary for cloud bigtable benchmark.
@@ -133,3 +129,5 @@
 -   Use OMB version 4.7.1 and parse new min/max columns.
 -   Added --application_default_credential_file as an alternative way to
     authenticate with Bigquery.
+-   Only install pip and pip3 when they are not already installed with Python.
+-   Install pip and pip3 from get-pip.py to avoid issues with old packages.

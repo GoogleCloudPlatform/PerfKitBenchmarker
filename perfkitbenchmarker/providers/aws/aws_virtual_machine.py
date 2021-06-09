@@ -1178,7 +1178,6 @@ class JujuBasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
   """Class with configuration for AWS Juju virtual machines."""
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-*64-server-20*'
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
 class AmazonLinux2BasedAwsVirtualMachine(

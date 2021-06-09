@@ -137,7 +137,7 @@ def _DownloadData(benchmark_spec, rank):
     rank: integer, the node rank in distributed training.
   """
   vm = benchmark_spec.vms[rank]
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
   vm.Install('wget')
   vm.RemoteCommand('[ -d $HOME/fairseq ] || git clone {git} -b {branch}'
                    .format(git=FAIRSEQ_GIT, branch=FAIRSEQ_BRANCH))
@@ -191,7 +191,6 @@ def _DownloadData(benchmark_spec, rank):
 
 def _PrepareVm(benchmark_spec, rank):
   vm = benchmark_spec.vms[rank]
-  vm.InstallPackages('python3-pip')
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     vm.Install('cuda_toolkit')
     vm.AuthenticateVm()

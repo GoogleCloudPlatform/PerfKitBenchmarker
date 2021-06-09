@@ -33,7 +33,7 @@ _PYTORCH_WHL = 'https://download.pytorch.org/whl/torch_stable.html'
 
 def Install(vm):
   """Installs PyTorch on the VM."""
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
   toolkit = 'cpu'
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     # Translates --cuda_toolkit_version=10.2 to "cu102" for the toolkit to

@@ -23,8 +23,7 @@ FLAGS = flags.FLAGS
 
 def Install(vm):
   """Installs the azure-cli package on the VM."""
-  vm.InstallPackages('python-dev')
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
 
   if FLAGS.azure_lib_version:
     version_string = '==' + FLAGS.azure_lib_version

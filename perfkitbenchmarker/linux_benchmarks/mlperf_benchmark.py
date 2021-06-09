@@ -151,7 +151,7 @@ def Prepare(benchmark_spec, vm=None):
       '  git clone https://github.com/mlperf/training_results_v0.6.git ; '
       'fi',
       should_log=True)
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
 
   if benchmark_spec.tpus:
     if vm == benchmark_spec.vms[0]:

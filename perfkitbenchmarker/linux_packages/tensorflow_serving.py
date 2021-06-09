@@ -44,7 +44,7 @@ def InstallTensorFlowServingAPI(vm):
   pip_package = posixpath.join(pip_package_output_dir,
                                'tensorflow_serving_api*.whl')
 
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
   vm.RemoteCommand('sudo pip3 install --upgrade pip')
 
   # Build the pip package from the same source as the serving binary

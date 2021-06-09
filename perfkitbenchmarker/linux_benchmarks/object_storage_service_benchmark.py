@@ -1366,12 +1366,7 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
 
 
 def PrepareVM(vm, service):
-  vm.InstallPackages('python3-pip')
-
-  # dependencies of API_TEST_SCRIPT
-  # Pip version 20.2.2 is the last verision before pip drops support for py3.5
-  # https://pip.pypa.io/en/stable/news/#id119
-  vm.RemoteCommand('sudo pip3 install --upgrade "pip<=20.2.2"')
+  vm.Install('pip3')
   vm.RemoteCommand('sudo pip3 install absl-py')
   # awscli 0.18 depends on a specific PyYAML version, and the AWS Ubuntu 16 AMI
   # ships with an old python-yaml Deb package that pip3 can't upgrade so we

@@ -431,7 +431,6 @@ class AliCloudKeyFileManager(object):
 class Ubuntu1604BasedAliVirtualMachine(AliVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_NAME_FILTER = 'ubuntu_16_04_64*alibase*.vhd'
-  PYTHON_PIP_PACKAGE_VERSION = '9.0.3'
 
 
 class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,

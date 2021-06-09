@@ -16,5 +16,5 @@
 
 def Install(vm):
   """Installs google cloud sdk on the VM."""
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
   vm.RemoteCommand('pip3 install google-cloud-storage')
