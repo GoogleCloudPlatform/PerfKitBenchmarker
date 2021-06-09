@@ -33,8 +33,8 @@ from perfkitbenchmarker.linux_packages import nvidia_driver
 CUDA_HOME = '/usr/local/cuda'
 
 flags.DEFINE_enum(
-    'cuda_toolkit_version',
-    '11.0', ['9.0', '10.0', '10.1', '10.2', '11.0', 'None', ''],
+    'cuda_toolkit_version', '11.0',
+    ['9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.3', 'None', ''],
     'Version of CUDA Toolkit to install. '
     'Input "None" or empty string to skip installation',
     module_name=__name__)
@@ -46,7 +46,13 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/x86_64/cuda-{os}.pin'
 
-CUDA_11_0_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.0.2/local_installers/cuda-repo-{os}-11-0-local_11.0.2-450.51.05-1_amd64.deb'
+CUDA_11_0_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.0.3/local_installers/cuda-repo-{os}-11-0-local_11.0.3-450.51.06-1_amd64.deb'
+
+CUDA_11_1_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda-repo-{os}-11-1-local_11.1.1-455.32.00-1_amd64.deb'
+
+CUDA_11_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-{os}-11-2-local_11.2.2-460.32.03-1_amd64.deb'
+
+CUDA_11_3_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_amd64.deb'
 
 CUDA_10_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-{os}-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb'
 
@@ -212,23 +218,45 @@ def _InstallCuda10Point2(vm):
                      'cuda-libraries-dev-10-2')
 
 
-def _InstallCuda11Point0(vm):
-  """Installs CUDA Toolkit 11.0 from NVIDIA.
+def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
+  """Installs CUDA Toolkit 11.x from NVIDIA.
 
   Args:
     vm: VM to install CUDA on
+    toolkit_fmt: format string to use for the toolkit name
+    version_dash: Version (ie 11-1) to install
   """
-  basename = posixpath.basename(CUDA_11_0_TOOLKIT.format(os=vm.OS_TYPE))
-  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=vm.OS_TYPE))
+  toolkit = toolkit_fmt.format(os=vm.OS_TYPE)
+  basename = posixpath.basename(toolkit)
+  vm.RemoteCommand(f'wget -q {CUDA_PIN.format(os=vm.OS_TYPE)}')
   vm.RemoteCommand(f'sudo mv cuda-{vm.OS_TYPE}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
-  vm.RemoteCommand('wget -q %s' % CUDA_11_0_TOOLKIT.format(os=vm.OS_TYPE))
-  vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-key add '
-                   f'/var/cuda-repo-{vm.OS_TYPE}-11-0-local/7fa2af80.pub')
+  vm.RemoteCommand(f'wget -q {toolkit}')
+  vm.RemoteCommand(f'sudo dpkg -i {basename}')
+  vm.RemoteCommand(
+      'sudo apt-key add '
+      f'/var/cuda-repo-{vm.OS_TYPE}-{version_dash}-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackages('cuda-toolkit-11-0 cuda-tools-11-0 cuda-libraries-11-0 '
-                     'cuda-libraries-dev-11-0')
+  vm.InstallPackages(f'cuda-toolkit-{version_dash} '
+                     f'cuda-tools-{version_dash} '
+                     f'cuda-libraries-{version_dash} '
+                     f'cuda-libraries-dev-{version_dash}')
+
+
+def _InstallCuda11Point0(vm):
+  _InstallCuda11Generic(vm, CUDA_11_0_TOOLKIT, '11-0')
+
+
+def _InstallCuda11Point1(vm):
+  _InstallCuda11Generic(vm, CUDA_11_1_TOOLKIT, '11-1')
+
+
+def _InstallCuda11Point2(vm):
+  _InstallCuda11Generic(vm, CUDA_11_2_TOOLKIT, '11-2')
+
+
+def _InstallCuda11Point3(vm):
+  _InstallCuda11Generic(vm, CUDA_11_3_TOOLKIT, '11-3')
 
 
 def AptInstall(vm):
@@ -260,6 +288,12 @@ def AptInstall(vm):
     _InstallCuda10Point2(vm)
   elif version_to_install == '11.0':
     _InstallCuda11Point0(vm)
+  elif version_to_install == '11.1':
+    _InstallCuda11Point1(vm)
+  elif version_to_install == '11.2':
+    _InstallCuda11Point2(vm)
+  elif version_to_install == '11.3':
+    _InstallCuda11Point3(vm)
   else:
     raise UnsupportedCudaVersionError()
   if _INSTALL_DEMO_SUITE.value:
