@@ -76,7 +76,7 @@ nccl:
         Azure:
           machine_type: Standard_ND40rs_v2
           zone: eastus
-          image: Canonical:UbuntuServer:18_04-lts-gen2:latest
+          image: microsoft-dsvm:ubuntu-hpc:1804:latest
           boot_disk_size: 105
 """
 
