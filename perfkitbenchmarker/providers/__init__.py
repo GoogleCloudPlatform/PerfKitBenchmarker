@@ -48,6 +48,11 @@ VALID_CLOUDS = (GCP, AZURE, AWS, IBMCLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
 _imported_providers = set()
 
 
+def _GetProviderPackageName(cloud: str) -> str:
+  """Gets the name of the provider package that corresponds to the cloud."""
+  return cloud.lower()
+
+
 def LoadProviderFlags(providers):
   """Imports just the flags module for each provider.
 
@@ -59,7 +64,7 @@ def LoadProviderFlags(providers):
         indicating a cloud provider for which to import the flags module.
   """
   for provider_name in providers:
-    normalized_name = provider_name.lower()
+    normalized_name = _GetProviderPackageName(provider_name)
     flags_module_name = '.'.join((__name__, normalized_name, 'flags'))
     importlib.import_module(flags_module_name)
 
@@ -86,7 +91,7 @@ def LoadProvider(provider_name, ignore_package_requirements=True):
     return
 
   # Check package requirements from the provider's pip requirements file.
-  normalized_name = provider_name.lower()
+  normalized_name = _GetProviderPackageName(provider_name)
   if not ignore_package_requirements:
     requirements.CheckProviderRequirements(normalized_name)
 
