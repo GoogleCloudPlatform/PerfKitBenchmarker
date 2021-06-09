@@ -65,10 +65,11 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
             'Same zone failover will fail over to the same zone.')
     else:
       if (not FLAGS.aws_elasticache_failover_zone or
-          FLAGS.aws_elasticache_failover_zone[:-1] != FLAGS.redis_region):
+          FLAGS.aws_elasticache_failover_zone[:-1] != FLAGS.cloud_redis_region):
         raise errors.Config.InvalidValue(
             'Invalid failover zone. '
-            'A failover zone in %s must be specified. ' % FLAGS.redis_region)
+            'A failover zone in %s must be specified. ' %
+            FLAGS.cloud_redis_region)
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the instance.
