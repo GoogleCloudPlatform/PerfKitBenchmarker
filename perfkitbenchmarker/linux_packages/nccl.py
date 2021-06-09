@@ -59,7 +59,8 @@ def AptInstall(vm):
 
   vm.Install('cuda_toolkit')
   _Build(vm)
-  vm.InstallPackages('{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
+  vm.InstallPackages('--allow-downgrades '
+                     '{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
                      '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'
                      .format(
                          build='./nccl/build/pkg/deb/',
