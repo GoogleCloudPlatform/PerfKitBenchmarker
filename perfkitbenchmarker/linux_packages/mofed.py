@@ -38,7 +38,7 @@ MLNX_OFED_DOWNLOAD_URL = ('https://www.mellanox.com/downloads/ofed/MLNX_OFED-'
 
 
 def _Install(vm):
-  """Installs the OpenMPI package on the VM."""
+  """Installs the Mellanox OpenFabrics driver on the VM."""
   if vm.OS_TYPE not in MOFED_OS_MAPPING:
     raise ValueError('OS type {} not in {}'.format(vm.OS_TYPE,
                                                    sorted(MOFED_OS_MAPPING)))
@@ -65,10 +65,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the OpenMPI package on the VM."""
+  """Installs the Mellanox OpenFabrics driver on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the OpenMPI package on the VM."""
+  """Installs the Mellanox OpenFabrics driver on the VM."""
   _Install(vm)
