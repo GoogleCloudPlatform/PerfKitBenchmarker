@@ -19,6 +19,7 @@ import collections
 import json
 import re
 import string
+from typing import Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -40,7 +41,7 @@ def IsRegion(zone_or_region):
   return zone_or_region[-1] in string.digits
 
 
-def GetRegionFromZone(zone_or_region):
+def GetRegionFromZone(zone_or_region: str) -> str:
   """Returns the region a zone is in (or "zone_or_region" if it's a region)."""
   if IsRegion(zone_or_region):
     return zone_or_region
@@ -68,7 +69,7 @@ def GetRegionFromZones(zones):
   return region
 
 
-def GetZonesInRegion(region):
+def GetZonesInRegion(region: str) -> Set[str]:
   """Returns all available zones in a given region."""
   get_zones_cmd = AWS_PREFIX + [
       'ec2',
@@ -77,9 +78,11 @@ def GetZonesInRegion(region):
   ]
   stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
   response = json.loads(stdout)
-  zones = [item['ZoneName'] for item in response['AvailabilityZones']
-           if item['State'] == 'available']
-  return zones
+  return {
+      item['ZoneName']
+      for item in response['AvailabilityZones']
+      if item['State'] == 'available'
+  }
 
 
 def GroupZonesIntoRegions(zones):

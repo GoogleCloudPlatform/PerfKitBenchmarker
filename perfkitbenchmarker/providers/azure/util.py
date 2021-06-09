@@ -129,7 +129,7 @@ def IsZone(zone_or_region):
   return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_region)
 
 
-def GetRegionFromZone(zone_or_region):
+def GetRegionFromZone(zone_or_region: str) -> str:
   """Returns the region a zone is in (or "zone_or_region" if it's a region)."""
   if _IsRegion(zone_or_region):
     return zone_or_region
