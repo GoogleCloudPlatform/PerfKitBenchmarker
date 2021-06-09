@@ -19,7 +19,7 @@ from absl import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
-flags.DEFINE_string('nccl_version', '2.7.8-1',
+flags.DEFINE_string('nccl_version', '2.9.9-1',
                     'NCCL version to install. '
                     'Input "None" to bypass installation.')
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin name')
@@ -54,7 +54,7 @@ def _Build(vm):
 
 def AptInstall(vm):
   """Installs the NCCL package on the VM."""
-  if FLAGS.nccl_version == 'None':
+  if FLAGS.nccl_version == 'None' or not FLAGS.nccl_version:
     return
 
   vm.Install('cuda_toolkit')
