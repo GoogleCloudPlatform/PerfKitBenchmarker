@@ -36,7 +36,7 @@ flags.DEFINE_boolean('spec17_fdo', False,
 _PACKAGE_NAME = 'speccpu2017'
 _MOUNT_DIR = 'cpu2017_mnt'
 _SPECCPU2017_DIR = 'cpu2017'
-_SPECCPU2017_TAR = 'cpu2017-gcc-x86.tgz'
+_SPECCPU2017_TAR = 'cpu2017-1.1.8.tar.gz'
 _SPECCPU2017_ISO = 'cpu2017-1.1.0.iso'
 _TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
 _LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
@@ -48,6 +48,7 @@ PREPROVISIONED_DATA = {
     'cpu2017-optimized.tgz': None,  # Optimized
     'cpu2017-gcc-arm.tgz': None,  # ARM-optimized
     'cpu2017-1.1.8_aocc.tar.gz': None,  # AOCC
+    'cpu2017-1.1.8.tar.gz': None,  # spec v1.1.8
 }
 
 
