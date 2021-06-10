@@ -22,6 +22,10 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('gcc_version', None, 'Version of gcc to use. Benchmarks '
                     'that utilize gcc compilation should ensure reinstallation '
                     'of GCC. Default is set by the OS package manager.')
+flags.DEFINE_boolean('force_build_gcc_from_source', False, 'Whether to force '
+                     'building GCC from source.')
+flags.DEFINE_boolean('build_fortran', False, 'Whether to build fortran '
+                     'alongside c and c++ when building GCC.')
 
 
 def YumInstall(vm):
@@ -59,16 +63,32 @@ def BuildGccFromSource(vm, gcc_version):
   vm.RemoteCommand(f'cd {build_dir} && mkdir -p obj.gcc-{gcc_version}')
   vm.RemoteCommand(f'cd {build_dir}/gcc-{gcc_version} && '
                    './contrib/download_prerequisites')
+  enable_languages = 'c,c++' + ',fortran' if FLAGS.build_fortran else ''
   vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && '
                    f'../gcc-{gcc_version}/configure '
-                   '--disable-multilib --enable-languages=c,c++')
+                   f'--disable-multilib --enable-languages={enable_languages}')
+  # TODO(user): Measure GCC compilation time as a benchmark.
   vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && '
-                   f'make -j {vm.NumCpusForBenchmark()}')
+                   f'time make -j {vm.NumCpusForBenchmark()}')
   vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && sudo make install')
   vm.RemoteCommand('sudo rm -rf /usr/bin/gcc && '
                    'sudo ln -s /usr/local/bin/gcc /usr/bin/gcc')
   vm.RemoteCommand('sudo rm -rf /usr/bin/g++ && '
                    'sudo ln -s /usr/local/bin/g++ /usr/bin/g++')
+  if FLAGS.build_fortran:
+    vm.RemoteCommand('sudo rm -rf /usr/bin/gfortran && '
+                     'sudo ln -s /usr/local/bin/gfortran /usr/bin/gfortran')
+
+  if '11' in gcc_version:
+    # https://stackoverflow.com/a/65384705
+    vm.RemoteCommand(
+        f'sudo cp {build_dir}/obj.gcc-{gcc_version}/x86_64-pc-linux-gnu/'
+        'libstdc++-v3/src/.libs/* /usr/lib/x86_64-linux-gnu/',
+        ignore_failure=True)
+    vm.RemoteCommand(
+        f'sudo cp {build_dir}/obj.gcc-{gcc_version}/aarch64-unknown-linux-gnu/'
+        'libstdc++-v3/src/.libs/* /usr/lib/aarch64-linux-gnu/',
+        ignore_failure=True)
 
 
 def GetVersion(vm, pkg):
@@ -93,7 +113,7 @@ def Reinstall(vm, version='4.7'):
     vm: VirtualMachine object.
     version: string. GCC version.
   """
-  if vm.BASE_OS_TYPE != os_types.DEBIAN:
+  if vm.BASE_OS_TYPE != os_types.DEBIAN or FLAGS.force_build_gcc_from_source:
     BuildGccFromSource(vm, version)
     logging.info('GCC info: %s', GetVersion(vm, 'gcc'))
     return

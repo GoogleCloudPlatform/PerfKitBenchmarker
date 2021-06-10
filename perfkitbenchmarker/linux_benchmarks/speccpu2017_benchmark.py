@@ -55,6 +55,9 @@ flags.DEFINE_boolean('spec17_build_only', False,
 flags.DEFINE_boolean('spec17_rebuild', True,
                      'Rebuild spec binaries, defaults to True. Set to False '
                      'when using run_stage_iterations > 1 to avoid recompiling')
+flags.DEFINE_string('spec17_gcc_flags', '-O3',
+                    'Flags to be used to override the default GCC -O3 used '
+                    'to compile SPEC.')
 
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -176,6 +179,14 @@ def Run(benchmark_spec):
   return samples
 
 
+def _OverwriteGccO3(vm):
+  config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
+  config_filepath = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
+  cmd = (f'sed -i \'s/-g -O3/{FLAGS.spec17_gcc_flags}/g\' {config_filepath}')
+  vm.RemoteCommand(cmd)
+  return
+
+
 def _Run(vm):
   """See base method.
 
@@ -185,6 +196,10 @@ def _Run(vm):
   Returns:
     A list of sample.Sample objects.
   """
+
+  # Make changes e.g. compiler flags to spec config file.
+  _OverwriteGccO3(vm)
+
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
   # Also consider setting enable_transparent_hugepages flag to true
@@ -250,9 +265,15 @@ def _Run(vm):
       elif test in FPRATE_SUITE:
         log_files.add(LOG_FILENAME['fprate'])
 
+  for log_file in log_files:
+    vm.RemoteCommand(
+        f'cp {vm.GetScratchDir()}/cpu2017/result/{log_file} ~/{log_file}.log')
+    vm.PullFile(vm_util.GetTempDir(), f'~/{log_file}.log')
+
   samples = speccpu.ParseOutput(vm, log_files, partial_results, None)
   for item in samples:
     item.metadata['vm_name'] = vm.name
+    item.metadata['spec17_gcc_flags'] = FLAGS.spec17_gcc_flags
 
   return samples
 

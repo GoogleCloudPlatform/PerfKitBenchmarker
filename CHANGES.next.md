@@ -86,6 +86,7 @@
 -   Add support for AWS IO2 EBS instances.
 -   Add support for Postgres 13 on VMs.
 -   Add support to compile GCC versions on non Debian systems.
+-   Add additional customization options to SPEC CPU 2017.
 
 ### Bug fixes and maintenance updates:
 
