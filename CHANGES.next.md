@@ -131,3 +131,4 @@
     authenticate with Bigquery.
 -   Only install pip and pip3 when they are not already installed with Python.
 -   Install pip and pip3 from get-pip.py to avoid issues with old packages.
+-   Fix parsing Dstat 0.7.3
