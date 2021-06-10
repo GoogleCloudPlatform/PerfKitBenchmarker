@@ -13,16 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing python 2.7 dev installation and cleanup functions."""
+"""Module containing python 3 dev installation and cleanup functions."""
 
 
 def YumInstall(vm):
   """Installs the package on the VM."""
-  Install(vm, package=vm.PYTHON_PACKAGE + '-devel')
+  vm.InstallPackages('python3-devel')
 
 
-def Install(vm, package='python-dev'):
+def AptInstall(vm):
   """Installs the package on the VM."""
-  # Install python first to get the python setup
-  vm.Install('python')
-  vm.InstallPackages(package)
+  vm.InstallPackages('python3-dev')

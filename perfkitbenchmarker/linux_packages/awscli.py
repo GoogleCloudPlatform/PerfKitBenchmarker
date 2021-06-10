@@ -28,7 +28,13 @@ _VERSION = '1.18.107'
 def Install(vm):
   """Installs the awscli package on the VM."""
   vm.Install('pip3')
-  vm.RemoteCommand(f"sudo pip3 install 'awscli=={_VERSION}' --force-reinstall")
+  vm.RemoteCommand(
+      f"sudo pip3 install 'awscli=={_VERSION}' "
+      # awscli 0.18 depends on a specific PyYAML version, and the AWS Ubuntu AMI
+      # ships with an old python-yaml Deb package that pip3 can't upgrade so we
+      # ignore it.
+      # TODO(user): remove version when we update AWS-cli
+      '--ignore-installed --force-reinstall')
 
 
 def YumInstall(vm):

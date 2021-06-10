@@ -17,6 +17,10 @@ import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
+# Gets major.minor version of python
+GET_VERSION = ('import sys; '
+               'print(".".join(str(v) for v in sys.version_info[:2]))')
+
 
 def YumInstall(vm):
   """Installs the package on the VM."""
@@ -95,3 +99,9 @@ def _SetDefaultPythonIfNeeded(vm, python_path):
         'Set default python path to {} but could not use default version'
         .format(python_path))
   logging.info('Set default python version to %s', txt.strip().split()[-1])
+
+
+def GetPythonVersion(vm, python_cmd='python') -> str:
+  """Get the major.minor version of Python on the vm."""
+  python_version, _ = vm.RemoteCommand(f"{python_cmd} -c '{GET_VERSION}'")
+  return python_version.strip()
