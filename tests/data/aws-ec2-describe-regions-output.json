@@ -1,0 +1,14 @@
+{
+    "Regions": [
+        {
+            "Endpoint": "ec2.af-south-1.amazonaws.com",
+            "RegionName": "af-south-1",
+            "OptInStatus": "opted-in"
+        },
+        {
+            "Endpoint": "ec2.us-west-2.amazonaws.com",
+            "RegionName": "us-west-2",
+            "OptInStatus": "opt-in-not-required"
+        }
+    ]
+}

@@ -85,6 +85,29 @@ def GetZonesInRegion(region: str) -> Set[str]:
   }
 
 
+def GetAllRegions() -> Set[str]:
+  """Returns all enabled AWS regions."""
+  get_regions_cmd = AWS_PREFIX + [
+      'ec2',
+      'describe-regions',
+  ]
+  stdout, _, _ = vm_util.IssueCommand(get_regions_cmd)
+  response = json.loads(stdout)
+  return {
+      item['RegionName']
+      for item in response['Regions']
+      if item['OptInStatus'] in ('opt-in-not-required', 'opted-in')
+  }
+
+
+def GetAllZones() -> Set[str]:
+  """Returns all available AWS zones."""
+  results = set()
+  for region in GetAllRegions():
+    results.update(GetZonesInRegion(region))
+  return results
+
+
 def GroupZonesIntoRegions(zones):
   """Returns a map of regions to zones."""
   regions_to_zones_map = collections.defaultdict(set)

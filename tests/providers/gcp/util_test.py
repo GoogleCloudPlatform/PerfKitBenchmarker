@@ -14,15 +14,26 @@
 """Tests for perfkitbenchmarker.providers.gcp.util."""
 
 
+import inspect
 import unittest
-import mock
 
+import mock
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
+from tests import pkb_common_test_case
 import six
 
 
 _GCLOUD_PATH = 'path/gcloud'
+
+
+def _MockIssueCommand(test_response):
+  return mock.patch.object(
+      vm_util,
+      'IssueCommand',
+      autospec=True,
+      return_value=[test_response, None, None])
 
 
 class GceResource(resource.BaseResource):
@@ -38,7 +49,7 @@ class GceResource(resource.BaseResource):
     raise NotImplementedError()
 
 
-class GcloudCommandTestCase(unittest.TestCase):
+class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GcloudCommandTestCase, self).setUp()
@@ -122,6 +133,43 @@ class GcloudCommandTestCase(unittest.TestCase):
   def testGetRegionFromZone(self):
     zone = 'us-central1-xyz'
     self.assertEqual(util.GetRegionFromZone(zone), 'us-central1')
+
+  def testGetAllZones(self):
+    test_output = inspect.cleandoc("""
+        us-east1-a
+        us-west1-b
+        """)
+    self.enter_context(_MockIssueCommand(test_output))
+
+    found_zones = util.GetAllZones()
+
+    expected_zones = {'us-east1-a', 'us-west1-b'}
+    self.assertEqual(found_zones, expected_zones)
+
+  def testGetZonesInRegion(self):
+    test_output = inspect.cleandoc("""
+        us-east1-a
+        us-east1-b
+        """)
+    self.enter_context(_MockIssueCommand(test_output))
+
+    found_zones = util.GetZonesInRegion('test_region')
+
+    expected_zones = {'us-east1-a', 'us-east1-b'}
+    self.assertEqual(found_zones, expected_zones)
+
+  def testGetAllRegions(self):
+    test_output = inspect.cleandoc("""
+        us-east1
+        us-east2
+        """)
+    self.enter_context(_MockIssueCommand(test_output))
+
+    found_regions = util.GetAllRegions()
+
+    expected_regions = {'us-east1', 'us-east2'}
+    self.assertEqual(found_regions, expected_regions)
+
 
 if __name__ == '__main__':
   unittest.main()

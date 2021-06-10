@@ -13,6 +13,7 @@
 # limitations under the License.
 """Common base class for PKB unittests."""
 
+import pathlib
 import subprocess
 from typing import Any, Dict
 
@@ -150,6 +151,11 @@ def CreateBenchmarkSpecFromConfigDict(
   benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
                            if b.BENCHMARK_NAME == benchmark_name))
   return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, 'name0')
+
+
+def GetTestDir() -> pathlib.Path:
+  """Returns the PKB base directory for tests."""
+  return pathlib.Path(__file__).parent
 
 
 class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):

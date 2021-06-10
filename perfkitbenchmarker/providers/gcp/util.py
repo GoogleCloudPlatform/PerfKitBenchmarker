@@ -18,6 +18,7 @@ import functools
 import json
 import logging
 import re
+from typing import Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -79,6 +80,37 @@ def GetRegionFromZone(zone):
   """
   parts = zone.split('-')
   return '-'.join(parts[:2])
+
+
+def GetAllZones() -> Set[str]:
+  """Gets a list of valid zones."""
+  cmd = GcloudCommand(None, 'compute', 'zones', 'list')
+  cmd.flags = {
+      'format': 'value(name)',
+  }
+  stdout, _, _ = cmd.Issue()
+  return set(stdout.splitlines())
+
+
+def GetAllRegions() -> Set[str]:
+  """Gets a list of valid regions."""
+  cmd = GcloudCommand(None, 'compute', 'regions', 'list')
+  cmd.flags = {
+      'format': 'value(name)',
+  }
+  stdout, _, _ = cmd.Issue()
+  return set(stdout.splitlines())
+
+
+def GetZonesInRegion(region) -> Set[str]:
+  """Gets a list of zones for the given region."""
+  cmd = GcloudCommand(None, 'compute', 'zones', 'list')
+  cmd.flags = {
+      'filter': f"name~'{region}'",
+      'format': 'value(name)',
+  }
+  stdout, _, _ = cmd.Issue()
+  return set(stdout.splitlines())
 
 
 def GetMultiRegionFromRegion(region):

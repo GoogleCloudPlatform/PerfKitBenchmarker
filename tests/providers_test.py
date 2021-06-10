@@ -21,6 +21,7 @@ import mock
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.providers.gcp import util as gcp_util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -78,6 +79,13 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
         'name', flag_values=FLAGS, **config)
     providers.LoadProvider.assert_called_with('AWS', True)
 
+  def testLoadProviderUtils(self):
+    test_cloud = providers.GCP
+
+    actual_utils_module = providers.LoadProviderUtils(test_cloud)
+
+    expected_utils_module = gcp_util
+    self.assertEqual(expected_utils_module, actual_utils_module)
 
 if __name__ == '__main__':
   unittest.main()

@@ -1,0 +1,46 @@
+[
+  {
+    "displayName": "East US",
+    "id": "/subscriptions/33cb057b-8662-478c-9122-d90208516324/locations/eastus",
+    "metadata": {
+      "geographyGroup": "US",
+      "latitude": "37.3719",
+      "longitude": "-79.8164",
+      "pairedRegion": [
+        {
+          "id": "/subscriptions/33cb057b-8662-478c-9122-d90208516324/locations/westus",
+          "name": "westus",
+          "subscriptionId": null
+        }
+      ],
+      "physicalLocation": "Virginia",
+      "regionCategory": "Recommended",
+      "regionType": "Physical"
+    },
+    "name": "eastus",
+    "regionalDisplayName": "(US) East US",
+    "subscriptionId": null
+  },
+  {
+    "displayName": "East US 2",
+    "id": "/subscriptions/33cb057b-8662-478c-9122-d90208516324/locations/eastus2",
+    "metadata": {
+      "geographyGroup": "US",
+      "latitude": "36.6681",
+      "longitude": "-78.3889",
+      "pairedRegion": [
+        {
+          "id": "/subscriptions/33cb057b-8662-478c-9122-d90208516324/locations/centralus",
+          "name": "centralus",
+          "subscriptionId": null
+        }
+      ],
+      "physicalLocation": "Virginia",
+      "regionCategory": "Recommended",
+      "regionType": "Physical"
+    },
+    "name": "eastus2",
+    "regionalDisplayName": "(US) East US 2",
+    "subscriptionId": null
+  }
+]

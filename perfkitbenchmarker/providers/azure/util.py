@@ -17,6 +17,7 @@
 
 import json
 import re
+from typing import Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
@@ -138,6 +139,28 @@ def GetRegionFromZone(zone_or_region: str) -> str:
 
   raise ValueError('%s is not a valid Azure zone or region name' %
                    zone_or_region)
+
+
+def GetZonesInRegion(region: str) -> Set[str]:
+  """Returns a set of zones in the region."""
+  # As of 2021 all Azure AZs are numbered 1-3 for eligible regions.
+  return set([f'{region}-{i}' for i in range(1, 4)])
+
+
+def GetAllRegions() -> Set[str]:
+  """Returns all valid regions."""
+  stdout, _ = vm_util.IssueRetryableCommand([
+      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+  ])
+  return set([item['name'] for item in json.loads(stdout)])
+
+
+def GetAllZones() -> Set[str]:
+  """Returns all valid availability zones."""
+  zones = set()
+  for region in GetAllRegions():
+    zones.update(GetZonesInRegion(region))
+  return zones
 
 
 def GetAvailabilityZoneFromZone(zone_or_region):

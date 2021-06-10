@@ -15,6 +15,7 @@
 import importlib
 import logging
 import os
+import types
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker import import_util
@@ -71,6 +72,12 @@ def LoadProviderFlags(providers):
 
 # Import flag definitions for all cloud providers.
 LoadProviderFlags(VALID_CLOUDS)
+
+
+def LoadProviderUtils(cloud: str) -> types.ModuleType:
+  util_module_name = '.'.join(
+      (__name__, _GetProviderPackageName(cloud), 'util'))
+  return importlib.import_module(util_module_name)
 
 
 def LoadProvider(provider_name, ignore_package_requirements=True):
