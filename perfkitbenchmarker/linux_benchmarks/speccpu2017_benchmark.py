@@ -198,7 +198,8 @@ def _Run(vm):
   """
 
   # Make changes e.g. compiler flags to spec config file.
-  _OverwriteGccO3(vm)
+  if 'gcc' in FLAGS.runspec_config:
+    _OverwriteGccO3(vm)
 
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
