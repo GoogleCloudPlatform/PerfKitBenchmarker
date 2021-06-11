@@ -4,7 +4,7 @@ import itertools
 import logging
 import re
 import time
-from typing import Any, Dict, Iterator, List, Optional, Pattern, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Pattern, Sequence, Tuple
 from absl import flags
 import dataclasses
 
@@ -52,14 +52,14 @@ _COMPUTE_RE = re.compile(
     r'(?P<comm>[\d\.]+)\s+'
     r'(?P<overlap>[\d\.]+)\s*$', re.X | re.MULTILINE)
 
-# Matches MPI debug output showing CPU pinning
-_PINNING_RE = re.compile(
-    r"""
-     MPI\s+startup\(\):\s+
-     (?P<rank>\d+)\s+
-     (?P<pid>\d+)\s+
-     (?P<node_name>\S+)\s+
-     {?(?P<cpus>[^}\s]+)""", re.X)
+# parse MPI pinning
+_MPI_STARTUP_PREFIX = r'^\[(?P<unused_cpuid>\d+)\] MPI startup\(\):\s+'
+_MPI_PIN_RE = re.compile(_MPI_STARTUP_PREFIX + (r'(?P<rank>\d+)\s+'
+                                                r'(?P<pid>\d+)\s+'
+                                                r'(?P<nodename>\S+)\s+'
+                                                r'.*?(?P<cpuids>[\d,-]+)'))
+_PKB_NODE_RE = re.compile(r'pkb-(?P<pkbid>.*?)-(?P<nodeindex>\d+)')
+
 
 # parameters to pass into the benchmark
 _NUMBER_ITERATIONS = flags.DEFINE_integer(
@@ -195,7 +195,7 @@ class RunResult:
   value_column: str
   number_processes: int
   run_time: int
-  pinning: str
+  pinning: List[str]
   perhost: int
 
 
@@ -287,7 +287,7 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
         value_column=BENCHMARKS[name].value_column,
         number_processes=number_processes,
         run_time=run_time,
-        pinning=_ParseMpiPinningInfo(txt),
+        pinning=ParseMpiPinning(txt.splitlines()),
         perhost=_MPI_PERHOST.value)
 
 
@@ -425,39 +425,61 @@ def _ParseBenchmarkData(benchmark_name: str,
   return data
 
 
-def _ParseMpiPinningInfo(txt: str) -> Dict[str, List[Tuple[int, int]]]:
-  """Returns the MPI pinning info for the run.
+def ParseMpiPinning(lines: Sequence[str]) -> List[str]:
+  """Grabs MPI pinning to CPUs from the log files.
 
-  Example:
-    MPI startup(): libfabric provider: tcp;ofi_rxm
-    MPI startup(): Rank    Pid      Node name       Pin cpu
-    MPI startup(): 0       17077    pkb-a0b71860-0  {0,1,15}
-    MPI startup(): 1       3475     pkb-a0b71860-1  {0,
-                                       1,15}
-    MPI startup(): 2       17078    pkb-a0b71860-0  {2,16,17}
-    MPI startup(): 3       3476     pkb-a0b71860-1  {2,16,17}
-
-
-  Returns {0: 'pkb-a0b71860-0:0,1,15',  1: 'pkb-a0b71860-1:0,1,15',
-           2: 'pkb-a0b71860-0:2,16,17', 3: 'pkb-a0b71860-1:2,16,17'}
+  Output format is (rank:node id:comma separated CPUs)
+    0:1:0,24;1:1:1,25;2:1:2,26;3:1:3,27
+  Rank 0 and 1 are on node 1 and are pinned to CPUs (0,24) and (1,25)
 
   Args:
-    txt: Stdout from the run.
+    lines: Text lines from mpirun output.
+
+  Returns:
+    Text strings of the MPI pinning
   """
-  start_pinning = re.compile(
-      r'.*MPI startup.*Rank\s+Pid\s+Node name\s+Pin cpu.*')
-  ret = {}
-  rank = None
-  for line in _LinesAfterMarker(start_pinning, txt):
-    match = _PINNING_RE.search(line)
-    if match:
-      rank = int(match['rank'])
-      ret[rank] = f'{match["node_name"]}:{match["cpus"]}'
-    else:
-      # might be a line break, append to last result
-      match = re.search(r'\s+(?P<cpus>\d+[,\d]*)', line)
-      if match:
-        ret[rank] += match['cpus']
+
+  def _CondenseMpiPinningMultiline(lines: Sequence[str]) -> Sequence[str]:
+    """Returns multi-line MPI pinning info as one line."""
+    condensed_lines = []
+    for line in lines:
+      m = _MPI_PIN_RE.search(line)
+      if m:
+        condensed_lines.append(line)
       else:
-        break
+        if condensed_lines and not condensed_lines[-1].endswith('}'):
+          condensed_lines[-1] += line.strip()
+    return condensed_lines
+
+  ret = []
+  for line in _CondenseMpiPinningMultiline(lines):
+    row = _MPI_PIN_RE.search(line)
+    if not row:
+      continue
+    nodename = row['nodename']
+    m2 = _PKB_NODE_RE.match(nodename)
+    if m2:
+      nodename = m2.group('nodeindex')
+    cpuids = ','.join(str(x) for x in _IntRange(row['cpuids']))
+    ret.append(':'.join((row['rank'], nodename, cpuids)))
   return ret
+
+
+def _IntRange(mask: str) -> List[int]:
+  """Converts an integer mask into a sorted list of integers.
+
+  _IntRange('0,1,5-7') == [0, 1, 5, 6, 7]
+
+  Args:
+    mask: String integer mask as from MPI pinning list
+
+  Returns:
+    Sorted list of integers from the mask
+  """
+  ints = []
+  for raw in mask.split(','):
+    parts = raw.split('-')
+    start = int(parts[0])
+    end = start if len(parts) == 1 else int(parts[1])
+    ints.extend(list(range(start, end + 1)))
+  return sorted(ints)

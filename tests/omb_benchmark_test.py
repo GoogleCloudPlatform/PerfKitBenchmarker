@@ -40,12 +40,7 @@ _RUN_RESULT = result = omb.RunResult(
     value_column='latency',
     number_processes=6,
     run_time=0,
-    pinning={
-        0: 'pkb-0:0,1,15',
-        1: 'pkb-1:0,1,15',
-        2: 'pkb-0:2,16,17',
-        3: 'pkb-1:2,16,17'
-    },
+    pinning=['0:0:0,1,15', '1:1:0,1,15', '2:0:2,16,17', '3:1:2,16,17'],
     perhost=1)
 
 _COMMON_METADATA = {
@@ -57,7 +52,7 @@ _COMMON_METADATA = {
     'mpi_version': '2019.6',
     'number_processes': 6,
     'run_time': 0,
-    'pinning': '0:pkb-0:0,1,15;1:pkb-1:0,1,15;2:pkb-0:2,16,17;3:pkb-1:2,16,17',
+    'pinning': '0:0:0,1,15;1:1:0,1,15;2:0:2,16,17;3:1:2,16,17',
     'perhost': 1,
 }
 _METADATA1 = {'foo': 100, 'latency': 10, **_COMMON_METADATA}

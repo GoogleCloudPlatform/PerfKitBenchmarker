@@ -163,10 +163,7 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
         value_column='bandwidth',
         number_processes=2,
         run_time=0,
-        pinning={
-            0: 'pkb-a0b71860-0:0,1',
-            1: 'pkb-a0b71860-1:0,1'
-        },
+        pinning=['0:0:0,1', '1:1:0,1'],
         perhost=1)
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
@@ -190,24 +187,21 @@ class OmbTest(parameterized.TestCase, absltest.TestCase):
     self.assertEqual(expected, omb._LinesAfterMarker(line_re, input_text))
 
   def testParseMpiPinningInfo(self):
-    txt = """
-    MPI startup(): libfabric provider: tcp;ofi_rxm
-    MPI startup(): Rank    Pid      Node name       Pin cpu
-    MPI startup(): 0       17077    pkb-a0b71860-0  {0,1,15}
-    MPI startup(): 1       3475     pkb-a0b71860-1  {0,
-                                       1,15}
-    MPI startup(): 2       17078    pkb-a0b71860-0  {2,16,17}
-    MPI startup(): 3       3476     pkb-a0b71860-1  {2,16,17}
-    """
+    txt = inspect.cleandoc("""
+    [0] MPI startup(): libfabric provider: tcp;ofi_rxm
+    [0] MPI startup(): Rank    Pid      Node name       Pin cpu
+    [0] MPI startup(): 0       17077    pkb-a0b71860-0  {0,1,15}
+    [0] MPI startup(): 1       3475     pkb-a0b71860-1  {0,
+                                           1,15}
+    [0] MPI startup(): 2       17078    pkb-a0b71860-0  {2,16,17}
+    [0] MPI startup(): 3       3476     pkb-a0b71860-1  {2,16,17}
+    """)
 
-    pinning = omb._ParseMpiPinningInfo(txt)
+    pinning = omb.ParseMpiPinning(txt.splitlines())
 
-    expected_pinning = {
-        0: 'pkb-a0b71860-0:0,1,15',
-        1: 'pkb-a0b71860-1:0,1,15',
-        2: 'pkb-a0b71860-0:2,16,17',
-        3: 'pkb-a0b71860-1:2,16,17'
-    }
+    expected_pinning = [
+        '0:0:0,1,15', '1:1:0,1,15', '2:0:2,16,17', '3:1:2,16,17'
+    ]
     self.assertEqual(expected_pinning, pinning)
 
   @flagsaver.flagsaver(omb_perhost=2)
