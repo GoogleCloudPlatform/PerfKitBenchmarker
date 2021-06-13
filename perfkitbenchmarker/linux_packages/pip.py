@@ -45,8 +45,8 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
     pip_path = '/usr/bin/' + pip_cmd
     # Create an sh shim that redirects to python -m pip
     vm.RemoteCommand(
-        f"echo 'exec {python_cmd} -m pip \"@\"'| sudo tee {pip_path} "
-        f'&& chmod 755 {pip_path}')
+        f"echo 'exec {python_cmd} -m pip \"$@\"'| sudo tee {pip_path} "
+        f'&& sudo chmod 755 {pip_path}')
   else:
     # get-pip.py has the appropriate latest version of pip for all Python
     # versions. Prefer it over linux packages or easy_install
