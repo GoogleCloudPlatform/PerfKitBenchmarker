@@ -63,7 +63,7 @@ def BuildGccFromSource(vm, gcc_version):
   vm.RemoteCommand(f'cd {build_dir} && mkdir -p obj.gcc-{gcc_version}')
   vm.RemoteCommand(f'cd {build_dir}/gcc-{gcc_version} && '
                    './contrib/download_prerequisites')
-  enable_languages = 'c,c++' + ',fortran' if FLAGS.build_fortran else ''
+  enable_languages = 'c,c++' + (',fortran' if FLAGS.build_fortran else '')
   vm.RemoteCommand(f'cd {build_dir}/obj.gcc-{gcc_version} && '
                    f'../gcc-{gcc_version}/configure '
                    f'--disable-multilib --enable-languages={enable_languages}')
