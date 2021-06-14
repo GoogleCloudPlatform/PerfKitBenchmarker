@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing classes related to AWS VM networking.
+"""Module containing classes related to AWS VPN networking.
 
-The Firewall class provides a way of opening VM ports. The Network class allows
-VMs to communicate via internal ips and isolates PerfKitBenchmarker VMs from
-others in
-the same project. See https://aws.amazon.com/documentation/vpc/
-for more information about AWS Virtual Private Clouds.
+Components needed for the AWS side of a site-to-site VPN can be managed by the
+classes in this module. Customer and VPN Gateway are AWS representations of the
+physical VPN appliances on each side.
+See https://docs.aws.amazon.com/vpn/latest/s2svpn/VPC_VPN.html
+for more information about AWS Virtual Private Networks.
 """
 
 import json
 import logging
-import re
-import threading
-import uuid
-import xmltodict
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -40,10 +36,15 @@ from perfkitbenchmarker.providers.aws import util, aws_network
 FLAGS = flags.FLAGS
 
 
-class AwsVPNGWResource(resource.BaseResource):
+class AwsVpnGatewayResource(resource.BaseResource):
+  """ClaSS representing an AWS VPNGatewayResource."""
 
   def __init__(self, name, network_name, az, cidr):
-    super(AwsVPNGWResource, self).__init__()
+    """initializes an AwsVPNGatewayResource
+
+      See https://docs.aws.amazon.com/vpn/latest/s2svpn/VPC_VPN.html
+      """
+    super(AwsVpnGatewayResource, self).__init__()
     self.name = name
     self.network_name = network_name
     self.az = az
@@ -53,79 +54,49 @@ class AwsVPNGWResource(resource.BaseResource):
     self.id = None
     self.vpc_id = None
     self.ip_address = None
-    self.vpn_cnxn = None
+    self.vpn_connection = None
     self.psk = None
+    self.ike_version = 'ipsec.1'
     self.routing = None
 
-  # {
-  #     "VpnGateway": {
-  #         "AmazonSideAsn": 64512,
-  #         "State": "available",
-  #         "Type": "ipsec.1",
-  #         "VpnGatewayId": "vgw-9a4cacf3",
-  #         "VpcAttachments": []
-  #     }
-  # }
   def _Create(self):
-    """Creates the VPN gateway."""
-    '''
-            --availability-zone (string)
-            The Availability Zone for the virtual private gateway.
-            --type (string)
-            The type of VPN connection this virtual private gateway supports.
-            Possible values:
-                ipsec.1
-            --amazon-side-asn (long)
-            A private Autonomous System Number (ASN) for the Amazon side of a BGP session.
-            If you're using a 16-bit ASN, it must be in the 64512 to 65534 range.
-            If you're using a 32-bit ASN, it must be in the 4200000000 to 4294967294 range.
-            Default: 64512
-            '''
+    """Creates the VPN gateway.
+
+      See https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVpnGateway.html
+      """
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-vpn-gateway',
         '--region=%s' % self.region,
         '--availability-zone=%s' % self.az,
-        '--type=%s' % 'ipsec.1'
+        '--type=%s' % self.ike_version
     ]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
-    #     logging.log(logging.INFO, response)
     self.id = response['VpnGateway']['VpnGatewayId']
     util.AddDefaultTags(self.id, self.region)
 
-  #   describe-vpn-gateways
-  # [--filters <value>]
-  # [--vpn-gateway-ids <value>]
-  # [--dry-run | --no-dry-run]
-  # [--cli-input-json <value>]
-  # [--generate-cli-skeleton <value>]
+
   def _Exists(self):
     """Returns true if the vpn gateway exists."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-vpn-gateways',
         '--region=%s' % self.region,
-        #         '--region=%s' % self.region,
         '--filter=Name=vpn-gateway-id,Values=%s' % self.id
     ]
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
-    #     logging.log(logging.INFO, response)
     vpn_gateways = response['VpnGateways']
     state = vpn_gateways[0]['State']
-    #     logging.log(logging.INFO, 'state: %s' % state)
-    #     logging.log(logging.INFO, 'vpngw_len: '.join(str(len(vpn_gateways))))
     assert len(vpn_gateways) < 2, 'Too many VPN gateways.'
     return len(vpn_gateways) > 0 and state != 'deleted'
 
-  #   delete-vpn-gateway
-  # --vpn-gateway-id <value>
-  # [--dry-run | --no-dry-run]
-  # [--cli-input-json <value>]
-  # [--generate-cli-skeleton <value>]
   def _Delete(self):
-    """Deletes the vpn gateway."""
+    """Deletes the vpn gateway.
+
+    See https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DeleteVpnGateway.html
+    """
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-vpn-gateway',
@@ -135,7 +106,10 @@ class AwsVPNGWResource(resource.BaseResource):
     vm_util.IssueCommand(delete_cmd)
 
   def Attach(self, vpc_id):
-    """Attaches the vpn gateway to the VPC."""
+    """Attaches the vpn gateway to the VPC.
+
+    See https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_AttachVpnGateway.html
+    """
     if not self.attached:
       self.vpc_id = vpc_id
       attach_cmd = util.AWS_PREFIX + [
@@ -149,7 +123,10 @@ class AwsVPNGWResource(resource.BaseResource):
       self.attached = True
 
   def Detach(self):
-    """Detaches the vpn gateway from the VPC."""
+    """Detaches the vpn gateway from the VPC.
+
+    See https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DetachVpnGateway.html
+    """
     if self.attached:
       detach_cmd = util.AWS_PREFIX + [
           'ec2',
@@ -162,6 +139,13 @@ class AwsVPNGWResource(resource.BaseResource):
       self.attached = False
 
   def AllowRoutePropogation(self, route_table_id):
+    """Propagate routes to the specified route table of a VPC.
+
+    See https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_EnableVgwRoutePropagation.html
+
+    Args:
+      route_table_id: The ID of the route table.
+    """
     cmd = util.AWS_PREFIX + [
         'ec2',
         'enable-vgw-route-propagation',
@@ -184,17 +168,30 @@ class AwsVPNGWResource(resource.BaseResource):
         return sg['GroupId']
 
 
-class AwsVPNGW(network.BaseVpnGateway):
+class AwsVpnGateway(network.BaseVpnGateway):
+  """Class representing an AWS VPN Gateway."""
   CLOUD = aws.CLOUD
 
   def __init__(self, name, network_name, az, cidr):
-    super(AwsVPNGW, self).__init__()
-    #     self._lock = threading.Lock()
+    """construct a new AwsVpnGateway
+
+    A VpnGateway is one end of a VpnConnection. VpnService attempts to
+    setup VpnConnections for provider gateway pairs by relaying configuration
+    information between them via shared dictionary [vpn_service.TunnelConfig].
+    VpnGateway implementations expose a ConfigureTunnel() entrypoint into the
+    provider specific connection logic. See BaseVpnGateway.ConfigureTunnel()
+
+    AWS object instances required for Site-to-Site VPN connections include:
+    Customer and VPC endpoints, routes, forwarding rules, tunnels, etc.
+    See https://docs.aws.amazon.com/vpn/latest/s2svpn/SetUpVPNConnections.html
+    """
+    super(AwsVpnGateway, self).__init__()
 
     self.forwarding_rules = {}
     self.tunnels = {}
     self.routes = {}
-    self.vpn_gateway_resource = AwsVPNGWResource(name, network_name, az, cidr)
+    self.vpn_gateway_resource = AwsVpnGatewayResource(
+        name, network_name, az, cidr)
 
     self.name = name
     self.network_name = network_name
@@ -204,10 +201,9 @@ class AwsVPNGW(network.BaseVpnGateway):
     self.ip_address = None
 
     self.created = False  # managed by BaseResource
-    #     self.endpoint = None
     self.attached = False
     self.psk = None
-    #     self.routing = None  # @TODO static/dynamic
+    self.routing = None  # @TODO static/dynamic
     self.require_target_to_init = True
     self.customer_gw = None
     self.cgw_id = None
@@ -215,7 +211,32 @@ class AwsVPNGW(network.BaseVpnGateway):
     self.route_table_id = None
 
   def ConfigureTunnel(self, tunnel_config):
-    # network.BaseVpnGateway.ConfigureTunnel(self, tunnel_config)
+    """Entrypoint to AWS specific VPN setup process
+
+    tunnel_config is a shared dictionary updated by both endpoints as VPN
+    construction progresses. If there's any new info from the other gateway
+    available we use it to build up our end of the tunnel. When no further
+     progress is possible (or needed) we write our updates back to tunnel_config
+    and hand it back to the caller.
+
+    High level AwsVpnConnection setup process:
+
+    Prerequisites
+    Step 1: Create a customer gateway
+    Step 2: Create a target gateway
+    Step 3: Configure routing
+    Step 4: Update your security group
+    Step 5: Create a Site-to-Site VPN connection
+    Step 6: Download the configuration file
+    Step 7: Configure the customer gateway device
+    See https://docs.aws.amazon.com/vpn/latest/s2svpn/SetUpVPNConnections.html
+
+    Args:
+      tunnel_config:
+
+    Returns:
+        tunnel_config:
+    """
     logging.info('Configuring Tunnel with params:')
     logging.info(tunnel_config)
 
@@ -258,7 +279,7 @@ class AwsVPNGW(network.BaseVpnGateway):
           'tunnel_config: Creating cuustomer gw for IP %s' %
           tunnel_config.endpoints[target_endpoint]['ip_address']
       )
-      self.customer_gw = AwsCustomerGW(
+      self.customer_gw = AwsCustomerGateway(
           self.region,
           tunnel_config.endpoints[target_endpoint]['ip_address']
       )
@@ -285,11 +306,13 @@ class AwsVPNGW(network.BaseVpnGateway):
       logging.info(
           "tunnel_config: Creating AWS VPN Connection with PSK %s" % self.psk
       )
-      self.vpn_connection = AwsVPNConnection(
+      self.vpn_connection = AwsVpnConnection(
           self.cgw_id,
           self.vpn_gateway_resource.id,
           self.region,
-          psk=self.psk
+          tunnel_config.shared_key,
+          routing= tunnel_config.routing,
+          type="ipsec.1"
       )
       self.vpn_connection.Create()
       self.ip_address = self.vpn_connection.ip
@@ -308,7 +331,7 @@ class AwsVPNGW(network.BaseVpnGateway):
         security_group=net.vpc.default_security_group_id,
         cidr=tunnel_config.endpoints[target_endpoint]['cidr']
       )
-      self.vpn_connection.Create_VPN_Cnxn_Route(
+      self.vpn_connection.Create_VPN_Connection_Route(
           tunnel_config.endpoints[target_endpoint]['cidr']
       )
 
@@ -318,27 +341,25 @@ class AwsVPNGW(network.BaseVpnGateway):
     return True
 
   def Create(self):
-    """Creates the actual VPNGW."""
+    """Creates the actual VPNGateway."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error(
           'GetNetwork called in a thread without a '
           'BenchmarkSpec.'
       )
-    # with self._lock:
     if self.created:
       return
     if self.vpn_gateway_resource:
       self.vpn_gateway_resource.Create()
     key = self.name
-    # with benchmark_spec.vpn_gateways_lock:
     if key not in benchmark_spec.vpn_gateways:
       benchmark_spec.vpn_gateways[key] = self
     return benchmark_spec.vpn_gateways[key]
     self.created = True
 
   def Delete(self):
-    """Deletes the actual VPNGW."""
+    """Deletes the actual VPNGateway."""
     if self.vpn_connection and self.vpn_connection._Exists():
       self.vpn_connection.Delete()
 
@@ -351,7 +372,7 @@ class AwsVPNGW(network.BaseVpnGateway):
       self.vpn_gateway_resource.Delete()
 
 
-class AwsVPNConnection(resource.BaseResource):
+class AwsVpnConnection(resource.BaseResource):
   """An object representing a Aws VPNConnection."""
 
   def __init__(
@@ -359,47 +380,38 @@ class AwsVPNConnection(resource.BaseResource):
       cgw_id,
       vpg_id,
       region,
-      psk=None,
+      psk,
       routing="static",
       type="ipsec.1"
   ):
-    super(AwsVPNConnection, self).__init__()
+    super(AwsVpnConnection, self).__init__()
     self.cgw_id = cgw_id
     self.vpg_id = vpg_id
     self.region = region
     self.type = type
     self.id = None
     self.routing = routing
-    self.psk = FLAGS.run_uri
-    self.cnxn_details = None
+    self.psk = psk
+    self.connection_details = None
     self.ip = None  # do we need to support failover (2nd IP?)
+    self.customer_config_xml = None
 
   def _Create(self):
-    """creates VPN cnxn and 2 vpn tunnels to CGW."""
+    """creates VPN connection and 2 vpn tunnels to CGW."""
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-vpn-connection',
-        # '--debug',
         '--region=%s' % self.region,
         '--customer-gateway-id=%s' % self.cgw_id,
         '--vpn-gateway-id=%s' % self.vpg_id,
         '--type=%s' % self.type,
-        '--options=%s' % self._getCnxnOpts()
+        '--options=%s' % self._getConnectionOpts()
     ]
     response, _ = util.IssueRetryableCommand(create_cmd)
-    response_xml = response[response.find("<"):response.rfind(">") +
-                            1].replace("\\n",
-                                       "").replace("\\",
-                                                   "")
-    self.cnxn_details = xmltodict.parse(response_xml)
-    response_json = re.sub(r'<.*>', '', response)
-    response_json = json.loads(response_json)
-    self.id = response_json["VpnConnection"]["VpnConnectionId"]
-    #     self.ip = response_json["VpnConnection"]["VgwTelemetry"][0][
-    #     "OutsideIpAddress"] # @TODO find "VgwTelemetry" from aws docs
-    response_xml_dict = xmltodict.parse(response_xml)
-    self.ip = response_xml_dict["vpn_connection"]["ipsec_tunnel"][0][
-        "vpn_gateway"]["tunnel_outside_address"]["ip_address"]
+    response_json = json.loads(response)
+    self.id = response_json['VpnConnection']['VpnConnectionId']
+    self.ip = response_json['VpnConnection']['Options']['TunnelOptions'][0]['OutsideIpAddress']
+    self.customer_config_xml = response_json['VpnConnection']['CustomerGatewayConfiguration']
 
   def _Delete(self):
     "Deletes the VPN Connection"
@@ -420,12 +432,10 @@ class AwsVPNConnection(resource.BaseResource):
         '--filter=Name=vpn-connection-id,Values=%s' % self.id
     ]
     response, _ = util.IssueRetryableCommand(cmd)
-    response_json = re.sub(r'<.*>', '', response)
-    response_json = json.loads(response_json)
+    response_json = json.loads(response)
     return (
         len(response_json["VpnConnections"]) > 0 and
-        response_json["VpnConnections"][0]["State"] in ["available",
-                                                        "pending"]
+        response_json["VpnConnections"][0]["State"] in ["available","pending"]
     )
 
   def IsReady(self):
@@ -437,14 +447,13 @@ class AwsVPNConnection(resource.BaseResource):
         '--filter=Name=vpn-connection-id,Values=%s' % self.id
     ]
     response, _ = util.IssueRetryableCommand(cmd)
-    response_json = re.sub(r'<.*>', '', response)
-    response_json = json.loads(response_json)
+    response_json = json.loads(response)
     return (
         len(response_json["VpnConnections"]) > 0 and
         response_json["VpnConnections"][0]["State"] in ["available"]
     )
 
-  def Create_VPN_Cnxn_Route(self, target_cidr):
+  def Create_VPN_Connection_Route(self, target_cidr):
     """sets up routes to target."""
     create_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -455,57 +464,26 @@ class AwsVPNConnection(resource.BaseResource):
     ]
     response, _ = util.IssueRetryableCommand(create_cmd)
 
-  def _getCnxnOpts(self):
-    """
-            --options StaticRoutesOnly=boolean,
-            TunnelOptions=[{TunnelInsideCidr=string,PreSharedKey=string},
-                           {TunnelInsideCidr=string,PreSharedKey=string}]
-            """
-    """
-            eg
-            aws ec2 create-vpn-connection
-              --type ipsec.1
-              --customer-gateway-id cgw-b4de3fdd
-              --vpn-gateway-id vgw-f211f09b
-              --options "{"StaticRoutesOnly":false,
-                          "TunnelOptions":[{
-                            "TunnelInsideCidr":"169.254.12.0/30",
-                            "PreSharedKey":"ExamplePreSharedKey1"},
-                           {"TunnelInsideCidr":"169.254.13.0/30",
-                            "PreSharedKey":"ExamplePreSharedKey2"}]}"
-            """
-    # should probably have tuples for insidecidr/psk
+  def _getConnectionOpts(self):
+    """See https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpnConnectionOptions.html"""
     opts = {}
-    logging.info("Get VPN Cnxn Options<empty>: %s " % str(opts))
     opts["StaticRoutesOnly"] = self.routing == "static"
-    logging.info("Get VPN Cnxn Options<routing>:  %s" % str(opts))
-    logging.info("Get VPN Cnxn Options<routing>:  %s" % repr(opts))
-    logging.info("Get VPN Cnxn Options<self.psk>:  %s" % str(self.psk))
 
-    key = 'key' + FLAGS.run_uri  # psk restrictions on some runuris
     opts["TunnelOptions"] = [
         {
-            'PreSharedKey': key
+            'PreSharedKey': self.psk
         },
         {
-            'PreSharedKey': key
+            'PreSharedKey': self.psk
         },
     ]
-    logging.info("Get VPN Cnxn Options<tun_opts>:  %s" % str(opts))
-    # https://docs.aws.amazon.com/cli/latest/userguide/cli-using-param.html
-    logging.info(
-        "Get VPN Cnxn Options:  %s" %
-        str(json.dumps(json.dumps(opts))[1:-1].replace('\\',
-                                                       ''))
-    )
-    return json.dumps(json.dumps(opts))[1:-1].replace('\\', '')
+    return json.dumps(opts)
 
-
-class AwsCustomerGW(resource.BaseResource):
-  """An object representing an AwsCustomerGW."""
+class AwsCustomerGateway(resource.BaseResource):
+  """An object representing an AwsCustomerGateway."""
 
   def __init__(self, region, target_ip, *args, **kwargs):
-    super(AwsCustomerGW, self).__init__()
+    super(AwsCustomerGateway, self).__init__()
     self.id = None
     self.target_ip = target_ip
     self.region = region
@@ -524,12 +502,12 @@ class AwsCustomerGW(resource.BaseResource):
         '--bgp-asn=%s' % '64513',
         '--type=%s' % 'ipsec.1'
     ]
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
-    response = json.loads(stdout)
-    self.id = response['CustomerGateway']['CustomerGatewayId']
+    response, _, _ = vm_util.IssueCommand(create_cmd)
+    response_json = json.loads(response)
+    self.id = response_json['CustomerGateway']['CustomerGatewayId']
 
   def _Delete(self):
-    """Deletes the AwsCustomerGW."""
+    """Deletes the AwsCustomerGateway."""
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-customer-gateway',
@@ -539,7 +517,7 @@ class AwsCustomerGW(resource.BaseResource):
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
 
   def _Exists(self):
-    """Returns True if the AwsCustomerGW exists."""
+    """Returns True if the AwsCustomerGateway exists."""
     cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-customer-gateways',
@@ -547,7 +525,6 @@ class AwsCustomerGW(resource.BaseResource):
         '--customer-gateway-ids=%s' % self.id
     ]
     response, _ = util.IssueRetryableCommand(cmd)
-    #     logging.log(logging.INFO, response)
     response = json.loads(response)
     return (
         len(response["CustomerGateways"]) > 0 and
@@ -556,7 +533,7 @@ class AwsCustomerGW(resource.BaseResource):
     )
 
   def _ExistsforIP(self):
-    """Returns True if the AwsCustomerGW exists."""
+    """Returns True if the AwsCustomerGateway exists."""
     cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-customer-gateways',
@@ -564,7 +541,6 @@ class AwsCustomerGW(resource.BaseResource):
         '--filter=Name=ip-address,Values=%s' % self.target_ip
     ]
     response, _ = util.IssueRetryableCommand(cmd)
-    #     logging.log(logging.INFO, response)
     response = json.loads(response)
     return (
         len(response["CustomerGateways"]) > 0 and

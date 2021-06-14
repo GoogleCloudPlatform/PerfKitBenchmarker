@@ -36,7 +36,7 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
-from perfkitbenchmarker.providers.aws.aws_vpn_network import AwsVPNGW
+from perfkitbenchmarker.providers.aws.aws_vpn_network import AwsVpnGateway
 
 flags.DEFINE_string('aws_vpc', None,
                     'The static AWS VPC id to use. Default creates a new one')
@@ -799,7 +799,7 @@ class AwsNetwork(network.BaseNetwork):
     if self.cidr and FLAGS.use_vpn:
       for vpn_gateway_num in range(0, FLAGS.vpn_service_gateway_count):
         vpn_gateway_name = 'vpngw-%s-%s-%s' % (spec.zone, vpn_gateway_num, FLAGS.run_uri)
-        self.vpn_gateway[vpn_gateway_name] = AwsVPNGW(
+        self.vpn_gateway[vpn_gateway_name] = AwsVpnGateway(
             vpn_gateway_name,
             name,
             spec.zone,

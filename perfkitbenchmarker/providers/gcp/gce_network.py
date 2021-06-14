@@ -191,7 +191,8 @@ class GceVpnGateway(network.BaseVpnGateway):
     region = tunnel_config.endpoints[self.name]['region']
     vpn_gateway_id = self.name
     target_ip = tunnel_config.endpoints[target_endpoint]['ip_address']
-    psk = tunnel_config.psk
+    # psk = tunnel_config.psk
+    psk = tunnel_config.shared_key
     ike_version = tunnel_config.ike_version
     suffix = tunnel_config.suffix
     name = 'tun-' + self.name + '-' + suffix
