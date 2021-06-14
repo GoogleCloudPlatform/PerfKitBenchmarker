@@ -34,7 +34,8 @@ flags.DEFINE_string('dpb_dataproc_image_version', None,
 
 disk_to_hdfs_map = {
     'pd-standard': 'HDD',
-    'pd-ssd': 'SSD'
+    'pd-balanced': 'SSD (Balanced)',
+    'pd-ssd': 'SSD',
 }
 
 

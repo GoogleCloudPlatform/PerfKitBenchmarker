@@ -44,8 +44,8 @@ JOB_WAIT_SLEEP = 30
 EMR_TIMEOUT = 14400
 
 disk_to_hdfs_map = {
-    aws_disk.ST1: 'HDD',
-    aws_disk.GP2: 'SSD',
+    aws_disk.ST1: 'HDD (ST1)',
+    aws_disk.GP2: 'SSD (GP2)',
     disk.LOCAL: 'Local SSD',
 }
 
