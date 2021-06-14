@@ -716,7 +716,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     See https://aws.amazon.com/hpc/efa/
     """
+    if not self.TryRemoteCommand('ulimit -l | grep unlimited'):
+      self.RemoteCommand(f'echo "{self.user_name} - memlock unlimited" | '
+                         'sudo tee -a /etc/security/limits.conf')
     self.RemoteCommand('cd aws-efa-installer; sudo ./efa_installer.sh -y')
+    if not self.TryRemoteCommand('ulimit -l | grep unlimited'):
+      # efa_installer.sh should reboot enabling this change, reboot if necessary
+      self.Reboot()
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
