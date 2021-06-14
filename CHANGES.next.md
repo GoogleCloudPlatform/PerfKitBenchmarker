@@ -41,6 +41,7 @@
 -   Add GPU PingPong benchmark.
 -   Added lmod linux package.
 -   Support IntelMPI 2021.x on RedHat.
+-   Add TensorFlow BigQuery Connector benchmark.
 -   Add gcsfuse benchmark.
 
 ### Enhancements:
