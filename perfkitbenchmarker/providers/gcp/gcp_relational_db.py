@@ -30,6 +30,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
@@ -39,20 +40,20 @@ from six.moves import range
 FLAGS = flags.FLAGS
 
 GCP_DATABASE_VERSION_MAPPING = {
-    relational_db.MYSQL: {
+    sql_engine_utils.MYSQL: {
         '5.5': 'MYSQL_5_5',
         '5.6': 'MYSQL_5_6',
         '5.7': 'MYSQL_5_7',
         '8.0': 'MYSQL_8_0'
     },
-    relational_db.POSTGRES: {
+    sql_engine_utils.POSTGRES: {
         '9.6': 'POSTGRES_9_6',
         '10': 'POSTGRES_10',
         '11': 'POSTGRES_11',
         '12': 'POSTGRES_12',
         '13': 'POSTGRES_13'
     },
-    relational_db.SQLSERVER: {
+    sql_engine_utils.SQLSERVER: {
         '2017_Standard': 'SQLSERVER_2017_Standard',
         '2017_Enterprise': 'SQLSERVER_2017_ENTERPRISE',
         '2017_Express': 'SQLSERVER_2017_EXPRESS',
@@ -70,15 +71,15 @@ DEFAULT_POSTGRES_PORT = 5432
 DEFAULT_SQLSERVER_PORT = 1433
 
 DEFAULT_PORTS = {
-    relational_db.MYSQL: DEFAULT_MYSQL_PORT,
-    relational_db.POSTGRES: DEFAULT_POSTGRES_PORT,
-    relational_db.SQLSERVER: DEFAULT_SQLSERVER_PORT,
+    sql_engine_utils.MYSQL: DEFAULT_MYSQL_PORT,
+    sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_PORT,
+    sql_engine_utils.SQLSERVER: DEFAULT_SQLSERVER_PORT,
 }
 
 DEFAULT_ENGINE_VERSIONS = {
-    relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
-    relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
-    relational_db.SQLSERVER: DEFAULT_SQL_SERVER_VERSION,
+    sql_engine_utils.MYSQL: DEFAULT_MYSQL_VERSION,
+    sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_VERSION,
+    sql_engine_utils.SQLSERVER: DEFAULT_SQL_SERVER_VERSION,
 }
 
 # PostgreSQL restrictions on memory.
@@ -149,10 +150,10 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         '--storage-size=%d' % storage_size,
         '--labels=%s' % util.MakeFormattedDefaultTags(),
     ]
-    if self.spec.engine == relational_db.MYSQL:
+    if self.spec.engine == sql_engine_utils.MYSQL:
       cmd_string.append('--enable-bin-log')
 
-    if self.spec.engine == relational_db.SQLSERVER:
+    if self.spec.engine == sql_engine_utils.SQLSERVER:
       # `--root-password` is required when creating SQL Server instances.
       cmd_string.append('--root-password={0}'.format(
           self.spec.database_password))
@@ -194,7 +195,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         if the database is unmanaged and the engine isn't MYSQL.
       Exception: if an invalid MySQL flag was used.
     """
-    if self.spec.engine == relational_db.MYSQL:
+    if self.spec.engine == sql_engine_utils.MYSQL:
       self._InstallMySQLClient()
     if self.is_managed_db:
       self._CreateGcloudSqlInstance()
@@ -402,7 +403,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     # this is a fix for b/71594701
     # by default the empty password on 'postgres'
     # is a security violation.  Change the password to a non-default value.
-    if self.spec.engine == relational_db.POSTGRES:
+    if self.spec.engine == sql_engine_utils.POSTGRES:
       cmd = util.GcloudCommand(
           self, 'sql', 'users', 'set-password', 'postgres',
           '--host=dummy_host', '--instance={0}'.format(self.instance_id),

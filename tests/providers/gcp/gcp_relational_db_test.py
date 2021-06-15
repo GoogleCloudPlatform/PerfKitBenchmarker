@@ -29,8 +29,8 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gcp_relational_db
 from perfkitbenchmarker.providers.gcp import util
-from perfkitbenchmarker.relational_db import MYSQL
-from perfkitbenchmarker.relational_db import POSTGRES
+from perfkitbenchmarker.sql_engine_utils import MYSQL
+from perfkitbenchmarker.sql_engine_utils import POSTGRES
 from tests import pkb_common_test_case
 from six.moves import builtins
 

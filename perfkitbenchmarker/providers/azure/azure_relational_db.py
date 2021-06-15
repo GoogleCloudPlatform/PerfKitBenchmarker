@@ -20,6 +20,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -121,11 +122,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       RelationalDbEngineNotFoundException: if an unknown engine is
                                                   requested.
     """
-    if engine == relational_db.POSTGRES:
+    if engine == sql_engine_utils.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
-    elif engine == relational_db.MYSQL:
+    elif engine == sql_engine_utils.MYSQL:
       return DEFAULT_MYSQL_VERSION
-    elif engine == relational_db.SQLSERVER:
+    elif engine == sql_engine_utils.SQLSERVER:
       return DEFALUT_SQLSERVER_VERSION
     else:
       raise relational_db.RelationalDbEngineNotFoundException(
@@ -141,22 +142,22 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
                                                   requested.
     """
     engine = self.spec.engine
-    if engine == relational_db.POSTGRES:
+    if engine == sql_engine_utils.POSTGRES:
       return DEFAULT_POSTGRES_PORT
-    elif engine == relational_db.MYSQL:
+    elif engine == sql_engine_utils.MYSQL:
       return DEFAULT_MYSQL_PORT
-    elif engine == relational_db.SQLSERVER:
+    elif engine == sql_engine_utils.SQLSERVER:
       return DEFAULT_SQLSERVER_PORT
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 
   def GetAzCommandForEngine(self):
     engine = self.spec.engine
-    if engine == relational_db.POSTGRES:
+    if engine == sql_engine_utils.POSTGRES:
       return 'postgres'
-    elif engine == relational_db.MYSQL:
+    elif engine == sql_engine_utils.MYSQL:
       return 'mysql'
-    elif engine == relational_db.SQLSERVER:
+    elif engine == sql_engine_utils.SQLSERVER:
       return 'sql'
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
@@ -216,7 +217,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   def RenameDatabase(self, new_name):
     """Renames an the database instace."""
     engine = self.spec.engine
-    if engine == relational_db.SQLSERVER:
+    if engine == sql_engine_utils.SQLSERVER:
       cmd = [
           azure.AZURE_PATH,
           self.GetAzCommandForEngine(),
@@ -382,11 +383,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def _CreateAzureManagedSqlInstance(self):
     """Creates an Azure Sql Instance from a managed service."""
-    if self.spec.engine == relational_db.POSTGRES:
+    if self.spec.engine == sql_engine_utils.POSTGRES:
       self._CreateMySqlOrPostgresInstance()
-    elif self.spec.engine == relational_db.MYSQL:
+    elif self.spec.engine == sql_engine_utils.MYSQL:
       self._CreateMySqlOrPostgresInstance()
-    elif self.spec.engine == relational_db.SQLSERVER:
+    elif self.spec.engine == sql_engine_utils.SQLSERVER:
       self._CreateSqlServerInstance()
     else:
       raise NotImplementedError('Unknown how to create Azure data base '
@@ -410,7 +411,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       Exception: if attempting to create a non high availability database.
 
     """
-    if self.spec.engine == relational_db.MYSQL:
+    if self.spec.engine == sql_engine_utils.MYSQL:
       self._InstallMySQLClient()
     if self.is_managed_db:
       self._CreateAzureManagedSqlInstance()
@@ -545,11 +546,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
         engine = self.spec.engine
-        if engine == relational_db.POSTGRES:
+        if engine == sql_engine_utils.POSTGRES:
           state = server_show_json['userVisibleState']
-        elif engine == relational_db.MYSQL:
+        elif engine == sql_engine_utils.MYSQL:
           state = server_show_json['userVisibleState']
-        elif engine == relational_db.SQLSERVER:
+        elif engine == sql_engine_utils.SQLSERVER:
           state = server_show_json['state']
         else:
           raise relational_db.RelationalDbEngineNotFoundException(

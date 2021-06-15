@@ -21,6 +21,7 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -44,31 +45,31 @@ DEFAULT_POSTGRES_PORT = 5432
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 _MAP_ENGINE_TO_DEFAULT_VERSION = {
-    relational_db.MYSQL: DEFAULT_MYSQL_VERSION,
-    relational_db.AURORA_MYSQL: DEFAULT_MYSQL_AURORA_VERSION,
-    relational_db.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
-    relational_db.POSTGRES: DEFAULT_POSTGRES_VERSION,
-    relational_db.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
-    relational_db.SQLSERVER_EXPRESS: DEFAULT_SQLSERVER_VERSION,
-    relational_db.SQLSERVER_STANDARD: DEFAULT_SQLSERVER_VERSION,
-    relational_db.SQLSERVER_ENTERPRISE: DEFAULT_SQLSERVER_VERSION,
+    sql_engine_utils.MYSQL: DEFAULT_MYSQL_VERSION,
+    sql_engine_utils.AURORA_MYSQL: DEFAULT_MYSQL_AURORA_VERSION,
+    sql_engine_utils.AURORA_MYSQL56: DEFAULT_MYSQL56_AURORA_VERSION,
+    sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_VERSION,
+    sql_engine_utils.AURORA_POSTGRES: DEFAULT_POSTGRES_AURORA_VERSION,
+    sql_engine_utils.SQLSERVER_EXPRESS: DEFAULT_SQLSERVER_VERSION,
+    sql_engine_utils.SQLSERVER_STANDARD: DEFAULT_SQLSERVER_VERSION,
+    sql_engine_utils.SQLSERVER_ENTERPRISE: DEFAULT_SQLSERVER_VERSION,
 }
 
 _AURORA_ENGINES = (
-    relational_db.AURORA_MYSQL56, relational_db.AURORA_MYSQL,
-    relational_db.AURORA_POSTGRES)
+    sql_engine_utils.AURORA_MYSQL56, sql_engine_utils.AURORA_MYSQL,
+    sql_engine_utils.AURORA_POSTGRES)
 
 _SQL_SERVER_ENGINES = (
-    relational_db.SQLSERVER_EXPRESS,
-    relational_db.SQLSERVER_STANDARD,
-    relational_db.SQLSERVER_ENTERPRISE)
+    sql_engine_utils.SQLSERVER_EXPRESS,
+    sql_engine_utils.SQLSERVER_STANDARD,
+    sql_engine_utils.SQLSERVER_ENTERPRISE)
 
 _RDS_ENGINES = (
-    relational_db.MYSQL,
-    relational_db.POSTGRES,
-    relational_db.SQLSERVER_EXPRESS,
-    relational_db.SQLSERVER_STANDARD,
-    relational_db.SQLSERVER_ENTERPRISE)
+    sql_engine_utils.MYSQL,
+    sql_engine_utils.POSTGRES,
+    sql_engine_utils.SQLSERVER_EXPRESS,
+    sql_engine_utils.SQLSERVER_STANDARD,
+    sql_engine_utils.SQLSERVER_ENTERPRISE)
 
 MYSQL5_7_PARAM_GROUP_FAMILY = 'mysql5.7'
 MYSQL8_0_PARAM_GROUP_FAMILY = 'mysql8.0'
@@ -418,8 +419,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
     """
     if self.spec.engine in [
-        relational_db.AURORA_MYSQL56, relational_db.AURORA_MYSQL,
-        relational_db.MYSQL
+        sql_engine_utils.AURORA_MYSQL56, sql_engine_utils.AURORA_MYSQL,
+        sql_engine_utils.MYSQL
     ]:
       self._InstallMySQLClient()
     if self.is_managed_db:
@@ -608,9 +609,9 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
                                                   requested.
     """
     engine = self.spec.engine
-    if engine == relational_db.MYSQL:
+    if engine == sql_engine_utils.MYSQL:
       return DEFAULT_MYSQL_PORT
-    if engine == relational_db.POSTGRES:
+    if engine == sql_engine_utils.POSTGRES:
       return DEFAULT_POSTGRES_PORT
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
@@ -783,7 +784,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
   def _GetParameterGroupFamily(self):
     """Get the parameter group family string."""
-    if self.spec.engine == relational_db.MYSQL:
+    if self.spec.engine == sql_engine_utils.MYSQL:
       if self.spec.engine_version.startswith('5.7'):
         return MYSQL5_7_PARAM_GROUP_FAMILY
       elif self.spec.engine_version.startswith('8.0'):

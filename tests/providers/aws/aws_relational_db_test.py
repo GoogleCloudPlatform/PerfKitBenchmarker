@@ -28,8 +28,8 @@ from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.providers.aws.aws_relational_db import (AwsRelationalDb)
-from perfkitbenchmarker.relational_db import AURORA_POSTGRES
-from perfkitbenchmarker.relational_db import MYSQL
+from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
+from perfkitbenchmarker.sql_engine_utils import MYSQL
 from six.moves import builtins
 
 FLAGS = flags.FLAGS

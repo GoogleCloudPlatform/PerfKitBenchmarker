@@ -23,6 +23,7 @@ import uuid
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 import six
 
@@ -113,30 +114,10 @@ flags.register_validator(
     lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION, value) is not None,
     message=('--database_backup_start_time must be in the form HH:MM'))
 
-MYSQL = 'mysql'
-POSTGRES = 'postgres'
-AURORA_POSTGRES = 'aurora-postgresql'
-AURORA_MYSQL = 'aurora-mysql'
-AURORA_MYSQL56 = 'aurora'
-SQLSERVER = 'sqlserver'
-SQLSERVER_EXPRESS = 'sqlserver-ex'
-SQLSERVER_ENTERPRISE = 'sqlserver-ee'
-SQLSERVER_STANDARD = 'sqlserver-se'
-
-ALL_ENGINES = [
-    MYSQL,
-    POSTGRES,
-    AURORA_POSTGRES,
-    AURORA_MYSQL,
-    AURORA_MYSQL56,
-    SQLSERVER,
-    SQLSERVER_EXPRESS,
-    SQLSERVER_ENTERPRISE,
-    SQLSERVER_STANDARD
-]
 
 FLAGS = flags.FLAGS
 
+# TODO(chunla): Move these into engine specific class.
 POSTGRES_13_VERSION = '13'
 POSTGRES_RESOURCE_PATH = 'database_configurations/postgres'
 
@@ -739,9 +720,9 @@ class BaseRelationalDb(resource.BaseResource):
         self._ApplyManagedDbFlags()
       else:
         # TODO(chunla): Refactor this into a separate engine module.
-        if self.spec.engine == MYSQL:
+        if self.spec.engine == sql_engine_utils.MYSQL:
           self._ApplyMySqlFlags()
-        elif self.spec.engine == POSTGRES:
+        elif self.spec.engine == sql_engine_utils.POSTGRES:
           self._ApplyPostgresFlags()
         else:
           raise NotImplementedError('Flags is not supported on %s' %

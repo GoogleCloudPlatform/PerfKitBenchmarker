@@ -36,6 +36,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import spark_service
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
@@ -497,7 +498,7 @@ class _RelationalDbSpec(spec.BaseSpec):
             'valid_values': providers.VALID_CLOUDS
         }),
         'engine': (option_decoders.EnumDecoder, {
-            'valid_values': relational_db.ALL_ENGINES,
+            'valid_values': sql_engine_utils.ALL_ENGINES,
         }),
         'zones': (option_decoders.ListDecoder, {
             'item_decoder': option_decoders.StringDecoder(),
