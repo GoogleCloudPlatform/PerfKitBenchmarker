@@ -1,6 +1,15 @@
---- /opt/pkb/fio/tools/hist/fiologparser_hist.py	2017-02-23 23:37:28.423750424 +0000
-+++ fiologparser_hist_new.py	2017-02-23 23:52:45.566326546 +0000
-@@ -282,7 +282,7 @@
+--- /opt/pkb/fio/tools/hist/fiologparser_hist.py        2021-06-14 17:49:57.094978288 +0000
++++ fiologparser_hist_new.py    2021-06-14 18:00:38.295603500 +0000
+@@ -367,6 +367,8 @@
+     fps = [open(f, 'r') for f in ctx.FILE]
+     gen = histogram_generator(ctx, fps, ctx.buff_size)
+ 
++    print('\n'.join(map(lambda x: str(x), mean_bin_vals.tolist())))
++    return
+     print(', '.join(columns))
+ 
+     try:
+@@ -507,7 +509,7 @@
      # calculate the corresponding 'coarseness' parameter used to generate
      # those files, and calculate the appropriate bin latency values:
      with open(ctx.FILE[0], 'r') as fp:
@@ -9,17 +18,11 @@
          __TOTAL_COLUMNS = len(fp.readline().split(','))
          __HIST_COLUMNS = __TOTAL_COLUMNS - __NON_HIST_COLUMNS
  
-@@ -291,10 +291,12 @@
-         bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness), np.arange(__HIST_COLUMNS)), dtype=float)
-         lower_bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness, 0.0), np.arange(__HIST_COLUMNS)), dtype=float)
-         upper_bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness, 1.0), np.arange(__HIST_COLUMNS)), dtype=float)
-+        mean_bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness, 0.5), np.arange(__HIST_COLUMNS)), dtype=float)
+@@ -516,6 +518,7 @@
+         bin_vals = np.array([plat_idx_to_val_coarse(x, coarseness) for x in np.arange(__HIST_COLUMNS)], dtype=float)
+         lower_bin_vals = np.array([plat_idx_to_val_coarse(x, coarseness, 0.0) for x in np.arange(__HIST_COLUMNS)], dtype=float)
+         upper_bin_vals = np.array([plat_idx_to_val_coarse(x, coarseness, 1.0) for x in np.arange(__HIST_COLUMNS)], dtype=float)
++        mean_bin_vals = np.array([plat_idx_to_val_coarse(x, coarseness, 0.5) for x in np.arange(__HIST_COLUMNS)], dtype=float)
  
-     fps = [open(f, 'r') for f in ctx.FILE]
-     gen = histogram_generator(ctx, fps, ctx.buff_size)
--
-+    print '\n'.join(map(lambda x: str(x), mean_bin_vals.tolist()))
-+    return
-     print(', '.join(columns))
- 
-     try:
+     # indicate which directions to output (read(0), write(1), trim(2), mixed(3))
+     directions = set()

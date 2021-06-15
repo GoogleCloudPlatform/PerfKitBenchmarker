@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 
 FIO_DIR = '%s/fio' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/axboe/fio.git'
-GIT_TAG = 'fio-2.17'
+GIT_TAG = 'fio-3.27'
 FIO_PATH = FIO_DIR + '/fio'
 FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH
 SECTION_REGEX = r'\[(\w+)\]\n([\w\d\n=*$/]+)'
@@ -59,10 +59,10 @@ def GetFioExec():
 def _Install(vm):
   """Installs the fio package on the VM."""
   # TODO(user): Upgrade to python3.
-  for p in ['build_tools', 'python', 'pip', 'python_dev']:
+  for p in ['build_tools', 'python', 'pip3', 'python_dev']:
     vm.Install(p)
   for package in ('numpy', 'pandas'):
-    vm.RemoteCommand(f'sudo pip install {package}')
+    vm.RemoteCommand(f'sudo pip3 install {package}')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, FIO_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(FIO_DIR, GIT_TAG))
   vm.RemoteCommand('cd {0} && ./configure && make'.format(FIO_DIR))
@@ -266,7 +266,8 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
         for key in hists:
           aggregates[key].update(hists[key])
       samples += _BuildHistogramSamples(aggregates, job_name, parameters)
-
+  for s in samples:
+    s.metadata['fio_version'] = GIT_TAG
   return samples
 
 
