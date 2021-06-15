@@ -170,6 +170,27 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     expected_regions = {'us-east1', 'us-east2'}
     self.assertEqual(found_regions, expected_regions)
 
+  def testGetGeoFromRegion(self):
+    test_region = 'us-central1'
+
+    found_geo = util.GetGeoFromRegion(test_region)
+
+    expected_geo = 'us'
+    self.assertEqual(found_geo, expected_geo)
+
+  def testGetRegionsInGeo(self):
+    test_output = inspect.cleandoc("""
+        us-west1
+        us-west2
+        asia-southeast1
+        """)
+    self.enter_context(_MockIssueCommand(test_output))
+
+    found_regions = util.GetRegionsInGeo('us')
+
+    expected_regions = {'us-west1', 'us-west2'}
+    self.assertEqual(found_regions, expected_regions)
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -17,7 +17,7 @@
 
 import json
 import re
-from typing import Set
+from typing import Any, Dict, Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
@@ -117,6 +117,10 @@ def _IsRegion(zone_or_region):
   return re.match(r'[a-z]+[0-9]?$', zone_or_region)
 
 
+def _IsRecommendedRegion(json_object: Dict[str, Any]) -> bool:
+  return json_object['metadata']['regionCategory'] == 'Recommended'
+
+
 def IsZone(zone_or_region):
   """Returns whether "zone_or_region" is a zone.
 
@@ -152,7 +156,10 @@ def GetAllRegions() -> Set[str]:
   stdout, _ = vm_util.IssueRetryableCommand([
       AZURE_PATH, 'account', 'list-locations', '--output', 'json'
   ])
-  return set([item['name'] for item in json.loads(stdout)])
+  # Filter out staging regions from the output.
+  return set([
+      item['name'] for item in json.loads(stdout) if _IsRecommendedRegion(item)
+  ])
 
 
 def GetAllZones() -> Set[str]:
@@ -161,6 +168,26 @@ def GetAllZones() -> Set[str]:
   for region in GetAllRegions():
     zones.update(GetZonesInRegion(region))
   return zones
+
+
+def GetGeoFromRegion(region: str) -> str:
+  """Gets valid geo from the region, i.e. region westus2 returns US."""
+  stdout, _ = vm_util.IssueRetryableCommand([
+      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+      '--query', f"[?name == '{region}'].metadata.geographyGroup"
+  ])
+  return stdout.splitlines()[1].strip('" ')
+
+
+def GetRegionsInGeo(geo: str) -> Set[str]:
+  """Gets valid regions in the geo."""
+  stdout, _ = vm_util.IssueRetryableCommand([
+      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+      '--query', f"[?metadata.geographyGroup == '{geo}']"
+  ])
+  return set([
+      item['name'] for item in json.loads(stdout) if _IsRecommendedRegion(item)
+  ])
 
 
 def GetAvailabilityZoneFromZone(zone_or_region):

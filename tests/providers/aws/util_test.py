@@ -40,6 +40,23 @@ class AwsUtilTest(pkb_common_test_case.PkbCommonTestCase):
     expected_regions = {'af-south-1', 'us-west-2'}
     self.assertEqual(expected_regions, actual_regions)
 
+  def testGetGeoFromRegion(self):
+    test_region = 'us-west-2'
+
+    found_geo = util.GetGeoFromRegion(test_region)
+
+    expected_geo = 'us'
+    self.assertEqual(found_geo, expected_geo)
+
+  def testGetRegionsInGeo(self):
+    self.enter_context(
+        _MockIssueCommand('aws-ec2-describe-regions-output.json'))
+
+    actual_regions = util.GetRegionsInGeo('us')
+
+    expected_regions = {'us-west-2'}
+    self.assertEqual(expected_regions, actual_regions)
+
 
 if __name__ == '__main__':
   unittest.main()

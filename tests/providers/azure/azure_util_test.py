@@ -90,6 +90,27 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
     }
     self.assertEqual(expected_zones, found_regions)
 
+  def test_get_geo_from_region(self):
+    test_output = """[
+      "US"
+    ]
+    """
+    self.enter_context(mock.patch.object(vm_util, 'IssueRetryableCommand',
+                                         autospec=True,
+                                         return_value=[test_output, None]))
+
+    found_geo = util.GetGeoFromRegion('test_region')
+
+    expected_geo = 'US'
+    self.assertEqual(found_geo, expected_geo)
+
+  def test_get_region_in_geo(self):
+    self.enter_context(
+        _MockIssueCommand('az-account-list-locations-output.json'))
+
+    found_regions = util.GetRegionsInGeo('test_geo')
+
+    self.assertEqual({'eastus', 'eastus2'}, found_regions)
 
 if __name__ == '__main__':
   unittest.main()

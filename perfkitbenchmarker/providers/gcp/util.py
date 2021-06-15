@@ -113,6 +113,16 @@ def GetZonesInRegion(region) -> Set[str]:
   return set(stdout.splitlines())
 
 
+def GetGeoFromRegion(region: str) -> str:
+  """Gets valid geo from the region, i.e. region us-central1 returns us."""
+  return region.split('-')[0]
+
+
+def GetRegionsInGeo(geo: str) -> Set[str]:
+  """Gets valid regions in the geo."""
+  return {region for region in GetAllRegions() if region.startswith(geo)}
+
+
 def GetMultiRegionFromRegion(region):
   """Gets the closest multi-region location to the region."""
   if (region.startswith('us') or

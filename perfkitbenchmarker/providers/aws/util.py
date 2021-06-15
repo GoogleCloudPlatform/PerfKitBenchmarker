@@ -100,6 +100,16 @@ def GetAllRegions() -> Set[str]:
   }
 
 
+def GetGeoFromRegion(region: str) -> str:
+  """Gets valid geo from the region, i.e. region us-west-1 returns us."""
+  return region.split('-')[0]
+
+
+def GetRegionsInGeo(geo: str) -> Set[str]:
+  """Gets valid regions in the geo."""
+  return {region for region in GetAllRegions() if region.startswith(geo)}
+
+
 def GetAllZones() -> Set[str]:
   """Returns all available AWS zones."""
   results = set()

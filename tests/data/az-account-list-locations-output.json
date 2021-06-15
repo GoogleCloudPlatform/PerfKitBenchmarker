@@ -42,5 +42,21 @@
     "name": "eastus2",
     "regionalDisplayName": "(US) East US 2",
     "subscriptionId": null
+  },
+  {
+    "displayName": "Central US (Stage)",
+    "id": "/subscriptions/33cb057b-8662-478c-9122-d90208516324/locations/centralusstage",
+    "metadata": {
+      "geographyGroup": "US",
+      "latitude": null,
+      "longitude": null,
+      "pairedRegion": null,
+      "physicalLocation": null,
+      "regionCategory": "Other",
+      "regionType": "Logical"
+    },
+    "name": "centralusstage",
+    "regionalDisplayName": "(US) Central US (Stage)",
+    "subscriptionId": null
   }
 ]
