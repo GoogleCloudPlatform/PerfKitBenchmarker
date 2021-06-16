@@ -136,6 +136,7 @@ BENCHMARK_SETS = {
             'iperf',
             'mesh_network',
             'mlperf',
+            'mlperf_multiworkers',
             'mnist',
             'mongodb_ycsb',
             'multichase',

@@ -43,6 +43,7 @@
 -   Support IntelMPI 2021.x on RedHat.
 -   Add TensorFlow BigQuery Connector benchmark.
 -   Add gcsfuse benchmark.
+-   Add MLPerf multiworker benchmark based on NVIDIA's v0.6 submission
 
 ### Enhancements:
 
