@@ -87,7 +87,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     """Creates the instance."""
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'create', self.name)
     cmd.flags['region'] = self.redis_region
-    cmd.flags['zone'] = FLAGS.zones[0]
+    cmd.flags['zone'] = FLAGS.zone[0]
     cmd.flags['network'] = FLAGS.gce_network_name
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size

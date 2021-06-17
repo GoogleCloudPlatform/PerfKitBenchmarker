@@ -28,7 +28,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(GcpCloudRedisTestCase, self).setUp()
     FLAGS.project = 'project'
-    FLAGS.zones = ['us-central1-a']
+    FLAGS.zone = ['us-central1-a']
     mock_spec = mock.Mock()
     self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
 
