@@ -132,6 +132,10 @@ def Run(benchmark_spec):
           FLAGS.cloud_spanner_ycsb_boundedstaleness,
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
   }
+  # Uses overridden cloud spanner endpoint in gcloud configuration
+  end_point = benchmark_spec.spanner.GetEndPoint()
+  if end_point:
+    run_kwargs['cloudspanner.host'] = end_point
 
   if FLAGS.cloud_spanner_ycsb_client_type == 'go':
     run_kwargs['cloudspanner.project'] = util.GetDefaultProject()
