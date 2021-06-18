@@ -181,7 +181,7 @@ def PrepareHorovod(vm):
       f'nvidia-dali-tf-plugin-cuda{cuda_version}')
 
   vm.RemoteCommand(
-      f'sudo {pip} install cython scipy \'opencv-python==3.4.2.17\'')
+      f'sudo {pip} install pynvml cython scipy \'opencv-python==3.4.2.17\'')
   vm.RemoteCommand(
       f'sudo {pip} install \'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI\''
   )
