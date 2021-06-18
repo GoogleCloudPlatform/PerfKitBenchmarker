@@ -136,3 +136,4 @@
 -   Install pip and pip3 from get-pip.py to avoid issues with old packages.
 -   Fix parsing Dstat 0.7.3
 -   Update hadoop version to 3.3.1
+-   Updated required numpy and six versions.

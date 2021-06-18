@@ -22,8 +22,9 @@ packaging
 pandas>=1.1.5
 PyYAML==5.3.1
 pint>=0.7
-numpy==1.16.4
+numpy>=1.16.5
 contextlib2>=0.5.1
+six>=1.13.0
 pywinrm
 timeout-decorator
 google-cloud-datastore
