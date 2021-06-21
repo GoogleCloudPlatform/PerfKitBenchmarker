@@ -45,6 +45,10 @@ flags.DEFINE_string('dpb_job_jarfile', None,
                     'Executable Jarfile containing workload implementation')
 flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
                     'implementation in the jar file')
+flags.DEFINE_string('dpb_service_bucket', None, 'A bucket to use with the DPB '
+                    'service. If none is provided one will be created by the '
+                    'benchmark and cleaned up afterwards unless you are using '
+                    'a static instance.')
 flags.DEFINE_string('dpb_service_zone', None, 'The zone for provisioning the '
                     'dpb_service instance.')
 flags.DEFINE_list('dpb_job_properties', [], 'A list of strings of the form '
@@ -148,7 +152,12 @@ class BaseDpbService(resource.BaseResource):
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
-    self.bucket = 'pkb-' + FLAGS.run_uri
+    if FLAGS.dpb_service_bucket:
+      self.bucket = FLAGS.dpb_service_bucket
+      self.manage_bucket = False
+    else:
+      self.bucket = 'pkb-' + FLAGS.run_uri
+      self.manage_bucket = True
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_version = dpb_service_spec.version
     self.dpb_service_type = 'unknown'
@@ -275,8 +284,8 @@ class BaseDpbService(resource.BaseResource):
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
-    print(self, self.storage_service, self.CLOUD)
-    self.storage_service.MakeBucket(self.bucket)
+    if self.manage_bucket:
+      self.storage_service.MakeBucket(self.bucket)
 
   def _Create(self):
     """Creates the underlying resource."""
@@ -284,7 +293,8 @@ class BaseDpbService(resource.BaseResource):
 
   def _DeleteDependencies(self):
     """Deletes the bucket used with the cluster."""
-    self.storage_service.DeleteBucket(self.bucket)
+    if self.manage_bucket:
+      self.storage_service.DeleteBucket(self.bucket)
 
   def _Delete(self):
     """Deletes the underlying resource.

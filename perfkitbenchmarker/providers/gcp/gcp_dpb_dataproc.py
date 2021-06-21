@@ -20,6 +20,8 @@ at https://cloud.google.com/dataproc/
 import datetime
 import json
 import logging
+from typing import Any, Dict, Optional
+
 from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -62,6 +64,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 'gs://'
+    if self.user_managed and not FLAGS.dpb_service_bucket:
+      self.bucket = self._GetCluster()['config']['tempBucket']
 
   @staticmethod
   def _ParseTime(state_time: str) -> datetime.datetime:
@@ -164,11 +168,16 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd = self.DataprocGcloudCommand('clusters', 'delete', self.cluster_id)
     cmd.Issue(raise_on_failure=False)
 
+  def _GetCluster(self) -> Optional[Dict[str, Any]]:
+    """Get the cluster resource in a dict."""
+    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+    if not retcode:
+      return json.loads(stdout)
+
   def _Exists(self):
     """Check to see whether the cluster exists."""
-    cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
-    return retcode == 0
+    return self._GetCluster() is not None
 
   def SubmitJob(self,
                 jarfile=None,
