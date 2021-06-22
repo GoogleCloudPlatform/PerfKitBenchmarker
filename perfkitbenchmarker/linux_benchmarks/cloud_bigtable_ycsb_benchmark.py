@@ -334,9 +334,11 @@ def _GetCpuUtilizationSample(samples, instance_id, workload_start_time):
           round(point.value.double_value, 3)
           for point in cluster_time_series.points]
 
+      average_utilization = round(sum(utilization) / len(utilization), 3)
       metadata = {
           'cluster_number': cluster_number,
           'cpu_utilization_per_minute': utilization,
+          'cpu_average_utilization': average_utilization,
       }
 
       cpu_utilization_sample = sample.Sample(

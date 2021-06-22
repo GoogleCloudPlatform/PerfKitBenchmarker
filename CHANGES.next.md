@@ -89,6 +89,8 @@
 -   Add support for Postgres 13 on VMs.
 -   Add support to compile GCC versions on non Debian systems.
 -   Add additional customization options to SPEC CPU 2017.
+-   Add average utilization to the metadata of cpu metrics for Cloud Bigtable
+    benchmark.
 
 ### Bug fixes and maintenance updates:
 
