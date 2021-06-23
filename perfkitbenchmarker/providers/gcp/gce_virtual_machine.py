@@ -34,7 +34,7 @@ import posixpath
 import re
 import threading
 
-from typing import Tuple
+from typing import Iterator, Dict, Optional, Tuple
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -944,50 +944,118 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return 3600
 
 
+class BaseLinuxGceVirtualMachine(GceVirtualMachine,
+                                 linux_vm.BaseLinuxMixin):
+  """Class supporting Linux GCE virtual machines.
+
+  Currently looks for gVNIC capabilities.
+  TODO(pclay): Make more generic and move to BaseLinuxMixin.
+  """
+
+  # regex to get the network devices from "ip link show"
+  _IP_LINK_RE = re.compile(r'^\d+: (?P<device_name>\S+):')
+  # devices to ignore from "ip link show"
+  _IGNORE_NETWORK_DEVICES = ('lo',)
+  # ethtool properties output should match this regex
+  _ETHTOOL_RE = re.compile(r'^(?P<key>.*?):\s*(?P<value>.*)\s*')
+  # the "device" value in ethtool properties for gvnic
+  _GVNIC_DEVICE_NAME = 'gve'
+
+  def __init__(self, vm_spec):
+    super(BaseLinuxGceVirtualMachine, self).__init__(vm_spec)
+    self._gvnic_version = None
+
+  def GetResourceMetadata(self):
+    """See base class."""
+    metadata = super(BaseLinuxGceVirtualMachine,
+                     self).GetResourceMetadata().copy()
+    if self._gvnic_version:
+      metadata['gvnic_version'] = self._gvnic_version
+    return metadata
+
+  def OnStartup(self):
+    """See base class.  Sets the _gvnic_version."""
+    super(BaseLinuxGceVirtualMachine, self).OnStartup()
+    self._gvnic_version = self.GetGvnicVersion()
+
+  def GetGvnicVersion(self) -> Optional[str]:
+    """Returns the gvnic network driver version."""
+    all_device_properties = {}
+    for device_name in self._GetNetworkDeviceNames():
+      if device_name in self._IGNORE_NETWORK_DEVICES:
+        continue
+      device = self._GetNetworkDeviceProperties(device_name)
+      all_device_properties[device_name] = device
+      if device.get('driver') == self._GVNIC_DEVICE_NAME:
+        logging.info('gvnic properties %s', device)
+        if 'version' in device:
+          return device['version']
+        raise ValueError(f'No version in {device}')
+      logging.error('Network device %s lacks a driver %s', device_name, device)
+
+  def _GetNetworkDeviceProperties(self, device_name: str) -> Dict[str, str]:
+    """Returns a dict of the network device properties."""
+    stdout, _ = self.RemoteCommand(f'ethtool -i {device_name}')
+    properties = {}
+    for line in stdout.splitlines():
+      m = self._ETHTOOL_RE.match(line)
+      if m:
+        properties[m['key']] = m['value']
+    return properties
+
+  def _GetNetworkDeviceNames(self) -> Iterator[str]:
+    """Yields network device names."""
+    stdout, _ = self.RemoteCommand('ip link show up')
+    for line in stdout.splitlines():
+      m = self._IP_LINK_RE.match(line)
+      if m:
+        yield m['device_name']
+
+
 class Debian9BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Debian9Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
 class Debian10BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Debian10Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-10'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
 class Rhel7BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Rhel7Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel7Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-7'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class Rhel8BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Rhel8Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-8'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class CentOs7BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.CentOs7Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.CentOs7Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-7'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class CentOs8BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.CentOs8Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.CentOs8Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-8'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class ContainerOptimizedOsBasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.ContainerOptimizedOsMixin):
+    BaseLinuxGceVirtualMachine, linux_vm.ContainerOptimizedOsMixin):
   DEFAULT_IMAGE_FAMILY = 'cos-stable'
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
 
 class CoreOsBasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.CoreOsMixin):
+    BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin):
   DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
   DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
 
@@ -998,19 +1066,19 @@ class CoreOsBasedGceVirtualMachine(
 
 
 class Ubuntu1604BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Ubuntu1604Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1604Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1604-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu1804BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Ubuntu1804Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1804Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu2004BasedGceVirtualMachine(
-    GceVirtualMachine, linux_vm.Ubuntu2004Mixin):
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2004Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-2004-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 

@@ -799,5 +799,73 @@ class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(zone, net.zone)
 
 
+_IP_LINK_TEXT = """
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state ...
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: ens4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1460 qdisc mq ...
+    link/ether 42:01:c0:a8:15:66 brd ff:ff:ff:ff:ff:ff
+"""
+
+# real example of ethtool -i ens4 output
+_ETHTOOL_TEXT = """
+driver: gve
+version: 1.0.0
+firmware-version:
+expansion-rom-version:
+bus-info: 0000:00:04.0
+supports-statistics: yes
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: no
+"""
+
+
+class GvnicTest(GceVirtualMachineTestCase):
+  """Tests specific to detecting gVNIC version."""
+
+  def setUp(self):
+    super(GvnicTest, self).setUp()
+    vm_spec = gce_virtual_machine.GceVmSpec('test_component', project='test')
+    self.vm = gce_virtual_machine.Ubuntu1804BasedGceVirtualMachine(vm_spec)
+    self.mock_cmd = mock.Mock()
+    self.vm.RemoteCommand = self.mock_cmd
+
+  def testGetNetworkDeviceNames(self):
+    self.mock_cmd.return_value = (_IP_LINK_TEXT, '')
+    names = list(self.vm._GetNetworkDeviceNames())
+    self.assertEqual(['lo', 'ens4'], names)
+    self.mock_cmd.assert_called_with('ip link show up')
+
+  def testGetNetworkDeviceProperties(self):
+    self.mock_cmd.return_value = (_ETHTOOL_TEXT, '')
+    props = self.vm._GetNetworkDeviceProperties('ens4')
+    expected = {
+        'bus-info': '0000:00:04.0',
+        'driver': 'gve',
+        'expansion-rom-version': '',
+        'firmware-version': '',
+        'supports-eeprom-access': 'no',
+        'supports-priv-flags': 'no',
+        'supports-register-dump': 'no',
+        'supports-statistics': 'yes',
+        'supports-test': 'no',
+        'version': '1.0.0'
+    }
+    self.assertEqual(expected, props)
+    self.mock_cmd.assert_called_with('ethtool -i ens4')
+
+  def testOnStartupSetGvnicVersion(self):
+    self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), (_ETHTOOL_TEXT, '')]
+    self.vm.OnStartup()
+    self.assertEqual('1.0.0', self.vm._gvnic_version)
+    self.assertEqual('1.0.0', self.vm.GetResourceMetadata()['gvnic_version'])
+
+  def testMissingVersionInProperties(self):
+    self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), ('driver: gve', '')]
+    with self.assertRaises(ValueError):
+      self.vm.OnStartup()
+
+
 if __name__ == '__main__':
   unittest.main()
