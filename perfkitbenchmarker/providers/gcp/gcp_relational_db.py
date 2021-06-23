@@ -195,8 +195,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         if the database is unmanaged and the engine isn't MYSQL.
       Exception: if an invalid MySQL flag was used.
     """
-    if self.spec.engine == sql_engine_utils.MYSQL:
-      self._InstallMySQLClient()
     if self.is_managed_db:
       self._CreateGcloudSqlInstance()
     else:
@@ -390,25 +388,25 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     """
     super()._PostCreate()
 
-    if not self.is_managed_db:
-      return
-
-    # The hostname '%' means unrestricted access from any host.
-    cmd = util.GcloudCommand(
-        self, 'sql', 'users', 'create', self.spec.database_username,
-        '--host=%', '--instance={0}'.format(self.instance_id),
-        '--password={0}'.format(self.spec.database_password))
-    _, _, _ = cmd.Issue()
-
-    # this is a fix for b/71594701
-    # by default the empty password on 'postgres'
-    # is a security violation.  Change the password to a non-default value.
-    if self.spec.engine == sql_engine_utils.POSTGRES:
+    if self.is_managed_db:
+      # The hostname '%' means unrestricted access from any host.
       cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'set-password', 'postgres',
-          '--host=dummy_host', '--instance={0}'.format(self.instance_id),
+          self, 'sql', 'users', 'create', self.spec.database_username,
+          '--host=%', '--instance={0}'.format(self.instance_id),
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
+
+      # this is a fix for b/71594701
+      # by default the empty password on 'postgres'
+      # is a security violation.  Change the password to a non-default value.
+      if self.spec.engine == sql_engine_utils.POSTGRES:
+        cmd = util.GcloudCommand(
+            self, 'sql', 'users', 'set-password', 'postgres',
+            '--host=dummy_host', '--instance={0}'.format(self.instance_id),
+            '--password={0}'.format(self.spec.database_password))
+        _, _, _ = cmd.Issue()
+
+    self.client_vm_query_tools.InstallPackages()
 
   def _ApplyManagedDbFlags(self):
     cmd_string = [

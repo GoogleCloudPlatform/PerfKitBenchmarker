@@ -249,6 +249,26 @@ class BaseRelationalDb(resource.BaseResource):
   def server_vm(self, server_vm):
     self._server_vm = server_vm
 
+  @property
+  def client_vm_query_tools(self):
+    if not hasattr(self, '_client_vm_query_tools'):
+      connection_properties = sql_engine_utils.DbConnectionProperties(
+          self.spec.engine, self.spec.engine_version, self.endpoint,
+          self.spec.database_username, self.spec.database_password)
+      self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
+          self.client_vm, connection_properties)
+    return self._client_vm_query_tools
+
+  @property
+  def server_vm_query_tools(self):
+    if not hasattr(self, '_server_vm_query_tools'):
+      connection_properties = sql_engine_utils.DbConnectionProperties(
+          self.spec.engine, self.spec.engine_version, 'localhost',
+          self.spec.database_username, self.spec.database_password)
+      self._server_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
+          self.server_vm, connection_properties)
+    return self._server_vm_query_tools
+
   def SetVms(self, vm_groups):
     self.client_vm = vm_groups['clients' if 'clients' in
                                vm_groups else 'default'][0]
@@ -262,42 +282,6 @@ class BaseRelationalDb(resource.BaseResource):
       if not self.postgres_shared_buffer_size:
         self.postgres_shared_buffer_size = int(self.server_vm.total_memory_kb *
                                                kb_to_gb / 4)
-    # TODO(jerlawson): Enable replications.
-
-  def MakePsqlConnectionString(self, database_name, use_localhost=False):
-    return '\'host={0} user={1} password={2} dbname={3}\''.format(
-        self.endpoint if not use_localhost else 'localhost',
-        self.spec.database_username, self.spec.database_password, database_name)
-
-  def MakeMysqlConnectionString(self, use_localhost=False):
-    return '-h {0}{1} -u {2} -p{3}'.format(
-        self.endpoint if not use_localhost else 'localhost',
-        ' -P 3306' if not self.is_managed_db else '',
-        self.spec.database_username, self.spec.database_password)
-
-  def MakeSysbenchConnectionString(self):
-    return (
-        '--mysql-host={0}{1} --mysql-user={2} --mysql-password="{3}" ').format(
-            self.endpoint,
-            ' --mysql-port=3306' if not self.is_managed_db else '',
-            self.spec.database_username, self.spec.database_password)
-
-  def MakeMysqlCommand(self, command, use_localhost=False):
-    """Return Mysql Command with correct credentials."""
-    return 'mysql %s -e "%s"' % (self.MakeMysqlConnectionString(
-        use_localhost=use_localhost), command)
-
-  def MakeSqlserverCommand(self, command, use_localhost=False):
-    """Return Sql server command with correct credentials."""
-    return '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s -Q "%s"' % (
-        self.endpoint if not use_localhost else 'localhost',
-        self.spec.database_username, self.spec.database_password, command)
-
-  def MakePostgresCommand(self, db_name, command, use_localhost=False):
-    """Return Postgres command vm with correct credentials."""
-
-    return 'psql %s -c "%s"' % (self.MakePsqlConnectionString(
-        db_name, use_localhost), command)
 
   @property
   def endpoint(self):
@@ -464,32 +448,6 @@ class BaseRelationalDb(resource.BaseResource):
     raise UnsupportedError('%s engine is not supported '
                            'for unmanaged database.' % self.spec.engine)
 
-  def _InstallMySQLClient(self):
-    """Installs MySQL Client on the client vm.
-
-    Raises:
-      Exception: If the requested engine version is unsupported.
-    """
-    if (self.spec.engine_version == '5.6' or
-        self.spec.engine_version.startswith('5.6.')):
-      mysql_name = 'mysqlclient56'
-    elif (self.spec.engine_version == '5.7' or
-          self.spec.engine_version.startswith('5.7') or
-          self.spec.engine_version == '8.0' or
-          self.spec.engine_version.startswith('8.0')):
-      mysql_name = 'mysqlclient'
-    else:
-      raise Exception('Invalid database engine version: %s. Only 5.6, 5.7 '
-                      'and 8.0 are supported.' % self.spec.engine_version)
-    self.client_vm.Install(mysql_name)
-    self.client_vm.RemoteCommand(
-        'sudo sed -i '
-        '"s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" %s' %
-        self.client_vm.GetPathToConfig(mysql_name))
-    self.client_vm.RemoteCommand(
-        'sudo cat %s' % self.client_vm.GetPathToConfig(mysql_name),
-        should_log=True)
-
   def _PrepareDataDirectories(self, mysql_name):
     # Make the data directories in case they don't already exist.
     self.server_vm.RemoteCommand('sudo mkdir -p /scratch/mysql')
@@ -532,6 +490,7 @@ class BaseRelationalDb(resource.BaseResource):
   def _SetupUnmanagedDatabase(self):
     """Installs unmanaged databases on server vm."""
     db_engine = self.spec.engine
+    self.server_vm_query_tools.InstallPackages()
 
     if self.client_vm.IS_REBOOTABLE:
       self.client_vm.ApplySysctlPersistent({
@@ -689,29 +648,22 @@ class BaseRelationalDb(resource.BaseResource):
         'sudo cat %s' % self.server_vm.GetPathToConfig(mysql_name),
         should_log=True)
 
-    self.server_vm.RemoteCommand(
-        self.MakeMysqlCommand(
-            'SET GLOBAL max_connections=8000;', use_localhost=True))
+    self.server_vm_query_tools.IssueSqlCommand(
+        'SET GLOBAL max_connections=8000;')
 
     if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
       client_ip = self.client_vm.internal_ip
     else:
       client_ip = self.client_vm.ip_address
 
-    self.server_vm.RemoteCommand(
-        self.MakeMysqlCommand(
-            'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %
-            (self.spec.database_username, client_ip,
-             self.spec.database_password),
-            use_localhost=True))
+    self.server_vm_query_tools.IssueSqlCommand(
+        'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %
+        (self.spec.database_username, client_ip, self.spec.database_password))
 
-    self.server_vm.RemoteCommand(
-        self.MakeMysqlCommand(
-            'GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';' %
-            (self.spec.database_username, client_ip),
-            use_localhost=True))
-    self.server_vm.RemoteCommand(
-        self.MakeMysqlCommand('FLUSH PRIVILEGES;', use_localhost=True))
+    self.server_vm_query_tools.IssueSqlCommand(
+        'GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';' %
+        (self.spec.database_username, client_ip))
+    self.server_vm_query_tools.IssueSqlCommand('FLUSH PRIVILEGES;')
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
@@ -736,8 +688,8 @@ class BaseRelationalDb(resource.BaseResource):
   def _ApplyMySqlFlags(self):
     if FLAGS.db_flags:
       for flag in FLAGS.db_flags:
-        cmd = self.MakeMysqlCommand('SET %s;' % flag)
-        _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+        _, stderr, _ = self.client_vm_query_tools.IssueSqlCommand(
+            'SET %s;' % flag, raise_on_failure=False)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
 
@@ -756,12 +708,10 @@ class BaseRelationalDb(resource.BaseResource):
     """Print server logs on unmanaged db."""
     if self.spec.engine == 'mysql':
       self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
-      self.server_vm.RemoteCommand(
-          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_connects\';"' %
-          self.MakeMysqlConnectionString(use_localhost=True))
-      self.server_vm.RemoteCommand(
-          'mysql %s -e "SHOW GLOBAL STATUS LIKE \'Aborted_clients\';"' %
-          self.MakeMysqlConnectionString(use_localhost=True))
+      self.server_vm_query_tools.IssueSqlCommand(
+          'SHOW GLOBAL STATUS LIKE \'Aborted_connects\';')
+      self.server_vm_query_tools.IssueSqlCommand(
+          'SHOW GLOBAL STATUS LIKE \'Aborted_clients\';')
 
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""

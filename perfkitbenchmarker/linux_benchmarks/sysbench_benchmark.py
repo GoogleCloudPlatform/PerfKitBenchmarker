@@ -292,7 +292,7 @@ def _GetCommonSysbenchOptions(benchmark_spec):
       # Could happen when we overload the database
       '--mysql-ignore-errors=1205,2013',
       '--db-driver=mysql',
-      db.MakeSysbenchConnectionString(),
+      db.client_vm_query_tools.GetSysbenchConnectionString(),
   ]
 
 
@@ -383,7 +383,7 @@ def _IssueMysqlPingCommandWithReturnCode(vm, benchmark_spec):
                     '--count=1',
                     '--sleep=1',
                     'status',
-                    db.MakeMysqlConnectionString()]
+                    db.client_vm_query_tools.GetConnectionString()]
   run_cmd = ' '.join(run_cmd_tokens)
   stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
       run_cmd,
@@ -442,7 +442,7 @@ def _GetDatabaseSize(vm, benchmark_spec):
       'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS "Size (MB)" '
       'FROM information_schema.TABLES '
       'GROUP BY table_schema; '
-      '\'' % db.MakeMysqlConnectionString())
+      '\'' % db.client_vm_query_tools.GetConnectionString())
 
   stdout, _ = vm.RemoteCommand(get_db_size_cmd)
   logging.info('Query database size results: \n%s', stdout)
@@ -691,7 +691,7 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   # Create the sbtest database for Sysbench.
   create_sbtest_db_cmd = ('mysql %s '
                           '-e \'create database sbtest;\'') % (
-                              db.MakeMysqlConnectionString())
+                              db.client_vm_query_tools.GetConnectionString())
   stdout, stderr = client_vm.RemoteCommand(create_sbtest_db_cmd)
   logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
   # Provision the Sysbench test based on the input flags (load data into DB)

@@ -56,7 +56,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(RelationalDbUnamangedTestCase, self).setUp()
-    self.minimal_spec = {
+    self.min_mysql_spec = {
         'cloud': 'GCP',
         'engine': 'mysql',
         'engine_version': '5.7',
@@ -72,65 +72,134 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
         }
     }
 
-    self.spec = benchmark_config_spec._RelationalDbSpec(
-        _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
+    self.min_postgres_spec = {
+        'cloud': 'GCP',
+        'engine': 'postgres',
+        'engine_version': '11',
+        'db_spec': {
+            'GCP': {
+                'machine_type': 'n1-standard-1'
+            }
+        },
+        'db_disk_spec': {
+            'GCP': {
+                'disk_size': 500
+            }
+        }
+    }
 
-  def testMakePostgresCommand(self):
+    self.min_sqlserver_spec = {
+        'cloud': 'GCP',
+        'engine': 'sqlserver',
+        'engine_version': '2019',
+        'db_spec': {
+            'GCP': {
+                'machine_type': 'n1-standard-1'
+            }
+        },
+        'db_disk_spec': {
+            'GCP': {
+                'disk_size': 500
+            }
+        }
+    }
+
+    self.mysql_spec = benchmark_config_spec._RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.min_mysql_spec)
+
+    self.postgres_spec = benchmark_config_spec._RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.min_postgres_spec)
+
+    self.sqlserver_spec = benchmark_config_spec._RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.min_sqlserver_spec)
+
+  def testMakePostgresClientCommand(self):
     FLAGS['use_managed_db'].parse(False)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.postgres_spec)
     db.endpoint = '1.1.1.1'
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
     self.assertEqual(
-        db.MakePostgresCommand('postgresql', 'Select 1', use_localhost=False),
+        db.client_vm_query_tools.MakeSqlCommand(
+            'Select 1', database_name='postgresql'),
         'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker dbname=postgresql\' -c "Select 1"'
     )
 
-  def testMakePostgresCommandWithLocalHost(self):
+  def testIssuePostgresClientCommand(self):
     FLAGS['use_managed_db'].parse(False)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.postgres_spec)
+    db.endpoint = '1.1.1.1'
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
+    with mock.patch.object(db.client_vm, 'RemoteCommand') as remote_command:
+      db.client_vm_query_tools.IssueSqlCommand('Select 1', database_name='abc')
+
+    command = [
+        mock.call(
+            'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
+            ' dbname=abc\' -c "Select 1"')
+    ]
+
+    self.assertCountEqual(remote_command.call_args_list, command)
+
+  def testMakePostgresServerCommand(self):
+    FLAGS['use_managed_db'].parse(False)
+    db = FakeRelationalDb(self.postgres_spec)
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     self.assertEqual(
-        db.MakePostgresCommand('postgresql', 'Select 1', use_localhost=True),
+        db.server_vm_query_tools.MakeSqlCommand(
+            'Select 1', database_name='postgresql'),
         'psql \'host=localhost user=root password=perfkitbenchmarker dbname=postgresql\' -c "Select 1"'
     )
 
-  def testMakeMysqlCommand(self):
+  def testMakeMysqlCientCommand(self):
     FLAGS['use_managed_db'].parse(False)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.mysql_spec)
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     self.assertEqual(
-        db.MakeMysqlCommand('Select 1', use_localhost=False),
+        db.client_vm_query_tools.MakeSqlCommand('Select 1'),
         'mysql -h 1.1.1.1 -P 3306 -u root -pperfkitbenchmarker -e "Select 1"')
 
   def testMakeMysqlCommandWithLocalHost(self):
     FLAGS['use_managed_db'].parse(False)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.mysql_spec)
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     self.assertEqual(
-        db.MakeMysqlCommand('Select 1', use_localhost=True),
+        db.server_vm_query_tools.MakeSqlCommand('Select 1'),
         'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "Select 1"')
 
   def testMakeSqlserverCommand(self):
     FLAGS['use_managed_db'].parse(False)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.sqlserver_spec)
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     self.assertEqual(
-        db.MakeSqlserverCommand('Select 1', use_localhost=False),
+        db.client_vm_query_tools.MakeSqlCommand('Select 1'),
         '/opt/mssql-tools/bin/sqlcmd -S 1.1.1.1 -U root -P perfkitbenchmarker -Q "Select 1"'
     )
 
   def testMakeSqlserverCommandWithLocalHost(self):
     FLAGS['use_managed_db'].parse(False)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.sqlserver_spec)
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     self.assertEqual(
-        db.MakeSqlserverCommand('Select 1', use_localhost=True),
+        db.server_vm_query_tools.MakeSqlCommand('Select 1'),
         '/opt/mssql-tools/bin/sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"'
     )
 
   def testInstallMYSQLServer(self):
     FLAGS['use_managed_db'].parse(False)
     FLAGS['innodb_buffer_pool_size'].parse(100)
-    db = FakeRelationalDb(self.spec)
+    db = FakeRelationalDb(self.mysql_spec)
     db.endpoint = '1.1.1.1'
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
@@ -183,21 +252,21 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('sudo service None restart'),
         mock.call('sudo cat None', should_log=True),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "SET GLOBAL max_connections=8000;"'
-        ),
+            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
+            '-e "SET GLOBAL max_connections=8000;"'),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "CREATE USER \'root\'@\'None\' IDENTIFIED BY \'perfkitbenchmarker\';"'
-        ),
+            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
+            '"CREATE USER \'root\'@\'None\' '
+            'IDENTIFIED BY \'perfkitbenchmarker\';"'),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"'
-        ),
+            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
+            '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"'),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "FLUSH PRIVILEGES;"'
-        )
+            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
+            '"FLUSH PRIVILEGES;"')
     ]
 
-    self.assertCountEqual(  # use assertCountEqual because order is undefined
-        remote_command.call_args_list, command)
+    self.assertCountEqual(remote_command.call_args_list, command)
 
 
 if __name__ == '__main__':

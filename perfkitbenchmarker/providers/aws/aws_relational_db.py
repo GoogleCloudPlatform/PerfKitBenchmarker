@@ -418,11 +418,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       Exception: if unknown how to create self.spec.engine.
 
     """
-    if self.spec.engine in [
-        sql_engine_utils.AURORA_MYSQL56, sql_engine_utils.AURORA_MYSQL,
-        sql_engine_utils.MYSQL
-    ]:
-      self._InstallMySQLClient()
     if self.is_managed_db:
       self._CreateAwsSqlInstance()
     else:
@@ -627,33 +622,36 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
     if not self.is_managed_db:
       self.port = self.GetDefaultPort()
-      return
-
-    need_ha_modification = self.spec.engine in _RDS_ENGINES
-
-    if self.spec.high_availability and need_ha_modification:
-      # When extending the database to be multi-az, the second region
-      # is picked by where the second subnet has been created.
-      cmd = util.AWS_PREFIX + [
-          'rds',
-          'modify-db-instance',
-          '--db-instance-identifier=%s' % self.instance_id,
-          '--multi-az',
-          '--apply-immediately',
-          '--region=%s' % self.region
-      ]
-      vm_util.IssueCommand(cmd)
-
-      if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
-        raise Exception('Instance could not be set to ready after '
-                        'modification for high availability')
-
-    json_output = self._DescribeInstance(self.instance_id)
-    self._SavePrimaryAndSecondaryZones(json_output)
-    if self.cluster_id:
-      self._GetPortsForClusterInstance(self.cluster_id)
+      self.client_vm_query_tools.InstallPackages()
     else:
-      self._GetPortsForWriterInstance(self.all_instance_ids[0])
+      need_ha_modification = self.spec.engine in _RDS_ENGINES
+
+      if self.spec.high_availability and need_ha_modification:
+        # When extending the database to be multi-az, the second region
+        # is picked by where the second subnet has been created.
+        cmd = util.AWS_PREFIX + [
+            'rds',
+            'modify-db-instance',
+            '--db-instance-identifier=%s' % self.instance_id,
+            '--multi-az',
+            '--apply-immediately',
+            '--region=%s' % self.region
+        ]
+        vm_util.IssueCommand(cmd)
+
+        if not self._IsInstanceReady(
+            self.instance_id, timeout=IS_READY_TIMEOUT):
+          raise Exception('Instance could not be set to ready after '
+                          'modification for high availability')
+
+      json_output = self._DescribeInstance(self.instance_id)
+      self._SavePrimaryAndSecondaryZones(json_output)
+      if self.cluster_id:
+        self._GetPortsForClusterInstance(self.cluster_id)
+      else:
+        self._GetPortsForWriterInstance(self.all_instance_ids[0])
+
+    self.client_vm_query_tools.InstallPackages()
 
   def _IsInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.

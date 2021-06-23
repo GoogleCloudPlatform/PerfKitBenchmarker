@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Utilities to support multiple engines."""
+import abc
 
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
@@ -49,6 +50,136 @@ AWS_AURORA_POSTGRES_ENGINE = 'aurora-postgresql'
 AWS_AURORA_MYSQL_ENGINE = 'aurora-mysql'
 
 
+# Query Related tools
+class DbConnectionProperties():
+  """Data class to store attrubutes needed for connecting to a database."""
+
+  def __init__(self, engine, engine_version, endpoint, database_username,
+               database_password):
+    self.engine = engine
+    self.engine_version = engine_version
+    self.endpoint = endpoint
+    self.database_username = database_username
+    self.database_password = database_password
+
+
+class ISQLQueryTools(metaclass=abc.ABCMeta):
+  """Interface for SQL related query.
+
+    Attributes:
+    vm: VM to issue command with.
+    connection_properties: Propreties of the database.
+  """
+  ENGINE_TYPE = None
+
+  def __init__(self, vm, connection_properties):
+    """Initialize ISQLQuery class."""
+    self.vm = vm
+    self.connection_properties = connection_properties
+
+  def IssueSqlCommand(self, command: str, database_name='', **kwargs):
+    """Issue Sql Command."""
+    return self.vm.RemoteCommand(
+        self.MakeSqlCommand(command, database_name=database_name), **kwargs)
+
+  @abc.abstractmethod
+  def InstallPackages(self) -> None:
+    """Installs packages required for making queries."""
+    pass
+
+  @abc.abstractmethod
+  def GetConnectionString(self, **kwargs):
+    """Get connection string."""
+    pass
+
+  @abc.abstractmethod
+  def MakeSqlCommand(self, command: str, **kwargs):
+    """Make a sql command."""
+    pass
+
+
+class PostgresCliQueryTools(ISQLQueryTools):
+  """SQL Query class to issue postgres related query."""
+  ENGINE_TYPE = POSTGRES
+
+  def InstallPackages(self):
+    """Installs packages required for making queries."""
+    self.vm.Install('postgres_client')
+
+  def IssueSqlCommand(self, command: str, database_name='postgres', **kwargs):
+    """Issue Sql Command."""
+    return self.vm.RemoteCommand(
+        self.MakeSqlCommand(command, database_name=database_name), **kwargs)
+
+  def MakeSqlCommand(self, command: str, database_name='postgres'):
+    return 'psql %s -c "%s"' % (self.GetConnectionString(database_name),
+                                command)
+
+  def GetConnectionString(self, database_name='postgres'):
+    return '\'host={0} user={1} password={2} dbname={3}\''.format(
+        self.connection_properties.endpoint,
+        self.connection_properties.database_username,
+        self.connection_properties.database_password, database_name)
+
+
+class MysqlCliQueryTools(ISQLQueryTools):
+  """SQL Query class to issue Mysql related query."""
+  ENGINE_TYPE = MYSQL
+
+  def InstallPackages(self):
+    """Installs packages required for making queries."""
+    if (self.connection_properties.engine_version == '5.6' or
+        self.connection_properties.engine_version.startswith('5.6.')):
+      mysql_name = 'mysqlclient56'
+    elif (self.connection_properties.engine_version == '5.7' or
+          self.connection_properties.engine_version.startswith('5.7') or
+          self.connection_properties.engine_version == '8.0' or
+          self.connection_properties.engine_version.startswith('8.0')):
+      mysql_name = 'mysqlclient'
+    else:
+      raise Exception('Invalid database engine version: %s. Only 5.6, 5.7 '
+                      'and 8.0 are supported.' %
+                      self.connection_properties.engine_version)
+    self.vm.Install(mysql_name)
+
+  def MakeSqlCommand(self, command, database_name=''):
+    mysql_command = 'mysql %s ' % (self.GetConnectionString())
+    if database_name:
+      mysql_command += database_name + ' '
+
+    return mysql_command + '-e "%s"' % command
+
+  def GetConnectionString(self):
+    return '-h {0} -P 3306 -u {1} -p{2}'.format(
+        self.connection_properties.endpoint,
+        self.connection_properties.database_username,
+        self.connection_properties.database_password)
+
+  def GetSysbenchConnectionString(self):
+    return ('--mysql-host={0} --mysql-user={1} --mysql-password="{2}" ').format(
+        self.connection_properties.endpoint,
+        self.connection_properties.database_username,
+        self.connection_properties.database_password)
+
+
+class SqlServerCliQueryTools(ISQLQueryTools):
+  """SQL Query class to issue SQL server related query."""
+  ENGINE_TYPE = SQLSERVER
+
+  def InstallPackages(self):
+    """Installs packages required for making queries."""
+    self.vm.Install('mssql_tools')
+
+  def MakeSqlCommand(self, command):
+    return '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s -Q "%s"' % (
+        self.connection_properties.endpoint,
+        self.connection_properties.database_username,
+        self.connection_properties.database_password, command)
+
+  def GetConnectionString(self, database_name=''):
+    raise NotImplementedError('Connection string currently not supported')
+
+
 # Helper functions for this module
 def GetDbEngineType(db_engine: str) -> str:
   """Converts the engine type from db_engine.
@@ -68,10 +199,21 @@ def GetDbEngineType(db_engine: str) -> str:
     return SQLSERVER
   elif db_engine == AWS_AURORA_POSTGRES_ENGINE:
     return POSTGRES
-  elif db_engine == AWS_AURORA_MYSQL_ENGINE:
+  elif db_engine == AWS_AURORA_MYSQL_ENGINE or db_engine == AURORA_MYSQL56:
     return MYSQL
 
   if db_engine not in ENGINE_TYPES:
     raise TypeError('Unsupported engine type', db_engine)
   return db_engine
+
+
+def GetQueryToolsByEngine(vm, connection_properties):
+  engine_type = GetDbEngineType(connection_properties.engine)
+  if engine_type == MYSQL:
+    return MysqlCliQueryTools(vm, connection_properties)
+  elif engine_type == POSTGRES:
+    return PostgresCliQueryTools(vm, connection_properties)
+  elif engine_type == SQLSERVER:
+    return SqlServerCliQueryTools(vm, connection_properties)
+  raise ValueError('Engine not supported')
 

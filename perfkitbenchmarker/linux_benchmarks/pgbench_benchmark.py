@@ -170,18 +170,16 @@ def Prepare(benchmark_spec):
   UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec)
 
   db = benchmark_spec.relational_db
-  connection_string = db.MakePsqlConnectionString(DEFAULT_DB_NAME)
 
   CreateDatabase(benchmark_spec, DEFAULT_DB_NAME, TEST_DB_NAME)
 
-  connection_string = db.MakePsqlConnectionString(TEST_DB_NAME)
+  connection_string = db.client_vm_query_tools.GetConnectionString(TEST_DB_NAME)
   vm.RobustRemoteCommand('pgbench {0} -i -s {1}'.format(
       connection_string, benchmark_spec.scale_factor))
 
-  stdout = _IssueDatabaseCommand(
-      benchmark_spec,
-      TEST_DB_NAME,
-      'SELECT pg_size_pretty(pg_database_size(\'{0}\'))'.format(TEST_DB_NAME))
+  stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
+      'SELECT pg_size_pretty(pg_database_size(\'{0}\'))'.format(TEST_DB_NAME),
+      database_name=TEST_DB_NAME)
 
   db.postgres_db_size_MB = ParseSizeFromTable(stdout)
 
@@ -234,17 +232,6 @@ def DoesDatabaseExist(client_vm, connection_string, database_name):
   return return_value == 0
 
 
-def _IssueDatabaseCommand(benchmark_spec, database_name, command):
-  client_vm = benchmark_spec.vms[0]
-  db = benchmark_spec.relational_db
-  connection_string = db.MakePsqlConnectionString(database_name)
-  command = 'psql {0} -c "{1};"'.format(
-      connection_string,
-      command)
-  stdout, _ = client_vm.RemoteCommand(command, should_log=True)
-  return stdout
-
-
 def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
   """Creates a new database on the database server.
 
@@ -260,18 +247,18 @@ def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
   """
   client_vm = benchmark_spec.vms[0]
   db = benchmark_spec.relational_db
-  connection_string = db.MakePsqlConnectionString(default_database_name)
+  connection_string = db.client_vm_query_tools.GetConnectionString(
+      database_name=default_database_name)
 
   if DoesDatabaseExist(client_vm, connection_string, new_database_name):
-    _IssueDatabaseCommand(
-        benchmark_spec,
-        default_database_name,
-        'DROP DATABASE {0}'.format(new_database_name))
+    db.client_vm_query_tools.IssueSqlCommand(
+        'DROP DATABASE {0}'.format(new_database_name),
+        database_name=default_database_name)
 
-  _IssueDatabaseCommand(
-      benchmark_spec,
-      default_database_name,
-      'CREATE DATABASE {0}'.format(new_database_name))
+  db.client_vm_query_tools.IssueSqlCommand(
+      'CREATE DATABASE {0}'.format(new_database_name),
+      database_name=default_database_name,
+  )
 
 
 def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
@@ -322,7 +309,8 @@ def Run(benchmark_spec):
   UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
 
   db = benchmark_spec.relational_db
-  connection_string = db.MakePsqlConnectionString(TEST_DB_NAME)
+  connection_string = db.client_vm_query_tools.GetConnectionString(
+      database_name=TEST_DB_NAME)
 
   common_metadata = {
       'scale_factor': benchmark_spec.scale_factor,

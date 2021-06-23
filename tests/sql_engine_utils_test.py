@@ -8,7 +8,7 @@ from tests import pkb_common_test_case
 
 class SqlEngineUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def test_get_db_engine_type(self):
+  def testGetDbEngineType(self):
     self.assertEqual(
         sql_engine_utils.GetDbEngineType('aurora-postgresql'), 'postgres')
     self.assertEqual(

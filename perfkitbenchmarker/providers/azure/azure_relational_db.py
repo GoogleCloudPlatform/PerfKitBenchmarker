@@ -411,8 +411,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       Exception: if attempting to create a non high availability database.
 
     """
-    if self.spec.engine == sql_engine_utils.MYSQL:
-      self._InstallMySQLClient()
     if self.is_managed_db:
       self._CreateAzureManagedSqlInstance()
     else:
@@ -482,27 +480,28 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     super()._PostCreate()
     self.port = self.GetDefaultPort()
 
-    if not self.is_managed_db:
-      return
-    cmd = [
-        azure.AZURE_PATH,
-        self.GetAzCommandForEngine(),
-        'server',
-        'firewall-rule',
-        'create',
-        '--resource-group', self.resource_group.name,
-        '--server', self.instance_id,
-        '--name', 'AllowAllIps',
-        '--start-ip-address', '0.0.0.0',
-        '--end-ip-address', '255.255.255.255'
-    ]
-    vm_util.IssueCommand(cmd)
-    self._AssignEndpointForWriterInstance()
+    if self.is_managed_db:
+      cmd = [
+          azure.AZURE_PATH,
+          self.GetAzCommandForEngine(),
+          'server',
+          'firewall-rule',
+          'create',
+          '--resource-group', self.resource_group.name,
+          '--server', self.instance_id,
+          '--name', 'AllowAllIps',
+          '--start-ip-address', '0.0.0.0',
+          '--end-ip-address', '255.255.255.255'
+      ]
+      vm_util.IssueCommand(cmd)
+      self._AssignEndpointForWriterInstance()
 
-    if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
-      # Azure will add @domainname after the database username
-      self.spec.database_username = (self.spec.database_username + '@' +
-                                     self.endpoint.split('.')[0])
+      if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
+        # Azure will add @domainname after the database username
+        self.spec.database_username = (self.spec.database_username + '@' +
+                                       self.endpoint.split('.')[0])
+
+    self.client_vm_query_tools.InstallPackages()
 
   def _Reboot(self):
     """Reboot the managed db."""
@@ -591,24 +590,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """
     server_show_json = self._AzServerShow()
     self.endpoint = server_show_json['fullyQualifiedDomainName']
-
-  def MakePsqlConnectionString(self, database_name):
-    """Makes the connection string used to connect via PSql.
-
-    Override implemenation in base class.  Azure postgres needs this format.
-
-    Args:
-        database_name: string, the name of the database to connect to.
-
-    Returns:
-        The connection string to use.
-    """
-    return '\'host={0} user={1}@{2} password={3} dbname={4}\''.format(
-        self.endpoint,
-        self.spec.database_username,
-        self.instance_id,
-        self.spec.database_password,
-        database_name)
 
   def _FailoverHA(self):
     raise NotImplementedError()
