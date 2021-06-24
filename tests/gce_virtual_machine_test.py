@@ -731,7 +731,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--accelerator', issue_command.call_args[0][0])
       self.assertIn('type=nvidia-tesla-k80,count=2',
                     issue_command.call_args[0][0])
-      self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
+      self.assertIn('--on-host-maintenance', issue_command.call_args[0][0])
       self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
 

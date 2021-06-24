@@ -479,7 +479,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.network.placement_group:
       self.metadata.update(self.network.placement_group.GetResourceMetadata())
       cmd.flags['resource-policies'] = self.network.placement_group.name
-      cmd.flags['maintenance-policy'] = 'TERMINATE'
+      cmd.flags['on-host-maintenance'] = 'TERMINATE'
     else:
       self.metadata[
           'placement_group_style'] = placement_group.PLACEMENT_GROUP_NONE
@@ -533,7 +533,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           'Cannot set flag gce_migrate_on_maintenance on instances with GPUs, '
           'as it is not supported by GCP.')
     if not FLAGS.gce_migrate_on_maintenance or self.gpu_count:
-      cmd.flags['maintenance-policy'] = 'TERMINATE'
+      cmd.flags['on-host-maintenance'] = 'TERMINATE'
     cmd.flags['local-ssd'] = (['interface={0}'.format(
         FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
