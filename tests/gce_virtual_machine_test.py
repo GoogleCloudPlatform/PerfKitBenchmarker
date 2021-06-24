@@ -828,6 +828,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     super(GvnicTest, self).setUp()
     vm_spec = gce_virtual_machine.GceVmSpec('test_component', project='test')
     self.vm = gce_virtual_machine.Ubuntu1804BasedGceVirtualMachine(vm_spec)
+    self.vm.HasPackage = mock.Mock(return_value=False)
     self.mock_cmd = mock.Mock()
     self.vm.RemoteCommand = self.mock_cmd
 
@@ -835,7 +836,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.mock_cmd.return_value = (_IP_LINK_TEXT, '')
     names = list(self.vm._GetNetworkDeviceNames())
     self.assertEqual(['lo', 'ens4'], names)
-    self.mock_cmd.assert_called_with('ip link show up')
+    self.mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
 
   def testGetNetworkDeviceProperties(self):
     self.mock_cmd.return_value = (_ETHTOOL_TEXT, '')
@@ -853,7 +854,8 @@ class GvnicTest(GceVirtualMachineTestCase):
         'version': '1.0.0'
     }
     self.assertEqual(expected, props)
-    self.mock_cmd.assert_called_with('ethtool -i ens4')
+    self.mock_cmd.assert_called_with(
+        'PATH="${PATH}":/usr/sbin ethtool -i ens4')
 
   def testOnStartupSetGvnicVersion(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), (_ETHTOOL_TEXT, '')]

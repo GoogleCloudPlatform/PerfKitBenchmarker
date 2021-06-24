@@ -995,7 +995,15 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
 
   def _GetNetworkDeviceProperties(self, device_name: str) -> Dict[str, str]:
     """Returns a dict of the network device properties."""
-    stdout, _ = self.RemoteCommand(f'ethtool -i {device_name}')
+    # ethtool can exist under /usr/sbin or needs to be installed (debian9)
+    if self.HasPackage('ethtool'):
+      self.InstallPackages('ethtool')
+    try:
+      stdout, _ = self.RemoteCommand(
+          f'PATH="${{PATH}}":/usr/sbin ethtool -i {device_name}')
+    except errors.VirtualMachine.RemoteCommandError:
+      logging.info('ethtool not installed', exc_info=True)
+      return {}
     properties = {}
     for line in stdout.splitlines():
       m = self._ETHTOOL_RE.match(line)
@@ -1005,7 +1013,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
 
   def _GetNetworkDeviceNames(self) -> Iterator[str]:
     """Yields network device names."""
-    stdout, _ = self.RemoteCommand('ip link show up')
+    stdout, _ = self.RemoteCommand('PATH="${PATH}":/usr/sbin ip link show up')
     for line in stdout.splitlines():
       m = self._IP_LINK_RE.match(line)
       if m:
