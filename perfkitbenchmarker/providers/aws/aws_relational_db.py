@@ -242,8 +242,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     """
     new_subnet_zones = self._GetNewZones()
     while len(new_subnet_zones) >= 1:
+      new_subnet_zone = new_subnet_zones.pop()
       try:
-        new_subnet_zone = new_subnet_zones.pop()
         new_subnet = self._CreateSubnetInZone(new_subnet_zone)
         return new_subnet
       except:
