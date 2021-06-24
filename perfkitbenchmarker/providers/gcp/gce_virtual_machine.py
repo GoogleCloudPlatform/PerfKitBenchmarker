@@ -410,6 +410,20 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_nic_type = FLAGS.gce_nic_type
     self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
+    # Default to GCE default (Live Migration)
+    self.on_host_maintenance = None
+    # https://cloud.google.com/compute/docs/instances/live-migration#gpusmaintenance
+    # https://cloud.google.com/compute/docs/instances/define-instance-placement#restrictions
+    # TODO(pclay): Update if this assertion ever changes
+    if (FLAGS['gce_migrate_on_maintenance'].present and
+        FLAGS.gce_migrate_on_maintenance and
+        (self.gpu_count or self.network.placement_group)):
+      raise errors.Config.InvalidValue(
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
+          'or network placement groups, as it is not supported by GCP.')
+    if (not FLAGS.gce_migrate_on_maintenance or
+        self.gpu_count or self.network.placement_group):
+      self.on_host_maintenance = 'TERMINATE'
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -432,6 +446,23 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     args = ['compute', 'instances', 'create', self.name]
 
     cmd = util.GcloudCommand(self, *args)
+
+    # Compute all flags requiring alpha first. Then if any flags are different
+    # between alpha and GA, we can set the appropriate ones.
+    if self.gce_egress_bandwidth_tier:
+      # gce_egress_bandwidth_tier is available in alpha and beta as of June 2021
+      # TODO(pclay): remove when available in GA
+      cmd.use_alpha_gcloud = True
+      network_performance_configs = f'total-egress-bandwidth-tier={self.gce_egress_bandwidth_tier}'
+      cmd.flags['network-performance-configs'] = network_performance_configs
+
+    if self.on_host_maintenance:
+      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
+      maintenance_flag = 'maintenance-policy'
+      if cmd.use_alpha_gcloud:
+        maintenance_flag = 'on-host-maintenance'
+      cmd.flags[maintenance_flag] = self.on_host_maintenance
+
     # Bundle network-related arguments with --network-interface
     # This flag is mutually exclusive with any of these flags:
     # --address, --network, --network-tier, --subnet, --private-network-ip.
@@ -479,15 +510,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.network.placement_group:
       self.metadata.update(self.network.placement_group.GetResourceMetadata())
       cmd.flags['resource-policies'] = self.network.placement_group.name
-      cmd.flags['on-host-maintenance'] = 'TERMINATE'
     else:
       self.metadata[
           'placement_group_style'] = placement_group.PLACEMENT_GROUP_NONE
-
-    if self.gce_egress_bandwidth_tier:
-      cmd.use_alpha_gcloud = True
-      network_performance_configs = f'total-egress-bandwidth-tier={self.gce_egress_bandwidth_tier}'
-      cmd.flags['network-performance-configs'] = network_performance_configs
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
@@ -525,15 +550,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
-    # TODO(user): If GCE one day supports live migration on GPUs
-    #                           this can be revised.
-    if (FLAGS['gce_migrate_on_maintenance'].present and
-        FLAGS.gce_migrate_on_maintenance and self.gpu_count):
-      raise errors.Config.InvalidValue(
-          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs, '
-          'as it is not supported by GCP.')
-    if not FLAGS.gce_migrate_on_maintenance or self.gpu_count:
-      cmd.flags['on-host-maintenance'] = 'TERMINATE'
     cmd.flags['local-ssd'] = (['interface={0}'.format(
         FLAGS.gce_ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:

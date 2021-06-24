@@ -67,7 +67,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     stack.enter_context(
         mock.patch(
             gce_network.__name__ + '.GceNetwork.GetNetwork',
-            return_value='fakenetwork'))
+            return_value=gce_network.GceNetwork(
+                gce_network.GceNetworkSpec('fakeproject'))))
 
     retval = (stdout, stderr, return_code)
     issue_command = stack.enter_context(

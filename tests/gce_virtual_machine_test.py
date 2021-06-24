@@ -555,8 +555,8 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
       self._CreateVmCommand(
           gce_migrate_on_maintenance=True, gpu_count=1, gpu_type='k80')
       self.assertEqual(str(cm.exception), (
-          'Cannot set flag gce_migrate_on_maintenance on '
-          'instances with GPUs, as it is not supported by GCP.'))
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
+          'or network placement groups, as it is not supported by GCP.'))
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
     _, call_count = self._CreateVmCommand(
@@ -604,7 +604,16 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     """Tests that egress bandwidth can be set as tier 1."""
     cmd, call_count = self._CreateVmCommand(gce_egress_bandwidth_tier='TIER_1')
     self.assertEqual(call_count, 1)
+    self.assertIn(' alpha ', cmd)
     self.assertIn('total-egress-bandwidth-tier=TIER_1', cmd)
+
+  def testAlphaMaintenanceFlag(self):
+    """Tests that egress bandwidth can be set as tier 1."""
+    cmd, call_count = self._CreateVmCommand(
+        gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80')
+    self.assertEqual(call_count, 1)
+    self.assertIn(' alpha ', cmd)
+    self.assertIn('--on-host-maintenance', cmd)
 
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(
@@ -731,7 +740,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--accelerator', issue_command.call_args[0][0])
       self.assertIn('type=nvidia-tesla-k80,count=2',
                     issue_command.call_args[0][0])
-      self.assertIn('--on-host-maintenance', issue_command.call_args[0][0])
+      self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
       self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
 
