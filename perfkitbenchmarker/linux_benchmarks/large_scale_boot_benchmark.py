@@ -333,7 +333,7 @@ def _BuildContext(launcher_vm, booter_template_vm):
   elif cloud == 'Azure':
     context.update({
         'boot_vm_name_prefix': launcher_vm.name.split('-', 1)[1],
-        'location': launcher_vm.location,
+        'location': launcher_vm.region,
         'image': booter_template_vm.image,
         'storage_sku': booter_template_vm.os_disk.disk_type,
         'resource_group': launcher_vm.resource_group.name,
