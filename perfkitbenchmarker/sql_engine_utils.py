@@ -77,10 +77,14 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     self.vm = vm
     self.connection_properties = connection_properties
 
-  def IssueSqlCommand(self, command: str, database_name='', **kwargs):
+  def IssueSqlCommand(self, command: str, database_name='', superuser=False,
+                      **kwargs):
     """Issue Sql Command."""
-    return self.vm.RemoteCommand(
-        self.MakeSqlCommand(command, database_name=database_name), **kwargs)
+    command = self.MakeSqlCommand(command, database_name=database_name)
+    if superuser:
+      command = 'sudo ' + command
+
+    return self.vm.RemoteCommand(command, **kwargs)
 
   @abc.abstractmethod
   def InstallPackages(self) -> None:

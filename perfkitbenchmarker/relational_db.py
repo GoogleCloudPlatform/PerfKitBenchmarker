@@ -649,7 +649,7 @@ class BaseRelationalDb(resource.BaseResource):
         should_log=True)
 
     self.server_vm_query_tools.IssueSqlCommand(
-        'SET GLOBAL max_connections=8000;')
+        'SET GLOBAL max_connections=8000;', superuser=True)
 
     if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
       client_ip = self.client_vm.internal_ip
@@ -658,12 +658,14 @@ class BaseRelationalDb(resource.BaseResource):
 
     self.server_vm_query_tools.IssueSqlCommand(
         'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %
-        (self.spec.database_username, client_ip, self.spec.database_password))
+        (self.spec.database_username, client_ip, self.spec.database_password),
+        superuser=True)
 
     self.server_vm_query_tools.IssueSqlCommand(
         'GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';' %
-        (self.spec.database_username, client_ip))
-    self.server_vm_query_tools.IssueSqlCommand('FLUSH PRIVILEGES;')
+        (self.spec.database_username, client_ip), superuser=True)
+    self.server_vm_query_tools.IssueSqlCommand('FLUSH PRIVILEGES;',
+                                               superuser=True)
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
@@ -709,9 +711,11 @@ class BaseRelationalDb(resource.BaseResource):
     if self.spec.engine == 'mysql':
       self.server_vm.RemoteCommand('sudo cat /var/log/mysql/error.log')
       self.server_vm_query_tools.IssueSqlCommand(
-          'SHOW GLOBAL STATUS LIKE \'Aborted_connects\';')
+          'SHOW GLOBAL STATUS LIKE \'Aborted_connects\';', superuser=True)
       self.server_vm_query_tools.IssueSqlCommand(
-          'SHOW GLOBAL STATUS LIKE \'Aborted_clients\';')
+          'SHOW GLOBAL STATUS LIKE \'Aborted_clients\';', superuser=True)
+      self.server_vm_query_tools.IssueSqlCommand(
+          'SHOW GLOBAL STATUS LIKE \'%version%\';', superuser=True)
 
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""

@@ -26,6 +26,15 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
+  vm.RemoteCommand('wget -c '
+                   'https://repo.mysql.com//mysql-apt-config_0.8.17-1_all.deb')
+  vm.RemoteCommand('echo mysql-apt-config mysql-apt-config/select-server'
+                   ' select mysql-8.0 | sudo debconf-set-selections')
+  vm.RemoteCommand('echo mysql-apt-config mysql-apt-config/select-product'
+                   ' select Ok | sudo debconf-set-selections')
+  vm.RemoteCommand('sudo -E DEBIAN_FRONTEND=noninteractive dpkg -i'
+                   ' mysql-apt-config_0.8.17-1_all.deb')
+  vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('echo "mysql-server-8.0 mysql-server/root_password password '
                    f'{MYSQL_PSWD}" | sudo debconf-set-selections')
   vm.RemoteCommand('echo "mysql-server-8.0 mysql-server/root_password_again '

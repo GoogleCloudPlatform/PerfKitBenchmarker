@@ -162,7 +162,8 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.endpoint = '1.1.1.1'
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand('Select 1'),
-        'mysql -h 1.1.1.1 -P 3306 -u root -pperfkitbenchmarker -e "Select 1"')
+        'mysql -h 1.1.1.1 -P 3306 -u root'
+        ' -pperfkitbenchmarker -e "Select 1"')
 
   def testMakeMysqlCommandWithLocalHost(self):
     FLAGS['use_managed_db'].parse(False)
@@ -172,7 +173,8 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.endpoint = '1.1.1.1'
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
-        'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "Select 1"')
+        'mysql -h localhost -P 3306 -u root '
+        '-pperfkitbenchmarker -e "Select 1"')
 
   def testMakeSqlserverCommand(self):
     FLAGS['use_managed_db'].parse(False)
@@ -252,17 +254,17 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('sudo service None restart'),
         mock.call('sudo cat None', should_log=True),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
+            'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
             '-e "SET GLOBAL max_connections=8000;"'),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
+            'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"CREATE USER \'root\'@\'None\' '
             'IDENTIFIED BY \'perfkitbenchmarker\';"'),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
+            'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"'),
         mock.call(
-            'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
+            'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"FLUSH PRIVILEGES;"')
     ]
 
