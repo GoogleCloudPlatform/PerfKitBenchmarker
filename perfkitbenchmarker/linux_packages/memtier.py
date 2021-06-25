@@ -11,10 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Module containing memtier installation and cleanup functions."""
-
 
 import json
 import logging
@@ -89,6 +86,10 @@ flags.DEFINE_string(
 flags.DEFINE_integer(
     'memtier_key_maximum', 10000000, 'Key ID maximum value. The range of keys '
     'will be from 1 (min) to this specified max key value.')
+flags.DEFINE_integer(
+    'memtier_load_key_maximum', None,
+    'Key ID maximum value for the preload step. The range of keys '
+    'will be from 1 (min) to this specified max key value.')
 flag_util.DEFINE_integerlist(
     'memtier_pipeline', [1],
     'Number of pipelines to use for memtier. Defaults to 1, '
@@ -104,8 +105,8 @@ def YumInstall(vm):
                                             linux_packages.INSTALL_DIR))
   vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(linux_packages.INSTALL_DIR,
                                                    LIBEVENT_TAR))
-  vm.RemoteCommand('cd {0} && ./configure && sudo make install'.format(
-      LIBEVENT_DIR))
+  vm.RemoteCommand(
+      'cd {0} && ./configure && sudo make install'.format(LIBEVENT_DIR))
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
   pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
@@ -175,9 +176,7 @@ def BuildMemtierCommand(
       'test-time': test_time,
   }
   # Arguments passed without a parameter
-  no_param_args = {
-      'random-data': random_data
-  }
+  no_param_args = {'random-data': random_data}
   # Build the command
   cmd = ['memtier_benchmark']
   for arg, value in args.items():
@@ -193,6 +192,15 @@ def BuildMemtierCommand(
 
 def Load(client_vm, server_ip, server_port):
   """Preload the server with data."""
+
+  # Load key max has to be at least memtier_key_maximum in order to avoid cache
+  # misses
+  key_max = None
+  if FLAGS.memtier_load_key_maximum:
+    key_max = max(FLAGS.memtier_load_key_maximum, FLAGS.memtier_key_maximum)
+  else:
+    key_max = FLAGS.memtier_key_maximum
+
   cmd = BuildMemtierCommand(
       server=server_ip,
       port=server_port,
@@ -203,7 +211,7 @@ def Load(client_vm, server_ip, server_port):
       data_size=FLAGS.memtier_data_size,
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=1,
-      key_maximum=FLAGS.memtier_key_maximum,
+      key_maximum=key_max,
       requests='allkeys')
   client_vm.RemoteCommand(cmd)
 
@@ -299,6 +307,7 @@ class MemtierResult:
 
     Args:
       memtier_results: Text output of running Memtier benchmark.
+
     Returns:
       MemtierResult object.
 
@@ -364,18 +373,10 @@ def _ParseHistogram(
   last_total_gets = 0
   for raw_line in memtier_results.splitlines():
     line = raw_line.strip()
-    last_total_sets = _ParseLine(
-        r'^SET',
-        line,
-        approx_total_sets,
-        last_total_sets,
-        set_histogram)
-    last_total_gets = _ParseLine(
-        r'^GET',
-        line,
-        approx_total_gets,
-        last_total_gets,
-        get_histogram)
+    last_total_sets = _ParseLine(r'^SET', line, approx_total_sets,
+                                 last_total_sets, set_histogram)
+    last_total_gets = _ParseLine(r'^GET', line, approx_total_gets,
+                                 last_total_gets, get_histogram)
   return set_histogram, get_histogram
 
 
@@ -399,8 +400,7 @@ def _ParseLine(pattern, line, approx_total, last_total, histogram):
   counts = _ConvertPercentToAbsolute(approx_total, float(percent))
   bucket_counts = int(round(counts - last_total))
   if bucket_counts > 0:
-    histogram.append({'microsec': float(msec) * 1000,
-                      'count': bucket_counts})
+    histogram.append({'microsec': float(msec) * 1000, 'count': bucket_counts})
   return counts
 
 
