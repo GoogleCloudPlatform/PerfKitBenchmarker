@@ -83,7 +83,6 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     command = self.MakeSqlCommand(command, database_name=database_name)
     if superuser:
       command = 'sudo ' + command
-
     return self.vm.RemoteCommand(command, **kwargs)
 
   @abc.abstractmethod
@@ -116,6 +115,7 @@ class PostgresCliQueryTools(ISQLQueryTools):
         self.MakeSqlCommand(command, database_name=database_name), **kwargs)
 
   def MakeSqlCommand(self, command: str, database_name='postgres'):
+    """Issue Sql Command."""
     return 'psql %s -c "%s"' % (self.GetConnectionString(database_name),
                                 command)
 
@@ -146,7 +146,8 @@ class MysqlCliQueryTools(ISQLQueryTools):
                       self.connection_properties.engine_version)
     self.vm.Install(mysql_name)
 
-  def MakeSqlCommand(self, command, database_name=''):
+  def MakeSqlCommand(self, command: str, database_name=''):
+    """See base class."""
     mysql_command = 'mysql %s ' % (self.GetConnectionString())
     if database_name:
       mysql_command += database_name + ' '
@@ -174,11 +175,17 @@ class SqlServerCliQueryTools(ISQLQueryTools):
     """Installs packages required for making queries."""
     self.vm.Install('mssql_tools')
 
-  def MakeSqlCommand(self, command):
-    return '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s -Q "%s"' % (
+  def MakeSqlCommand(self, command: str, database_name=''):
+    """See base class."""
+    sqlserver_command = '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s ' % (
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
-        self.connection_properties.database_password, command)
+        self.connection_properties.database_password)
+    if database_name:
+      sqlserver_command += '-d %s ' % database_name
+
+    sqlserver_command = sqlserver_command + '-Q "%s"' % command
+    return sqlserver_command
 
   def GetConnectionString(self, database_name=''):
     raise NotImplementedError('Connection string currently not supported')
