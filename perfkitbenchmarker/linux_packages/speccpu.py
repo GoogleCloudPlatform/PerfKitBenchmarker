@@ -95,6 +95,10 @@ flags.DEFINE_enum(
     'spec_runmode', BASE_MODE,
     [BASE_MODE, PEAK_MODE, ALL_MODE],
     'Run mode to use. Defaults to base. ')
+flags.DEFINE_string(
+    'runspec_script', None,
+    'Used by the PKB speccpu benchmarks. If set, the benchmark will execute '
+    'this script instead of invoking runspec binary directly.')
 
 
 VM_STATE_ATTR = 'speccpu_vm_state'
@@ -619,8 +623,12 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   if version_specific_parameters:
     fl += ' '.join(version_specific_parameters)
 
-  runspec_cmd = '{cmd} --noreportable {flags} {subset}'.format(
-      cmd=cmd, flags=fl, subset=benchmark_subset)
+  if FLAGS.runspec_script:
+    vm.PushDataFile(FLAGS.runspec_script, remote_path=speccpu_vm_state.spec_dir)
+    runspec_cmd = f'sudo bash {FLAGS.runspec_script}'
+  else:
+    runspec_cmd = '{cmd} --noreportable {flags} {subset}'.format(
+        cmd=cmd, flags=fl, subset=benchmark_subset)
 
   cmd = ' && '.join((
       'cd {0}'.format(speccpu_vm_state.spec_dir), 'rm -rf result', '. ./shrc',

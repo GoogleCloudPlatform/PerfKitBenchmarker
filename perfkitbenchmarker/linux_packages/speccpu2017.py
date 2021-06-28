@@ -49,6 +49,7 @@ PREPROVISIONED_DATA = {
     'cpu2017-gcc-arm.tgz': None,  # ARM-optimized
     'cpu2017-1.1.8_aocc.tar.gz': None,  # AOCC
     'cpu2017-1.1.8.tar.gz': None,  # spec v1.1.8
+    'cpu2017-1.1.8_icc.tar.gz': None,  # ICC
 }
 
 
