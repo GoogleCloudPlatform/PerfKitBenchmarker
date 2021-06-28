@@ -1731,6 +1731,10 @@ class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
     self.RemoteCommand('sudo mount -o remount,exec /home')
     self.RemoteCommand('sudo mount -o remount,exec /tmp')
 
+  def HasPackage(self, package: str) -> bool:
+    # Change this when implementing InstallPackages.
+    return False
+
 
 class CoreOsMixin(BaseContainerLinuxMixin):
   """Class holding CoreOS Container Linux specific VM methods and attributes."""
