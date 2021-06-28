@@ -30,7 +30,7 @@ from perfkitbenchmarker.linux_packages import hadoop
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('spark_version', '3.1.1', 'Version of spark.')
+flags.DEFINE_string('spark_version', '3.1.2', 'Version of spark.')
 
 DATA_FILES = [
     'spark/spark-defaults.conf.j2', 'spark/spark-env.sh.j2', 'spark/workers.j2'
