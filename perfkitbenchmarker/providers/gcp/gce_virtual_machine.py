@@ -424,6 +424,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if (not FLAGS.gce_migrate_on_maintenance or
         self.gpu_count or self.network.placement_group):
       self.on_host_maintenance = 'TERMINATE'
+    if self.preemptible:
+      self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -545,7 +547,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.preemptible:
       cmd.flags['preemptible'] = True
-      self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
       metadata.update([self._PreemptibleMetadataKeyValue()])
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
