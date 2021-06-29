@@ -34,7 +34,7 @@ import posixpath
 import re
 import threading
 
-from typing import Iterator, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -970,7 +970,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
   """
 
   # regex to get the network devices from "ip link show"
-  _IP_LINK_RE = re.compile(r'^\d+: (?P<device_name>\S+):')
+  _IP_LINK_RE = re.compile(r'^\d+: (?P<device_name>\S+):.*mtu (?P<mtu>\d+)')
   # devices to ignore from "ip link show"
   _IGNORE_NETWORK_DEVICES = ('lo',)
   # ethtool properties output should match this regex
@@ -981,6 +981,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
   def __init__(self, vm_spec):
     super(BaseLinuxGceVirtualMachine, self).__init__(vm_spec)
     self._gvnic_version = None
+    self._discovered_mtu: Optional[int] = None
 
   def GetResourceMetadata(self):
     """See base class."""
@@ -988,19 +989,26 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
                      self).GetResourceMetadata().copy()
     if self._gvnic_version:
       metadata['gvnic_version'] = self._gvnic_version
+    if self._discovered_mtu:
+      metadata['mtu'] = self._discovered_mtu
     return metadata
 
   def OnStartup(self):
     """See base class.  Sets the _gvnic_version."""
     super(BaseLinuxGceVirtualMachine, self).OnStartup()
     self._gvnic_version = self.GetGvnicVersion()
+    devices = self._GetNetworkDevices()
+    all_mtus = set(devices.values())
+    if len(all_mtus) == 1:
+      self._discovered_mtu = list(all_mtus)[0]
+    else:
+      logging.warning('To record MTU must only have 1 unique MTU value not: %s',
+                      devices)
 
   def GetGvnicVersion(self) -> Optional[str]:
     """Returns the gvnic network driver version."""
     all_device_properties = {}
-    for device_name in self._GetNetworkDeviceNames():
-      if device_name in self._IGNORE_NETWORK_DEVICES:
-        continue
+    for device_name in self._GetNetworkDevices():
       device = self._GetNetworkDeviceProperties(device_name)
       all_device_properties[device_name] = device
       if device.get('driver') == self._GVNIC_DEVICE_NAME:
@@ -1028,13 +1036,17 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
         properties[m['key']] = m['value']
     return properties
 
-  def _GetNetworkDeviceNames(self) -> Iterator[str]:
-    """Yields network device names."""
+  def _GetNetworkDevices(self) -> Dict[str, int]:
+    """Returns network device names and their MTUs."""
     stdout, _ = self.RemoteCommand('PATH="${PATH}":/usr/sbin ip link show up')
+    devices = {}
     for line in stdout.splitlines():
       m = self._IP_LINK_RE.match(line)
       if m:
-        yield m['device_name']
+        device_name = m['device_name']
+        if device_name not in self._IGNORE_NETWORK_DEVICES:
+          devices[device_name] = int(m['mtu'])
+    return devices
 
 
 class Debian9BasedGceVirtualMachine(
