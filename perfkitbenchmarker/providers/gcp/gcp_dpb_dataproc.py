@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional
 from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gcs
@@ -154,7 +155,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if FLAGS.gce_network_name:
       cmd.flags['network'] = FLAGS.gce_network_name
 
-    cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+    metadata = util.GetDefaultTags()
+    metadata.update(flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
+    cmd.flags['metadata'] = util.FormatTags(metadata)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min
     # TODO(saksena): Retrieve the cluster create time and hold in a var
