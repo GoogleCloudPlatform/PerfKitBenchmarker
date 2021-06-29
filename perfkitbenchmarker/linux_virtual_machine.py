@@ -28,6 +28,7 @@ for you.
 
 import abc
 import collections
+import copy
 import logging
 import os
 import pipes
@@ -490,14 +491,40 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                        'num_disable_cpus: %i, num_cpus: %i' %
                        (self.num_disable_cpus, self.num_cpus))
 
-    # We can't disable cpu 0, but we want to disable a contiguous range
-    # of cpus for symmetry. So disable the last cpus in the range.
-    # e.g.  If num_cpus = 4 and num_disable_cpus = 2,
-    # then want cpus 0,1 active and 2,3 inactive.
-    for x in range(self.num_cpus - self.num_disable_cpus, self.num_cpus):
-      self.RemoteCommand('sudo bash -c '
-                         '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
-                         x)
+    # We can't disable cpu 0, starting from the last cpu in /proc/cpuinfo.
+    # On multiprocessor systems, we also attempt to disable cpus on each
+    # physical processor based on "physical id" in order to keep a similar
+    # number of cpus on each physical processor.
+    # In addition, for each cpu we disable, we will look for cpu with same
+    # "core id" in order to disable vcpu pairs.
+    cpus = copy.deepcopy(self.CheckProcCpu().mappings)
+    cpu_mapping = collections.defaultdict(list)
+    for cpu, info in cpus.items():
+      numa = info.get('physical id')
+      cpu_mapping[int(numa)].append((cpu, int(info.get('core id'))))
+
+    # Sort cpus based on 'core id' on each numa node
+    for numa in cpu_mapping:
+      cpu_mapping[numa] = sorted(
+          cpu_mapping[numa],
+          key=lambda cpu_info: (cpu_info[1], cpu_info[0]))
+
+    def _GetNextCPUToDisable(num_disable_cpus):
+      """Get the next CPU id to disable."""
+      numa_nodes = list(cpu_mapping)
+      while num_disable_cpus:
+        for numa in sorted(numa_nodes, reverse=True):
+          cpu_id, _ = cpu_mapping[numa].pop()
+          num_disable_cpus -= 1
+          yield cpu_id
+          if not num_disable_cpus:
+            break
+
+    for cpu_id in _GetNextCPUToDisable(self.num_disable_cpus):
+      self.RemoteCommand('sudo bash -c "echo 0 > '
+                         f'/sys/devices/system/cpu/cpu{cpu_id}/online"')
+    self._proccpu_cache = None
+    self._lscpu_cache = None
 
   def UpdateEnvironmentPath(self):
     """Specific Linux flavors should override this."""
