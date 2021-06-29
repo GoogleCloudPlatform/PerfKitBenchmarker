@@ -404,7 +404,7 @@ def Prepare(benchmark_spec):
       public_ip_name = ''
       if FLAGS.use_public_ip:
         public_ip = azure_virtual_machine.AzurePublicIPAddress(
-            launcher_vms[0].location, launcher_vms[0].availability_zone,
+            launcher_vms[0].region, launcher_vms[0].availability_zone,
             '{}-public-ip'.format(i), 'booter-{}-{}'.format(FLAGS.run_uri, i))
         public_ip.Create()
         public_ip_name = public_ip.name
