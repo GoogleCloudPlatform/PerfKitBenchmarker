@@ -46,10 +46,11 @@ class FailedSubstatus(object):
   # General failure that don't fit in the above categories.
   UNCATEGORIZED = 'UNCATEGORIZED'
 
-  # List of valid substatuses
-  VALID_SUBSTATUSES = [
+  # List of valid substatuses for use with --retries.
+  # UNCATEGORIZED failures are not retryable. To make a specific UNCATEGORIZED
+  # failure retryable, please raise an errors.Benchmarks.KnownIntermittentError.
+  RETRYABLE_SUBSTATUSES = [
       QUOTA, INSUFFICIENT_CAPACITY, KNOWN_INTERMITTENT, INTERRUPTED,
-      UNCATEGORIZED
   ]
 
 

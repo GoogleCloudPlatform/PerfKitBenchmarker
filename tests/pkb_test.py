@@ -16,10 +16,13 @@
 
 import textwrap
 import unittest
+
 from absl import flags
 from absl.testing import flagsaver
-
+from absl.testing import parameterized
 import mock
+from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import sample
@@ -277,6 +280,75 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
     self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
     vm.RemoteCommand.assert_called_with('cat /proc/meminfo')
 
+
+class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(retries=3)
+  def testRunRetries(self):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    # Generate some exceptions for each run.
+    self.enter_context(
+        mock.patch.object(
+            pkb,
+            'DoProvisionPhase',
+            side_effect=errors.Benchmarks.QuotaFailure()))
+
+    benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
+
+    self.assertEqual(len(benchmark_specs), 4)
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'SuccessStatus',
+          'status': benchmark_status.SUCCEEDED,
+          'failed_substatus': None,
+          'retry_substatuses': pkb._RETRY_SUBSTATUSES.value,
+          'expected_retry': False,
+      },
+      {
+          'testcase_name': 'UncategorizedFailure',
+          'status': benchmark_status.FAILED,
+          'failed_substatus': benchmark_status.FailedSubstatus.UNCATEGORIZED,
+          'retry_substatuses': pkb._RETRY_SUBSTATUSES.value,
+          'expected_retry': False,
+      },
+      {
+          'testcase_name': 'FailedSubstatusNotIncluded',
+          'status': benchmark_status.FAILED,
+          'failed_substatus': benchmark_status.FailedSubstatus.QUOTA,
+          'retry_substatuses': [benchmark_status.FailedSubstatus.INTERRUPTED],
+          'expected_retry': False,
+      },
+      {
+          'testcase_name':
+              'FailedSubstatusIncluded',
+          'status':
+              benchmark_status.FAILED,
+          'failed_substatus':
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
+          'retry_substatuses':
+              [benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY],
+          'expected_retry':
+              True,
+      },
+  )
+  def testShouldRetry(self, status, failed_substatus, retry_substatuses,
+                      expected_retry):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_spec.status = status
+    test_spec.failed_substatus = failed_substatus
+    with flagsaver.flagsaver(retry_substatuses=retry_substatuses):
+      self.assertEqual(pkb._ShouldRetry(test_spec), expected_retry)
+
+  @parameterized.named_parameters(
+      ('NoRetrySomeStages', 0, [stages.PROVISION, stages.PREPARE], True),
+      ('RetrySomeStages', 1, [stages.PROVISION, stages.PREPARE], False),
+      ('NoRetryAllStages', 0, stages.STAGES, True),
+      ('RetryAllStages', 1, stages.STAGES, True),
+  )
+  def testValidateRetriesAndBenchmarkStages(self, retries, run_stage, is_valid):
+    flags_dict = {'retries': retries, 'run_stage': run_stage}
+    self.assertEqual(pkb.ValidateRetriesAndRunStages(flags_dict), is_valid)
 
 if __name__ == '__main__':
   unittest.main()

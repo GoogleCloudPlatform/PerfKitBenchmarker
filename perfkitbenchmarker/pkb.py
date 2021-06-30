@@ -57,6 +57,7 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
 
 
 import collections
+import copy
 import getpass
 import itertools
 import json
@@ -69,7 +70,7 @@ import re
 import sys
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 import uuid
 
 from absl import flags
@@ -292,6 +293,17 @@ flags.DEFINE_integer(
     'this number of failures any exceptions will cause benchmark termination. '
     'If run_stage_time is exceeded, the run stage will not be retried even if '
     'the number of failures is less than the value of this flag.')
+_MAX_RETRIES = flags.DEFINE_integer(
+    'retries', 0, 'The amount of times PKB should retry each benchmark.'
+    'Use with --retry_substatuses to specify which failure substatuses to '
+    'retry on. Defaults to all valid substatuses.')
+_RETRY_SUBSTATUSES = flags.DEFINE_multi_enum(
+    'retry_substatuses', benchmark_status.FailedSubstatus.RETRYABLE_SUBSTATUSES,
+    benchmark_status.FailedSubstatus.RETRYABLE_SUBSTATUSES,
+    'The failure substatuses to retry on. By default, failed runs are run with '
+    'the same previous config.')
+_RETRY_DELAY_SECONDS = flags.DEFINE_integer(
+    'retry_delay_seconds', 0, 'The time to wait in between retries.')
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
@@ -368,7 +380,7 @@ flags.DEFINE_integer(
     'timeout_minutes', 240,
     'An upper bound on the time in minutes that the benchmark is expected to '
     'run. This time is annotated or tagged on the resources of cloud '
-    'providers.')
+    'providers. Note that for retries, this applies to each individual retry.')
 flags.DEFINE_integer(
     'persistent_timeout_minutes', 240,
     'An upper bound on the time in minutes that resources left behind by the '
@@ -406,6 +418,15 @@ flags.DEFINE_bool('randomize_run_order', False,
 _TEARDOWN_EVENT = multiprocessing.Event()
 
 events.initialization_complete.connect(traces.RegisterAll)
+
+
+@flags.multi_flags_validator(
+    ['retries', 'run_stage'],
+    message='Retries requires running all stages of the benchmark.')
+def ValidateRetriesAndRunStages(flags_dict):
+  if flags_dict['retries'] > 0 and flags_dict['run_stage'] != stages.STAGES:
+    return False
+  return True
 
 
 def _InjectBenchmarkInfoIntoDocumentation():
@@ -1105,20 +1126,27 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
   return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
-def RunBenchmarkTask(spec):
+def _ShouldRetry(spec: bm_spec.BenchmarkSpec) -> bool:
+  """Returns whether the benchmark run should be retried."""
+  return (spec.status == benchmark_status.FAILED and
+          spec.failed_substatus in _RETRY_SUBSTATUSES.value)
+
+
+def RunBenchmarkTask(
+    spec: bm_spec.BenchmarkSpec
+) -> Tuple[Sequence[bm_spec.BenchmarkSpec], List[sample.Sample]]:
   """Task that executes RunBenchmark.
 
-  This is designed to be used with RunParallelProcesses.
+  This is designed to be used with RunParallelProcesses. Note that
+  for retries only the last run has its samples published.
 
   Arguments:
     spec: BenchmarkSpec. The spec to call RunBenchmark with.
 
   Returns:
-    A tuple of BenchmarkSpec, list of samples.
+    A BenchmarkSpec for each run iteration and a list of samples from the
+    last run.
   """
-  if _TEARDOWN_EVENT.is_set():
-    return spec, []
-
   # Many providers name resources using run_uris. When running multiple
   # benchmarks in parallel, this causes name collisions on resources.
   # By modifying the run_uri, we avoid the collisions.
@@ -1127,23 +1155,61 @@ def RunBenchmarkTask(spec):
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0
 
-  collector = SampleCollector()
-  try:
-    RunBenchmark(spec, collector)
-  except BaseException as e:
-    logging.exception('Exception running benchmark')
-    msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
-        spec.sequence_number, spec.total_benchmarks, spec.name, spec.uid)
-    if isinstance(e, KeyboardInterrupt) or FLAGS.stop_after_benchmark_failure:
-      logging.error('%s Execution will not continue.', msg)
-      _TEARDOWN_EVENT.set()
-    else:
+  # Set the run count.
+  max_run_count = 1 + _MAX_RETRIES.value
+
+  # Useful format string for debugging.
+  benchmark_info = (
+      f'{spec.sequence_number}/{spec.total_benchmarks} '
+      f'{spec.name} (UID: {spec.uid})'
+  )
+
+  result_specs = []
+  for current_run_count in range(max_run_count):
+    # Attempt to return the most recent results.
+    if _TEARDOWN_EVENT.is_set():
+      if result_specs and collector:
+        return result_specs, collector.samples
+      return [spec], []
+
+    run_start_msg = ('\n' + '-' * 85 + '\n' +
+                     'Starting benchmark %s attempt %s of %s' + '\n' + '-' * 85)
+    logging.info(run_start_msg, benchmark_info, current_run_count + 1,
+                 max_run_count)
+    collector = SampleCollector()
+    # Make a new copy of the benchmark_spec for each run since currently a
+    # benchmark spec isn't compatible with multiple runs. In particular, the
+    # benchmark_spec doesn't correctly allow for a provision of resources
+    # after tearing down.
+    spec_for_run = copy.deepcopy(spec)
+    result_specs.append(spec_for_run)
+    try:
+      RunBenchmark(spec_for_run, collector)
+    except BaseException as e:  # pylint: disable=broad-except
+      logging.exception('Exception running benchmark')
+      msg = f'Benchmark {benchmark_info} failed.'
+      if isinstance(e, KeyboardInterrupt) or FLAGS.stop_after_benchmark_failure:
+        logging.error('%s Execution will not continue.', msg)
+        _TEARDOWN_EVENT.set()
+        break
       logging.error('%s Execution will continue.', msg)
-  finally:
-    # We need to return both the spec and samples so that we know
-    # the status of the test and can publish any samples that
-    # haven't yet been published.
-    return spec, collector.samples
+
+    # Don't retry on the last run.
+    if _ShouldRetry(spec_for_run) and current_run_count != max_run_count - 1:
+      logging.info(
+          'Benchmark should be retried. Waiting %s seconds before running.',
+          _RETRY_DELAY_SECONDS.value)
+      time.sleep(_RETRY_DELAY_SECONDS.value)
+    else:
+      logging.warning(
+          'Benchmark failed and should not be retried. '
+          'Finished %s runs of %s', current_run_count + 1, max_run_count)
+      break
+
+  # We need to return both the spec and samples so that we know
+  # the status of the test and can publish any samples that
+  # haven't yet been published.
+  return result_specs, collector.samples
 
 
 def _LogCommandLineFlags():
@@ -1252,6 +1318,7 @@ def RunBenchmarks():
       print('')
     return 0
 
+  benchmark_spec_lists = None
   collector = SampleCollector()
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
@@ -1261,14 +1328,16 @@ def RunBenchmarks():
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(
           tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
-    benchmark_specs, sample_lists = list(zip(*spec_sample_tuples))
+    benchmark_spec_lists, sample_lists = list(zip(*spec_sample_tuples))
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
 
   finally:
     if collector.samples:
       collector.PublishSamples()
-
+    # Use the last run in the series of runs.
+    if benchmark_spec_lists:
+      benchmark_specs = [spec_list[-1] for spec_list in benchmark_spec_lists]
     if benchmark_specs:
       logging.info(benchmark_status.CreateSummary(benchmark_specs))
 
