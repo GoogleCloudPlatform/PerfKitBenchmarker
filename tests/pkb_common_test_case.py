@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
@@ -168,6 +169,11 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
     super(PkbCommonTestCase, self).setUp()
     saved_flag_values = flagsaver.save_flag_values()
     self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
+
+    # Functions that create a benchmark_spec.BenchmarkSpec attach the
+    # benchmark spec to the running thread in __init__(). If this isn't
+    # cleaned up, it creates problems for tests run using unittest.
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     p = mock.patch(
         util.__name__ + '.GetDefaultProject',
