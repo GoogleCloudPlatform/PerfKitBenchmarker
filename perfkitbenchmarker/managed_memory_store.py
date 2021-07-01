@@ -46,16 +46,15 @@ REDIS_5_0 = 'redis_5_0'
 REDIS_6_X = 'redis_6_x'
 REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X]
 
-flags.DEFINE_string('managed_memory_store_version',
-                    None,
-                    'The version of managed memory store to use. This flag '
-                    'overrides Redis or Memcached version defaults that is set '
-                    'in benchmark config. Defaults to None so that benchmark '
-                    'config defaults are used.')
-flags.DEFINE_string('cloud_redis_region',
-                    'us-central1',
-                    'The region to spin up cloud redis in.'
-                    'Defaults to the GCP region of us-central1.')
+flags.DEFINE_string(
+    'managed_memory_store_version', None,
+    'The version of managed memory store to use. This flag '
+    'overrides Redis or Memcached version defaults that is set '
+    'in benchmark config. Defaults to None so that benchmark '
+    'config defaults are used.')
+flags.DEFINE_string(
+    'cloud_redis_region', 'us-central1', 'The region to spin up cloud redis in.'
+    'Defaults to the GCP region of us-central1.')
 
 MEMCACHED_NODE_COUNT = 1
 
@@ -88,7 +87,7 @@ def ParseReadableVersion(version):
   Returns:
     Parsed version
   """
-  if version.count('.') < 2:
+  if version.count('.') < 1:
     logging.info(
         'Could not parse version string correctly,'
         'full Redis version returned: %s', version)
