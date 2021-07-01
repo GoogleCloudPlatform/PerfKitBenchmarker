@@ -641,6 +641,8 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     if report_only_physical_cpus and self.IsSmtEnabled():
       # return half the number of CPUs.
       return self.num_cpus // 2
+    if self.num_disable_cpus:
+      return self.num_cpus - self.num_disable_cpus
     return self.num_cpus
 
   @abc.abstractmethod
