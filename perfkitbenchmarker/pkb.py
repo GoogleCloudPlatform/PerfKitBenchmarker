@@ -70,7 +70,8 @@ import re
 import sys
 import threading
 import time
-from typing import Dict, List, Optional, Sequence, Tuple
+import types
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 import uuid
 
 from absl import flags
@@ -90,6 +91,7 @@ from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
@@ -304,6 +306,22 @@ _RETRY_SUBSTATUSES = flags.DEFINE_multi_enum(
     'the same previous config.')
 _RETRY_DELAY_SECONDS = flags.DEFINE_integer(
     'retry_delay_seconds', 0, 'The time to wait in between retries.')
+_SMART_QUOTA_RETRY = flags.DEFINE_bool(
+    'smart_quota_retry', False,
+    'If True, causes the benchmark to rerun in a zone in a different region '
+    'in the same geo on a quota exception. Currently only works for benchmarks '
+    'that specify a single zone (via --zone or --zones). The zone is selected '
+    'at random and overrides the --zones flag or the --zone flag, depending on '
+    'which is provided. QUOTA_EXCEEDED must be in the list of retry '
+    'substatuses for this to work.')
+_SMART_CAPACITY_RETRY = flags.DEFINE_bool(
+    'smart_capacity_retry', False,
+    'If True, causes the benchmark to rerun in a different zone in the same '
+    'region on a capacity exception. Currently only works for benchmarks '
+    'that specify a single zone (via --zone or --zones). The zone is selected '
+    'at random and overrides the --zones flag or the --zone flag, depending on '
+    'which is provided. INSUFFICIENT_CAPACITY must be in the list of retry '
+    'substatuses for this to work.')
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
@@ -418,6 +436,21 @@ flags.DEFINE_bool('randomize_run_order', False,
 _TEARDOWN_EVENT = multiprocessing.Event()
 
 events.initialization_complete.connect(traces.RegisterAll)
+
+
+@flags.multi_flags_validator(
+    ['smart_quota_retry', 'smart_capacity_retry', 'retries', 'zones', 'zone'],
+    message='Smart zone retries requires exactly one single zone from --zones '
+    'or --zone, as well as retry count > 0.')
+def ValidateSmartZoneRetryFlags(flags_dict):
+  """Validates smart zone retry flags."""
+  if flags_dict['smart_quota_retry'] or flags_dict['smart_capacity_retry']:
+    if flags_dict['retries'] == 0:
+      return False
+    return (len(flags_dict['zones']) == 1 and
+            not flags_dict['zone']) or (len(flags_dict['zone']) == 1 and
+                                        not flags_dict['zones'])
+  return True
 
 
 @flags.multi_flags_validator(
@@ -1164,6 +1197,7 @@ def RunBenchmarkTask(
       f'{spec.name} (UID: {spec.uid})'
   )
 
+  zone_retry_manager = ZoneRetryManager()
   result_specs = []
   for current_run_count in range(max_run_count):
     # Attempt to return the most recent results.
@@ -1200,9 +1234,13 @@ def RunBenchmarkTask(
           'Benchmark should be retried. Waiting %s seconds before running.',
           _RETRY_DELAY_SECONDS.value)
       time.sleep(_RETRY_DELAY_SECONDS.value)
+
+      # Handle smart retries if specified.
+      zone_retry_manager.HandleSmartRetries(spec_for_run)
+
     else:
-      logging.warning(
-          'Benchmark failed and should not be retried. '
+      logging.info(
+          'Benchmark should not be retried. '
           'Finished %s runs of %s', current_run_count + 1, max_run_count)
       break
 
@@ -1210,6 +1248,75 @@ def RunBenchmarkTask(
   # the status of the test and can publish any samples that
   # haven't yet been published.
   return result_specs, collector.samples
+
+
+class ZoneRetryManager():
+  """Encapsulates state and functions for zone retries.
+
+  Attributes:
+    original_zone: If specified, the original zone provided to the benchmark.
+    zones_tried: Zones that have already been tried in previous runs.
+  """
+
+  def __init__(self):
+    if not _SMART_CAPACITY_RETRY.value and not _SMART_QUOTA_RETRY.value:
+      return
+    self._zones_tried: Set[str] = set()
+    self._utils: types.ModuleType = providers.LoadProviderUtils(FLAGS.cloud)
+    self._SetOriginalZoneAndFlag()
+
+  def _SetOriginalZoneAndFlag(self) -> None:
+    """Records the flag name and zone value that the benchmark started with."""
+    # This is guaranteed to set values due to flag validator.
+    for zone_flag in ['zone', 'zones']:
+      if FLAGS[zone_flag].value:
+        self._original_zone = FLAGS[zone_flag].value[0]
+        self._zone_flag = zone_flag
+
+  def HandleSmartRetries(self, spec: bm_spec.BenchmarkSpec) -> None:
+    """Handles smart zone retry flags if provided."""
+    if (_SMART_QUOTA_RETRY.value and spec.failed_substatus
+        == benchmark_status.FailedSubstatus.QUOTA):
+      self._AssignZoneToNewRegion()
+    elif (_SMART_CAPACITY_RETRY.value and spec.failed_substatus
+          == benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY):
+      self._AssignNewZoneSameRegion()
+
+  def _AssignZoneToNewRegion(self) -> None:
+    """Changes zone to be a new zone in the same geo but different region."""
+    region = self._utils.GetRegionFromZone(self._original_zone)
+    geo = self._utils.GetGeoFromRegion(region)
+    possible_zones = set()
+    for new_region in self._utils.GetRegionsInGeo(geo):
+      if new_region != region:
+        zones = self._utils.GetZonesInRegion(new_region)
+        possible_zones.update(zones)
+    self._ChooseAndSetNewZone(possible_zones)
+
+  def _AssignNewZoneSameRegion(self) -> None:
+    """Changes zone to be a new zone in the same region."""
+    region = self._utils.GetRegionFromZone(self._original_zone)
+    possible_zones = self._utils.GetZonesInRegion(region)
+    self._ChooseAndSetNewZone(possible_zones)
+
+  def _ChooseAndSetNewZone(self, possible_zones: Set[str]) -> None:
+    """Saves the current _zone_flag and sets it to a new zone.
+
+    Args:
+      possible_zones: The set of zones to choose from.
+    """
+    current_zone = FLAGS[self._zone_flag].value[0]
+    self._zones_tried.add(current_zone)
+    zones_to_try = possible_zones - self._zones_tried
+    # Restart from empty if we've exhausted all alternatives.
+    if not zones_to_try:
+      self._zones_tried.clear()
+      new_zone = self._original_zone
+    else:
+      new_zone = random.choice(tuple(zones_to_try))
+    logging.info('Retry using new zone %s', new_zone)
+    FLAGS[self._zone_flag].unparse()
+    FLAGS[self._zone_flag].parse([new_zone])
 
 
 def _LogCommandLineFlags():

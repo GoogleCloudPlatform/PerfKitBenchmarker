@@ -25,9 +25,11 @@ from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker.providers.gcp import util as gcp_utils
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -283,6 +285,23 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
 
 class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
 
+  def _MockLoadProviderUtils(self, utils_module):
+    return self.enter_context(
+        mock.patch.object(
+            providers,
+            'LoadProviderUtils',
+            autospec=True,
+            return_value=utils_module))
+
+  def _MockGcpUtils(self, function_name, return_value=None, side_effect=None):
+    return self.enter_context(
+        mock.patch.object(
+            gcp_utils,
+            function_name,
+            autospec=True,
+            return_value=return_value,
+            side_effect=side_effect))
+
   @flagsaver.flagsaver(retries=3)
   def testRunRetries(self):
     test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
@@ -341,6 +360,83 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(pkb._ShouldRetry(test_spec), expected_retry)
 
   @parameterized.named_parameters(
+      {
+          'testcase_name': 'SmartRetry',
+          'quota_flag_value': True,
+          'capacity_flag_value': True,
+          'retry_count': 2,
+          'run_results': [
+              errors.Benchmarks.QuotaFailure(),
+              errors.Benchmarks.InsufficientCapacityCloudFailure(),
+              Exception(),
+          ],
+          'expected_run_count': 3,
+          'expected_quota_retry_calls': 1,
+          'expected_capacity_retry_calls': 1,
+      }, {
+          'testcase_name': 'Default',
+          'quota_flag_value': False,
+          'capacity_flag_value': False,
+          'retry_count': 2,
+          'run_results': [
+              errors.Benchmarks.QuotaFailure(),
+              errors.Benchmarks.InsufficientCapacityCloudFailure(),
+              Exception(),
+          ],
+          'expected_run_count': 3,
+          'expected_quota_retry_calls': 0,
+          'expected_capacity_retry_calls': 0,
+      })
+  @flagsaver.flagsaver
+  def testRunBenchmarkTask(self, quota_flag_value, capacity_flag_value,
+                           retry_count, run_results, expected_run_count,
+                           expected_quota_retry_calls,
+                           expected_capacity_retry_calls):
+    FLAGS.zones = ['test_zone']
+    FLAGS.cloud = 'GCP'
+    FLAGS.retries = retry_count
+    FLAGS.smart_quota_retry = quota_flag_value
+    FLAGS.smart_capacity_retry = capacity_flag_value
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    # Generate some exceptions for each run.
+    self.enter_context(
+        mock.patch.object(pkb, 'DoProvisionPhase', side_effect=run_results))
+    # Mock the retry options.
+    mock_quota_retry = self.enter_context(
+        mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToNewRegion'))
+    mock_capacity_retry = self.enter_context(
+        mock.patch.object(pkb.ZoneRetryManager, '_AssignNewZoneSameRegion'))
+
+    benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
+
+    self.assertEqual(len(benchmark_specs), expected_run_count)
+    # Retry preparation functions should have the right calls.
+    self.assertEqual(mock_quota_retry.call_count, expected_quota_retry_calls)
+    self.assertEqual(mock_capacity_retry.call_count,
+                     expected_capacity_retry_calls)
+
+  @parameterized.named_parameters(
+      ('1', False, False, ['test_zone_1'], ['test_zone_2'], 1, True),
+      ('2', True, True, ['test_zone_1'], ['test_zone_2'], 1, False),
+      ('3', True, True, [], [], 1, False),
+      ('4', True, True, [], ['test_zone_1'], 1, True),
+      ('5', True, True, ['test_zone_2'], [], 1, True),
+      ('6', True, False, ['test_zone_1', 'test_zone_2'], [], 1, False),
+      ('7', True, True, ['test_zone_2'], [], 0, False),
+  )
+  def testValidateSmartZoneRetryFlags(self, smart_quota_retry,
+                                      smart_capacity_retry, zone, zones,
+                                      retries, is_valid):
+    flags_dict = {
+        'retries': retries,
+        'smart_quota_retry': smart_quota_retry,
+        'smart_capacity_retry': smart_capacity_retry,
+        'zone': zone,
+        'zones': zones,
+    }
+    self.assertEqual(pkb.ValidateSmartZoneRetryFlags(flags_dict), is_valid)
+
+  @parameterized.named_parameters(
       ('NoRetrySomeStages', 0, [stages.PROVISION, stages.PREPARE], True),
       ('RetrySomeStages', 1, [stages.PROVISION, stages.PREPARE], False),
       ('NoRetryAllStages', 0, stages.STAGES, True),
@@ -349,6 +445,66 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
   def testValidateRetriesAndBenchmarkStages(self, retries, run_stage, is_valid):
     flags_dict = {'retries': retries, 'run_stage': run_stage}
     self.assertEqual(pkb.ValidateRetriesAndRunStages(flags_dict), is_valid)
+
+  @flagsaver.flagsaver(zone=['zone_1'], smart_quota_retry=True, retries=1)
+  def testSmartQuotaRetry(self):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
+    # Start with zone_1 in region_1.
+    self._MockLoadProviderUtils(gcp_utils)
+    self._MockGcpUtils('GetRegionFromZone', return_value='region_1')
+    self._MockGcpUtils('GetGeoFromRegion')
+    self._MockGcpUtils('GetRegionsInGeo', return_value={'region_1', 'region_2'})
+    # Expect that region_1 is skipped when getting zones.
+    mock_get_zones = self._MockGcpUtils(
+        'GetZonesInRegion', return_value={'zone_2'})
+
+    test_retry_manager = pkb.ZoneRetryManager()
+    test_retry_manager.HandleSmartRetries(test_spec)
+
+    # Function should not get zones from region_1, resulting in only 1 call.
+    mock_get_zones.assert_called_once()
+    # zone_1 is recorded.
+    self.assertEqual(test_retry_manager._zones_tried, {'zone_1'})
+    # zone_2 is the new zone picked.
+    self.assertEqual(FLAGS.zone, ['zone_2'])
+
+  @flagsaver.flagsaver(zone=['zone_1'], smart_capacity_retry=True, retries=1)
+  def testSmartCapacityRetry(self):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
+    self._MockLoadProviderUtils(gcp_utils)
+    self._MockGcpUtils('GetRegionFromZone')
+    # Expect that the correct possible zones are passed to the function below.
+    self._MockGcpUtils('GetZonesInRegion', return_value={'zone_1', 'zone_2'})
+
+    test_retry_manager = pkb.ZoneRetryManager()
+    test_retry_manager.HandleSmartRetries(test_spec)
+
+    # zone_1 is recorded.
+    self.assertEqual(test_retry_manager._zones_tried, {'zone_1'})
+    # zone_2 is the new zone picked.
+    self.assertEqual(FLAGS.zone, ['zone_2'])
+
+  @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
+  @flagsaver.flagsaver(retries=2)
+  def testChooseAndSetNewZone(self, zone_flag):
+    FLAGS[zone_flag].parse(['us-west1-a'])
+    FLAGS.smart_quota_retry = True
+    test_retry_manager = pkb.ZoneRetryManager()
+    possible_zones = {'us-west1-a', 'us-west1-b'}
+
+    # us-west1-b is chosen.
+    test_retry_manager._ChooseAndSetNewZone(possible_zones)
+    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-b')
+    self.assertEqual(test_retry_manager._zones_tried, {'us-west1-a'})
+
+    # All possible zones are exhausted so the original zone is used.
+    test_retry_manager._ChooseAndSetNewZone(possible_zones)
+    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')
+    self.assertEmpty(test_retry_manager._zones_tried)
+
 
 if __name__ == '__main__':
   unittest.main()
