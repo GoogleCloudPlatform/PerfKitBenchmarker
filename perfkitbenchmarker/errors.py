@@ -194,6 +194,9 @@ class Resource(object):
     """An error on creation which is not retryable."""
     pass
 
+  class CleanupError(Error):
+    pass
+
   class RetryableCreationError(Error):
     pass
 
