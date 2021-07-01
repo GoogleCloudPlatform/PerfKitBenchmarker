@@ -36,12 +36,6 @@ BOTO_LIB_VERSION = 'boto_lib_version'
 _OBJECT_STORAGE_REGISTRY = {}
 
 
-def GetObjectStorageClass(storage_name):
-  """Return the ObjectStorageService subclass corresponding to storage_name."""
-
-  return _OBJECT_STORAGE_REGISTRY[storage_name]
-
-
 class AutoRegisterObjectStorageMeta(abc.ABCMeta):
 
   def __init__(cls, name, bases, dct):
@@ -308,6 +302,12 @@ class ObjectStorageService(
     """
 
     return []
+
+
+def GetObjectStorageClass(storage_name) -> type(ObjectStorageService):
+  """Return the ObjectStorageService subclass corresponding to storage_name."""
+
+  return _OBJECT_STORAGE_REGISTRY[storage_name]
 
 
 # TODO(user): Move somewhere more generic
