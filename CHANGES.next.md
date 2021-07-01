@@ -92,6 +92,8 @@
 -   Add additional customization options to SPEC CPU 2017.
 -   Add average utilization to the metadata of cpu metrics for Cloud Bigtable
     benchmark.
+-   Add flag --ycsb_log_remote_command_output to allow enabling/disabling
+    the logging of stdout & stderr from wait_for_command.
 
 ### Bug fixes and maintenance updates:
 

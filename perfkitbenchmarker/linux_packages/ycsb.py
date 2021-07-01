@@ -197,6 +197,9 @@ flags.DEFINE_integer('ycsb_dynamic_load_sustain_timelimit', 300,
                      'if we have already reached sustained throughput.')
 flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
                      'Sleep duration in seconds between load and run stage.')
+flags.DEFINE_boolean('ycsb_log_remote_command_output', True,
+                     'Whether to log the remote command\'s output at the info '
+                     'level.')
 _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.')
@@ -1006,7 +1009,8 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('load', **kwargs)
-    stdout, stderr = vm.RobustRemoteCommand(command, should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(
+        command, should_log=FLAGS.ycsb_log_remote_command_output)
     return ParseResults(str(stderr + stdout), self.measurement_type)
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
@@ -1107,7 +1111,8 @@ class YCSBExecutor(object):
     hdr_files_dir = kwargs.get('hdrhistogram.output.path', None)
     if hdr_files_dir:
       vm.RemoteCommand('mkdir -p {0}'.format(hdr_files_dir))
-    stdout, stderr = vm.RobustRemoteCommand(command, should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(
+        command, should_log=FLAGS.ycsb_log_remote_command_output)
     return ParseResults(str(stderr + stdout), self.measurement_type)
 
   def _RunThreaded(self, vms, **kwargs):
