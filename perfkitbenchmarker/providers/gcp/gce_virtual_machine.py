@@ -489,6 +489,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['boot-disk-size'] = self.boot_disk_size
     if self.boot_disk_type:
       cmd.flags['boot-disk-type'] = self.boot_disk_type
+    if FLAGS.disable_smt:
+      cmd.flags['threads-per-core'] = 1
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
