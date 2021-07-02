@@ -48,9 +48,6 @@ FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
 
-_VM_SPEC_REGISTRY = {}
-_VM_REGISTRY = {}
-
 
 def ValidateVmMetadataFlag(options_list):
   """Verifies correct usage of the vm metadata flag.
