@@ -133,7 +133,7 @@ class MessagingServiceClientTest(parameterized.TestCase):
     random_message = self.messaging_service._generate_random_message(
         MESSAGE_SIZE)
     self.assertLen(random_message, MESSAGE_SIZE)
-    self.assertIsInstance(random_message, bytes)
+    self.assertIsInstance(random_message, str)
 
   @mock.patch.object(MessagingServiceClient, '_publish_message')
   @mock.patch.object(

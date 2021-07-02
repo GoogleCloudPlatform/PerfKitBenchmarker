@@ -3,21 +3,25 @@
 This PubSub client is implemented using Google Cloud SDK.
 """
 # pylint: disable=g-import-not-at-top
+import random
 import sys
 
 from absl import flags
 from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1.types import PullResponse
+
 # see PEP 366 @ ReservedAssignment
 if __name__ == '__main__' and not __package__:
   # import for client VM
   from messaging_service_client import MessagingServiceClient
   from messaging_service_client import TIMEOUT
+  from messaging_service_client import MESSAGE_CHARACTERS
 else:
   # import for blaze test
   from perfkitbenchmarker.data.messaging_service.messaging_service_client import MessagingServiceClient
   from perfkitbenchmarker.data.messaging_service.messaging_service_client import TIMEOUT
+  from perfkitbenchmarker.data.messaging_service.messaging_service_client import MESSAGE_CHARACTERS
 
 FLAGS = flags.FLAGS
 
@@ -47,6 +51,11 @@ class GCPPubSubInterface(MessagingServiceClient):
     self.subscription_path = self.subscriber.subscription_path(
         self.project,
         self.subscription)
+
+  def _generate_random_message(self, message_size: int) -> bytes:
+    message = ''.join(
+        random.choice(MESSAGE_CHARACTERS) for _ in range(message_size))
+    return message.encode('utf-8')
 
   def _publish_message(self, message: bytes) -> str:
     """Publishes a single message to a PubSub topic."""

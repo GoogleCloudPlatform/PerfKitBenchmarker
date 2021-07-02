@@ -90,17 +90,17 @@ class MessagingServiceClient:
     }
     return metrics_data
 
-  def _generate_random_message(self, message_size: int) -> bytes:
+  def _generate_random_message(self, message_size: int) -> str:
     message = ''.join(
         random.choice(MESSAGE_CHARACTERS) for _ in range(message_size))
-    return message.encode('utf-8')
+    return message
 
   @abc.abstractmethod
-  def _publish_message(self, message_payload: bytes) -> Any:
+  def _publish_message(self, message_payload: str) -> Any:
     """Publishes a single message to the messaging service.
 
     Args:
-      message_payload: Message in bytes, created by '_generate_random_message'.
+      message_payload: Message, created by '_generate_random_message'.
       This message will be the one that we publish/pull from the messaging
       service.
 
