@@ -41,16 +41,18 @@ mlperf_multiworkers:
         GCP:
           machine_type: n1-highmem-96
           zone: us-west1-b
-          boot_disk_size: 100
+          boot_disk_size: 110
           gpu_type: v100
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-east-1
-          boot_disk_size: 100
+          boot_disk_size: 110
         Azure:
-          machine_type: Standard_ND40s_v2
+          machine_type: Standard_ND40rs_v2
           zone: eastus
+          boot_disk_size: 110
+          image: microsoft-dsvm:ubuntu-hpc:1804:latest
       vm_count: null
 """
 
