@@ -319,21 +319,26 @@ def Prepare(benchmark_spec, vm=None):
     # 80 cpus.   if CPU cores is less than 80, need to update the numactrl
     # commands to be within the range of available CPUs
     if vm.num_cpus < 80:
-      run_script = 'training_results_v0.6/NVIDIA/benchmarks/resnet/implementations/mxnet/ompi_bind_DGX1.sh'
-      step = int(vm.num_cpus / 8)
-      # create a range like 20-24 if root=24 and step=5
-      get_range = lambda root, step: f'{root * step}-{(root + 1) * step - 1}'
-      for i in range(8):
-        # Replace
-        # export OMPI_MCA_btl_openib_if_include=mlx5_1 exec numactl
-        # --physcpubind=15-19,55-59 --membind=0 "${@}"
-        # to
-        # export OMPI_MCA_btl_openib_if_include=mlx5_1 exec numactl
-        # --physcpubind=15-19 --membind=0 "${@}"
+      if RESNET in benchmark_spec.benchmark:
+        run_script = 'training_results_v0.6/NVIDIA/benchmarks/resnet/implementations/mxnet/ompi_bind_DGX1.sh'
+        step = int(vm.num_cpus / 8)
+        # create a range like 20-24 if root=24 and step=5
+        get_range = lambda root, step: f'{root * step}-{(root + 1) * step - 1}'
+        for i in range(8):
+          # Replace
+          # export OMPI_MCA_btl_openib_if_include=mlx5_1 exec numactl
+          # --physcpubind=15-19,55-59 --membind=0 "${@}"
+          # to
+          # export OMPI_MCA_btl_openib_if_include=mlx5_1 exec numactl
+          # --physcpubind=15-19 --membind=0 "${@}"
+          vm_util.ReplaceText(
+              vm,
+              f'physcpubind={get_range(i, 5)},{get_range(i + 8, 5)}',
+              f'physcpubind={get_range(i, step)}', run_script)
+      elif MASK in benchmark_spec.benchmark:
+        run_script = 'training_results_v0.6/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/run_and_time.sh'
         vm_util.ReplaceText(
-            vm,
-            f'physcpubind={get_range(i, 5)},{get_range(i + 8, 5)}',
-            f'physcpubind={get_range(i, step)}', run_script)
+            vm, 'bind_launch', 'bind_launch --no_hyperthreads', run_script)
 
     if RESNET in benchmark_spec.benchmark:
       vm.RemoteCommand(
