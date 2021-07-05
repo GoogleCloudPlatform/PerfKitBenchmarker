@@ -47,6 +47,7 @@ class XgboostBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
   def MockVm(self) -> mock.Mock:
     vm = mock.Mock()
     vm.RemoteCommandWithReturnCode.return_value = self.CudaOutput(), '', 0
+    vm.RemoteCommand.return_value = '1.4.2', ''
     return vm
 
   def testCmd(self) -> None:
@@ -74,6 +75,7 @@ class XgboostBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
             'iterations': 500,
             'test_size': 0.25,
             'params': None,
+            'xgboost_version': '1.4.2',
             'command':
                 'PATH=/opt/conda/bin:$PATH python3 '
                 '/opt/pkb/xgboost/tests/benchmark/benchmark_tree.py '

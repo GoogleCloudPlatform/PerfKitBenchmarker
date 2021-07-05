@@ -21,15 +21,33 @@ from perfkitbenchmarker.linux_packages import nvidia_driver
 
 _ENV = flags.DEFINE_string('xgboost_env', 'PATH=/opt/conda/bin:$PATH',
                            'The xboost install environment.')
+_VERSION = flags.DEFINE_string('xgboost_version', '1.4.2',
+                               'The XGBoost version.')
 FLAGS = flags.FLAGS
+
+
+def GetXgboostVersion(vm):
+  """Returns the XGBoost version installed on the vm.
+
+  Args:
+    vm: the target vm on which to check the XGBoost version
+
+  Returns:
+    Installed python XGBoost version as a string
+  """
+  stdout, _ = vm.RemoteCommand(
+      'echo -e "import xgboost\nprint(xgboost.__version__)" | '
+      f'{_ENV.value} python3'
+  )
+  return stdout.strip()
 
 
 def Install(vm):
   """Installs XGBoost on the VM."""
   vm.Install('build_tools')
   install_dir = posixpath.join(linux_packages.INSTALL_DIR, 'xgboost')
-  vm.RemoteCommand(
-      f'git clone --recursive https://github.com/dmlc/xgboost {install_dir}')
+  vm.RemoteCommand('git clone --recursive https://github.com/dmlc/xgboost '
+                   f'--branch v{_VERSION.value} {install_dir}')
   nccl_make_option = ''
   nccl_install_option = ''
   if nvidia_driver.QueryNumberOfGpus(vm) > 1:

@@ -24,6 +24,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import xgboost
 
 _TREE_METHOD = flags.DEFINE_enum(
     'xgboost_tree_method', 'gpu_hist', ['gpu_hist', 'hist'],
@@ -93,7 +94,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   vm_util.RunThreaded(lambda vm: vm.Install('xgboost'), bm_spec.vms)
 
 
-def _MetadataFromFlags() -> [str, Any]:
+def _MetadataFromFlags(vm: virtual_machine.BaseVirtualMachine) -> [str, Any]:
   """Returns metadata dictionary from flag settings."""
   return {
       'tree_method': _TREE_METHOD.value,
@@ -103,6 +104,7 @@ def _MetadataFromFlags() -> [str, Any]:
       'iterations': _ITERATIONS.value,
       'test_size': _TEST_SIZE.value,
       'params': _PARAMS.value,
+      'xgboost_version': xgboost.GetXgboostVersion(vm),
   }
 
 
@@ -129,7 +131,7 @@ def _CollectGpuSamples(
   ]
   if _PARAMS.value:
     cmd.append(f'--params="{_PARAMS.value}"')
-  metadata = _MetadataFromFlags()
+  metadata = _MetadataFromFlags(vm)
   metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['command'] = ' '.join(cmd)
 
