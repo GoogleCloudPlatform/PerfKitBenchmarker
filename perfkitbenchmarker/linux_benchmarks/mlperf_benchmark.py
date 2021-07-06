@@ -86,12 +86,12 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'mlperf_transformer_decode_dir', '', 'Transformer decode directory')
 flags.DEFINE_string('wmt_data_dir',
-                    'gs://p3rf-mlperf/mlperf_v0.6_nv_transformer/',
+                    'gs://p3rf-mlperf/mlperf_v0.6_nv_transformer',
                     'Directory where the wmt dataset is stored')
-flags.DEFINE_string('coco_data_dir', 'gs://p3rf-mlperf/coco2017/',
+flags.DEFINE_string('coco_data_dir', 'gs://p3rf-mlperf/coco2017',
                     'Directory where the coco dataset is stored')
 flags.DEFINE_string('gnmt_data_dir',
-                    'gs://p3rf-mlperf/mlperf_v0.6_nv_gnmt/',
+                    'gs://p3rf-mlperf/mlperf_v0.6_nv_gnmt',
                     'Directory where the nv v0.6 WMT dataset is stored')
 flags.DEFINE_string('minigo_model_dir', '',
                     'Directory on GCS to copy minigo source data from. Files '
