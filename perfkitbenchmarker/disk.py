@@ -31,6 +31,9 @@ flags.DEFINE_integer('nfs_rsize', 1048576, 'NFS read size.')
 flags.DEFINE_integer('nfs_wsize', 1048576, 'NFS write size.')
 flags.DEFINE_integer('nfs_timeout', 60, 'NFS timeout.')
 flags.DEFINE_integer('nfs_retries', 2, 'NFS Retries.')
+flags.DEFINE_integer(
+    'nfs_nconnect', None, 'Number of connections that each NFS client should '
+    'establish to the server.')
 flags.DEFINE_boolean(
     'nfs_noresvport', False,
     'Whether the NFS client should use a non-privileged '
@@ -242,6 +245,8 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['nfs_timeout'] = flag_values.nfs_timeout
     if flag_values['nfs_retries'].present:
       config_values['nfs_retries'] = flag_values.nfs_retries
+    if flag_values['nfs_nconnect'].present:
+      config_values['nfs_nconnect'] = flag_values.nfs_nconnect
     if flag_values['nfs_ip_address'].present:
       config_values['nfs_ip_address'] = flag_values.nfs_ip_address
     if flag_values['nfs_managed'].present:
@@ -315,6 +320,9 @@ class BaseDiskSpec(spec.BaseSpec):
         }),
         'nfs_retries': (option_decoders.IntDecoder, {
             'default': 2
+        }),
+        'nfs_nconnect': (option_decoders.IntDecoder, {
+            'default': None
         }),
         'smb_version': (option_decoders.StringDecoder, {
             'default': '3.0'
@@ -539,6 +547,7 @@ class NfsDisk(NetworkDisk):
     self.nfs_wsize = disk_spec.nfs_wsize
     self.nfs_timeout = disk_spec.nfs_timeout
     self.nfs_retries = disk_spec.nfs_retries
+    self.nfs_nconnect = disk_spec.nfs_nconnect
     self.device_path = remote_mount_address
     for key, value in six.iteritems(self._GetNetworkDiskMountOptionsDict()):
       self.metadata['nfs_{}'.format(key)] = value
@@ -559,6 +568,8 @@ class NfsDisk(NetworkDisk):
     # the client doesn't have to specify an NFS version to use (but should)
     if self.nfs_version:
       options['nfsvers'] = self.nfs_version
+    if self.nfs_nconnect:
+      options['nconnect'] = self.nfs_nconnect
     if FLAGS.nfs_noresvport:
       options['noresvport'] = None
     return options

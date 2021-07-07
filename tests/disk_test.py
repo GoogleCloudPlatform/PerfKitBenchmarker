@@ -164,7 +164,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def MountOptionsAsDict(self, mount_options_str):
     options = dict()
-    int_values = set(['retrans', 'rsize', 'timeo', 'wsize'])
+    int_values = set(['retrans', 'rsize', 'timeo', 'wsize', 'nconnect'])
     for entry in mount_options_str.split(','):
       parts = entry.split('=', 1)
       key = parts[0]
@@ -192,9 +192,16 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['nfs_timeout'].parse(3)
     FLAGS['nfs_timeout_hard'].parse(False)
     FLAGS['nfs_retries'].parse(4)
+    FLAGS['nfs_nconnect'].parse(5)
     nfs_disk = _NfsDisk(FLAGS)
     mount_options = self.MountOptions(
-        soft=None, retrans=4, rsize=1, timeo=30, wsize=2, nfsvers='4.1')
+        soft=None,
+        retrans=4,
+        rsize=1,
+        timeo=30,
+        wsize=2,
+        nfsvers='4.1',
+        nconnect=5)
     mount_options.pop('hard')
     self.assertEqual(mount_options,
                      self.MountOptionsAsDict(nfs_disk.mount_options))
