@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.disk."""
 
-
 import unittest
 from absl import flags
 import mock
@@ -41,8 +40,12 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testProvidedValid(self):
     spec = disk.BaseDiskSpec(
-        _COMPONENT, device_path='test_device_path', disk_number=1,
-        disk_size=75, disk_type='test_disk_type', mount_point='/mountpoint',
+        _COMPONENT,
+        device_path='test_device_path',
+        disk_number=1,
+        disk_size=75,
+        disk_type='test_disk_type',
+        mount_point='/mountpoint',
         num_striped_disks=2)
     self.assertEqual(spec.device_path, 'test_device_path')
     self.assertEqual(spec.disk_number, 1)
@@ -53,8 +56,12 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testProvidedNone(self):
     spec = disk.BaseDiskSpec(
-        _COMPONENT, device_path=None, disk_number=None, disk_size=None,
-        disk_type=None, mount_point=None)
+        _COMPONENT,
+        device_path=None,
+        disk_number=None,
+        disk_size=None,
+        disk_type=None,
+        mount_point=None)
     self.assertIsNone(spec.device_path)
     self.assertIsNone(spec.disk_number)
     self.assertIsNone(spec.disk_size)
@@ -65,9 +72,10 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testUnrecognizedOptions(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
       disk.BaseDiskSpec(_COMPONENT, color='red', flavor='cherry', texture=None)
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in test_component: color, flavor, '
-        'texture.'))
+    self.assertEqual(
+        str(cm.exception),
+        ('Unrecognized options were found in test_component: color, flavor, '
+         'texture.'))
 
   def testInvalidOptionTypes(self):
     with self.assertRaises(errors.Config.InvalidValue):
@@ -185,8 +193,8 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['nfs_timeout_hard'].parse(False)
     FLAGS['nfs_retries'].parse(4)
     nfs_disk = _NfsDisk(FLAGS)
-    mount_options = self.MountOptions(soft=None, retrans=4, rsize=1, timeo=30,
-                                      wsize=2, nfsvers='4.1')
+    mount_options = self.MountOptions(
+        soft=None, retrans=4, rsize=1, timeo=30, wsize=2, nfsvers='4.1')
     mount_options.pop('hard')
     self.assertEqual(mount_options,
                      self.MountOptionsAsDict(nfs_disk.mount_options))
@@ -222,9 +230,10 @@ class _SmbDisk(disk.SmbDisk):
       disk_spec = disk.BaseDiskSpec(_COMPONENT, FLAGS)
     else:
       disk_spec = disk.BaseDiskSpec(_COMPONENT)
-    super(_SmbDisk, self).__init__(
-        disk_spec, 'host1', {'user': 'username', 'pw': 'password'},
-        default_smb_version)
+    super(_SmbDisk, self).__init__(disk_spec, 'host1', {
+        'user': 'username',
+        'pw': 'password'
+    }, default_smb_version)
 
 
 class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -244,8 +253,8 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def MountOptionsAsDict(self, mount_options_str):
     options = dict()
-    string_values = set(['vers', 'username', 'password',
-                         'dir_mode', 'file_mode'])
+    string_values = set(
+        ['vers', 'username', 'password', 'dir_mode', 'file_mode'])
     for entry in mount_options_str.split(','):
       parts = entry.split('=', 1)
       key = parts[0]
@@ -267,8 +276,8 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testSmbFlags(self):
     FLAGS['smb_version'].parse('3.0')
     smb_disk = _SmbDisk(FLAGS)
-    mount_options = self.MountOptions(vers='3.0', dir_mode='0777',
-                                      file_mode='0777')
+    mount_options = self.MountOptions(
+        vers='3.0', dir_mode='0777', file_mode='0777')
     self.assertEqual(mount_options,
                      self.MountOptionsAsDict(smb_disk.mount_options))
 

@@ -11,12 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Module containing abstract classes related to disks.
 
 Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
-
 
 import abc
 import logging
@@ -33,20 +31,24 @@ flags.DEFINE_integer('nfs_rsize', 1048576, 'NFS read size.')
 flags.DEFINE_integer('nfs_wsize', 1048576, 'NFS write size.')
 flags.DEFINE_integer('nfs_timeout', 60, 'NFS timeout.')
 flags.DEFINE_integer('nfs_retries', 2, 'NFS Retries.')
-flags.DEFINE_boolean('nfs_noresvport', False,
-                     'Whether the NFS client should use a non-privileged '
-                     'source port. Suggested to use with EFS')
-flags.DEFINE_boolean('nfs_managed', True,
-                     'Use a managed NFS service if using NFS disks. Otherwise '
-                     'start an NFS server on the first VM.')
-flags.DEFINE_string('nfs_ip_address', None,
-                    'If specified, PKB will target this ip address when '
-                    'mounting NFS "disks" rather than provisioning an NFS '
-                    'Service for the corresponding cloud.')
-flags.DEFINE_string('nfs_directory', None,
-                    'Directory to mount if using a StaticNfsService. This '
-                    'corresponds to the "VOLUME_NAME" of other NfsService '
-                    'classes.')
+flags.DEFINE_boolean(
+    'nfs_noresvport', False,
+    'Whether the NFS client should use a non-privileged '
+    'source port. Suggested to use with EFS')
+flags.DEFINE_boolean(
+    'nfs_managed', True,
+    'Use a managed NFS service if using NFS disks. Otherwise '
+    'start an NFS server on the first VM.')
+flags.DEFINE_string(
+    'nfs_ip_address', None,
+    'If specified, PKB will target this ip address when '
+    'mounting NFS "disks" rather than provisioning an NFS '
+    'Service for the corresponding cloud.')
+flags.DEFINE_string(
+    'nfs_directory', None,
+    'Directory to mount if using a StaticNfsService. This '
+    'corresponds to the "VOLUME_NAME" of other NfsService '
+    'classes.')
 flags.DEFINE_string('smb_version', '3.0', 'SMB version.')
 flags.DEFINE_list('mount_options', [],
                   'Additional arguments to supply when mounting.')
@@ -54,7 +56,6 @@ flags.DEFINE_list('fstab_options', [],
                   'Additional arguments to supply to fstab.')
 
 FLAGS = flags.FLAGS
-
 
 # These are the (deprecated) old disk type names
 STANDARD = 'standard'
@@ -104,10 +105,10 @@ def RegisterDiskTypeMap(provider_name, type_map):
   (deprecated) legacy flags are removed.
 
   Args:
-    provider_name: a string. The name of the provider. Must match
-      the names we give to providers in benchmark_spec.py.
-    type_map: a dict. Maps generic disk type names (STANDARD,
-      REMOTE_SSD, PIOPS) to provider-specific names.
+    provider_name: a string. The name of the provider. Must match the names we
+      give to providers in benchmark_spec.py.
+    type_map: a dict. Maps generic disk type names (STANDARD, REMOTE_SSD, PIOPS)
+      to provider-specific names.
   """
 
   DISK_TYPE_MAPS[provider_name] = type_map
@@ -133,8 +134,9 @@ def WarnAndTranslateDiskTypes(name, cloud):
     disk_type_map = DISK_TYPE_MAPS[cloud]
     if name in disk_type_map and disk_type_map[name] != name:
       new_name = disk_type_map[name]
-      logging.warning('Disk type name %s is deprecated and will be removed. '
-                      'Translating to %s for now.', name, new_name)
+      logging.warning(
+          'Disk type name %s is deprecated and will be removed. '
+          'Translating to %s for now.', name, new_name)
       return new_name
     else:
       return name
@@ -154,8 +156,9 @@ def WarnAndCopyFlag(old_name, new_name):
   """
 
   if FLAGS[old_name].present:
-    logging.warning('Flag --%s is deprecated and will be removed. Please '
-                    'switch to --%s.', old_name, new_name)
+    logging.warning(
+        'Flag --%s is deprecated and will be removed. Please '
+        'switch to --%s.', old_name, new_name)
     if not FLAGS[new_name].present:
       FLAGS[new_name].value = FLAGS[old_name].value
 
@@ -178,8 +181,7 @@ DISK_FLAGS_TO_TRANSLATE = {
 
 
 def WarnAndTranslateDiskFlags():
-  """Translate old disk-related flags to new disk-related flags.
-  """
+  """Translate old disk-related flags to new disk-related flags."""
 
   for old, new in six.iteritems(DISK_FLAGS_TO_TRANSLATE):
     WarnAndCopyFlag(old, new)
@@ -190,14 +192,14 @@ class BaseDiskSpec(spec.BaseSpec):
 
   Attributes:
     device_path: None or string. Path on the machine where the disk is located.
-    disk_number: None or int. Optional disk identifier unique within the
-        current machine.
+    disk_number: None or int. Optional disk identifier unique within the current
+      machine.
     disk_size: None or int. Size of the disk in GB.
     disk_type: None or string. See cloud specific disk classes for more
-        information about acceptable values.
+      information about acceptable values.
     mount_point: None or string. Directory of mount point.
     num_striped_disks: int. The number of disks to stripe together. If this is
-        1, it means no striping will occur. This must be >= 1.
+      1, it means no striping will occur. This must be >= 1.
   """
 
   SPEC_TYPE = 'BaseDiskSpec'
@@ -211,9 +213,9 @@ class BaseDiskSpec(spec.BaseSpec):
 
     Args:
       config_values: dict mapping config option names to provided values. Is
-          modified by this function.
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
 
     Returns:
       dict mapping config option names to values derived from the config
@@ -263,28 +265,60 @@ class BaseDiskSpec(spec.BaseSpec):
     """
     result = super(BaseDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'device_path': (option_decoders.StringDecoder, {'default': None,
-                                                        'none_ok': True}),
-        'disk_number': (option_decoders.IntDecoder, {'default': None,
-                                                     'none_ok': True}),
-        'disk_size': (option_decoders.IntDecoder, {'default': None,
-                                                   'none_ok': True}),
-        'disk_type': (option_decoders.StringDecoder, {'default': None,
-                                                      'none_ok': True}),
-        'mount_point': (option_decoders.StringDecoder, {'default': None,
-                                                        'none_ok': True}),
-        'num_striped_disks': (option_decoders.IntDecoder, {'default': 1,
-                                                           'min': 1}),
-        'nfs_version': (option_decoders.StringDecoder, {'default': None}),
-        'nfs_ip_address': (option_decoders.StringDecoder, {'default': None}),
-        'nfs_managed': (option_decoders.BooleanDecoder, {'default': True}),
-        'nfs_directory': (option_decoders.StringDecoder, {'default': None}),
-        'nfs_rsize': (option_decoders.IntDecoder, {'default': 1048576}),
-        'nfs_wsize': (option_decoders.IntDecoder, {'default': 1048576}),
-        'nfs_timeout': (option_decoders.IntDecoder, {'default': 60}),
-        'nfs_timeout_hard': (option_decoders.BooleanDecoder, {'default': True}),
-        'nfs_retries': (option_decoders.IntDecoder, {'default': 2}),
-        'smb_version': (option_decoders.StringDecoder, {'default': '3.0'}),
+        'device_path': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'disk_number': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'disk_size': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'disk_type': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'mount_point': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'num_striped_disks': (option_decoders.IntDecoder, {
+            'default': 1,
+            'min': 1
+        }),
+        'nfs_version': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'nfs_ip_address': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'nfs_managed': (option_decoders.BooleanDecoder, {
+            'default': True
+        }),
+        'nfs_directory': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'nfs_rsize': (option_decoders.IntDecoder, {
+            'default': 1048576
+        }),
+        'nfs_wsize': (option_decoders.IntDecoder, {
+            'default': 1048576
+        }),
+        'nfs_timeout': (option_decoders.IntDecoder, {
+            'default': 60
+        }),
+        'nfs_timeout_hard': (option_decoders.BooleanDecoder, {
+            'default': True
+        }),
+        'nfs_retries': (option_decoders.IntDecoder, {
+            'default': 2
+        }),
+        'smb_version': (option_decoders.StringDecoder, {
+            'default': '3.0'
+        }),
     })
     return result
 
@@ -493,7 +527,10 @@ class NfsDisk(NetworkDisk):
     nfs_tier: The NFS tier / performance level of the server.
   """
 
-  def __init__(self, disk_spec, remote_mount_address, default_nfs_version=None,
+  def __init__(self,
+               disk_spec,
+               remote_mount_address,
+               default_nfs_version=None,
                nfs_tier=None):
     super(NfsDisk, self).__init__(disk_spec)
     self.nfs_version = disk_spec.nfs_version or default_nfs_version
@@ -542,8 +579,12 @@ class SmbDisk(NetworkDisk):
     smb_tier: The SMB tier / performance level of the server.
   """
 
-  def __init__(self, disk_spec, remote_mount_address, storage_account_and_key,
-               default_smb_version=None, smb_tier=None):
+  def __init__(self,
+               disk_spec,
+               remote_mount_address,
+               storage_account_and_key,
+               default_smb_version=None,
+               smb_tier=None):
     super(SmbDisk, self).__init__(disk_spec)
     self.smb_version = disk_spec.smb_version
     self.device_path = remote_mount_address
