@@ -642,30 +642,42 @@ class GceFirewall(network.BaseFirewall):
 class GceNetworkSpec(network.BaseNetworkSpec):
   """Object representing a GCE Network specification."""
 
-  def __init__(self, project: Optional[str] = None, **kwargs):
+  def __init__(self,
+               project: Optional[str] = None,
+               mtu: Optional[int] = None,
+               **kwargs):
     """Initializes the GceNetworkSpec.
 
     Args:
       project: The project for which the Network should be created.
+      mtu: The MTU (max transmission unit) to use, if any.
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super(GceNetworkSpec, self).__init__(**kwargs)
     self.project = project
+    self.mtu = mtu
 
 
 class GceNetworkResource(resource.BaseResource):
   """Object representing a GCE Network resource."""
 
-  def __init__(self, name: str, mode: str, project: str):
+  def __init__(self,
+               name: str,
+               mode: str,
+               project: str,
+               mtu: Optional[int] = None):
     super(GceNetworkResource, self).__init__()
     self.name = name
     self.mode = mode
     self.project = project
+    self.mtu = mtu
 
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
     cmd.flags['subnet-mode'] = self.mode
+    if self.mtu:
+      cmd.flags['mtu'] = self.mtu
     cmd.Issue()
 
   def _Delete(self):
@@ -750,13 +762,15 @@ class GceNetwork(network.BaseNetwork):
     if network_spec.cidr:
       self.net_type = network.NetType.MULTI.value
       self.cidr = network_spec.cidr
+    self.mtu = network_spec.mtu
 
     name = self._MakeGceNetworkName()
 
     subnet_region = (FLAGS.gce_subnet_region if not network_spec.cidr else
                      util.GetRegionFromZone(network_spec.zone))
     mode = 'auto' if subnet_region is None else 'custom'
-    self.network_resource = GceNetworkResource(name, mode, self.project)
+    self.network_resource = GceNetworkResource(name, mode, self.project,
+                                               self.mtu)
     if subnet_region is None:
       self.subnet_resource = None
     else:
@@ -914,7 +928,8 @@ class GceNetwork(network.BaseNetwork):
   @staticmethod
   def _GetNetworkSpecFromVm(vm) -> GceNetworkSpec:
     """Returns a BaseNetworkSpec created from VM attributes."""
-    return GceNetworkSpec(project=vm.project, zone=vm.zone, cidr=vm.cidr)
+    return GceNetworkSpec(
+        project=vm.project, zone=vm.zone, cidr=vm.cidr, mtu=vm.mtu)
 
   @classmethod
   def _GetKeyFromNetworkSpec(

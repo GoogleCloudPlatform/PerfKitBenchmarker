@@ -23,11 +23,17 @@ same project.
 import abc
 
 from enum import Enum
+from absl import flags
+
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import resource
+
+
+flags.DEFINE_integer('mtu', None,
+                     'Network MTU to set, if any.  Only enabled for GCP.')
 
 
 class NetType(Enum):

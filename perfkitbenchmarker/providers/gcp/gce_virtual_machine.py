@@ -393,6 +393,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
     self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
     self.backfill_image = False
+    self.mtu: Optional[int] = FLAGS.mtu
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size or self.BOOT_DISK_SIZE_GB
@@ -844,6 +845,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         'gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.boot_disk_size
+    if self.network.mtu:
+      result['mtu'] = self.network.mtu
     return result
 
   def SimulateMaintenanceEvent(self):

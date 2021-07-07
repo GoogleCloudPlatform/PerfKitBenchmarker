@@ -45,6 +45,7 @@
 -   Add gcsfuse benchmark.
 -   Add MLPerf multiworker benchmark based on NVIDIA's v0.6 submission
 -   Add retries to PKB.
+-   Added GCE networking MTU support with --mtu.
 
 ### Enhancements:
 

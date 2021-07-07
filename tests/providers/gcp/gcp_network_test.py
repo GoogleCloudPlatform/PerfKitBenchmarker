@@ -493,13 +493,34 @@ class TestGceNetwork(BaseGceNetworkTest):
         'cluster_boot', flag_values=FLAGS)
     benchmark_spec.BenchmarkSpec(mock.Mock(), config_spec, 'uid')
 
-  def testGetNetwork(self):
+  @mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
+  def testGetNetwork(self, mock_issue):
     project = 'myproject'
     zone = 'us-east1-a'
-    vm = mock.Mock(zone=zone, project=project, cidr=None)
+    vm = mock.Mock(zone=zone, project=project, cidr=None, mtu=None)
+
     net = gce_network.GceNetwork.GetNetwork(vm)
+    net.Create()
+
     self.assertEqual(project, net.project)
     self.assertEqual(zone, net.zone)
+    self.assertIsNone(net.mtu)
+    create_network_cmd = mock_issue.call_args_list[0][0][0]
+    self.assertRegex(' '.join(create_network_cmd), 'compute networks create ')
+    # --mtu does NOT appear in the compute network create command
+    self.assertNotIn('--mtu', ' '.join(create_network_cmd))
+
+  @mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
+  def testMtuSupport(self, mock_issue):
+    vm = mock.Mock(project='abc', cidr=None, mtu=1500)
+
+    net = gce_network.GceNetwork.GetNetwork(vm)
+    net.Create()
+
+    self.assertEqual(1500, net.mtu)
+    create_network_cmd = mock_issue.call_args_list[0][0][0]
+    self.assertRegex(' '.join(create_network_cmd),
+                     'compute networks create .*--mtu 1500')
 
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
