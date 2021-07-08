@@ -145,6 +145,10 @@ flags.DEFINE_enum('bq_client_interface', 'CLI',
 flags.DEFINE_string('gcp_preemptible_status_bucket', None,
                     'The GCS bucket to store the preemptible status when '
                     'running on GCP.')
+flags.DEFINE_integer(
+    'gcp_provisioned_iops', 100000,
+    'Iops to provision for pd-extreme. Defaults to the gcloud '
+    'default of 100000.')
 
 
 def _ValidatePreemptFlags(flags_dict):

@@ -31,6 +31,7 @@ FLAGS = flags.FLAGS
 PD_STANDARD = 'pd-standard'
 PD_SSD = 'pd-ssd'
 PD_BALANCED = 'pd-balanced'
+PD_EXTREME = 'pd-extreme'
 
 DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
 
@@ -49,10 +50,14 @@ DISK_METADATA = {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
     },
+    PD_EXTREME: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE,
+    },
     disk.LOCAL: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.NONE,
-    }
+    },
 }
 
 SCSI = 'SCSI'
@@ -81,6 +86,9 @@ class GceDisk(disk.BaseDisk):
     self.project = project
     self.replica_zones = replica_zones
     self.region = util.GetRegionFromZone(self.zone)
+    self.provisioned_iops = None
+    if self.disk_type == PD_EXTREME:
+      self.provisioned_iops = FLAGS.gcp_provisioned_iops
 
     disk_metadata = DISK_METADATA[disk_spec.disk_type]
     if self.replica_zones:
@@ -89,12 +97,16 @@ class GceDisk(disk.BaseDisk):
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
     if self.disk_type == disk.LOCAL:
       self.metadata['interface'] = FLAGS.gce_ssd_interface
+    if self.provisioned_iops and self.disk_type == PD_EXTREME:
+      self.metadata['provisioned_iops'] = self.provisioned_iops
 
   def _Create(self):
     """Creates the disk."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'create', self.name)
     cmd.flags['size'] = self.disk_size
     cmd.flags['type'] = self.disk_type
+    if self.provisioned_iops and self.disk_type == PD_EXTREME:
+      cmd.flags['provisioned-iops'] = self.provisioned_iops
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     if self.image:
       cmd.flags['image'] = self.image
