@@ -53,11 +53,14 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     port_patch = self.enter_context(
         mock.patch.object(redis_instance, 'GetMemoryStorePort'))
     port_patch.return_value = '1234'
+    password_patch = self.enter_context(
+        mock.patch.object(redis_instance, 'GetMemoryStorePassword'))
+    password_patch.return_value = 'password'
     load_patch = self.enter_context(mock.patch.object(memtier, 'Load'))
 
     cloud_redis_memtier_benchmark.Prepare(benchmark_spec)
     redis_instance.Create.assert_called_once_with()
-    load_patch.assert_called_once_with(vm, '0.0.0', '1234')
+    load_patch.assert_called_once_with(vm, '0.0.0', '1234', 'password')
 
   def testRun(self):
     vm = mock.Mock()

@@ -81,9 +81,10 @@ def Prepare(benchmark_spec):
   benchmark_spec.cloud_redis_instance.Create()
   memory_store_ip = benchmark_spec.cloud_redis_instance.GetMemoryStoreIp()
   memory_store_port = benchmark_spec.cloud_redis_instance.GetMemoryStorePort()
+  password = benchmark_spec.cloud_redis_instance.GetMemoryStorePassword()
 
   for vm in memtier_vms:
-    memtier.Load(vm, memory_store_ip, memory_store_port)
+    memtier.Load(vm, memory_store_ip, memory_store_port, password)
 
 
 def Run(benchmark_spec):
@@ -99,7 +100,8 @@ def Run(benchmark_spec):
   memtier_vms = benchmark_spec.vm_groups['clients']
   samples = memtier.RunOverAllThreadsPipelinesAndClients(
       memtier_vms[0], benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
-      benchmark_spec.cloud_redis_instance.GetMemoryStorePort())
+      benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
+      benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
 
   for sample in samples:
     sample.metadata.update(

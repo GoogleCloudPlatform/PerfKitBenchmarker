@@ -156,12 +156,14 @@ def BuildMemtierCommand(
     random_data: Optional[bool] = None,
     test_time: Optional[int] = None,
     outfile: Optional[pathlib.PosixPath] = None,
+    password: Optional[str] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
   args = {
       'server': server,
       'port': port,
+      'authenticate': password,
       'protocol': protocol,
       'clients': clients,
       'threads': threads,
@@ -190,7 +192,7 @@ def BuildMemtierCommand(
   return ' '.join(cmd)
 
 
-def Load(client_vm, server_ip, server_port):
+def Load(client_vm, server_ip, server_port, server_password=None):
   """Preload the server with data."""
 
   # Load key max has to be at least memtier_key_maximum in order to avoid cache
@@ -212,12 +214,16 @@ def Load(client_vm, server_ip, server_port):
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=1,
       key_maximum=key_max,
-      requests='allkeys')
+      requests='allkeys',
+      password=server_password)
   client_vm.RemoteCommand(cmd)
 
 
 def RunOverAllThreadsPipelinesAndClients(
-    client_vm, server_ip: str, server_port: str) -> List[sample.Sample]:
+    client_vm,
+    server_ip: str,
+    server_port: str,
+    password: Optional[str] = None) -> List[sample.Sample]:
   """Runs memtier over all pipeline and thread combinations."""
   samples = []
   for pipeline in FLAGS.memtier_pipeline:
@@ -234,15 +240,21 @@ def RunOverAllThreadsPipelinesAndClients(
             server_port=server_port,
             threads=client_thread,
             pipeline=pipeline,
-            clients=client)
+            clients=client,
+            password=password)
         metadata = GetMetadata(
             clients=client, threads=client_thread, pipeline=pipeline)
         samples.extend(results.GetSamples(metadata))
   return samples
 
 
-def _Run(vm, server_ip: str, server_port: str, threads: int, pipeline: int,
-         clients: int) -> 'MemtierResult':
+def _Run(vm,
+         server_ip: str,
+         server_port: str,
+         threads: int,
+         pipeline: int,
+         clients: int,
+         password: Optional[str] = None) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
   memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
   vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
@@ -265,6 +277,7 @@ def _Run(vm, server_ip: str, server_port: str, threads: int, pipeline: int,
       random_data=True,
       test_time=FLAGS.memtier_run_duration,
       requests=requests,
+      password=password,
       outfile=MEMTIER_RESULTS)
   vm.RemoteCommand(cmd)
 
