@@ -106,6 +106,21 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
                                       timestamp=timestamp,
                                       **kwargs)
 
+  def __eq__(self, other) -> bool:
+    if not isinstance(other, Sample):
+      # don't attempt to compare against unrelated types
+      return NotImplemented
+    if self.value != other.value:
+      return False
+    if self.metric != other.metric:
+      return False
+    if self.timestamp != other.timestamp:
+      return False
+    for key, value in other.metadata.items():
+      if key not in self.metadata or self.metadata[key] != value:
+        return False
+    return True
+
   def asdict(self):
     """Converts the Sample to a dictionary."""
     return self._asdict()

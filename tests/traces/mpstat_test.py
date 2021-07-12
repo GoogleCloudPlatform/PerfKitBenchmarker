@@ -15,7 +15,6 @@
 import datetime
 import json
 import os
-from typing import List
 import unittest
 
 from absl.testing import parameterized
@@ -29,48 +28,6 @@ MPSTAT_METADATA = {
     'event': 'mpstat',
     'sender': 'run',
 }
-
-
-def _SampleMatchesExpected(actual_sample: sample.Sample,
-                           expected_sample: sample.Sample) -> bool:
-  """Helper function that asserts a sample matches specific properties dict.
-
-  Args:
-    actual_sample: the actual sample produced
-    expected_sample: a test sample we expect to see.
-
-  Returns:
-    a boolean representing whether the samples match
-
-  We verify that the followign match:
-  - value
-  - metric
-  - timestamp
-  - metadata (we'll assert all the key/value pairs are present in
-      the actual sample)
-  """
-  if actual_sample.value != expected_sample.value:
-    return False
-  if actual_sample.metric != expected_sample.metric:
-    return False
-  if actual_sample.timestamp != expected_sample.timestamp:
-    return False
-  for key, value in expected_sample.metadata.items():
-    if key not in actual_sample.metadata or actual_sample.metadata[key] != value:
-      return False
-  return True
-
-
-def _ActualSamplesIncludesExpectedSample(
-    actual_samples: List[sample.Sample],
-    expected_sample: sample.Sample) -> bool:
-  """Checks whether an expected sample matches an actual sample."""
-
-  for actual_sample in actual_samples:
-    if _SampleMatchesExpected(actual_sample, expected_sample):
-      return True
-  return False
-
 
 _AGGREGATE_SAMPLES = [
     sample.Sample(
@@ -197,9 +154,7 @@ class MpstatTestCase(parameterized.TestCase):
     self.assertLen(actual_samples, expected_number_of_samples)
 
     for expected_sample in expected_samples:
-      if not _ActualSamplesIncludesExpectedSample(
-          actual_samples,
-          expected_sample):
+      if expected_sample not in actual_samples:
         sample_not_found_message = (
             f'Expected sample:\n{expected_sample}\nnot found in actual samples:'
             f'\n{actual_samples}')

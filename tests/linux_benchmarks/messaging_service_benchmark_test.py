@@ -173,11 +173,10 @@ class MessagingServiceBenchmarkTest(parameterized.TestCase):
     actual_samples = messaging_service_benchmark._CreateSamples(
         self.contents, NUMBER_OF_MESSAGES, MESSAGE_SIZE, CLOUD)
 
-    for expected_sample_key in expected_samples:
-      # TODO(user): check if sample is in list of samples.
-      if expected_sample_key not in actual_samples:
+    for expected_sample in expected_samples:
+      if expected_sample not in actual_samples:
         sample_not_found_message = (
-            f'Expected sample:\n{expected_sample_key}\nnot found in actual samples:'
+            f'Expected sample:\n{expected_sample}\nnot found in actual samples:'
             f'\n{actual_samples}')
         raise Exception(sample_not_found_message)
 
