@@ -256,7 +256,9 @@ class AzureDisk(disk.BaseDisk):
     if self.disk_type == disk.LOCAL:
       if LocalDriveIsNvme(self.machine_type):
         return '/dev/nvme%sn1' % str(self.lun)
-      return '/dev/sdb'
+      # Temp disk naming isn't always /dev/sdb:
+      # https://github.com/MicrosoftDocs/azure-docs/issues/54055
+      return '/dev/disk/azure/resource'
     else:
       try:
         start_index = 1  # the os drive is always at index 0; skip the OS drive.
