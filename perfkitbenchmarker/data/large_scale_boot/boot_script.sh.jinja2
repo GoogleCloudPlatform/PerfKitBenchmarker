@@ -69,7 +69,7 @@ echo $(date +%s%N) > {{start_time_file}}
     --tags perfkitbenchmarker
     --no-restart-on-failure
     --zone {{ zone }}
-    --metadata "${START_UP_SCRIPT}"
+    --metadata "${START_UP_SCRIPT}",{{ tags }}
   )
   {% if os_type == 'linux' %}
     gcloud_args+=( --network-interface {{ use_public_ip }}address,network-tier=PREMIUM )
@@ -89,7 +89,7 @@ echo $(date +%s%N) > {{start_time_file}}
     --key-name {{ key_name }}
     --instance-type {{ boot_machine_type }}
     --{{ use_public_ip }}associate-public-ip-address
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=launcher_id,Value={{launcher_vm_name}}}]'
+    --tag-specifications '{{ tags }}'
     --placement AvailabilityZone={{ zone }},GroupName={{ group_name }}
     --user-data "${START_UP_SCRIPT}"
     --count {{vm_count}}

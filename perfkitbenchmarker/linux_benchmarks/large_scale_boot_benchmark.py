@@ -321,14 +321,18 @@ def _BuildContext(launcher_vm, booter_template_vm):
         'image_project': booter_template_vm.image_project,
         'gcloud_path': FLAGS.gcloud_path,
         'project': FLAGS.project,
+        'tags': gcp_util.MakeFormattedDefaultTags(),
     })
   elif cloud == 'AWS':
+    tags = aws_util.MakeDefaultTags()
+    tags.update({'launcher_id': launcher_vm.name})
     context.update({
         'group_name': booter_template_vm.placement_group.name,
         'image': booter_template_vm.image,
         'key_name': 'perfkit-key-{0}'.format(FLAGS.run_uri),
         'region': aws_util.GetRegionFromZone(launcher_vm.zone),
         'subnet_id': booter_template_vm.network.subnet.id,
+        'tags': aws_util.FormatTagSpecifications('instance', tags),
     })
   elif cloud == 'Azure':
     context.update({
