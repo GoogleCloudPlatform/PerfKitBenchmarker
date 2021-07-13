@@ -97,6 +97,9 @@ flags.DEFINE_string('minigo_model_dir', '',
                     'Directory on GCS to copy minigo source data from. Files '
                     'will be copied from subdirectories of src_dir '
                     'corresponding to the board size.')
+RESNET_EPOCHS = flags.DEFINE_integer(
+    'mlperf_resnet_epochs', 2,
+    'The Number of epochs to use for training ResNet.', lower_bound=2)
 
 
 def GetConfig(user_config):
@@ -341,6 +344,9 @@ def Prepare(benchmark_spec, vm=None):
             vm, 'bind_launch', 'bind_launch --no_hyperthreads', run_script)
 
     if RESNET in benchmark_spec.benchmark:
+      run_script = 'training_results_v0.6/NVIDIA/benchmarks/resnet/implementations/mxnet/run_and_time.sh'
+      vm_util.ReplaceText(
+          vm, 'NUMEPOCHS=.*', f'NUMEPOCHS={RESNET_EPOCHS.value}', run_script)
       vm.RemoteCommand(
           'cd training_results_v0.6/NVIDIA/benchmarks/resnet/implementations/mxnet &&'
           ' sudo docker build --network=host . -t mlperf-nvidia:image_classification',

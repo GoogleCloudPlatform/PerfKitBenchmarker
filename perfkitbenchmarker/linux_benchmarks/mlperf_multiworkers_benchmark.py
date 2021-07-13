@@ -516,6 +516,8 @@ def _GetChangesForResnet(benchmark_spec,
                             cuda_exports=cuda_exports))]
 
   run_and_time_sed += [(r'BIND=.*', r'BIND=\"\"')]
+  run_and_time_sed += [('NUMEPOCHS=.*',
+                        f'NUMEPOCHS={mlperf_benchmark.RESNET_EPOCHS.value}')]
 
   run_sed += [(r'srun --mem=0 -n \$SLURM_JOB_NUM_NODES --ntasks-per-node=1',
                r'mpirun -mca btl_tcp_if_exclude docker0,lo -N 1 '
