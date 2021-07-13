@@ -35,7 +35,7 @@ mlperf_multiworkers:
   description: Runs MLPerf Benchmark on multiple workers.
   vm_groups:
     default:
-      os_type: ubuntu1604
+      os_type: ubuntu1804
       disk_spec: *default_500_gb
       vm_spec:
         GCP:
@@ -46,11 +46,12 @@ mlperf_multiworkers:
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
-          zone: us-east-1
+          zone: us-west-2a
           boot_disk_size: 110
+          image: ami-08c6f8e3871c56139
         Azure:
           machine_type: Standard_ND40rs_v2
-          zone: eastus
+          zone: westus2
           boot_disk_size: 110
           image: microsoft-dsvm:ubuntu-hpc:1804:latest
       vm_count: null

@@ -231,7 +231,8 @@ NUM_LOCAL_VOLUMES = {
     'f1.2xlarge': 1,
     'f1.4xlarge': 1,
     'f1.16xlarge': 4,
-    'p3dn.24xlarge': 2
+    'p3dn.24xlarge': 2,
+    'p4d.24xlarge': 8,
 }
 
 
