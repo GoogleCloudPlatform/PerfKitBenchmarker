@@ -88,9 +88,13 @@ class GCPPubSubInterface(MessagingServiceClient):
           request={'subscription': self.subscription_path, 'ack_ids': ack_ids})
 
 
-if __name__ == '__main__':
+def main():
   benchmark_runner = GCPPubSubInterface(FLAGS.project,
                                         FLAGS.pubsub_topic,
                                         FLAGS.pubsub_subscription)
   benchmark_runner.run_phase(FLAGS.benchmark_scenario, FLAGS.number_of_messages,
                              FLAGS.message_size)
+
+
+if __name__ == '__main__':
+  main()
