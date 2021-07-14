@@ -998,8 +998,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return status in INSTANCE_EXISTS_STATUSES
 
   def _GetNvmeBootIndex(self):
-    if aws_disk.LocalDriveIsNvme(self.machine_type) and \
-       aws_disk.EbsDriveIsNvme(self.machine_type):
+    if (aws_disk.LocalDriveIsNvme(self.machine_type) and
+        aws_disk.EbsDriveIsNvme(self.machine_type)):
       # identify boot drive
       # If this command ever fails consider 'findmnt -nM / -o source'
       cmd = ('realpath /dev/disk/by-label/cloudimg-rootfs '

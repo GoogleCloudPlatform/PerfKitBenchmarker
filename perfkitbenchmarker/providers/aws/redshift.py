@@ -20,7 +20,7 @@ and deleted.
 import copy
 import json
 import os
-from typing import Dict, List, Text
+from typing import Dict, List, Text, Tuple
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
@@ -106,6 +106,9 @@ class CliClientInterface(edw_service.EdwClientInterface):
     self.user = user
     self.password = password
 
+    # set by SetProvisionedAttributes()
+    self.host = None
+
   def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
     """Sets any attributes that were unknown during initialization."""
     super(CliClientInterface, self).SetProvisionedAttributes(bm_spec)
@@ -138,7 +141,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
             os.path.join(service_specific_dir,
                          'provider_specific_script_driver.py')))
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -185,6 +188,9 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.user = user
     self.password = password
 
+    # set in SetProvisionedAttributes()
+    self.host = None
+
   def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
     """Sets any attributes that were unknown during initialization."""
     super(JdbcClientInterface, self).SetProvisionedAttributes(bm_spec)
@@ -206,7 +212,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(package_name,
                                                     [REDSHIFT_JDBC_JAR], '')
 
-  def ExecuteQuery(self, query_name: Text) -> (float, Dict[str, str]):
+  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -361,8 +367,8 @@ class Redshift(edw_service.EdwService):
       MissingOption: If any of the required parameters is missing.
     """
     if not (cluster_identifier and node_type and user and password):
-      raise errors.MissingOption('Need cluster_identifier, user and password '
-                                 'set for creating a cluster.')
+      raise errors.Config.MissingOption('Need cluster_identifier, user and '
+                                        'password set for creating a cluster.')
 
     prefix = [
         'redshift', 'create-cluster', '--cluster-identifier', cluster_identifier
@@ -431,8 +437,8 @@ class Redshift(edw_service.EdwService):
     """
 
     if not (self.user and self.password and self.db):
-      raise errors.MissingOption('Need the db, user and password set for '
-                                 'restoring a cluster')
+      raise errors.Config.MissingOption(
+          'Need the db, user and password set for restoring a cluster')
 
     if self._ValidateSnapshot(snapshot_identifier):
       node_type, node_count = self._SnapshotDetails(snapshot_identifier)
