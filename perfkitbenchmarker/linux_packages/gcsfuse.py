@@ -4,7 +4,7 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('gcsfuse_version', '0.35.0', 'The version of the gcsfuse.')
+flags.DEFINE_string('gcsfuse_version', '0.35.1', 'The version of the gcsfuse.')
 flags.DEFINE_string('gcsfuse_options', '--implicit-dirs',
                     'The options used to mount gcsfuse.')
 
@@ -27,7 +27,8 @@ def AptInstall(vm):
   vm.RemoteCommand('wget -O {local} {url}'.format(
       local=PACKAGE_LOCAL, url=_PackageUrl()))
 
-  vm.InstallPackages(PACKAGE_LOCAL)
+  vm.RemoteCommand(
+      f'sudo apt-get install -y --allow-downgrades {PACKAGE_LOCAL}')
 
   vm.RemoteCommand(
       'sudo mkdir -p {mnt} && sudo chmod a+w {mnt}'.format(mnt=MNT))
