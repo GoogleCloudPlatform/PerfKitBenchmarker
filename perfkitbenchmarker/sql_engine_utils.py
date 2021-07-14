@@ -14,6 +14,8 @@
 
 """Utilities to support multiple engines."""
 import abc
+import typing
+from perfkitbenchmarker import virtual_machine
 
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
@@ -49,6 +51,8 @@ AWS_SQLSERVER_ENGINES = ['sqlserver-ee', 'sqlserver-se',
 AWS_AURORA_POSTGRES_ENGINE = 'aurora-postgresql'
 AWS_AURORA_MYSQL_ENGINE = 'aurora-mysql'
 
+DEFAULT_COMMAND = 'default'
+
 
 # Query Related tools
 class DbConnectionProperties():
@@ -68,22 +72,38 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
 
     Attributes:
     vm: VM to issue command with.
-    connection_properties: Propreties of the database.
+    connection_properties: Connection properties of the database.
   """
   ENGINE_TYPE = None
 
-  def __init__(self, vm, connection_properties):
+  def __init__(self, vm: virtual_machine.VirtualMachine,
+               connection_properties: DbConnectionProperties):
     """Initialize ISQLQuery class."""
     self.vm = vm
     self.connection_properties = connection_properties
 
-  def IssueSqlCommand(self, command: str, database_name='', superuser=False,
+  def IssueSqlCommand(self,
+                      command: typing.Union[str, typing.Dict[str, str]],
+                      database_name: str = '',
+                      superuser: bool = False,
                       **kwargs):
     """Issue Sql Command."""
-    command = self.MakeSqlCommand(command, database_name=database_name)
+    command_string = None
+    # Get the command to issue base on type
+    if isinstance(command, dict):
+      if self.ENGINE_TYPE in command:
+        command_string = command[self.ENGINE_TYPE]
+      else:
+        command_string = command[DEFAULT_COMMAND]
+    elif isinstance(command, str):
+      command_string = command
+
+    command_string = self.MakeSqlCommand(
+        command_string, database_name=database_name)
+
     if superuser:
-      command = 'sudo ' + command
-    return self.vm.RemoteCommand(command, **kwargs)
+      command_string = 'sudo ' + command_string
+    return self.vm.RemoteCommand(command_string, **kwargs)
 
   @abc.abstractmethod
   def InstallPackages(self) -> None:
@@ -105,21 +125,23 @@ class PostgresCliQueryTools(ISQLQueryTools):
   """SQL Query class to issue postgres related query."""
   ENGINE_TYPE = POSTGRES
 
+  # The default database in postgres
+  DEFAULT_DATABASE = POSTGRES
+
   def InstallPackages(self):
     """Installs packages required for making queries."""
     self.vm.Install('postgres_client')
 
-  def IssueSqlCommand(self, command: str, database_name='postgres', **kwargs):
-    """Issue Sql Command."""
-    return self.vm.RemoteCommand(
-        self.MakeSqlCommand(command, database_name=database_name), **kwargs)
-
-  def MakeSqlCommand(self, command: str, database_name='postgres'):
-    """Issue Sql Command."""
+  def MakeSqlCommand(self, command: str, database_name=''):
+    """Make Sql Command."""
+    if not database_name:
+      database_name = self.DEFAULT_DATABASE
     return 'psql %s -c "%s"' % (self.GetConnectionString(database_name),
                                 command)
 
-  def GetConnectionString(self, database_name='postgres'):
+  def GetConnectionString(self, database_name=''):
+    if not database_name:
+      database_name = self.DEFAULT_DATABASE
     return '\'host={0} user={1} password={2} dbname={3}\''.format(
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
