@@ -15,9 +15,11 @@
 
 import logging
 import time
+from typing import List
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAME = 'cluster_boot'
@@ -170,23 +172,63 @@ def _MeasureReboot(vms):
     List of Samples containing the reboot times and an overall cluster reboot
     time.
   """
-  samples = []
   before_reboot_timestamp = time.time()
   reboot_times = vm_util.RunThreaded(lambda vm: vm.Reboot(), vms)
   cluster_reboot_time = time.time() - before_reboot_timestamp
-  os_types = set()
+  return _GetVmOperationDataSamples(reboot_times, cluster_reboot_time, 'Reboot',
+                                    vms)
+
+
+def MeasureDelete(
+    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+  """Measures the time to delete the cluster of VMs.
+
+  Args:
+    vms: List of BaseVirtualMachine subclasses.
+
+  Returns:
+    List of Samples containing the delete times and an overall cluster delete
+    time.
+  """
+  before_delete_timestamp = time.time()
+  vm_util.RunThreaded(lambda vm: vm.Delete(), vms)
+  delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]
+  max_delete_end_time = max([vm.delete_end_time for vm in vms])
+  cluster_delete_time = max_delete_end_time - before_delete_timestamp
+  return _GetVmOperationDataSamples(delete_times, cluster_delete_time, 'Delete',
+                                    vms)
+
+
+def _GetVmOperationDataSamples(
+    operation_times: List[int], cluster_time: int, operation: str,
+    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+  """Append samples from given data.
+
+  Args:
+    operation_times: The list of times for each vms.
+    cluster_time: The cluster time for the benchmark.
+    operation: The benchmark operation being run, capitalized with no spaces.
+    vms: list of virtual machines.
+
+  Returns:
+    List of samples constructed from data.
+  """
+  samples = []
+  metadata_list = []
   for i, vm in enumerate(vms):
     metadata = {
         'machine_instance': i,
         'num_vms': len(vms),
         'os_type': vm.OS_TYPE
     }
-    os_types.add(vm.OS_TYPE)
+    metadata_list.append(metadata)
+  for operation_time, metadata in zip(operation_times, metadata_list):
     samples.append(
-        sample.Sample('Reboot Time', reboot_times[i], 'seconds', metadata))
+        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata))
+  os_types = set([vm.OS_TYPE for vm in vms])
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
-      sample.Sample('Cluster Reboot Time', cluster_reboot_time, 'seconds',
+      sample.Sample(f'Cluster {operation} Time', cluster_time, 'seconds',
                     metadata))
   return samples
 

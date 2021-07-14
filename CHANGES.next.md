@@ -47,6 +47,8 @@
 -   Add retries to PKB.
 -   Added GCE networking MTU support with --mtu.
 -   Add pd extreme support to PKB.
+-   Add '--delete_samples' to measure VM deletion during benchmark teardown
+    phase
 
 ### Enhancements:
 

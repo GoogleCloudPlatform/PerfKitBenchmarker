@@ -325,6 +325,9 @@ _SMART_CAPACITY_RETRY = flags.DEFINE_bool(
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
+_MEASURE_DELETE = flags.DEFINE_boolean(
+    'delete_samples', False,
+    'Whether to publish delete time samples for all tests.')
 flags.DEFINE_boolean(
     'gpu_samples', False,
     'Whether to publish GPU memcpy bandwidth samples for GPU tests.')
@@ -918,7 +921,7 @@ def DoCleanupPhase(spec, timer):
       spec.BenchmarkCleanup(spec)
 
 
-def DoTeardownPhase(spec, timer):
+def DoTeardownPhase(spec, collector, timer):
   """Performs the Teardown phase of benchmark execution.
 
   Teardown phase work should be delegated to spec.Delete to allow non-PKB based
@@ -926,10 +929,16 @@ def DoTeardownPhase(spec, timer):
 
   Args:
     spec: The BenchmarkSpec created for the benchmark.
+    collector: The SampleCollector object to add samples to
+      (if collecting delete samples)
     timer: An IntervalTimer that measures the start and stop times of
       resource teardown.
   """
   logging.info('Tearing down resources for benchmark %s', spec.name)
+  # Add delete time metrics after metadeta collected
+  if _MEASURE_DELETE.value:
+    samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
+    collector.AddSamples(samples, spec.name, spec)
 
   spec.Freeze()
 
@@ -1036,7 +1045,7 @@ def RunBenchmark(spec, collector):
 
           if stages.TEARDOWN in FLAGS.run_stage:
             current_run_stage = stages.TEARDOWN
-            DoTeardownPhase(spec, detailed_timer)
+            DoTeardownPhase(spec, collector, detailed_timer)
 
         # Add timing samples.
         if (FLAGS.run_stage == stages.STAGES and
@@ -1083,7 +1092,7 @@ def RunBenchmark(spec, collector):
         if (FLAGS.always_teardown_on_exception and
             stages.TEARDOWN not in FLAGS.run_stage):
           # Note that if TEARDOWN is specified, it will happen below.
-          DoTeardownPhase(spec, detailed_timer)
+          DoTeardownPhase(spec, collector, detailed_timer)
         raise
       finally:
         if interrupt_checker:
