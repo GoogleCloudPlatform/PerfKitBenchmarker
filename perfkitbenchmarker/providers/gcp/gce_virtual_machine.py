@@ -172,6 +172,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       else:
         # Specifying gcp_min_cpu_platform explicitly removes any config.
         config_values.pop('min_cpu_platform', None)
+    if flag_values['disable_smt'].present:
+      config_values['threads_per_core'] = 1
     if flag_values['gce_tags'].present:
       config_values['gce_tags'] = flag_values.gce_tags
 
@@ -215,6 +217,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             'default': 'n1-node-96-624'
         }),
         'min_cpu_platform': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'threads_per_core': (option_decoders.IntDecoder, {
             'default': None
         }),
         'gce_tags': (option_decoders.ListDecoder, {
@@ -404,6 +409,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
+    self.threads_per_core = vm_spec.threads_per_core
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
@@ -490,17 +496,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['boot-disk-size'] = self.boot_disk_size
     if self.boot_disk_type:
       cmd.flags['boot-disk-type'] = self.boot_disk_type
-    if FLAGS.disable_smt:
-      cmd.flags['threads-per-core'] = 1
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
-      if self.min_cpu_platform:
-        cmd.flags['min-cpu-platform'] = self.min_cpu_platform
     else:
       cmd.flags['machine-type'] = self.machine_type
-      if self.min_cpu_platform:
-        cmd.flags['min-cpu-platform'] = self.min_cpu_platform
+
+    if self.min_cpu_platform:
+      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
+
+    if self.threads_per_core:
+      cmd.flags['threads-per-core'] = self.threads_per_core
+
     if self.gpu_count and self.machine_type and 'a2-' not in self.machine_type:
       # A2 machine type already has predefined GPU type and count.
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
@@ -845,6 +852,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         'gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.boot_disk_size
+    if self.threads_per_core:
+      result['threads_per_core'] = self.threads_per_core
     if self.network.mtu:
       result['mtu'] = self.network.mtu
     return result

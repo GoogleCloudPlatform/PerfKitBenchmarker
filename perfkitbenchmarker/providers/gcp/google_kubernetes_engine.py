@@ -144,6 +144,11 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.vm_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.vm_config.min_cpu_platform
 
+    if self.vm_config.threads_per_core:
+      # TODO(user): Remove when threads-per-core is available in GA
+      cmd.use_alpha_gcloud = True
+      cmd.flags['threads-per-core'] = self.vm_config.threads_per_core
+
     if self.vm_config.boot_disk_size:
       cmd.flags['disk-size'] = self.vm_config.boot_disk_size
     if self.vm_config.boot_disk_type:
