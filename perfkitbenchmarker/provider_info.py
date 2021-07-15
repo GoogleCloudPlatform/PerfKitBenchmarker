@@ -35,7 +35,7 @@ class AutoRegisterProviderInfoMeta(type):
 
   def __init__(cls, name, bases, dct):
     super(AutoRegisterProviderInfoMeta, cls).__init__(name, bases, dct)
-    if cls.CLOUD is not None:
+    if hasattr(cls, 'CLOUD') and cls.CLOUD is not None:
       _PROVIDER_INFO_REGISTRY[cls.CLOUD] = cls
 
 

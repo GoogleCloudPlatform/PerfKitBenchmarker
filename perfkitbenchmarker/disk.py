@@ -492,6 +492,9 @@ class NetworkDisk(BaseDisk):
     super(NetworkDisk, self).__init__(disk_spec)
     super(NetworkDisk, self).GetResourceMetadata()
 
+    # Set in derived classes by Attach()
+    self.vm = None
+
   @abc.abstractmethod
   def _GetNetworkDiskMountOptionsDict(self):
     """Default mount options as a dict."""
@@ -509,8 +512,14 @@ class NetworkDisk(BaseDisk):
   def fstab_options(self):
     return self.mount_options
 
+  @abc.abstractmethod
+  def Attach(self):
+    """Attached NetworkDisk to a VM.  Must set self.vm."""
+    raise NotImplementedError()
+
   def Detach(self):
-    self.vm.RemoteCommand('sudo umount %s' % self.mount_point)
+    if self.vm:
+      self.vm.RemoteCommand('sudo umount %s' % self.mount_point)
 
   def _Create(self):
     # handled by the Network Disk service
