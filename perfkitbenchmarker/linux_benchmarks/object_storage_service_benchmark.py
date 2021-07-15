@@ -403,8 +403,14 @@ def MultiThreadDeleteDelay(num_vms, threads_per_vm):
   return (num_vms * threads_per_vm) / (MULTISTREAM_DELETE_OPS_PER_SEC)
 
 
-def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
-                               all_sizes, results, metadata=None):
+def ProcessMultiStreamResults(start_times,
+                              latencies,
+                              sizes,
+                              operation,
+                              all_sizes,
+                              results,
+                              metadata=None,
+                              allow_failing_streams=False):
   """Read and process results from the api_multistream worker process.
 
   Results will be reported per-object size and combined for all
@@ -421,17 +427,24 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
       distribution used, in bytes.
     results: a list to append Sample objects to.
     metadata: dict. Base sample metadata
+    allow_failing_streams: Whether to expect a result for all streams.
   """
 
-  num_streams = FLAGS.object_storage_streams_per_vm * FLAGS.num_vms
-
-  assert len(start_times) == num_streams
-  assert len(latencies) == num_streams
-  assert len(sizes) == num_streams
+  total_num_streams = FLAGS.object_storage_streams_per_vm * FLAGS.num_vms
+  if allow_failing_streams:
+    num_streams = len(start_times)
+    assert len(latencies) == num_streams
+    assert len(sizes) == num_streams
+  else:
+    assert len(start_times) == total_num_streams
+    assert len(latencies) == total_num_streams
+    assert len(sizes) == total_num_streams
+    num_streams = total_num_streams
 
   if metadata is None:
     metadata = {}
-  metadata['num_streams'] = num_streams
+  metadata['num_streams'] = total_num_streams
+  metadata['num_failing_streams'] = total_num_streams - num_streams
   metadata['objects_per_stream'] = (
       FLAGS.object_storage_multistream_objects_per_stream)
   metadata['object_naming'] = FLAGS.object_storage_object_naming_scheme
@@ -1053,7 +1066,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   if FLAGS.object_storage_worker_output:
     with open(FLAGS.object_storage_worker_output, 'w') as out_file:
       out_file.write(json.dumps(output))
-  _ProcessMultiStreamResults(
+  ProcessMultiStreamResults(
       start_times,
       latencies,
       sizes,

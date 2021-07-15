@@ -689,7 +689,8 @@ def _PrepareBucket(benchmark_spec):
   storage_service = benchmark_spec.storage_service
   storage_service.PrepareService(util.GetRegionFromZone(location))
   storage_service.MakeBucket(bucket, raise_on_failure=False)
-  storage_service.ChmodBucket(benchmark_spec.gcp_service_account, 'W', bucket)
+  storage_service.AclBucket(benchmark_spec.gcp_service_account, gcs.WRITER,
+                            bucket)
 
 
 def _ClearTmpDirectory(benchmark_spec, vm):
