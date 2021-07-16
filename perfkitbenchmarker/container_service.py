@@ -22,6 +22,7 @@ expanded to support first-class container benchmarks.
 """
 
 import collections
+import ipaddress
 import itertools
 import os
 import time
@@ -29,6 +30,7 @@ from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import os_types
@@ -550,7 +552,7 @@ class KubernetesContainerService(BaseContainerService):
 
   def _Create(self):
     run_cmd = [
-        FLAGS.kubectl,
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'run',
         self.name,
         '--image=%s' % self.image,
@@ -632,3 +634,45 @@ class KubernetesCluster(BaseContainerCluster):
     service = KubernetesContainerService(container_spec, name)
     self.services[name] = service
     service.Create()
+
+  def ApplyManifest(self, manifest_filename):
+    """Applies a declarative Kubernetes manifest."""
+    run_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'apply',
+        '-f',
+        manifest_filename
+    ]
+    vm_util.IssueCommand(run_cmd)
+
+  def WaitForResource(self, resource_name, condition_name):
+    """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
+    run_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'wait',
+        '--for=condition=%s' % condition_name,
+        '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
+        resource_name
+    ]
+
+    vm_util.IssueRetryableCommand(run_cmd)
+
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  def GetLoadBalancerIP(self, service_name):
+    """Returns the IP address of a LoadBalancer service when ready."""
+    get_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'get', 'service', service_name,
+        '-o', 'jsonpath="{.status.loadBalancer.ingress[0].ip}"'
+    ]
+
+    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+
+    try:
+      # Ensure the load balancer is ready by parsing the output IP
+      ip_address = ipaddress.ip_address(yaml.safe_load(stdout))
+    except ValueError:
+      raise errors.Resource.RetryableCreationError(
+          "Load Balancer IP for service '%s' is not ready." % service_name)
+
+    return format(ip_address)
