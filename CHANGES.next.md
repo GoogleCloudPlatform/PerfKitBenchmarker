@@ -147,3 +147,4 @@
 -   Fix parsing Dstat 0.7.3
 -   Update hadoop version to 3.3.1
 -   Updated required numpy and six versions.
+-   Added no_proxy flag for proxy settings
