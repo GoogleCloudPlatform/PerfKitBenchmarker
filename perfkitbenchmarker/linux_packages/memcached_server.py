@@ -44,7 +44,7 @@ def _Install(vm):
   vm.RemoteCommand(
       f'cd {DIR}; '
       'wget https://www.memcached.org/files/'
-      f'memcached-{FLAGS.memcached_version}.tar.gz; '
+      f'memcached-{FLAGS.memcached_version}.tar.gz --no-check-certificate; '
       f'tar -zxvf memcached-{FLAGS.memcached_version}.tar.gz; '
       f'cd memcached-{FLAGS.memcached_version}; '
       './configure && make && sudo make install')
