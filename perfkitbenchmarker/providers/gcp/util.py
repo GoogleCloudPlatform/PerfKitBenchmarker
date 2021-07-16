@@ -456,3 +456,14 @@ def MakeFormattedDefaultTags(timeout_minutes=None):
     A string contains tags, contributed from the benchmark spec.
   """
   return FormatTags(GetDefaultTags(timeout_minutes))
+
+
+def GetAccessToken():
+  """Gets the access token for the default project.
+
+  Returns:
+    Text string of the access token.
+  """
+  cmd = [FLAGS.gcloud_path, 'auth', 'print-access-token']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  return stdout.strip()

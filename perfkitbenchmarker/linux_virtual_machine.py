@@ -36,7 +36,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, Set
+from typing import Dict, List, Set
 import uuid
 
 from absl import flags
@@ -936,6 +936,36 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       RemoteCommandError: If there was a problem establishing the connection.
     """
     return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
+
+  def RemoteCommandsInParallel(self,
+                               commands: List[str],
+                               *args,
+                               **kwargs):
+    """Runs several commands on the VM in parallel.
+
+    Because of the behavior of the wait command. This ignores failure on all
+    commands.
+
+    Args:
+      commands: the list of commands to run
+      *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
+      **kwargs: Keyword arguments passed directly to
+          RemoteHostCommandWithReturnCode.
+
+    Returns:
+      A tuple of stdout, stderr from running the commands. Both will be
+      interleaved from all the commands in no guaranteed order.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    command_delimiter = ' & '
+    # Wrap each command in a subshell to support command chaining .e.g
+    # (echo do this; echo then this) & (echo do this in parallel)
+    command = command_delimiter.join(f'( {command} )' for command in commands)
+    command += '; wait'
+
+    return self.RobustRemoteCommand(command, *args, **kwargs)
 
   def RemoteCommandWithReturnCode(self, *args, **kwargs):
     """Runs a command on the VM.

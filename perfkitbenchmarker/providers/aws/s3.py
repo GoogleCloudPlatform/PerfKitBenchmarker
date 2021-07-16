@@ -14,14 +14,23 @@
 
 """Contains classes/functions related to S3."""
 
+import base64
+import hashlib
+import hmac
+import json
 import os
 import posixpath
+import threading
+import time
+from typing import List as TList
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
@@ -29,10 +38,18 @@ FLAGS = flags.FLAGS
 
 AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
+_READ = 's3:GetObject'
+_WRITE = 's3:PutObject'
 
 
 class S3Service(object_storage_service.ObjectStorageService):
   """Interface to Amazon S3."""
+
+  def __init__(self):
+    super().__init__()
+    self._credentials_lock = threading.Lock()
+    self.access_key = None
+    self.secret_key = None
 
   STORAGE_NAME = aws.CLOUD
 
@@ -119,7 +136,7 @@ class S3Service(object_storage_service.ObjectStorageService):
   def DeleteBucket(self, bucket):
     """See base class."""
 
-    def _suppress_failure(stdout, stderr, retcode):
+    def _SuppressFailure(stdout, stderr, retcode):
       """Suppresses failure when bucket does not exist."""
       del stdout  # unused
       if retcode and 'NoSuchBucket' in stderr:
@@ -131,7 +148,7 @@ class S3Service(object_storage_service.ObjectStorageService):
          's3://%s' % bucket,
          '--region', self.region,
          '--force'],  # --force deletes even if bucket contains objects.
-        suppress_failure=_suppress_failure)
+        suppress_failure=_SuppressFailure)
 
   def EmptyBucket(self, bucket):
     vm_util.IssueCommand(
@@ -139,6 +156,54 @@ class S3Service(object_storage_service.ObjectStorageService):
          's3://%s' % bucket,
          '--region', self.region,
          '--recursive'])
+
+  def MakeBucketPubliclyReadable(self, bucket, also_make_writable=False):
+    """See base class."""
+    actions = [_READ]
+    logging.warning('Making bucket %s publicly readable!', bucket)
+    if also_make_writable:
+      actions.append(_WRITE)
+      logging.warning('Making bucket %s publicly writable!', bucket)
+    vm_util.IssueCommand([
+        'aws', 's3api', 'put-bucket-policy', '--region', self.region,
+        '--bucket', bucket, '--policy',
+        _MakeS3BucketPolicy(bucket, actions)
+    ])
+
+  def GetDownloadUrl(self, bucket, object_name, use_https=True):
+    """See base class."""
+    assert self.region
+    scheme = 'https' if use_https else 'http'
+    return f'{scheme}://{bucket}.s3.{self.region}.amazonaws.com/{object_name}'
+
+  UPLOAD_HTTP_METHOD = 'PUT'
+
+  def _InitializeCredentials(self):
+    """Load credentials under a lock."""
+    with self._credentials_lock:
+      if not self.access_key:
+        self.access_key, self.secret_key = aws_credentials.GetCredentials()
+
+  def GetHttpAuthorizationHeaders(self, http_method: str, bucket: str,
+                                  object_name: str) -> TList[str]:
+    """See base class."""
+    self._InitializeCredentials()
+    # https://docs.aws.amazon.com/AmazonS3/latest/userguide/RESTAuthentication.html
+    # https://www.ietf.org/rfc/rfc2616.txt supports asctime
+    timestamp_header = 'x-amz-date:' + time.asctime(time.gmtime())
+    content_type = ''
+    if http_method == 'PUT':
+      content_type = 'application/x-www-form-urlencoded'
+    string_to_sign = '\n'.join([
+        http_method, '', content_type, '', timestamp_header,
+        f'/{bucket}/{object_name}'
+    ])
+    signature = base64.b64encode(
+        hmac.new(self.secret_key.encode(),
+                 string_to_sign.encode(),
+                 hashlib.sha1).digest()).decode()
+    auth_header = f'Authorization: AWS {self.access_key}:{signature}'
+    return [timestamp_header, auth_header]
 
   def PrepareVM(self, vm):
     vm.Install('awscli')
@@ -174,3 +239,20 @@ class S3Service(object_storage_service.ObjectStorageService):
   @classmethod
   def APIScriptFiles(cls):
     return ['s3.py']
+
+
+def _MakeS3BucketPolicy(bucket: str,
+                        actions: TList[str],
+                        object_prefix='') -> str:
+  # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_s3_rw-bucket.html
+  return json.dumps({
+      'Version':
+          '2012-10-17',
+      'Statement': [{
+          'Principal': '*',
+          'Sid': 'PkbAcl',
+          'Effect': 'Allow',
+          'Action': actions,
+          'Resource': [f'arn:aws:s3:::{bucket}/{object_prefix}*']
+      }]
+  })

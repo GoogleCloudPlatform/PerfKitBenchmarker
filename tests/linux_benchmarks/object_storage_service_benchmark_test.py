@@ -19,6 +19,7 @@ import time
 import unittest
 from absl import flags
 import mock
+import numpy as np
 
 from perfkitbenchmarker.linux_benchmarks import object_storage_service_benchmark
 from tests import pkb_common_test_case
@@ -45,7 +46,7 @@ class TestBuildCommands(pkb_common_test_case.PkbCommonTestCase):
 
     with mock.patch(time.__name__ + '.time', return_value=1.0):
       with mock.patch(object_storage_service_benchmark.__name__ +
-                      '._ProcessMultiStreamResults'):
+                      '.ProcessMultiStreamResults'):
         with mock.patch(object_storage_service_benchmark.__name__ +
                         '.LoadWorkerOutput', return_value=(None, None, None)):
           object_storage_service_benchmark.MultiStreamRWBenchmark(
@@ -133,6 +134,39 @@ class TestColdObjectsWrittenFiles(pkb_common_test_case.PkbCommonTestCase):
       # Verify that the age is between 72 and 73 hours.
       self.assertLessEqual(72, age)
       self.assertLessEqual(age, 73)
+
+
+class TestProcessMultiStreamResults(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(TestProcessMultiStreamResults, self).setUp()
+    FLAGS.object_storage_streams_per_vm = 2
+    FLAGS.num_vms = 2
+    FLAGS.object_storage_multistream_objects_per_stream = 2
+
+  def testDefault(self):
+    start_times = [np.array([6, 5], dtype=np.float64)] * 4
+    latencies = [np.array([4, 3], dtype=np.float64)] * 4
+    sizes = [np.array([2, 1])] * 4
+    all_sizes = [1, 2]
+    results = []
+    object_storage_service_benchmark.ProcessMultiStreamResults(
+        start_times, latencies, sizes, 'download', all_sizes, results)
+
+  def testAllowFailing(self):
+    start_times = [np.array([6, 5], dtype=np.float64)] * 3
+    latencies = [np.array([4, 3], dtype=np.float64)] * 3
+    sizes = [np.array([2, 1])] * 3
+    all_sizes = [1, 2]
+    results = []
+    object_storage_service_benchmark.ProcessMultiStreamResults(
+        start_times,
+        latencies,
+        sizes,
+        'download',
+        all_sizes,
+        results,
+        allow_failing_streams=True)
 
 
 if __name__ == '__main__':
