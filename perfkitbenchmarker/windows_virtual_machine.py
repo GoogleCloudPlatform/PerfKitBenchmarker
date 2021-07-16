@@ -645,6 +645,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
                  'online disk noerr\n'
                  'attributes disk clear readonly\n'
                  'clean\n'
+                 'convert gpt\n'
                  'convert dynamic\n' % disk_number)
 
     # Create a volume out of the disk(s).
@@ -658,9 +659,14 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     if disk_spec.mount_point:
       self.RemoteCommand('mkdir %s' % disk_spec.mount_point)
       script += ('format quick\n'
+                 'assign letter=d\n'
                  'assign mount=%s\n' % disk_spec.mount_point)
 
     self._RunDiskpartScript(script)
+
+    # Grant user permissions on the drive
+    self.RemoteCommand('icacls D: /grant Users:F /L')
+    self.RemoteCommand('icacls D: --% /grant Users:(OI)(CI)F /L')
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
