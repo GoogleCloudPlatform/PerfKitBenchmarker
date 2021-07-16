@@ -98,8 +98,8 @@ flags.DEFINE_string('minigo_model_dir', '',
                     'will be copied from subdirectories of src_dir '
                     'corresponding to the board size.')
 RESNET_EPOCHS = flags.DEFINE_integer(
-    'mlperf_resnet_epochs', 2,
-    'The Number of epochs to use for training ResNet.', lower_bound=2)
+    'mlperf_resnet_epochs', 4,
+    'The Number of epochs to use for training ResNet.', lower_bound=4)
 
 
 def GetConfig(user_config):
