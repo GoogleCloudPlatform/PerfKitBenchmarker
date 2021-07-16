@@ -36,7 +36,7 @@ flags.DEFINE_integer(
     1,
     'Number of fault domains to create for SPREAD placement group',
     lower_bound=1,
-    upper_bound=5)
+    upper_bound=8)
 
 
 class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
