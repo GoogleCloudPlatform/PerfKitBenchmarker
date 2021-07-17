@@ -18,8 +18,6 @@
 
 def YumInstall(vm):
   """Installs python rrdtool on the VM."""
-  vm.InstallPackages('librrd-dev')
-  vm.InstallPackages('libpython3-dev')
   vm.InstallPackages('rrdtool')
   vm.RemoteCommand('sudo pip install rrdtool')
 
