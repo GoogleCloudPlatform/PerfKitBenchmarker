@@ -131,7 +131,7 @@ def Prepare(benchmark_spec):
   client_vm.RemoteCommand(f'sudo chmod 777 {netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT}')
 
 
-def ParseNetperfAggregateOutput(stdout, direction):
+def ParseNetperfAggregateOutput(stdout, test_type):
   """Parses the stdout of a single netperf process.
 
   Args:
@@ -150,7 +150,7 @@ def ParseNetperfAggregateOutput(stdout, direction):
     match = re.search('peak interval', line)
     if match:
       line_split = line.split()
-      metric = direction + ' ' + line_split[0] + ' ' + line_split[6]
+      metric = test_type + ' ' + line_split[0] + ' ' + line_split[6]
       value = float(line_split[5])
       unit = line_split[6]
       aggregate_samples.append(sample.Sample(
