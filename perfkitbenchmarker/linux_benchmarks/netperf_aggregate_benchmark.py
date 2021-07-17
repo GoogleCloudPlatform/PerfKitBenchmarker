@@ -33,10 +33,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import data
 from perfkitbenchmarker.linux_packages import netperf
 
-ALL_BENCHMARKS = ['STREAM', 'MAERTS', 
-                  'BIDIR', 'RRAGG', 
-                  # 'RR', 'ANCILLARY'
-                 ]
+ALL_BENCHMARKS = ['STREAM', 'MAERTS', 'BIDIR', 'RRAGG']
 flags.DEFINE_list('netperf_aggregate_benchmarks', ALL_BENCHMARKS,
                   'The netperf aggregate benchmark(s) to run. '
                   'STREAM measures outbound throughput. '
@@ -75,14 +72,6 @@ def GetConfig(user_config):
 def PrepareNetperfAggregate(vm):
   """Installs netperf on a single vm."""
 
-  # vm.Install('texinfo')
-  # # vm.Install('python_rrdtool')
-  # vm.RemoteCommand('curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py')
-  # vm.RemoteCommand('sudo python get-pip.py')
-  # # 
-  # vm.RemoteCommand('sudo apt -y install gcc g++ librrd-dev')
-  # vm.RemoteCommand('sudo apt -y install libpython2-dev')
-  # vm.RemoteCommand('sudo pip install rrdtool')
   vm.Install('python3')
   vm.InstallPackages('python3-pip')
   vm.RemoteCommand('sudo pip3 install --upgrade pip')
@@ -90,6 +79,8 @@ def PrepareNetperfAggregate(vm):
   vm.Install('python_rrdtool')
   vm.Install('netperf')
 
+
+  # Enable test types in the script runemomniaggdemo.sh
   if 'STREAM' in FLAGS.netperf_aggregate_benchmarks:
     vm.RemoteCommand(
       r'sed -i "s/DO_STREAM=0;/DO_STREAM=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
@@ -106,14 +97,6 @@ def PrepareNetperfAggregate(vm):
     vm.RemoteCommand(
       r'sed -i "s/DO_RRAGG=0;/DO_RRAGG=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
     )
-  if 'RR' in FLAGS.netperf_aggregate_benchmarks:
-    vm.RemoteCommand(
-      r'sed -i "s/DO_RR=0;/DO_RR=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
-    )
-  if 'ANCILLARY' in FLAGS.netperf_aggregate_benchmarks:
-    vm.RemoteCommand(
-      r'sed -i "s/DO_ANCILLARY=0;/DO_ANCILLARY=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
-    )
 
   port_end = PORT_START
 
@@ -125,9 +108,6 @@ def PrepareNetperfAggregate(vm):
       netserver_path=netperf.NETSERVER_PATH)
   vm.RemoteCommand(netserver_cmd)
 
-  # remote_path = netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT
-  # vm.RemoteCommand('chmod +x %s' % (remote_path))
-
 
 def Prepare(benchmark_spec):
   """Install netperf on the target vm.
@@ -137,8 +117,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
 
-  # vms = benchmark_spec.vms
-  
   vms = benchmark_spec.vms
   vm_dict = benchmark_spec.vm_groups
   client_vms = vm_dict['client']
@@ -151,11 +129,6 @@ def Prepare(benchmark_spec):
   print(server_vms)
 
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
-  # Copy remote test script to client
-  # path = data.ResourcePath(os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT))
-  # logging.info('Uploading %s to %s', path, client_vm)
-  # print("COPY FILE TO REMOTE")
-  # client_vm.PushDataFile(path, netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT)
   client_vm.RemoteCommand(f'sudo chmod 777 {netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT}')
 
 
@@ -217,8 +190,6 @@ def RunNetperfAggregate(vm, server_ips):
   vm.RemoteCommand(f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
                    f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
 
-  # allow script to be executed and run script
-  # vm.RemoteCommand('export PATH="/opt/pkb/netperf-netperf-2.7.0/doc/examples:$PATH"')
   vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && '
       'export PATH=$PATH:. && '
@@ -228,37 +199,6 @@ def RunNetperfAggregate(vm, server_ips):
       should_log=True,
       login_shell=False,
       timeout=1200)
-
-  stdout_1, stderr_1 = vm.RemoteCommand(
-      f'ls {netperf.NETPERF_EXAMPLE_DIR}',
-      ignore_failure=True,
-      should_log=True,
-      login_shell=False,
-      timeout=1200)
-
-  print(stdout_1)
-
-  # print out netperf_outbound.log to log
-  stdout_1, stderr_1 = vm.RemoteCommand(
-      f'cat {netperf.NETPERF_EXAMPLE_DIR}netperf_outbound.log',
-      ignore_failure=True,
-      should_log=True,
-      login_shell=False,
-      timeout=1200)
-
-  logging.info(stdout_1)
-  logging.info(stderr_1)
-
-  # print out netperf_inbound.log to log
-  stdout_1, stderr_1 = vm.RemoteCommand(
-      f'cat {netperf.NETPERF_EXAMPLE_DIR}netperf_inbound.log',
-      ignore_failure=True,
-      should_log=True,
-      login_shell=False,
-      timeout=1200)
-
-  logging.info(stdout_1)
-  logging.info(stderr_1)
 
   samples = []
   # do post processing step
@@ -290,24 +230,12 @@ def RunNetperfAggregate(vm, server_ips):
       ignore_failure=True)
     print(proc_stdout)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Bidirectional'))
-  # if 'RR' in FLAGS.netperf_aggregate_benchmarks:
-  #   proc_stdout, _ = vm.RemoteCommand(
-  #     f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
-  #     '--intervals netperf_sync_tps.log',
-  #     ignore_failure=True)
-  #   print(proc_stdout)
-  #   samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Sync TPS'))
-  # if 'ANCILLARY' in FLAGS.netperf_aggregate_benchmarks:
-  #   proc_stdout, _ = vm.RemoteCommand(
-  #     f'cd {netperf.NETPERF_EXAMPLE_DIR} && cat interrupts.txt',
-  #     ignore_failure=True)
-  #   print(proc_stdout)
 
 
   vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_inbound*')
   vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_outbound*')
   vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_tps*')
-  # vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_sync_tps*')
+  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_bidirectional*')
 
   return samples
 
