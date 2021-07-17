@@ -25,7 +25,6 @@ to test packets per second and inbound and outbound throughput
 
 import logging
 import re
-import os
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
