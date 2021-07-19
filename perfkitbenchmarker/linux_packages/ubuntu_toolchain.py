@@ -16,5 +16,7 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test')
   for key in _REQUIRED_KEYS:
     vm.RemoteCommand(
-        f'sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys {key}')
+        'curl -sL '
+        f'"http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key}"'
+        ' | sudo apt-key add')
   vm.RemoteCommand('sudo apt update')
