@@ -454,6 +454,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
+  def _WaitForSSH(self):
+    """Waits until VM is ready.
+
+    Implementations of this method should set the 'hostname' attribute.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
   def VMLastBootTime(self):
     """Returns the time the VM was last rebooted as reported by the VM.
     """

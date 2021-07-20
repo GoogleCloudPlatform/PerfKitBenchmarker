@@ -736,12 +736,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.TestConnectRemoteAccessPort()
       self.port_listening_time = time.time()
 
+    self._WaitForSSH()
+
+    if self.bootable_time is None:
+      self.bootable_time = time.time()
+
+  @vm_util.Retry(log_errors=False, poll_interval=1)
+  def _WaitForSSH(self):
+    """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks
     resp, _ = self.RemoteHostCommand('hostname', retries=1,
                                      suppress_warning=True)
-    if self.bootable_time is None:
-      self.bootable_time = time.time()
     if self.hostname is None:
       self.hostname = resp[:-1]
 

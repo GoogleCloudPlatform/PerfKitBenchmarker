@@ -76,6 +76,9 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def WaitForBootCompletion(self):
     pass
 
+  def _WaitForSSH(self):
+    pass
+
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     pass
 
