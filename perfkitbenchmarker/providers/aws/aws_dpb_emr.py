@@ -258,7 +258,15 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         'emr', 'describe-step', '--cluster-id', self.cluster_id, '--step-id',
         job_id
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode:
+      if 'ThrottlingException' in stderr:
+        logging.warning('Rate limited while polling EMR step:\n%s\nRetrying.',
+                        stderr)
+        return None
+      else:
+        raise errors.VmUtil.IssueCommandError(
+            f'Getting step status failed:\n{stderr}')
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
     if state == 'FAILED':
