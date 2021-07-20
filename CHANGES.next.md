@@ -49,6 +49,7 @@
 -   Add pd extreme support to PKB.
 -   Add '--delete_samples' to measure VM deletion during benchmark teardown
     phase
+-   Add cloudharmony iperf benchmark to pkb.
 
 ### Enhancements:
 
