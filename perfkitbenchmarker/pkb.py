@@ -1058,8 +1058,10 @@ def RunBenchmark(spec, collector):
 
         # Add resource related samples.
         collector.AddSamples(spec.GetSamples(), spec.name, spec)
-
-      except Exception as e:
+      # except block will clean up benchmark specific resources on exception. It
+      # may also clean up generic resources based on
+      # FLAGS.always_teardown_on_exception.
+      except (Exception, KeyboardInterrupt) as e:
         # Log specific type of failure, if known
         # TODO(dlott) Move to exception chaining with Python3 support
         if (isinstance(e, errors.Benchmarks.InsufficientCapacityCloudFailure)
@@ -1094,6 +1096,8 @@ def RunBenchmark(spec, collector):
           # Note that if TEARDOWN is specified, it will happen below.
           DoTeardownPhase(spec, collector, detailed_timer)
         raise
+      # finally block will only clean up generic resources if teardown is
+      # included in FLAGS.run_stage.
       finally:
         if interrupt_checker:
           interrupt_checker.EndCheckInterruptThread()

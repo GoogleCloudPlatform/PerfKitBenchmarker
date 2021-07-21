@@ -149,3 +149,5 @@
 -   Update hadoop version to 3.3.1
 -   Updated required numpy and six versions.
 -   Added `--hadoop_bin_url` flag to allow overrides for Hadoop downloads.
+-   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
+    resources can be cleaned up on cancellation.
