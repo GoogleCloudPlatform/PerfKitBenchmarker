@@ -8,6 +8,7 @@ import posixpath
 from absl import flags
 from perfkitbenchmarker import cloud_harmony_util
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 BENCHMARK_GIT_URL = 'https://github.com/cloudharmony/iperf.git'
@@ -30,6 +31,16 @@ TCP = 'TCP'
 UDP = 'UDP'
 _PORT = 8080
 _BW_SCRATCH_FILE = '/tmp/tcpbw'
+# List of cloudharmony metric names
+_CLOUDHARMONY_IPERF_METRICS = [
+    'bandwidth_max', 'bandwidth_mean', 'bandwidth_median', 'bandwidth_min',
+    'bandwidth_p10', 'bandwidth_p25', 'bandwidth_p75', 'bandwidth_p90',
+    'bandwidth_stdev',
+    'jitter_max', 'jitter_mean', 'jitter_median', 'jitter_min',
+    'jitter_p10', 'jitter_p25', 'jitter_p75', 'jitter_p90', 'jitter_stdev',
+    'loss_max', 'loss_mean', 'loss_median', 'loss_min', 'loss_p10',
+    'loss_p25', 'loss_p75', 'loss_p90', 'loss_stdev',
+]
 
 
 _IPERF_BANDWIDTH = flags.DEFINE_string(
@@ -96,8 +107,8 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(_StartServer, vm_groups['server'])
 
 
-def Run(benchmark_spec):
-  """Runs cloudharmony iperf and reports the results."""
+def _Run(benchmark_spec):
+  """Runs cloudharmony iperf from cloudharmony harness."""
   vm_groups = benchmark_spec.vm_groups
   client = vm_groups['client'][0]
   servers = vm_groups['server']
@@ -149,9 +160,34 @@ def Run(benchmark_spec):
     save_command += cloud_harmony_util.GetSaveCommand()
 
   client.RemoteCommand(f'{save_command}')
-  cloud_harmony_metadata = cloud_harmony_util.ParseCsvResultsIntoMetadata(
-      client, OUTPUT)
-  return cloud_harmony_util.GetMetadataSamples(cloud_harmony_metadata)
+
+  return cloud_harmony_util.ParseCsvResultsIntoMetadata(client, OUTPUT)
+
+
+def Run(benchmark_spec):
+  """Runs cloudharmony iperf and reports the results."""
+  cloud_harmony_metadata = _Run(benchmark_spec)
+  samples = cloud_harmony_util.GetMetadataSamples(cloud_harmony_metadata)
+
+  # format pkb-style samples
+  for result_row in cloud_harmony_metadata:
+    for metric in _CLOUDHARMONY_IPERF_METRICS:
+      samples.append(
+          sample.Sample(metric, result_row[metric], _GetMetricUnit(metric),
+                        result_row))
+
+  return samples
+
+
+def _GetMetricUnit(metric_name):
+  """Returns the appropriate units for the given metric."""
+  metric_type = metric_name.split('_')[0]
+  if metric_type == 'bandwidth':
+    return 'Mbits/sec'
+  if metric_type == 'jitter':
+    return 'ms'
+  if metric_type == 'loss':
+    return '%'
 
 
 def Cleanup(unused_benchmark_spec):

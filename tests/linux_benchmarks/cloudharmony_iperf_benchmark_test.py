@@ -6,7 +6,6 @@ from absl import flags
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import cloud_harmony_util
-from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import cloudharmony_iperf_benchmark
 from tests import pkb_common_test_case
@@ -41,7 +40,7 @@ class CloudharmonyIperfBenchmarkTestCase(
     spec = benchmark_spec.BenchmarkSpec(benchmark_module, benchmark_config,
                                         'abcdefg')
     spec.vm_groups = {'client': [client], 'server': [server]}
-    results = cloudharmony_iperf_benchmark.Run(spec)
+    results = cloudharmony_iperf_benchmark._Run(spec)
     client.RobustRemoteCommand.assert_called_with(
         'iperf/run.sh  '
         f'--iperf_server 10.0.0.1:{cloudharmony_iperf_benchmark._PORT} '
@@ -63,7 +62,6 @@ class CloudharmonyIperfBenchmarkTestCase(
         '--wkhtml_xvfb '
         '--verbose')
     self.assertLen(results, 2)
-    print(results[0])
 
     expected_gartner_metadata = [{
         'bandwidth_direction': 'up',
@@ -242,17 +240,8 @@ class CloudharmonyIperfBenchmarkTestCase(
         'test_stopped': '2021-02-25 4:22:01',
         'transfer': 11605.5
     }]
-    expected_gartner_samples = []
-    for result in expected_gartner_metadata:
-      expected_gartner_samples.append(
-          sample.Sample(
-              metric='cloudharmony_output', value=0.0, unit='',
-              metadata=result))
 
-    self.assertEqual(len(expected_gartner_samples), len(results))
-    for index in range(len(results)):
-      self.assertSamplesEqualUpToTimestamp(expected_gartner_samples[index],
-                                           results[index])
+    self.assertListEqual(expected_gartner_metadata, results)
 
 
 if __name__ == '__main__':
