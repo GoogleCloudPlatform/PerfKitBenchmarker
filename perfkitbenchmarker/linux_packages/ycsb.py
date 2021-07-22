@@ -200,6 +200,10 @@ flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
 flags.DEFINE_boolean('ycsb_log_remote_command_output', True,
                      'Whether to log the remote command\'s output at the info '
                      'level.')
+_SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
+    'ycsb_fail_on_incomplete_loading', False,
+    'Whether to fail the benchmarking if loading is not complete, '
+    'e.g., there are insert failures.')
 _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.')
@@ -1375,9 +1379,21 @@ class YCSBExecutor(object):
     workloads = workloads or _GetWorkloadFileList()
     load_samples = []
     assert workloads, 'no workloads'
+
+    def _HasInsertFailures(result_samples):
+      for s in result_samples:
+        if s.metric == 'insert Return=ERROR' and s.value > 0:
+          return True
+      return False
+
     if FLAGS.ycsb_reload_database or not self.loaded:
       load_samples += list(self._LoadThreaded(
           vms, workloads[0], **(load_kwargs or {})))
+      if (_SHOULD_FAIL_ON_INCOMPLETE_LOADING.value and
+          _HasInsertFailures(load_samples)):
+        raise errors.Benchmarks.RunError(
+            'There are insert failures, so the table loading is incomplete')
+
       self.loaded = True
     if FLAGS.ycsb_sleep_after_load_in_sec > 0:
       logging.info('Sleeping %s seconds after load stage.',

@@ -151,3 +151,5 @@
 -   Added `--hadoop_bin_url` flag to allow overrides for Hadoop downloads.
 -   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
     resources can be cleaned up on cancellation.
+-   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
+    in the case of table loading failures.
