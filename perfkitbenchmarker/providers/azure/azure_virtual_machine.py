@@ -49,7 +49,6 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
 
-import six
 from six.moves import range
 import yaml
 
@@ -270,20 +269,6 @@ class AzureNIC(resource.BaseResource):
     self._deleted = True
 
 
-class AzureVirtualMachineMetaClass(resource.AutoRegisterResourceMeta):
-  """Metaclass for AzureVirtualMachine.
-
-  Registers default image pattern for each operating system.
-  """
-
-  def __init__(self, name, bases, dct):
-    super(AzureVirtualMachineMetaClass, self).__init__(name, bases, dct)
-    if hasattr(self, 'OS_TYPE'):
-      assert self.OS_TYPE, '{0} did not override OS_TYPE'.format(self.__name__)
-      assert self.IMAGE_URN, ('{0} did not override IMAGE_URN'.format(
-          self.__name__))
-
-
 class AzureDedicatedHostGroup(resource.BaseResource):
   """Object representing an Azure host group (a collection of dedicated hosts).
 
@@ -463,9 +448,7 @@ class AzureDedicatedHost(resource.BaseResource):
       return False
 
 
-class AzureVirtualMachine(
-    six.with_metaclass(AzureVirtualMachineMetaClass,
-                       virtual_machine.BaseVirtualMachine)):
+class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
   CLOUD = azure.CLOUD
 
