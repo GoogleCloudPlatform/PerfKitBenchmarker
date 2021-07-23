@@ -22,6 +22,7 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -71,6 +72,10 @@ flags.DEFINE_integer('managed_db_azure_compute_units', None,
                      'Number of Dtus in the database.')
 flags.DEFINE_string('managed_db_tier', None,
                     'Tier in azure. (Basic, Standard, Premium).')
+flags.DEFINE_string('server_vm_os_type', None,
+                    'OS type of the client vm.')
+flags.DEFINE_string('client_vm_os_type', None,
+                    'OS type of the client vm.')
 flags.DEFINE_string('client_vm_machine_type', None,
                     'Machine type of the client vm.')
 flags.DEFINE_integer('client_vm_cpus', None, 'Number of Cpus in the client vm.')
@@ -125,6 +130,7 @@ POSTGRES_HBA_CONFIG = 'pg_hba.conf'
 POSTGRES_CONFIG = 'postgresql.conf'
 POSTGRES_CONFIG_PATH = '/etc/postgresql/{0}/main/'
 
+UNMANAGED_SQL_SERVER_PORT = 1433
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
 
@@ -424,7 +430,7 @@ class BaseRelationalDb(resource.BaseResource):
       raise Exception('Checking state of unmanaged database when the database '
                       'is managed.')
 
-    if self.spec.engine == 'mysql':
+    if self.spec.engine == sql_engine_utils.MYSQL:
       if (self.spec.engine_version == '5.6' or
           self.spec.engine_version.startswith('5.6.')):
         mysql_name = 'mysql56'
@@ -440,10 +446,15 @@ class BaseRelationalDb(resource.BaseResource):
       stdout, stderr = self.server_vm.RemoteCommand(
           'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
       return stdout and not stderr
-    elif self.spec.engine == 'postgres':
+    elif self.spec.engine == sql_engine_utils.POSTGRES:
       stdout, stderr = self.server_vm.RemoteCommand(
           'sudo service postgresql status')
       return stdout and not stderr
+
+    elif self.spec.engine == sql_engine_utils.SQLSERVER:
+      self.server_vm.firewall.AllowPort(self.server_vm,
+                                        UNMANAGED_SQL_SERVER_PORT)
+      return True
 
     raise UnsupportedError('%s engine is not supported '
                            'for unmanaged database.' % self.spec.engine)
@@ -487,8 +498,47 @@ class BaseRelationalDb(resource.BaseResource):
         '"s|tmpdir\t\t= /tmp|tmpdir\t\t= /scratch/tmp|g" '
         '%s' % self.server_vm.GetPathToConfig(mysql_name))
 
-  def _SetupUnmanagedDatabase(self):
-    """Installs unmanaged databases on server vm."""
+  def _SetupWindowsUnamangedDatabase(self):
+    db_engine = self.spec.engine
+
+    if db_engine == sql_engine_utils.SQLSERVER:
+      self.spec.database_username = 'sa'
+      self.spec.database_password = GenerateRandomDbPassword()
+      self.server_vm.RemoteCommand('sqlcmd -Q "ALTER LOGIN sa ENABLE;"')
+      self.server_vm.RemoteCommand(
+          'sqlcmd -Q "ALTER LOGIN sa WITH PASSWORD = \'%s\' ;"' %
+          self.spec.database_password)
+
+      # Change the authentication method from windows authentication to
+      # SQL Server Authentication
+      # https://docs.microsoft.com/en-us/sql/database-engine/configure-windows/change-server-authentication-mode?view=sql-server-ver15
+      self.server_vm.RemoteCommand(
+          'sqlcmd -Q "EXEC xp_instance_regwrite'
+          ' N\'HKEY_LOCAL_MACHINE\','
+          ' N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+          'N\'LoginMode\', REG_DWORD, 2"')
+
+      # Set the default database location to scratch disk
+      self.server_vm.RemoteCommand(
+          'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+          'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+          'N\'BackupDirectory\', REG_SZ, N\'C:\\scratch\'"')
+      self.server_vm.RemoteCommand(
+          'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+          'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+          'N\'DefaultData\', REG_SZ, N\'D:\\\'"')
+      self.server_vm.RemoteCommand(
+          'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+          'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+          'N\'DefaultLog\', REG_SZ, N\'D:\\\'"')
+      self.server_vm.RemoteCommand('net stop mssqlserver')
+      self.server_vm.RemoteCommand('net start mssqlserver')
+      return
+
+    raise UnsupportedError('Only sql server is currently '
+                           'supported on windows vm')
+
+  def _SetupLinuxUnmanagedDatabase(self):
     db_engine = self.spec.engine
     self.server_vm_query_tools.InstallPackages()
 
@@ -513,6 +563,13 @@ class BaseRelationalDb(resource.BaseResource):
       raise Exception(
           'Engine {0} not supported for unmanaged databases.'.format(
               self.spec.engine))
+
+  def _SetupUnmanagedDatabase(self):
+    """Installs unmanaged databases on server vm."""
+    if self.server_vm.OS_TYPE in os_types.WINDOWS_OS_TYPES:
+      self._SetupWindowsUnamangedDatabase()
+    else:
+      self._SetupLinuxUnmanagedDatabase()
 
   def _InstallPostgresServer(self):
     if self.spec.engine_version == POSTGRES_13_VERSION:

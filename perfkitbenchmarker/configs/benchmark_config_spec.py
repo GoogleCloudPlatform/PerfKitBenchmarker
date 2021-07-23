@@ -680,6 +680,15 @@ class _RelationalDbSpec(spec.BaseSpec):
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
             'iops'] = flag_values.managed_db_disk_iops
+
+    if flag_values['client_vm_os_type'].present:
+      config_values['vm_groups']['clients'][
+          'os_type'] = flag_values.client_vm_os_type
+
+    if flag_values['server_vm_os_type'].present:
+      config_values['vm_groups']['servers'][
+          'os_type'] = flag_values.server_vm_os_type
+
     if flag_values['client_vm_disk_size'].present:
       config_values['vm_groups']['clients']['disk_spec'][cloud]['disk_size'] = (
           flag_values.client_vm_disk_size)

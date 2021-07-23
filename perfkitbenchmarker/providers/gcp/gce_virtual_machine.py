@@ -1260,6 +1260,34 @@ class Windows2019DesktopGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
 
 
+class Windows2019DesktopSQLServer2017StandardGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2017Standard):
+  DEFAULT_IMAGE_FAMILY = 'sql-std-2017-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2019DesktopSQLServer2017EnterpriseGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2017Enterprise):
+  DEFAULT_IMAGE_FAMILY = 'sql-ent-2017-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2019DesktopSQLServer2019StandardGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Standard):
+  DEFAULT_IMAGE_FAMILY = 'sql-std-2019-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Enterprise):
+  DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""
