@@ -50,6 +50,7 @@
 -   Add '--delete_samples' to measure VM deletion during benchmark teardown
     phase
 -   Add cloudharmony iperf benchmark to pkb.
+-   Add specjbb2015 benchmark to PKB.
 
 ### Enhancements:
 
