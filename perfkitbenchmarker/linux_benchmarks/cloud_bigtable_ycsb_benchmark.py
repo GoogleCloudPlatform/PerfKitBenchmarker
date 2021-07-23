@@ -314,13 +314,19 @@ def _GetCpuUtilizationSample(samples, instance_id, workload_start_time):
     # Adjust the start timestamp to skip the load phase.
     start_timestamp = load_sample.timestamp
   end_timestamp = last_run_sample.timestamp
+  workload_duration_minutes = int((end_timestamp - start_timestamp) / 60)
+  if workload_duration_minutes == 0:
+    logging.warning(
+        'Workload lasted for less than 1 minute, rounding duration up to get a '
+        'valid CPU usage measurement.')
+    workload_duration_minutes = 1
   samples = []
   for metric in ['cpu_load', 'cpu_load_hottest_node']:
     cpu_query = query.Query(
         client, project=(FLAGS.project or _GetDefaultProject()),
         metric_type='bigtable.googleapis.com/cluster/{}'.format(metric),
         end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
-        minutes=int((end_timestamp - start_timestamp) / 60))
+        minutes=workload_duration_minutes)
     cpu_query = cpu_query.select_resources(instance=instance_id)
     time_series = list(cpu_query)
     if not time_series:

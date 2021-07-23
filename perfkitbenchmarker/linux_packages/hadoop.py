@@ -41,7 +41,7 @@ DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
-HADOOP_URL_BASE = 'https://www-us.apache.org/dist/hadoop/common'
+HADOOP_URL_BASE = 'https://downloads.apache.org/hadoop/common'
 
 HADOOP_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hadoop')
 HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
