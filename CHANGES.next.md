@@ -100,6 +100,7 @@
 -   Add flag --ycsb_log_remote_command_output to allow enabling/disabling the
     logging of stdout & stderr from wait_for_command.
 -   Add support for NFS `nconnect` mount option.
+-   Add support for custom compilation of OpenJDK.
 
 ### Bug fixes and maintenance updates:
 
