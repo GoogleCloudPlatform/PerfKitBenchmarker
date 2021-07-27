@@ -145,8 +145,8 @@ def Run(benchmark_spec):
           FLAGS.aerospike_storage_type,
       'memory_size':
           int(aerospike_vms[0].total_memory_kb * 0.8),
-      'transaction_threads_per_queue':
-          FLAGS.aerospike_transaction_threads_per_queue,
+      'service_threads':
+          FLAGS.aerospike_service_threads,
       'replication_factor':
           FLAGS.aerospike_replication_factor,
   }

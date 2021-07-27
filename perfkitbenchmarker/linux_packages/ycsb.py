@@ -549,8 +549,12 @@ def _ValidateErrorRate(result):
   """
   for operation in result['groups'].values():
     name, stats = operation['group'], operation['statistics']
+    # The operation count can be 0
+    count = stats.get('Operations', 0)
+    if count == 0:
+      continue
     # These keys may be missing from the output.
-    error_rate = stats.get('Return=ERROR', 0) / stats.get('Operations', 1)
+    error_rate = stats.get('Return=ERROR', 0) / count
     if error_rate > _ERROR_RATE_THRESHOLD.value:
       raise errors.Benchmarks.RunError(
           f'YCSB had a {error_rate} error rate for {name}, higher than '
