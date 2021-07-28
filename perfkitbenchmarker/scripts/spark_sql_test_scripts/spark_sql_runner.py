@@ -46,6 +46,10 @@ dataframe reader. e.g.:
       default=False,
       help='Whether to try to read data from Hive.')
   parser.add_argument(
+      '--table-cache',
+      choices=['eager', 'lazy'],
+      help='Whether to cache the tables in memory spilling to local-disk.')
+  parser.add_argument(
       '--report-dir',
       required=True,
       help='Directory to write out query timings to.')
@@ -70,6 +74,12 @@ def main(args):
   for name, (fmt, options) in table_metadata:
     logging.info('Loading %s', name)
     spark.read.format(fmt).options(**options).load().createTempView(name)
+  if args.table_cache:
+    # This captures both tables in args.database and views from table_metadata
+    for table in spark.catalog.listTables():
+      spark.sql('CACHE {lazy} TABLE {name}'.format(
+          lazy='LAZY' if args.table_cache == 'lazy' else '',
+          name=table.name))
 
   results = []
   for script in args.sql_scripts:
