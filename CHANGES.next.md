@@ -155,3 +155,4 @@
     resources can be cleaned up on cancellation.
 -   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
     in the case of table loading failures.
+-   Enable the aggregation for "Return=NOT_FOUND" errors.
