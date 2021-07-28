@@ -43,6 +43,3 @@ def AptInstall(vm):
                                                  location=_DEB_FILE_LOCATION))
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo ACCEPT_EULA=Y /usr/bin/apt-get -y install mssql-tools')
-  vm.RemoteCommand('echo "alias sqlcmd=\'/opt/mssql-tools/bin/sqlcmd\'"'
-                   ' >> ~/.bashrc')
-  vm.RemoteCommand('source ~/.bashrc')
