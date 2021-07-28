@@ -50,7 +50,7 @@ class AWSSQSInterface(MessagingServiceClient):
         QueueUrl=self.queue.url, MaxNumberOfMessages=1, WaitTimeSeconds=TIMEOUT)
     return pulled_message
 
-  def _acknowledges_received_message(self, response: Dict[str, Any]):
+  def _acknowledge_received_message(self, response: Dict[str, Any]):
     message = response['Messages'][0]
     receipt_handle = message['ReceiptHandle']
     self.sqs_client.delete_message(

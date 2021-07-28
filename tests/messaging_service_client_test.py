@@ -174,7 +174,7 @@ class MessagingServiceClientTest(parameterized.TestCase):
                                                FAILURE_COUNTER)
 
   @mock.patch.object(MessagingServiceClient, '_pull_message')
-  @mock.patch.object(MessagingServiceClient, '_acknowledges_received_message')
+  @mock.patch.object(MessagingServiceClient, '_acknowledge_received_message')
   @mock.patch.object(
       MessagingServiceClient,
       '_get_summary_statistics',
@@ -197,7 +197,7 @@ class MessagingServiceClientTest(parameterized.TestCase):
       MessagingServiceClient,
       '_pull_message',
       side_effect=Exception('MockedException'))
-  @mock.patch.object(MessagingServiceClient, '_acknowledges_received_message')
+  @mock.patch.object(MessagingServiceClient, '_acknowledge_received_message')
   @mock.patch.object(
       MessagingServiceClient,
       '_get_summary_statistics',

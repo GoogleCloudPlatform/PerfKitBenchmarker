@@ -67,8 +67,7 @@ class AzureServiceBusInterface(messaging_service_client.MessagingServiceClient):
         max_message_count=1)
     return pulled_message
 
-  def _acknowledges_received_message(self, response):
-    # TODO(user): Update acknowledges to acknowledge.
+  def _acknowledge_received_message(self, response):
     message = response[0]
     self.subscription_receiver.complete_message(message)
 
