@@ -1592,6 +1592,10 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
   def Uninstall(self, package_name):
     raise NotImplementedError('Only use for cluster boot for now')
 
+  def HasPackage(self, package: str) -> bool:
+    # Change this when implementing InstallPackages.
+    return False
+
 
 class BaseRhelMixin(BaseLinuxMixin):
   """Class holding RHEL/CentOS specific VM methods and attributes."""
@@ -1763,10 +1767,6 @@ class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
     # TODO(user): Support reboots
     self.RemoteCommand('sudo mount -o remount,exec /home')
     self.RemoteCommand('sudo mount -o remount,exec /tmp')
-
-  def HasPackage(self, package: str) -> bool:
-    # Change this when implementing InstallPackages.
-    return False
 
 
 class CoreOsMixin(BaseContainerLinuxMixin):
