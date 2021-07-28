@@ -129,8 +129,10 @@ class ContainerSpec(spec.BaseSpec):
     result.update({
         'image': (option_decoders.StringDecoder, {}),
         'static_image': (option_decoders.BooleanDecoder, {'default': False}),
-        'cpus': (option_decoders.FloatDecoder, {'default': 1.0}),
-        'memory': (custom_virtual_machine_spec.MemoryDecoder, {}),
+        'cpus': (option_decoders.FloatDecoder, {'default': None}),
+        'memory': (custom_virtual_machine_spec.MemoryDecoder, {
+            'default': None
+        }),
         'command': (_CommandDecoder, {}),
         'container_port': (option_decoders.IntDecoder, {'default': 8080}),
     })
@@ -501,8 +503,16 @@ class KubernetesContainer(BaseContainer):
         self.name,
         '--image=%s' % self.image,
         '--restart=Never',
-        '--limits=cpu=%sm,memory=%sMi' % (int(1000 * self.cpus), self.memory),
     ]
+
+    limits = []
+    if self.cpus:
+      limits.extend('cpu=%sm' % (int(1000 * self.cpus)))
+    if self.memory:
+      limits.extend('memory=%sMi' % self.memory)
+    if limits:
+      run_cmd.extend('--limits=%s' % ','.join(limits))
+
     if self.command:
       run_cmd.extend(['--command', '--'])
       run_cmd.extend(self.command)
@@ -556,9 +566,17 @@ class KubernetesContainerService(BaseContainerService):
         'run',
         self.name,
         '--image=%s' % self.image,
-        '--limits=cpu=%sm,memory=%sMi' % (int(1000 * self.cpus), self.memory),
         '--port', str(self.port)
     ]
+
+    limits = []
+    if self.cpus:
+      limits.extend('cpu=%sm' % (int(1000 * self.cpus)))
+    if self.memory:
+      limits.extend('memory=%sMi' % self.memory)
+    if limits:
+      run_cmd.extend('--limits=%s' % ','.join(limits))
+
     if self.command:
       run_cmd.extend(['--command', '--'])
       run_cmd.extend(self.command)
