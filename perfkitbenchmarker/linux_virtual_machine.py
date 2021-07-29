@@ -464,6 +464,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         ('sudo mkdir -p {0}; '
          'sudo chmod a+rwxt {0}').format(linux_packages.INSTALL_DIR))
 
+  # LinuxMixins do not implement _Start or _Stop
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
+
   def SetFiles(self):
     """Apply --set_files to the VM."""
 

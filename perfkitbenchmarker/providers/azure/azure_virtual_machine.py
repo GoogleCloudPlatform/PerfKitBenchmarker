@@ -641,6 +641,15 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     # The VM will be deleted when the resource group is.
     self._deleted = True
 
+  #  _Start or _Stop not yet implemented for Azure
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
+
   @vm_util.Retry()
   def _PostCreate(self):
     """Get VM data."""

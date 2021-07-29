@@ -591,6 +591,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.preemptible:
       self._AddShutdownScript()
 
+  def _Start(self):
+    """Starts the VM."""
+    start_cmd = util.GcloudCommand(self, 'compute', 'instances', 'start',
+                                   self.name)
+    # After start, IP address is changed
+    stdout, _, _ = start_cmd.Issue()
+    response = json.loads(stdout)
+    # Response is a list of size one
+    self._ParseDescribeResponse(response[0])
+
+  def _Stop(self):
+    """Stops the VM."""
+    stop_cmd = util.GcloudCommand(self, 'compute', 'instances', 'stop',
+                                  self.name)
+    stop_cmd.Issue()
+
   def _PreDelete(self):
     super()._PreDelete()
     if self.preemptible:

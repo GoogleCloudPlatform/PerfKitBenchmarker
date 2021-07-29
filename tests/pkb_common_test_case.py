@@ -79,6 +79,12 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def _WaitForSSH(self):
     pass
 
+  def _Start(self):
+    pass
+
+  def _Stop(self):
+    pass
+
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     pass
 
@@ -109,6 +115,12 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
     pass
 
   def _Delete(self):
+    pass
+
+  def _Start(self):
+    pass
+
+  def _Stop(self):
     pass
 
 

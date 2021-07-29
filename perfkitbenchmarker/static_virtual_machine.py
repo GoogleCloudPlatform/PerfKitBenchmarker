@@ -143,6 +143,15 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """StaticVirtualMachines do not implement _Create()."""
     pass
 
+  # StaticVirtualMachines do not implement _Start or _Stop
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
+
   def _Delete(self):
     """Returns the virtual machine to the pool."""
     if self.from_pool:

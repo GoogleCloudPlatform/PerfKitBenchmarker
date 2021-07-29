@@ -51,6 +51,7 @@
     phase
 -   Add cloudharmony iperf benchmark to pkb.
 -   Add specjbb2015 benchmark to PKB.
+-   Add VM stop start benchmark.
 
 ### Enhancements:
 

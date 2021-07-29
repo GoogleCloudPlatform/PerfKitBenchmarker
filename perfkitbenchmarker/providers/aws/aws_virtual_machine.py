@@ -923,6 +923,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                               f'--region={self.region}',
                               f'--allocation-id={self.allocation_id}'])
 
+  #  _Start or _Stop not yet implemented for AWS
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
+
   def _UpdateInterruptibleVmStatusThroughApi(self):
     if hasattr(self, 'spot_instance_request_id'):
       describe_cmd = util.AWS_PREFIX + [

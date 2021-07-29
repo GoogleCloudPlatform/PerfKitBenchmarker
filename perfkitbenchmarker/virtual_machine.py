@@ -430,6 +430,43 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     pass
 
+  def Start(self) -> float:
+    """Starts the VM.
+
+    Returns:
+      The duration in seconds from the time the start command was issued to
+      the time we could SSH into the VM and verify that the timestamp changed.
+    """
+
+    before_start_timestamp = time.time()
+    self._Start()
+    self._WaitForSSH()
+    start_duration_sec = time.time() - before_start_timestamp
+    return start_duration_sec
+
+  @abc.abstractmethod
+  def _Start(self):
+    """Provider-specific implementation of start command."""
+    raise NotImplementedError()
+
+  def Stop(self) -> float:
+    """Stop the VM.
+
+    Returns:
+      The duration in seconds from the time the start command was issued to
+      after the API call
+    """
+
+    before_stop_timestamp = time.time()
+    self._Stop()
+    stop_duration_sec = time.time() - before_stop_timestamp
+    return stop_duration_sec
+
+  @abc.abstractmethod
+  def _Stop(self):
+    """Provider-specific implementation of stop command."""
+    raise NotImplementedError()
+
   @abc.abstractmethod
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
@@ -1317,3 +1354,4 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)
+
