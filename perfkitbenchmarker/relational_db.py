@@ -76,6 +76,10 @@ flags.DEFINE_string('server_vm_os_type', None,
                     'OS type of the client vm.')
 flags.DEFINE_string('client_vm_os_type', None,
                     'OS type of the client vm.')
+flags.DEFINE_string('server_gcp_min_cpu_platform', None,
+                    'Cpu platform of the server vm.')
+flags.DEFINE_string('client_gcp_min_cpu_platform', None,
+                    'CPU platform of the client vm.')
 flags.DEFINE_string('client_vm_machine_type', None,
                     'Machine type of the client vm.')
 flags.DEFINE_integer('client_vm_cpus', None, 'Number of Cpus in the client vm.')
