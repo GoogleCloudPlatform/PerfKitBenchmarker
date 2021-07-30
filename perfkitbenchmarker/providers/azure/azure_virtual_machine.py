@@ -650,6 +650,14 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Stops the VM."""
     raise NotImplementedError()
 
+  def _Suspend(self):
+    """Suspends the VM."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes the VM."""
+    raise NotImplementedError()
+
   @vm_util.Retry()
   def _PostCreate(self):
     """Get VM data."""

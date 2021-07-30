@@ -99,6 +99,12 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['pubkey'] = pubkey
     return cmd.CreateKey()
 
+  def _Suspend(self):
+    raise NotImplementedError()
+
+  def _Resume(self):
+    raise NotImplementedError()
+
   def _CheckImage(self):
     """Verifies we have an imageid to use."""
     cmd = ibm.IbmAPICommand(self)

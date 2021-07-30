@@ -70,6 +70,12 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def Uninstall(self, package_name):
     pass
 
+  def _Suspend(self):
+    pass
+
+  def _Resume(self):
+    pass
+
   def VMLastBootTime(self):
     pass
 
@@ -121,6 +127,12 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
     pass
 
   def _Stop(self):
+    pass
+
+  def _Suspend(self):
+    pass
+
+  def _Resume(self):
     pass
 
 

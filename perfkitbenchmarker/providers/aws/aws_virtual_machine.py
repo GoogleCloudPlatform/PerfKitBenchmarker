@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Class to represent an AWS Virtual Machine object.
 
 All VM specifics are self-contained and the class provides methods to
@@ -892,6 +891,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if retcode:
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
+
+  def _Suspend(self):
+    """Suspends a VM instance."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes a VM instance."""
+    raise NotImplementedError()
 
   def _Delete(self):
     """Delete a VM instance."""

@@ -418,9 +418,49 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._AfterReboot()
     return reboot_duration_sec
 
+  def Suspend(self) -> float:
+    """Suspends the vm.
+
+      Future plans and edge cases: checking if a vm is suspendable.
+      Accidentally suspending a VM that is already suspending.
+      Trying to resume a VM that is not already suspended.
+
+    Returns:
+      The amount of time it takes to Suspend a VM that is suspendable.
+    """
+    before_suspend_timestamp = time.time()
+
+    self._Suspend()
+
+    return time.time() - before_suspend_timestamp
+
+  def Resume(self) -> float:
+    """Resumes the vm.
+
+    Returns:
+      The amount of time it takes to resume a VM that is suspendable.
+    """
+    before_resume_timestamp = time.time()
+    self._Resume()
+
+    # WaitForSSH tries to ssh into the VM,ensuring resume was successful
+    self._WaitForSSH()
+
+    return time.time() - before_resume_timestamp
+
   @abc.abstractmethod
   def _Reboot(self):
     """OS-specific implementation of reboot command."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _Suspend(self):
+    """Provider specific implementation of a VM suspend command."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _Resume(self):
+    """Provider specific implementation of a VM resume command."""
     raise NotImplementedError()
 
   def _AfterReboot(self):
@@ -1354,4 +1394,3 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)
-

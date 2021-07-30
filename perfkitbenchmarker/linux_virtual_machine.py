@@ -277,6 +277,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._proccpu_cache = None
     self._smp_affinity_script = None
 
+  def _Suspend(self):
+    """Suspends a VM."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes a VM."""
+    raise NotImplementedError()
+
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
