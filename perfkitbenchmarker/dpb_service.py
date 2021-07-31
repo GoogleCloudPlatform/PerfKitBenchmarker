@@ -284,7 +284,8 @@ class BaseDpbService(resource.BaseResource):
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
-    if self.manage_bucket:
+    if (self.manage_bucket and
+        self.dpb_service_type != UNMANAGED_DPB_SVC_YARN_CLUSTER):
       self.storage_service.MakeBucket(self.bucket)
 
   def _Create(self):
@@ -293,7 +294,8 @@ class BaseDpbService(resource.BaseResource):
 
   def _DeleteDependencies(self):
     """Deletes the bucket used with the cluster."""
-    if self.manage_bucket:
+    if (self.manage_bucket and
+        self.dpb_service_type != UNMANAGED_DPB_SVC_YARN_CLUSTER):
       self.storage_service.DeleteBucket(self.bucket)
 
   def _Delete(self):
