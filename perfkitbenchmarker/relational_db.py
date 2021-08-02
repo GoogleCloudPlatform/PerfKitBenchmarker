@@ -535,7 +535,7 @@ class BaseRelationalDb(resource.BaseResource):
           'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
           'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
           'N\'DefaultLog\', REG_SZ, N\'D:\\\'"')
-      self.server_vm.RemoteCommand('net stop mssqlserver')
+      self.server_vm.RemoteCommand('net stop mssqlserver /y')
       self.server_vm.RemoteCommand('net start mssqlserver')
       return
 
