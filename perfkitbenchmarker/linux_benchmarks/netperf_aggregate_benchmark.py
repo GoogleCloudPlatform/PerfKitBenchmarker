@@ -117,10 +117,7 @@ def Prepare(benchmark_spec):
   """
 
   vms = benchmark_spec.vms
-  vm_dict = benchmark_spec.vm_groups
-  client_vms = vm_dict['client']
-  server_vms = vm_dict['servers']
-  client_vm = client_vms[0]
+  client_vm = benchmark_spec.vm_groups['client'][0]
 
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
   client_vm.RemoteCommand(f'sudo chmod 777 {netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT}')
@@ -200,25 +197,25 @@ def RunNetperfAggregate(vm, server_ips):
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_outbound.log',
-      ignore_failure=True)
+      ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Outbound'))
   if 'MAERTS' in FLAGS.netperf_aggregate_benchmarks:
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_inbound.log',
-      ignore_failure=True)
+      ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Inbound'))
   if 'RRAGG' in FLAGS.netperf_aggregate_benchmarks:
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_tps.log',
-      ignore_failure=True)
+      ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Request/Response Aggregate'))
   if 'BIDIR' in FLAGS.netperf_aggregate_benchmarks:
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_bidirectional.log',
-      ignore_failure=True)
+      ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Bidirectional'))
 
 
