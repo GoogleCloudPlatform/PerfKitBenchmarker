@@ -689,10 +689,10 @@ class _RelationalDbSpec(spec.BaseSpec):
           'os_type'] = flag_values.server_vm_os_type
 
     if flag_values['client_gcp_min_cpu_platform'].present:
-      config_values['vm_groups']['clients'][
+      config_values['vm_groups']['clients']['vm_spec'][cloud][
           'min_cpu_platform'] = flag_values.client_gcp_min_cpu_platform
     if flag_values['server_gcp_min_cpu_platform'].present:
-      config_values['vm_groups']['servers'][
+      config_values['vm_groups']['servers']['vm_spec'][cloud][
           'min_cpu_platform'] = flag_values.server_gcp_min_cpu_platform
 
     if flag_values['client_vm_disk_size'].present:
@@ -852,9 +852,6 @@ class _VmGroupSpec(spec.BaseSpec):
         }),
         'os_type': (option_decoders.EnumDecoder, {
             'valid_values': os_types.ALL
-        }),
-        'min_cpu_platform': (option_decoders.StringDecoder, {
-            'default': None
         }),
         'static_vms': (_StaticVmListDecoder, {}),
         'vm_count': (option_decoders.IntDecoder, {
