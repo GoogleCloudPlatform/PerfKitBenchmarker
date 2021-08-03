@@ -4,6 +4,7 @@ General utility functions used on the messaging service benchmark.
 """
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import messaging_service
+from perfkitbenchmarker.providers.aws import aws_sqs
 from perfkitbenchmarker.providers.gcp import gcp_pubsub
 
 
@@ -15,7 +16,8 @@ def get_instance(
     instance = gcp_pubsub.GCPCloudPubSub(client)
     return instance
   elif cloud == 'AWS':
-    raise NotImplementedError
+    instance = aws_sqs.AwsSqs(client)
+    return instance
   elif cloud == 'Azure':
     raise NotImplementedError
   raise NotImplementedError

@@ -14,9 +14,11 @@ class MessagingServiceUtilTest(pkb_common_test_case.PkbCommonTestCase):
     messaging_service_util.get_instance(mock_client, 'GCP')
     gcp_instance.assert_called_with(mock_client)
 
-  def testGetInstanceAWS(self):
-    self.assertRaises(NotImplementedError, messaging_service_util.get_instance,
-                      'mock_client', 'AWS')
+  @mock.patch('perfkitbenchmarker.providers.aws.aws_sqs.AwsSqs')
+  def testGetInstanceAWS(self, aws_instance):
+    mock_client = 'mock_client'
+    messaging_service_util.get_instance(mock_client, 'AWS')
+    aws_instance.assert_called_with(mock_client)
 
 
 if __name__ == '__main__':
