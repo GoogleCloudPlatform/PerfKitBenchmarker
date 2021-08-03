@@ -122,6 +122,13 @@ flags.DEFINE_list(
 flags.DEFINE_bool(
     'dpb_sparksql_copy_to_hdfs', False,
     'Instead of reading the data directly, copy into HDFS and read from there.')
+flags.DEFINE_enum(
+    'dpb_sparksql_table_cache', None, ['eager', 'lazy'],
+    'Optionally tell Spark to cache all tables to memory and spilling to disk. '
+    'Eager cache will prefetch all tables in lexicographic order. '
+    'Lazy will cache tables as they are read. This might have some '
+    'counter-intuitive results and Spark reads more data than necessary to '
+    "populate it's cache.")
 flags.DEFINE_string(
     'spark_bigquery_connector',
     None,
@@ -296,6 +303,8 @@ def Run(benchmark_spec):
     # Note you can even read from Hive without --create_hive_tables if they
     # were precreated.
     args += ['--enable-hive', 'True']
+  if FLAGS.dpb_sparksql_table_cache:
+    args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)

@@ -49,6 +49,10 @@
 -   Add pd extreme support to PKB.
 -   Add '--delete_samples' to measure VM deletion during benchmark teardown
     phase
+-   Add cloudharmony iperf benchmark to pkb.
+-   Add specjbb2015 benchmark to PKB.
+-   Add VM stop start benchmark.
+-   Add suspend_resume benchmark.
 
 ### Enhancements:
 
@@ -99,6 +103,7 @@
 -   Add flag --ycsb_log_remote_command_output to allow enabling/disabling the
     logging of stdout & stderr from wait_for_command.
 -   Add support for NFS `nconnect` mount option.
+-   Add support for custom compilation of OpenJDK.
 
 ### Bug fixes and maintenance updates:
 
@@ -147,4 +152,10 @@
 -   Fix parsing Dstat 0.7.3
 -   Update hadoop version to 3.3.1
 -   Updated required numpy and six versions.
+-   Added `--hadoop_bin_url` flag to allow overrides for Hadoop downloads.
+-   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
+    resources can be cleaned up on cancellation.
+-   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
+    in the case of table loading failures.
+-   Enable the aggregation for "Return=NOT_FOUND" errors.
 -   Added no_proxy flag for proxy settings

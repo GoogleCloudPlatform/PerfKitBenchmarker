@@ -77,7 +77,7 @@ class GCPPubSubInterface(MessagingServiceClient):
         retry=retry.Retry(deadline=TIMEOUT))
     return pulled_message
 
-  def _acknowledges_received_message(self, response: PullResponse) -> None:
+  def _acknowledge_received_message(self, response: PullResponse) -> None:
     if response.received_messages[0].message.data:
       ack_ids = []
 

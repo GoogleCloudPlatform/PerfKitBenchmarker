@@ -428,13 +428,18 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks.
-    stdout, _ = self.RemoteCommand('hostname', suppress_warning=True)
+    self._WaitForSSH()
     if self.bootable_time is None:
       self.bootable_time = time.time()
-    if self.hostname is None:
-      self.hostname = stdout.rstrip()
     if FLAGS.log_windows_password:
       logging.info('Password for %s: %s', self, self.password)
+
+  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
+  def _WaitForSSH(self):
+    """Waits for the VMs to be ready."""
+    stdout, _ = self.RemoteCommand('hostname', suppress_warning=True)
+    if self.hostname is None:
+      self.hostname = stdout.rstrip()
 
   @vm_util.Retry(poll_interval=1, max_retries=15)
   def OnStartup(self):
@@ -734,3 +739,23 @@ class Windows2016DesktopMixin(BaseWindowsMixin):
 class Windows2019DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
   OS_TYPE = os_types.WINDOWS2019_DESKTOP
+
+
+class Windows2019SQLServer2017Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_STANDARD
+
+
+class Windows2019SQLServer2017Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE
+
+
+class Windows2019SQLServer2019Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_STANDARD
+
+
+class Windows2019SQLServer2019Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE

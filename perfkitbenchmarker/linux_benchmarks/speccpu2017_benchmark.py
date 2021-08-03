@@ -23,7 +23,9 @@ memory subsystem and compiler.
 SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 """
 
+import re
 import time
+
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -148,14 +150,14 @@ def _Prepare(vm):
 
 def _GenIncFile(vm):
   """Generates .inc files when not already included in tarballs."""
-  if FLAGS.runspec_config == 'amd_rate_aocc300_milan_A1.cfg':
+  if re.search(r'amd_(speed|rate)_aocc300_milan_(A1|B2).cfg',
+               FLAGS.runspec_config):
+
     # python script requires stdin
     vm.RemoteCommand("printf 'yes\nyes\nyes\n' > yes.txt")
-
-    # run_amd_rate_aocc300_milan_A1.py is in the AOCC tarball.
-    cmd = (
-        'cd /scratch/cpu2017 && sudo ./run_amd_rate_aocc300_milan_A1.py '
-        '--tuning=base --exit_after_inc_gen < ~/yes.txt')
+    config = FLAGS.runspec_config.split('.')[0]
+    cmd = (f'cd /scratch/cpu2017 && sudo ./run_{config}.py '
+           '--tuning=base --exit_after_inc_gen < ~/yes.txt')
     vm.RemoteCommand(cmd)
 
 

@@ -418,9 +418,49 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._AfterReboot()
     return reboot_duration_sec
 
+  def Suspend(self) -> float:
+    """Suspends the vm.
+
+      Future plans and edge cases: checking if a vm is suspendable.
+      Accidentally suspending a VM that is already suspending.
+      Trying to resume a VM that is not already suspended.
+
+    Returns:
+      The amount of time it takes to Suspend a VM that is suspendable.
+    """
+    before_suspend_timestamp = time.time()
+
+    self._Suspend()
+
+    return time.time() - before_suspend_timestamp
+
+  def Resume(self) -> float:
+    """Resumes the vm.
+
+    Returns:
+      The amount of time it takes to resume a VM that is suspendable.
+    """
+    before_resume_timestamp = time.time()
+    self._Resume()
+
+    # WaitForSSH tries to ssh into the VM,ensuring resume was successful
+    self._WaitForSSH()
+
+    return time.time() - before_resume_timestamp
+
   @abc.abstractmethod
   def _Reboot(self):
     """OS-specific implementation of reboot command."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _Suspend(self):
+    """Provider specific implementation of a VM suspend command."""
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _Resume(self):
+    """Provider specific implementation of a VM resume command."""
     raise NotImplementedError()
 
   def _AfterReboot(self):
@@ -429,6 +469,43 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     This will be called after every call to Reboot().
     """
     pass
+
+  def Start(self) -> float:
+    """Starts the VM.
+
+    Returns:
+      The duration in seconds from the time the start command was issued to
+      the time we could SSH into the VM and verify that the timestamp changed.
+    """
+
+    before_start_timestamp = time.time()
+    self._Start()
+    self._WaitForSSH()
+    start_duration_sec = time.time() - before_start_timestamp
+    return start_duration_sec
+
+  @abc.abstractmethod
+  def _Start(self):
+    """Provider-specific implementation of start command."""
+    raise NotImplementedError()
+
+  def Stop(self) -> float:
+    """Stop the VM.
+
+    Returns:
+      The duration in seconds from the time the start command was issued to
+      after the API call
+    """
+
+    before_stop_timestamp = time.time()
+    self._Stop()
+    stop_duration_sec = time.time() - before_stop_timestamp
+    return stop_duration_sec
+
+  @abc.abstractmethod
+  def _Stop(self):
+    """Provider-specific implementation of stop command."""
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
@@ -450,6 +527,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     Implementations of this method should set the 'bootable_time' attribute
     and the 'hostname' attribute.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def _WaitForSSH(self):
+    """Waits until VM is ready.
+
+    Implementations of this method should set the 'hostname' attribute.
     """
     raise NotImplementedError()
 

@@ -591,6 +591,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.preemptible:
       self._AddShutdownScript()
 
+  def _Start(self):
+    """Starts the VM."""
+    start_cmd = util.GcloudCommand(self, 'compute', 'instances', 'start',
+                                   self.name)
+    # After start, IP address is changed
+    stdout, _, _ = start_cmd.Issue()
+    response = json.loads(stdout)
+    # Response is a list of size one
+    self._ParseDescribeResponse(response[0])
+
+  def _Stop(self):
+    """Stops the VM."""
+    stop_cmd = util.GcloudCommand(self, 'compute', 'instances', 'stop',
+                                  self.name)
+    stop_cmd.Issue()
+
   def _PreDelete(self):
     super()._PreDelete()
     if self.preemptible:
@@ -727,6 +743,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_cmd = util.GcloudCommand(self, 'compute', 'instances', 'delete',
                                     self.name)
     delete_cmd.Issue(raise_on_failure=False)
+
+  def _Suspend(self):
+    """Suspend a GCE VM instance."""
+    util.GcloudCommand(self, 'compute', 'instances', 'suspend',
+                       self.name).Issue()
+
+  def _Resume(self):
+    """Resume a GCE VM instance."""
+    util.GcloudCommand(self, 'compute', 'instances', 'resume',
+                       self.name).Issue()
 
   def _Exists(self):
     """Returns true if the VM exists."""
@@ -1258,6 +1284,34 @@ class Windows2019DesktopGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
+
+
+class Windows2019DesktopSQLServer2017StandardGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2017Standard):
+  DEFAULT_IMAGE_FAMILY = 'sql-std-2017-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2019DesktopSQLServer2017EnterpriseGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2017Enterprise):
+  DEFAULT_IMAGE_FAMILY = 'sql-ent-2017-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2019DesktopSQLServer2019StandardGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Standard):
+  DEFAULT_IMAGE_FAMILY = 'sql-std-2019-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Enterprise):
+  DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

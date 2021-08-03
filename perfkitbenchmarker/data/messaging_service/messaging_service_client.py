@@ -121,8 +121,8 @@ class MessagingServiceClient:
     """
 
   @abc.abstractmethod
-  def _acknowledges_received_message(self, response: Any):
-    """Acknowledges that the pulled message was received.
+  def _acknowledge_received_message(self, response: Any):
+    """Acknowledge that the pulled message was received.
 
     It tries to acknowledge the message that was pulled with _pull_message.
 
@@ -224,7 +224,7 @@ class MessagingServiceClient:
       try:
         response = self._pull_message()
         pull_end_time = GET_TIME_IN_MILLISECONDS()
-        self._acknowledges_received_message(response)
+        self._acknowledge_received_message(response)
         acknowledge_end_time = GET_TIME_IN_MILLISECONDS()
         pull_latencies.append(pull_end_time - start_time)
         acknowledge_latencies.append(acknowledge_end_time - start_time)

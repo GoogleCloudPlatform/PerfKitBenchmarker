@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Class to represent an AWS Virtual Machine object.
 
+Images: aws ec2 describe-images --owners self amazon
 All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
@@ -893,6 +893,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
 
+  def _Suspend(self):
+    """Suspends a VM instance."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes a VM instance."""
+    raise NotImplementedError()
+
   def _Delete(self):
     """Delete a VM instance."""
     if self.id:
@@ -922,6 +930,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                              ['ec2', 'release-address',
                               f'--region={self.region}',
                               f'--allocation-id={self.allocation_id}'])
+
+  #  _Start or _Stop not yet implemented for AWS
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
 
   def _UpdateInterruptibleVmStatusThroughApi(self):
     if hasattr(self, 'spot_instance_request_id'):
@@ -1375,6 +1392,18 @@ class Windows2019DesktopAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
+
+
+class Windows2019DesktopSQLServer2019StandardAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Standard):
+  IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-SQL_2019_Standard-*'
+
+
+class Windows2019DesktopSQLServer2019EnterpriseAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Enterprise):
+  IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-SQL_2019_Enterprise-*'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

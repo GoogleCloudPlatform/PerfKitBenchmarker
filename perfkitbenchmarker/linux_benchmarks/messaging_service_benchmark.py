@@ -47,13 +47,13 @@ messaging_service:
       os_type: debian10
       vm_spec:
         AWS:
-          machine_type: t2.medium
+          machine_type: m5.2xlarge
           zone: us-east-1a
         Azure:
-          machine_type: Standard_D2_v3
+          machine_type: Standard_D8d_v4
           zone: eastus
         GCP:
-          machine_type: e2-medium
+          machine_type: n2-standard-8
           zone: us-central1-a
 """
 

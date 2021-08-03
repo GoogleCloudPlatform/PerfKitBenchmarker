@@ -15,6 +15,35 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_boolean('ch_store_results', False,
+                     'Whether to store cloudharmony benchmark reports. '
+                     'Defaults to False, can be turned on for production runs. '
+                     'This flag is used to produce benchmark reports.')
+STORE = flags.DEFINE_string('ch_results_store', None,
+                            'Storage to store cloudharmony benchmark reports. '
+                            'Used if ch_store_results is set to True.')
+BUCKET = flags.DEFINE_string('ch_results_bucket', None,
+                             'Bucket to store cloudharmony benchmark reports. '
+                             'Used if ch_store_results is set to True.')
+KEY = flags.DEFINE_string(
+    'ch_results_key', None,
+    'Access key to store cloudharmony benchmark reports. '
+    'Used in conjunction with ch_results_bucket')
+SECRET = flags.DEFINE_string(
+    'ch_results_secret', None,
+    'Access secret to store cloudharmony benchmark reports. '
+    'Used in conjunction with ch_results_bucket')
+
+ITERATIONS = flags.DEFINE_integer(
+    'ch_iterations', 1, 'The number of times to run the test. Multiple test '
+    'iterations will be grouped and saved in the same results resport.')
+
+
+def GetSaveCommand() -> str:
+  """Returns the cloudharmony command to save benchmark reports."""
+  return (f' --db_and_csv --store {STORE.value} --store_key {KEY.value} '
+          f' --store_secret {SECRET.value} --store_container {BUCKET.value} ')
+
 
 def GetRegionFromZone(zone: str) -> str:
   # only gcp is supported as cloudharmony metadata is exclusive to gcp runs.

@@ -102,6 +102,7 @@ def GetConfig(user_config):
 
 
 def _ConfigureNginx(server):
+  """Configures nginx server."""
   content_path = '/var/www/html/random_content'
   server.RemoteCommand('sudo mkdir -p /var/www/html')  # create folder if needed
   server.RemoteCommand('sudo dd  bs=1 count=%s if=/dev/urandom of=%s' %
@@ -109,7 +110,12 @@ def _ConfigureNginx(server):
   if FLAGS.nginx_conf:
     server.PushDataFile(FLAGS.nginx_conf)
     server.RemoteCommand('sudo cp %s /etc/nginx/nginx.conf' % FLAGS.nginx_conf)
-    server.RemoteCommand('sudo service nginx restart')
+  else:
+    # disable logging, nginx logs every request by default.
+    server.RemoteCommand(
+        'sudo sed -i \'s|access_log .*|access_log /dev/null;|g\' '
+        '/etc/nginx/nginx.conf')
+  server.RemoteCommand('sudo service nginx restart')
 
 
 def Prepare(benchmark_spec):

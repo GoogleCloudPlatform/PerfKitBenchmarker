@@ -96,6 +96,15 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Delete(self):
     self._DeletePod()
 
+  # Kubernetes VMs do not implement _Start or _Stop
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
+
   def _CheckPrerequisites(self):
     """Exits if any of the prerequisites is not met."""
     if not FLAGS.kubectl:

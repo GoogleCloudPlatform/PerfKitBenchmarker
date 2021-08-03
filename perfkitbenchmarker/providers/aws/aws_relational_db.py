@@ -41,6 +41,7 @@ DEFAULT_SQLSERVER_VERSION = '14.00.3223.3.v1'
 
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
+DEFAULT_SQLSERVER_PORT = 1433
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
@@ -608,6 +609,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       return DEFAULT_MYSQL_PORT
     if engine == sql_engine_utils.POSTGRES:
       return DEFAULT_POSTGRES_PORT
+    if engine == sql_engine_utils.SQLSERVER:
+      return DEFAULT_SQLSERVER_PORT
     raise relational_db.RelationalDbEngineNotFoundException(
         'Unsupported engine {0}'.format(engine))
 

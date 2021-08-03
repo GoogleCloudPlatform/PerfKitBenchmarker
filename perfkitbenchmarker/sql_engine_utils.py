@@ -199,7 +199,7 @@ class SqlServerCliQueryTools(ISQLQueryTools):
 
   def MakeSqlCommand(self, command: str, database_name=''):
     """See base class."""
-    sqlserver_command = 'sqlcmd -S %s -U %s -P %s ' % (
+    sqlserver_command = '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s ' % (
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
         self.connection_properties.database_password)

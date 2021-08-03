@@ -277,6 +277,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._proccpu_cache = None
     self._smp_affinity_script = None
 
+  def _Suspend(self):
+    """Suspends a VM."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes a VM."""
+    raise NotImplementedError()
+
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
@@ -463,6 +471,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand(
         ('sudo mkdir -p {0}; '
          'sudo chmod a+rwxt {0}').format(linux_packages.INSTALL_DIR))
+
+  # LinuxMixins do not implement _Start or _Stop
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
 
   def SetFiles(self):
     """Apply --set_files to the VM."""
@@ -736,12 +753,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.TestConnectRemoteAccessPort()
       self.port_listening_time = time.time()
 
+    self._WaitForSSH()
+
+    if self.bootable_time is None:
+      self.bootable_time = time.time()
+
+  @vm_util.Retry(log_errors=False, poll_interval=1)
+  def _WaitForSSH(self):
+    """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks
     resp, _ = self.RemoteHostCommand('hostname', retries=1,
                                      suppress_warning=True)
-    if self.bootable_time is None:
-      self.bootable_time = time.time()
     if self.hostname is None:
       self.hostname = resp[:-1]
 
@@ -1586,6 +1609,10 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
   def Uninstall(self, package_name):
     raise NotImplementedError('Only use for cluster boot for now')
 
+  def HasPackage(self, package: str) -> bool:
+    # Change this when implementing InstallPackages.
+    return False
+
 
 class BaseRhelMixin(BaseLinuxMixin):
   """Class holding RHEL/CentOS specific VM methods and attributes."""
@@ -1757,10 +1784,6 @@ class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
     # TODO(user): Support reboots
     self.RemoteCommand('sudo mount -o remount,exec /home')
     self.RemoteCommand('sudo mount -o remount,exec /tmp')
-
-  def HasPackage(self, package: str) -> bool:
-    # Change this when implementing InstallPackages.
-    return False
 
 
 class CoreOsMixin(BaseContainerLinuxMixin):

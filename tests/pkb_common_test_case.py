@@ -70,10 +70,25 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def Uninstall(self, package_name):
     pass
 
+  def _Suspend(self):
+    pass
+
+  def _Resume(self):
+    pass
+
   def VMLastBootTime(self):
     pass
 
   def WaitForBootCompletion(self):
+    pass
+
+  def _WaitForSSH(self):
+    pass
+
+  def _Start(self):
+    pass
+
+  def _Stop(self):
     pass
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
@@ -106,6 +121,18 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
     pass
 
   def _Delete(self):
+    pass
+
+  def _Start(self):
+    pass
+
+  def _Stop(self):
+    pass
+
+  def _Suspend(self):
+    pass
+
+  def _Resume(self):
     pass
 
 

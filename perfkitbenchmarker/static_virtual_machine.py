@@ -139,9 +139,26 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.from_pool = False
     self.preemptible = False
 
+  def _Suspend(self):
+    """Suspends VM."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes VM."""
+    raise NotImplementedError()
+
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
     pass
+
+  # StaticVirtualMachines do not implement _Start or _Stop
+  def _Start(self):
+    """Starts the VM."""
+    raise NotImplementedError()
+
+  def _Stop(self):
+    """Stops the VM."""
+    raise NotImplementedError()
 
   def _Delete(self):
     """Returns the virtual machine to the pool."""

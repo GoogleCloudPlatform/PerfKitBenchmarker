@@ -143,6 +143,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     except ValueError:
       return False
 
+  def _Suspend(self):
+    """Suspends the vm."""
+    raise NotImplementedError()
+
+  def _Resume(self):
+    """Resumes the VM."""
+    raise NotImplementedError()
+
   def _CheckCanaryCommand(self):
     if OpenStackVirtualMachine.command_works:  # fast path
       return
@@ -228,7 +236,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         err_msg: string. Error message if command fails.
     """
     if err_msg is None:
-      err_msg = ""
+      err_msg = ''
     stdout, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Config.InvalidValue(err_msg)

@@ -31,12 +31,17 @@ from perfkitbenchmarker.linux_packages import aws_credentials
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('hadoop_version', '3.3.1', 'Version of hadoop.')
+flags.DEFINE_string('hadoop_version', '3.3.1', 'Version of Hadoop.')
+flags.DEFINE_string('hadoop_bin_url', None,
+                    'Specify to override url from HADOOP_URL_BASE.')
+
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml.j2',
               'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
+
+HADOOP_URL_BASE = 'https://downloads.apache.org/hadoop/common'
 
 HADOOP_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hadoop')
 HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
@@ -49,6 +54,19 @@ HADOOP_TOOLS_DIR = posixpath.join(HADOOP_DIR, 'share', 'hadoop', 'tools', 'lib')
 HADOOP_CMD = posixpath.join(HADOOP_BIN, 'hadoop')
 HDFS_CMD = posixpath.join(HADOOP_BIN, 'hdfs')
 YARN_CMD = posixpath.join(HADOOP_BIN, 'yarn')
+
+
+def _GetHadoopURL():
+  """Gets the Hadoop download url based on flags.
+
+  The default is to look for the version `--hadoop_version` to download.
+
+  Returns:
+    The Hadoop download url.
+  """
+
+  return '{0}/hadoop-{1}/hadoop-{1}.tar.gz'.format(
+      HADOOP_URL_BASE, FLAGS.hadoop_version)
 
 
 def CheckPrerequisites():
@@ -64,8 +82,8 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('openjdk')
   vm.Install('curl')
-  hadoop_url = ('https://www-us.apache.org/dist/hadoop/common/hadoop-{0}/'
-                'hadoop-{0}.tar.gz').format(FLAGS.hadoop_version)
+  hadoop_url = FLAGS.hadoop_bin_url or _GetHadoopURL()
+
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         HADOOP_DIR, hadoop_url))
