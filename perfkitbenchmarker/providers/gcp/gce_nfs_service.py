@@ -85,13 +85,16 @@ class GceNfsService(nfs_service.BaseNfsService):
   def _Describe(self):
     return self._NfsCommand('describe')
 
+  def _GetLocation(self):
+    return self.zone
+
   def _NfsCommand(self, verb, *args):
     cmd = [FLAGS.gcloud_path, 'alpha', '--quiet', '--format', 'json']
     if FLAGS.project:
       cmd += ['--project', FLAGS.project]
     cmd += ['filestore', 'instances', verb, self.name]
     cmd += [str(arg) for arg in args]
-    cmd += ['--location', self.zone]
+    cmd += ['--location', self._GetLocation()]
     stdout, stderr, retcode = vm_util.IssueCommand(
         cmd, raise_on_failure=False, timeout=1800)
     if retcode:

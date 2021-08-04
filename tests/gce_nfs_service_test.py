@@ -1,6 +1,5 @@
 """Tests the GCE NFS service."""
 
-
 import json
 import unittest
 from absl import flags
@@ -22,50 +21,50 @@ _NET_NAME = 'gce-network'
 
 _NFS_NAME = 'nfs-%s' % _RUN_URI
 
-_CREATE_CMD = [
-    'create',
-    _NFS_NAME,
-    '--file-share',
-    'name=vol0,capacity=1024',
-    '--network',
-    'name=%s' % (_NET_NAME),
-    '--labels',
-    '',
-    '--tier',
-    'STANDARD',
-]
-
 _CREATE_RES = []
-
-_DESCRIBE_RES = {
-    'createTime':
-        '2018-05-04T21:38:49.862374Z',
-    'name':
-        'projects/foo/locations/asia-east1-a/instances/nfs-xxxxxxxx',
-    'networks': [{
-        'ipAddresses': ['10.198.13.2'],
-        'network': 'default2',
-        'reservedIpRange': '10.198.13.0/29'
-    }],
-    'state':
-        'READY',
-    'tier':
-        'STANDARD',
-    'volumes': [{
-        'capacityGb': '1024',
-        'name': 'vol0'
-    }]
-}
 
 _ERROR = 'error'
 
 
-def _FullGcloud(args):
+def _CreateCmd(tier='STANDARD'):
+  return [
+      'create',
+      _NFS_NAME,
+      '--file-share',
+      'name=vol0,capacity=1024',
+      '--network',
+      'name=%s' % _NET_NAME,
+      '--labels',
+      '',
+      '--tier',
+      tier,
+  ]
+
+
+def _DescribeResult(tier='STANDARD'):
+  return {
+      'createTime': '2018-05-04T21:38:49.862374Z',
+      'name': 'projects/foo/locations/asia-east1-a/instances/nfs-xxxxxxxx',
+      'networks': [{
+          'ipAddresses': ['10.198.13.2'],
+          'network': 'default2',
+          'reservedIpRange': '10.198.13.0/29'
+      }],
+      'state': 'READY',
+      'tier': tier,
+      'volumes': [{
+          'capacityGb': '1024',
+          'name': 'vol0'
+      }]
+  }
+
+
+def _FullGcloud(args, location):
   prefix = [
       'gcloud', 'alpha', '--quiet', '--format', 'json', '--project', _PROJECT,
       'filestore', 'instances'
   ]
-  postfix = ['--location', _ZONE]
+  postfix = ['--location', location]
   return prefix + list(args) + postfix
 
 
@@ -107,21 +106,25 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
         responses_as_tuples.append((json.dumps(response), '', 0))
     self.issue_cmd.side_effect = responses_as_tuples
 
-  def assertCommandCalled(self, *args):
+  def assertCommandCalled(self, *args, location=_ZONE):
     self.issue_cmd.assert_called_with(
-        _FullGcloud(args), raise_on_failure=False, timeout=1800)
+        _FullGcloud(args, location), raise_on_failure=False, timeout=1800)
 
-  def assertMultipleCommands(self, *cmds):
-    self.assertEqual([
-        mock.call(_FullGcloud(cmd), raise_on_failure=False, timeout=1800)
-        for cmd in cmds
-    ], self.issue_cmd.call_args_list)
+  def assertMultipleCommands(self, *cmds, location=_ZONE):
+    expected_calls = []
+    for cmd in cmds:
+      expected_calls.append(
+          mock.call(
+              _FullGcloud(cmd, location=location),
+              raise_on_failure=False,
+              timeout=1800))
+    self.assertEqual(expected_calls, self.issue_cmd.call_args_list)
 
   def testCreate(self):
     nfs = self._NfsService()
     self._SetResponses(_CREATE_RES)
     nfs._Create()
-    self.assertCommandCalled(*_CREATE_CMD)
+    self.assertCommandCalled(*_CreateCmd())
 
   def testCreateWithErrors(self):
     self._SetResponses(_ERROR, _ERROR)
@@ -129,7 +132,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
       nfs = self._NfsService()
       nfs._Create()
     describe_cmd = ['describe', 'nfs-fb810a9b']
-    self.assertMultipleCommands(_CREATE_CMD, describe_cmd)
+    self.assertMultipleCommands(_CreateCmd(), describe_cmd)
 
   def testCreate2TBDisk(self):
     self._SetResponses(_CREATE_RES)
@@ -139,7 +142,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertRegexpMatches(' '.join(cmd), 'capacity=2048')
 
   def testGetRemoteAddress(self):
-    self._SetResponses(_DESCRIBE_RES)
+    self._SetResponses(_DescribeResult())
     nfs = self._NfsService(disk_size=2048)
     self.assertEqual('10.198.13.2', nfs.GetRemoteAddress())
 
@@ -150,7 +153,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertCommandCalled('delete', _NFS_NAME, '--async')
 
   def testDeleteWithErrors(self):
-    self._SetResponses(_ERROR, _DESCRIBE_RES)
+    self._SetResponses(_ERROR, _DescribeResult())
     with self.assertRaises(errors.Resource.RetryableDeletionError):
       nfs = self._NfsService()
       nfs._Delete()
@@ -159,7 +162,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertMultipleCommands(delete_cmd, describe_cmd)
 
   def testIsReady(self):
-    self._SetResponses(_DESCRIBE_RES)
+    self._SetResponses(_DescribeResult())
     nfs = self._NfsService()
     self.assertTrue(nfs._IsReady())
 
