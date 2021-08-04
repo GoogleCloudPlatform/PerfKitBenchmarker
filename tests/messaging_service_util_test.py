@@ -20,6 +20,13 @@ class MessagingServiceUtilTest(pkb_common_test_case.PkbCommonTestCase):
     messaging_service_util.get_instance(mock_client, 'AWS')
     aws_instance.assert_called_with(mock_client)
 
+  @mock.patch(
+      'perfkitbenchmarker.providers.azure.azure_service_bus.AzureServiceBus')
+  def testGetInstanceAzure(self, azure_instance):
+    mock_client = 'mock_client'
+    messaging_service_util.get_instance(mock_client, 'Azure')
+    azure_instance.assert_called_with(mock_client)
+
 
 if __name__ == '__main__':
   unittest.main()
