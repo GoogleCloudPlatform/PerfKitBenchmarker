@@ -71,6 +71,17 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     samples.return_value = []
     self.assertEqual([], cloud_redis_memtier_benchmark.Run(benchmark_spec))
 
+  def testRunLatencyAtGivenCpu(self):
+    FLAGS.memtier_measure_cpu_latency = memtier.MemtierMode.MEASURE_CPU_LATENCY
+    client_vm = mock.Mock()
+    measure_latency_vm = mock.Mock()
+    benchmark_spec = mock.Mock()
+    benchmark_spec.vm_groups = {'clients': [client_vm, measure_latency_vm]}
+    samples = self.enter_context(
+        mock.patch.object(memtier, 'RunGetLatencyAtCpu'))
+    samples.return_value = []
+    self.assertEqual([], cloud_redis_memtier_benchmark.Run(benchmark_spec))
+
   def testDelete(self):
     benchmark_spec = mock.Mock()
     redis_instance = mock.Mock()

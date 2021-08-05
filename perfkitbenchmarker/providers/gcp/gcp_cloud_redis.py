@@ -17,7 +17,11 @@ Instances can be created and deleted.
 """
 import json
 import logging
+import time
+
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3.types import TimeInterval
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import vm_util
@@ -139,3 +143,45 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
           'Failed to retrieve information on {}'.format(self.name))
     self._ip = json.loads(stdout)['host']
     self._port = json.loads(stdout)['port']
+
+  def MeasureCpuUtilization(self, interval_length):
+    """Measure the average CPU utilization on GCP instance."""
+    now = time.time()
+    seconds = int(now)
+    interval = TimeInterval()
+    interval.end_time.seconds = seconds
+    interval.start_time.seconds = seconds - interval_length
+    client = monitoring_v3.MetricServiceClient()
+
+    api_filter = (
+        'metric.type = "redis.googleapis.com/stats/cpu_utilization" '
+        'AND resource.labels.instance_id = "projects/'
+    ) + self.project + '/locations/' + self.redis_region + '/instances/' + self.name + '"'
+
+    time_series = client.list_time_series(
+        name='projects/' + self.project,
+        filter_=api_filter,
+        interval=interval,
+        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL)
+
+    return self._ParseMonitoringTimeSeries(time_series)
+
+  def _ParseMonitoringTimeSeries(self, time_series):
+    """Parses time series data and returns average CPU across intervals."""
+    intervals = []
+    # For each of the four types of load, sum the CPU across all intervals
+    for i, time_interval in enumerate(time_series):
+      for j, interval in enumerate(time_interval.points):
+        if i == 0:
+          intervals.append(interval.value.double_value)
+        else:
+          intervals[j] += interval.value.double_value
+
+    if intervals:
+      # Average over all intervals captured
+      return sum(intervals) / len(intervals)
+    return None
+
+  def GetInstanceSize(self):
+    """Return the size of the GCP instance in gigabytes."""
+    return self.size

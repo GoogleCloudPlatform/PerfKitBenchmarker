@@ -134,3 +134,11 @@ class BaseManagedMemoryStore(resource.BaseResource):
   def GetMemoryStorePassword(self):
     """Returns the access password of the managed memory store, if any."""
     return self._password
+
+  def MeasureCpuUtilization(self):
+    """Measures the CPU utilization of an instance using the cloud's API."""
+    return NotImplementedError()
+
+  def GetInstanceSize(self):
+    """Returns size of instance in gigabytes."""
+    return NotImplementedError()

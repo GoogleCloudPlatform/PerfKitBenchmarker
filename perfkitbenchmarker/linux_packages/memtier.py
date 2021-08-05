@@ -17,11 +17,13 @@ import json
 import logging
 import pathlib
 import re
+import time
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
 import dataclasses
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
@@ -39,10 +41,20 @@ MEMTIER_RESULTS = pathlib.PosixPath('memtier_results')
 
 _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
 _WRITE_ONLY = '1:0'
+CPU_TOLERANCE = 0.05
+WARM_UP_SECONDS = 360
 
 MemtierHistogram = List[Dict[str, Union[float, int]]]
 
 FLAGS = flags.FLAGS
+
+
+class MemtierMode(object):
+  """Enum of options for --memtier_measure_cpu_latency."""
+  MEASURE_CPU_LATENCY = 'MEASURE_CPU_LATENCY'
+  NORMAL_RUN = 'NORMAL_RUN'
+  ALL = (MEASURE_CPU_LATENCY, NORMAL_RUN)
+
 
 flags.DEFINE_enum(
     'memtier_protocol', 'memcache_binary',
@@ -90,6 +102,24 @@ flags.DEFINE_integer(
     'memtier_load_key_maximum', None,
     'Key ID maximum value for the preload step. The range of keys '
     'will be from 1 (min) to this specified max key value.')
+flags.DEFINE_enum(
+    'memtier_measure_cpu_latency', MemtierMode.NORMAL_RUN, MemtierMode.ALL,
+    'Mode that the benchmark is set to. NORMAL_RUN measures latency and '
+    'throughput, MEASURE_CPU_LATENCY measures single threaded latency at '
+    'memtier_cpu_utilization_target. When measuring CPU latency flags for '
+    'clients, threads, and pipelines are ignored and '
+    'memtier_cpu_utilization_target and memtier_cpu_interval_length must not '
+    'be None.')
+flags.DEFINE_float(
+    'memtier_cpu_utilization_target', 0.5,
+    'The target CPU utilization when running memtier and trying to get the '
+    'latency at variable CPU metric. The target can range from 1%-100% and '
+    'represents the percent CPU utilization (e.g. 0.5 -> 50% CPU utilization)')
+flags.DEFINE_integer(
+    'memtier_cpu_interval_length', 300, 'Number of seconds worth of data taken '
+    'to measure the CPU utilization of an instance. When MEASURE_CPU_LATENCY '
+    'mode is on, memtier_run_duration is set to memtier_cpu_interval_target '
+    '+ WARM_UP_SECONDS.')
 flag_util.DEFINE_integerlist(
     'memtier_pipeline', [1],
     'Number of pipelines to use for memtier. Defaults to 1, '
@@ -248,6 +278,102 @@ def RunOverAllThreadsPipelinesAndClients(
   return samples
 
 
+def RunGetLatencyAtCpu(cloud_instance, client_vms):
+  """Run a modified binary search to find latency at a given CPU.
+
+  Args:
+    cloud_instance: A managed cloud instance. Only works on managed cloud
+      instances but could extend to vms.
+    client_vms: Need at least two client vms, one to hold the CPU utilization
+      load and the other to get the single threaded latency.
+
+  Returns:
+    A list of sample.Sample instances.
+  """
+  samples = []
+  server_ip = cloud_instance.GetMemoryStoreIp()
+  server_port = cloud_instance.GetMemoryStorePort()
+  password = cloud_instance.GetMemoryStorePassword()
+  load_vm = client_vms[0]
+  latency_measurement_vm = client_vms[-1]
+
+  # Implement modified binary search to find optimal client count +/- tolerance
+  # of target CPU usage
+  target = FLAGS.memtier_cpu_utilization_target
+
+  # Larger clusters need two threads to get to maximum CPU
+  threads = 1 if cloud_instance.GetInstanceSize() < 150 or target < 0.5 else 2
+  pipeline = 1
+
+  # Set maximum of the binary search based off size of the instance
+  upper_bound = cloud_instance.GetInstanceSize() // 2 + 10
+  lower_bound = 1
+  current_clients = 1
+  while lower_bound < upper_bound:
+    current_clients = (upper_bound + lower_bound) // 2
+    _Run(
+        vm=load_vm,
+        server_ip=server_ip,
+        server_port=server_port,
+        threads=threads,
+        pipeline=pipeline,
+        clients=current_clients,
+        password=password)
+
+    cpu_util = cloud_instance.MeasureCpuUtilization(
+        FLAGS.memtier_cpu_interval_length)
+
+    if not cpu_util:
+      raise errors.Benchmarks.RunError(
+          'Could not measure CPU utilization for the instance.')
+    cpu_percent = cpu_util / 60
+    logging.info(
+        'Tried %s clients and got %s%% CPU utilization for the last run with '
+        'the target CPU being %s%%', current_clients, cpu_percent, target)
+
+    if cpu_percent < target - CPU_TOLERANCE:
+      lower_bound = current_clients + 1
+    elif cpu_percent > target + CPU_TOLERANCE:
+      upper_bound = current_clients - 1
+    else:
+      logging.info('Finished binary search and the current client count is %s',
+                   current_clients)
+      process_args = [
+          (_Run, [
+              load_vm, server_ip, server_port, threads, pipeline,
+              current_clients, password
+          ], {}),
+          (_GetSingleThreadedLatency,
+           [latency_measurement_vm, server_ip, server_port, password], {})
+      ]
+      results = vm_util.RunParallelThreads(process_args, len(process_args))
+      metadata = GetMetadata(
+          clients=current_clients, threads=threads, pipeline=pipeline)
+      metadata['measured_cpu_percent'] = cloud_instance.MeasureCpuUtilization(
+          FLAGS.memtier_cpu_interval_length) / 60
+      samples.extend(results[1].GetSamples(metadata))
+      return samples
+
+  # If complete binary search without finding a client count,
+  # it's not possible on this configuration.
+  raise errors.Benchmarks.RunError(
+      'Completed binary search and did not find a client count that worked for '
+      'this configuration and CPU utilization.')
+
+
+def _GetSingleThreadedLatency(client_vm, server_ip, server_port, password):
+  """Wait for background run to stabilize then send single threaded request."""
+  time.sleep(300)
+  return _Run(
+      vm=client_vm,
+      server_ip=server_ip,
+      server_port=server_port,
+      threads=1,
+      pipeline=1,
+      clients=1,
+      password=password)
+
+
 def _Run(vm,
          server_ip: str,
          server_port: str,
@@ -261,6 +387,7 @@ def _Run(vm,
   # Specify one of run requests or run duration.
   requests = (
       FLAGS.memtier_requests if FLAGS.memtier_run_duration is None else None)
+  test_time = FLAGS.memtier_run_duration if FLAGS.memtier_measure_cpu_latency == MemtierMode.NORMAL_RUN else WARM_UP_SECONDS + FLAGS.memtier_cpu_interval_length
   cmd = BuildMemtierCommand(
       server=server_ip,
       port=server_port,
@@ -275,7 +402,7 @@ def _Run(vm,
       key_minimum=1,
       key_maximum=FLAGS.memtier_key_maximum,
       random_data=True,
-      test_time=FLAGS.memtier_run_duration,
+      test_time=test_time,
       requests=requests,
       password=password,
       outfile=MEMTIER_RESULTS)
@@ -298,10 +425,15 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_data_size': FLAGS.memtier_data_size,
       'memtier_key_pattern': FLAGS.memtier_key_pattern,
       'memtier_pipeline': pipeline,
-      'memtier_version': GIT_TAG
+      'memtier_version': GIT_TAG,
+      'memtier_measure_cpu_latency': FLAGS.memtier_measure_cpu_latency,
   }
   if FLAGS.memtier_run_duration:
     meta['memtier_run_duration'] = FLAGS.memtier_run_duration
+  if FLAGS.memtier_measure_cpu_latency == MemtierMode.MEASURE_CPU_LATENCY:
+    meta[
+        'memtier_cpu_utilization_target'] = FLAGS.memtier_cpu_utilization_target
+    meta['memtier_cpu_interval_length'] = FLAGS.memtier_cpu_interval_length
   return meta
 
 

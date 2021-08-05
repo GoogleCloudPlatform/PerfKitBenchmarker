@@ -15,7 +15,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
@@ -33,26 +32,26 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
 
   def testCreate(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('{}', '', 0)) as gcloud:
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)) as gcloud:
       self.redis._Create()
       gcloud.assert_called_once_with(timeout=600)
       self.assertTrue(self.redis._Exists())
 
   def testDelete(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('{}', '', 0)) as gcloud:
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)) as gcloud:
       self.redis._Delete()
       gcloud.assert_called_once_with(raise_on_failure=False, timeout=600)
 
   def testExistTrue(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('{}', '', 0)):
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)):
       self.assertTrue(self.redis._Exists())
 
   def testExistFalse(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('{}', '', 1)):
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 1)):
       self.assertFalse(self.redis._Exists())
 
   def testReadableVersion(self):
@@ -63,6 +62,48 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.redis.ParseReadableVersion('redis_8'), 'redis_8')
     self.assertEqual(
         self.redis.ParseReadableVersion('redis 9.7.5'), 'redis 9.7.5')
+
+  class TimeSeries():
+
+    def __init__(self, points):
+      self.points = [self.TimeSeriesValue(value) for value in points]
+
+    class TimeSeriesValue():
+
+      def __init__(self, value):
+        self.value = self.TimeSeriesDoubleValue(value)
+
+      class TimeSeriesDoubleValue():
+
+        def __init__(self, value):
+          self.double_value = value
+
+  def testParseMonitoringTimeSeriesShort(self):
+    avg_cpu = self.redis._ParseMonitoringTimeSeries([
+        self.TimeSeries([1, 2]),
+        self.TimeSeries([2, 1]),
+        self.TimeSeries([0, 0]),
+        self.TimeSeries([3, 3])
+    ])
+    self.assertEqual(avg_cpu, 6)
+
+  def testParseMonitoringTimeSeriesMedium(self):
+    avg_cpu = self.redis._ParseMonitoringTimeSeries([
+        self.TimeSeries([4.05, 2.12, 3.21, 1.58]),
+        self.TimeSeries([2.83, 2.27, 4.71, 5.11]),
+        self.TimeSeries([0, 0, 0, 0]),
+        self.TimeSeries([3.91, 3.11, 4.00, 1.65])
+    ])
+    self.assertEqual(avg_cpu, 9.6375)
+
+  def testParseMonitoringTimeSeriesLong(self):
+    avg_cpu = self.redis._ParseMonitoringTimeSeries([
+        self.TimeSeries([12, 32, 62, 51, 12, 103, 54, 91]),
+        self.TimeSeries([81, 32, 84, 91, 25, 62, 31, 1]),
+        self.TimeSeries([12, 93, 109, 73, 32, 58, 18, 10]),
+        self.TimeSeries([77, 34, 29, 83, 11, 8, 38, 68])
+    ])
+    self.assertEqual(avg_cpu, 197.125)
 
 
 if __name__ == '__main__':
