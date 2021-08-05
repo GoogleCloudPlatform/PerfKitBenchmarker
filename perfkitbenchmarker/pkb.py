@@ -432,6 +432,9 @@ flags.DEFINE_string('https_proxy', '',
 flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('no_proxy', '',
+                    'Specify host(s) to exclude from proxy, e.g. '
+                    '--no_proxy=localhost,.example.com,192.168.0.1')
 flags.DEFINE_bool('randomize_run_order', False,
                   'When running with more than one benchmarks, '
                   'randomize order of the benchmarks.')

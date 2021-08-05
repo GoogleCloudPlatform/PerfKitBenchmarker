@@ -158,3 +158,4 @@
 -   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
     in the case of table loading failures.
 -   Enable the aggregation for "Return=NOT_FOUND" errors.
+-   Added no_proxy flag for proxy settings
