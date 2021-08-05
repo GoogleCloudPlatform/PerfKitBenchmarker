@@ -34,9 +34,9 @@ RATE_LIMITED_MESSAGE = 'Rate Limit Exceeded'
 # ERROR: (gcloud.compute.disks.add-labels) PERMISSION_DENIED: Quota exceeded
 # for quota group 'ReadGroup' and limit 'Read requests per 100 seconds' of
 # service 'compute.googleapis.com' for consumer 'project_number:012345678901'.
-TAGGING_RATE_LIMITED_REGEX = re.compile("Quota exceeded .*? limit '.*?"
-                                        "requests per.*?seconds' of service "
-                                        "'compute.googleapis.com'")
+TAGGING_RATE_LIMITED_REGEX = re.compile(
+    "Quota exceeded for quota group '.*?' and limit "
+    "'.*? per.*?seconds' of service 'compute.googleapis.com'")
 RATE_LIMITED_MAX_RETRIES = 10
 # 200s is chosen because 1) quota is measured in 100s intervals and 2) fuzzing
 # causes a random number between 100 and this to be chosen.
@@ -252,11 +252,13 @@ class GcloudCommand(object):
     return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
   @staticmethod
-  def _IsIssueRateLimitMessage(text):
-    return (
-        (RATE_LIMITED_MESSAGE in text) or
-        TAGGING_RATE_LIMITED_REGEX.search(text)
-        )
+  def _IsIssueRateLimitMessage(text) -> bool:
+    if RATE_LIMITED_MESSAGE in text:
+      return True
+    match = TAGGING_RATE_LIMITED_REGEX.search(text)
+    if match:
+      return True
+    return False
 
   @vm_util.Retry(
       poll_interval=RATE_LIMITED_MAX_POLLING_INTERVAL,

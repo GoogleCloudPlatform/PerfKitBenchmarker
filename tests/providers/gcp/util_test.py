@@ -17,6 +17,7 @@
 import inspect
 import unittest
 
+from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -190,6 +191,27 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     expected_regions = {'us-west1', 'us-west2'}
     self.assertEqual(found_regions, expected_regions)
+
+  @parameterized.named_parameters(
+      ('rate_limit_exceeded',
+       'ERROR: (gcloud.compute.instances.create) Could not fetch resource:\n'
+       '  - Rate Limit Exceeded', True),
+      ('legacy_add_labels', 'ERROR: (gcloud.compute.disks.add-labels) '
+       "PERMISSION_DENIED: Quota exceeded for quota group 'ReadGroup' and "
+       "limit 'Read requests per 100 seconds' of service "
+       "'compute.googleapis.com' for consumer 'project_number:012345678901'.",
+       True),
+      ('no match', 'not a rate limit error message', False),
+      ('add_labels',
+       "ERROR: (gcloud.compute.disks.add-labels) PERMISSION_DENIED: "
+       "Quota exceeded for quota group 'default' and limit "
+       "'Queries per 100 seconds' of service 'compute.googleapis.com' for "
+       "consumer 'project_number:300314462293'.", True),
+      )
+  def testGcloudCommand(self, error_text: str, is_rate_limit_message: bool):
+    self.assertEqual(
+        util.GcloudCommand._IsIssueRateLimitMessage(error_text),
+        is_rate_limit_message)
 
 
 if __name__ == '__main__':
