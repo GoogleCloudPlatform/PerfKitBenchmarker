@@ -563,6 +563,22 @@ class Endor(Bigquery):
     return data_details
 
 
+class Endorazure(Endor):
+  """Class representing BigQuery Endor Azure service."""
+
+  SERVICE_TYPE = 'endorazure'
+
+  def GetMetadata(self) -> Dict[str, str]:
+    """Return a dictionary of the metadata for the BigQuery Endor Azure service.
+
+    Returns:
+      A dictionary set to Endor Azure service details.
+    """
+    basic_data = super(Endorazure, self).GetMetadata()
+    basic_data['edw_service_type'] = 'endorazure'
+    return basic_data
+
+
 class Bqfederated(Bigquery):
   """Class representing BigQuery Federated service."""
 
