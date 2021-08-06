@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: {{ nginx_replicas }}
+  template:
+    metadata:
+      labels:
+        app: nginx
+        appCluster: nginx-cluster
+    spec:
+      affinity:
+        podAntiAffinity:
+          # Schedule 1 Nginx pod per node
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - nginx
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: nginx
+        image: {{ nginx_image }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/sites-enabled/default
+          subPath: default
+        command:
+          - /bin/bash
+          - -c
+        args:
+          - |
+            mkdir -p /var/www/html
+            dd bs=1 count={{ nginx_content_size }} if=/dev/urandom of=/var/www/html/random_content
+            nginx -g 'daemon off;'
+      volumes:
+      - name: config-volume
+        configMap:
+          name: default-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-cluster
+spec:
+  ports:
+  - name: nginx-port
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+    appCluster: nginx-cluster
+  externalTrafficPolicy: Local
+  type: LoadBalancer

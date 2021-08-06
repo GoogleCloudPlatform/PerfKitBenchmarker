@@ -694,3 +694,19 @@ class KubernetesCluster(BaseContainerCluster):
           "Load Balancer IP for service '%s' is not ready." % service_name)
 
     return format(ip_address)
+
+  def CreateConfigMap(self, name, from_file_dir):
+    """Creates a Kubernetes ConfigMap.
+
+    Args:
+      name: The name of the ConfigMap to create
+      from_file_dir: The directory name containing files that will be
+          key/values in the ConfigMap
+    """
+    create_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'create', 'configmap', name,
+        '--from-file', from_file_dir
+    ]
+
+    vm_util.IssueCommand(create_cmd)

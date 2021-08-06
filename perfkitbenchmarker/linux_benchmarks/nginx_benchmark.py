@@ -131,6 +131,8 @@ def Prepare(benchmark_spec):
   _ConfigureNginx(server)
   vm_util.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
 
+  benchmark_spec.nginx_endpoint_ip = benchmark_spec.vm_groups['server'][0]
+
 
 def _RunMultiClient(clients, target, rate, connections, duration, threads):
   """Run multiple instances of wrk2 against a single target."""
@@ -192,9 +194,8 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   clients = benchmark_spec.vm_groups['clients']
-  server = benchmark_spec.vm_groups['server'][0]
   results = []
-  target = 'http://%s/random_content' % server.internal_ip
+  target = 'http://%s/random_content' % benchmark_spec.nginx_endpoint_ip
 
   if FLAGS.nginx_throttle:
     return _RunMultiClient(
