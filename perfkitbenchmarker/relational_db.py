@@ -138,11 +138,11 @@ UNMANAGED_SQL_SERVER_PORT = 1433
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
 
-class RelationalDbPropertyNotSet(Exception):
+class RelationalDbPropertyNotSetError(Exception):
   pass
 
 
-class RelationalDbEngineNotFoundException(Exception):
+class RelationalDbEngineNotFoundError(Exception):
   pass
 
 
@@ -228,13 +228,13 @@ class BaseRelationalDb(resource.BaseResource):
     the VPC, IP address, etc.
 
     Raises:
-      RelationalDbPropertyNotSet: if the client_vm is missing.
+      RelationalDbPropertyNotSetError: if the client_vm is missing.
 
     Returns:
       The client_vm.
     """
     if not hasattr(self, '_client_vm'):
-      raise RelationalDbPropertyNotSet('client_vm is not set')
+      raise RelationalDbPropertyNotSetError('client_vm is not set')
     return self._client_vm
 
   @client_vm.setter
@@ -246,13 +246,13 @@ class BaseRelationalDb(resource.BaseResource):
     """Server VM for hosting a managed database.
 
     Raises:
-      RelationalDbPropertyNotSet: if the server_vm is missing.
+      RelationalDbPropertyNotSetError: if the server_vm is missing.
 
     Returns:
       The server_vm.
     """
     if not hasattr(self, '_server_vm'):
-      raise RelationalDbPropertyNotSet('server_vm is not set')
+      raise RelationalDbPropertyNotSetError('server_vm is not set')
     return self._server_vm
 
   @server_vm.setter
@@ -297,7 +297,7 @@ class BaseRelationalDb(resource.BaseResource):
   def endpoint(self):
     """Endpoint of the database server (exclusing port)."""
     if not hasattr(self, '_endpoint'):
-      raise RelationalDbPropertyNotSet('endpoint not set')
+      raise RelationalDbPropertyNotSetError('endpoint not set')
     return self._endpoint
 
   @endpoint.setter
@@ -308,7 +308,7 @@ class BaseRelationalDb(resource.BaseResource):
   def port(self):
     """Port (int) on which the database server is listening."""
     if not hasattr(self, '_port'):
-      raise RelationalDbPropertyNotSet('port not set')
+      raise RelationalDbPropertyNotSetError('port not set')
     return self._port
 
   @port.setter
@@ -321,7 +321,7 @@ class BaseRelationalDb(resource.BaseResource):
     Child classes can extend this if needed.
 
     Raises:
-       RelationalDbPropertyNotSet: if any expected metadata is missing.
+       RelationalDbPropertyNotSetError: if any expected metadata is missing.
     """
     metadata = {
         'zone': self.spec.db_spec.zone,
@@ -379,7 +379,7 @@ class BaseRelationalDb(resource.BaseResource):
           'compute_units': self.spec.db_spec.compute_units,
       })
     else:
-      raise RelationalDbPropertyNotSet(
+      raise RelationalDbPropertyNotSetError(
           'Machine type of the database must be set.')
 
     if (hasattr(self.spec.vm_groups['clients'].vm_spec, 'machine_type') and
@@ -397,7 +397,7 @@ class BaseRelationalDb(resource.BaseResource):
           'client_vm_memory': self.spec.vm_groups['clients'].vm_spec.memory,
       })
     else:
-      raise RelationalDbPropertyNotSet(
+      raise RelationalDbPropertyNotSetError(
           'Machine type of the client VM must be set.')
 
     if FLAGS.db_flags:

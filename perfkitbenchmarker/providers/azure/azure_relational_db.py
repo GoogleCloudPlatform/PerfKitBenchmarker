@@ -119,7 +119,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       (string): Default engine version.
     Raises:
-      RelationalDbEngineNotFoundException: if an unknown engine is
+      RelationalDbEngineNotFoundError: if an unknown engine is
                                                   requested.
     """
     if engine == sql_engine_utils.POSTGRES:
@@ -129,7 +129,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     elif engine == sql_engine_utils.SQLSERVER:
       return DEFALUT_SQLSERVER_VERSION
     else:
-      raise relational_db.RelationalDbEngineNotFoundException(
+      raise relational_db.RelationalDbEngineNotFoundError(
           'Unsupported engine {0}'.format(engine))
 
   def GetDefaultPort(self):
@@ -138,7 +138,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       (string): Default port
     Raises:
-      RelationalDbEngineNotFoundException: if an unknown engine is
+      RelationalDbEngineNotFoundError: if an unknown engine is
                                                   requested.
     """
     engine = self.spec.engine
@@ -148,7 +148,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       return DEFAULT_MYSQL_PORT
     elif engine == sql_engine_utils.SQLSERVER:
       return DEFAULT_SQLSERVER_PORT
-    raise relational_db.RelationalDbEngineNotFoundException(
+    raise relational_db.RelationalDbEngineNotFoundError(
         'Unsupported engine {0}'.format(engine))
 
   def GetAzCommandForEngine(self):
@@ -159,7 +159,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       return 'mysql'
     elif engine == sql_engine_utils.SQLSERVER:
       return 'sql'
-    raise relational_db.RelationalDbEngineNotFoundException(
+    raise relational_db.RelationalDbEngineNotFoundError(
         'Unsupported engine {0}'.format(engine))
 
   def GetConfigFromMachineType(self, machine_type):
@@ -235,7 +235,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       vm_util.IssueCommand(cmd)
       self.database_name = new_name
     else:
-      raise relational_db.RelationalDbEngineNotFoundException(
+      raise relational_db.RelationalDbEngineNotFoundError(
           'Unsupported engine {0}'.format(engine))
 
   def _ApplyManagedDbFlags(self):
@@ -552,7 +552,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         elif engine == sql_engine_utils.SQLSERVER:
           state = server_show_json['state']
         else:
-          raise relational_db.RelationalDbEngineNotFoundException(
+          raise relational_db.RelationalDbEngineNotFoundError(
               'The db engine does not contain a valid state')
 
         if state == 'Ready':

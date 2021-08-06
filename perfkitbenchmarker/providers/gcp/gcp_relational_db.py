@@ -93,7 +93,7 @@ DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
 CREATION_TIMEOUT = 1200  # 20 minutes
 
 
-class UnsupportedDatabaseEngineException(Exception):
+class UnsupportedDatabaseEngineError(Exception):
   pass
 
 
@@ -191,7 +191,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere.
 
     Raises:
-      UnsupportedDatabaseEngineException:
+      UnsupportedDatabaseEngineError:
         if the database is unmanaged and the engine isn't MYSQL.
       Exception: if an invalid MySQL flag was used.
     """

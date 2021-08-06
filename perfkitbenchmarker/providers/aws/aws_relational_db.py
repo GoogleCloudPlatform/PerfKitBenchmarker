@@ -76,11 +76,11 @@ MYSQL5_7_PARAM_GROUP_FAMILY = 'mysql5.7'
 MYSQL8_0_PARAM_GROUP_FAMILY = 'mysql8.0'
 
 
-class AwsRelationalDbCrossRegionException(Exception):
+class AwsRelationalDbCrossRegionError(Exception):
   pass
 
 
-class AwsRelationalDbParameterException(Exception):
+class AwsRelationalDbParameterError(Exception):
   """Exceptions for invalid Db parameters."""
   pass
 
@@ -601,7 +601,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       (string): Default port
     Raises:
-      RelationalDbEngineNotFoundException: if an unknown engine is
+      RelationalDbEngineNotFoundError: if an unknown engine is
                                                   requested.
     """
     engine = self.spec.engine
@@ -611,7 +611,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       return DEFAULT_POSTGRES_PORT
     if engine == sql_engine_utils.SQLSERVER:
       return DEFAULT_SQLSERVER_PORT
-    raise relational_db.RelationalDbEngineNotFoundException(
+    raise relational_db.RelationalDbEngineNotFoundError(
         'Unsupported engine {0}'.format(engine))
 
   def _PostCreate(self):
@@ -769,8 +769,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       for flag in self.spec.db_flags:
         key_value_pair = flag.split('=')
         if len(key_value_pair) != 2:
-          raise AwsRelationalDbParameterException('Malformed parameter %s' %
-                                                  flag)
+          raise AwsRelationalDbParameterError('Malformed parameter %s' % flag)
         cmd = util.AWS_PREFIX + [
             'rds', 'modify-db-parameter-group',
             '--db-parameter-group-name=%s' % self.parameter_group,
@@ -817,11 +816,11 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     """Asserts that the client vm is in the same region requested by the server.
 
     Raises:
-      AwsRelationalDbCrossRegionException: if the client vm is in a
+      AwsRelationalDbCrossRegionError: if the client vm is in a
         different region that is requested by the server.
     """
     if self.client_vm.region != self.region:
-      raise AwsRelationalDbCrossRegionException(
+      raise AwsRelationalDbCrossRegionError(
           ('client_vm and relational_db server '
            'must be in the same region'))
 
