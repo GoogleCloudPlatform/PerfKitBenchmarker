@@ -131,7 +131,8 @@ def Prepare(benchmark_spec):
   _ConfigureNginx(server)
   vm_util.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
 
-  benchmark_spec.nginx_endpoint_ip = benchmark_spec.vm_groups['server'][0]
+  benchmark_spec.nginx_endpoint_ip = (
+      benchmark_spec.vm_groups['server'][0].internal_ip)
 
 
 def _RunMultiClient(clients, target, rate, connections, duration, threads):
