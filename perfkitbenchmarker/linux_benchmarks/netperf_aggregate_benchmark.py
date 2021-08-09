@@ -72,7 +72,7 @@ def PrepareNetperfAggregate(vm):
   """Installs netperf on a single vm."""
 
   vm.Install('python3')
-  vm.InstallPackages('python3-pip')
+  vm.Install('pip3')
   vm.RemoteCommand('sudo pip3 install --upgrade pip')
   vm.Install('texinfo')
   vm.Install('python_rrdtool')
@@ -199,30 +199,28 @@ def RunNetperfAggregate(vm, server_ips):
       '--intervals netperf_outbound.log',
       ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Outbound'))
+    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_outbound*')
   if 'MAERTS' in FLAGS.netperf_aggregate_benchmarks:
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_inbound.log',
       ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Inbound'))
+    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_inbound*')
   if 'RRAGG' in FLAGS.netperf_aggregate_benchmarks:
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_tps.log',
       ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Request/Response Aggregate'))
+    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_tps*')
   if 'BIDIR' in FLAGS.netperf_aggregate_benchmarks:
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
       '--intervals netperf_bidirectional.log',
       ignore_failure=False)
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Bidirectional'))
-
-
-  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_inbound*')
-  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_outbound*')
-  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_tps*')
-  vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_bidirectional*')
+    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_bidirectional*')  
 
   return samples
 
