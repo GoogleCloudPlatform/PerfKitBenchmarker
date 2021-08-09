@@ -753,9 +753,9 @@ class Windows2019SQLServer2017Enterprise(BaseWindowsMixin):
 
 class Windows2019SQLServer2019Standard(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
-  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_STANDARD
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2019_STANDARD
 
 
 class Windows2019SQLServer2019Enterprise(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
-  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE
