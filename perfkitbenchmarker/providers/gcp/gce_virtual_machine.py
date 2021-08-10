@@ -746,12 +746,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Suspend(self):
     """Suspend a GCE VM instance."""
-    util.GcloudCommand(self, 'compute', 'instances', 'suspend',
+    util.GcloudCommand(self, 'beta', 'compute', 'instances', 'suspend',
                        self.name).Issue()
 
   def _Resume(self):
     """Resume a GCE VM instance."""
-    util.GcloudCommand(self, 'compute', 'instances', 'resume',
+    util.GcloudCommand(self, 'beta', 'compute', 'instances', 'resume',
                        self.name).Issue()
 
   def _Exists(self):
