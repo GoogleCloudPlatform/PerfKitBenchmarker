@@ -530,11 +530,13 @@ class BaseRelationalDb(resource.BaseResource):
       self.server_vm.RemoteCommand(
           'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
           'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
-          'N\'DefaultData\', REG_SZ, N\'D:\\\'"')
+          'N\'DefaultData\', REG_SZ, N\'%s:\\\'"' %
+          self.server_vm.assigned_disk_letter)
       self.server_vm.RemoteCommand(
           'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
           'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
-          'N\'DefaultLog\', REG_SZ, N\'D:\\\'"')
+          'N\'DefaultLog\', REG_SZ, N\'%s:\\\'"' %
+          self.server_vm.assigned_disk_letter)
       self.server_vm.RemoteCommand('net stop mssqlserver /y')
       self.server_vm.RemoteCommand('net start mssqlserver')
       return

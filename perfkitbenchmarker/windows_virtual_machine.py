@@ -44,6 +44,9 @@ flags.DEFINE_bool(
     'Allows executables to be set to High (up from Normal) CPU priority '
     'through the SetProcessPriorityToHigh function.')
 
+# Windows disk letter starts from C, use a larger disk letter for attached disk
+# to avoid conflict. On Azure, D is reserved for DvD drive.
+ATTACHED_DISK_LETTER = 'F'
 SMB_PORT = 445
 WINRM_PORT = 5986
 RDP_PORT = 3389
@@ -95,6 +98,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.temp_dir = None
     self.home_dir = None
     self.system_drive = None
+    self.assigned_disk_letter = ATTACHED_DISK_LETTER
     self._send_remote_commands_to_cygwin = False
 
   def RobustRemoteCommand(self, command, should_log=False, ignore_failure=False,
@@ -664,14 +668,17 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     if disk_spec.mount_point:
       self.RemoteCommand('mkdir %s' % disk_spec.mount_point)
       script += ('format quick\n'
-                 'assign letter=d\n'
-                 'assign mount=%s\n' % disk_spec.mount_point)
+                 'assign letter=%s\n'
+                 'assign mount=%s\n' %
+                 (ATTACHED_DISK_LETTER.lower(), disk_spec.mount_point))
 
     self._RunDiskpartScript(script)
 
     # Grant user permissions on the drive
-    self.RemoteCommand('icacls D: /grant Users:F /L')
-    self.RemoteCommand('icacls D: --% /grant Users:(OI)(CI)F /L')
+    self.RemoteCommand(
+        'icacls {}: /grant Users:F /L'.format(ATTACHED_DISK_LETTER))
+    self.RemoteCommand(
+        'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(ATTACHED_DISK_LETTER))
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.

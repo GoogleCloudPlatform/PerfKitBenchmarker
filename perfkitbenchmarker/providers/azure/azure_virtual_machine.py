@@ -211,7 +211,12 @@ class AzurePublicIPAddress(resource.BaseResource):
 class AzureNIC(resource.BaseResource):
   """Class to represent an Azure NIC."""
 
-  def __init__(self, subnet, name, public_ip, accelerated_networking,
+  def __init__(self,
+               subnet,
+               name,
+               public_ip,
+               accelerated_networking,
+               network_security_group,
                private_ip=None):
     super(AzureNIC, self).__init__()
     self.subnet = subnet
@@ -223,6 +228,7 @@ class AzureNIC(resource.BaseResource):
     self.region = self.subnet.vnet.region
     self.args = ['--nics', self.name]
     self.accelerated_networking = accelerated_networking
+    self.network_security_group = network_security_group
 
   def _Create(self):
     cmd = [
@@ -235,6 +241,8 @@ class AzureNIC(resource.BaseResource):
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
+    if self.network_security_group:
+      cmd += ['--network-security-group', self.network_security_group.name]
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
@@ -483,7 +491,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
                                           self.name + '-public-ip')
     self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
-                        self.public_ip.name, vm_spec.accelerated_networking)
+                        self.public_ip.name, vm_spec.accelerated_networking,
+                        self.network.nsg)
     self.storage_account = self.network.storage_account
     self.image = vm_spec.image or type(self).IMAGE_URN
     self.host = None
@@ -702,9 +711,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
       else:
-        # Remote disk numbers start at 1 + max_local disks (0 is the system disk
-        # and local disks occupy [1, max_local_disks]).
-        disk_number = self.remote_disk_counter + 1 + self.max_local_disks
+        # Remote disk numbers start at max_local disks, Azure does not separate
+        # local disk and system disk.
+        disk_number = self.remote_disk_counter + self.max_local_disks
         self.remote_disk_counter += 1
       lun = next(self._lun_counter)
       data_disk = azure_disk.AzureDisk(disk_spec, self, lun)
@@ -920,6 +929,18 @@ class Windows2019DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
+
+
+class Windows2019DesktopSQLServer2019StandardAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Standard):
+  IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:standard:latest'
+
+
+class Windows2019DesktopSQLServer2019EnterpriseAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Enterprise):
+  IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:enterprise:latest'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
