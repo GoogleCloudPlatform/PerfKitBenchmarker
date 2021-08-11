@@ -751,8 +751,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Resume(self):
     """Resume a GCE VM instance."""
-    util.GcloudCommand(self, 'beta', 'compute', 'instances', 'resume',
-                       self.name).Issue()
+    resume_cmd = util.GcloudCommand(self, 'beta', 'compute', 'instances',
+                                    'resume', self.name)
+
+    # After resume, IP address is refreshed
+    stdout, _, _ = resume_cmd.Issue()
+    response = json.loads(stdout)
+    # Response is a list of size one
+    self._ParseDescribeResponse(response[0])
 
   def _Exists(self):
     """Returns true if the VM exists."""
