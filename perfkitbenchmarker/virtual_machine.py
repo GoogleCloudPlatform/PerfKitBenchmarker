@@ -418,6 +418,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._AfterReboot()
     return reboot_duration_sec
 
+  def _BeforeSuspend(self):
+    """Installs packages for the Debian 9 class."""
+    pass
+
   def Suspend(self) -> float:
     """Suspends the vm.
 
@@ -428,6 +432,8 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     Returns:
       The amount of time it takes to Suspend a VM that is suspendable.
     """
+    self._BeforeSuspend()
+
     before_suspend_timestamp = time.time()
 
     self._Suspend()

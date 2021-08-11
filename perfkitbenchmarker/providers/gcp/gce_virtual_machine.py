@@ -1094,6 +1094,10 @@ class Debian9BasedGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
+  def _BeforeSuspend(self):
+    self.InstallPackages('dbus')
+    self.RemoteCommand('sudo systemctl restart systemd-logind.service')
+
 
 class Debian10BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin):

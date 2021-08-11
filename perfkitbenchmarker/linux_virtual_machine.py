@@ -285,6 +285,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Resumes a VM."""
     raise NotImplementedError()
 
+  def _BeforeSuspend(self):
+    pass
+
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
