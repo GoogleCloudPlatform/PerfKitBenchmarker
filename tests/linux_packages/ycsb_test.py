@@ -19,6 +19,7 @@ import os
 import unittest
 
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
 from tests import pkb_common_test_case
@@ -268,6 +269,33 @@ class HdrLogsParserTestCase(unittest.TestCase):
     expected = [(0.0, 0.314, 2), (10.0, 0.853, 49953),
                 (20.0, 0.949, 50396), (30.0, 1.033, 49759)]
     self.assertEqual(actual, expected)
+
+
+class PrerequisitesTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name':
+              'SnapshotVersion',
+          'url':
+              'https://storage.googleapis.com/externally_shared_files/ycsb-0.18.0-SNAPSHOT.tar.gz',
+          'expected_version':
+              18,
+      }, {
+          'testcase_name': 'StandardVersion',
+          'url': 'https://storage.googleapis.com/ycsbclient/ycsb-0.17.0.tar.gz',
+          'expected_version': 17,
+      }, {
+          'testcase_name':
+              'GitHubVersion',
+          'url':
+              'https://github.com/brianfrankcooper/YCSB/releases/download/0.17.0/ycsb-0.17.0.tar.gz',
+          'expected_version':
+              17,
+      })
+  def testGetVersionIndexFromUrl(self, url, expected_version):
+    actual_version = ycsb._GetVersionFromUrl(url)
+    self.assertEqual(actual_version, expected_version)
 
 
 if __name__ == '__main__':

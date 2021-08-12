@@ -221,32 +221,36 @@ def SetYcsbTarUrl(url):
   _ycsb_tar_url = url
 
 
-def _GetVersionIndex(version_str):
-  """Returns the version index from ycsb version string.
+def _GetVersion(version_str):
+  """Returns the version from ycsb version string.
 
   Args:
-    version_str: ycsb version string with format '0.<version index>.0'.
+    version_str: ycsb version string with format '0.<version>.0'.
 
   Returns:
-    (int) version index.
+    (int) version.
   """
   return int(version_str.split('.')[1])
 
 
-def _GetVersionIndexFromUrl(url):
-  """Returns the version index from ycsb url string.
+def _GetVersionFromUrl(url):
+  """Returns the version from ycsb url string.
 
   Args:
     url: ycsb url string with format
     'https://github.com/brianfrankcooper/YCSB/releases/'
-      'download/0.<version-index>.0/ycsb-0.<version-index>.0.tar.gz'
+      'download/0.<version>.0/ycsb-0.<version>.0.tar.gz'
      OR
-    'https://storage.googleapis.com/<ycsb_client_jar>/ycsb-0.<version-index>.0.tar.gz'
+    'https://storage.googleapis.com/<ycsb_client_jar>/ycsb-0.<version>.0.tar.gz'
+     OR
+    'https://storage.googleapis.com/externally_shared_files/ycsb-0.<version>.0-SNAPSHOT.tar.gz'
 
   Returns:
-    (int) version index.
+    (int) version.
   """
-  return _GetVersionIndex(url.split('-')[-1].replace('.tar.gz', ''))
+  # matches ycsb-0.<version>.0
+  match = re.search(r'ycsb-0\.\d{2}\.0', url)
+  return _GetVersion(match.group(0).strip('ycsb-'))
 
 
 def _GetThreadsQpsPerLoaderList():
@@ -286,11 +290,11 @@ def CheckPrerequisites():
       raise IOError('Missing workload file: {0}'.format(workload_file))
 
   if _ycsb_tar_url:
-    ycsb_version = _GetVersionIndexFromUrl(_ycsb_tar_url)
+    ycsb_version = _GetVersionFromUrl(_ycsb_tar_url)
   elif FLAGS.ycsb_tar_url:
-    ycsb_version = _GetVersionIndexFromUrl(FLAGS.ycsb_tar_url)
+    ycsb_version = _GetVersionFromUrl(FLAGS.ycsb_tar_url)
   else:
-    ycsb_version = _GetVersionIndex(FLAGS.ycsb_version)
+    ycsb_version = _GetVersion(FLAGS.ycsb_version)
 
   if ycsb_version < 17:
     raise errors.Config.InvalidValue('must use YCSB version 0.17.0 or higher.')
@@ -322,7 +326,7 @@ def _Install(vm):
   install_cmd = ('mkdir -p {0} && curl -L {1} | '
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
-  if _GetVersionIndex(FLAGS.ycsb_version) >= 11:
+  if _GetVersion(FLAGS.ycsb_version) >= 11:
     vm.Install('maven')
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
     # _JAVA_OPTIONS needed to work around this issue:
