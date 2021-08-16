@@ -28,6 +28,9 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 HOSTFILE = 'HOSTFILE'
+PORT = '4242'
+DGXSYSTEM = 'DGXA100_multi'
+CONFIG = f'config_{DGXSYSTEM}.sh'
 
 BENCHMARK_NAME = 'mlperf_multiworkers'
 BENCHMARK_CONFIG = """
@@ -140,18 +143,31 @@ def _PrepareWorker(vm):
   """
   vm.Install('cuda_toolkit')
   vm.Install('openmpi')
+  vm.Install('nccl')
 
   vm.AuthenticateVm()
 
 
-def _PrepareMLPerf(benchmark_spec, vm):
+def _PrepareMLPerfBenchmark(benchmark_spec, node_rank):
   """Install and set up MLPerf on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification
-    vm: The target vm
+    node_rank: int, The rank of the node for multi-node distributed training
   """
-  mlperf_benchmark.Prepare(benchmark_spec, vm)
+  vm = benchmark_spec.vms[node_rank]
+  mlperf_benchmark.PrepareBenchmark(benchmark_spec, vm)
+
+
+def _PrepareMLPerfRunner(benchmark_spec, node_rank):
+  """Install and set up MLPerf on the target vm.
+
+  Args:
+    benchmark_spec: The benchmark specification
+    node_rank: int, The rank of the node for multi-node distributed training
+  """
+  vm = benchmark_spec.vms[node_rank]
+  mlperf_benchmark.PrepareRunner(benchmark_spec, vm)
   vm.RemoteCommand('sudo usermod -aG docker $USER')
 
 
@@ -184,8 +200,18 @@ def _DictToString(dictionary):
   return dict_str
 
 
+def _GetNcclParam():
+  for extra_param in FLAGS.nccl_extra_params:
+    param_key, param_value = extra_param.split('=', 1)
+    yield f'export {param_key}={param_value}'
+
+
+def _GetNcclParams():
+  return '\n'.join(_GetNcclParam())
+
+
 def _GetChangesForTransformer(benchmark_spec, vm, script_path,
-                              nccl_log_exports, nvprof_flags, cuda_exports,
+                              nccl_log_exports, nvprof_flags,
                               config_sed_input, run_sed_input,
                               run_and_time_sed_input):
   """Get changes to config and run scripts for Transformer.
@@ -198,13 +224,12 @@ def _GetChangesForTransformer(benchmark_spec, vm, script_path,
     script_path: The location of scripts on vm.
     nccl_log_exports: The exports to enable NCCL logging.
     nvprof_flags: The flags for nvprof.
-    cuda_exports: The exports for CUDA, e.g. CUDA_VISIBLE_DEVICES.
-    config_sed_input: Input list of sed pairs for config_DGX1_multi.sh.
+    config_sed_input: Input list of sed pairs for config_DGXA100_multi.sh.
     run_sed_input: Input list of sed pairs for run.sub.
     run_and_time_sed_input: Input list of sed pairs for run_and_time.sh.
 
   Returns:
-    config_sed_output: Output list of sed pairs for config_DGX1_multi.sh.
+    config_sed_output: Output list of sed pairs for config_DGXA100_multi.sh.
     run_sed_output: Output list of sed pairs for run.sub.
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
@@ -238,10 +263,7 @@ def _GetChangesForTransformer(benchmark_spec, vm, script_path,
 
   run_training_sed += [(r'export DGXSYSTEM',
                         r'export DGXSYSTEM\n'
-                        r'{nccl_exports}'
-                        r'{cuda_exports}'
-                        .format(nccl_exports=nccl_exports,
-                                cuda_exports=cuda_exports))]
+                        fr'{nccl_exports}\n')]
 
   vm.RemoteCommand(
       r'cd {script_path} && '
@@ -259,7 +281,7 @@ def _GetChangesForTransformer(benchmark_spec, vm, script_path,
 
 
 def _GetChangesForSSD(benchmark_spec,
-                      nccl_log_exports, nvprof_flags, cuda_exports,
+                      nccl_log_exports, nvprof_flags,
                       config_sed_input, run_sed_input, run_and_time_sed_input):
   """Get changes to config and run scripts for SSD.
 
@@ -267,13 +289,12 @@ def _GetChangesForSSD(benchmark_spec,
     benchmark_spec: The benchmark specification.
     nccl_log_exports: The exports to enable NCCL logging.
     nvprof_flags: The flags for nvprof.
-    cuda_exports: The exports for CUDA, e.g. CUDA_VISIBLE_DEVICES.
-    config_sed_input: Input list of sed pairs for config_DGX1_multi.sh.
+    config_sed_input: Input list of sed pairs for config_DGXA100_multi.sh.
     run_sed_input: Input list of sed pairs for run.sub.
     run_and_time_sed_input: Input list of sed pairs for run_and_time.sh.
 
   Returns:
-    config_sed_output: Output list of sed pairs for config_DGX1_multi.sh.
+    config_sed_output: Output list of sed pairs for config_DGXA100_multi.sh.
     run_sed_output: Output list of sed pairs for run.sub.
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
@@ -305,10 +326,7 @@ def _GetChangesForSSD(benchmark_spec,
     nccl_exports = ''
   run_and_time_sed += [(r'run benchmark',
                         r'run  benchmark\n'
-                        r'{nccl_exports}'
-                        r'{cuda_exports}'
-                        .format(nccl_exports=nccl_exports,
-                                cuda_exports=cuda_exports))]
+                        fr'{nccl_exports}')]
 
   run_sed += [(r'sleep infinity',
                r' bash -c \"\x27 cp \/workspace\/{model}1\/*.sh '
@@ -320,7 +338,7 @@ def _GetChangesForSSD(benchmark_spec,
 
 
 def _GetChangesForGNMT(benchmark_spec,
-                       nccl_log_exports, nvprof_flags, cuda_exports,
+                       nccl_log_exports, nvprof_flags,
                        config_sed_input, run_sed_input, run_and_time_sed_input):
   """Get changes to config and run scripts for GNMT.
 
@@ -328,13 +346,12 @@ def _GetChangesForGNMT(benchmark_spec,
     benchmark_spec: The benchmark specification.
     nccl_log_exports: The exports to enable NCCL logging.
     nvprof_flags: The flags for nvprof.
-    cuda_exports: The exports for CUDA, e.g. CUDA_VISIBLE_DEVICES.
-    config_sed_input: Input list of sed pairs for config_DGX1_multi.sh.
+    config_sed_input: Input list of sed pairs for config_DGXA100_multi.sh.
     run_sed_input: Input list of sed pairs for run.sub.
     run_and_time_sed_input: Input list of sed pairs for run_and_time.sh.
 
   Returns:
-    config_sed_output: Output list of sed pairs for config_DGX1_multi.sh.
+    config_sed_output: Output list of sed pairs for config_DGXA100_multi.sh.
     run_sed_output: Output list of sed pairs for run.sub.
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
@@ -366,10 +383,7 @@ def _GetChangesForGNMT(benchmark_spec,
     nccl_exports = r''
   run_and_time_sed += [(r'running benchmark\"',
                         r'running  benchmark\"\n'
-                        r'{nccl_exports}'
-                        r'{cuda_exports}\n'
-                        .format(nccl_exports=nccl_exports,
-                                cuda_exports=cuda_exports))]
+                        fr'{nccl_exports}\n')]
 
   run_sed += [(r'sleep infinity',
                r' bash -c \"\x27 cp \/workspace\/{model}1\/*.sh '
@@ -379,8 +393,8 @@ def _GetChangesForGNMT(benchmark_spec,
   return config_sed, run_sed, run_and_time_sed
 
 
-def _GetChangesForMask(benchmark_spec, vm, script_path,
-                       nccl_log_exports, nvprof_flags, cuda_exports,
+def _GetChangesForMask(benchmark_spec, node_rank, script_path,
+                       nccl_log_exports, nvprof_flags,
                        config_sed_input, run_sed_input, run_and_time_sed_input):
   """Get changes to config and run scripts for MaskRCNN.
 
@@ -388,20 +402,20 @@ def _GetChangesForMask(benchmark_spec, vm, script_path,
 
   Args:
     benchmark_spec: The benchmark specification.
-    vm: The target vm.
+    node_rank: int, The rank of the node for multi-node distributed training
     script_path: The location of scripts on vm.
     nccl_log_exports: The exports to enable NCCL logging.
     nvprof_flags: The flags for nvprof.
-    cuda_exports: The exports for CUDA, e.g. CUDA_VISIBLE_DEVICES.
-    config_sed_input: Input list of sed pairs for config_DGX1_multi.sh.
+    config_sed_input: Input list of sed pairs for config_DGXA100_multi.sh.
     run_sed_input: Input list of sed pairs for run.sub.
     run_and_time_sed_input: Input list of sed pairs for run_and_time.sh.
 
   Returns:
-    config_sed_output: Output list of sed pairs for config_DGX1_multi.sh.
+    config_sed_output: Output list of sed pairs for config_DGXA100_multi.sh.
     run_sed_output: Output list of sed pairs for run.sub.
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
+  vm = benchmark_spec.vms[node_rank]
   config_sed = config_sed_input
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
@@ -409,23 +423,35 @@ def _GetChangesForMask(benchmark_spec, vm, script_path,
   per_gpu_eval_batch_size = benchmark_spec.total_num_gpus
 
   # pylint: disable=line-too-long
-  # The BASE_LR and WARMUP_ITERS are from https://raw.githubusercontent.com/mlperf/training_results_v0.6/master/NVIDIA/results/dgx2_ngc19.05_pytorch/maskrcnn/result_0.txt
-  config_sed += [(r'BASE_LR.*', r'BASE_LR\"  \"0.12\"')]
-  config_sed += [(r'WARMUP_ITERS.*', r'WARMUP_ITERS\"  \"625\"')]
-  # The STEPS numbers are from https://raw.githubusercontent.com/mlperf/training_results_v0.6/master/NVIDIA/results/dgx2h_n12_ngc19.05_pytorch/maskrcnn/result_0.txt
+  # The BASE_LR and WARMUP_ITERS are from https://raw.githubusercontent.com/mlcommons/training_results_v1.0/master/NVIDIA/results/dgx2_ngc19.05_pytorch/maskrcnn/result_0.txt
+  config_sed += [(r'BASE_LR [0-9\.]*', 'BASE_LR 0.12')]
+  config_sed += [(r'WARMUP_ITERS [0-9\.]*', 'WARMUP_ITERS 625')]
+  # The STEPS numbers are from https://raw.githubusercontent.com/mlcommons/training_results_v1.0/master/NVIDIA/results/dgx2h_n12_ngc19.05_pytorch/maskrcnn/result_0.txt
   # pylint: enable=line-too-long
   # Using the step numbers provided by the smaller scale
   # results didn't run or converge. That's why the
   # hyperparameters are mixed.
-  config_sed += [(r'STEPS.*', r'STEPS\"  \"(7000, 9333)\"')]
-  config_sed += [(r'SOLVER.IMS_PER_BATCH.*',
-                  r'SOLVER.IMS_PER_BATCH\"  \"{per_gpu_train_batch_size}\"'
-                  .format(per_gpu_train_batch_size=per_gpu_train_batch_size))]
-  config_sed += [(r'TEST.IMS_PER_BATCH.*',
-                  r'TEST.IMS_PER_BATCH\" \"{per_gpu_eval_batch_size}\"'
-                  .format(per_gpu_eval_batch_size=per_gpu_eval_batch_size))]
-  config_sed += [(r'TOP_N_TRAIN.*', r'TOP_N_TRAIN\" \"1000\"')]
+  config_sed += [(r'STEPS ([0-9]*,[0-9]*)', 'STEPS (7000,9333)')]
+  config_sed += [(r'SOLVER.IMS_PER_BATCH [0-9\.]*',
+                  f'SOLVER.IMS_PER_BATCH {per_gpu_train_batch_size}')]
+  config_sed += [(r'TEST.IMS_PER_BATCH [0-9\.]*',
+                  f'TEST.IMS_PER_BATCH {per_gpu_eval_batch_size}')]
+  config_sed += [(r'TOP_N_TRAIN [0-9\.]*', 'TOP_N_TRAIN 1000')]
+  config_sed += [('SOLVER_MAX_ITER=.*',
+                  f'SOLVER_MAX_ITER={mlperf_benchmark.MASK_ITERATION.value}')]
+  config_sed += [(r'WALLTIME=.*',
+                  r'WALLTIME=30\n'
+                  r'export CONT=mlperf-nvidia:object_detection\n'
+                  r'export DATADIR=\/data\n'
+                  r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
+                  r'export NEXP=1')]
 
+  run_and_time_sed += [(r"'bind_launch'",
+                        r"'bind_launch' "
+                        f"'--nnodes={benchmark_spec.num_vms}' "
+                        f"'--node_rank={node_rank}' "
+                        f"'--master_addr={benchmark_spec.vms[0].internal_ip}' "
+                        f"'--master_port={PORT}'")]
   if FLAGS.mlperf_keep_nccl_log:
     run_and_time_sed += [(r'run benchmark',
                           r'run  benchmark\n{nccl_log_exports}'
@@ -447,37 +473,36 @@ def _GetChangesForMask(benchmark_spec, vm, script_path,
   else:
     nccl_exports = r''
   run_and_time_sed += [(r'set -x',
-                        r'{nccl_exports}\n'
-                        r'{cuda_exports}\n'
-                        r'set  -x'
-                        .format(nccl_exports=nccl_exports,
-                                cuda_exports=cuda_exports))]
+                        fr'{nccl_exports}\n'
+                        r'set -x')]
 
-  run_sed += [(r'sleep infinity',
-               r' bash -c \"\x27 cp \/workspace\/{model}1\/*.sh '
-               r'\/workspace\/object_detection\/ \&\& sleep  infinity\x27 \"'
-               .format(model=benchmark_spec.benchmark))]
+  run_sed += [(r'SYSLOGGING=1', r'SYSLOGGING=0')]
+  run_sed += [(r'_cont_mounts=(',
+               r'_cont_mounts=(\"--volume=\${PKLDIR}:\/pkl_coco\" ')]
 
   return config_sed, run_sed, run_and_time_sed
 
 
 def _GetChangesForResnet(benchmark_spec,
-                         nccl_log_exports, nvprof_flags, cuda_exports,
+                         node_rank,
+                         nccl_log_exports, nvprof_flags,
                          config_sed_input, run_sed_input,
                          run_and_time_sed_input):
   """Get changes to config and run scripts for Resnet.
 
   Args:
     benchmark_spec: The benchmark specification.
+    node_rank: int, The rank of the node for multi-node distributed training
     nccl_log_exports: The exports to enable NCCL logging.
     nvprof_flags: The flags for nvprof.
-    cuda_exports: The exports for CUDA, e.g. CUDA_VISIBLE_DEVICES.
-    config_sed_input: Input list of sed pairs for config_DGX1_multi.sh.
+    config_sed_input: Input list of sed pairs for
+    config_DGXA100_multi.sh.
     run_sed_input: Input list of sed pairs for run.sub.
     run_and_time_sed_input: Input list of sed pairs for run_and_time.sh.
 
   Returns:
-    config_sed_output: Output list of sed pairs for config_DGX1_multi.sh.
+    config_sed_output: Output list of sed pairs for
+    config_DGXA100_multi.sh.
     run_sed_output: Output list of sed pairs for run.sub.
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
@@ -488,6 +513,10 @@ def _GetChangesForResnet(benchmark_spec,
 
   config_sed += [(r'BATCHSIZE=.*', r'BATCHSIZE=\"{per_gpu_batch_size}\"'
                   .format(per_gpu_batch_size=per_gpu_batch_size))]
+  config_sed += [(r'NUMEPOCHS=.*',
+                  fr'NUMEPOCHS={mlperf_benchmark.RESNET_EPOCHS.value}\n'
+                  r'export CONT=mlperf-nvidia:image_classification\n'
+                  r'export DATADIR=\/data\/imagenet')]
 
   if FLAGS.mlperf_keep_nccl_log:
     run_and_time_sed += [(r'run benchmark',
@@ -508,66 +537,125 @@ def _GetChangesForResnet(benchmark_spec,
   else:
     nccl_exports = r''
   run_and_time_sed += [(r'SLURM_NTASKS_PER_NODE=',
-                        r'{nccl_exports}'
-                        r'{cuda_exports}\n'
-                        r'SLURM_NTASKS_PER_NODE='
-                        .format(
-                            nccl_exports=nccl_exports,
-                            cuda_exports=cuda_exports))]
+                        fr'{nccl_exports}\n'
+                        r'SLURM_NTASKS_PER_NODE=')]
 
   run_and_time_sed += [(r'BIND=.*', r'BIND=\"\"')]
   run_and_time_sed += [('NUMEPOCHS=.*',
                         f'NUMEPOCHS={mlperf_benchmark.RESNET_EPOCHS.value}')]
 
-  run_sed += [(r'srun --mem=0 -n \$SLURM_JOB_NUM_NODES --ntasks-per-node=1',
-               r'mpirun -mca btl_tcp_if_exclude docker0,lo -N 1 '
-               r'-n \$SLURM_JOB_NUM_NODES -hostfile \$HOME\/{hostfile}'
-               .format(hostfile=HOSTFILE))]
-  run_sed += [(r'SRUNl=\"\$SRUN -l\"', r'SRUNl=\"\$SRUN \"')]
-  run_sed += [(r'root --bind-to none',
-               r'root -mca btl_tcp_if_exclude docker0,lo '
-               r'-x CONTNAME=\$CONTNAME --bind-to none')]
-  run_sed += [(r'mkdir -p .*',
-               r'\$SRUNl -x SLURM_JOB_ID=\$SLURM_JOB_ID bash -c '
-               r'\x27 mkdir -p \/dev\/shm\/mpi\/\${SLURM_JOB_ID} \&\& '
-               r'chmod 700 \/dev\/shm\/mpi\/\${SLURM_JOB_ID}\x27')]
-  run_sed += [(r'cat \/dev\/shm\/mpi.*',
-               r'    for hostn in \${hosts[@]}\; do\n'
-               r'      scp \/dev\/shm\/mpi\/\${SLURM_JOB_ID}.tgz '
-               r'\$hostn:\/dev\/shm\/mpi\;\n'
-               r'    done\;\n'
-               r'  \$SRUNl -x SLURM_JOB_ID=\$SLURM_JOB_ID tar zxPf '
-               r'\/dev\/shm\/mpi\/\${SLURM_JOB_ID}.tgz ')]
-  run_sed += [(r'\$SRUNl cp -pr ',
-               r'\$SRUNl -x SLURM_JOB_ID=\${SLURM_JOB_ID} cp -pr ')]
-  run_sed += [(r'sleep infinity',
-               r'cp \/workspace\/{model}1\/*.sh '
-               r'\/workspace\/image_classification\/ \&\& sleep  infinity'
-               .format(model=benchmark_spec.benchmark))]
-  run_sed += [(r'SRUNl docker exec',
-               r'SRUNl -x SLURM_JOB_ID -x CONTAINER_UID '
-               r'-x CONTAINER_GID -x VARS -x CONTNAME docker exec')]
-  run_sed += [(r'\$SLURM_JOB_NUM_NODES -eq 1',
-               r'\$SLURM_JOB_NUM_NODES -eq 0')]
+  hosts = ','.join(f'{vm.internal_ip}:{benchmark_spec.gpus_per_vm}'
+                   for vm in benchmark_spec.vms)
+  np = benchmark_spec.gpus_per_vm * benchmark_spec.num_vms
+  run_and_time_sed += [(r'mpirun.*',
+                        fr'horovodrun -H {hosts} -p {PORT} -np {np}\"')]
+
+  run_sed += [(r'_cont_mounts=(',
+               r'_cont_mounts=(\"--volume=\$HOME\/.ssh:\/tmp\/.ssh\" ')]
+
+  if node_rank == 0:
+    run_sed += [(r'sleep infinity',
+                 r'bash -c \"cp -r \/tmp\/.ssh \/root\/.ssh;sleep infinity\"')]
+  else:
+    run_sed += [(r'sleep infinity',
+                 r'bash -c \"cp -r \/tmp\/.ssh \/root\/.ssh;'
+                 r'apt update;'
+                 r'apt-get install -y openssh-server;'
+                 r'systemctl enable ssh;'
+                 r'mkdir -p \/run\/sshd;'
+                 fr'\/usr\/sbin\/sshd -p {PORT};'
+                 r'sleep infinity\"')]
+    run_sed += [(r'.*run_and_time.*', r'')]
+    run_sed += [(r'trap.*', r'')]
 
   return config_sed, run_sed, run_and_time_sed
 
 
-def _UpdateScripts(benchmark_spec, vm):
+def _GetChangesForBert(benchmark_spec, node_rank,
+                       nccl_log_exports, nvprof_flags,
+                       config_sed_input, run_sed_input, run_and_time_sed_input):
+  """Get changes to config and run scripts for BERT.
+
+  Also update train_mlperf.py if nvprof is used.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+    node_rank: int, The rank of the node for multi-node distributed training
+    nccl_log_exports: The exports to enable NCCL logging.
+    nvprof_flags: The flags for nvprof.
+    config_sed_input: Input list of sed pairs for config_DGXA100_multi.sh.
+    run_sed_input: Input list of sed pairs for run.sub.
+    run_and_time_sed_input: Input list of sed pairs for run_and_time.sh.
+
+  Returns:
+    config_sed_output: Output list of sed pairs for config_DGXA100_multi.sh.
+    run_sed_output: Output list of sed pairs for run.sub.
+    run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
+  """
+  config_sed = config_sed_input
+  run_sed = run_sed_input
+  run_and_time_sed = run_and_time_sed_input
+
+  config_sed += [(r'source .*',
+                  r'export CONT=mlperf-nvidia:language_model\n'
+                  r'export NEXP=1')]
+  config_sed += [(r'DATADIR=.*',
+                  r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
+  config_sed += [(r'MAX_STEPS=.*',
+                  f'MAX_STEPS={mlperf_benchmark.BERT_STEPS.value}')]
+  config_sed += [(r'DATADIR_PHASE2=.*',
+                  r'DATADIR_PHASE2=\/data\/bert_data\/'
+                  r'2048_shards_uncompressed')]
+  config_sed += [(r'EVALDIR=.*',
+                  r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
+  config_sed += [(r'CHECKPOINTDIR=.*',
+                  r'CHECKPOINTDIR=\/data\/bert_data\/tf1_ckpt')]
+  config_sed += [(r'CHECKPOINTDIR_PHASE1=.*',
+                  r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/tf1_ckpt')]
+  config_sed += [(r'BATCHSIZE=.*',
+                  fr'BATCHSIZE={mlperf_benchmark.BERT_BATCH_SIZE.value}')]
+
+  if FLAGS.mlperf_keep_nccl_log:
+    run_and_time_sed += [(r'run benchmark',
+                          r'run benchmark\n'
+                          fr'{nccl_log_exports}')]
+  if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
+    run_and_time_sed += [(r'python', fr'nvprof {nvprof_flags} python')]
+  if FLAGS.mlperf_use_optimized_nccl_config:
+    nccl_exports = (r'export NCCL_SOCKET_NTHREADS=3\n'
+                    r'export NCCL_NSOCKS_PERTHREAD=2\n'
+                    r'export NCCL_MIN_NRINGS=2\n')
+  else:
+    nccl_exports = r''
+  run_and_time_sed += [(r'set -x', fr'{nccl_exports}\nset -x')]
+
+  run_sed += [(r"'bind_pyt'",
+               r"'bind_pyt' "
+               fr"'--nnodes={benchmark_spec.num_vms}' "
+               fr"'--node_rank={node_rank}' "
+               fr"'--master_addr={benchmark_spec.vms[0].internal_ip}' "
+               fr"'--master_port={PORT}'")]
+
+  return config_sed, run_sed, run_and_time_sed
+
+
+def _UpdateScripts(benchmark_spec, node_rank):
   """Update the running scripts on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification.
-    vm: The target vm.
+    node_rank: int, The rank of the node for multi-node distributed training
   """
+  vm = benchmark_spec.vms[node_rank]
   benchmark = benchmark_spec.benchmark
 
+  # TODO(tohaowu) Change config and script using a patch file.
   # request pairs to the sed command
   # each pair('str_A', 'str_B') indicates a request "replace anything
   # matching str_A to str_B" for a specific file
   config_sed = []
   config_sed += [(r'DGXIBDEVICES=.*', r'DGXIBDEVICES=\"\"')]
-  config_sed += [(r'DGXSYSTEM=.*', r'DGXSYSTEM=\"DGX1_multi\"')]
+  config_sed += [(r'DGXSYSTEM=.*', fr'DGXSYSTEM=\"{DGXSYSTEM}\"')]
   config_sed += [(r'DGXNNODES=.*', r'DGXNNODES={num_vms}'
                   .format(num_vms=benchmark_spec.num_vms))]
   config_sed += [(r'DGXNGPU=.*', r'DGXNGPU={gpus_per_vm}'
@@ -579,15 +667,10 @@ def _UpdateScripts(benchmark_spec, vm):
 
   run_and_time_sed = []
   run_and_time_sed += [(r'run_training.sh', r'run_training1.sh')]
-  run_and_time_sed += [(r'DGXSYSTEM=.*', r'DGXSYSTEM=\"DGX1_multi\"')]
-  run_and_time_sed += [(r'config_\${DGXSYSTEM}.sh',
-                        r'config_\${DGXSYSTEM}1.sh')]
+  run_and_time_sed += [(r'DGXSYSTEM=.*', fr'DGXSYSTEM=\"{DGXSYSTEM}\"')]
 
   run_sed = []
   run_sed += [(r'SYSLOGGING=1', r'SYSLOGGING=0')]
-  run_sed += [(r'config_DGX1_multi', r'config_DGX1_multi1')]
-  run_sed += [(r'config_\${DGXSYSTEM}.sh', r'config_\${DGXSYSTEM}1.sh')]
-  run_sed += [(r'run_and_time.sh', r'run_and_time1.sh')]
   run_sed += [(r'env [|] grep SLURM', r'export SLURM_NNODES={num_vms}'
                .format(num_vms=benchmark_spec.num_vms))]
   run_sed += [(r'data -v \$LOGDIR',
@@ -600,75 +683,87 @@ def _UpdateScripts(benchmark_spec, vm):
   run_sed += [(r'srun --mem=0 -N 1 -n 1 -w \$hostn',
                r'mpirun -N 1 -n 1 -H \$hostn')]
   run_sed += [(r'sleep 30', r'sleep 60')]
+  run_sed += [(r'docker exec -it', r'docker exec -t')]
+  run_sed += [(r'run_and_time.sh', r'run_and_time1.sh')]
+  run_sed += [(r'set -euxo pipefail',
+               fr'set -euxo pipefail\nsource .\/{CONFIG}')]
 
   nccl_log_exports = (
       r'export NCCL_DEBUG=INFO \n'
       r'export NCCL_DEBUG_SUBSYS=ALL \n'
       r'export NCCL_DEBUG_FILE=\"\/results\/%h.%p.nccl\" \n')
   nvprof_flags = r'-f -o \/results\/%h.%p.nvprof --profile-child-processes'
-  if (FLAGS.cloud == 'GCP' and benchmark_spec.gpus_per_vm == 8):
-    cuda_exports = r'export CUDA_VISIBLE_DEVICES=0,1,3,2,7,6,4,5'
-  else:
-    cuda_exports = r''
 
   script_path = (
-      r'$HOME/training_results_v0.6/NVIDIA/benchmarks/{model}'
+      r'$HOME/training_results_{version}/NVIDIA/benchmarks/{model}'
       r'/implementations/{framework}'
-      .format(model='maskrcnn' if mlperf_benchmark.MASK in benchmark
+      .format(version=mlperf_benchmark.MLPERF_VERSION,
+              model='maskrcnn' if mlperf_benchmark.MASK in benchmark
               else benchmark,
               framework='mxnet' if mlperf_benchmark.RESNET in benchmark
               else 'pytorch'))
 
+  config_files = [CONFIG]
   if mlperf_benchmark.TRANSFORMER in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForTransformer(
         benchmark_spec, vm, script_path,
-        nccl_log_exports, nvprof_flags, cuda_exports,
+        nccl_log_exports, nvprof_flags,
         config_sed, run_sed, run_and_time_sed)
 
   elif mlperf_benchmark.SSD in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForSSD(
         benchmark_spec,
-        nccl_log_exports, nvprof_flags, cuda_exports,
+        nccl_log_exports, nvprof_flags,
         config_sed, run_sed, run_and_time_sed)
 
   elif mlperf_benchmark.GNMT in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForGNMT(
         benchmark_spec,
-        nccl_log_exports, nvprof_flags, cuda_exports,
+        nccl_log_exports, nvprof_flags,
         config_sed, run_sed, run_and_time_sed)
 
   elif mlperf_benchmark.MASK in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForMask(
-        benchmark_spec, vm, script_path,
-        nccl_log_exports, nvprof_flags, cuda_exports,
+        benchmark_spec, node_rank, script_path,
+        nccl_log_exports, nvprof_flags,
         config_sed, run_sed, run_and_time_sed)
+
+    config_files = ['config_DGXA100_multi_4x8x4.sh']
 
   elif mlperf_benchmark.RESNET in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForResnet(
-        benchmark_spec,
-        nccl_log_exports, nvprof_flags, cuda_exports,
+        benchmark_spec, node_rank,
+        nccl_log_exports, nvprof_flags,
         config_sed, run_sed, run_and_time_sed)
 
-  vm.RemoteCommand(
-      r'cd {script_path} && '
-      r'sed "{config_sed}" config_DGX1_multi.sh > config_DGX1_multi1.sh && '
-      r'chmod 755 config_DGX1_multi1.sh '
-      .format(script_path=script_path,
-              config_sed=_SedPairsToString(config_sed)))
+    config_files = ['config_DGXA100_common.sh',
+                    'config_DGXA100_multi_8x8x204.sh']
+
+  elif mlperf_benchmark.BERT in benchmark:
+    config_sed, run_sed, run_and_time_sed = _GetChangesForBert(
+        benchmark_spec, node_rank, nccl_log_exports, nvprof_flags, config_sed,
+        run_sed, run_and_time_sed)
+
+    config_files = ['config_DGXA100_common.sh',
+                    'config_DGXA100_8x8x48x1.sh']
 
   vm.RemoteCommand(
-      r'cd {script_path} && '
-      r'sed "{run_and_time_sed}" run_and_time.sh > run_and_time1.sh && '
-      r'chmod 755 run_and_time1.sh '
-      .format(script_path=script_path,
-              run_and_time_sed=_SedPairsToString(run_and_time_sed)))
+      f'cd {script_path} && '
+      f'sed "{_SedPairsToString(config_sed)}" '
+      f'{" ".join(config_files)} > {CONFIG} && '
+      f'chmod 755 {CONFIG} ')
 
   vm.RemoteCommand(
-      r'cd {script_path} && '
-      r'sed "{run_sed}" run.sub > run1.sub && '
-      r'chmod 755 run1.sub '
-      .format(script_path=script_path,
-              run_sed=_SedPairsToString(run_sed)))
+      f'cd {script_path} && '
+      f'sed "{_SedPairsToString(run_and_time_sed)}" run_and_time.sh | '
+      f'sed "2 i source {CONFIG}" > run_and_time1.sh && '
+      'chmod 755 run_and_time1.sh ')
+
+  vm.RemoteCommand(
+      fr'cd {script_path} && '
+      fr'sed "{_SedPairsToString(run_sed)}" run_with_docker.sh '
+      r'> run_with_docker1.sh && '
+      r'chmod 755 run_with_docker1.sh')
 
 
 def _PrepareBucket(benchmark_spec):
@@ -692,7 +787,8 @@ def _PrepareBucket(benchmark_spec):
   storage_service.ChmodBucket(benchmark_spec.gcp_service_account, 'W', bucket)
 
 
-def _ClearTmpDirectory(benchmark_spec, vm):
+def _ClearTmpDirectory(benchmark_spec, node_rank):
+  vm = benchmark_spec.vms[node_rank]
   vm.RemoteCommand(
       r'sudo rm -rf {dir}'
       .format(dir=posixpath.join(vm_util.VM_TMP_DIR, benchmark_spec.benchmark)))
@@ -708,14 +804,17 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(_PrepareWorker, vms)
 
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  list_params = [((benchmark_spec, vms[i]), {}) for i in range(len(vms))]
+  list_params = [((benchmark_spec, node_rank), {})
+                 for node_rank in range(len(vms))]
   _PrepareBucket(benchmark_spec)
 
   vm_util.RunThreaded(_ClearTmpDirectory, list_params)
 
-  vm_util.RunThreaded(_PrepareMLPerf, list_params)
+  vm_util.RunThreaded(_PrepareMLPerfBenchmark, list_params)
 
   vm_util.RunThreaded(_UpdateScripts, list_params)
+
+  vm_util.RunThreaded(_PrepareMLPerfRunner, list_params)
 
   hpc_util.CreateMachineFile(vms, lambda _: benchmark_spec.gpus_per_vm,
                              HOSTFILE)
@@ -776,14 +875,15 @@ def Run(benchmark_spec):
   env_params = {}
   env_params['SLURM_JOB_ID'] = r'{uri}'.format(uri=FLAGS.run_uri)
   env_params['PULL'] = 0
-  env_params['DGXSYSTEM'] = r'DGX1_multi'
+  env_params['DGXSYSTEM'] = DGXSYSTEM
   env_params['NEXP'] = 1
   env_params['LOGDIR'] = posixpath.join(vm_util.VM_TMP_DIR, benchmark)
 
   script_path = (
-      r'$HOME/training_results_v0.6/NVIDIA/benchmarks/{model}'
+      '$HOME/training_results_{version}/NVIDIA/benchmarks/{model}'
       r'/implementations/{framework}'
-      .format(model='maskrcnn' if mlperf_benchmark.MASK in benchmark
+      .format(version=mlperf_benchmark.MLPERF_VERSION,
+              model='maskrcnn' if mlperf_benchmark.MASK in benchmark
               else benchmark,
               framework='mxnet' if mlperf_benchmark.RESNET in benchmark
               else 'pytorch'))
@@ -794,16 +894,35 @@ def Run(benchmark_spec):
           'DATADIR': r'/data/wmt/utf8'},
       mlperf_benchmark.SSD: {
           'CONT': r'"mlperf-nvidia:single_stage_detector"',
-          'DATADIR': r'/data'},
+          'DATADIR': '/data'},
       mlperf_benchmark.GNMT: {
           'CONT': r'"mlperf-nvidia:rnn_translator"',
           'DATADIR': r'/data/gnmt'},
       mlperf_benchmark.MASK: {
           'CONT': r'"mlperf-nvidia:object_detection"',
-          'DATADIR': r'/data'},
+          'DATADIR': r'/data',
+          'PKLDIR': '/data/coco2017/pkl_coco',
+          'DGXNSOCKET': master_vm.CheckLsCpu().socket_count,
+          'DGXSOCKETCORES': master_vm.CheckLsCpu().cores_per_socket,
+          'DGXNGPU': benchmark_spec.gpus_per_vm,
+          'SOLVER_MAX_ITER': mlperf_benchmark.MASK_ITERATION.value,
+      },
       mlperf_benchmark.RESNET: {
           'CONT': r'"mlperf-nvidia:image_classification"',
-          'DATADIR': r'/data/imagenet'}
+          'DATADIR': r'/data/imagenet',
+          'NUMEPOCHS': mlperf_benchmark.RESNET_EPOCHS.value,
+      },
+      mlperf_benchmark.BERT: {
+          'DATADIR': '/data/bert_data/2048_shards_uncompressed',
+          'CONT': 'mlperf-nvidia:language_model',
+          'MAX_STEPS': mlperf_benchmark.BERT_STEPS.value,
+          'DATADIR_PHASE2': '/data/bert_data/2048_shards_uncompressed',
+          'EVALDIR': '/data/bert_data/eval_set_uncompressed',
+          'CHECKPOINTDIR': '/data/bert_data/tf1_ckpt',
+          'CHECKPOINTDIR_PHASE1': '/data/bert_data/tf1_ckpt',
+          'MASTER_ADDR': master_vm.internal_ip,
+          'MASTER_PORT': PORT,
+      },
   }
   env_params.update(benchmark_env_params.get(benchmark, {}))
   if mlperf_benchmark.RESNET in benchmark:
@@ -813,12 +932,17 @@ def Run(benchmark_spec):
   if nvidia_driver.CheckNvidiaGpuExists(master_vm):
     env = tensorflow.GetEnvironmentVars(master_vm)
 
-  cmd = (
-      r'cd {script_path} && {env} {params} ./run1.sub'
-      .format(
-          script_path=script_path,
-          env=env,
-          params=_DictToString(env_params)))
+  cmd = (f'cd {script_path} && '
+         f'{env} {_DictToString(env_params)} '
+         'mpirun '
+         '--allow-run-as-root '
+         '-hostfile $HOME/HOSTFILE '
+         '--mca pml ^cm '
+         '--mca btl tcp,self '
+         '--mca btl_tcp_if_exclude docker0,lo '
+         '--bind-to none '
+         '-N 1 '
+         './run_with_docker1.sh')
   if (mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler or
       FLAGS.mlperf_keep_nccl_log):
     cmd += (r' && cp /tmp/pkb/cmd* {logdir}'

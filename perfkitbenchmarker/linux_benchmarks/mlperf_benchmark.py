@@ -99,14 +99,17 @@ flags.DEFINE_string('minigo_model_dir', '',
                     'will be copied from subdirectories of src_dir '
                     'corresponding to the board size.')
 RESNET_EPOCHS = flags.DEFINE_integer(
-    'mlperf_resnet_epochs', 37,
+    'mlperf_resnet_epochs', 10,
     'The Number of epochs to use for training ResNet.', lower_bound=4)
 MASK_ITERATION = flags.DEFINE_integer(
-    'mlperf_mask_iteration', 40000,
+    'mlperf_mask_iteration', 10,
     'The Number of iteration to use for training Mask R-CNN.', lower_bound=1)
 BERT_STEPS = flags.DEFINE_integer(
-    'mlperf_bert_steps', 7100,
+    'mlperf_bert_steps', 10,
     'The Number of steps to use for training BERT.', lower_bound=1)
+
+BERT_BATCH_SIZE = flags.DEFINE_integer(
+    'mlperf_bert_batch_size', 46, 'The batch size to use for training BERT.')
 
 RE_FLOAT = r'\d+\.\d+'
 
@@ -160,7 +163,7 @@ def _DownloadData(data_dir, data_path, vm):
           data_path=data_path))
 
 
-def Prepare(benchmark_spec, vm=None):
+def PrepareBenchmark(benchmark_spec, vm=None):
   """Install and set up MLPerf on the target vm.
 
   Args:
@@ -171,8 +174,7 @@ def Prepare(benchmark_spec, vm=None):
     errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  if vm is None:
-    vm = benchmark_spec.vms[0]
+  vm = vm or benchmark_spec.vms[0]
 
   if (bool(benchmark_spec.tpus) and nvidia_driver.CheckNvidiaGpuExists(vm)):
     raise errors.Config.InvalidValue(
@@ -186,6 +188,18 @@ def Prepare(benchmark_spec, vm=None):
       should_log=True)
   vm.Install('pip3')
 
+
+def PrepareRunner(benchmark_spec, vm=None):
+  """Install and set up MLPerf on the target vm.
+
+  Args:
+    benchmark_spec: The benchmark specification
+    vm: The VM to work on
+
+  Raises:
+    errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
+  """
+  vm = vm or benchmark_spec.vms[0]
   if benchmark_spec.tpus:
     if vm == benchmark_spec.vms[0]:
       storage_service = gcs.GoogleCloudStorageService()
@@ -414,6 +428,20 @@ def Prepare(benchmark_spec, vm=None):
           should_log=True)
       _DownloadData(benchmark_spec.bert_data_dir,
                     posixpath.join('/data', 'bert_data'), vm)
+
+
+def Prepare(benchmark_spec, vm=None):
+  """Install and set up MLPerf on the target vm.
+
+  Args:
+    benchmark_spec: The benchmark specification
+    vm: The VM to work on
+
+  Raises:
+    errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
+  """
+  PrepareBenchmark(benchmark_spec, vm)
+  PrepareRunner(benchmark_spec, vm)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -654,7 +682,7 @@ def Run(benchmark_spec):
             'CHECKPOINTDIR_PHASE1': '/data/bert_data/tf1_ckpt',
             'DGXNSOCKET': vm.CheckLsCpu().socket_count,
             'DGXSOCKETCORES': vm.CheckLsCpu().cores_per_socket,
-            'BATCHSIZE': 46,
+            'BATCHSIZE': BERT_BATCH_SIZE.value,
         }
     }
     env.update(envs[benchmark_spec.benchmark])
