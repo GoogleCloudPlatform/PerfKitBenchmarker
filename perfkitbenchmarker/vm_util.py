@@ -27,6 +27,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from typing import Callable, Dict, Iterable, Optional, Tuple
 
 from absl import flags
 import jinja2
@@ -300,10 +301,16 @@ def _ReadIssueCommandOutput(tf_out, tf_err):
   return stdout, stderr
 
 
-def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
-                 env=None, timeout=DEFAULT_TIMEOUT, cwd=None,
-                 raise_on_failure=True, suppress_failure=None,
-                 raise_on_timeout=True):
+def IssueCommand(
+    cmd: Iterable[str],
+    force_info_log: bool = False,
+    suppress_warning: bool = False,
+    env: Optional[Dict[str, str]] = None,
+    timeout: int = DEFAULT_TIMEOUT,
+    cwd: Optional[str] = None,
+    raise_on_failure: bool = True,
+    suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
+    raise_on_timeout: bool = True) -> Tuple[str, str, int]:
   """Tries running the provided command once.
 
   Args:
@@ -346,7 +353,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     logging.debug('Environment variables: %s', env)
 
   # Force conversion to string so you get a nice log statement before hitting a
-  # type error or NPE. subprocess will still catch it.
+  # type error or NPE.
   full_cmd = ' '.join(str(w) for w in cmd)
   logging.info('Running: %s', full_cmd)
 
@@ -363,14 +370,23 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
 
     cmd_to_use = cmd
     if should_time:
-      cmd_to_use = [time_file_path,
-                    '-o', tf_timing.name,
-                    '--quiet',
-                    '-f', ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '] + cmd
+      cmd_to_use = [
+          time_file_path, '-o', tf_timing.name, '--quiet', '-f',
+          ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '
+      ] + list(cmd)
 
-    process = subprocess.Popen(cmd_to_use, env=env, shell=shell_value,
-                               stdin=subprocess.PIPE, stdout=tf_out,
-                               stderr=tf_err, cwd=cwd)
+    try:
+      process = subprocess.Popen(cmd_to_use, env=env, shell=shell_value,
+                                 stdin=subprocess.PIPE, stdout=tf_out,
+                                 stderr=tf_err, cwd=cwd)
+    except TypeError as e:
+      # Only perform this validation after a type error, in case we are being
+      # too strict.
+      non_strings = [s for s in cmd if not isinstance(s, str)]
+      if non_strings:
+        raise ValueError(
+            f'Command {cmd} contains non-string elements {non_strings}.') from e
+      raise
 
     did_timeout = _BoxedObject(False)
     was_killed = _BoxedObject(False)
