@@ -67,10 +67,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     # vm_util.IssueCommand() is used here instead of util.GcloudCommand()
     # because gcloud flags cannot be appended to the command since they
     # are interpreted as docker args instead.
-    push_cmd = [
-        FLAGS.gcloud_path, '--project', self.project,
-        'docker', '--', 'push', full_tag
-    ]
+    push_cmd = ['docker', '--', 'push', full_tag]
     vm_util.IssueCommand(push_cmd)
 
   def RemoteBuild(self, image):
@@ -171,6 +168,9 @@ class GkeCluster(container_service.KubernetesCluster):
           self.vm_config.cpus, self.vm_config.memory_mib)
     else:
       cmd.flags['machine-type'] = self.vm_config.machine_type
+
+    if self.vm_config.network:
+      cmd.flags['network'] = self.vm_config.network.network_resource.name
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()

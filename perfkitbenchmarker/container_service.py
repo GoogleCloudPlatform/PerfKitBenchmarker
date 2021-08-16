@@ -507,11 +507,11 @@ class KubernetesContainer(BaseContainer):
 
     limits = []
     if self.cpus:
-      limits.extend('cpu=%sm' % (int(1000 * self.cpus)))
+      limits.append(f'cpu={int(1000 * self.cpus)}m')
     if self.memory:
-      limits.extend('memory=%sMi' % self.memory)
+      limits.append(f'memory={self.memory}Mi')
     if limits:
-      run_cmd.extend('--limits=%s' % ','.join(limits))
+      run_cmd.append('--limits=' + ','.join(limits))
 
     if self.command:
       run_cmd.extend(['--command', '--'])
@@ -571,11 +571,11 @@ class KubernetesContainerService(BaseContainerService):
 
     limits = []
     if self.cpus:
-      limits.extend('cpu=%sm' % (int(1000 * self.cpus)))
+      limits.append(f'cpu={int(1000 * self.cpus)}m')
     if self.memory:
-      limits.extend('memory=%sMi' % self.memory)
+      limits.append(f'memory={self.memory}Mi')
     if limits:
-      run_cmd.extend('--limits=%s' % ','.join(limits))
+      run_cmd.append('--limits=' + ','.join(limits))
 
     if self.command:
       run_cmd.extend(['--command', '--'])
