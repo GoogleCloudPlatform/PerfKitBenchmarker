@@ -162,8 +162,9 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             util,
             'IssueRetryableCommand'))
+    self.enter_context(mock.patch.object(test_instance, '_IsReady'))
 
-    test_instance._SetThroughput(5, 5)
+    test_instance.SetThroughput(5, 5)
 
     self.assertArgumentInCommand(cmd, '--table-name throughput_table')
     self.assertArgumentInCommand(cmd, '--region us-east-1')
@@ -247,7 +248,7 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             test_instance, '_GetThroughput', return_value=(rcu, wcu)))
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, '_SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
 
     test_instance._Freeze()
 
@@ -259,7 +260,7 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(
         mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, '_SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
 
     test_instance._Freeze()
 
@@ -270,7 +271,7 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     test_instance.rcu = 5000
     test_instance.wcu = 1000
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, '_SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
 
     test_instance._Restore()
 

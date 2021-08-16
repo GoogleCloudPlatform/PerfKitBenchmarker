@@ -27,6 +27,12 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
 
+_INITIAL_WRITES = flags.DEFINE_integer(
+    'aws_dynamodb_ycsb_provision_wcu', 10000,
+    'The provisioned WCU to use during the load phase.')
+flags.register_validator('aws_dynamodb_ycsb_provision_wcu',
+                         lambda wcu: wcu >= 1,
+                         message='WCU must be >=1 to load successfully.')
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'aws_dynamodb_ycsb'
@@ -106,8 +112,12 @@ def Run(benchmark_spec):
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS.ycsb_preload_threads
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  # More WCU results in a faster load stage.
+  benchmark_spec.dynamodb_instance.SetThroughput(wcu=_INITIAL_WRITES.value)
+  samples = list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
+  # Reset the WCU to the initial level.
+  benchmark_spec.dynamodb_instance.SetThroughput()
+  samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
   benchmark_metadata = {
       'ycsb_client_vms': len(vms),
   }

@@ -18,7 +18,7 @@ Tables can be created and deleted.
 
 import json
 import logging
-from typing import Any, Dict, Tuple, Sequence
+from typing import Any, Dict, Optional, Tuple, Sequence
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -271,8 +271,14 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
     }
 
-  def _SetThroughput(self, rcu: int, wcu: int) -> None:
+  def SetThroughput(self,
+                    rcu: Optional[int] = None,
+                    wcu: Optional[int] = None) -> None:
     """Updates the table's rcu and wcu."""
+    if not rcu:
+      rcu = self.rcu
+    if not wcu:
+      wcu = self.wcu
     cmd = util.AWS_PREFIX + [
         'dynamodb', 'update-table',
         '--table-name', self.table_name,
@@ -283,6 +289,8 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     logging.info('Setting %s table provisioned throughput to %s rcu and %s wcu',
                  self.table_name, rcu, wcu)
     util.IssueRetryableCommand(cmd)
+    while not self._IsReady():
+      continue
 
   def _GetThroughput(self) -> Tuple[int, int]:
     """Returns the current (rcu, wcu) of the table."""
@@ -340,11 +348,11 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     rcu, wcu = self._GetThroughput()
     if rcu > _FREE_TIER_RCU or wcu > _FREE_TIER_WCU:
       logging.info('(rcu=%s, wcu=%s) is higher than free tier.', rcu, wcu)
-      self._SetThroughput(rcu=_FREE_TIER_RCU, wcu=_FREE_TIER_WCU)
+      self.SetThroughput(rcu=_FREE_TIER_RCU, wcu=_FREE_TIER_WCU)
 
   def _Restore(self) -> None:
     """See base class.
 
     Restores provisioned throughput back to benchmarking levels.
     """
-    self._SetThroughput(self.rcu, self.wcu)
+    self.SetThroughput(self.rcu, self.wcu)
