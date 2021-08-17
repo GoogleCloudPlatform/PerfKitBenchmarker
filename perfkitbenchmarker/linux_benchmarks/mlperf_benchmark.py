@@ -98,13 +98,13 @@ flags.DEFINE_string('minigo_model_dir', '',
                     'will be copied from subdirectories of src_dir '
                     'corresponding to the board size.')
 RESNET_EPOCHS = flags.DEFINE_integer(
-    'mlperf_resnet_epochs', 10,
+    'mlperf_resnet_epochs', 48,
     'The Number of epochs to use for training ResNet.', lower_bound=4)
 MASK_ITERATION = flags.DEFINE_integer(
-    'mlperf_mask_iteration', 10,
+    'mlperf_mask_iteration', 40000,
     'The Number of iteration to use for training Mask R-CNN.', lower_bound=1)
 BERT_STEPS = flags.DEFINE_integer(
-    'mlperf_bert_steps', 10,
+    'mlperf_bert_steps', 7100,
     'The Number of steps to use for training BERT.', lower_bound=1)
 
 BERT_BATCH_SIZE = flags.DEFINE_integer(
