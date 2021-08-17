@@ -486,6 +486,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     before_start_timestamp = time.time()
     self._Start()
+    self._PostStart()
     self._WaitForSSH()
     start_duration_sec = time.time() - before_start_timestamp
     return start_duration_sec
@@ -494,6 +495,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   def _Start(self):
     """Provider-specific implementation of start command."""
     raise NotImplementedError()
+
+  def _PostStart(self):
+    """Provider-specific checks after start command."""
+    pass
 
   def Stop(self) -> float:
     """Stop the VM.
@@ -505,6 +510,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     before_stop_timestamp = time.time()
     self._Stop()
+    self._PostStop()
     stop_duration_sec = time.time() - before_stop_timestamp
     return stop_duration_sec
 
@@ -512,6 +518,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   def _Stop(self):
     """Provider-specific implementation of stop command."""
     raise NotImplementedError()
+
+  def _PostStop(self):
+    """Provider-specific checks after stop command."""
+    pass
 
   @abc.abstractmethod
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):

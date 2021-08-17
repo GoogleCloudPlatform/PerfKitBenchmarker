@@ -934,11 +934,72 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   #  _Start or _Stop not yet implemented for AWS
   def _Start(self):
     """Starts the VM."""
-    raise NotImplementedError()
+    if not self.id:
+      raise errors.Benchmarks.VmStateError(
+          'Expected VM id to be non-null. Please make sure the VM exists.')
+    start_cmd = util.AWS_PREFIX + [
+        'ec2', 'start-instances',
+        f'--region={self.region}',
+        f'--instance-ids={self.id}'
+    ]
+    vm_util.IssueCommand(start_cmd)
+
+  @vm_util.Retry(
+      poll_interval=0.5,
+      retryable_exceptions=(AwsTransitionalVmRetryableError,))
+  def _PostStart(self):
+    """Attempts to get new public ip after starting the VM.
+
+    Raises:
+      AwsTransitionalVmRetryableError: If VM is pending. This is retried.
+    """
+    status_cmd = util.AWS_PREFIX + [
+        'ec2', 'describe-instances',
+        f'--region={self.region}',
+        f'--instance-ids={self.id}'
+    ]
+    stdout, _, _ = vm_util.IssueCommand(status_cmd)
+    response = json.loads(stdout)
+    instance = response['Reservations'][0]['Instances'][0]
+    if 'PublicIpAddress' in instance:
+      self.ip_address = instance['PublicIpAddress']
+    else:
+      logging.info('VM is pending.')
+      raise AwsTransitionalVmRetryableError()
 
   def _Stop(self):
     """Stops the VM."""
-    raise NotImplementedError()
+    if not self.id:
+      raise errors.Benchmarks.VmStateError(
+          'Expected VM id to be non-null. Please make sure the VM exists.')
+    stop_cmd = util.AWS_PREFIX + [
+        'ec2', 'stop-instances',
+        f'--region={self.region}',
+        f'--instance-ids={self.id}'
+    ]
+    vm_util.IssueCommand(stop_cmd)
+
+  @vm_util.Retry(
+      poll_interval=0.5,
+      retryable_exceptions=(AwsTransitionalVmRetryableError,))
+  def _PostStop(self):
+    """Wait until VM has entered stopped stage.
+
+    Raises:
+      AwsTransitionalVmRetryableError: If VM is stopping. This is retried.
+    """
+    status_cmd = util.AWS_PREFIX + [
+        'ec2', 'describe-instance-status',
+        f'--region={self.region}',
+        f'--instance-ids={self.id}',
+        '--include-all-instances'
+    ]
+    stdout, _, _ = vm_util.IssueCommand(status_cmd, raise_on_failure=False)
+    response = json.loads(stdout)
+    status = response['InstanceStatuses'][0]['InstanceState']['Name']
+    if status.lower() != 'stopped':
+      logging.info('VM has status %s.', status)
+      raise AwsTransitionalVmRetryableError()
 
   def _UpdateInterruptibleVmStatusThroughApi(self):
     if hasattr(self, 'spot_instance_request_id'):
