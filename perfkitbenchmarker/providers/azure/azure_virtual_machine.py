@@ -216,7 +216,7 @@ class AzureNIC(resource.BaseResource):
                name,
                public_ip,
                accelerated_networking,
-               network_security_group,
+               network_security_group=None,
                private_ip=None):
     super(AzureNIC, self).__init__()
     self.subnet = subnet

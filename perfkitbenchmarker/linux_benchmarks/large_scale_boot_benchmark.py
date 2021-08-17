@@ -413,8 +413,12 @@ def Prepare(benchmark_spec):
         public_ip.Create()
         public_ip_name = public_ip.name
       nic = azure_virtual_machine.AzureNIC(
-          launcher_vms[0].network.subnet, nic_name_prefix + str(i),
-          public_ip_name, False, private_ip)
+          subnet=launcher_vms[0].network.subnet,
+          name=nic_name_prefix + str(i),
+          public_ip=public_ip_name,
+          accelerated_networking=False,
+          network_security_group=None,
+          private_ip=private_ip)
       nic.Create()
 
   vm_util.RunThreaded(
