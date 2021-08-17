@@ -25,9 +25,9 @@ class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self, resource_group_mock):
     super().setUp()
     FLAGS.run_uri = 'uri'
-    FLAGS.zones = [_REGION]
     resource_group_mock.return_value.args = ['mocked_args']
     self.client = mock.Mock()
+    self.client.zone = _REGION
     self.servicebus = azure_service_bus.AzureServiceBus(self.client)
 
   def _MockIssueCommand(self, return_value):

@@ -26,8 +26,8 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self, _):
     super().setUp()
     FLAGS.run_uri = 'uid'
-    FLAGS.zones = [_REGION]
     self.client = mock.Mock()
+    self.client.zone = _REGION
     self.sqs = aws_sqs.AwsSqs(self.client)
 
   def _MockIssueCommand(self, return_value):

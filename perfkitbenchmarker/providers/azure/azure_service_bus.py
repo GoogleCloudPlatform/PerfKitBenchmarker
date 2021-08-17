@@ -32,7 +32,7 @@ class AzureServiceBus(MessagingService):
   def __init__(self,
                client: virtual_machine.BaseVirtualMachine):
     super().__init__(client)
-    self.location = FLAGS.zones[0]
+    self.location = client.zone
     self.topic_name = 'pkb-topic-{0}'.format(FLAGS.run_uri)
     self.subscription_name = 'pkb-subscription-{0}'.format(FLAGS.run_uri)
     self.namespace_name = 'pkb-namespace-{0}'.format(FLAGS.run_uri)
@@ -204,4 +204,3 @@ class AzureServiceBus(MessagingService):
     self.delete_resource(self._delete_subscription, self._subscription_exists)
     self.delete_resource(self._delete_topic, self._topic_exists)
     self.delete_resource(self._delete_namespace, self._namespace_exists)
-

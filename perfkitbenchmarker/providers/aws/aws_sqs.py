@@ -28,7 +28,7 @@ class AwsSqs(MessagingService):
 
   def __init__(self, client: aws_virtual_machine.AwsVirtualMachine):
     super().__init__(client)
-    self.region = util.GetRegionFromZone(FLAGS.zones[0])
+    self.region = util.GetRegionFromZone(client.zone)
     self.queue_name = 'pkb-queue-{0}'.format(FLAGS.run_uri)
 
   def _get_queue(self) -> str:
