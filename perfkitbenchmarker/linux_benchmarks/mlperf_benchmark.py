@@ -110,7 +110,7 @@ BERT_STEPS = flags.DEFINE_integer(
 BERT_BATCH_SIZE = flags.DEFINE_integer(
     'mlperf_bert_batch_size', 46, 'The batch size to use for training BERT.')
 
-HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', False,
+HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', True,
                                  'enable or disable binding to hyperthreads')
 
 RE_FLOAT = r'\d+\.\d+'
