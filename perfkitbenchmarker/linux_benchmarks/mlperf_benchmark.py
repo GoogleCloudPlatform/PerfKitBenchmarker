@@ -110,6 +110,9 @@ BERT_STEPS = flags.DEFINE_integer(
 BERT_BATCH_SIZE = flags.DEFINE_integer(
     'mlperf_bert_batch_size', 46, 'The batch size to use for training BERT.')
 
+HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', False,
+                                 'enable or disable binding to hyperthreads')
+
 RE_FLOAT = r'\d+\.\d+'
 
 
@@ -186,6 +189,22 @@ def PrepareBenchmark(benchmark_spec, vm=None):
       'fi',
       should_log=True)
   vm.Install('pip3')
+  if not HYPERTHREADS.value:
+    if BERT in benchmark_spec.benchmark:
+      vm_util.ReplaceText(
+          vm, "'bind_pyt'", "'bind_pyt' '--no_hyperthreads'",
+          f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/bert/'
+          'implementations/pytorch/run_with_docker.sh')
+    elif MASK in benchmark_spec.benchmark:
+      vm_util.ReplaceText(
+          vm, "'bind_launch'", "'bind_launch' '--no_hyperthreads'",
+          f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/maskrcnn/'
+          'implementations/pytorch/run_and_time.sh')
+    elif RESNET in benchmark_spec.benchmark:
+      vm_util.ReplaceText(
+          vm, '--cpu=exclusive', '--cpu=exclusive,nosmt',
+          f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/resnet/'
+          'implementations/mxnet/run_and_time.sh')
 
 
 def PrepareRunner(benchmark_spec, vm=None):
@@ -344,31 +363,6 @@ def PrepareRunner(benchmark_spec, vm=None):
 
     vm.Install('nvidia_docker')
     vm.RemoteCommand('if [ ! -d "/data" ]; then sudo ln -s /scratch /data; fi')
-
-    # ompi_bind_DGX1.sh sets cpu affinity using numa control assuming there are
-    # 80 cpus.   if CPU cores is less than 80, need to update the numactrl
-    # commands to be within the range of available CPUs
-    if vm.num_cpus < 80:
-      if RESNET in benchmark_spec.benchmark:
-        run_script = f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/resnet/implementations/mxnet/ompi_bind_DGX1.sh'
-        step = int(vm.num_cpus / 8)
-        # create a range like 20-24 if root=24 and step=5
-        get_range = lambda root, step: f'{root * step}-{(root + 1) * step - 1}'
-        for i in range(8):
-          # Replace
-          # export OMPI_MCA_btl_openib_if_include=mlx5_1 exec numactl
-          # --physcpubind=15-19,55-59 --membind=0 "${@}"
-          # to
-          # export OMPI_MCA_btl_openib_if_include=mlx5_1 exec numactl
-          # --physcpubind=15-19 --membind=0 "${@}"
-          vm_util.ReplaceText(
-              vm,
-              f'physcpubind={get_range(i, 5)},{get_range(i + 8, 5)}',
-              f'physcpubind={get_range(i, step)}', run_script)
-      elif MASK in benchmark_spec.benchmark:
-        run_script = f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/run_and_time.sh'
-        vm_util.ReplaceText(
-            vm, 'bind_launch', 'bind_launch --no_hyperthreads', run_script)
 
     if RESNET in benchmark_spec.benchmark:
       run_script = f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/resnet/implementations/mxnet/run_and_time.sh'
@@ -689,6 +683,11 @@ def Run(benchmark_spec):
     run_script = posixpath.join(run_path, 'run_with_docker.sh')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     vm_util.ReplaceText(vm, 'docker exec -it', 'docker exec -t', run_script)
+    if FLAGS.cloud == 'Azure':
+      vm_util.ReplaceText(vm, 'nvidia-docker ', 'sudo nvidia-docker ',
+                          run_script)
+      vm_util.ReplaceText(vm, 'docker ', 'sudo docker ',
+                          run_script)
     if benchmark_spec.benchmark == MASK:
       vm_util.ReplaceText(vm, r'_cont_mounts=\(',
                           r'_cont_mounts=\(\"--volume=\${PKLDIR}:\/pkl_coco\" ',

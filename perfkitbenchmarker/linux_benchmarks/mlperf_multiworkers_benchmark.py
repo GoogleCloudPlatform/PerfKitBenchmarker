@@ -686,6 +686,9 @@ def _UpdateScripts(benchmark_spec, node_rank):
   run_sed += [(r'set -euxo pipefail',
                fr'set -euxo pipefail\nsource .\/{CONFIG}')]
 
+  run_sed += [(r'nvidia-docker ', r'sudo nvidia-docker ')]
+  run_sed += [('docker ', 'sudo docker ')]
+
   nccl_log_exports = (
       r'export NCCL_DEBUG=INFO \n'
       r'export NCCL_DEBUG_SUBSYS=ALL \n'
