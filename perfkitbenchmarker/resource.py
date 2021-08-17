@@ -84,6 +84,13 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     deleted: True if the resource has been deleted.
     user_managed: Whether Create() and Delete() should be skipped.
     frozen: Whether the resource is currently in a frozen state.
+    enable_freeze_restore: Whether the resource should use freeze/restore when
+      the option is specified on the command line. Different benchmarks may want
+      different resources to have freeze/restore enabled.
+    create_on_restore_error: Whether to create the resource if there is an issue
+      while restoring.
+    delete_on_freeze_error: Whether to delete the resource if there is an issue
+      while freezing.
     create_start_time: The start time of the last create.
     delete_start_time: The start time of the last delete.
     create_end_time: The end time of the last create.
@@ -104,12 +111,21 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
   # Time between retries.
   POLL_INTERVAL = 5
 
-  def __init__(self, user_managed=False):
+  def __init__(
+      self,
+      user_managed=False,
+      enable_freeze_restore=False,
+      create_on_restore_error=False,
+      delete_on_freeze_error=False,
+  ):
     super(BaseResource, self).__init__()
     self.created = user_managed
     self.deleted = user_managed
     self.user_managed = user_managed
     self.frozen: bool = False
+    self.enable_freeze_restore = enable_freeze_restore
+    self.create_on_restore_error = create_on_restore_error
+    self.delete_on_freeze_error = delete_on_freeze_error
 
     # Creation and deletion time information
     # that we may make use of later.
@@ -300,15 +316,12 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     self.frozen = False
     self.UpdateTimeout(FLAGS.timeout_minutes)
 
-  def Create(self,
-             restore: bool = False,
-             create_on_restore_failure: bool = False) -> None:
+  def Create(self, restore: bool = False) -> None:
     """Creates a resource and its dependencies.
 
     Args:
-      restore: Whether to restore the resource instead of creating.
-      create_on_restore_failure: If true, creates the resource if there is an
-        error while restoring.
+      restore: Whether to restore the resource instead of creating. If
+        enable_freeze_restore is false, this proceeds with creation.
 
     Raises:
       RestoreError: If there is an error while restoring.
@@ -325,15 +338,15 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     if self.user_managed:
       return
 
-    if restore:
+    if restore and self.enable_freeze_restore:
       try:
         self.Restore()
         return
       except errors.Resource.RestoreError:
         logging.exception(
             'Encountered an exception while attempting to Restore(). '
-            'Creating: %s', create_on_restore_failure)
-        if not create_on_restore_failure:
+            'Creating: %s', self.create_on_restore_error)
+        if not self.create_on_restore_error:
           raise
 
     self._CreateDependencies()
@@ -365,15 +378,12 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     self.frozen = True
     self.UpdateTimeout(FLAGS.persistent_timeout_minutes)
 
-  def Delete(self,
-             freeze: bool = False,
-             delete_on_freeze_error: bool = False) -> None:
+  def Delete(self, freeze: bool = False) -> None:
     """Deletes a resource and its dependencies.
 
     Args:
-      freeze: Whether to freeze the resource instead of deleting.
-      delete_on_freeze_error: If true, deletes the resource if there is an error
-        while freezing.
+      freeze: Whether to freeze the resource instead of deleting. If
+        enable_freeze_restore is false, this proceeds with deletion.
 
     Raises:
       FreezeError: If there is an error while freezing.
@@ -381,15 +391,15 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     if self.user_managed:
       return
 
-    if freeze:
+    if freeze and self.enable_freeze_restore:
       try:
         self.Freeze()
         return
       except errors.Resource.FreezeError:
         logging.exception(
             'Encountered an exception while attempting to Freeze(). '
-            'Deleting: %s', delete_on_freeze_error)
-        if not delete_on_freeze_error:
+            'Deleting: %s', self.delete_on_freeze_error)
+        if not self.delete_on_freeze_error:
           raise
 
     self._PreDelete()

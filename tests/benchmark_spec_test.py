@@ -13,9 +13,11 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
+import inspect
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -112,16 +114,6 @@ edw_benchmark:
       vm_spec: *default_single_core
 """
 
-_SIMPLE_SPANNER_CONFIG = """
-cloud_spanner_ycsb:
-  description: Sample spanner ycsb benchmark
-  spanner:
-    service_type: default
-  vm_groups:
-    client:
-      vm_spec: *default_single_core
-"""
-
 
 class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -133,17 +125,6 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
 
-class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
-
-  def testSimpleConfig(self):
-    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        yaml_string=_SIMPLE_SPANNER_CONFIG, benchmark_name='cloud_spanner_ycsb')
-    spec.ConstructSpanner()
-    self.assertEqual('default', spec.spanner.SERVICE_TYPE)
-    self.assertIsInstance(spec.spanner,
-                          gcp_spanner.GcpSpannerInstance)
-
-
 class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
 
   def testSimpleConfig(self):
@@ -152,6 +133,49 @@ class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
     spec.ConstructEdwService()
     self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)
     self.assertIsInstance(spec.edw_service, providers.aws.snowflake.Snowflake)
+
+
+class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
+
+  def setUp(self):
+    super().setUp()
+    test_spec = inspect.cleandoc("""
+    cloud_spanner_ycsb:
+      description: Sample spanner benchmark
+      spanner:
+        service_type: default
+        enable_freeze_restore: True
+        delete_on_freeze_error: True
+        create_on_restore_error: True
+    """)
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb')
+
+  def testInitialization(self):
+    self.test_bm_spec.ConstructSpanner()
+    spanner_instance = self.test_bm_spec.spanner
+    self.assertIsInstance(spanner_instance, gcp_spanner.GcpSpannerInstance)
+    self.assertEqual(spanner_instance.SERVICE_TYPE, 'default')
+    self.assertTrue(spanner_instance.enable_freeze_restore)
+    self.assertTrue(spanner_instance.delete_on_freeze_error)
+    self.assertTrue(spanner_instance.create_on_restore_error)
+
+  @flagsaver.flagsaver
+  def testRestoreInstanceCopiedFromPreviousSpec(self):
+    restore_spanner_spec = inspect.cleandoc("""
+    cloud_spanner_ycsb:
+      spanner:
+        name: restore_spanner
+        service_type: default
+    """)
+    # Set up the restore spec Spanner instance
+    self.test_bm_spec.restore_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=restore_spanner_spec, benchmark_name='cloud_spanner_ycsb')
+    self.test_bm_spec.restore_spec.ConstructSpanner()
+
+    self.test_bm_spec.ConstructSpanner()
+
+    self.assertEqual(self.test_bm_spec.spanner.name, 'restore_spanner')
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):

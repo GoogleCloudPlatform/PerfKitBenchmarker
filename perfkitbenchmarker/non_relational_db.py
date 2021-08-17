@@ -17,6 +17,7 @@ from typing import Dict, Optional
 
 from absl import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
@@ -27,7 +28,7 @@ DYNAMODB = 'dynamodb'
 FLAGS = flags.FLAGS
 
 
-class BaseNonRelationalDbSpec(spec.BaseSpec):
+class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   """Configurable options of a nonrelational database service."""
 
   # Needed for registering the spec class and its subclasses. See BaseSpec.

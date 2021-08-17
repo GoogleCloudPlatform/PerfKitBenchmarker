@@ -16,13 +16,14 @@
 Instances can be created and deleted.
 """
 
+import dataclasses
 import json
 import logging
 from typing import Dict, Optional
 
 from absl import flags
-import dataclasses
 from perfkitbenchmarker import resource
+from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
@@ -59,7 +60,7 @@ _NONE_OK = {'default': None, 'none_ok': True}
 
 
 @dataclasses.dataclass
-class SpannerSpec(spec.BaseSpec):
+class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
   """Configurable options of a Spanner instance."""
 
   # Needed for registering the spec class.
@@ -201,7 +202,10 @@ class GcpSpannerInstance(resource.BaseResource):
         ddl=spanner_spec.ddl,
         config=spanner_spec.config,
         nodes=spanner_spec.nodes,
-        project=spanner_spec.project)
+        project=spanner_spec.project,
+        enable_freeze_restore=spanner_spec.enable_freeze_restore,
+        create_on_restore_error=spanner_spec.create_on_restore_error,
+        delete_on_freeze_error=spanner_spec.delete_on_freeze_error)
 
   def _Create(self):
     """Creates the instance, the database, and update the schema."""

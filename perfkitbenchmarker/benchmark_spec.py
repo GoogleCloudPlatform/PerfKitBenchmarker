@@ -48,6 +48,7 @@ from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
+from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 import six
 from six.moves import range
@@ -198,6 +199,30 @@ class BenchmarkSpec(object):
     with self.config.RedirectFlags(FLAGS):
       yield
 
+  def _InitializeFromSpec(
+      self, attribute_name: str,
+      resource_spec: freeze_restore_spec.FreezeRestoreSpec) -> bool:
+    """Initializes the BenchmarkSpec attribute from the restore_spec.
+
+    Args:
+      attribute_name: The attribute to restore.
+      resource_spec: The spec class corresponding to the resource to be
+        restored.
+
+    Returns:
+      True if successful, False otherwise.
+    """
+    if not hasattr(self, 'restore_spec'):
+      return False
+    if not self.restore_spec or not hasattr(self.restore_spec, attribute_name):
+      return False
+    if not resource_spec.enable_freeze_restore:
+      return False
+    logging.info('Getting %s instance from restore_spec', attribute_name)
+    frozen_resource = copy.copy(getattr(self.restore_spec, attribute_name))
+    setattr(self, attribute_name, frozen_resource)
+    return True
+
   def ConstructContainerCluster(self):
     """Create the container cluster."""
     if self.config.container_cluster is None:
@@ -267,15 +292,14 @@ class BenchmarkSpec(object):
     self.relational_db = relational_db_class(self.config.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:
-    """Creates the non_relational db."""
+    """Initializes the non_relational db."""
     db_spec: non_relational_db.BaseNonRelationalDbSpec = self.config.non_relational_db
     if not db_spec:
       return
-    if self.restore_spec:
-      logging.info('Getting non_relational_db instance from restore_spec: %s.',
-                   self.restore_spec.non_relational_db)
-      self.non_relational_db = copy.copy(self.restore_spec.non_relational_db)
+    # Initialization from restore spec
+    if self._InitializeFromSpec('non_relational_db', db_spec):
       return
+    # Initialization from benchmark config spec
     logging.info('Constructing non_relational_db instance with spec: %s.',
                  db_spec)
     service_type = db_spec.service_type
@@ -284,15 +308,14 @@ class BenchmarkSpec(object):
     self.non_relational_db = non_relational_db_class.FromSpec(db_spec)
 
   def ConstructSpanner(self) -> None:
-    """Creates the spanner instance."""
+    """Initializes the spanner instance."""
     spanner_spec: gcp_spanner.SpannerSpec = self.config.spanner
     if not spanner_spec:
       return
-    if self.restore_spec:
-      logging.info('Getting spanner instance from restore_spec: %s.',
-                   self.restore_spec.spanner)
-      self.spanner = copy.copy(self.restore_spec.spanner)
+    # Initialization from restore spec
+    if self._InitializeFromSpec('spanner', spanner_spec):
       return
+    # Initialization from benchmark config spec
     logging.info('Constructing spanner instance with spec: %s.', spanner_spec)
     spanner_class = gcp_spanner.GetSpannerClass(spanner_spec.service_type)
     self.spanner = spanner_class.FromSpec(spanner_spec)

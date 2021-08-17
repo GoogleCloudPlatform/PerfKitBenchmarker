@@ -49,6 +49,7 @@ cloud_spanner_ycsb:
     service_type: {gcp_spanner.DEFAULT_SPANNER_TYPE}
     nodes: 1
     description: {BENCHMARK_DESCRIPTION}
+    enable_freeze_restore: True
   flags:
     gcloud_scopes: >
       {' '.join(REQUIRED_SCOPES)}"""
