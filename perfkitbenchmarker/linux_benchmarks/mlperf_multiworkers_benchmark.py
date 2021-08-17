@@ -42,20 +42,18 @@ mlperf_multiworkers:
       disk_spec: *default_500_gb
       vm_spec:
         GCP:
-          machine_type: n1-highmem-96
-          zone: us-west1-b
-          boot_disk_size: 110
-          gpu_type: v100
-          gpu_count: 8
+          machine_type: a2-highgpu-8g
+          zone: us-central1-b
+          boot_disk_size: 200
         AWS:
-          machine_type: p3dn.24xlarge
+          machine_type: p4d.24xlarge
           zone: us-west-2a
-          boot_disk_size: 110
-          image: ami-08c6f8e3871c56139
+          boot_disk_size: 200
+          image: ami-0ccc71d716eb5d6a4
         Azure:
-          machine_type: Standard_ND40rs_v2
+          machine_type: Standard_ND96asr_v4
           zone: westus2
-          boot_disk_size: 110
+          boot_disk_size: 200
           image: microsoft-dsvm:ubuntu-hpc:1804:latest
       vm_count: null
 """

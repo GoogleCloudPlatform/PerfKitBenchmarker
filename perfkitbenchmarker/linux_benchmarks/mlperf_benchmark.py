@@ -42,17 +42,16 @@ mlperf:
         GCP:
           machine_type: a2-highgpu-8g
           zone: us-central1-b
-          boot_disk_size: 105
-          boot_disk_type: pd-ssd
+          boot_disk_size: 200
         AWS:
           machine_type: p4d.24xlarge
           zone: us-west-2a
-          boot_disk_size: 105
-          image: ami-0a4a0d42e3b855a2c
+          boot_disk_size: 200
+          image: ami-0ccc71d716eb5d6a4
         Azure:
           machine_type: Standard_ND96asr_v4
           zone: westus2
-          boot_disk_size: 105
+          boot_disk_size: 200
           image: microsoft-dsvm:ubuntu-hpc:1804:latest
 """
 
