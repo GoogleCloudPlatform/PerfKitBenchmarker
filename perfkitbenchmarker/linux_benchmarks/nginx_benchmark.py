@@ -49,6 +49,11 @@ flags.DEFINE_string('nginx_client_machine_type', None,
 flags.DEFINE_string('nginx_server_machine_type', None,
                     'Machine type to use for the nginx server if different '
                     'from wrk2 client machine type.')
+flags.DEFINE_boolean('nginx_use_ssl', False,
+                     'Use HTTPs when connecting to nginx.')
+flags.DEFINE_integer('nginx_worker_connections', 1024,
+                     'The maximum number of simultaneous connections that can '
+                     'be opened by a worker process.')
 
 
 def _ValidateLoadConfigs(load_configs):
@@ -101,6 +106,34 @@ def GetConfig(user_config):
   return config
 
 
+def _ConfigureNginxForSsl(server):
+  """Configures an nginx server for SSL/TLS."""
+  server.RemoteCommand('sudo mkdir -p /etc/nginx/ssl')
+  # Enable TLS/SSL with:
+  # - ECDHE for key exchange
+  # - ECDSA for authentication
+  # - AES256-GCM for bulk encryption
+  # - SHA384 for message authentication
+  server.RemoteCommand('sudo openssl req -x509 -nodes -days 365 -newkey ec '
+                       '-subj "/CN=localhost" '
+                       '-pkeyopt ec_paramgen_curve:secp384r1 '
+                       '-keyout /etc/nginx/ssl/ecdsa.key '
+                       '-out /etc/nginx/ssl/ecdsa.crt')
+  server.RemoteCommand(
+      r"sudo sed -i 's|# \(listen 443 ssl .*\)|\1|g' "
+      r"/etc/nginx/sites-enabled/default")
+  server.RemoteCommand(
+      r"sudo sed -i 's|# \(listen \[::\]:443 ssl .*\)|\1|g' "
+      r"/etc/nginx/sites-enabled/default")
+  server.RemoteCommand(
+      r"sudo sed -i 's|\(\s*\)\(listen \[::\]:443 ssl .*;\)|"
+      r"\1\2\n"
+      r"\1ssl_certificate /etc/nginx/ssl/ecdsa.crt;\n"
+      r"\1ssl_certificate_key /etc/nginx/ssl/ecdsa.key;\n"
+      r"\1ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384;|g' "
+      r"/etc/nginx/sites-enabled/default")
+
+
 def _ConfigureNginx(server):
   """Configures nginx server."""
   content_path = '/var/www/html/random_content'
@@ -113,8 +146,23 @@ def _ConfigureNginx(server):
   else:
     # disable logging, nginx logs every request by default.
     server.RemoteCommand(
-        'sudo sed -i \'s|access_log .*|access_log /dev/null;|g\' '
-        '/etc/nginx/nginx.conf')
+        r"sudo sed -i 's|access_log .*|access_log /dev/null;|g' "
+        r"/etc/nginx/nginx.conf")
+    # Add some optimizations to the Nginx stack to improve throughput.
+    # This is based off https://www.nginx.com/blog/tuning-nginx/
+    # Increase worker_connections from to 1024 (default 768)
+    server.RemoteCommand(
+        r"sudo sed -i 's|worker_connections .*|worker_connections %s;|g' "
+        r"/etc/nginx/nginx.conf" % FLAGS.nginx_worker_connections)
+    # Increase keepalive_requests to a large value (default 1000)
+    server.RemoteCommand(
+        r"sudo sed -i 's|\(\s*\)keepalive_timeout .*|"
+        r"\1keepalive_timeout 75;\n\1keepalive_requests 1000000000;|g' "
+        r"/etc/nginx/nginx.conf")
+
+  if FLAGS.nginx_use_ssl:
+    _ConfigureNginxForSsl(server)
+
   server.RemoteCommand('sudo service nginx restart')
 
 
@@ -173,6 +221,8 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
       'duration': duration,
       'target_rate': rate * num_clients,
       'nginx_throttle': FLAGS.nginx_throttle,
+      'nginx_worker_connections': FLAGS.nginx_worker_connections,
+      'nginx_use_ssl': FLAGS.nginx_use_ssl
   }
   results += [
       sample.Sample('achieved_rate', requests / duration, '', metadata),
@@ -196,7 +246,8 @@ def Run(benchmark_spec):
   """
   clients = benchmark_spec.vm_groups['clients']
   results = []
-  target = 'http://%s/random_content' % benchmark_spec.nginx_endpoint_ip
+  scheme = 'https' if FLAGS.nginx_use_ssl else 'http'
+  target = f'{scheme}://{benchmark_spec.nginx_endpoint_ip}/random_content'
 
   if FLAGS.nginx_throttle:
     return _RunMultiClient(
