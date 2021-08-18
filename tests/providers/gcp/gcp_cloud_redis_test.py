@@ -85,7 +85,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.TimeSeries([0, 0]),
         self.TimeSeries([3, 3])
     ])
-    self.assertEqual(avg_cpu, 6)
+    self.assertEqual(avg_cpu, 0.1)
 
   def testParseMonitoringTimeSeriesMedium(self):
     avg_cpu = self.redis._ParseMonitoringTimeSeries([
@@ -94,16 +94,16 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.TimeSeries([0, 0, 0, 0]),
         self.TimeSeries([3.91, 3.11, 4.00, 1.65])
     ])
-    self.assertEqual(avg_cpu, 9.6375)
+    self.assertEqual(avg_cpu, 0.160625)
 
   def testParseMonitoringTimeSeriesLong(self):
     avg_cpu = self.redis._ParseMonitoringTimeSeries([
-        self.TimeSeries([12, 32, 62, 51, 12, 103, 54, 91]),
+        self.TimeSeries([12, 32, 62, 51, 12, 103, 54, 85]),
         self.TimeSeries([81, 32, 84, 91, 25, 62, 31, 1]),
-        self.TimeSeries([12, 93, 109, 73, 32, 58, 18, 10]),
+        self.TimeSeries([12, 93, 101, 70, 32, 58, 18, 10]),
         self.TimeSeries([77, 34, 29, 83, 11, 8, 38, 68])
     ])
-    self.assertEqual(avg_cpu, 197.125)
+    self.assertEqual(avg_cpu, 3.25)
 
 
 if __name__ == '__main__':

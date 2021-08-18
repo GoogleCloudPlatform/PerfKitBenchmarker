@@ -42,7 +42,7 @@ def GetConfig(user_config):
   # TODO(user) Remove version from config and make it a flag only
   if FLAGS['managed_memory_store_version'].present:
     config['cloud_redis']['redis_version'] = FLAGS.managed_memory_store_version
-  if FLAGS['memtier_measure_cpu_latency']:
+  if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
     config['vm_groups']['clients']['vm_count'] += 1
   return config
 
@@ -101,7 +101,7 @@ def Run(benchmark_spec):
   """
   memtier_vms = benchmark_spec.vm_groups['clients']
   samples = []
-  if FLAGS.memtier_measure_cpu_latency == memtier.MemtierMode.MEASURE_CPU_LATENCY:
+  if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
     samples = memtier.RunGetLatencyAtCpu(benchmark_spec.cloud_redis_instance,
                                          memtier_vms)
   else:

@@ -72,7 +72,7 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual([], cloud_redis_memtier_benchmark.Run(benchmark_spec))
 
   def testRunLatencyAtGivenCpu(self):
-    FLAGS.memtier_measure_cpu_latency = memtier.MemtierMode.MEASURE_CPU_LATENCY
+    FLAGS.memtier_run_mode = memtier.MemtierMode.MEASURE_CPU_LATENCY
     client_vm = mock.Mock()
     measure_latency_vm = mock.Mock()
     benchmark_spec = mock.Mock()

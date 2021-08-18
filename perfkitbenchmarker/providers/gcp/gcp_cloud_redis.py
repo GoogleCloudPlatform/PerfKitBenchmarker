@@ -145,7 +145,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self._port = json.loads(stdout)['port']
 
   def MeasureCpuUtilization(self, interval_length):
-    """Measure the average CPU utilization on GCP instance."""
+    """Measure the average CPU utilization on GCP instance in percentage."""
     now = time.time()
     seconds = int(now)
     interval = TimeInterval()
@@ -167,7 +167,19 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     return self._ParseMonitoringTimeSeries(time_series)
 
   def _ParseMonitoringTimeSeries(self, time_series):
-    """Parses time series data and returns average CPU across intervals."""
+    """Parses time series data and returns average CPU across intervals in %.
+
+    For example, an interval of 3 minutes would be represented as [x, y, z],
+    where x, y, and z are cpu seconds.
+    average CPU usage per minute in cpu seconds = (x + y + z) / 3
+    average cpu usage in percentage = [(x + y + z) / 3] / 60
+
+    Args:
+      time_series: time series of cpu seconds returned by monitoring.
+
+    Returns:
+      Percentage CPU use.
+    """
     intervals = []
     # For each of the four types of load, sum the CPU across all intervals
     for i, time_interval in enumerate(time_series):
@@ -178,8 +190,11 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
           intervals[j] += interval.value.double_value
 
     if intervals:
-      # Average over all intervals captured
-      return sum(intervals) / len(intervals)
+      # Average over all minute intervals captured
+      averaged = sum(intervals) / len(intervals)
+      # averaged is in the unit of cpu seconds per minute.
+      # So divide by 60sec in 1 min to get a percentage usage over the minute.
+      return averaged / 60
     return None
 
   def GetInstanceSize(self):

@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing memtier installation and cleanup functions."""
+"""Module containing memtier installation, utilization and cleanup functions."""
 
+import dataclasses
 import json
 import logging
 import pathlib
@@ -21,12 +22,11 @@ import time
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
-import dataclasses
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.15'
@@ -50,22 +50,22 @@ FLAGS = flags.FLAGS
 
 
 class MemtierMode(object):
-  """Enum of options for --memtier_measure_cpu_latency."""
+  """Enum of options for --memtier_run_mode."""
   MEASURE_CPU_LATENCY = 'MEASURE_CPU_LATENCY'
   NORMAL_RUN = 'NORMAL_RUN'
   ALL = (MEASURE_CPU_LATENCY, NORMAL_RUN)
 
 
-flags.DEFINE_enum(
+MEMTIER_PROTOCOL = flags.DEFINE_enum(
     'memtier_protocol', 'memcache_binary',
     ['memcache_binary', 'redis', 'memcache_text'],
     'Protocol to use. Supported protocols are redis, '
     'memcache_text, and memcache_binary. '
     'Defaults to memcache_binary.')
-flags.DEFINE_integer(
+MEMTIER_RUN_COUNT = flags.DEFINE_integer(
     'memtier_run_count', 1, 'Number of full-test iterations to perform. '
     'Defaults to 1.')
-flags.DEFINE_integer(
+MEMTIER_RUN_DURATION = flags.DEFINE_integer(
     'memtier_run_duration', None, 'Mutually exclusive with memtier_requests.'
     'Duration for each client count in seconds. '
     'By default, test length is set '
@@ -75,7 +75,7 @@ flags.DEFINE_integer(
     'once run_duration is passed. '
     'Total test duration = run_duration * runs * '
     'len(memtier_clients).')
-flags.DEFINE_integer(
+MEMTIER_REQUESTS = flags.DEFINE_integer(
     'memtier_requests', 10000, 'Mutually exclusive with memtier_run_duration. '
     'Number of total requests per client. Defaults to 10000.')
 flag_util.DEFINE_integerlist(
@@ -83,42 +83,36 @@ flag_util.DEFINE_integerlist(
     'Comma separated list of number of clients per thread. '
     'Specify more than 1 value to vary the number of clients. '
     'Defaults to [50].')
-flag_util.DEFINE_integerlist('memtier_threads', [4],
-                             'Number of threads. Defaults to 4.')
-flags.DEFINE_integer(
-    'memtier_ratio', 9,
-    'Set:Get ratio. Defaults to 9x Get versus Sets (9 Gets to '
-    '1 Set in 10 total requests).')
-flags.DEFINE_integer('memtier_data_size', 32,
-                     'Object data size. Defaults to 32 bytes.')
-flags.DEFINE_string(
+flag_util.DEFINE_integerlist(
+    'memtier_threads', [4], 'Number of threads. Defaults to 4.')
+MEMTIER_RATIO = flags.DEFINE_string(
+    'memtier_ratio', '1:9', 'Set:Get ratio. Defaults to 1:9 Sets:Gets.')
+MEMTIER_DATA_SIZE = flags.DEFINE_integer(
+    'memtier_data_size', 32, 'Object data size. Defaults to 32 bytes.')
+MEMTIER_KEY_PATTERN = flags.DEFINE_string(
     'memtier_key_pattern', 'R:R',
     'Set:Get key pattern. G for Gaussian distribution, R for '
     'uniform Random, S for Sequential. Defaults to R:R.')
-flags.DEFINE_integer(
+MEMTIER_KEY_MAXIMUM = flags.DEFINE_integer(
     'memtier_key_maximum', 10000000, 'Key ID maximum value. The range of keys '
     'will be from 1 (min) to this specified max key value.')
-flags.DEFINE_integer(
-    'memtier_load_key_maximum', None,
-    'Key ID maximum value for the preload step. The range of keys '
-    'will be from 1 (min) to this specified max key value.')
-flags.DEFINE_enum(
-    'memtier_measure_cpu_latency', MemtierMode.NORMAL_RUN, MemtierMode.ALL,
+MEMTIER_RUN_MODE = flags.DEFINE_enum(
+    'memtier_run_mode', MemtierMode.NORMAL_RUN, MemtierMode.ALL,
     'Mode that the benchmark is set to. NORMAL_RUN measures latency and '
     'throughput, MEASURE_CPU_LATENCY measures single threaded latency at '
-    'memtier_cpu_utilization_target. When measuring CPU latency flags for '
+    'memtier_cpu_target. When measuring CPU latency flags for '
     'clients, threads, and pipelines are ignored and '
-    'memtier_cpu_utilization_target and memtier_cpu_interval_length must not '
+    'memtier_cpu_target and memtier_cpu_duration must not '
     'be None.')
-flags.DEFINE_float(
-    'memtier_cpu_utilization_target', 0.5,
+MEMTIER_CPU_TARGET = flags.DEFINE_float(
+    'memtier_cpu_target', 0.5,
     'The target CPU utilization when running memtier and trying to get the '
     'latency at variable CPU metric. The target can range from 1%-100% and '
     'represents the percent CPU utilization (e.g. 0.5 -> 50% CPU utilization)')
-flags.DEFINE_integer(
-    'memtier_cpu_interval_length', 300, 'Number of seconds worth of data taken '
+MEMTIER_CPU_DURATION = flags.DEFINE_integer(
+    'memtier_cpu_duration', 300, 'Number of seconds worth of data taken '
     'to measure the CPU utilization of an instance. When MEASURE_CPU_LATENCY '
-    'mode is on, memtier_run_duration is set to memtier_cpu_interval_target '
+    'mode is on, memtier_run_duration is set to memtier_cpu_duration '
     '+ WARM_UP_SECONDS.')
 flag_util.DEFINE_integerlist(
     'memtier_pipeline', [1],
@@ -222,28 +216,23 @@ def BuildMemtierCommand(
   return ' '.join(cmd)
 
 
-def Load(client_vm, server_ip, server_port, server_password=None):
+def Load(client_vm,
+         server_ip: str,
+         server_port: str,
+         server_password: Optional[str] = None) -> None:
   """Preload the server with data."""
-
-  # Load key max has to be at least memtier_key_maximum in order to avoid cache
-  # misses
-  key_max = None
-  if FLAGS.memtier_load_key_maximum:
-    key_max = max(FLAGS.memtier_load_key_maximum, FLAGS.memtier_key_maximum)
-  else:
-    key_max = FLAGS.memtier_key_maximum
 
   cmd = BuildMemtierCommand(
       server=server_ip,
       port=server_port,
-      protocol=FLAGS.memtier_protocol,
+      protocol=MEMTIER_PROTOCOL.value,
       clients=1,
       threads=1,
       ratio=_WRITE_ONLY,
-      data_size=FLAGS.memtier_data_size,
+      data_size=MEMTIER_DATA_SIZE.value,
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=1,
-      key_maximum=key_max,
+      key_maximum=MEMTIER_KEY_MAXIMUM.value,
       requests='allkeys',
       password=server_password)
   client_vm.RemoteCommand(cmd)
@@ -299,7 +288,7 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
 
   # Implement modified binary search to find optimal client count +/- tolerance
   # of target CPU usage
-  target = FLAGS.memtier_cpu_utilization_target
+  target = MEMTIER_CPU_TARGET.value
 
   # Larger clusters need two threads to get to maximum CPU
   threads = 1 if cloud_instance.GetInstanceSize() < 150 or target < 0.5 else 2
@@ -320,13 +309,12 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
         clients=current_clients,
         password=password)
 
-    cpu_util = cloud_instance.MeasureCpuUtilization(
-        FLAGS.memtier_cpu_interval_length)
+    cpu_percent = cloud_instance.MeasureCpuUtilization(
+        MEMTIER_CPU_DURATION.value)
 
-    if not cpu_util:
+    if not cpu_percent:
       raise errors.Benchmarks.RunError(
           'Could not measure CPU utilization for the instance.')
-    cpu_percent = cpu_util / 60
     logging.info(
         'Tried %s clients and got %s%% CPU utilization for the last run with '
         'the target CPU being %s%%', current_clients, cpu_percent, target)
@@ -350,7 +338,7 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
       metadata = GetMetadata(
           clients=current_clients, threads=threads, pipeline=pipeline)
       metadata['measured_cpu_percent'] = cloud_instance.MeasureCpuUtilization(
-          FLAGS.memtier_cpu_interval_length) / 60
+          MEMTIER_CPU_DURATION.value)
       samples.extend(results[1].GetSamples(metadata))
       return samples
 
@@ -361,7 +349,8 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
       'this configuration and CPU utilization.')
 
 
-def _GetSingleThreadedLatency(client_vm, server_ip, server_port, password):
+def _GetSingleThreadedLatency(client_vm, server_ip: str, server_port: str,
+                              password: str) -> 'MemtierResult':
   """Wait for background run to stabilize then send single threaded request."""
   time.sleep(300)
   return _Run(
@@ -382,25 +371,27 @@ def _Run(vm,
          clients: int,
          password: Optional[str] = None) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
-  memtier_ratio = '1:{0}'.format(FLAGS.memtier_ratio)
   vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
   # Specify one of run requests or run duration.
   requests = (
-      FLAGS.memtier_requests if FLAGS.memtier_run_duration is None else None)
-  test_time = FLAGS.memtier_run_duration if FLAGS.memtier_measure_cpu_latency == MemtierMode.NORMAL_RUN else WARM_UP_SECONDS + FLAGS.memtier_cpu_interval_length
+      MEMTIER_REQUESTS.value if MEMTIER_RUN_DURATION.value is None else None)
+  test_time = (
+      MEMTIER_RUN_DURATION.value
+      if MEMTIER_RUN_MODE.value == MemtierMode.NORMAL_RUN else WARM_UP_SECONDS +
+      MEMTIER_CPU_DURATION.value)
   cmd = BuildMemtierCommand(
       server=server_ip,
       port=server_port,
-      protocol=FLAGS.memtier_protocol,
-      run_count=FLAGS.memtier_run_count,
+      protocol=MEMTIER_PROTOCOL.value,
+      run_count=MEMTIER_RUN_COUNT.value,
       clients=clients,
       threads=threads,
-      ratio=memtier_ratio,
-      data_size=FLAGS.memtier_data_size,
-      key_pattern=FLAGS.memtier_key_pattern,
+      ratio=MEMTIER_RATIO.value,
+      data_size=MEMTIER_DATA_SIZE.value,
+      key_pattern=MEMTIER_KEY_PATTERN.value,
       pipeline=pipeline,
       key_minimum=1,
-      key_maximum=FLAGS.memtier_key_maximum,
+      key_maximum=MEMTIER_KEY_MAXIMUM.value,
       random_data=True,
       test_time=test_time,
       requests=requests,
@@ -415,25 +406,24 @@ def _Run(vm,
 def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
   """Metadata for memtier test."""
   meta = {
-      'memtier_protocol': FLAGS.memtier_protocol,
-      'memtier_run_count': FLAGS.memtier_run_count,
-      'memtier_requests': FLAGS.memtier_requests,
+      'memtier_protocol': MEMTIER_PROTOCOL.value,
+      'memtier_run_count': MEMTIER_RUN_COUNT.value,
+      'memtier_requests': MEMTIER_REQUESTS.value,
       'memtier_threads': threads,
       'memtier_clients': clients,
-      'memtier_ratio': FLAGS.memtier_ratio,
-      'memtier_key_maximum': FLAGS.memtier_key_maximum,
-      'memtier_data_size': FLAGS.memtier_data_size,
-      'memtier_key_pattern': FLAGS.memtier_key_pattern,
+      'memtier_ratio': MEMTIER_RATIO.value,
+      'memtier_key_maximum': MEMTIER_KEY_MAXIMUM.value,
+      'memtier_data_size': MEMTIER_DATA_SIZE.value,
+      'memtier_key_pattern': MEMTIER_KEY_PATTERN.value,
       'memtier_pipeline': pipeline,
       'memtier_version': GIT_TAG,
-      'memtier_measure_cpu_latency': FLAGS.memtier_measure_cpu_latency,
+      'memtier_run_mode': MEMTIER_RUN_MODE.value,
   }
-  if FLAGS.memtier_run_duration:
-    meta['memtier_run_duration'] = FLAGS.memtier_run_duration
-  if FLAGS.memtier_measure_cpu_latency == MemtierMode.MEASURE_CPU_LATENCY:
-    meta[
-        'memtier_cpu_utilization_target'] = FLAGS.memtier_cpu_utilization_target
-    meta['memtier_cpu_interval_length'] = FLAGS.memtier_cpu_interval_length
+  if MEMTIER_RUN_DURATION.value:
+    meta['memtier_run_duration'] = MEMTIER_RUN_DURATION.value
+  if MEMTIER_RUN_MODE.value == MemtierMode.MEASURE_CPU_LATENCY:
+    meta['memtier_cpu_target'] = MEMTIER_CPU_TARGET.value
+    meta['memtier_cpu_duration'] = MEMTIER_CPU_DURATION.value
   return meta
 
 
@@ -511,8 +501,10 @@ def _ParseHistogram(
   """Parses the 'Request Latency Distribution' section of memtier output."""
   set_histogram = []
   get_histogram = []
-  total_requests = FLAGS.memtier_requests
-  approx_total_sets = round(float(total_requests) / (FLAGS.memtier_ratio + 1))
+  total_requests = MEMTIER_REQUESTS.value
+  sets = int(MEMTIER_RATIO.value.split(':')[0])
+  gets = int(MEMTIER_RATIO.value.split(':')[1])
+  approx_total_sets = round(float(total_requests) / (sets + gets) * sets)
   last_total_sets = 0
   approx_total_gets = total_requests - approx_total_sets
   last_total_gets = 0
@@ -536,7 +528,8 @@ def _ParseTotalThroughputAndLatency(
   raise errors.Benchmarks.RunError('No "TOTALS" line in memtier output.')
 
 
-def _ParseLine(pattern, line, approx_total, last_total, histogram):
+def _ParseLine(pattern: str, line: str, approx_total: int, last_total: int,
+               histogram: MemtierHistogram) -> float:
   """Helper function to parse an output line."""
   if not re.match(pattern, line):
     return last_total
@@ -549,6 +542,6 @@ def _ParseLine(pattern, line, approx_total, last_total, histogram):
   return counts
 
 
-def _ConvertPercentToAbsolute(total_value, percent):
+def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
   """Given total value and a 100-based percentage, returns the actual value."""
   return percent / 100 * total_value
