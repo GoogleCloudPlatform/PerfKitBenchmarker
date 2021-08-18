@@ -683,11 +683,10 @@ def Run(benchmark_spec):
     run_script = posixpath.join(run_path, 'run_with_docker.sh')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     vm_util.ReplaceText(vm, 'docker exec -it', 'docker exec -t', run_script)
-    if FLAGS.cloud == 'Azure':
-      vm_util.ReplaceText(vm, 'nvidia-docker ', 'sudo nvidia-docker ',
-                          run_script)
-      vm_util.ReplaceText(vm, 'docker ', 'sudo docker ',
-                          run_script)
+    vm_util.ReplaceText(vm, 'nvidia-docker', 'sudo nvidia-docker', run_script)
+    vm_util.ReplaceText(vm, 'docker exec', 'sudo docker exec', run_script)
+    vm_util.ReplaceText(vm, 'docker container', 'sudo docker container',
+                        run_script)
     if benchmark_spec.benchmark == MASK:
       vm_util.ReplaceText(vm, r'_cont_mounts=\(',
                           r'_cont_mounts=\(\"--volume=\${PKLDIR}:\/pkl_coco\" ',
