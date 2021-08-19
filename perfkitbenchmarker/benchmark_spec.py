@@ -34,6 +34,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
@@ -802,6 +803,18 @@ class BenchmarkSpec(object):
     targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
 
+  def _IsSafeKeyOrValueCharacter(self, char):
+    return char.isalpha() or char.isnumeric() or char == '_'
+
+  def _SafeLabelKeyOrValue(self, key):
+    result = ''.join(c if self._IsSafeKeyOrValueCharacter(c) else '_'
+                     for c in key.lower())
+
+    # max length contraints on keys and values
+    # https://cloud.google.com/resource-manager/docs/creating-managing-labels
+    max_safe_length = 63
+    return result[:max_safe_length]
+
   def _GetResourceDict(self, time_format, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
     now_utc = datetime.datetime.utcnow()
@@ -821,6 +834,12 @@ class BenchmarkSpec(object):
         'owner': FLAGS.owner,
         'benchmark_uid': self.uid,
     }
+
+    # add metadata key value pairs
+    metadata_dict = (flag_util.ParseKeyValuePairs(FLAGS.metadata)
+                     if hasattr(FLAGS, 'metadata') else dict())
+    for key, value in metadata_dict.items():
+      tags[self._SafeLabelKeyOrValue(key)] = self._SafeLabelKeyOrValue(value)
 
     return tags
 
