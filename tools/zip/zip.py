@@ -26,7 +26,7 @@ def main(argv):
     sys.exit('Usage: %s <outfile>' % argv[0])
   zip_file_path = argv[1]
 
-  version = subprocess.check_output(('pkb.py', '--version')).rstrip()
+  version = subprocess.check_output((os.path.join(os.getcwd(), 'pkb.py'), '--version')).rstrip()
 
   with zipfile.ZipFile(zip_file_path, 'w') as zip_file:
     for dir_path, _, file_names in os.walk('perfkitbenchmarker'):
