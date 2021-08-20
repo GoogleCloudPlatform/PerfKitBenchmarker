@@ -40,12 +40,9 @@ class MessagingService:
     create resources - on GCP it creates a Cloud PubSub topic and subscription.
     """
     # Install commom packages
-    self.client.RemoteCommand('sudo apt-get update')
-    self.client.RemoteCommand('sudo apt-get install python3')
-    self.client.RemoteCommand('sudo apt-get install -y python3-pip')
-    self.client.RemoteCommand('sudo pip3 install --upgrade pip')
-    self.client.RemoteCommand('sudo pip3 install absl-py')
-    self.client.RemoteCommand('sudo pip3 install numpy')
+    self.client.Install('python3')
+    self.client.Install('pip3')
+    self.client.RemoteCommand('sudo pip3 install absl-py numpy')
 
     # Upload Common Client Interface
     self.client.PushDataFile(os.path.join(
