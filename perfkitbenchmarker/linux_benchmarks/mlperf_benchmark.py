@@ -104,7 +104,7 @@ MASK_ITERATION = flags.DEFINE_integer(
     'mlperf_mask_iteration', 40000,
     'The Number of iteration to use for training Mask R-CNN.', lower_bound=1)
 BERT_STEPS = flags.DEFINE_integer(
-    'mlperf_bert_steps', 7100,
+    'mlperf_bert_steps', 1271,
     'The Number of steps to use for training BERT.', lower_bound=1)
 
 BERT_BATCH_SIZE = flags.DEFINE_integer(
