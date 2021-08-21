@@ -26,6 +26,7 @@ import logging
 import posixpath
 import re
 import threading
+import time
 import uuid
 
 from absl import flags
@@ -43,6 +44,7 @@ from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 from six.moves import range
+
 
 FLAGS = flags.FLAGS
 
@@ -212,7 +214,10 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     root_block_device = GetRootBlockDeviceSpecForImage(image_id, region)
     root_block_device['Ebs']['VolumeSize'] = root_volume_size_gb
     # The 'Encrypted' key must be removed or the CLI will complain
-    root_block_device['Ebs'].pop('Encrypted')
+    if not FLAGS.aws_vm_hibernate:
+      root_block_device['Ebs'].pop('Encrypted')
+    else:
+      root_block_device['Ebs']['Encrypted'] = True
     mappings.append(root_block_device)
 
   if (machine_type in aws_disk.NUM_LOCAL_VOLUMES and
@@ -790,6 +795,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s' %
         util.FormatTagSpecifications('instance', self.aws_tags)]
+
+    if FLAGS.aws_vm_hibernate:
+      create_cmd.extend([
+          '--hibernation-options=Configured=true',
+      ])
+
     if FLAGS.disable_smt:
       query_cmd = util.AWS_PREFIX + [
           'ec2',
@@ -893,13 +904,97 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
 
+  @vm_util.Retry(
+      poll_interval=0.5,
+      log_errors=True,
+      retryable_exceptions=(AwsTransitionalVmRetryableError,))
+  def _WaitForStoppedStatus(self):
+    """Returns the status of the VM.
+
+    Returns:
+      Whether the VM is suspended i.e. in a stopped status. If not, raises an
+      error
+
+    Raises:
+      AwsUnknownStatusError: If an unknown status is returned from AWS.
+      AwsTransitionalVmRetryableError: If the VM is pending. This is retried.
+    """
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-instance-status',
+        '--region=%s' % self.region,
+        '--instance-ids=%s' % self.id,
+        '--include-all-instances',
+    ]
+
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    status = response['InstanceStatuses'][0]['InstanceState']['Name']
+    if status.lower() != 'stopped':
+      logging.info('VM has status %s.', status)
+
+      raise AwsTransitionalVmRetryableError()
+
+  def _PostSuspend(self):
+    self._WaitForStoppedStatus()
+
   def _Suspend(self):
     """Suspends a VM instance."""
-    raise NotImplementedError()
+    suspend_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'stop-instances',
+        '--region=%s' % self.region,
+        '--instance-ids=%s' % self.id,
+        '--hibernate',
+    ]
+    # Add a timer that waits for a given duration after vm instance is
+    # created before calling suspend on the vm to ensure that the vm is
+    # ready for hibernation.
+    try:
+      time.sleep(600)
+      # Wait until timer is complete before calling hibernate
+      vm_util.IssueCommand(suspend_cmd)
+    except:
+      raise errors.Benchmarks.KnownIntermittentError(
+          'Instance is still not ready to hibernate')
+
+    self._PostSuspend()
+
+  @vm_util.Retry(
+      poll_interval=0.5,
+      retryable_exceptions=(AwsTransitionalVmRetryableError,))
+  def _WaitForNewIP(self):
+    """Checks for a new IP address, waiting if the VM is still pending.
+
+    Raises:
+      AwsTransitionalVmRetryableError: If VM is pending. This is retried.
+    """
+    status_cmd = util.AWS_PREFIX + [
+        'ec2', 'describe-instances', f'--region={self.region}',
+        f'--instance-ids={self.id}'
+    ]
+    stdout, _, _ = vm_util.IssueCommand(status_cmd)
+    response = json.loads(stdout)
+    instance = response['Reservations'][0]['Instances'][0]
+    if 'PublicIpAddress' in instance:
+      self.ip_address = instance['PublicIpAddress']
+    else:
+      logging.info('VM is pending.')
+      raise AwsTransitionalVmRetryableError()
+
+  def _PostResume(self):
+    self._WaitForNewIP()
 
   def _Resume(self):
     """Resumes a VM instance."""
-    raise NotImplementedError()
+    resume_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'start-instances',
+        '--region=%s' % self.region,
+        '--instance-ids=%s' % self.id,
+    ]
+    vm_util.IssueCommand(resume_cmd)
+    self._PostResume()
 
   def _Delete(self):
     """Delete a VM instance."""
@@ -944,28 +1039,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     ]
     vm_util.IssueCommand(start_cmd)
 
-  @vm_util.Retry(
-      poll_interval=0.5,
-      retryable_exceptions=(AwsTransitionalVmRetryableError,))
   def _PostStart(self):
-    """Attempts to get new public ip after starting the VM.
-
-    Raises:
-      AwsTransitionalVmRetryableError: If VM is pending. This is retried.
-    """
-    status_cmd = util.AWS_PREFIX + [
-        'ec2', 'describe-instances',
-        f'--region={self.region}',
-        f'--instance-ids={self.id}'
-    ]
-    stdout, _, _ = vm_util.IssueCommand(status_cmd)
-    response = json.loads(stdout)
-    instance = response['Reservations'][0]['Instances'][0]
-    if 'PublicIpAddress' in instance:
-      self.ip_address = instance['PublicIpAddress']
-    else:
-      logging.info('VM is pending.')
-      raise AwsTransitionalVmRetryableError()
+    self._WaitForNewIP()
 
   def _Stop(self):
     """Stops the VM."""
@@ -979,27 +1054,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     ]
     vm_util.IssueCommand(stop_cmd)
 
-  @vm_util.Retry(
-      poll_interval=0.5,
-      retryable_exceptions=(AwsTransitionalVmRetryableError,))
   def _PostStop(self):
-    """Wait until VM has entered stopped stage.
-
-    Raises:
-      AwsTransitionalVmRetryableError: If VM is stopping. This is retried.
-    """
-    status_cmd = util.AWS_PREFIX + [
-        'ec2', 'describe-instance-status',
-        f'--region={self.region}',
-        f'--instance-ids={self.id}',
-        '--include-all-instances'
-    ]
-    stdout, _, _ = vm_util.IssueCommand(status_cmd, raise_on_failure=False)
-    response = json.loads(stdout)
-    status = response['InstanceStatuses'][0]['InstanceState']['Name']
-    if status.lower() != 'stopped':
-      logging.info('VM has status %s.', status)
-      raise AwsTransitionalVmRetryableError()
+    self._WaitForStoppedStatus()
 
   def _UpdateInterruptibleVmStatusThroughApi(self):
     if hasattr(self, 'spot_instance_request_id'):
@@ -1011,11 +1067,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, _, _ = vm_util.IssueCommand(describe_cmd)
       sir_response = json.loads(stdout)['SpotInstanceRequests']
       self.spot_status_code = sir_response[0]['Status']['Code']
-      self.spot_early_termination = (self.spot_status_code in
-                                     AWS_INITIATED_SPOT_TERMINAL_STATUSES)
+      self.spot_early_termination = (
+          self.spot_status_code in AWS_INITIATED_SPOT_TERMINAL_STATUSES)
 
-  @vm_util.Retry(poll_interval=1, log_errors=False,
-                 retryable_exceptions=(AwsTransitionalVmRetryableError,))
+  @vm_util.Retry(
+      poll_interval=1,
+      log_errors=False,
+      retryable_exceptions=(AwsTransitionalVmRetryableError,))
   def _Exists(self):
     """Returns whether the VM exists.
 
@@ -1223,6 +1281,10 @@ class Debian9BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'debian-stretch-*64-*'
   IMAGE_OWNER = DEBIAN_9_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
+
+  def _BeforeSuspend(self):
+    """Prepares the aws vm for hibernation."""
+    raise NotImplementedError()
 
 
 class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,

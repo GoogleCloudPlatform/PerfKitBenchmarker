@@ -422,6 +422,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """Installs packages for the Debian 9 class."""
     pass
 
+  def _PostSuspend(self):
+    pass
+
   def Suspend(self) -> float:
     """Suspends the vm.
 
@@ -437,6 +440,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     before_suspend_timestamp = time.time()
 
     self._Suspend()
+    self._PostSuspend()
 
     return time.time() - before_suspend_timestamp
 

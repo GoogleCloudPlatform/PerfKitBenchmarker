@@ -110,3 +110,7 @@ flags.DEFINE_boolean(
 flags.DEFINE_enum('aws_credit_specification', None,
                   ['CpuCredits=unlimited', 'CpuCredits=standard'],
                   'Credit specification for burstable vms.')
+flags.DEFINE_boolean('aws_vm_hibernate', False,
+                     'Whether to hibernate(suspend) an aws vm'
+                     'instance.')
+
