@@ -19,19 +19,11 @@
 def YumInstall(vm):
   """Installs python rrdtool on the VM."""
   vm.InstallPackages('rrdtool')
-  vm.RemoteCommand('sudo pip install rrdtool')
-
+  vm.RemoteCommand('sudo dnf --enablerepo=powertools install -y rrdtool-devel')
+  vm.RemoteCommand('sudo pip3 install rrdtool')
 
 def AptInstall(vm):
   """Installs python rrdtool on the VM."""
   vm.InstallPackages('librrd-dev')
   vm.InstallPackages('libpython3-dev')
-  vm.InstallPackages('rrdtool')
-  vm.RemoteCommand('sudo pip install rrdtool')
-
-def Install(vm):
-  """Install python rrdtool with pip"""
-  vm.InstallPackages('librrd-dev')
-  vm.InstallPackages('libpython3-dev')
-  vm.InstallPackages('rrdtool')
   vm.RemoteCommand('sudo pip install rrdtool')
