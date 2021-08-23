@@ -601,10 +601,10 @@ class KubernetesContainerService(BaseContainerService):
     get_cmd = [
         FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'get', 'ing', ingress_name,
-        '-o', 'jsonpath="{.status.loadBalancer.ingress[*][\'ip\']}"'
+        '-o', 'jsonpath={.status.loadBalancer.ingress[*].ip}'
     ]
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
-    ip_address = yaml.safe_load(stdout)
+    ip_address = stdout
     if ip_address:
       self.ip_address = ip_address
 
@@ -681,14 +681,14 @@ class KubernetesCluster(BaseContainerCluster):
     get_cmd = [
         FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'get', 'service', service_name,
-        '-o', 'jsonpath="{.status.loadBalancer.ingress[0].ip}"'
+        '-o', 'jsonpath={.status.loadBalancer.ingress[0].ip}'
     ]
 
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
 
     try:
       # Ensure the load balancer is ready by parsing the output IP
-      ip_address = ipaddress.ip_address(yaml.safe_load(stdout))
+      ip_address = ipaddress.ip_address(stdout)
     except ValueError:
       raise errors.Resource.RetryableCreationError(
           "Load Balancer IP for service '%s' is not ready." % service_name)
