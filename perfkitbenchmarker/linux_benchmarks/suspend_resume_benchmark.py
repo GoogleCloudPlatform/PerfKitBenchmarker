@@ -42,6 +42,7 @@ suspend_resume:
     # We don't want boot time samples to be affected from retrying, so don't
     # retry cluster_boot when rate limited.
     retry_on_rate_limited: False
+    aws_vm_hibernate: True
 """
 
 
