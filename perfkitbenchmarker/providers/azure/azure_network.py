@@ -37,6 +37,9 @@ from perfkitbenchmarker.providers.azure import util
 FLAGS = flags.FLAGS
 SSH_PORT = 22
 
+flags.DEFINE_boolean('azure_infiniband', False,
+                     'Install Mellanox OpenFabrics drivers')
+
 DEFAULT_REGION = 'eastus2'
 
 REGION = 'region'

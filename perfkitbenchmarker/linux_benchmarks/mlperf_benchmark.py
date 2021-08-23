@@ -101,7 +101,7 @@ RESNET_EPOCHS = flags.DEFINE_integer(
     'mlperf_resnet_epochs', 48,
     'The Number of epochs to use for training ResNet.', lower_bound=4)
 MASK_ITERATION = flags.DEFINE_integer(
-    'mlperf_mask_iteration', 40000,
+    'mlperf_mask_iteration', 20000,
     'The Number of iteration to use for training Mask R-CNN.', lower_bound=1)
 BERT_STEPS = flags.DEFINE_integer(
     'mlperf_bert_steps', 1271,

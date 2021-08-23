@@ -171,7 +171,7 @@ def _PrepareHpcg(vm):
   Args:
     vm: vm to operate on
   """
-  if FLAGS.mofed_install:
+  if FLAGS.azure_infiniband:
     vm.Install('mofed')
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')

@@ -148,7 +148,7 @@ def PrepareVm(vm):
   if FLAGS.aws_efa:
     env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
            '$LD_LIBRARY_PATH &&')
-  if FLAGS.mofed_install:
+  if FLAGS.azure_infiniband:
     vm.Install('mofed')
   vm.AuthenticateVm()
   vm.Install('cuda_toolkit')
@@ -200,7 +200,7 @@ def CreateMetadataDict():
       'nccl_extra_params': FLAGS.nccl_extra_params,
       'extra_params': FLAGS.nccl_extra_params
   }
-  if FLAGS.mofed_install:
+  if FLAGS.azure_infiniband:
     metadata['mofed_version'] = FLAGS.mofed_version
   return metadata
 
