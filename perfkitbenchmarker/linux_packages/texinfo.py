@@ -18,7 +18,7 @@
 
 def YumInstall(vm):
   """Installs build tools on the VM."""
-  vm.InstallPackages('texinfo')
+  pass
 
 
 def AptInstall(vm):
