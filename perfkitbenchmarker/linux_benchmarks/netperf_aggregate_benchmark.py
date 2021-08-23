@@ -26,6 +26,7 @@ to test packets per second and inbound and outbound throughput
 import logging
 import re
 from absl import flags
+from collections import namedtuple
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -192,36 +193,22 @@ def RunNetperfAggregate(vm, server_ips):
       login_shell=False,
       timeout=1200)
 
+  interval_naming = namedtuple("IntervalNaming", "output_file parse_name")
+  BENCHMARK_INTERVAL_MAPPING = {'STREAM': interval_naming('netperf_outbound', 'Outbound'),
+                                'MAERTS': interval_naming('netperf_inbound', 'Inbound'),
+                                'RRAGG': interval_naming('netperf_tps', 'Request/Response Aggregate'),
+                                'BIDIR': interval_naming('netperf_bidirectional', 'Bidirectional')}
+
   samples = []
-  # do post processing step
-  if 'STREAM' in FLAGS.netperf_aggregate_benchmarks:
+  for benchmark in FLAGS.netperf_aggregate_benchmarks:
+    output_file = BENCHMARK_INTERVAL_MAPPING[benchmark].output_file
+    parse_name = BENCHMARK_INTERVAL_MAPPING[benchmark].parse_name
     proc_stdout, _ = vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
-      '--intervals netperf_outbound.log',
+      f'--intervals {output_file}.log',
       ignore_failure=False)
-    samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Outbound'))
-    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_outbound*')
-  if 'MAERTS' in FLAGS.netperf_aggregate_benchmarks:
-    proc_stdout, _ = vm.RemoteCommand(
-      f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
-      '--intervals netperf_inbound.log',
-      ignore_failure=False)
-    samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Inbound'))
-    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_inbound*')
-  if 'RRAGG' in FLAGS.netperf_aggregate_benchmarks:
-    proc_stdout, _ = vm.RemoteCommand(
-      f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
-      '--intervals netperf_tps.log',
-      ignore_failure=False)
-    samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Request/Response Aggregate'))
-    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_tps*')
-  if 'BIDIR' in FLAGS.netperf_aggregate_benchmarks:
-    proc_stdout, _ = vm.RemoteCommand(
-      f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
-      '--intervals netperf_bidirectional.log',
-      ignore_failure=False)
-    samples.extend(ParseNetperfAggregateOutput(proc_stdout, 'Bidirectional'))
-    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm netperf_bidirectional*')  
+    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm {output_file}*')
+    samples.extend(ParseNetperfAggregateOutput(proc_stdout, f'{parse_name}')) 
 
   return samples
 
