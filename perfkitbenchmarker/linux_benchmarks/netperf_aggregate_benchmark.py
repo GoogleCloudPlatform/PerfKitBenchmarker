@@ -37,7 +37,8 @@ flags.DEFINE_list('netperf_aggregate_benchmarks', ALL_BENCHMARKS,
                   'The netperf aggregate benchmark(s) to run. '
                   'STREAM measures outbound throughput. '
                   'MAERTS measures inbound throughput. '
-                  'RRAGG measures packets per second.')
+                  'RRAGG measures packets per second.'
+                  'BIDIR measure bidirectional bulk throughput')
 flags.register_validator(
     'netperf_aggregate_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
