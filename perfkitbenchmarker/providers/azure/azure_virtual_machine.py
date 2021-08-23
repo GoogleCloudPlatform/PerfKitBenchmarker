@@ -650,14 +650,23 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     # The VM will be deleted when the resource group is.
     self._deleted = True
 
-  #  _Start or _Stop not yet implemented for Azure
   def _Start(self):
     """Starts the VM."""
-    raise NotImplementedError()
+    start_cmd = ([azure.AZURE_PATH, 'vm', 'start', '--name', self.name] +
+                 self.resource_group.args)
+    vm_util.IssueCommand(start_cmd)
+    self.ip_address = self.public_ip.GetIPAddress()
 
   def _Stop(self):
     """Stops the VM."""
-    raise NotImplementedError()
+    stop_cmd = ([azure.AZURE_PATH, 'vm', 'stop', '--name', self.name] +
+                self.resource_group.args)
+    vm_util.IssueCommand(stop_cmd)
+    # remove resources, similar to GCE stop
+    deallocate_cmd = (
+        [azure.AZURE_PATH, 'vm', 'deallocate', '--name', self.name] +
+        self.resource_group.args)
+    vm_util.IssueCommand(deallocate_cmd)
 
   def _Suspend(self):
     """Suspends the VM."""
