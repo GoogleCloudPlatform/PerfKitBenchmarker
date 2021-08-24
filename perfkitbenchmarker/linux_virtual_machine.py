@@ -1967,6 +1967,17 @@ class Debian10Mixin(BaseDebianMixin):
   OS_TYPE = os_types.DEBIAN10
 
 
+class Debian11Mixin(BaseDebianMixin):
+  """Class holding Debian 11 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN11
+
+  def PrepareVMEnvironment(self):
+    # Missing in some images. Required by PrepareVMEnvironment to determine
+    # partitioning.
+    self.InstallPackages('fdisk')
+    super().PrepareVMEnvironment()
+
+
 class BaseUbuntuMixin(BaseDebianMixin):
   """Class holding Ubuntu specific VM methods and attributes."""
 

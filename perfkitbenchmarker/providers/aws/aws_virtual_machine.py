@@ -89,7 +89,8 @@ AMAZON_LINUX_IMAGE_PROJECT = [
 # Marketplace AMI exists, but not in all regions
 DEBIAN_9_IMAGE_PROJECT = ['379101102735']
 # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
-DEBIAN_10_IMAGE_PROJECT = ['136693071363']
+# From https://wiki.debian.org/Cloud/AmazonEC2Image/Bullseye
+DEBIAN_IMAGE_PROJECT = ['136693071363']
 # Owns AMIs lists here:
 # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
 # Also owns the AMIS listed in
@@ -1296,7 +1297,15 @@ class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
                                      linux_virtual_machine.Debian10Mixin):
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
   IMAGE_NAME_FILTER = 'debian-10-*64*'
-  IMAGE_OWNER = DEBIAN_10_IMAGE_PROJECT
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_USER_NAME = 'admin'
+
+
+class Debian11BasedAwsVirtualMachine(AwsVirtualMachine,
+                                     linux_virtual_machine.Debian11Mixin):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
+  IMAGE_NAME_FILTER = 'debian-11-*64*'
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
 
 

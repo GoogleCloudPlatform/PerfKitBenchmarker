@@ -23,6 +23,7 @@ COS = 'cos'
 CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
+DEBIAN11 = 'debian11'
 JUJU = 'juju'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
@@ -55,6 +56,7 @@ LINUX_OS_TYPES = [
     COS,
     DEBIAN9,
     DEBIAN10,
+    DEBIAN11,
     JUJU,
     RHEL7,
     RHEL8,

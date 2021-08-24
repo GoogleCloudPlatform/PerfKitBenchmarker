@@ -55,6 +55,7 @@
 -   Add suspend_resume benchmark.
 -   Add AWS support for VM stop start benchmark.
 -   Add Azure support for VM stop start benchmark.
+-   Add `--os_type=debian11` support for GCP, AWS and Azure Providers.
 
 ### Enhancements:
 

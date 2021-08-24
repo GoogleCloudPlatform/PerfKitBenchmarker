@@ -1111,6 +1111,12 @@ class Debian10BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
+class Debian11BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian11Mixin):
+  DEFAULT_IMAGE_FAMILY = 'debian-11'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class Rhel7BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel7Mixin):
   DEFAULT_IMAGE_FAMILY = 'rhel-7'
