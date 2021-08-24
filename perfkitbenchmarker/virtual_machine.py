@@ -419,7 +419,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     return reboot_duration_sec
 
   def _BeforeSuspend(self):
-    """Installs packages for the Debian 9 class."""
     pass
 
   def _PostSuspend(self):

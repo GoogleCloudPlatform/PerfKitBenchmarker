@@ -935,6 +935,16 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
       raise AwsTransitionalVmRetryableError()
 
+  def _BeforeSuspend(self):
+    """Prepares the instance for suspend by having the VM sleep for a given duration.
+
+    This ensures the VM is ready for hibernation
+    """
+    # Add a timer that waits for a given duration after vm instance is
+    # created before calling suspend on the vm to ensure that the vm is
+    # ready for hibernation in aws.
+    time.sleep(600)
+
   def _PostSuspend(self):
     self._WaitForStoppedStatus()
 
@@ -947,12 +957,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--instance-ids=%s' % self.id,
         '--hibernate',
     ]
-    # Add a timer that waits for a given duration after vm instance is
-    # created before calling suspend on the vm to ensure that the vm is
-    # ready for hibernation.
     try:
-      time.sleep(600)
-      # Wait until timer is complete before calling hibernate
       vm_util.IssueCommand(suspend_cmd)
     except:
       raise errors.Benchmarks.KnownIntermittentError(
