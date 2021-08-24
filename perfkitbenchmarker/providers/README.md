@@ -9,7 +9,7 @@ provider(s) you want to benchmark:
 *   [DigitalOcean](https://www.digitalocean.com)
 *   [Rackspace Cloud](https://www.rackspace.com)
 *   [ProfitBricks](https://www.profitbricks.com/)
-
+*   [Equinix Metal](https://metal.equinix.com)
 ## Cloud account setup
 
 This section describes the setup steps needed for each cloud system. Note that
@@ -462,3 +462,7 @@ Open the `.boto` file and edit the following fields:
     `client_id`, `client_secret`: set these to be the same as those in your
     gcloud credentials file (`~/.config/gcloud/credentials.db`), which was setup
     as part of the `gcloud auth login` step.
+    
+## Equinix Metal Config
+Install `metal`, the Equinix CLI, following the instructions at
+    `https://github.com/equinix/metal-cli`.
