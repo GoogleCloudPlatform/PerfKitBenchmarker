@@ -29,7 +29,7 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 HOSTFILE = 'HOSTFILE'
 PORT = '4242'
-DGXSYSTEM = 'DGXA100_multi'
+DGXSYSTEM = 'DGXA100_multinode'
 CONFIG = f'config_{DGXSYSTEM}.sh'
 AWS_EFA_NCCL_BASEAMI_PIPELINE_URL = 'https://github.com/aws-samples/aws-efa-nccl-baseami-pipeline.git'
 NVIDIA_EFA_DOCKERFILE = 'aws-efa-nccl-baseami-pipeline/nvidia-efa-docker_base/Dockerfile.base'
@@ -246,11 +246,9 @@ def _GetChangesForTransformer(benchmark_spec, vm, script_path, nvprof_flags,
                           .format(profile_steps=FLAGS.mlperf_profile_steps))]
 
   vm.RemoteCommand(
-      r'cd {script_path} && '
-      r'sed "{run_training_sed}" run_training.sh > run_training1.sh && '
-      r'chmod 755 run_training1.sh '
-      .format(script_path=script_path,
-              run_training_sed=_SedPairsToString(run_training_sed)))
+      fr'cd {script_path} && '
+      fr'sed "{mlperf_benchmark.SedPairsToString(run_training_sed)}" '
+      r'run_training.sh > run_training1.sh && chmod 755 run_training1.sh')
 
   run_sed += [(r'sleep infinity',
                r' bash -c \"\x27 cp \/workspace\/{model}1\/*.sh '
@@ -369,28 +367,11 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
   config_sed = config_sed_input
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
-  per_gpu_train_batch_size = 2 * benchmark_spec.total_num_gpus
-  per_gpu_eval_batch_size = benchmark_spec.total_num_gpus
 
-  # pylint: disable=line-too-long
-  # The BASE_LR and WARMUP_ITERS are from https://raw.githubusercontent.com/mlcommons/training_results_v1.0/master/NVIDIA/results/dgx2_ngc19.05_pytorch/maskrcnn/result_0.txt
-  config_sed += [(r'BASE_LR [0-9\.]*', 'BASE_LR 0.12')]
-  config_sed += [(r'WARMUP_ITERS [0-9\.]*', 'WARMUP_ITERS 625')]
-  # The STEPS numbers are from https://raw.githubusercontent.com/mlcommons/training_results_v1.0/master/NVIDIA/results/dgx2h_n12_ngc19.05_pytorch/maskrcnn/result_0.txt
-  # pylint: enable=line-too-long
-  # Using the step numbers provided by the smaller scale
-  # results didn't run or converge. That's why the
-  # hyperparameters are mixed.
-  config_sed += [(r'STEPS ([0-9]*,[0-9]*)', 'STEPS (7000,9333)')]
-  config_sed += [(r'SOLVER.IMS_PER_BATCH [0-9\.]*',
-                  f'SOLVER.IMS_PER_BATCH {per_gpu_train_batch_size}')]
-  config_sed += [(r'TEST.IMS_PER_BATCH [0-9\.]*',
-                  f'TEST.IMS_PER_BATCH {per_gpu_eval_batch_size}')]
-  config_sed += [(r'TOP_N_TRAIN [0-9\.]*', 'TOP_N_TRAIN 1000')]
   config_sed += [('SOLVER_MAX_ITER=.*',
                   f'SOLVER_MAX_ITER={mlperf_benchmark.MASK_ITERATION.value}')]
-  config_sed += [(r'WALLTIME=.*',
-                  r'WALLTIME=30\n'
+  config_sed += [(r'WALLTIME_MINUTES=30',
+                  r'WALLTIME_MINUTES=30\n'
                   r'export CONT=mlperf-nvidia:object_detection\n'
                   r'export DATADIR=\/data\n'
                   r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
@@ -443,10 +424,7 @@ def _GetChangesForResnet(benchmark_spec, node_rank, nvprof_flags,
   config_sed = config_sed_input
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
-  per_gpu_batch_size = min(65, 33280 / benchmark_spec.total_num_gpus)
 
-  config_sed += [(r'BATCHSIZE=.*', r'BATCHSIZE=\"{per_gpu_batch_size}\"'
-                  .format(per_gpu_batch_size=per_gpu_batch_size))]
   config_sed += [(r'NUMEPOCHS=.*',
                   fr'NUMEPOCHS={mlperf_benchmark.RESNET_EPOCHS.value}\n'
                   r'export CONT=mlperf-nvidia:image_classification\n'
@@ -516,7 +494,9 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
 
   config_sed += [(r'source .*',
                   r'export CONT=mlperf-nvidia:language_model\n'
-                  r'export NEXP=1')]
+                  r'export NEXP=1\n'
+                  fr'export MASTER_ADDR={benchmark_spec.vms[0].internal_ip}\n'
+                  fr'export MASTER_PORT={PORT}')]
   config_sed += [(r'DATADIR=.*',
                   r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
   config_sed += [(r'MAX_STEPS=.*',
@@ -561,7 +541,6 @@ def _UpdateScripts(benchmark_spec, node_rank):
   # each pair('str_A', 'str_B') indicates a request "replace anything
   # matching str_A to str_B" for a specific file
   config_sed = []
-  config_sed += [(r'DGXIBDEVICES=.*', r'DGXIBDEVICES=\"\"')]
   config_sed += [(r'DGXSYSTEM=.*', fr'DGXSYSTEM=\"{DGXSYSTEM}\"')]
   config_sed += [(r'DGXNNODES=.*', r'DGXNNODES={num_vms}'
                   .format(num_vms=benchmark_spec.num_vms))]
@@ -604,8 +583,6 @@ def _UpdateScripts(benchmark_spec, node_rank):
   run_sed += [(r'sleep 30', r'sleep 60')]
   run_sed += [(r'docker exec -it', r'docker exec -t')]
   run_sed += [(r'run_and_time.sh', r'run_and_time1.sh')]
-  run_sed += [(r'set -euxo pipefail',
-               fr'set -euxo pipefail\nsource .\/{CONFIG}')]
 
   run_sed += [(r'nvidia-docker', r'sudo nvidia-docker')]
   run_sed += [(r'docker exec', r'sudo docker exec')]
@@ -672,21 +649,21 @@ def _UpdateScripts(benchmark_spec, node_rank):
 
   vm.RemoteCommand(
       f'cd {script_path} && '
-      f'sed "{_SedPairsToString(config_sed)}" '
+      f'sed "{mlperf_benchmark.SedPairsToString(config_sed)}" '
       f'{" ".join(config_files)} > {CONFIG} && '
       f'chmod 755 {CONFIG} ')
 
   vm.RemoteCommand(
       f'cd {script_path} && '
-      f'sed "{_SedPairsToString(run_and_time_sed)}" run_and_time.sh | '
-      f'sed "2 i source {CONFIG}" > run_and_time1.sh && '
+      f'sed "{mlperf_benchmark.SedPairsToString(run_and_time_sed)}" '
+      f'run_and_time.sh | sed "2 i source {CONFIG}" > run_and_time1.sh && '
       'chmod 755 run_and_time1.sh ')
 
   vm.RemoteCommand(
-      fr'cd {script_path} && '
-      fr'sed "{_SedPairsToString(run_sed)}" run_with_docker.sh '
-      r'> run_with_docker1.sh && '
-      r'chmod 755 run_with_docker1.sh')
+      f'cd {script_path} && '
+      f'sed "{mlperf_benchmark.SedPairsToString(run_sed)}" run_with_docker.sh '
+      f'| sed "2 i source {CONFIG}" > run_with_docker1.sh && '
+      'chmod 755 run_with_docker1.sh')
 
   docker_file = posixpath.join(script_path, 'Dockerfile')
   if FLAGS.aws_efa:
@@ -831,31 +808,9 @@ def Run(benchmark_spec):
       mlperf_benchmark.GNMT: {
           'CONT': r'"mlperf-nvidia:rnn_translator"',
           'DATADIR': r'/data/gnmt'},
-      mlperf_benchmark.MASK: {
-          'CONT': r'"mlperf-nvidia:object_detection"',
-          'DATADIR': r'/data',
-          'PKLDIR': '/data/coco2017/pkl_coco',
-          'DGXNSOCKET': master_vm.CheckLsCpu().socket_count,
-          'DGXSOCKETCORES': master_vm.CheckLsCpu().cores_per_socket,
-          'DGXNGPU': benchmark_spec.gpus_per_vm,
-          'SOLVER_MAX_ITER': mlperf_benchmark.MASK_ITERATION.value,
-      },
-      mlperf_benchmark.RESNET: {
-          'CONT': r'"mlperf-nvidia:image_classification"',
-          'DATADIR': r'/data/imagenet',
-          'NUMEPOCHS': mlperf_benchmark.RESNET_EPOCHS.value,
-      },
-      mlperf_benchmark.BERT: {
-          'DATADIR': '/data/bert_data/2048_shards_uncompressed',
-          'CONT': 'mlperf-nvidia:language_model',
-          'MAX_STEPS': mlperf_benchmark.BERT_STEPS.value,
-          'DATADIR_PHASE2': '/data/bert_data/2048_shards_uncompressed',
-          'EVALDIR': '/data/bert_data/eval_set_uncompressed',
-          'CHECKPOINTDIR': '/data/bert_data/tf1_ckpt',
-          'CHECKPOINTDIR_PHASE1': '/data/bert_data/tf1_ckpt',
-          'MASTER_ADDR': master_vm.internal_ip,
-          'MASTER_PORT': PORT,
-      },
+      mlperf_benchmark.MASK: {},
+      mlperf_benchmark.RESNET: {},
+      mlperf_benchmark.BERT: {},
   }
   env_params.update(benchmark_env_params.get(benchmark, {}))
   if mlperf_benchmark.RESNET in benchmark:

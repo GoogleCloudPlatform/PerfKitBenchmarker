@@ -55,6 +55,8 @@ mlperf:
           image: microsoft-dsvm:ubuntu-hpc:1804:latest
 """
 
+DGXSYSTEM = 'DGXA100_singlenode'
+CONFIG = f'config_{DGXSYSTEM}.sh'
 TRANSFORMER = 'transformer'
 RESNET = 'resnet'
 MASK = 'mask'
@@ -423,6 +425,141 @@ def PrepareRunner(benchmark_spec, vm=None):
                     posixpath.join('/data', 'bert_data'), vm)
 
 
+def _GetChangesForMask(config_sed_input):
+  """Get changes to config and run scripts for MaskRCNN.
+
+  Also update train_mlperf.py if nvprof is used.
+
+  Args:
+    config_sed_input: Input list of sed pairs for config_DGXA100.sh.
+
+  Returns:
+    config_sed_output: Output list of sed pairs for config_DGXA100.sh.
+  """
+  config_sed = config_sed_input
+  config_sed += [('SOLVER_MAX_ITER=.*',
+                  f'SOLVER_MAX_ITER={MASK_ITERATION.value}')]
+  config_sed += [(r'WALLTIME_MINUTES=100',
+                  r'WALLTIME_MINUTES=100\n'
+                  r'export CONT=mlperf-nvidia:object_detection\n'
+                  r'export DATADIR=\/data\n'
+                  r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
+                  r'export NEXP=1')]
+  return config_sed
+
+
+def _GetChangesForResnet(config_sed_input):
+  """Get changes to config and run scripts for Resnet.
+
+  Args:
+    config_sed_input: Input list of sed pairs for config_DGXA100.sh.
+
+  Returns:
+    config_sed_output: Output list of sed pairs for config_DGXA100.sh.
+  """
+  config_sed = config_sed_input
+  config_sed += [(r'NUMEPOCHS=.*',
+                  fr'NUMEPOCHS={RESNET_EPOCHS.value}\n'
+                  r'export CONT=mlperf-nvidia:image_classification\n'
+                  r'export DATADIR=\/data\/imagenet')]
+
+  return config_sed
+
+
+def _GetChangesForBert(config_sed_input):
+  """Get changes to config and run scripts for BERT.
+
+  Args:
+    config_sed_input: Input list of sed pairs for config_DGXA100.sh.
+
+  Returns:
+    config_sed_output: Output list of sed pairs for config_DGXA100.sh.
+  """
+  config_sed = config_sed_input
+
+  config_sed += [(r'source .*',
+                  r'export CONT=mlperf-nvidia:language_model\n'
+                  r'export NEXP=1')]
+  config_sed += [(r'DATADIR=.*',
+                  r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
+  config_sed += [(r'MAX_STEPS=.*', f'MAX_STEPS={BERT_STEPS.value}')]
+  config_sed += [(r'DATADIR_PHASE2=.*',
+                  r'DATADIR_PHASE2=\/data\/bert_data\/'
+                  r'2048_shards_uncompressed')]
+  config_sed += [(r'EVALDIR=.*',
+                  r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
+  config_sed += [(r'CHECKPOINTDIR=.*',
+                  r'CHECKPOINTDIR=\/data\/bert_data\/tf1_ckpt')]
+  config_sed += [(r'CHECKPOINTDIR_PHASE1=.*',
+                  r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/tf1_ckpt')]
+  config_sed += [(r'BATCHSIZE=.*', fr'BATCHSIZE={BERT_BATCH_SIZE.value}')]
+
+  return config_sed
+
+
+def SedPairsToString(pairs):
+  """Convert a list of sed pairs to a string for the sed command.
+
+  Args:
+    pairs: a list of pairs, indicating the replacement requests
+
+  Returns:
+    a string to supply to the sed command
+  """
+  sed_str = '; '.join(['s/%s/%s/g' % pair for pair in pairs])
+  if pairs:
+    sed_str += ';'
+  return sed_str
+
+
+def _UpdateScripts(benchmark_spec, vm):
+  """Update the running scripts on the target vm.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+    vm: The VM to work on
+  """
+  benchmark = benchmark_spec.benchmark
+  vm = vm or benchmark_spec.vms[0]
+
+  config_sed = []
+  config_sed += [(r'DGXSYSTEM=.*', fr'DGXSYSTEM=\"{DGXSYSTEM}\"')]
+  config_sed += [(r'DGXNGPU=.*',
+                  fr'DGXNGPU={nvidia_driver.QueryNumberOfGpus(vm)}')]
+  config_sed += [(r'DGXNSOCKET=.*',
+                  fr'DGXNSOCKET={vm.CheckLsCpu().socket_count}')]
+  config_sed += [(r'DGXSOCKETCORES=.*',
+                  fr'DGXSOCKETCORES={vm.CheckLsCpu().cores_per_socket}')]
+
+  model = 'maskrcnn' if MASK in benchmark else benchmark
+  framework = 'mxnet' if RESNET in benchmark else 'pytorch'
+  script_path = (
+      fr'$HOME/training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/{model}/'
+      fr'implementations/{framework}')
+
+  config_files = [CONFIG]
+
+  if MASK in benchmark:
+    config_sed = _GetChangesForMask(config_sed)
+    config_files = ['config_DGXA100.sh']
+
+  elif RESNET in benchmark:
+    config_sed = _GetChangesForResnet(config_sed)
+    config_files = ['config_DGXA100_common.sh', 'config_DGXA100.sh']
+
+  elif BERT in benchmark:
+    config_sed = _GetChangesForBert(config_sed)
+    config_files = ['config_DGXA100_common.sh', 'config_DGXA100_1x8x56x1.sh']
+
+  vm.RemoteCommand(
+      f'cd {script_path} && '
+      f'sed "{SedPairsToString(config_sed)}" '
+      f'{" ".join(config_files)} > {CONFIG} && '
+      f'chmod 755 {CONFIG} && '
+      f'sed -i "2 i source {CONFIG}" run_and_time.sh && '
+      f'sed -i "2 i source {CONFIG}" run_with_docker.sh')
+
+
 def Prepare(benchmark_spec, vm=None):
   """Install and set up MLPerf on the target vm.
 
@@ -434,6 +571,7 @@ def Prepare(benchmark_spec, vm=None):
     errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
   """
   PrepareBenchmark(benchmark_spec, vm)
+  _UpdateScripts(benchmark_spec, vm)
   PrepareRunner(benchmark_spec, vm)
 
 
@@ -515,13 +653,6 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model=RESNET):
   return samples
 
 
-def GetEnv(vm, run_path, filename):
-  config = posixpath.join(run_path, filename)
-  stdout, _ = vm.RemoteCommand(f'cat {config}')
-  text = re.sub('#.*', '', stdout)
-  return dict(regex_util.ExtractAllMatches(r'export (\S+)=(.*)', text))
-
-
 def Run(benchmark_spec):
   """Run MLPerf on the cluster.
 
@@ -594,89 +725,20 @@ def Run(benchmark_spec):
     benchmark_path = f'$HOME/training_results_{MLPERF_VERSION}/NVIDIA/benchmarks'
     run_path = posixpath.join(benchmark_path,
                               run_sub_paths[benchmark_spec.benchmark])
-    env = {}
-    if benchmark_spec.benchmark == RESNET:
-      env.update(GetEnv(vm, run_path, 'config_DGXA100_common.sh'))
-      env.update(GetEnv(vm, run_path, 'config_DGXA100.sh'))
-    elif benchmark_spec.benchmark == MASK:
-      env.update(GetEnv(vm, run_path, 'config_DGXA100.sh'))
-    elif benchmark_spec.benchmark == BERT:
-      env.update(GetEnv(vm, run_path, 'config_DGXA100_common.sh'))
-      env.update(GetEnv(vm, run_path, 'config_DGXA100_1x8x56x1.sh'))
-    env.update({
-        'DGXSYSTEM': 'DGXA100',
+    env = {
+        'DGXSYSTEM': DGXSYSTEM,
         'NEXP': 1,
         'PULL': 0,
         'LOGDIR': f'/tmp/{benchmark_spec.benchmark}',
-    })
-    mask_env = {
-        'ENABLE_DALI': False,
-        'USE_CUDA_GRAPH': True,
-        'CACHE_EVAL_IMAGES': True,
-        'EVAL_SEGM_NUMPROCS': 10,
-        'EVAL_MASK_VIRTUAL_PASTE': True,
-        'INCLUDE_RPN_HEAD': True,
-        'PRECOMPUTE_RPN_CONSTANT_TENSORS': True,
-        'DATALOADER_NUM_WORKERS': 1,
-        'HYBRID_LOADER': True,
-        'SOLVER_MAX_ITER': MASK_ITERATION.value,
     }
     envs = {
-        RESNET: {
-            'DATADIR': '/data/imagenet',
-            'CONT': 'mlperf-nvidia:image_classification',
-            'NUMEPOCHS': RESNET_EPOCHS.value,
-        },
+        RESNET: {},
         TRANSFORMER: {'DATADIR': '/data/wmt/utf8'},
         MINIGO: {'CONT': 'mlperf-nvidia:minigo'},
-        MASK: {
-            'DATADIR': '/data',
-            'CONT': 'mlperf-nvidia:object_detection',
-            'WALLTIME': 500,
-            'DGXNSOCKET': vm.CheckLsCpu().socket_count,
-            'DGXSOCKETCORES': vm.CheckLsCpu().cores_per_socket,
-            'PKLDIR': '/data/coco2017/pkl_coco',
-            'EXTRA_CONFIG':
-                '"SOLVER.BASE_LR 0.12 '
-                'SOLVER.WARMUP_FACTOR 0.000192 '
-                'SOLVER.WARMUP_ITERS 625 '
-                'SOLVER.WARMUP_METHOD mlperf_linear '
-                'SOLVER.STEPS (12000,16000) '
-                'SOLVER.IMS_PER_BATCH 96 '
-                'TEST.IMS_PER_BATCH 96 '
-                'MODEL.RPN.FPN_POST_NMS_TOP_N_TRAIN 12000 '
-                'MODEL.RPN.FPN_POST_NMS_TOP_N_PER_IMAGE False '
-                'NHWC True '
-                'MODEL.RESNETS.TRANS_FUNC FastBottleneckWithFixedBatchNorm '
-                f'SOLVER.MAX_ITER {mask_env["SOLVER_MAX_ITER"]} '
-                f'DATALOADER.DALI {mask_env["ENABLE_DALI"]} '
-                f'DATALOADER.DALI_ON_GPU {mask_env["ENABLE_DALI"]} '
-                f'DATALOADER.CACHE_EVAL_IMAGES {mask_env["CACHE_EVAL_IMAGES"]} '
-                f'EVAL_SEGM_NUMPROCS {mask_env["EVAL_SEGM_NUMPROCS"]} '
-                f'USE_CUDA_GRAPH {mask_env["USE_CUDA_GRAPH"]} '
-                'EVAL_MASK_VIRTUAL_PASTE '
-                f'{mask_env["EVAL_MASK_VIRTUAL_PASTE"]} '
-                'MODEL.BACKBONE.INCLUDE_RPN_HEAD '
-                f'{mask_env["INCLUDE_RPN_HEAD"]} '
-                f'DATALOADER.NUM_WORKERS {mask_env["DATALOADER_NUM_WORKERS"]} '
-                'PRECOMPUTE_RPN_CONSTANT_TENSORS '
-                f'{mask_env["PRECOMPUTE_RPN_CONSTANT_TENSORS"]} '
-                f'DATALOADER.HYBRID {mask_env["HYBRID_LOADER"]}"'
-        },
+        MASK: {},
         GNMT: {'DATADIR': '/data/gnmt'},
         SSD: {'DATADIR': '/data'},
-        BERT: {
-            'DATADIR': '/data/bert_data/2048_shards_uncompressed',
-            'CONT': 'mlperf-nvidia:language_model',
-            'MAX_STEPS': BERT_STEPS.value,
-            'DATADIR_PHASE2': '/data/bert_data/2048_shards_uncompressed',
-            'EVALDIR': '/data/bert_data/eval_set_uncompressed',
-            'CHECKPOINTDIR': '/data/bert_data/tf1_ckpt',
-            'CHECKPOINTDIR_PHASE1': '/data/bert_data/tf1_ckpt',
-            'DGXNSOCKET': vm.CheckLsCpu().socket_count,
-            'DGXSOCKETCORES': vm.CheckLsCpu().cores_per_socket,
-            'BATCHSIZE': BERT_BATCH_SIZE.value,
-        }
+        BERT: {}
     }
     env.update(envs[benchmark_spec.benchmark])
 
