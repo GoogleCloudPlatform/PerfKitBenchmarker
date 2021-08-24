@@ -43,6 +43,9 @@ suspend_resume:
     # retry cluster_boot when rate limited.
     retry_on_rate_limited: False
     aws_vm_hibernate: True
+    # AWS boot disk size must be specified for an encrypted disk mapping to be
+    # created.
+    aws_boot_disk_size: 30
 """
 
 
