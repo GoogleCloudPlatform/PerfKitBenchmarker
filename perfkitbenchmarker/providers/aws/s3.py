@@ -14,10 +14,13 @@
 
 """Contains classes/functions related to S3."""
 
+import json
 import os
 import posixpath
+from typing import List
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
@@ -29,6 +32,8 @@ FLAGS = flags.FLAGS
 
 AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
+_READ = 's3:GetObject'
+_WRITE = 's3:PutObject'
 
 
 class S3Service(object_storage_service.ObjectStorageService):
@@ -119,7 +124,7 @@ class S3Service(object_storage_service.ObjectStorageService):
   def DeleteBucket(self, bucket):
     """See base class."""
 
-    def _suppress_failure(stdout, stderr, retcode):
+    def _SuppressFailure(stdout, stderr, retcode):
       """Suppresses failure when bucket does not exist."""
       del stdout  # unused
       if retcode and 'NoSuchBucket' in stderr:
@@ -131,7 +136,7 @@ class S3Service(object_storage_service.ObjectStorageService):
          's3://%s' % bucket,
          '--region', self.region,
          '--force'],  # --force deletes even if bucket contains objects.
-        suppress_failure=_suppress_failure)
+        suppress_failure=_SuppressFailure)
 
   def EmptyBucket(self, bucket):
     vm_util.IssueCommand(
@@ -139,6 +144,27 @@ class S3Service(object_storage_service.ObjectStorageService):
          's3://%s' % bucket,
          '--region', self.region,
          '--recursive'])
+
+  def MakeBucketPubliclyReadable(self, bucket, also_make_writable=False):
+    """See base class."""
+    actions = [_READ]
+    logging.warning('Making bucket %s publicly readable!', bucket)
+    if also_make_writable:
+      actions.append(_WRITE)
+      logging.warning('Making bucket %s publicly writable!', bucket)
+    vm_util.IssueCommand([
+        'aws', 's3api', 'put-bucket-policy', '--region', self.region,
+        '--bucket', bucket, '--policy',
+        _MakeS3BucketPolicy(bucket, actions)
+    ])
+
+  def GetDownloadUrl(self, bucket, object_name, use_https=True):
+    """See base class."""
+    assert self.region
+    scheme = 'https' if use_https else 'http'
+    return f'{scheme}://{bucket}.s3.{self.region}.amazonaws.com/{object_name}'
+
+  UPLOAD_HTTP_METHOD = 'PUT'
 
   def PrepareVM(self, vm):
     vm.Install('awscli')
@@ -174,3 +200,20 @@ class S3Service(object_storage_service.ObjectStorageService):
   @classmethod
   def APIScriptFiles(cls):
     return ['s3.py']
+
+
+def _MakeS3BucketPolicy(bucket: str,
+                        actions: List[str],
+                        object_prefix='') -> str:
+  # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_s3_rw-bucket.html
+  return json.dumps({
+      'Version':
+          '2012-10-17',
+      'Statement': [{
+          'Principal': '*',
+          'Sid': 'PkbAcl',
+          'Effect': 'Allow',
+          'Action': actions,
+          'Resource': [f'arn:aws:s3:::{bucket}/{object_prefix}*']
+      }]
+  })

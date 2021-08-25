@@ -56,6 +56,7 @@
 -   Add AWS support for VM stop start benchmark.
 -   Add Azure support for VM stop start benchmark.
 -   Add `--os_type=debian11` support for GCP, AWS and Azure Providers.
+-   Add cURL benchmark for object storage.
 
 ### Enhancements:
 

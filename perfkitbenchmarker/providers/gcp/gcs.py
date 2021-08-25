@@ -19,6 +19,7 @@ import ntpath
 import os
 import posixpath
 import re
+from typing import List as TList
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -35,6 +36,8 @@ DEFAULT_GCP_REGION = 'us-central1'
 GCLOUD_CONFIG_PATH = '.config/gcloud'
 GCS_CLIENT_PYTHON = 'python'
 GCS_CLIENT_BOTO = 'boto'
+READER = 'objectViewer'
+WRITER = 'objectCreator'
 
 flags.DEFINE_string('google_cloud_sdk_version', None,
                     'Use a particular version of the Google Cloud SDK, e.g.: '
@@ -155,18 +158,44 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         ['gsutil', '-m', 'rm', '-r',
          'gs://%s/*' % bucket], raise_on_failure=False)
 
-  def ChmodBucket(self, account, access, bucket):
+  def AclBucket(self, entity: str, roles: TList[str], bucket: str):
     """Updates access control lists.
 
     Args:
-      account: string, the user to be granted.
-      access: string, the permission to be granted.
-      bucket: string, the name of the bucket to change
+      entity: the user or group to grant permission.
+      roles: the IAM roles to be granted.
+      bucket: the name of the bucket to change
     """
     vm_util.IssueCommand([
-        'gsutil', 'acl', 'ch', '-u',
-        '{account}:{access}'.format(account=account, access=access),
-        'gs://{}'.format(bucket)])
+        'gsutil', 'iam', 'ch', f"{entity}:{','.join(roles)}", f'gs://{bucket}'
+    ])
+
+  def MakeBucketPubliclyReadable(self, bucket, also_make_writable=False):
+    """See base class."""
+    roles = [READER]
+    logging.warning('Making bucket %s publicly readable!', bucket)
+    if also_make_writable:
+      roles.append(WRITER)
+      logging.warning('Making bucket %s publicly writable!', bucket)
+    self.AclBucket('allUsers', roles, bucket)
+
+  # Use JSON API over XML for URLs
+  def GetDownloadUrl(self, bucket, object_name, use_https=True):
+    """See base class."""
+    # https://cloud.google.com/storage/docs/downloading-objects
+    scheme = 'https' if use_https else 'http'
+    return (f'{scheme}://storage.googleapis.com/storage/v1/'
+            f'b/{bucket}/o/{object_name}?alt=media')
+
+  def GetUploadUrl(self, bucket, object_name, use_https=True):
+    """See base class."""
+    # https://cloud.google.com/storage/docs/uploading-objects
+    # Note I don't believe GCS supports upload via HTTP.
+    scheme = 'https' if use_https else 'http'
+    return (f'{scheme}://storage.googleapis.com/upload/storage/v1/'
+            f'b/{bucket}/o?uploadType=media&name={object_name}')
+
+  UPLOAD_HTTP_METHOD = 'POST'
 
   @classmethod
   def AcquireWritePermissionsWindows(cls, vm):

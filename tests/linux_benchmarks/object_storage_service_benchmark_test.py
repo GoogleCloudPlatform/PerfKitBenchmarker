@@ -45,7 +45,7 @@ class TestBuildCommands(pkb_common_test_case.PkbCommonTestCase):
 
     with mock.patch(time.__name__ + '.time', return_value=1.0):
       with mock.patch(object_storage_service_benchmark.__name__ +
-                      '._ProcessMultiStreamResults'):
+                      '.ProcessMultiStreamResults'):
         with mock.patch(object_storage_service_benchmark.__name__ +
                         '.LoadWorkerOutput', return_value=(None, None, None)):
           object_storage_service_benchmark.MultiStreamRWBenchmark(

@@ -403,8 +403,13 @@ def MultiThreadDeleteDelay(num_vms, threads_per_vm):
   return (num_vms * threads_per_vm) / (MULTISTREAM_DELETE_OPS_PER_SEC)
 
 
-def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
-                               all_sizes, results, metadata=None):
+def ProcessMultiStreamResults(start_times,
+                              latencies,
+                              sizes,
+                              operation,
+                              all_sizes,
+                              results,
+                              metadata=None):
   """Read and process results from the api_multistream worker process.
 
   Results will be reported per-object size and combined for all
@@ -1053,7 +1058,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   if FLAGS.object_storage_worker_output:
     with open(FLAGS.object_storage_worker_output, 'w') as out_file:
       out_file.write(json.dumps(output))
-  _ProcessMultiStreamResults(
+  ProcessMultiStreamResults(
       start_times,
       latencies,
       sizes,

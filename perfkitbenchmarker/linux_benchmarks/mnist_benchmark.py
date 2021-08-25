@@ -141,7 +141,8 @@ def Prepare(benchmark_spec):
     location = benchmark_spec.tpu_groups['train'].GetZone()
     storage_service.PrepareService(util.GetRegionFromZone(location))
     storage_service.MakeBucket(bucket)
-    storage_service.ChmodBucket(benchmark_spec.gcp_service_account, 'W', bucket)
+    storage_service.AclBucket(benchmark_spec.gcp_service_account, gcs.WRITER,
+                              bucket)
   else:
     benchmark_spec.model_dir = '/tmp'
 

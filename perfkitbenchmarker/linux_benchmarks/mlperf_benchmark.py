@@ -235,8 +235,8 @@ def PrepareRunner(benchmark_spec, vm=None):
       location = benchmark_spec.tpu_groups['train'].GetZone()
       storage_service.PrepareService(util.GetRegionFromZone(location))
       storage_service.MakeBucket(bucket)
-      storage_service.ChmodBucket(benchmark_spec.gcp_service_account, 'W',
-                                  bucket)
+      storage_service.AclBucket(benchmark_spec.gcp_service_account, gcs.WRITER,
+                                bucket)
 
     # For MLPerf 1.0, the benchmake code of different hardware are different.
     if (benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-32' or
