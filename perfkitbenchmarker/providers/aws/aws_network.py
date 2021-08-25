@@ -36,6 +36,7 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.providers.aws.aws_vpn_network import AwsVpnGateway
 
 flags.DEFINE_string('aws_vpc', None,
                     'The static AWS VPC id to use. Default creates a new one')
@@ -66,16 +67,19 @@ class AwsFirewall(network.BaseFirewall):
     self.firewall_icmp_set = set()
     self._lock = threading.Lock()
 
-  def AllowIcmp(self, vm):
+  def AllowIcmp(self, vm, region=None, security_group=None, cidr=None):
     """Opens the ICMP protocol on the firewall.
 
     Args:
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
+      region: override vm.region if no vm is passed.
+      security_group: override vm.group_id if no vm is passed.
+      cidr: override default '0.0.0.0/0' for ingress traffic source.
     """
-    source = '0.0.0.0/0'
+    source = cidr or '0.0.0.0/0'
 
     # region, group_id, source
-    entry = (vm.region, vm.group_id, source)
+    entry = (region or vm.region, security_group or vm.group_id, source)
     with self._lock:
       if entry in self.firewall_icmp_set:
         return
@@ -86,8 +90,8 @@ class AwsFirewall(network.BaseFirewall):
       authorize_cmd = util.AWS_PREFIX + [
           'ec2',
           'authorize-security-group-ingress',
-          '--region=%s' % vm.region,
-          '--group-id=%s' % vm.group_id,
+          '--region=%s' % region or vm.region,
+          '--group-id=%s' % security_group or vm.group_id,
           '--protocol=icmp',
           '--port=-1',
           '--cidr=%s' % source]
@@ -176,11 +180,11 @@ class AwsFirewall(network.BaseFirewall):
 class AwsVpc(resource.BaseResource):
   """An object representing an Aws VPC."""
 
-  def __init__(self, region, vpc_id=None, regional_network_index=0):
+  def __init__(self, region, vpc_id=None, regional_network_index=0, cidr=None):
     super(AwsVpc, self).__init__(vpc_id is not None)
     self.region = region
     self.regional_network_index = regional_network_index
-    self.cidr = network.GetCidrBlock(self.regional_network_index, 0, 16)
+    self.cidr = cidr or network.GetCidrBlock(self.regional_network_index, 0, 16)
     self.id = vpc_id
     # Subnets are assigned per-AZ.
     # _subnet_index tracks the next unused 10.x.y.0/24 block.
@@ -616,11 +620,13 @@ class _AwsRegionalNetwork(network.BaseNetwork):
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
-  def __init__(self, region, vpc_id=None):
+  def __init__(self, region, vpc_id=None, cidr=None):
     self.region = region
+    self.vpc = AwsVpc(self.region, vpc_id=vpc_id, cidr=cidr)
     self.internet_gateway = AwsInternetGateway(region, vpc_id)
     self.route_table = None
     self.created = False
+    self.cidr = cidr
 
     # Locks to ensure that a single thread creates / deletes the instance.
     self._create_lock = threading.Lock()
@@ -634,14 +640,19 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 
     # Each regional network needs unique cidr_block for VPC peering.
     with _AwsRegionalNetwork._regional_network_lock:
-      self.vpc = AwsVpc(self.region, vpc_id,
-                        _AwsRegionalNetwork._regional_network_count)
-      self.cidr_block = network.GetCidrBlock(
-          _AwsRegionalNetwork._regional_network_count)
+      self.vpc = AwsVpc(
+          self.region,
+          vpc_id,
+          _AwsRegionalNetwork._regional_network_count,
+          self.cidr
+      )
+      self.cidr_block = self.cidr or network.GetCidrBlock(
+          _AwsRegionalNetwork._regional_network_count
+      )
       _AwsRegionalNetwork._regional_network_count += 1
 
   @classmethod
-  def GetForRegion(cls, region, vpc_id=None):
+  def GetForRegion(cls, region, vpc_id=None, cidr_block=None):
     """Retrieves or creates an _AwsRegionalNetwork.
 
     Args:
@@ -657,12 +668,12 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    key = cls.CLOUD, REGION, region
+    key = cls.CLOUD, REGION, region, cidr_block
     # Because this method is only called from the AwsNetwork constructor, which
     # is only called from AwsNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
     if key not in benchmark_spec.regional_networks:
-      benchmark_spec.regional_networks[key] = cls(region, vpc_id)
+      benchmark_spec.regional_networks[key] = cls(region, vpc_id, cidr_block)
     return benchmark_spec.regional_networks[key]
 
   def Create(self):
@@ -708,8 +719,8 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
 
-  def __init__(self, zone, vpc_id=None, subnet_id=None):
-    super(AwsNetworkSpec, self).__init__(zone)
+  def __init__(self, zone, vpc_id=None, subnet_id=None, cidr=None):
+    super(AwsNetworkSpec, self).__init__(zone, cidr)
     if vpc_id or subnet_id:
       logging.info('Confirming vpc (%s) and subnet (%s) selections', vpc_id,
                    subnet_id)
@@ -748,10 +759,20 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.regional_network = _AwsRegionalNetwork.GetForRegion(
-        self.region, spec.vpc_id)
+    if spec.cidr:
+      self.regional_network = _AwsRegionalNetwork.GetForRegion(
+          self.region,
+          spec.vpc_id,
+          spec.cidr
+      )
+    else:
+      self.regional_network = _AwsRegionalNetwork.GetForRegion(
+          self.region,
+          spec.vpc_id
+      )
     self.subnet = None
     self.vpc_peering = None
+    self.cidr = None
     if (FLAGS.placement_group_style ==
         placement_group.PLACEMENT_GROUP_NONE):
       self.placement_group = None
@@ -769,15 +790,39 @@ class AwsNetwork(network.BaseNetwork):
           cidr_block=self.regional_network.cidr_block,
           subnet_id=spec.subnet_id)
 
+    self.vpn_gateway = {}
+    self.az = spec.zone
+
+    name = 'pkb-network-%s' % FLAGS.run_uri
+    if spec.cidr:
+      self.cidr = spec.cidr
+    if self.cidr and FLAGS.use_vpn:
+      for vpn_gateway_num in range(0, FLAGS.vpn_service_gateway_count):
+        vpn_gateway_name = 'vpngw-%s-%s-%s' % (spec.zone, vpn_gateway_num, FLAGS.run_uri)
+        self.vpn_gateway[vpn_gateway_name] = AwsVpnGateway(
+            vpn_gateway_name,
+            name,
+            spec.zone,
+            spec.cidr
+        )
+
+
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns an AwsNetworkSpec created from VM attributes and flags."""
-    return AwsNetworkSpec(vm.zone, FLAGS.aws_vpc, FLAGS.aws_subnet)
+    return AwsNetworkSpec(vm.zone, FLAGS.aws_vpc, FLAGS.aws_subnet, vm.cidr)
 
   def Create(self):
     """Creates the network."""
     self.regional_network.Create()
 
+    if self.cidr:
+      self.subnet = AwsSubnet(
+          self.zone,
+          self.regional_network.vpc.id,
+          cidr_block=self.cidr
+      )
+      self.subnet.Create()
     if self.subnet is None:
       cidr = self.regional_network.vpc.NextSubnetCidrBlock()
       self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
@@ -785,9 +830,15 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet.Create()
     if self.placement_group:
       self.placement_group.Create()
+    if getattr(self, 'vpn_gateway', False):
+      for gw in self.vpn_gateway:
+        self.vpn_gateway[gw].Create()
 
   def Delete(self):
     """Deletes the network."""
+    if getattr(self, 'vpn_gateway', False):
+      for gw in self.vpn_gateway:
+        self.vpn_gateway[gw].Delete()
     if self.subnet:
       self.subnet.Delete()
     if self.placement_group:
