@@ -107,6 +107,7 @@
     logging of stdout & stderr from wait_for_command.
 -   Add support for NFS `nconnect` mount option.
 -   Add support for custom compilation of OpenJDK.
+-   Add support for configuring the HBase binding to use with `--hbase_binding`.
 
 ### Bug fixes and maintenance updates:
 

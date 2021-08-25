@@ -115,9 +115,6 @@ DROPWIZARD_METRICS_CORE_URL = posixpath.join(
     'io/dropwizard/metrics/metrics-core/3.1.2/', METRICS_CORE_JAR)
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
-HBASE_BINDING = 'hbase12-binding'
-YCSB_HBASE_LIB = posixpath.join(ycsb.YCSB_DIR, HBASE_BINDING, 'lib')
-YCSB_HBASE_CONF = posixpath.join(ycsb.YCSB_DIR, HBASE_BINDING, 'conf')
 
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/bigtable.admin',
@@ -231,14 +228,16 @@ def _Install(vm):
   preprovisioned_pkgs = [TCNATIVE_BORINGSSL_JAR]
   if 'hbase-1.x' in FLAGS.google_bigtable_hbase_jar_url:
     preprovisioned_pkgs.append(METRICS_CORE_JAR)
-  vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, preprovisioned_pkgs, YCSB_HBASE_LIB)
+  ycsb_hbase_lib = posixpath.join(ycsb.YCSB_DIR,
+                                  FLAGS.hbase_binding + '-binding', 'lib')
+  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, preprovisioned_pkgs,
+                                        ycsb_hbase_lib)
   vm.InstallPreprovisionedBenchmarkData(
       BENCHMARK_NAME, preprovisioned_pkgs, hbase_lib)
 
   url = FLAGS.google_bigtable_hbase_jar_url
   jar_name = os.path.basename(url)
-  jar_path = posixpath.join(YCSB_HBASE_LIB, jar_name)
+  jar_path = posixpath.join(ycsb_hbase_lib, jar_name)
   vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
   vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
 
@@ -395,7 +394,8 @@ def Prepare(benchmark_spec):
       'jvm-args': jvm_args,
       'table': table_name}
 
-  benchmark_spec.executor = ycsb.YCSBExecutor('hbase12', **executor_flags)
+  benchmark_spec.executor = ycsb.YCSBExecutor(FLAGS.hbase_binding,
+                                              **executor_flags)
 
 
 def Run(benchmark_spec):
