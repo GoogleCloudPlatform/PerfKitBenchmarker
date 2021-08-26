@@ -208,7 +208,7 @@ def RunNetperfAggregate(vm, server_ips):
       f'--intervals {output_file}.log',
       ignore_failure=False)
     vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm {output_file}*')
-    samples.extend(ParseNetperfAggregateOutput(proc_stdout, f'{parse_name}')) 
+    samples.extend(ParseNetperfAggregateOutput(proc_stdout, f'{parse_name}'))
 
   return samples
 
