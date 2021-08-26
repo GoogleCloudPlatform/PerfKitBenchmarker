@@ -30,7 +30,6 @@ import os
 import pipes
 import posixpath
 import subprocess
-import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -270,87 +269,79 @@ def MaxWithDefault(iterable, key, default):
     return default
 
 
-def _GetCpuUtilizationSample(samples, instance_id, workload_start_time):
-  """Gets a list of cpu utilization samples - one per cluster.
+def _GetCpuUtilizationSample(samples, instance_id):
+  """Gets a list of cpu utilization samples - one per cluster per workload.
 
-  Note that the utilization only covers the run stage.
+  Note that the utilization only covers the workload run stage.
 
   Args:
-    samples: list of sample.Sample. Used to find the load and run samples for
-             computing the run time.
+    samples: list of sample.Sample. Used to find the timestamp information to
+             determine the time windows for the cpu metrics.
     instance_id: the bigtable instance id.
-    workload_start_time: the timestamp (in seconds) when the workload starts.
 
   Returns:
-    a list of two samples for metrics "cpu_load" and "cpu_load_hottest_node",
+    a list of samples for metrics "cpu_load" and "cpu_load_hottest_node",
   """
-  load_sample = MaxWithDefault(
-      (cur_sample for cur_sample in samples
-       if cur_sample.metadata.get('stage') == 'load'),
-      key=lambda sample: sample.timestamp,
-      default=None)
-
-  # get the last sample recorded in the run stage
-  last_run_sample = MaxWithDefault(
-      (cur_sample for cur_sample in samples
-       if cur_sample.metadata.get('stage') == 'run'),
-      key=lambda sample: sample.timestamp,
-      default=None)
-
-  if not last_run_sample:
-    logging.debug('Could not find the run samples.')
-    return []
+  runtime_samples = [
+      s for s in samples
+      if s.metadata.get('stage') == 'run' and s.metric == 'overall RunTime'
+  ]
 
   # pylint: disable=g-import-not-at-top
   from google.cloud import monitoring_v3
   from google.cloud.monitoring_v3 import query
-
-  # Query the cpu utilization, which are gauged values at each minute in the
-  # time window of [start_timestamp, end_timestamp].
   client = monitoring_v3.MetricServiceClient()
-  start_timestamp = workload_start_time
-  if load_sample:
-    # Adjust the start timestamp to skip the load phase.
-    start_timestamp = load_sample.timestamp
-  end_timestamp = last_run_sample.timestamp
-  workload_duration_minutes = int((end_timestamp - start_timestamp) / 60)
-  if workload_duration_minutes == 0:
-    logging.warning(
-        'Workload lasted for less than 1 minute, rounding duration up to get a '
-        'valid CPU usage measurement.')
-    workload_duration_minutes = 1
-  samples = []
-  for metric in ['cpu_load', 'cpu_load_hottest_node']:
-    cpu_query = query.Query(
-        client, project=(FLAGS.project or _GetDefaultProject()),
-        metric_type='bigtable.googleapis.com/cluster/{}'.format(metric),
-        end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
-        minutes=workload_duration_minutes)
-    cpu_query = cpu_query.select_resources(instance=instance_id)
-    time_series = list(cpu_query)
-    if not time_series:
-      logging.debug(
-          'Time series for computing %s could not be found.', metric)
+
+  cpu_samples = []
+  time_units_in_secs = {'s': 1, 'ms': 0.001, 'us': 0.000001}
+  for runtime_sample in runtime_samples:
+    if runtime_sample.unit not in time_units_in_secs:
+      logging.warning('The unit of overall RunTime is not supported: %s',
+                      runtime_sample.unit)
       continue
 
-    # Build the dict to be added to samples.
-    for cluster_number, cluster_time_series in enumerate(time_series):
-      utilization = [
-          round(point.value.double_value, 3)
-          for point in cluster_time_series.points]
+    duration_sec = runtime_sample.value * time_units_in_secs.get(
+        runtime_sample.unit)
+    workload_duration_minutes = max(1, int(duration_sec / 60))
 
-      average_utilization = round(sum(utilization) / len(utilization), 3)
-      metadata = {
-          'cluster_number': cluster_number,
-          'cpu_utilization_per_minute': utilization,
-          'cpu_average_utilization': average_utilization,
-      }
+    # workload_index helps associate the cpu metrics with the current run stage.
+    workload_index = runtime_sample.metadata.get('workload_index')
 
-      cpu_utilization_sample = sample.Sample(
-          '{}_array'.format(metric), -1, '', metadata)
+    # Query the cpu utilization, which are gauged values at each minute in the
+    # time window determined by end_timestamp and workload_duration_minutes.
+    end_timestamp = runtime_sample.timestamp
+    for metric in ['cpu_load', 'cpu_load_hottest_node']:
+      cpu_query = query.Query(
+          client, project=(FLAGS.project or _GetDefaultProject()),
+          metric_type='bigtable.googleapis.com/cluster/{}'.format(metric),
+          end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+          minutes=workload_duration_minutes)
+      cpu_query = cpu_query.select_resources(instance=instance_id)
+      time_series = list(cpu_query)
+      if not time_series:
+        logging.debug(
+            'Time series for computing %s could not be found.', metric)
+        continue
 
-      samples.append(cpu_utilization_sample)
-  return samples
+      # Build and add the cpu samples from the query results.
+      for cluster_number, cluster_time_series in enumerate(time_series):
+        utilization = [
+            round(point.value.double_value, 3)
+            for point in cluster_time_series.points]
+
+        average_utilization = round(sum(utilization) / len(utilization), 3)
+        metadata = {
+            'cluster_number': cluster_number,
+            'workload_index': workload_index,
+            'cpu_utilization_per_minute': utilization,
+            'cpu_average_utilization': average_utilization,
+        }
+
+        cpu_utilization_sample = sample.Sample(
+            '{}_array'.format(metric), -1, '', metadata)
+
+        cpu_samples.append(cpu_utilization_sample)
+  return cpu_samples
 
 
 def Prepare(benchmark_spec):
@@ -448,16 +439,12 @@ def Run(benchmark_spec):
   if not FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = 1
 
-  # Get the starting time of the workload for cpu metric collection, where the
-  # starting time may be adjusted if there is a table loading phase.
-  workload_start_time = time.time()
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
 
   # Optionally add new samples for cluster cpu utilization.
   if FLAGS.get_bigtable_cluster_cpu_utilization:
-    cpu_utilization_samples = _GetCpuUtilizationSample(samples, instance_name,
-                                                       workload_start_time)
+    cpu_utilization_samples = _GetCpuUtilizationSample(samples, instance_name)
     samples.extend(cpu_utilization_samples)
 
   for current_sample in samples:

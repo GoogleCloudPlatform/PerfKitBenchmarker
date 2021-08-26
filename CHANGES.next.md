@@ -109,6 +109,9 @@
 -   Add support for NFS `nconnect` mount option.
 -   Add support for custom compilation of OpenJDK.
 -   Add support for configuring the HBase binding to use with `--hbase_binding`.
+-   Enhance the cpu utilization metrics for cloud bigtable ycsb benchmark:
+    collect the cpu data for each workload (differentiated by workload_index);
+    the time window estimation is also more accurate.
 
 ### Bug fixes and maintenance updates:
 
