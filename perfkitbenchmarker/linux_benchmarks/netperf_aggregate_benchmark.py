@@ -82,21 +82,9 @@ def PrepareNetperfAggregate(vm):
 
 
   # Enable test types in the script runemomniaggdemo.sh
-  if 'STREAM' in FLAGS.netperf_aggregate_benchmarks:
+  for benchmark in FLAGS.netperf_aggregate_benchmarks:
     vm.RemoteCommand(
-      r'sed -i "s/DO_STREAM=0;/DO_STREAM=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
-    )
-  if 'MAERTS' in FLAGS.netperf_aggregate_benchmarks:
-    vm.RemoteCommand(
-      r'sed -i "s/DO_MAERTS=0;/DO_MAERTS=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
-    )
-  if 'BIDIR' in FLAGS.netperf_aggregate_benchmarks:
-    vm.RemoteCommand(
-      r'sed -i "s/DO_BIDIR=0;/DO_BIDIR=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
-    )
-  if 'RRAGG' in FLAGS.netperf_aggregate_benchmarks:
-    vm.RemoteCommand(
-      r'sed -i "s/DO_RRAGG=0;/DO_RRAGG=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
+      f'sed -i "s/DO_{benchmark}=0;/DO_{benchmark}=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
     )
 
   port_end = PORT_START
