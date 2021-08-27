@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,12 +18,14 @@ docs:
 https://hewlettpackard.github.io/netperf/doc/netperf.html
 manpage: http://manpages.ubuntu.com/manpages/maverick/man1/netperf.1.html
 
-Runs UDP_RR in script between one source machine and two target machines
-to test packets per second
+Runs multiple tests in script between one source machine and two target machines
+to test packets per second and inbound and outbound throughput
 
 """
 
+import collections
 import logging
+import os
 import re
 from absl import flags
 from perfkitbenchmarker import configs
@@ -31,12 +33,23 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
 
+ALL_BENCHMARKS = ['STREAM', 'MAERTS', 'BIDIR', 'RRAGG']
+flags.DEFINE_list('netperf_aggregate_benchmarks', ALL_BENCHMARKS,
+                  'The netperf aggregate benchmark(s) to run. '
+                  'STREAM measures outbound throughput. '
+                  'MAERTS measures inbound throughput. '
+                  'RRAGG measures packets per second.'
+                  'BIDIR measure bidirectional bulk throughput')
+flags.register_validator(
+    'netperf_aggregate_benchmarks',
+    lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
+
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'netperf_pps'
+BENCHMARK_NAME = 'netperf_aggregate'
 BENCHMARK_CONFIG = """
-netperf_pps:
-  description: test packets per second performance using netperf
+netperf_aggregate:
+  description: simultaneous netperf to multiple endpoints
   vm_groups:
     servers:
       vm_spec: *default_single_core
@@ -61,9 +74,18 @@ def GetConfig(user_config):
 def PrepareNetperfAggregate(vm):
   """Installs netperf on a single vm."""
 
+  vm.Install('python3')
+  vm.Install('pip3')
+  vm.RemoteCommand('sudo pip3 install --upgrade pip')
   vm.Install('texinfo')
   vm.Install('python_rrdtool')
   vm.Install('netperf')
+
+  # Enable test types in the script runemomniaggdemo.sh
+  for benchmark in FLAGS.netperf_aggregate_benchmarks:
+    vm.RemoteCommand(
+        f'sed -i "s/DO_{benchmark}=0;/DO_{benchmark}=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
+    )
 
   port_end = PORT_START
 
@@ -75,9 +97,6 @@ def PrepareNetperfAggregate(vm):
       netserver_path=netperf.NETSERVER_PATH)
   vm.RemoteCommand(netserver_cmd)
 
-  remote_path = netperf.NETPERF_EXAMPLE_DIR + REMOTE_SCRIPT
-  vm.RemoteCommand('chmod +x %s' % (remote_path))
-
 
 def Prepare(benchmark_spec):
   """Install netperf on the target vm.
@@ -88,14 +107,20 @@ def Prepare(benchmark_spec):
   """
 
   vms = benchmark_spec.vms
+  client_vm = benchmark_spec.vm_groups['client'][0]
+
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
+  client_vm.RemoteCommand(
+      f'sudo chmod 777 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
+  )
 
 
-def ParseNetperfAggregateOutput(stdout):
+def ParseNetperfAggregateOutput(stdout, test_type):
   """Parses the stdout of a single netperf process.
 
   Args:
     stdout: the stdout of the netperf process
+    test_type: the type of test
 
   Returns:
     A tuple containing (throughput_sample, latency_samples, latency_histogram)
@@ -110,7 +135,7 @@ def ParseNetperfAggregateOutput(stdout):
     match = re.search('peak interval', line)
     if match:
       line_split = line.split()
-      metric = line_split[0] + ' ' + line_split[6]
+      metric = f'{test_type} {line_split[0]} {line_split[6]}'
       value = float(line_split[5])
       unit = line_split[6]
       aggregate_samples.append(sample.Sample(
@@ -149,7 +174,6 @@ def RunNetperfAggregate(vm, server_ips):
   vm.RemoteCommand(f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
                    f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
 
-  # allow script to be executed and run script
   vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && '
       'export PATH=$PATH:. && '
@@ -160,24 +184,25 @@ def RunNetperfAggregate(vm, server_ips):
       login_shell=False,
       timeout=1200)
 
-  # print out netperf_tps.log to log
-  stdout_1, stderr_1 = vm.RemoteCommand(
-      f'cat {netperf.NETPERF_EXAMPLE_DIR}/netperf_tps.log',
-      ignore_failure=True,
-      should_log=True,
-      login_shell=False,
-      timeout=1200)
+  interval_naming = collections.namedtuple(
+      'IntervalNaming', 'output_file parse_name')
+  benchmark_interval_mapping = {
+      'STREAM': interval_naming('netperf_outbound', 'Outbound'),
+      'MAERTS': interval_naming('netperf_inbound', 'Inbound'),
+      'RRAGG': interval_naming('netperf_tps', 'Request/Response Aggregate'),
+      'BIDIR': interval_naming('netperf_bidirectional', 'Bidirectional')
+  }
 
-  logging.info(stdout_1)
-  logging.info(stderr_1)
-
-  # do post processing step
-  proc_stdout, _ = vm.RemoteCommand(
-      f'cd {netperf.NETPERF_EXAMPLE_DIR} && ./post_proc.py '
-      '--intervals netperf_tps.log',
-      ignore_failure=True)
-
-  samples = ParseNetperfAggregateOutput(proc_stdout)
+  samples = []
+  for benchmark in FLAGS.netperf_aggregate_benchmarks:
+    output_file = benchmark_interval_mapping[benchmark].output_file
+    parse_name = benchmark_interval_mapping[benchmark].parse_name
+    proc_stdout, _ = vm.RemoteCommand(
+        f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
+        f'--intervals {output_file}.log',
+        ignore_failure=False)
+    vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm {output_file}*')
+    samples.extend(ParseNetperfAggregateOutput(proc_stdout, f'{parse_name}'))
 
   return samples
 

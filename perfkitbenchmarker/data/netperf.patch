@@ -307,7 +307,8 @@ diff -u -r netperf-2.6.0/doc/examples/runemomniaggdemo.sh netperf-2.6.0-patch/do
  # net.core.[r|w]mem_max are sufficiently large
 -DO_BIDIR=1;
 +DO_BIDIR=0;
- DO_RRAGG=1;
+-DO_RRAGG=1;
++DO_RRAGG=0;
 -DO_RR=1;
 -DO_ANCILLARY=1;
 +DO_RR=0;
@@ -339,3 +340,94 @@ diff -u -r netperf-2.7.0/config.guess  netperf-2.7.0-patch/config.guess
      alpha:Linux:*:*)
         case `sed -n '/^cpu model/s/^.*: \(.*\)/\1/p' < /proc/cpuinfo` in
           EV5)   UNAME_MACHINE=alphaev5 ;;
+
+diff -u -r netperf-2.7.0/doc/examples/post_proc.py netperf-2.7.0-patch/doc/examples/post_proc.py
+--- netperf-2.7.0/doc/examples/post_proc.py 2015-07-20 12:39:35.000000000 -0500
++++ netperf-2.7.0-patch/doc/examples/post_proc.py   2021-07-16 10:22:34.642546090 -0500
+@@ -125,7 +125,7 @@
+             ksink[key] += float(result[0])
+         else:
+             if result[0]:
+-                print "Key %d not in ksink" % key
++                print("Key %d not in ksink" % key)
+ 
+ def process_result(basename, raw_results, end_time, ksink):
+     first_result = True
+@@ -209,7 +209,7 @@
+             try:
+                 update_rrd(basename,interim_result,interim_end)
+             except Exception as e:
+-                print "Update to %s with %s at %s failed with %s" % (basename,interim_result,interim_end,e)
++                print("Update to %s with %s at %s failed with %s" % (basename,interim_result,interim_end,e))
+             have_result = False
+             had_results = True
+ 
+@@ -221,7 +221,7 @@
+         return 0, 0
+ 
+ def process_result_files(prefix,start_time,end_time,ksink):
+-    print "Prefix is %s" % prefix
++    print("Prefix is %s" % prefix)
+     min_timestamp = 9999999999.9
+     results_list = glob.glob(prefix+"*.out")
+ 
+@@ -254,13 +254,13 @@
+     # find that key in the kitchen sink, we will use the value to
+     # update the overall rrd.
+     prevkey = -1
+-    for key in xrange(int(start_time),int(end_time)+1):
++    for key in range(int(start_time),int(end_time)+1):
+         if key in ksink:
+             try:
+                 update_rrd(overall,ksink[key],key)
+                 prevkey = key
+             except Exception as e:
+-                print "Update to %s failed for %d, previous %d %s" % (overall, key, prevkey, e)
++                print("Update to %s failed for %d, previous %d %s" % (overall, key, prevkey, e))
+ 
+ def overall_min_max_avg(prefix,start_time,end_time,intervals):
+ 
+@@ -312,7 +312,7 @@
+         imax = float(result[2].strip('"'))
+         results_list.append((iavg, imin, imax, start, end))
+ 
+-        for time in xrange(start,end+1):
++        for time in range(start,end+1):
+             rrdtool.update(prefix + "_intervals.rrd",
+                            '%d:%f:%f:%f' % (time, iavg, imin, imax))
+         if iavg > max_average:
+@@ -444,13 +444,13 @@
+     # the time being I will preallocate the entire dict in one fell
+     # swoop until I can modify add_to_ksink() accordingly
+     length = int(end_time + 1) - int(start_time)
+-    ksink=dict(zip(xrange(int(start_time),
++    ksink=dict(zip(range(int(start_time),
+                           int(end_time)+1),
+                    [0.0] * length))
+ 
+     min_timestamp = process_result_files(prefix,start_time,end_time,ksink)
+     if min_timestamp == 9999999999.9:
+-        print "There were no valid results for this prefix!"
++        print("There were no valid results for this prefix!")
+         exit()
+ 
+ #    print "Min timestamp for %s is %s start time is %s end_time is %s" % (prefix,min_timestamp,start_time,end_time)
+@@ -471,12 +471,12 @@
+                          annotation=args.annotation,override=args.title)
+     
+     units, multiplier, direction = units_et_al_by_prefix(prefix)
+-    print "Average of peak interval is %.3f %s from %d to %d" % (results_list[0][0] * float(multiplier), units, peak_start, peak_end)
+-    print "Minimum of peak interval is %.3f %s from %d to %d" % (peak_minimum * float(multiplier), units, peak_start, peak_end)
+-    print "Maximum of peak interval is %.3f %s from %d to %d" % (peak_maximum * float(multiplier), units, peak_start, peak_end)
++    print("Average of peak interval is %.3f %s from %d to %d" % (results_list[0][0] * float(multiplier), units, peak_start, peak_end))
++    print("Minimum of peak interval is %.3f %s from %d to %d" % (peak_minimum * float(multiplier), units, peak_start, peak_end))
++    print("Maximum of peak interval is %.3f %s from %d to %d" % (peak_maximum * float(multiplier), units, peak_start, peak_end))
+ 
+     if args.intervals:
+         for id, interval in enumerate(results_list[1:]):
+-            print "Average of interval %d is %.3f %s from %d to %d" % (id, interval[0] * float(multiplier), units, interval[3], interval[4])
+-            print "Minimum of interval %d is %.3f %s from %d to %d" % (id, interval[1] * float(multiplier), units, interval[3], interval[4])
+-            print "Maximum of interval %d is %.3f %s from %d to %d" % (id, interval[2] * float(multiplier), units, interval[3], interval[4])
++            print("Average of interval %d is %.3f %s from %d to %d" % (id, interval[0] * float(multiplier), units, interval[3], interval[4]))
++            print("Minimum of interval %d is %.3f %s from %d to %d" % (id, interval[1] * float(multiplier), units, interval[3], interval[4]))
++            print("Maximum of interval %d is %.3f %s from %d to %d" % (id, interval[2] * float(multiplier), units, interval[3], interval[4]))

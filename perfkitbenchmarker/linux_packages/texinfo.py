@@ -16,9 +16,9 @@
 """Module containing build tools installation and cleanup functions."""
 
 
-def YumInstall(vm):
+def YumInstall(_):
   """Installs build tools on the VM."""
-  vm.InstallPackages('texinfo')
+  pass
 
 
 def AptInstall(vm):
