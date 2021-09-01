@@ -29,13 +29,13 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
-GIT_TAG = '1.2.15'
+GIT_TAG = '793d74dbc09395dfc241342d847730a6197d7c0c'
 LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
 LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
 LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % linux_packages.INSTALL_DIR
 MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
-APT_PACKAGES = ('autoconf automake libpcre3-dev '
-                'libevent-dev pkg-config zlib1g-dev')
+APT_PACKAGES = ('build-essential autoconf automake libpcre3-dev '
+                'libevent-dev pkg-config zlib1g-dev libssl-dev')
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
 MEMTIER_RESULTS = pathlib.PosixPath('memtier_results')
 
@@ -83,8 +83,8 @@ flag_util.DEFINE_integerlist(
     'Comma separated list of number of clients per thread. '
     'Specify more than 1 value to vary the number of clients. '
     'Defaults to [50].')
-flag_util.DEFINE_integerlist(
-    'memtier_threads', [4], 'Number of threads. Defaults to 4.')
+flag_util.DEFINE_integerlist('memtier_threads', [4],
+                             'Number of threads. Defaults to 4.')
 MEMTIER_RATIO = flags.DEFINE_string(
     'memtier_ratio', '1:9', 'Set:Get ratio. Defaults to 1:9 Sets:Gets.')
 MEMTIER_DATA_SIZE = flags.DEFINE_integer(
@@ -200,6 +200,7 @@ def BuildMemtierCommand(
       'requests': requests,
       'run-count': run_count,
       'test-time': test_time,
+      'print-percentile': '50,90,95,99,99.9',
   }
   # Arguments passed without a parameter
   no_param_args = {'random-data': random_data}
@@ -446,18 +447,16 @@ class MemtierResult:
     Returns:
       MemtierResult object.
 
-    Example memtier_benchmark output, note Hits/sec and Misses/sec are displayed
-    in error for version 1.2.8+ due to bug:
-    https://github.com/RedisLabs/memtier_benchmark/issues/46
+    Example memtier_benchmark output.
 
     4         Threads
     50        Connections per thread
     20        Seconds
-    Type        Ops/sec     Hits/sec   Misses/sec      Latency       KB/sec
-    ------------------------------------------------------------------------
-    Sets        4005.50          ---          ---      4.50600       308.00
-    Gets       40001.05         0.00     40001.05      4.54300      1519.00
-    Totals     44006.55         0.00     40001.05      4.54000      1828.00
+    Type        Ops/sec     Hits/sec   Misses/sec   Avg. Latency  ...    KB/sec
+    ----------------------------------------------------------------------------
+    Sets        4005.50          ---          ---        4.50600  ...    308.00
+    Gets       40001.05         0.00     40001.05        4.54300  ...    1519.00
+    Totals     44006.55         0.00     40001.05        4.54000  ...    1828.00
 
     Request Latency Distribution
     Type        <= msec      Percent
@@ -523,7 +522,7 @@ def _ParseTotalThroughputAndLatency(
   for raw_line in memtier_results.splitlines():
     line = raw_line.strip()
     if re.match(r'^Totals', line):
-      _, ops_per_sec, _, _, latency_ms, kb_per_sec = line.split()
+      _, ops_per_sec, _, _, latency_ms, _, _, _, _, _, kb_per_sec = line.split()
       return float(ops_per_sec), float(latency_ms), float(kb_per_sec)
   raise errors.Benchmarks.RunError('No "TOTALS" line in memtier output.')
 
