@@ -37,11 +37,13 @@ from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
 
-flags.DEFINE_string('aws_vpc', None,
-                    'The static AWS VPC id to use. Default creates a new one')
-flags.DEFINE_string(
+_AWS_VPC = flags.DEFINE_string(
+    'aws_vpc', None,
+    'The static AWS VPC id to use. If unset, creates a new VPC.')
+_AWS_SUBNET = flags.DEFINE_string(
     'aws_subnet', None,
-    'The static AWS subnet id to use.  Default creates a new one')
+    'The static AWS subnet id to use.  Set value to "default" to use '
+    'default subnet. If unset, creates a new subnet.')
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
 flags.DEFINE_string('aws_efa_version', '1.12.1',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
@@ -725,6 +727,36 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
       self.cidr_block = None
 
 
+def _get_default_vpc_id(region: str) -> str:
+  """Returns the default VPC ID for the region."""
+  vpc_cmd = util.AWS_PREFIX + [
+      'ec2', 'describe-vpcs',
+      '--region', region,
+      '--filters', 'Name=isDefault,Values=true'
+  ]
+  stdout, _ = vm_util.IssueRetryableCommand(vpc_cmd)
+  vpcs = json.loads(stdout)['Vpcs']
+  if not vpcs:
+    raise RuntimeError(f'AWS default VPC does not exist for region {region}.')
+  return vpcs[0]['VpcId']
+
+
+def _get_default_subnet_id(zone: str) -> str:
+  """Returns the default Subnet ID for the zone."""
+  region = util.GetRegionFromZone(zone)
+  subnet_cmd = util.AWS_PREFIX + [
+      'ec2', 'describe-subnets',
+      '--region', region, '--filter',
+      f'Name=availabilityZone,Values={zone}',
+      'Name=defaultForAz,Values=true'
+  ]
+  stdout, _ = vm_util.IssueRetryableCommand(subnet_cmd)
+  subnets = json.loads(stdout)['Subnets']
+  if not subnets:
+    raise RuntimeError(f'AWS default subnet does not exist for zone {zone}.')
+  return subnets[0]['SubnetId']
+
+
 class AwsNetwork(network.BaseNetwork):
   """Object representing an AWS Network.
 
@@ -772,7 +804,13 @@ class AwsNetwork(network.BaseNetwork):
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns an AwsNetworkSpec created from VM attributes and flags."""
-    return AwsNetworkSpec(vm.zone, FLAGS.aws_vpc, FLAGS.aws_subnet)
+    if _AWS_SUBNET.value == 'default':
+      vpc_id = _get_default_vpc_id(vm.region)
+      subnet_id = _get_default_subnet_id(vm.zone)
+    else:
+      vpc_id = _AWS_VPC.value
+      subnet_id = _AWS_SUBNET.value
+    return AwsNetworkSpec(vm.zone, vpc_id, subnet_id)
 
   def Create(self):
     """Creates the network."""
