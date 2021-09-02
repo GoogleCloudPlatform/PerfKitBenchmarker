@@ -1,17 +1,21 @@
 """Installs and runs the OSU MPI micro-benchmark."""
 
+import dataclasses
 import itertools
 import logging
 import re
 import time
 from typing import Any, Dict, Iterator, List, Optional, Pattern, Sequence, Tuple
-from absl import flags
-import dataclasses
 
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker.linux_packages import intelmpi
+from perfkitbenchmarker.linux_packages import openmpi
+
+FLAGS = flags.FLAGS
+flags.DEFINE_enum('mpi_vendor', 'intel', ['intel', 'openmpi'], 'MPI provider.')
 
 VERSION = '5.7.1'
 _PKG_NAME = 'osu-micro-benchmarks'
@@ -59,7 +63,6 @@ _MPI_PIN_RE = re.compile(_MPI_STARTUP_PREFIX + (r'(?P<rank>\d+)\s+'
                                                 r'(?P<nodename>\S+)\s+'
                                                 r'.*?(?P<cpuids>[\d,-]+)'))
 _PKB_NODE_RE = re.compile(r'pkb-(?P<pkbid>.*?)-(?P<nodeindex>\d+)')
-
 
 # parameters to pass into the benchmark
 _NUMBER_ITERATIONS = flags.DEFINE_integer(
@@ -209,9 +212,8 @@ class RunRequest:
 FLAGS = flags.FLAGS
 
 
-def Install(vm) -> None:
-  """Installs the omb package on the VM."""
-  vm.AuthenticateVm()
+def _InstallForIntelMpi(vm) -> None:
+  """Installs the omb package with IntelMPI lib on the VM."""
   vm.Install('intelmpi')
   txt, _ = vm.RemoteCommand(f'{intelmpi.SourceMpiVarsCommand(vm)}; '
                             'which mpicc mpicxx')
@@ -225,8 +227,34 @@ def Install(vm) -> None:
   _TestInstall([vm])
 
 
+def _InstallForOpenMpi(vm) -> None:
+  """Installs the omb package with OpenMPI lib on the VM."""
+  vm.Install('openmpi')
+  txt, _ = vm.RemoteCommand('which mpicc mpicxx')
+  mpicc_path, mpicxx_path = txt.splitlines()
+  vm.Install('build_tools')
+  vm.InstallPreprovisionedPackageData('omb', [_TARBALL], '.')
+  vm.RemoteCommand(f'tar -xvf {_TARBALL}')
+  vm.RemoteCommand(f'cd {_SRC_DIR}; ./configure CC={mpicc_path} '
+                   f'CXX={mpicxx_path}; make; sudo make install')
+  _TestInstall([vm])
+
+
+def Install(vm) -> None:
+  """Installs the omb package with specified MPI lib on the VM."""
+  vm.AuthenticateVm()
+  if FLAGS.mpi_vendor == 'intel':
+    _InstallForIntelMpi(vm)
+  else:
+    _InstallForOpenMpi(vm)
+
+
 def PrepareWorkers(vms) -> None:
-  intelmpi.NfsExportIntelDirectory(vms)
+  if FLAGS.mpi_vendor == 'intel':
+    intelmpi.NfsExportIntelDirectory(vms)
+  else:
+    for vm in vms:
+      vm.Install('openmpi')
   nfs_service.NfsExportAndMount(vms, _RUN_DIR)
   _TestInstall(vms)
 
@@ -282,8 +310,8 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
         full_cmd=full_cmd,
         units='MB/s' if 'MB/s' in txt else 'usec',
         params=params,
-        mpi_vendor='intel',
-        mpi_version=intelmpi.MpirunMpiVersion(vms[0]),
+        mpi_vendor=FLAGS.mpi_vendor,
+        mpi_version=_GetMpiVersion(vms[0]),
         value_column=BENCHMARKS[name].value_column,
         number_processes=number_processes,
         run_time=run_time,
@@ -291,25 +319,22 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
         perhost=_MPI_PERHOST.value)
 
 
-def _RunBenchmark(vm,
-                  name: str,
-                  perhost: int,
-                  number_processes: int = None,
-                  hosts: List[Any] = None,
-                  options: Dict[str, Any] = None) -> Tuple[str, str]:
-  """Runs the microbenchmark.
+def _GetMpiVersion(vm) -> Optional[str]:
+  """Returns the MPI version to use for the given OS type."""
+  if FLAGS.mpi_vendor == 'intel':
+    return intelmpi.MpirunMpiVersion(vm)
+  elif FLAGS.mpi_vendor == 'openmpi':
+    return openmpi.GetMpiVersion(vm)
 
-  Args:
-    vm: The headnode to run on.
-    name: The name of the microbenchmark.
-    perhost: MPI option -perhost.  Use 0 to not set value.
-    number_processes: The number of mpi processes to use.
-    hosts: List of BaseLinuxVirtualMachines to use in the cluster.
-    options: Optional dict of flags to pass into the benchmark.
 
-  Returns:
-    Tuple of the output text of mpirun and the command ran.
-  """
+def _RunBenchmarkWithIntelMpi(
+    vm,
+    name: str,
+    perhost: int,
+    number_processes: int = None,
+    hosts: List[Any] = None,
+    options: Dict[str, Any] = None) -> Tuple[str, str]:
+  """Runs the microbenchmark using Intel MPI library."""
   # Create the mpirun command
   full_benchmark_path = _PathToBenchmark(vm, name)
   mpirun_cmd = []
@@ -334,6 +359,66 @@ def _RunBenchmark(vm,
 
   txt, _ = vm.RobustRemoteCommand(full_cmd)
   return txt, full_cmd
+
+
+def _RunBenchmarkWithOpenMpi(vm,
+                             name: str,
+                             perhost: int,
+                             number_processes: int = None,
+                             hosts: List[Any] = None,
+                             options: Dict[str, Any] = None) -> Tuple[str, str]:
+  """Runs the microbenchmark using OpenMPI library."""
+  # Create the mpirun command
+  full_benchmark_path = _PathToBenchmark(vm, name)
+  mpirun_cmd = []
+  mpirun_cmd.append('mpirun')
+  mpirun_cmd.append('--use-hwthread-cpus')
+  mpirun_cmd.append('-report-bindings')
+  mpirun_cmd.append('-display-map')
+  if perhost:
+    mpirun_cmd.append(f'-npernode {perhost}')
+  if number_processes:
+    mpirun_cmd.append(f'-n {number_processes}')
+  if hosts:
+    host_ips = ','.join(
+        [f'{vm.internal_ip}:slots={number_processes}' for vm in hosts])
+    mpirun_cmd.append(f'-host {host_ips}')
+  mpirun_cmd.append(full_benchmark_path)
+  if options:
+    for key, value in sorted(options.items()):
+      mpirun_cmd.append(f'{key} {value}')
+  # _TestInstall runs the "hello" test which isn't a benchmark
+  if name in BENCHMARKS and BENCHMARKS[name].supports_full:
+    mpirun_cmd.append('--full')
+  full_cmd = ' '.join(mpirun_cmd)
+
+  txt, _ = vm.RobustRemoteCommand(full_cmd)
+  return txt, full_cmd
+
+
+def _RunBenchmark(vm,
+                  name: str,
+                  perhost: int,
+                  number_processes: int = None,
+                  hosts: List[Any] = None,
+                  options: Dict[str, Any] = None) -> Tuple[str, str]:
+  """Runs the microbenchmark.
+
+  Args:
+    vm: The headnode to run on.
+    name: The name of the microbenchmark.
+    perhost: MPI option -perhost.  Use 0 to not set value.
+    number_processes: The number of mpi processes to use.
+    hosts: List of BaseLinuxVirtualMachines to use in the cluster.
+    options: Optional dict of flags to pass into the benchmark.
+
+  Returns:
+    Tuple of the output text of mpirun and the command ran.
+  """
+  run_impl = _RunBenchmarkWithIntelMpi
+  if FLAGS.mpi_vendor == 'openmpi':
+    run_impl = _RunBenchmarkWithOpenMpi
+  return run_impl(vm, name, perhost, number_processes, hosts, options)
 
 
 def _PathToBenchmark(vm, name: str) -> str:
