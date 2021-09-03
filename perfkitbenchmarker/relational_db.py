@@ -273,7 +273,7 @@ class BaseRelationalDb(resource.BaseResource):
   def client_vm_query_tools(self):
     if not hasattr(self, '_client_vm_query_tools'):
       connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, self.endpoint,
+          self.spec.engine, self.spec.engine_version, self.endpoint, self.port,
           self.spec.database_username, self.spec.database_password)
       self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
           self.client_vm, connection_properties)
@@ -283,7 +283,7 @@ class BaseRelationalDb(resource.BaseResource):
   def server_vm_query_tools(self):
     if not hasattr(self, '_server_vm_query_tools'):
       connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, 'localhost',
+          self.spec.engine, self.spec.engine_version, 'localhost', self.port,
           self.spec.database_username, self.spec.database_password)
       self._server_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
           self.server_vm, connection_properties)

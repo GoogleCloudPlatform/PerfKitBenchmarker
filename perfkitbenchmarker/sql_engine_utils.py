@@ -58,11 +58,12 @@ DEFAULT_COMMAND = 'default'
 class DbConnectionProperties():
   """Data class to store attrubutes needed for connecting to a database."""
 
-  def __init__(self, engine, engine_version, endpoint, database_username,
+  def __init__(self, engine, engine_version, endpoint, port, database_username,
                database_password):
     self.engine = engine
     self.engine_version = engine_version
     self.endpoint = endpoint
+    self.port = port
     self.database_username = database_username
     self.database_password = database_password
 
@@ -86,7 +87,9 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
                       command: typing.Union[str, typing.Dict[str, str]],
                       database_name: str = '',
                       superuser: bool = False,
-                      **kwargs):
+                      session_variables: str = '',
+                      timeout: typing.Optional[int] = None,
+                      ignore_failure: bool = False):
     """Issue Sql Command."""
     command_string = None
     # Get the command to issue base on type
@@ -99,11 +102,15 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
       command_string = command
 
     command_string = self.MakeSqlCommand(
-        command_string, database_name=database_name)
+        command_string,
+        database_name=database_name,
+        session_variables=session_variables)
 
     if superuser:
       command_string = 'sudo ' + command_string
-    return self.vm.RemoteCommand(command_string, **kwargs)
+
+    return self.vm.RemoteCommand(
+        command_string, timeout=timeout, ignore_failure=ignore_failure)
 
   @abc.abstractmethod
   def InstallPackages(self) -> None:
@@ -116,7 +123,10 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     pass
 
   @abc.abstractmethod
-  def MakeSqlCommand(self, command: str, **kwargs):
+  def MakeSqlCommand(self,
+                     command: str,
+                     database_name: str = '',
+                     session_variables: str = ''):
     """Make a sql command."""
     pass
 
@@ -132,12 +142,20 @@ class PostgresCliQueryTools(ISQLQueryTools):
     """Installs packages required for making queries."""
     self.vm.Install('postgres_client')
 
-  def MakeSqlCommand(self, command: str, database_name=''):
+  def MakeSqlCommand(self,
+                     command: str,
+                     database_name: str = '',
+                     session_variables: str = ''):
     """Make Sql Command."""
     if not database_name:
       database_name = self.DEFAULT_DATABASE
-    return 'psql %s -c "%s"' % (self.GetConnectionString(database_name),
-                                command)
+    sql_command = 'psql %s ' % self.GetConnectionString(database_name)
+    if session_variables:
+      for session_variable in session_variables:
+        sql_command += '-c "%s" ' % session_variable
+
+    sql_command += '-c "%s"' % command
+    return sql_command
 
   def GetConnectionString(self, database_name=''):
     if not database_name:
@@ -168,8 +186,14 @@ class MysqlCliQueryTools(ISQLQueryTools):
                       self.connection_properties.engine_version)
     self.vm.Install(mysql_name)
 
-  def MakeSqlCommand(self, command: str, database_name=''):
+  def MakeSqlCommand(self,
+                     command: str,
+                     database_name: str = '',
+                     session_variables: str = ''):
     """See base class."""
+    if session_variables:
+      raise NotImplementedError(
+          'Session variables is currently not supported in mysql')
     mysql_command = 'mysql %s ' % (self.GetConnectionString())
     if database_name:
       mysql_command += database_name + ' '
@@ -197,8 +221,14 @@ class SqlServerCliQueryTools(ISQLQueryTools):
     """Installs packages required for making queries."""
     self.vm.Install('mssql_tools')
 
-  def MakeSqlCommand(self, command: str, database_name=''):
+  def MakeSqlCommand(self,
+                     command: str,
+                     database_name: str = '',
+                     session_variables: str = ''):
     """See base class."""
+    if session_variables:
+      raise NotImplementedError(
+          'Session variables is currently not supported in mysql')
     sqlserver_command = '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s ' % (
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
@@ -249,4 +279,3 @@ def GetQueryToolsByEngine(vm, connection_properties):
   elif engine_type == SQLSERVER:
     return SqlServerCliQueryTools(vm, connection_properties)
   raise ValueError('Engine not supported')
-
