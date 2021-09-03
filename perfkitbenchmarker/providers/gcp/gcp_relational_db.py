@@ -66,16 +66,6 @@ DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_SQL_SERVER_VERSION = '2017_Standard'
 
-DEFAULT_MYSQL_PORT = 3306
-DEFAULT_POSTGRES_PORT = 5432
-DEFAULT_SQLSERVER_PORT = 1433
-
-DEFAULT_PORTS = {
-    sql_engine_utils.MYSQL: DEFAULT_MYSQL_PORT,
-    sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_PORT,
-    sql_engine_utils.SQLSERVER: DEFAULT_SQLSERVER_PORT,
-}
-
 DEFAULT_ENGINE_VERSIONS = {
     sql_engine_utils.MYSQL: DEFAULT_MYSQL_VERSION,
     sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_VERSION,
@@ -206,7 +196,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         self.endpoint = self.server_vm.ip_address
         self.firewall = gce_network.GceFirewall()
         self.firewall.AllowPort(
-            self.server_vm, 3306, source_range=[self.client_vm.ip_address])
+            self.server_vm, self.port, source_range=[self.client_vm.ip_address])
       self.unmanaged_db_exists = True
 
   def _GetHighAvailabilityFlag(self):
@@ -349,7 +339,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    self.port = self._GetDefaultPort(self.spec.engine)
     if not self.is_managed_db:
       return self._IsReadyUnmanaged()
 
@@ -481,14 +470,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           'versions include {1}'.format(version, valid_versions))
 
     return version_mapping[version]
-
-  @staticmethod
-  def _GetDefaultPort(engine):
-    """Returns default port for the db engine from the spec."""
-    if engine not in DEFAULT_PORTS:
-      raise NotImplementedError('Default port not specified for '
-                                'engine {0}'.format(engine))
-    return DEFAULT_PORTS[engine]
 
   def _FailoverHA(self):
     """Fail over from master to replica."""
