@@ -1,0 +1,313 @@
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import posixpath
+import os
+
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
+from absl import flags
+from perfkitbenchmarker import data
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
+
+INSTALLED_PACKAGES = {}
+BENCHMARK_NAME = "{{ metadata.generated_name }}"
+BENCHMARK_DATA_DIR = "{{ metadata.data_dir }}"
+BENCHMARK_DIR = posixpath.join(INSTALL_DIR, BENCHMARK_DATA_DIR)
+BENCHMARK_CONFIG = """
+{{ metadata.generated_name }}:
+  description: Runs a sample benchmark.
+  vm_groups:
+{%- for vm_group in vm_groups %}
+    {{ vm_group.name.strip('"') }}:
+      os_type: {{ vm_group.deps[0].os_type.strip('"') }}
+      vm_spec:
+        AWS:
+          machine_type: m5.xlarge
+          zone: us-east-2
+          boot_disk_size: 100
+        GCP:
+          machine_type: n1-standard-4
+          zone: us-central1-a
+          image: null
+        Azure:
+          machine_type: Standard_F2s_v2
+          zone: eastus2
+          image: null
+{%- endfor %}
+"""
+
+FLAGS = flags.FLAGS
+{%- set flag_options = [config_flags, tunable_flags] %}
+
+{%- macro displayFlags(flag_option) %}
+{% for cfg in flag_option %}
+  {%- if cfg.range_type == "enum" -%}
+    flags.DEFINE_enum("{{ cfg.full_name }}", "{{ cfg.default }}", {{ cfg.range }}, "{{ cfg.description }}")
+  {%- elif cfg.range_type == "list" -%}
+    flags.DEFINE_list("{{ cfg.full_name }}", {{ cfg.default }}, " {{ cfg.range }}, {{ cfg.description }}")
+  {%- else -%}
+     {%- if cfg.type == "hex" -%}
+        flags.DEFINE_string("{{ cfg.full_name }}", {{ cfg.default }}, "{{ cfg.description }}")
+     {%- elif cfg.type == "float" -%}
+        {%- if cfg.range_type == "range" -%}
+            flags.DEFINE_float("{{ cfg.full_name }}", {{cfg.default}}, "{{ cfg.description }}",
+                   lower_bound={{ cfg.min }}, upper_bound={{ cfg.max }})
+        {%- else -%}
+            flags.DEFINE_float("{{ cfg.full_name }}", {{ cfg.default }}, "{{ cfg.description }}")
+        {%- endif -%}
+     {%- elif cfg.type == "integer" -%}
+        {%- if cfg.range_type == "range" -%}
+            flags.DEFINE_integer("{{ cfg.full_name }}", {{cfg.default}}, "{{ cfg.description }}",
+                     lower_bound={{ cfg.min }}, upper_bound={{ cfg.max }})
+        {%- else -%}
+            flags.DEFINE_integer("{{ cfg.full_name }}", {{ cfg.default }}, "{{ cfg.description }}")
+        {%- endif -%}
+     {%- else -%}
+        flags.DEFINE_string("{{ cfg.full_name }}", "{{ cfg.default }}", "{{ cfg.description }}")
+     {%- endif -%}
+  {%- endif -%}
+{{ '' }}
+{% endfor %}
+{%- endmacro %}
+
+""" Configuration flags """
+
+{{- displayFlags(config_flags) }}
+
+""" Tunable flags """
+
+{{- displayFlags(tunable_flags) }}
+
+
+def _GetInternalResources(vm, urls):
+  if urls:
+    dir_name = "internal_resources_{0}".format(vm.name)
+    internal_dir = vm_util.PrependTempDir(dir_name)
+    vm_util.IssueCommand("mkdir -p {0}".format(internal_dir).split())
+    os.chdir(os.path.abspath(internal_dir))
+    for url in urls:
+      vm_util.IssueCommand("curl -O {0}".format(url).split(), timeout=None)
+    archive_name = "{0}.tar.gz".format(dir_name)
+    archive_path = vm_util.PrependTempDir(archive_name)
+    remote_archive_path = posixpath.join(BENCHMARK_DIR, archive_name)
+    vm_util.IssueCommand("tar czf {0} -C {1} .".format(archive_path, internal_dir).split())
+    vm.RemoteCopy(archive_path, remote_archive_path)
+    vm.RemoteCommand("tar xf {0} -C {1}".format(remote_archive_path, BENCHMARK_DIR))
+
+
+def _ConvertNumericValue(val):
+  converted_val = val
+  try:
+    converted_val = int(val)
+  except BaseException:
+    try:
+      converted_val = float(val)
+    except BaseException:
+      if val.lower().startswith('0x'):
+        try:
+          converted_val = int(val, 16)
+        except BaseException:
+          pass
+  return converted_val
+
+{%- macro initializeFlags(flag_option) %}
+  """ If  there are any flags which will be assigned a value
+      based on some operations on the host/SUT, they will be initilaized here
+  """
+{%- for vm_group in vm_groups %}
+  vm_group_{{ vm_group.name.strip('"') }} = benchmark_spec.vm_groups[{{ vm_group.name }}]
+  print(vm_group_{{ vm_group.name.strip('"') }})
+{%- endfor %}
+{%- for cfg in flag_option %}
+{%- if cfg.default_cmd %}
+  if not FLAGS["{{ cfg.full_name.strip('"') }}"].present:
+    out, _ = vm_group_{{ cfg.target_default.strip('"') }}.RemoteCommand("{{ cfg.default_cmd.strip('"') }}")
+    val = out.strip()
+    {%- if cfg.type == "integer" or cfg.type == "float" %}
+    val = _ConvertNumericValue(val)
+    {%- endif %}
+    FLAGS.{{ cfg.full_name }} = val
+{%- endif %}
+{%- endfor %}
+{%- endmacro %}
+
+
+def _InitFlags(benchmark_spec):
+  {%- if not config_flags_has_cmd and not tunable_flags_has_cmd %}
+  pass
+  {%- endif %}
+  {%- if config_flags_has_cmd %}
+  {{- initializeFlags(config_flags) }}
+  {%- endif %}
+  {%- if tunable_flags_has_cmd %}
+  {{- initializeFlags(tunable_flags) }}
+  {%- endif %}
+
+
+def GetConfig(user_config):
+  """Returns the configuration of a benchmark."""
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+def Prepare(benchmark_spec):
+  """Prepares the VMs and other resources for running the benchmark.
+
+  This is a good place to download binaries onto the VMs, create any data files
+  needed for a benchmark run, etc.
+
+  Args:
+    benchmark_spec: The benchmark spec for this sample benchmark.
+  """
+  all_vms = [vm for group, vms in benchmark_spec.vm_groups.items() for vm in vms]
+  source_dir = data.ResourcePath("custom_pkb_workloads/" + BENCHMARK_DATA_DIR)
+  vm_util.RunThreaded(lambda vm: vm.RemoteCopy(source_dir, INSTALL_DIR), all_vms)
+  vm_util.RunThreaded(lambda vm: vm.RemoteCommand("sudo chmod -R +x {0}".format(INSTALL_DIR)), all_vms)
+  _InitFlags(benchmark_spec)
+  {%- for vm_group in vm_groups %}
+  vm_group_{{ vm_group.name.strip('"') }} = benchmark_spec.vm_groups[{{ vm_group.name }}]
+  INSTALLED_PACKAGES[{{ vm_group.name }}] = []
+  vm_util.RunThreaded(lambda vm: vm.Install("{0}_{1}_deps".format(BENCHMARK_NAME, {{ vm_group.name }})), vm_group_{{ vm_group.name.strip('"') }})
+  {%- endfor %}
+  {%- for flag_option in flag_options %}
+  {%- for cfg in flag_option %}
+  {%- if cfg.setcmd %}
+  target = vm_group_{{ cfg.target_setcmd.strip('"') }}
+  if isinstance(target, list):
+    vm_util.RunThreaded(lambda vm: vm.RemoteCommand({{ cfg.setcmd }} + " {0}".format(FLAGS.{{ cfg.full_name }})), target)
+  else:
+    target.RemoteCommand({{ cfg.setcmd }} + " {0}".format(FLAGS.{{ cfg.full_name }}))
+  {%- endif %}
+  {%- endfor %}
+  {%- endfor %}
+  {%- for ins in install -%}
+  {%- if ins %}
+  {%- if ins.target %}
+  {%- if ins.target.strip('"') == "local" %}
+  vm_util.IssueCommand({{ ins.cmd }}.split())
+  {%- else %}
+  target = vm_group_{{ ins.target.strip('"') }}
+  if not isinstance(target, list):
+    target = [target]
+  {%- if ins.internal_resources %}
+  res = {{ ins.internal_resources | map(attribute='url') | list}}
+  res = [eval(r) for r in res]
+  if isinstance(target, list):
+    vm_util.RunThreaded(lambda vm: _GetInternalResources(vm, res), target)
+  else:
+    _GetInternalResources(target, res)
+  {%- endif %}
+  {%- if ins.cmd %}
+  if isinstance(target, list):
+    vm_util.RunThreaded(lambda vm: vm.RemoteCommand({{ ins.cmd }}), target)
+  else:
+    target.RemoteCommand({{ ins.cmd }})
+  {%- endif %}
+  {%- endif %}
+  {%- endif %}
+  {%- endif %}
+  {%- endfor %}
+
+
+def Run(benchmark_spec):
+  """Runs the benchmark and returns a dict of performance data.
+
+  It must be possible to run the benchmark multiple times after the Prepare
+  stage.
+
+  Args:
+    benchmark_spec: The benchmark spec for this sample benchmark.
+
+  Returns:
+    A list of performance samples.
+  """
+  {%- for vm_group in vm_groups %}
+  vm_group_{{ vm_group.name.strip('"') }} = benchmark_spec.vm_groups[{{ vm_group.name }}]
+  print(vm_group_{{ vm_group.name.strip('"') }})
+  {%- endfor %}
+  results = []
+  metadata = {
+      "type": "{{ metadata.type }}",
+      "load": "{{ metadata.load }}",
+  }
+  packages_versions = GetInstalledPackageVersions(benchmark_spec.vm_groups)
+  if packages_versions:
+    metadata["packages"] = packages_versions
+  {%- for r in run %}
+  {%- if r.target.strip('"') == "local" %}
+  {%- if r.cmd %}
+  vm_util.IssueCommand({{ r.cmd }}.split())
+  {%- endif %}
+  {%- else %}
+  {%- if r.cmd %}
+  run_cmd = {{ r.cmd }}
+  vm_group_{{ r.target.strip('"') }}.RemoteCommand(run_cmd)
+  {%- endif %}
+  {%- endif %}
+  {%- endfor %}
+  {%- for m in metric %}
+  metadata["goal"] = {{ m.goal }}
+  vm = vm_group_{{ m.target.strip('"') }}
+  out, _ = vm.RemoteCommand({{ m.read }})
+  val = out.strip()
+  results.append(sample.Sample({{ m.name }}, val, {{ m.unit }}, metadata))
+  {%- endfor %}
+  {%- if output_dir %}
+  vm_group_{{ output_dir.target.strip('"') }}.RemoteCopy(vm_util.GetTempDir(), {{ output_dir.path }}, False)
+  {%- endif %}
+  return results
+
+
+def Cleanup(benchmark_spec):
+  """Cleans up after the benchmark completes.
+
+  The state of the VMs should be equivalent to the state before Prepare was
+  called.
+
+  Args:
+    benchmark_spec: The benchmark spec for this sample benchmark.
+  """
+  {%- for vm_group in vm_groups %}
+  vm_group_{{ vm_group.name.strip('"') }} = benchmark_spec.vm_groups[{{ vm_group.name }}]
+  vm_util.RunThreaded(lambda vm: vm.Uninstall("{0}_{1}_deps".format(BENCHMARK_NAME, {{ vm_group.name }})), vm_group_{{ vm_group.name.strip('"') }})
+  {%- endfor %}
+  {%- for c in cleanup %}
+  {%- if c.target.strip('"') == "local" %}
+  {%- if c.cmd %}
+  vm_util.IssueCommand({{ c.cmd }}.split())
+  {%- endif %}
+  {%- else %}
+  {%- if c.cmd %}
+  target = vm_group_{{ c.target.strip('"') }}
+  {%- endif %}
+  print(list)
+  if isinstance(target, list):
+    vm_util.RunThreaded(lambda vm: vm.RemoteCommand({{ c.cmd }}), target)
+  else:
+    target.RemoteCommand({{ c.cmd }})
+  {%- endif %}
+  {%- endfor %}
+
+
+def GetInstalledPackageVersions(vm_groups):
+  packages = INSTALLED_PACKAGES
+  packages_diff_versions = {}
+  for group, pkgs in packages.items():
+    local_pkgs = []
+    for pkg in pkgs:
+      local_pkgs.append(pkg)
+    if local_pkgs:
+      packages_diff_versions[group] = local_pkgs
+  return packages_diff_versions

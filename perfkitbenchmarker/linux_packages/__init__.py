@@ -36,6 +36,7 @@ See perfkitbenchmarker/package_managers.py for more information on how to use
 packages in benchmarks.
 """
 
+import os
 from perfkitbenchmarker import import_util
 
 
@@ -44,6 +45,7 @@ INSTALL_DIR = '/opt/pkb'
 
 
 def _LoadPackages():
+  __path__.append(os.path.join(__path__[0], "custom_pkb_workloads"))
   packages = dict([(module.__name__.split('.')[-1], module) for module in
                    import_util.LoadModulesForPath(__path__, __name__)])
   packages.update(packages['docker'].CreateImagePackages())

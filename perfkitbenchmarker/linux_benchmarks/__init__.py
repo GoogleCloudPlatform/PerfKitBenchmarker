@@ -17,10 +17,12 @@ All modules within this package are considered benchmarks, and are loaded
 dynamically. Add non-benchmark code to other packages.
 """
 
+import os
 from perfkitbenchmarker import import_util
 
 
 def _LoadBenchmarks():
+  __path__.append(os.path.join(__path__[0], "custom_pkb_workloads"))
   return list(import_util.LoadModulesForPath(__path__, __name__))
 
 BENCHMARKS = _LoadBenchmarks()

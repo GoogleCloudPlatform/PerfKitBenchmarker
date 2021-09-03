@@ -1,0 +1,461 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "cmd_on_target": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "description": "[REQUIRED] target can be either the 'local' which is your PKB host, an entire vm_group, or a single vm within a vm_group. 'target': 'vm_group1' -> run this step in parallel on all vms in vm_group1. 'target': 'vm_group2[0]' -> run this step only on vm with index 0 in vm_group2 ",
+              "type": "string",
+              "minLength": 1
+            },
+            "cmd": {
+              "description": "[REQUIRED] command to run ",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "target",
+            "cmd"
+          ]
+      },
+    "flags": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "[REQUIRED] The name will become a PKB flag, using the format workload1_knob1_name.Any blank spaces in the name will be replaced by '_'.Any 'key':'value' pair defined in the template can be referenced as $key throughout the template.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "description": "[OPTIONAL, but highly recommended] If not blank, the description will serve as a description for the PKB flag",
+          "type": "string"
+        },
+        "range": {
+          "description": "[OPTIONAL] Ignore if null string. Accepted formats are : 'range': '1-5' will be generated as a PKB integer parameter with a min value 1 and max value 5. 'range':'[1, 2, 3]' will be generated as a PKB list with one or more accepted values falling in that list. 'range': '('a', 'b', 'c')' will be generated as a PKB enum with only a single accepted value from the specified enum",
+          "anyOf": [
+            { "type": "string" },
+            { "type": "number" }
+          ]
+        },
+        "range_step": {
+          "description": "[OPTIONAL] If range is mentioned, this can be used to specify the step or difference between each value in the list. Mostly used for Adaptive Optimization.",
+          "type": "number"
+        },
+        "type": {
+          "description": "[REQUIRED] The type is required, as all PKB flags need to have specific types. Accepted values are: 'type': 'num' -> numeric, can be either integer or float. 'type': 'str' -> string. 'type': 'hex' -> string containing hexadecimal representation of a number. 'type': 'OS-num' -> numeric result of running an OS command. 'type': 'OS-str' -> string result of running an OS command. 'type': 'custom-num' -> numeric result of running a custom, user provided script. 'type': 'custom-str' -> string result of running a custom, user provided script",
+          "type": "string",
+          "enum": [
+            "OS-num",
+            "OS-str",
+            "custom-num",
+            "custom-str",
+            "num",
+            "str",
+            "hex"
+          ]
+        },
+        "target_default": {
+          "description": "[REQUIRED IF TYPE IS A COMMAND] Skipped otherwise. In case the type specified above is any type of command ('OS-num', 'OS-str', 'custom-num', 'custom-str'), it is obvious that we need to know where to run that command. The 'target' complies with the previous explanations and is supposed to be a single vm in this case, as  it is needed to be run only once, to determine the default value of the knob. ",
+          "type": "string"
+        },
+        "default": {
+          "description": "[Optional] If null string or missing, set the default PKB flag value to 'None'. Examples: 'default': '5' -> numerical default value equal to 5 (type needs to be 'num' above). 'default': '3.14' -> numerical default value equal to 3.14 (type needs to be 'num' above). 'default': 'xyz' -> string default value equal to xyz (type needs to be 'str' above). 'default': '0xFF' -> numerical default value equal to 255 (type needs to be 'hex' above). 'default': 'nproc' -> numerical default value equal to the output of the `nproc` command run on -> the SUT (type needs to be 'OS-num' above). 'default': 'uname -r' -> string default value equal to the output of the `uname -r` command run on -> the SUT (type needs to be 'OS-str' above). 'default': './get_num_memory_DIMMs' -> numerical default value equal to the output obtained after -> running the custom script 'get_num_memory_DIMMs' (which needs to be -> provided alongside the template) on the SUT. Type needs to be 'custom-num' above.",
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" }
+            ]
+        },
+        "setcmd": {
+          "description": "[Optional] If not provided or null string, ignore. This command does not produce output. Its only role is to propagate the value of the knob to the right place, so that the benchmark will leverage the new knob value (e.g. change a Mysql config entry in /etc/mysql/my.cnf, then restart the service). Setcmd will take as parameter either the default, or a user-provided value. As with the custom scripts mentioned before, if it begins with './', it means a custom script is executed (and needs to be provided alongside the template).",
+          "type": "string"
+        },
+        "target_setcmd": {
+          "description": "REQUIRED IF SETCMD IS PROVIDED. Skipped otherwise. In case setcmd is provided, we need to know where to run that command to set the knob value. The 'target' complies with the previous explanations and can be a single vm or entire vm_group",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "allOf": [
+        {
+          "if" : {
+            "properties": {"type": { "enum": [
+                                              "OS-num",
+                                              "OS-str",
+                                              "custom-num",
+                                              "custom-str"
+                                              ]
+              }
+            }
+          },
+          "then" : {
+            "properties": {
+              "target_default": { "minLength": 1 }
+            },
+            "required": ["target_default"]
+          },
+          "else": {
+            "properties": {
+              "target_default": { "minLength": 0 }
+            }
+          }
+        },
+        {
+          "if" : {
+            "properties": {
+              "setcmd": {"minLength": 1}
+            },
+            "required" : [ "setcmd" ]
+          },
+          "then": {
+            "properties": {
+              "target_setcmd": { "minLength": 1 }
+            },
+            "required" : [ "target_setcmd" ]
+          },
+          "else": {
+            "properties": {
+              "target_setcmd": { "minLength": 0 }
+            }
+          }
+        },
+        {
+          "if" : {
+            "properties": {
+              "target_setcmd": {"minLength": 1}
+            },
+            "required" : [ "target_setcmd" ]
+          },
+          "then": {
+            "properties": {
+              "setcmd": { "minLength": 1 }
+            },
+            "required" : [ "setcmd" ]
+          },
+          "else": {
+            "properties": {
+              "setcmd": { "minLength": 0 }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "workload1": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "Name of the workload",
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "description": "Category of the workload - Web, DB, HPC, Media, etc",
+              "type": "string",
+              "minLength": 1
+            },
+            "load": {
+              "description": "Average or Peak or Unknown",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "name",
+            "type",
+            "load"
+          ]
+        },
+        "vm_groups": {
+          "description": "Specify the requirements per vm group. [REQUIRED] At least 1 vm_group needs to be defined ",
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "type":"object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "deps": {
+                    "type": "array",
+                    "items": {
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "os_type": {
+                              "description": "[REQUIRED] 'os_type' can take the values of the platforms supported by PKB.",
+                              "type": "string",
+                              "minLength": 1,
+                              "enum": ["amazonlinux1", "amazonlinux2", "centos7", "centos8", "clear", "core_os", "cos", "debian9",
+                                       "debian10", "rhel7", "rhel8", "ubuntu1604", "ubuntu1710", "ubuntu1804", "ubuntu1910", "ubuntu2004"]
+                            },
+                            "packages_info": {
+                              "description": "[Optional] Information about packages that need to be installed for the OS specified above",
+                              "type": "array",
+                              "items": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "description": "[REQUIRED] name of the package to be installed. If custom package, the custom_install script needs to be provided alongside the template. If OS package, this name will be passed as an argument to the OS package mgmt (e.g. apt) install command",
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "ver": {
+                                        "description": "[OPTIONAL] package version. If the OS package mgmt system allows installing a specific version, attempt to install the version. If not, ignore this in the install phase and simply report at the end of the PKB run whether the version installed is different from the one expected. If null string, ignore. If not null, the package version will become a PKB flag with 'ver' as the default value",
+                                        "anyOf": [
+                                          { "type": "string" },
+                                          { "type": "number" }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "name"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "packages_install": {
+                              "description": "[Optional] Scripts to install packages for OS specified above",
+                              "type": "array",
+                              "items": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "install_script": {
+                                        "description": "[OPTIONAL] name of the script to be installed.",
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "packages_remove": {
+                              "description": "[Optional] Scripts to install packages for OS specified above",
+                              "type": "array",
+                              "items": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "uninstall_script": {
+                                        "description": "[OPTIONAL] name of the script to be installed.",
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "os_type"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required":[
+                  "name",
+                  "deps"
+                ]
+              }
+            ]
+          }
+        },
+        "install": {
+          "description": "[Optional] logic for installing the workload.This will be run during the Prepare stage. The 'install' field is a list because, for multi node workloads, installing might need to be split into phases. Each step is run on the vm_group or individual vm within vm_group specified as the target. Using this workflow, for example we can run step 1 on the master node, then run step 2 on only one worker node, then run step 3 across all worker nodes.Because multi-node setups will always require knowing the IPs of other machines involved, these can be accessed as '$vm_group1.IP_list', which will provide a list of IPs belonging to every instance in that VM group. The list can be indexed to access a single IP - '$vm_group1.IP_list[0]'. We can also run commands on the PKB host by using target as 'local' and giving the cmd to run in cmd",
+          "type": "array",
+          "items": [
+           {
+            "type": "object",
+            "properties": {
+              "target": {
+                "description": "step 1 [REQUIRED] target can be either an entire vm_group, or a single vm within a vm_group 'target': 'vm_group1' -> run this install step in parallel on all vms in vm_group1 'target': 'vm_group2[0]' -> run this install step only on vm with index 0 in vm_group2",
+                "type": "string"
+              },
+              "cmd": {
+                "description": "[REQUIRED] cmd is run on the SUT. It can be either an OS command or custom script (needs to be provided alongside this template if custom). All custom resources mentioned from here on, which are provided alongside this template, will be placed by the code generator into perfkitbenchmarker/data/workload1_name/. If custom script, it will be specified with './', while OS commands are expected to be in PATH and don't use file path. If null string (''), ignore.",
+                "type": "string"
+              },
+              "internal_resources": {
+                "description": "[Optional] internal_resources define all resources that need to be downloaded from behind an company proxy. Many times, workloads use resources that are not yet public and will need to be downloaded from an internal URL. All these resources will be downloaded by the workload on the PKB host (NOT the SUTs), then copied onto the SUTs in the same directory as the custom scripts provided with the templates, so that the scripts can use them.",
+                "type": "array",
+                "items": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "description": "Description of the resource",
+                        "type": "string"
+                      },
+                      "url": {
+                        "description": "Internal URL where the resource can be downloaded",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "url"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "target",
+              "cmd"
+            ]
+          },
+          {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string"
+            },
+            "cmd": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "cmd"
+          ]
+          }
+          ]
+        },
+        "run": {
+          "description": "# [REQUIRED] This section describes how the workload is run, it is executed in the RUN stage.",
+          "type": "array",
+          "items": [
+           {
+              "type": "object",
+              "properties": {"$ref": "#/definitions/cmd_on_target"}
+           }
+          ]
+        },
+        "config_flags": {
+          "description": "[OPTIONAL] This section has the user configuration flags. This can include port, IP and so on which don't need to be tuned during the workload run.",
+          "type": "array",
+          "items": [
+            {
+                "type": "object",
+                "properties": { "$ref": "#/definitions/flags"}
+              }
+            ]
+        },
+        "tunable_flags": {
+          "description": "[OPTIONAL] This section include tunable flags which can be modified to analyze the performance of the workload.",
+          "type": "array",
+          "items": [
+              {
+                "type": "object",
+                "properties": {"$ref": "#/definitions/flags"}
+              }
+            ]
+        },
+        "output_dir": {
+          "description": "[OPTIONAL] If specified (and not null string), the $output_dir directory on the SUT will be copied in the PKB results dir on the PKB host, under /tmp/perfkitbenchmarker/runs/<run_uri>/",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "[REQUIRED] Specifies the path on the SUT that will be copied to the results folder on the PKB host",
+              "type": "string"
+            },
+            "target": {
+              "description": "[REQUIRED] The 'target' complies with the previous explanations and should be a single vm from which to retrieve WL results ",
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "target"
+          ]
+        },
+        "metric": {
+          "description": "[REQUIRED] At least one metric needs to be defined",
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "description": "[REQUIRED] String containing the metric name",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "goal": {
+                    "description": "[REQUIRED] Increase or Decrease. Will be reported as-is by PKB",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "read": {
+                    "description": "[REQUIRED] The command below can be either an OS command or a custom command, in which case it will start with './'. All previous comments regarding custom commands are applicable here.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "target": {
+                    "description": "# [REQUIRED] The 'target' complies with the previous explanations and should be a single vm which determines where the read command specified above should be run",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "unit": {
+                    "description": "[REQUIRED] Reported as-is by PKB",
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name",
+                  "goal",
+                  "read",
+                  "target",
+                  "unit"
+                ]
+              }
+            ]
+          }
+        },
+        "cleanup":  {
+          "description": "[OPTIONAL, but recommended] Same as the install logic, the cleanup is performed in steps, to make sure that, for multinode workloads, the cleanup sequence is respected (e.g. maybe the steps on the worker nodes depend on something being run first on the master node). There can be as many steps as needed, the example below shows 2 steps.",
+          "type": "array",
+          "items": [
+            {
+              "type": "object",
+              "properties": { "$ref": "#/definitions/cmd_on_target" }
+            }
+          ]
+        }
+      },
+      "required": [
+        "metadata",
+        "vm_groups",
+        "run",
+        "metric"
+      ]
+    }
+  },
+  "required": [
+    "workload1"
+  ]
+}

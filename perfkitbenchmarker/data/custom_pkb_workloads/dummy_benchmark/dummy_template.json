@@ -1,0 +1,112 @@
+{
+    "workload1": {
+      "metadata": {
+        "name": "Dummy",
+        "type": "Stats",
+        "load": "Unknown"
+      },
+      "vm_groups": [
+        {
+          "name": "vm_group1",
+          "deps": [
+            {
+              "os_type": "ubuntu2004",
+              "packages_info": [
+                {
+                  "name": "make",
+                  "ver": "4.0"
+                }
+              ],
+              "packages_install": [
+                {
+                  "install_script": "./dummy_prepare_ubuntu2004.sh install"
+                }
+              ],
+              "packages_remove": [
+                {
+                  "uninstall_script": "./dummy_prepare_ubuntu2004.sh remove"
+                }
+              ]
+            },
+            {
+              "os_type": "centos7",
+              "packages_info": [
+                {
+                  "name": "make",
+                  "ver": "4.0"
+                }
+              ],
+              "packages_install": [
+                {
+                  "install_script": "./dummy_prepare_centos7.sh install"
+                }
+              ],
+              "packages_remove": [
+                {
+                  "uninstall_script": "./dummy_prepare_centos7.sh remove"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "run": [
+        {
+          "target": "vm_group1[0]",
+          "cmd": "./dummy_run.sh $set_hugepages"
+        }
+      ],
+      "config_flags": [
+        {
+          "name": "version",
+          "description": "Set Version of the Workload",
+          "range": "",
+          "range_step": "",
+          "type": "str",
+          "target_default": "",
+          "default": "v1.0",
+          "setcmd": "",
+          "target_setcmd": ""
+        }
+      ],
+      "tunable_flags": [
+        {
+          "name": "set_hugepages",
+          "description": "Set Hugepages to desired number",
+          "range": "",
+          "range_step": "",
+          "type": "num",
+          "target_default": "",
+          "default": "100",
+          "setcmd": "",
+          "target_setcmd": ""
+        }
+      ],
+      "output_dir": {
+        "path": "~/dummy_results",
+        "target": "vm_group1[0]"
+      },
+      "metric": [
+        {
+          "name": "MemAvailable",
+          "goal": "Sustain",
+          "read": "cat ~/dummy_results/results.txt | grep MemAvailable | awk -F ' ' '{print $2}'",
+          "target": "vm_group1[0]",
+          "unit": "KB"
+        },
+        {
+          "name": "HugePages",
+          "goal": "Sustain",
+          "read": "cat ~/dummy_results/results.txt | grep HugePages_Total  | awk -F ' ' '{print $2}'",
+          "target": "vm_group1[0]",
+          "unit": "Units"
+        }
+      ],
+      "cleanup": [
+        {
+          "target": "vm_group1[0]",
+          "cmd": "cd ~/dummy_results && rm results.txt && cd .. && rmdir  ~/dummy_results"
+        }
+      ]
+    }
+  }

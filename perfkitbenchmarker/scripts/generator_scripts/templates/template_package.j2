@@ -1,0 +1,98 @@
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import posixpath
+import logging
+
+from absl import flags
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
+
+
+BENCHMARK_NAME = "{{ metadata.generated_name }}"
+BENCHMARK_DATA_DIR = "{{ metadata.data_dir }}"
+BENCHMARK_DIR = posixpath.join(INSTALL_DIR, BENCHMARK_DATA_DIR)
+GROUP_NAME = "{{ name }}"
+FLAGS = flags.FLAGS
+
+
+{% for dep in deps %}
+  {%- for pkg in dep.packages_info -%}
+{% if pkg.flag_name %}
+flags.DEFINE_string("{{ pkg.flag_name }}", {{ pkg.flag_default }},
+                    "{{ pkg.flag_description }}")
+{%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
+
+{%- for dep in deps -%}
+  {% if "ubuntu" == dep["generated_os_name"] %}
+
+
+def AptInstall(vm):
+  from perfkitbenchmarker.linux_benchmarks.{{ metadata.generated_name }}_benchmark import INSTALLED_PACKAGES
+  {%- for pkg in dep.packages_info %}
+  {%- if pkg.flag_name %}
+  pkg = {{ pkg.name }}
+  pkg_dict = {"name": pkg}
+  if FLAGS.{{ pkg.flag_name.strip('"') }}:
+    ver = FLAGS.{{ pkg.flag_name.strip('"') }}
+    pkg_dict["version"] = ver
+  INSTALLED_PACKAGES[GROUP_NAME].append(pkg_dict)
+  {%- endif %}
+  {%- endfor %}
+  {%- for pkg in dep.packages_install %}
+  vm.RemoteCommand({{ pkg.install_script }})
+  {%- endfor %}
+
+
+def AptUninstall(vm):
+  """
+  Uninstall Packages
+  """
+
+  {%- for pkg in dep.packages_remove %}
+  vm.RemoteCommand({{ pkg.uninstall_script }})
+  {%- endfor %}
+
+  {%- elif "centos" == dep["generated_os_name"] %}
+
+
+def YumInstall(vm):
+  from perfkitbenchmarker.linux_benchmarks.{{ metadata.generated_name }}_benchmark import INSTALLED_PACKAGES
+  {%- for pkg in dep.packages_info %}
+  {%- if pkg.flag_name %}
+  pkg = {{ pkg.name }}
+  pkg_dict = {"name": pkg}
+  if FLAGS.{{ pkg.flag_name.strip('"') }}:
+    ver = FLAGS.{{ pkg.flag_name.strip('"') }}
+    pkg_dict["version"] = ver
+  INSTALLED_PACKAGES[GROUP_NAME].append(pkg_dict)
+  {%- endif %}
+  {%- endfor %}
+  {%- for pkg in dep.packages_install %}
+  vm.RemoteCommand({{ pkg.install_script }})
+  {%- endfor %}
+
+
+def YumUninstall(vm):
+  """
+  Uninstall Packages
+  """
+  {%- for pkg in dep.packages_remove %}
+  vm.RemoteCommand({{ pkg.uninstall_script }})
+  {%- endfor %}
+
+  {%- endif %}
+{{ '' }}
+{%- endfor %}

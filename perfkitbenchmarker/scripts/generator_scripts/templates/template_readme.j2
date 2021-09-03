@@ -1,0 +1,41 @@
+# {{ metadata.generated_name }} benchmark
+
+## How to run on AWS
+
+- Runing on Ubuntu
+
+```./pkb.py --cloud=AWS --benchmarks={{ metadata.generated_name }} --machine_type=m5.2xlarge --os_type=ubuntu2004```
+
+- Runing on Centos
+
+```./pkb.py --cloud=AWS --benchmarks={{ metadata.generated_name }} --machine_type=m5.2xlarge --os_type=centos7```
+
+## {{ metadata.generated_name }} specific flag values
+
+### Benchmark flags values
+
+{%- macro flagsInfo(flag_option) %}
+{% for cfg in flag_option %}
+  {%- if cfg.type == "OS-num" %}
+- `{{ cfg.full_name }}=[user defined]`: {{ cfg.description }}
+  {% elif  cfg.type != "custom-hex" %}
+- `{{ cfg.full_name }}=[{{ cfg.default }}]`: {{ cfg.description }}
+  {%- endif -%}
+{% endfor %}
+{%- endmacro %}
+
+### Configuration flags
+{{ flagsInfo(config_flags) }}
+
+### Tunable Flags
+{{ flagsInfo(tunable_flags) }}
+
+### Package flags values
+
+{% for vm in vm_groups %}
+{%- for dep in vm.deps %}
+{%- for pkg in dep.packages_info %}
+- `{{ pkg.flag_name }}=[{{ pkg.flag_default }}]`: {{ pkg.flag_description }} on {{ dep.os_type }} OS
+{% endfor -%}
+{% endfor %}
+{% endfor %}

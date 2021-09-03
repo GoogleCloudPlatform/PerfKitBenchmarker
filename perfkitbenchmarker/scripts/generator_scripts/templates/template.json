@@ -1,0 +1,117 @@
+{
+  "workload1": {
+    "metadata": {
+      "name": "Workload1 Name",
+      "type": "workload category - Web, DB, HPC, Media, etc. ",
+      "load": "Average or Peak or Unknown"
+    },
+    "vm_groups": [
+      {
+        "name": "vm_group1",
+        "deps": [
+          {
+            "os_type": "Linux Operating System Distro/Name",
+            "packages_info": [
+              {
+                "name": "name1",
+                "ver": "v0.xx"
+              },
+              {
+                "name": "name2",
+                "ver": "v0.yy"
+              }
+            ],
+            "packages_install": [
+              {
+                "install_script": "Script to install all the packages"
+              }
+            ],
+            "packages_remove": [
+              {
+                "uninstall_script": "Script to uninstall all the packages"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "install": [
+      {
+        "target": "vm_group or individual vm where to run this install step",
+        "cmd": "command to install the workload or app",
+        "internal_resources": [
+          {
+            "name": "Description of the resource",
+            "url": "Internal URL where the resource can be downloaded"
+          }
+        ]
+      },
+      {
+        "target": "vm_group or individual vm where to run this install step",
+        "cmd": "command to run in step 2"
+      }
+    ],
+    "run": [
+      {
+        "target": "individual vm where to start the workload run",
+        "cmd": "command to execute / run the workload"
+      }
+    ],
+    "config_flags": [
+      {
+        "name": "knob1_name",
+        "description": "Description of the knob",
+        "range": "Minimum to Maximum or list/enum",
+        "range_step": "Step difference between each value in the range",
+        "type": "Type of argument provided",
+        "target_default": "individual vm where to run the command to retrieve the knob default",
+        "default": "Can be numbers, string, hex, OS or custom cmd",
+        "setcmd": "command or script or API call to set the configuration value",
+        "target_setcmd": "vm or vm_group where to run setcmd to set the knob value"
+      }
+    ],
+    "tunable_flags": [
+      {
+        "name": "knob1 name",
+        "description": "Description of the knob",
+        "range": "Minimum to Maximum or list",
+        "range_step": "Step difference between each value in the range",
+        "type": "Any of the types described above",
+        "target_default": "Target vm to run the default command, if type is cmd",
+        "default": "Can be numbers, string, hex, OS or custom cmd",
+        "setcmd": "command or script or API call to set the configuration value",
+        "target_setcmd": "vm or vm_group where to run setcmd to set the knob value"
+      }
+    ],
+    "output_dir": {
+      "path": "path/to/output/dir/on/SUT",
+      "target": "single vm from where to retrieve WL results folder"
+    },
+    "metric": [
+      {
+        "name": "metric1 name",
+        "goal": "Increase or Decrease or Sustain",
+        "read": "command to read/access the metric or score",
+        "target": "single vm where to run read command in order to retrieve the WL metric",
+        "unit": "Measure unit"
+      },
+      {
+        "name": "metric2 name",
+        "goal": "Increase or Decrease or Sustain",
+        "read": "command to read/access the metric or score",
+        "target": "single vm where to run read command in order to retrieve the WL metric",
+        "unit": "Measure unit"
+      }
+    ],
+    "cleanup": [
+      {
+        "target": "vm_group or individual vm where to run this cleanup step",
+        "cmd": "command to perform first step of cleanup"
+      },
+      {
+        "target": "vm_group or individual vm where to run this cleanup step",
+        "cmd": "command to perform second step of cleanup"
+      }
+    ]
+  }
+}
