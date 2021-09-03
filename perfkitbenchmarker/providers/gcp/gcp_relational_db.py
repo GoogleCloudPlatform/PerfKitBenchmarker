@@ -72,6 +72,13 @@ DEFAULT_ENGINE_VERSIONS = {
     sql_engine_utils.SQLSERVER: DEFAULT_SQL_SERVER_VERSION,
 }
 
+# TODO(chunla): Move to engine specific module
+DEFAULT_USERNAME = {
+    sql_engine_utils.MYSQL: 'mysql',
+    sql_engine_utils.POSTGRES: 'postgres',
+    sql_engine_utils.SQLSERVER: 'sqlserver',
+}
+
 # PostgreSQL restrictions on memory.
 # Source: https://cloud.google.com/sql/docs/postgres/instance-settings.
 CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
@@ -385,16 +392,15 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
 
-      # this is a fix for b/71594701
-      # by default the empty password on 'postgres'
-      # is a security violation.  Change the password to a non-default value.
-      if self.spec.engine == sql_engine_utils.POSTGRES:
-        cmd = util.GcloudCommand(
-            self, 'sql', 'users', 'set-password', 'postgres',
-            '--host=dummy_host', '--instance={0}'.format(self.instance_id),
-            '--password={0}'.format(self.spec.database_password))
-        _, _, _ = cmd.Issue()
+      # By default the empty password is a security violation.
+      # Change the password to a non-default value.
+      default_user = DEFAULT_USERNAME[self.spec.engine]
 
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'set-password', default_user,
+          '--host=dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
     self.client_vm_query_tools.InstallPackages()
 
   def _ApplyManagedDbFlags(self):

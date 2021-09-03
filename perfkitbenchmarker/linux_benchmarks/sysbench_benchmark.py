@@ -678,16 +678,6 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   db = benchmark_spec.relational_db
 
-  # every cloud provider has a different mechansim for setting root password
-  # on initialize.  GCP doesnt support setting password at creation though.
-  # So initialize root password here early as possible.
-  if FLAGS.cloud == 'GCP' and FLAGS.use_managed_db:
-    set_db_root_password_command = 'mysqladmin -h %s -u root password %s' % (
-        db.endpoint,
-        db.spec.database_password)
-    stdout, stderr = client_vm.RemoteCommand(set_db_root_password_command)
-    logging.info('Root password is set to %s.', db.spec.database_password)
-
   # Create the sbtest database for Sysbench.
   create_sbtest_db_cmd = ('mysql %s '
                           '-e \'create database sbtest;\'') % (
