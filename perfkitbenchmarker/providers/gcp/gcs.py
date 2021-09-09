@@ -339,7 +339,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     vm.RemoveFile('google-cloud-sdk')
     vm.RemoveFile(GCLOUD_CONFIG_PATH)
     if FLAGS.gcs_client == GCS_CLIENT_BOTO:
-      vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION)
+      vm.RemoveFile(object_storage_service.FindBotoFile())
       vm.Uninstall('gcs_boto_plugin')
 
   def CLIUploadDirectory(self, vm, directory, files, bucket):
