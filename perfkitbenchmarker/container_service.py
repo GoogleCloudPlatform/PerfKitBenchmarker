@@ -675,6 +675,18 @@ class KubernetesCluster(BaseContainerCluster):
 
     vm_util.IssueRetryableCommand(run_cmd)
 
+  def WaitForRollout(self, resource_name):
+    """Blocks until a Kubernetes rollout is completed."""
+    run_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'rollout',
+        'status',
+        '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
+        resource_name
+    ]
+
+    vm_util.IssueCommand(run_cmd)
+
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def GetLoadBalancerIP(self, service_name):
     """Returns the IP address of a LoadBalancer service when ready."""
@@ -710,3 +722,38 @@ class KubernetesCluster(BaseContainerCluster):
     ]
 
     vm_util.IssueCommand(create_cmd)
+
+  def GetPodLabel(self, resource_name):
+    run_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'get', resource_name,
+        '-o', 'jsonpath="{.spec.selector.matchLabels.app}"'
+    ]
+
+    stdout, _, _ = vm_util.IssueCommand(run_cmd)
+    return yaml.safe_load(stdout)
+
+  def GetPodIps(self, resource_name):
+    """Returns a list of internal IPs for a pod name.
+
+    Args:
+      resource_name: The pod resource name
+    """
+    pod_label = self.GetPodLabel(resource_name)
+
+    get_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'get', 'pods', '-l', 'app=%s' % pod_label,
+        '-o', 'jsonpath="{.items[*].status.podIP}"'
+    ]
+
+    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    return yaml.safe_load(stdout).split()
+
+  def RunKubectlCommand(self, pod_name, cmd):
+    run_cmd = [
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'exec', '-it', pod_name, '--'
+    ] + cmd
+    vm_util.IssueCommand(run_cmd)
+

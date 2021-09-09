@@ -89,13 +89,14 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   redis_server.Start(server_vm)
   memtier.Load(server_vm, 'localhost', str(redis_server.DEFAULT_PORT))
 
+  bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
+
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
   client_vms = bm_spec.vm_groups['clients']
-  server_vm = bm_spec.vm_groups['servers'][0]
   results = memtier.RunOverAllThreadsPipelinesAndClients(
-      client_vms[0], server_vm.internal_ip, str(redis_server.DEFAULT_PORT))
+      client_vms[0], bm_spec.redis_endpoint_ip, str(redis_server.DEFAULT_PORT))
   redis_metadata = redis_server.GetMetadata()
   for result_sample in results:
     result_sample.metadata.update(redis_metadata)

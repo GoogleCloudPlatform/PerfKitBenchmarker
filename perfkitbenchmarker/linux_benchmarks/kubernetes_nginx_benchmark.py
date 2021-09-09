@@ -20,9 +20,9 @@ import shutil
 import tempfile
 
 from absl import flags
-import jinja2
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import nginx_benchmark
 
@@ -74,18 +74,6 @@ def GetConfig(user_config):
   return config
 
 
-def _CreateRenderedManifestFile(filename, config):
-  """Returns a file containing a rendered Jinja manifest (.j2) template."""
-  manifest_filename = data.ResourcePath(filename)
-  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-  with open(manifest_filename) as manifest_file:
-    manifest_template = environment.from_string(manifest_file.read())
-  rendered_yaml = tempfile.NamedTemporaryFile(mode='w')
-  rendered_yaml.write(manifest_template.render(config))
-  rendered_yaml.flush()
-  return rendered_yaml
-
-
 def _CreateNginxConfigMapDir():
   """Returns a TemporaryDirectory containing files in the Nginx ConfigMap."""
   if FLAGS.nginx_conf:
@@ -108,7 +96,7 @@ def _PrepareCluster(benchmark_spec):
   container_image = benchmark_spec.container_specs['kubernetes_nginx'].image
   replicas = benchmark_spec.container_cluster.num_nodes
 
-  with _CreateRenderedManifestFile(
+  with kubernetes_helper.CreateRenderedManifestFile(
       'container/kubernetes_nginx/kubernetes_nginx.yaml.j2', {
           'nginx_image': container_image,
           'nginx_replicas': replicas,

@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import tempfile
 import time
 
 from absl import flags
+import jinja2
+from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -95,3 +98,15 @@ def DeleteResource(resource_body):
     tf.write(resource_body)
     tf.close()
     DeleteFromFile(tf.name)
+
+
+def CreateRenderedManifestFile(filename, config):
+  """Returns a file containing a rendered Jinja manifest (.j2) template."""
+  manifest_filename = data.ResourcePath(filename)
+  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+  with open(manifest_filename) as manifest_file:
+    manifest_template = environment.from_string(manifest_file.read())
+  rendered_yaml = tempfile.NamedTemporaryFile(mode='w')
+  rendered_yaml.write(manifest_template.render(config))
+  rendered_yaml.flush()
+  return rendered_yaml
