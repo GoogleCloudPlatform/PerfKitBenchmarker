@@ -208,7 +208,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       vm: gce virtual machine object.
     """
     boto_src = object_storage_service.FindBotoFile()
-    boto_des = ntpath.join(vm.home_dir, posixpath.basename(boto_src))
+    boto_des = object_storage_service.DEFAULT_BOTO_LOCATION_USER
     stdout, _ = vm.RemoteCommand(f'Test-Path {boto_des}')
     if 'True' in stdout:
       return
@@ -236,7 +236,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     vm_pwd, _ = vm.RemoteCommand('pwd')
     home_dir = vm_pwd.strip()
     boto_src = object_storage_service.FindBotoFile()
-    boto_des = posixpath.join(home_dir, posixpath.basename(boto_src))
+    boto_des = object_storage_service.DEFAULT_BOTO_LOCATION_USER
     if vm.TryRemoteCommand(f'test -f {boto_des}'):
       return
     with open(boto_src) as f:
@@ -339,7 +339,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     vm.RemoveFile('google-cloud-sdk')
     vm.RemoveFile(GCLOUD_CONFIG_PATH)
     if FLAGS.gcs_client == GCS_CLIENT_BOTO:
-      vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION)
+      vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION_USER)
       vm.Uninstall('gcs_boto_plugin')
 
   def CLIUploadDirectory(self, vm, directory, files, bucket):

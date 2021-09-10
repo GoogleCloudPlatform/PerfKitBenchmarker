@@ -18,6 +18,7 @@
 import abc
 import logging
 import os
+import pathlib
 from typing import Optional
 
 from absl import flags
@@ -31,7 +32,8 @@ flags.DEFINE_string('boto_file_location', None,
 
 FLAGS = flags.FLAGS
 
-DEFAULT_BOTO_LOCATION = '~/.boto'
+DEFAULT_BOTO_LOCATION_USER = '~/.boto'
+DEFAULT_BOTO_LOCATION_MACHINE = '/etc/boto.cfg'
 BOTO_LIB_VERSION = 'boto_lib_version'
 
 _OBJECT_STORAGE_REGISTRY = {}
@@ -364,12 +366,17 @@ def FindCredentialFile(default_location):
 
 def FindBotoFile():
   """Return the path to the boto file."""
+  paths_to_check = [
+      FLAGS.boto_file_location,
+      DEFAULT_BOTO_LOCATION_USER,
+      DEFAULT_BOTO_LOCATION_MACHINE,
+  ]
 
-  boto_file = FLAGS.boto_file_location or DEFAULT_BOTO_LOCATION
-  boto_file = os.path.expanduser(boto_file)
+  for path in paths_to_check:
+    if not path:
+      continue
+    if pathlib.Path(path).exists():
+      return path
 
-  if not os.path.isfile(boto_file):
-    raise errors.Benchmarks.MissingObjectCredentialException(
-        'Boto file cannot be found in %s.' % boto_file)
-
-  return boto_file
+  raise errors.Benchmarks.MissingObjectCredentialException(
+      'Boto file cannot be found in %s.' % paths_to_check)
