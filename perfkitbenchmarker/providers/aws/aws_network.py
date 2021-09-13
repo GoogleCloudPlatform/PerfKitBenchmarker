@@ -728,7 +728,20 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
 
 
 def _get_default_vpc_id(region: str) -> str:
-  """Returns the default VPC ID for the region."""
+  """Returns the default VPC ID for the region.
+
+  Creates a default VPC if one did not exist previously
+
+
+  Args:
+    region: Region of the default VPC.
+
+  Returns: Default VPC ID
+
+  Raises:
+    UnsupportedConfigError: When default VPC does not exist and cannot be
+      created.
+  """
   vpc_cmd = util.AWS_PREFIX + [
       'ec2', 'describe-vpcs',
       '--region', region,
@@ -736,13 +749,33 @@ def _get_default_vpc_id(region: str) -> str:
   ]
   stdout, _ = vm_util.IssueRetryableCommand(vpc_cmd)
   vpcs = json.loads(stdout)['Vpcs']
-  if not vpcs:
-    raise RuntimeError(f'AWS default VPC does not exist for region {region}.')
-  return vpcs[0]['VpcId']
+  if vpcs:
+    return vpcs[0]['VpcId']
+  create_cmd = util.AWS_PREFIX + [
+      'ec2', 'create-default-vpc', '--region', region,
+  ]
+  stdout, _, ret = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
+  if ret:
+    raise errors.Benchmarks.UnsupportedConfigError(
+        f'AWS default VPC does not exist for region {region}.')
+  return json.loads(stdout)['Vpc']['VpcId']
 
 
 def _get_default_subnet_id(zone: str) -> str:
-  """Returns the default Subnet ID for the zone."""
+  """Returns the default subnet ID for the zone.
+
+  Creates a default subnet if one did not exist previously
+
+
+  Args:
+    zone: Zone of the default subnet.
+
+  Returns: Default Subnet ID
+
+  Raises:
+    UnsupportedConfigError: When default subnet does not exist and cannot be
+      created.
+  """
   region = util.GetRegionFromZone(zone)
   subnet_cmd = util.AWS_PREFIX + [
       'ec2', 'describe-subnets',
@@ -752,9 +785,18 @@ def _get_default_subnet_id(zone: str) -> str:
   ]
   stdout, _ = vm_util.IssueRetryableCommand(subnet_cmd)
   subnets = json.loads(stdout)['Subnets']
-  if not subnets:
-    raise RuntimeError(f'AWS default subnet does not exist for zone {zone}.')
-  return subnets[0]['SubnetId']
+  if subnets:
+    return subnets[0]['SubnetId']
+  create_cmd = util.AWS_PREFIX + [
+      'ec2', 'create-default-subnet',
+      '--region', region,
+      '--availability-zone', zone
+  ]
+  stdout, _, ret = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
+  if ret:
+    raise errors.Benchmarks.UnsupportedConfigError(
+        f'AWS default subnet does not exist for zone {zone}.')
+  return json.loads(stdout)['Subnet']['SubnetId']
 
 
 class AwsNetwork(network.BaseNetwork):

@@ -113,6 +113,8 @@
     collect the cpu data for each workload (differentiated by workload_index);
     the time window estimation is also more accurate.
 -   Support default subnets in --aws_subnet with `default` as value passed.
+-   Add Unsupported config failure substatus for runs that are not supported by
+    the cloud.
 
 ### Bug fixes and maintenance updates:
 

@@ -43,6 +43,10 @@ class FailedSubstatus(object):
   # completes. User non-preventable.
   INTERRUPTED = 'INTERRUPTED'
 
+  # Failure due to an unsupported configuration running. Ex. Machine type not
+  # supported in a zone.
+  UNSUPPORTED = 'UNSUPPORTED'
+
   # General failure that don't fit in the above categories.
   UNCATEGORIZED = 'UNCATEGORIZED'
 

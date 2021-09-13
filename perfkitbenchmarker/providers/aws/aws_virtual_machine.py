@@ -901,6 +901,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # separate zone. Retrying fixes this error.
     if 'InvalidPlacementGroup.InUse' in stderr:
       raise errors.Resource.RetryableCreationError(stderr)
+    if 'Unsupported' in stderr:
+      raise errors.Benchmarks.UnsupportedConfigError(stderr)
     if retcode:
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))

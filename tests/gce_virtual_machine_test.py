@@ -715,6 +715,19 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(errors.Resource.CreationError):
         vm._Create()
 
+  def testCreateVMUnsupportedConfig(self):
+    fake_rets = [('stdout', "Invalid value for field 'resource.machineType':",
+                  1)]
+    with PatchCriticalObjects(fake_rets):
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
+        vm._Create()
+
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(

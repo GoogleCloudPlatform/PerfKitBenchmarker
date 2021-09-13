@@ -1077,6 +1077,9 @@ def RunBenchmark(spec, collector):
         elif isinstance(e, errors.Benchmarks.KnownIntermittentError):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT)
+        elif (isinstance(e, errors.Benchmarks.UnsupportedConfigError) or
+              'UnsupportedConfigError' in str(e)):
+          spec.failed_substatus = benchmark_status.FailedSubstatus.UNSUPPORTED
         else:
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.UNCATEGORIZED)

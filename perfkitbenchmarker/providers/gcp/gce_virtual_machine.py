@@ -65,6 +65,7 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.')
+_UNSUPPORTED_MACHINE = "Invalid value for field 'resource.machineType'"
 _GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 _SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
@@ -658,6 +659,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         return
       if util.RATE_LIMITED_MESSAGE in stderr:
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
+      if _UNSUPPORTED_MACHINE in stderr:
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if self.preemptible and _FAILED_TO_START_DUE_TO_PREEMPTION in stderr:
         self.spot_early_termination = True
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
