@@ -159,6 +159,14 @@ def _ConfigureNginx(server):
         r"sudo sed -i 's|\(\s*\)keepalive_timeout .*|"
         r"\1keepalive_timeout 75;\n\1keepalive_requests 1000000000;|g' "
         r"/etc/nginx/nginx.conf")
+    # Enable caching
+    server.RemoteCommand("sudo sed -i 's|# server_tokens off;|"
+                         'open_file_cache max=200000 inactive=20s;'
+                         'open_file_cache_valid 30s;'
+                         'open_file_cache_min_uses 2;'
+                         'open_file_cache_errors on;'
+                         "# server_tokens off;|g' "
+                         '/etc/nginx/nginx.conf')
 
   if FLAGS.nginx_use_ssl:
     _ConfigureNginxForSsl(server)
@@ -224,6 +232,8 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
       'nginx_worker_connections': FLAGS.nginx_worker_connections,
       'nginx_use_ssl': FLAGS.nginx_use_ssl
   }
+  if not FLAGS.nginx_conf:
+    metadata['caching'] = True
   results += [
       sample.Sample('achieved_rate', requests / duration, '', metadata),
       sample.Sample('aggregate requests', requests, '', metadata),
