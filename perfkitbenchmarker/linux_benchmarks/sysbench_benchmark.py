@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MySQL Service Benchmarks.
+"""Sysbench Benchmark.
 
-This is a set of benchmarks that measures performance of MySQL Databases on
-managed MySQL services.
-
-- On AWS, we will use RDS+MySQL.
-- On GCP, we will use Cloud SQL v2 (Performance Edition).
+This is a set of benchmarks that measures performance of Sysbench Databases on
+managed MySQL or Postgres.
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
 
@@ -47,11 +44,13 @@ to install it. This will allow this benchmark to properly create an instance.
 import logging
 import re
 import time
+
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 import six
 
@@ -106,13 +105,13 @@ BENCHMARK_DATA = {
         'a116f0a6f58212b568bd339e65223eaf5ed59437503700002f016302d8a9c6ed',
 }
 
+
+# Parameters are defined in oltp_common.lua file
+# https://github.com/akopytov/sysbench
 _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
-    'tpcc': set(
-        ['scale']
-    ),
-    'oltp_read_write': set(
-        ['table_size']
-    )
+    'tpcc': set(['scale']),
+    'oltp_write_only': set(['table_size']),
+    'oltp_read_write': set(['table_size'])
 }
 
 
@@ -284,16 +283,49 @@ def AddMetricsForSysbenchOutput(
   results.append(qps_sample)
 
 
+# TODO(chunla) Move this to engine specific module
+def _GetSysbenchConnectionParameter(client_vm_query_tools):
+  """Get Sysbench connection parameter."""
+  connection_string = ''
+  if client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.MYSQL:
+    connection_string = (
+        '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" ').format(
+            client_vm_query_tools.connection_properties.endpoint,
+            client_vm_query_tools.connection_properties.database_username,
+            client_vm_query_tools.connection_properties.database_password)
+  elif client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.POSTGRES:
+    connection_string = (
+        '--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
+        '--pgsql-port=5432').format(
+            client_vm_query_tools.connection_properties.endpoint,
+            client_vm_query_tools.connection_properties.database_username,
+            client_vm_query_tools.connection_properties.database_password)
+  return connection_string
+
+
+# TODO(chunla) Move this to engine specific module
 def _GetCommonSysbenchOptions(benchmark_spec):
+  """Get Sysbench options."""
   db = benchmark_spec.relational_db
-  return [
-      '--db-ps-mode=%s' % DISABLE,
-      # Error 1205: Lock wait timeout exceeded
-      # Could happen when we overload the database
-      '--mysql-ignore-errors=1205,2013',
-      '--db-driver=mysql',
-      db.client_vm_query_tools.GetSysbenchConnectionString(),
-  ]
+  engine = sql_engine_utils.GetDbEngineType(FLAGS.managed_db_engine)
+  result = []
+
+  if engine == sql_engine_utils.MYSQL:
+    result += [
+        '--db-ps-mode=%s' % DISABLE,
+        # Error 1205: Lock wait timeout exceeded
+        # Could happen when we overload the database
+        '--mysql-ignore-errors=1205,2013',
+        '--db-driver=mysql'
+    ]
+  elif engine == sql_engine_utils.POSTGRES:
+    # TODO(chunla): might need to add pgsql-db
+    result += [
+        '--db-driver=pgsql',
+    ]
+
+  result += [db.client_vm_query_tools.GetSysbenchConnectionString()]
+  return result
 
 
 def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
@@ -432,30 +464,36 @@ def _RunSysbench(
   return results
 
 
-def _GetDatabaseSize(vm, benchmark_spec):
+def _GetDatabaseSize(benchmark_spec):
   """Get the size of the database in MB."""
   db = benchmark_spec.relational_db
-  get_db_size_cmd = (
-      'mysql %s '
-      '-e \''
-      'SELECT table_schema AS "Database", '
-      'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS "Size (MB)" '
-      'FROM information_schema.TABLES '
-      'GROUP BY table_schema; '
-      '\'' % db.client_vm_query_tools.GetConnectionString())
+  db_engine = sql_engine_utils.GetDbEngineType(FLAGS.managed_db_engine)
+  stdout = None
+  if db_engine == sql_engine_utils.MYSQL:
+    stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
+        'SELECT table_schema AS \'Database\', '
+        'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) '
+        'AS \'Size (MB)\' '
+        'FROM information_schema.TABLES '
+        'GROUP BY table_schema; ')
+    logging.info('Query database size results: \n%s', stdout)
+    # example stdout is tab delimited but shown here with spaces:
+    # Database  Size (MB)
+    # information_schema  0.16
+    # mysql 5.53
+    # performance_schema  0.00
+    # sbtest  0.33
+    size_mb = 0
+    for line in stdout.splitlines()[1:]:
+      _, word_size_mb = line.split()
+      size_mb += float(word_size_mb)
 
-  stdout, _ = vm.RemoteCommand(get_db_size_cmd)
-  logging.info('Query database size results: \n%s', stdout)
-  # example stdout is tab delimited but shown here with spaces:
-  # Database  Size (MB)
-  # information_schema  0.16
-  # mysql 5.53
-  # performance_schema  0.00
-  # sbtest  0.33
-  size_mb = 0
-  for line in stdout.splitlines()[1:]:
-    _, word_size_mb = line.split()
-    size_mb += float(word_size_mb)
+  elif db_engine == sql_engine_utils.POSTGRES:
+    stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
+        r'SELECT pg_database_size('
+        '\'sbtest\''
+        ')/1024/1024')
+    size_mb = int(stdout.split()[2])
 
   return size_mb
 
@@ -678,11 +716,9 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   db = benchmark_spec.relational_db
 
-  # Create the sbtest database for Sysbench.
-  create_sbtest_db_cmd = ('mysql %s '
-                          '-e \'create database sbtest;\'') % (
-                              db.client_vm_query_tools.GetConnectionString())
-  stdout, stderr = client_vm.RemoteCommand(create_sbtest_db_cmd)
+  stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
+      'create database sbtest;')
+
   logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
@@ -715,7 +751,7 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
                stdout, stderr)
 
-  db.mysql_db_size_MB = _GetDatabaseSize(client_vm, benchmark_spec)
+  db.sysbench_db_size_MB = _GetDatabaseSize(benchmark_spec)
   metadata = CreateMetadataFromFlags(db)
 
   results.append(sample.Sample(
@@ -750,7 +786,7 @@ def CreateMetadataFromFlags(db):
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
-      'mysql_db_size_MB': db.mysql_db_size_MB,
+      'sysbench_db_size_MB': db.sysbench_db_size_MB,
       'sysbench_pre_failover_seconds': FLAGS.sysbench_post_failover_seconds,
       'sysbench_post_failover_seconds': FLAGS.sysbench_pre_failover_seconds
   }
@@ -791,7 +827,7 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  """Run the MySQL Service benchmark and publish results.
+  """Run the sysbench benchmark and publish results.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -800,7 +836,7 @@ def Run(benchmark_spec):
   Returns:
     Results.
   """
-  logging.info('Start benchmarking MySQL Service, '
+  logging.info('Start benchmarking, '
                'Cloud Provider is %s.', FLAGS.cloud)
   client_vm = benchmark_spec.vms[0]
   db = benchmark_spec.relational_db
@@ -833,7 +869,7 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  """Clean up MySQL Service benchmark related states on server and client.
+  """Clean up benchmark related states on server and client.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is

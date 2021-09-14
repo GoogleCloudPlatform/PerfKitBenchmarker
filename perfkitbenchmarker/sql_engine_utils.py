@@ -165,6 +165,13 @@ class PostgresCliQueryTools(ISQLQueryTools):
         self.connection_properties.database_username,
         self.connection_properties.database_password, database_name)
 
+  def GetSysbenchConnectionString(self):
+    return ('--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
+            '--pgsql-port=5432').format(
+                self.connection_properties.endpoint,
+                self.connection_properties.database_username,
+                self.connection_properties.database_password)
+
 
 class MysqlCliQueryTools(ISQLQueryTools):
   """SQL Query class to issue Mysql related query."""
