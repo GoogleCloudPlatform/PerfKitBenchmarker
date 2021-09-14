@@ -79,8 +79,10 @@ def _CreateNginxConfigMapDir():
   if FLAGS.nginx_conf:
     nginx_conf_filename = FLAGS.nginx_conf
   else:
-    nginx_conf_filename = (
-        data.ResourcePath('container/kubernetes_nginx/http.conf'))
+    relative_nginx_conf_filename = 'container/kubernetes_nginx/http.conf'
+    if FLAGS.nginx_use_ssl:
+      relative_nginx_conf_filename = 'container/kubernetes_nginx/https.conf'
+    nginx_conf_filename = data.ResourcePath(relative_nginx_conf_filename)
 
   temp_dir = tempfile.TemporaryDirectory()
   config_map_filename = os.path.join(temp_dir.name, 'default')
@@ -96,11 +98,17 @@ def _PrepareCluster(benchmark_spec):
   container_image = benchmark_spec.container_specs['kubernetes_nginx'].image
   replicas = benchmark_spec.container_cluster.num_nodes
 
+  nginx_port = 80
+  if FLAGS.nginx_use_ssl:
+    nginx_port = 443
+
   with kubernetes_helper.CreateRenderedManifestFile(
       'container/kubernetes_nginx/kubernetes_nginx.yaml.j2', {
           'nginx_image': container_image,
           'nginx_replicas': replicas,
           'nginx_content_size': FLAGS.nginx_content_size,
+          'nginx_port': nginx_port,
+          'nginx_worker_connections': FLAGS.nginx_worker_connections
       }) as rendered_manifest:
     benchmark_spec.container_cluster.ApplyManifest(rendered_manifest.name)
 
