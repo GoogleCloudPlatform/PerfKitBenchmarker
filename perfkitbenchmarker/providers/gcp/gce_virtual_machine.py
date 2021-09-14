@@ -1060,12 +1060,16 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
     for device_name in self._GetNetworkDevices():
       device = self._GetNetworkDeviceProperties(device_name)
       all_device_properties[device_name] = device
-      if device.get('driver') == self._GVNIC_DEVICE_NAME:
+      driver = device.get('driver')
+      driver_version = device.get('version')
+      if not driver:
+        logging.error(
+            'Network device %s lacks a driver %s', device_name, device)
+      elif driver == self._GVNIC_DEVICE_NAME:
         logging.info('gvnic properties %s', device)
-        if 'version' in device:
-          return device['version']
+        if driver_version:
+          return driver_version
         raise ValueError(f'No version in {device}')
-      logging.error('Network device %s lacks a driver %s', device_name, device)
 
   def _GetNetworkDeviceProperties(self, device_name: str) -> Dict[str, str]:
     """Returns a dict of the network device properties."""
