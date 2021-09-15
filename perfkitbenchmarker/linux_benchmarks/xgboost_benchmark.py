@@ -65,11 +65,11 @@ xgboost:
         AWS:
           machine_type: g4dn.xlarge
           zone: us-east-1a
-          image: ami-0e956fe81fa11d0a9
+          image: ami-0d50576797d8d1a43
         Azure:
           machine_type: Standard_NC4as_T4_v3
           zone: eastus
-          image: microsoft-dsvm:ubuntu-1804:1804-gen2:21.01.21
+          image: microsoft-dsvm:ubuntu-hpc:1804:latest
 """
 
 
