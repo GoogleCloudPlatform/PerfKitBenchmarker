@@ -666,6 +666,27 @@ def _UpdateScripts(benchmark_spec, node_rank):
       'chmod 755 run_with_docker1.sh')
 
   docker_file = posixpath.join(script_path, 'Dockerfile')
+  if FLAGS.nccl_net_plugin:
+    vm_util.ReplaceText(
+        vm,
+        'RUN apt-get update',
+        r'RUN echo \"deb https:\/\/packages.cloud.google.com\/apt '
+        r'google-fast-socket main\" | '
+        r'tee \/etc\/apt\/sources.list.d\/google-fast-socket.list\n'
+        r'RUN curl -s -L '
+        r'https:\/\/packages.cloud.google.com\/apt\/doc\/apt-key.gpg | '
+        r'apt-key add -\n'
+        r'RUN rm -f \/opt\/hpcx\/nccl_rdma_sharp_plugin\/lib\/libnccl-net.so\n'
+        r'RUN apt-get update',
+        docker_file
+    )
+    vm_util.ReplaceText(
+        vm,
+        'apt-get install -y --no-install-recommends',
+        'apt-get install -y --no-install-recommends google-fast-socket',
+        docker_file
+    )
+
   if FLAGS.aws_efa:
     vm.RemoteCommand(f'git clone {AWS_EFA_NCCL_BASEAMI_PIPELINE_URL}')
     vm.RemoteCommand(f'cat {NVIDIA_EFA_DOCKERFILE} >> {docker_file}')
