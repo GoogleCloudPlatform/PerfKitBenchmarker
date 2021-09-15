@@ -464,9 +464,7 @@ class BaseRelationalDb(resource.BaseResource):
       stdout, stderr = self.server_vm.RemoteCommand(
           'sudo service postgresql status')
       return stdout and not stderr
-
     elif self.spec.engine == sql_engine_utils.SQLSERVER:
-      self.server_vm.firewall.AllowPort(self.server_vm, self.port)
       return True
 
     raise UnsupportedError('%s engine is not supported '
