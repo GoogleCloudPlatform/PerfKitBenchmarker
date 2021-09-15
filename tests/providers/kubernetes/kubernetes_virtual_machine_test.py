@@ -52,7 +52,8 @@ _EXPECTED_CALL_BODY_WITHOUT_GPUS = """
             "image": "test_image",
             "securityContext": {
                 "privileged": true
-            }
+            },
+            "command": ["tail", "-f", "/dev/null"]
         }]
     },
     "kind": "Pod",
@@ -87,7 +88,8 @@ _EXPECTED_CALL_BODY_WITH_2_GPUS = """
               "requests": {
                 "nvidia.com/gpu": "2"
                 }
-            }
+            },
+            "command": ["tail", "-f", "/dev/null"]
         }]
     },
     "kind": "Pod",
@@ -115,11 +117,7 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
             "securityContext": {
                 "privileged": true
             },
-            "command": [
-              "bash",
-              "-c",
-              "apt-get update && apt-get install -y sudo && sed -i '/env_reset/d' /etc/sudoers && sed -i '/secure_path/d' /etc/sudoers && sudo ldconfig && tail -f /dev/null"
-            ]
+            "command": ["tail", "-f", "/dev/null"]
         }]
     },
     "kind": "Pod",
@@ -265,20 +263,6 @@ class KubernetesVirtualMachineOsTypesTestCase(
     kub_vm = vm_class(spec)
     kub_vm._WaitForPodBootCompletion = lambda: None
     kub_vm._Create()
-
-  def testUbuntuImagesInstallSudo(self):
-    with patch_critical_objects() as (_, temp_file):
-      self.create_kubernetes_vm(os_types.UBUNTU1604)
-
-      write_mock = get_write_mock_from_temp_file_mock(temp_file)
-      create_json = json.loads(write_mock.call_args[0][0])
-      command = create_json['spec']['containers'][0]['command']
-      self.assertEqual(command,
-                       [u'bash', u'-c',
-                        (u'apt-get update && apt-get install -y sudo && '
-                         'sed -i \'/env_reset/d\' /etc/sudoers && '
-                         'sed -i \'/secure_path/d\' /etc/sudoers && '
-                         'sudo ldconfig && tail -f /dev/null')])
 
   def testCreateUbuntu1604(self):
     with patch_critical_objects() as (_, temp_file):
