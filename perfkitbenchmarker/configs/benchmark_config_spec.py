@@ -17,7 +17,6 @@ See perfkitbenchmarker/configs/__init__.py for more information about
 configuration files.
 """
 
-
 import contextlib
 import logging
 import os
@@ -72,23 +71,26 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     Args:
       value: dict Dpb Service config dictionary
       component_full_name: string.  Fully qualified name of the configurable
-      component containing the config option.
-      flag_values: flags.FlagValues.  Runtime flag values to be propagated
-      to BaseSpec constructors.
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
     Returns:
       _DpbServiceSpec Build from the config passed in in value.
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    dpb_service_config = super(_DpbServiceDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    dpb_service_config = super(_DpbServiceDecoder,
+                               self).Decode(value, component_full_name,
+                                            flag_values)
 
     if (dpb_service_config['service_type'] == dpb_service.EMR and
         component_full_name == 'dpb_wordcount_benchmark'):
       if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
         raise errors.Config.InvalidValue('EMR service requires S3.')
-    result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
-                             flag_values, **dpb_service_config)
+    result = _DpbServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **dpb_service_config)
     return result
 
 
@@ -103,8 +105,8 @@ class _DpbServiceSpec(spec.BaseSpec):
       static_dpb_service_instance: if user has pre created a container, the id
       worker_group: Vm group spec for workers.
       worker_count: the number of workers part of the dpb service
-      applications: An enumerated list of applications that need
-        to be enabled on the dpb service
+      applications: An enumerated list of applications that need to be enabled
+        on the dpb service
       version: string. The version of software to install inside the service.
   """
 
@@ -127,15 +129,20 @@ class _DpbServiceSpec(spec.BaseSpec):
             'default': None,
             'none_ok': True
         }),
-        'service_type': (option_decoders.EnumDecoder, {
-            'default':
-                dpb_service.DATAPROC,
-            'valid_values': [
-                dpb_service.DATAPROC, dpb_service.DATAFLOW, dpb_service.EMR,
-                dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
-                dpb_service.UNMANAGED_SPARK_CLUSTER,
-            ]
-        }),
+        'service_type': (
+            option_decoders.EnumDecoder,
+            {
+                'default':
+                    dpb_service.DATAPROC,
+                'valid_values': [
+                    dpb_service.DATAPROC,
+                    dpb_service.DATAFLOW,
+                    dpb_service.EMR,
+                    dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+                    dpb_service.UNMANAGED_SPARK_CLUSTER,
+                    dpb_service.KUBERNETES_SPARK_CLUSTER,
+                ]
+            }),
         'worker_group': (_VmGroupSpecDecoder, {}),
         'worker_count': (option_decoders.IntDecoder, {
             'default': dpb_service.DEFAULT_WORKER_COUNT,
@@ -156,10 +163,10 @@ class _DpbServiceSpec(spec.BaseSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values.
-      May be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-      provided config values.
+        provided config values.
     """
     super(_DpbServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['static_dpb_service_instance'].present:
@@ -177,10 +184,15 @@ class _DpbServiceSpec(spec.BaseSpec):
 class _TpuGroupSpec(spec.BaseSpec):
   """Configurable options of a TPU."""
 
-  def __init__(self, component_full_name, group_name, flag_values=None,
+  def __init__(self,
+               component_full_name,
+               group_name,
+               flag_values=None,
                **kwargs):
-    super(_TpuGroupSpec, self).__init__('{0}.{1}'.format(
-        component_full_name, group_name), flag_values=flag_values, **kwargs)
+    super(_TpuGroupSpec, self).__init__(
+        '{0}.{1}'.format(component_full_name, group_name),
+        flag_values=flag_values,
+        **kwargs)
     if not self.tpu_name:
       self.tpu_name = 'pkb-tpu-{group_name}-{run_uri}'.format(
           group_name=group_name, run_uri=flag_values.run_uri)
@@ -233,10 +245,10 @@ class _TpuGroupSpec(spec.BaseSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(_TpuGroupSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present:
@@ -263,8 +275,7 @@ class _EdwServiceDecoder(option_decoders.TypeVerifier):
   """Validates the edw service dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(_EdwServiceDecoder, self).__init__(
-        valid_types=(dict,), **kwargs)
+    super(_EdwServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies edw service dictionary of a benchmark config object.
@@ -272,18 +283,21 @@ class _EdwServiceDecoder(option_decoders.TypeVerifier):
     Args:
       value: dict edw service config dictionary
       component_full_name: string.  Fully qualified name of the configurable
-      component containing the config option.
-      flag_values: flags.FlagValues.  Runtime flag values to be propagated
-      to BaseSpec constructors.
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
     Returns:
       _EdwServiceSpec Built from the config passed in in value.
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    edw_service_config = super(_EdwServiceDecoder, self).Decode(
-        value, component_full_name, flag_values)
-    result = _EdwServiceSpec(self._GetOptionFullName(
-        component_full_name), flag_values, **edw_service_config)
+    edw_service_config = super(_EdwServiceDecoder,
+                               self).Decode(value, component_full_name,
+                                            flag_values)
+    result = _EdwServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **edw_service_config)
     return result
 
 
@@ -317,49 +331,64 @@ class _EdwServiceSpec(spec.BaseSpec):
     result.update({
         'type': (option_decoders.StringDecoder, {
             'default': 'redshift',
-            'none_ok': False}),
+            'none_ok': False
+        }),
         'cluster_identifier': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'endpoint': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'concurrency': (option_decoders.IntDecoder, {
             'default': 5,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'db': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'user': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'password': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'node_type': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'node_count': (option_decoders.IntDecoder, {
             'default': edw_service.DEFAULT_NUMBER_OF_NODES,
-            'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
+            'min': edw_service.DEFAULT_NUMBER_OF_NODES
+        }),
         'snapshot': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'cluster_subnet_group': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'cluster_parameter_group': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'resource_group': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'server_name': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'iam_role': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True})
+            'none_ok': True
+        })
     })
     return result
 
@@ -371,9 +400,9 @@ class _EdwServiceSpec(spec.BaseSpec):
 
     Args:
       config_values: dict mapping config option names to provided values. May be
-       modified by this function.
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-      provided config values.
+        provided config values.
     """
     super(_EdwServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     # TODO(saksena): Add cluster_subnet_group and cluster_parameter_group flags
@@ -406,11 +435,11 @@ class _StaticVmDecoder(option_decoders.TypeVerifier):
 
     Args:
       value: dict mapping static VM config option name string to corresponding
-          option value.
+        option value.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       StaticVmSpec decoded from the input dict.
@@ -443,9 +472,9 @@ class _RelationalDbSpec(spec.BaseSpec):
     # TODO(ferneyhough): This is a lot of boilerplate, and is repeated
     # below in VmGroupSpec. See if some can be consolidated. Maybe we can
     # specify a VmGroupSpec instead of both vm_spec and disk_spec.
-    ignore_package_requirements = (getattr(flag_values,
-                                           'ignore_package_requirements', True)
-                                   if flag_values else True)
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True)
+        if flag_values else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
 
     if self.db_disk_spec:
@@ -544,10 +573,10 @@ class _RelationalDbSpec(spec.BaseSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     # TODO(ferneyhough): Add flags for db_disk_spec.
     # Currently the only way to modify the disk spec of the
@@ -613,8 +642,8 @@ class _RelationalDbSpec(spec.BaseSpec):
     if flag_values['db_flags'].present:
       config_values['db_flags'] = flag_values.db_flags
     cloud = config_values['cloud']
-    has_unmanaged_dbs = ('vm_groups' in config_values
-                         and 'servers' in config_values['vm_groups'])
+    has_unmanaged_dbs = ('vm_groups' in config_values and
+                         'servers' in config_values['vm_groups'])
 
     if flag_values['managed_db_zone'].present:
       config_values['db_spec'][cloud]['zone'] = flag_values.managed_db_zone[0]
@@ -763,10 +792,10 @@ class _SparkServiceSpec(spec.BaseSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['spark_static_cluster_id'].present:
@@ -786,24 +815,24 @@ class _VmGroupSpec(spec.BaseSpec):
     cloud: string. Cloud provider of the VMs in this group.
     disk_count: int. Number of data disks to attach to each VM in this group.
     disk_spec: BaseDiskSpec. Configuration for all data disks to be attached to
-        VMs in this group.
+      VMs in this group.
     os_type: string. OS type of the VMs in this group.
     static_vms: None or list of StaticVmSpecs. Configuration for all static VMs
-        in this group.
+      in this group.
     vm_count: int. Number of VMs in this group, including static VMs and
-        provisioned VMs.
+      provisioned VMs.
     vm_spec: BaseVmSpec. Configuration for provisioned VMs in this group.
-    placement_group_name: string. Name of placement group
-        that VM group belongs to.
+    placement_group_name: string. Name of placement group that VM group belongs
+      to.
     cidr: subnet each vm in this group belongs to
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_VmGroupSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
-    ignore_package_requirements = (getattr(flag_values,
-                                           'ignore_package_requirements', True)
-                                   if flag_values else True)
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True)
+        if flag_values else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
@@ -876,10 +905,10 @@ class _VmGroupSpec(spec.BaseSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(_VmGroupSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
@@ -901,11 +930,11 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
 
     Args:
       value: dict mapping VM group name string to the corresponding VM group
-          config dict.
+        config dict.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       dict mapping VM group name string to _VmGroupSpec.
@@ -913,8 +942,9 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_configs = super(_VmGroupsDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    vm_group_configs = super(_VmGroupsDecoder,
+                             self).Decode(value, component_full_name,
+                                          flag_values)
     result = {}
     for vm_group_name, vm_group_config in six.iteritems(vm_group_configs):
       result[vm_group_name] = _VmGroupSpec(
@@ -937,9 +967,9 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Args:
       value: dict corresonding to a VM group config.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       dict a _VmGroupSpec.
@@ -947,8 +977,9 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super(_VmGroupSpecDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    vm_group_config = super(_VmGroupSpecDecoder,
+                            self).Decode(value, component_full_name,
+                                         flag_values)
     return _VmGroupSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
@@ -966,12 +997,12 @@ class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
     """Verifies placement_group_specs dictionary of a benchmark config object.
 
     Args:
-      value: dict mapping Placement Group Spec name string to the
-          corresponding placement group spec config dict.
+      value: dict mapping Placement Group Spec name string to the corresponding
+        placement group spec config dict.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       dict mapping Placement Group Spec name string
@@ -980,11 +1011,9 @@ class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    placement_group_spec_configs = (super(_PlacementGroupSpecsDecoder, self)
-                                    .Decode(
-                                        value,
-                                        component_full_name,
-                                        flag_values))
+    placement_group_spec_configs = (
+        super(_PlacementGroupSpecsDecoder,
+              self).Decode(value, component_full_name, flag_values))
     result = {}
     for placement_group_name, placement_group_spec_config in six.iteritems(
         placement_group_spec_configs):
@@ -1003,19 +1032,19 @@ class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
   """Validates the container_registry dictionary of a benchmark config."""
 
   def __init__(self, **kwargs):
-    super(_ContainerRegistryDecoder, self).__init__(valid_types=(dict,),
-                                                    **kwargs)
+    super(_ContainerRegistryDecoder, self).__init__(
+        valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_registry dictionary of a benchmark config object.
 
     Args:
       value: dict mapping VM group name string to the corresponding container
-          spec config dict.
+        spec config dict.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       dict mapping container spec name string to ContainerSpec.
@@ -1023,8 +1052,9 @@ class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super(_ContainerRegistryDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    vm_group_config = super(_ContainerRegistryDecoder,
+                            self).Decode(value, component_full_name,
+                                         flag_values)
     return container_service.ContainerRegistrySpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
@@ -1042,11 +1072,11 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
 
     Args:
       value: dict mapping VM group name string to the corresponding container
-          spec config dict.
+        spec config dict.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       dict mapping container spec name string to ContainerSpec.
@@ -1054,8 +1084,9 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    container_spec_configs = super(_ContainerSpecsDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    container_spec_configs = super(_ContainerSpecsDecoder,
+                                   self).Decode(value, component_full_name,
+                                                flag_values)
     result = {}
     for spec_name, spec_config in six.iteritems(container_spec_configs):
       result[spec_name] = container_service.ContainerSpec(
@@ -1072,9 +1103,9 @@ class _ContainerClusterSpec(spec.BaseSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_ContainerClusterSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
-    ignore_package_requirements = (getattr(flag_values,
-                                           'ignore_package_requirements', True)
-                                   if flag_values else True)
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True)
+        if flag_values else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
@@ -1102,7 +1133,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'valid_values': providers.VALID_CLOUDS
         }),
         'type': (option_decoders.StringDecoder, {
-            'default': 'Kubernetes',
+            'default': container_service.KUBERNETES,
         }),
         'vm_count': (option_decoders.IntDecoder, {
             'default': _DEFAULT_VM_COUNT,
@@ -1139,8 +1170,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
     # running in multiple zones in a single PKB invocation.
     if flag_values['zones'].present:
       for cloud in config_values['vm_spec']:
-        config_values['vm_spec'][cloud]['zone'] = (
-            flag_values.zones[0])
+        config_values['vm_spec'][cloud]['zone'] = (flag_values.zones[0])
 
 
 class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
@@ -1152,8 +1182,8 @@ class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_cluster dictionairy of a benchmark config object."""
-    cluster_config = super(_ContainerClusterSpecDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    cluster_config = super(_ContainerClusterSpecDecoder,
+                           self).Decode(value, component_full_name, flag_values)
 
     return _ContainerClusterSpec(
         self._GetOptionFullName(component_full_name),
@@ -1173,16 +1203,18 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     Args:
       value: dict Spark Service config dictionary
       component_full_name: string.  Fully qualified name of the configurable
-      component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues.  Runtime flag values to be propagated to
         BaseSpec constructors.
+
     Returns:
       _SparkServiceSpec Build from the config passed in in value.
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    spark_service_config = super(_SparkServiceDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    spark_service_config = super(_SparkServiceDecoder,
+                                 self).Decode(value, component_full_name,
+                                              flag_values)
     result = _SparkServiceSpec(
         self._GetOptionFullName(component_full_name), flag_values,
         **spark_service_config)
@@ -1303,7 +1335,7 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
     Args:
       value: dict. Config dictionary
       component_full_name: string.  Fully qualified name of the configurable
-      component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues.  Runtime flag values to be propagated to
         BaseSpec constructors.
 
@@ -1313,21 +1345,19 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    tpu_group_configs = super(_TpuGroupsDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    tpu_group_configs = super(_TpuGroupsDecoder,
+                              self).Decode(value, component_full_name,
+                                           flag_values)
     result = {}
     for tpu_group_name, tpu_group_config in six.iteritems(tpu_group_configs):
       result[tpu_group_name] = _TpuGroupSpec(
-          self._GetOptionFullName(component_full_name),
-          tpu_group_name,
-          flag_values,
-          **tpu_group_config)
+          self._GetOptionFullName(component_full_name), tpu_group_name,
+          flag_values, **tpu_group_config)
     return result
 
 
 class _CloudRedisSpec(spec.BaseSpec):
-  """Specs needed to configure a cloud redis instance.
-  """
+  """Specs needed to configure a cloud redis instance."""
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_CloudRedisSpec, self).__init__(
@@ -1347,13 +1377,16 @@ class _CloudRedisSpec(spec.BaseSpec):
     result = super(_CloudRedisSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS}),
+            'valid_values': providers.VALID_CLOUDS
+        }),
         'redis_name': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': False}),
+            'none_ok': False
+        }),
         'redis_version': (option_decoders.EnumDecoder, {
             'default': managed_memory_store.REDIS_3_2,
-            'valid_values': managed_memory_store.REDIS_VERSIONS}),
+            'valid_values': managed_memory_store.REDIS_VERSIONS
+        }),
     })
     return result
 
@@ -1362,10 +1395,10 @@ class _CloudRedisSpec(spec.BaseSpec):
     """Modifies config options based on runtime flag values.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(_CloudRedisSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
@@ -1373,8 +1406,7 @@ class _CloudRedisSpec(spec.BaseSpec):
 
 
 class _CloudRedisDecoder(option_decoders.TypeVerifier):
-  """Validate the cloud_redis dictionary of a benchmark config object.
-  """
+  """Validate the cloud_redis dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
     super(_CloudRedisDecoder, self).__init__(valid_types=(dict,), **kwargs)
@@ -1395,9 +1427,9 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    cloud_redis_config = super(
-        _CloudRedisDecoder, self).Decode(value, component_full_name,
-                                         flag_values)
+    cloud_redis_config = super(_CloudRedisDecoder,
+                               self).Decode(value, component_full_name,
+                                            flag_values)
     result = _CloudRedisSpec(
         self._GetOptionFullName(component_full_name), flag_values,
         **cloud_redis_config)
@@ -1430,22 +1462,28 @@ class _VPNServiceSpec(spec.BaseSpec):
     result.update({
         'shared_key': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'name': (option_decoders.StringDecoder, {
             'default': None,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'tunnel_count': (option_decoders.IntDecoder, {
             'default': 1,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'gateway_count': (option_decoders.IntDecoder, {
             'default': 1,
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'routing_type': (option_decoders.StringDecoder, {
             'default': 'static',
-            'none_ok': True}),
+            'none_ok': True
+        }),
         'ike_version': (option_decoders.IntDecoder, {
             'default': 1,
-            'none_ok': True}),
+            'none_ok': True
+        }),
     })
     return result
 
@@ -1454,10 +1492,10 @@ class _VPNServiceSpec(spec.BaseSpec):
     """Modifies config options based on runtime flag values.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(_VPNServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['vpn_service_tunnel_count'].present:
@@ -1475,8 +1513,7 @@ class _VPNServiceSpec(spec.BaseSpec):
 
 
 class _VPNServiceDecoder(option_decoders.TypeVerifier):
-  """Validate the vpn_service dictionary of a benchmark config object.
-  """
+  """Validate the vpn_service dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
     super(_VPNServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
@@ -1497,9 +1534,9 @@ class _VPNServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vpn_service_config = super(
-        _VPNServiceDecoder, self).Decode(value, component_full_name,
-                                         flag_values)
+    vpn_service_config = super(_VPNServiceDecoder,
+                               self).Decode(value, component_full_name,
+                                            flag_values)
     result = _VPNServiceSpec(
         self._GetOptionFullName(component_full_name), flag_values,
         **vpn_service_config)
@@ -1521,11 +1558,16 @@ class _AppGroupSpec(spec.BaseSpec):
     result = super(_AppGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'app_runtime': (option_decoders.StringDecoder, {
-            'default': None, 'none_ok': True}),
+            'default': None,
+            'none_ok': True
+        }),
         'app_type': (option_decoders.StringDecoder, {
-            'default': None, 'none_ok': True}),
-        'appservice_count': (
-            option_decoders.IntDecoder, {'default': 1}),
+            'default': None,
+            'none_ok': True
+        }),
+        'appservice_count': (option_decoders.IntDecoder, {
+            'default': 1
+        }),
         'appservice_spec': (_AppServiceDecoder, {})
     })
     return result
@@ -1563,8 +1605,9 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    app_group_configs = super(_AppGroupsDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    app_group_configs = super(_AppGroupsDecoder,
+                              self).Decode(value, component_full_name,
+                                           flag_values)
     result = {}
     for app_group_name, app_group_config in six.iteritems(app_group_configs):
       result[app_group_name] = _AppGroupSpec(
@@ -1597,13 +1640,14 @@ class _AppServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    config = super(_AppServiceDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    config = super(_AppServiceDecoder, self).Decode(value, component_full_name,
+                                                    flag_values)
     spec_cls = app_service.GetAppServiceSpecClass(
         flag_values.appservice or config.get('appservice'))
     return spec_cls(
         self._GetOptionFullName(component_full_name),
-        flag_values=flag_values, **config)
+        flag_values=flag_values,
+        **config)
 
 
 class BenchmarkConfigSpec(spec.BaseSpec):
@@ -1612,10 +1656,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
   Attributes:
     description: None or string. Description of the benchmark to run.
     name: Optional. The name of the benchmark
-    flags: dict. Values to use for each flag while executing the
-        benchmark.
+    flags: dict. Values to use for each flag while executing the benchmark.
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
-        options for each VM group used by the benchmark.
+      options for each VM group used by the benchmark.
   """
 
   def __init__(self, component_full_name, expected_os_types=None, **kwargs):
@@ -1623,7 +1666,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
 
     Args:
       component_full_name: string. Fully qualified name of the benchmark config
-          dict within the config file.
+        dict within the config file.
       expected_os_types: Optional series of strings from os_types.ALL.
       **kwargs: Keyword arguments for the BaseSpec constructor.
 
@@ -1642,9 +1685,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         raise errors.Config.InvalidValue(
             'VM groups in {0} may only have the following OS types: {1}. The '
             'following VM group options are invalid:{2}{3}'.format(
-                component_full_name, ', '.join(
-                    repr(os_type) for os_type in expected_os_types), os.linesep,
-                os.linesep.join(mismatched_os_types)))
+                component_full_name,
+                ', '.join(repr(os_type) for os_type in expected_os_types),
+                os.linesep, os.linesep.join(mismatched_os_types)))
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1730,21 +1773,22 @@ class BenchmarkConfigSpec(spec.BaseSpec):
 
     Args:
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config options.
+        component containing the config options.
       config: dict mapping option name string to option value.
       decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
       flag_values: flags.FlagValues. Runtime flags that may override provided
-          config option values. These flags have already been applied to the
-          current config, but they may be passed to the decoders for propagation
-          to deeper spec constructors.
+        config option values. These flags have already been applied to the
+        current config, but they may be passed to the decoders for propagation
+        to deeper spec constructors.
     """
     # Decode benchmark-specific flags first and use them while decoding the
     # rest of the BenchmarkConfigSpec's options.
     decoders = decoders.copy()
     self.flags = config.get('flags')
     with self.RedirectFlags(flag_values):
-      super(BenchmarkConfigSpec, self)._DecodeAndInit(
-          component_full_name, config, decoders, flag_values)
+      super(BenchmarkConfigSpec,
+            self)._DecodeAndInit(component_full_name, config, decoders,
+                                 flag_values)
 
   @contextlib.contextmanager
   def RedirectFlags(self, flag_values):
@@ -1752,7 +1796,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
 
     Args:
       flag_values: flags.FlagValues object. Within the enclosed code block,
-          reads and writes to this object are redirected to self.flags.
+        reads and writes to this object are redirected to self.flags.
+
     Yields:
       context manager that redirects flag reads and writes.
     """

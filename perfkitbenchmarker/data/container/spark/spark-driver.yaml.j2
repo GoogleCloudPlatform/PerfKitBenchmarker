@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ name }}
+  labels:
+    app: spark-driver
+spec:
+  restartPolicy: Never
+  serviceAccountName: {{ service_account }}
+  containers:
+    - name: spark-driver
+      command: {{ command }}
+      image: {{ image }}
+      ports:
+        - name: driver
+          containerPort: {{ driver_port }}
+        # Exposed for debugging
+        - name: web
+          containerPort: 4040
+      resources:
+        requests:
+          memory: "{{ driver_memory_mb }}Mi"
+
+---
+# This is a headless k8s service that allows the executor to dial into the
+# driver. Since this yaml is applied rather than created it can be reused by
+# sequential Spark applications. Parallel applications would get confused and
+# not know which driver to talk to however. However we wait for termination of
+# the driver before returning to the Benchmark. See
+# https://spark.apache.org/docs/latest/running-on-kubernetes.html#client-mode-networking
+# https://kubernetes.io/docs/concepts/services-networking/service/#headless-services
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ driver_service }}
+spec:
+  ports:
+  - name: driver
+    port: {{ driver_port }}
+  selector:
+    app: spark-driver
+  clusterIP: None

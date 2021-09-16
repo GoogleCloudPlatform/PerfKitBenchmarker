@@ -35,10 +35,11 @@ flags.DEFINE_string('hadoop_version', '3.3.1', 'Version of Hadoop.')
 flags.DEFINE_string('hadoop_bin_url', None,
                     'Specify to override url from HADOOP_URL_BASE.')
 
-
-DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
-              'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml.j2',
-              'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2']
+DATA_FILES = [
+    'hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
+    'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml.j2',
+    'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2'
+]
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
 HADOOP_URL_BASE = 'https://downloads.apache.org/hadoop/common'
@@ -65,8 +66,8 @@ def _GetHadoopURL():
     The Hadoop download url.
   """
 
-  return '{0}/hadoop-{1}/hadoop-{1}.tar.gz'.format(
-      HADOOP_URL_BASE, FLAGS.hadoop_version)
+  return '{0}/hadoop-{1}/hadoop-{1}.tar.gz'.format(HADOOP_URL_BASE,
+                                                   FLAGS.hadoop_version)
 
 
 def CheckPrerequisites():
@@ -84,9 +85,9 @@ def _Install(vm):
   vm.Install('curl')
   hadoop_url = FLAGS.hadoop_bin_url or _GetHadoopURL()
 
-  vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
-                    'tar -C {0} --strip-components=1 -xzf -').format(
-                        HADOOP_DIR, hadoop_url))
+  vm.RemoteCommand(
+      ('mkdir {0} && curl -L {1} | '
+       'tar -C {0} --strip-components=1 -xzf -').format(HADOOP_DIR, hadoop_url))
 
 
 def YumInstall(vm):
@@ -111,11 +112,6 @@ def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
                    'gcs-connector-hadoop{}-latest.jar'.format(
                        FLAGS.hadoop_version[0]))
   vm.RemoteCommand('cd {0} && curl -O {1}'.format(install_dir, connector_url))
-
-
-def InstallS3Connector(vm, install_dir=HADOOP_LIB_DIR):
-  """Copy the S3 connector onto Hadoop's classpath."""
-  vm.RemoteCommand('cp {0}/*aws*.jar {1}'.format(HADOOP_TOOLS_DIR, install_dir))
 
 
 # Scheduling constants.
@@ -177,8 +173,10 @@ def _RenderConfig(vm,
 
   aws_access_key = None
   aws_secret_key = None
+  optional_tools = None
   if configure_s3:
     aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
+    optional_tools = 'hadoop-aws'
 
   context = {
       'master_ip': master.internal_ip,
@@ -196,6 +194,7 @@ def _RenderConfig(vm,
       'num_reduce_tasks': num_reduce_tasks,
       'aws_access_key': aws_access_key,
       'aws_secret_key': aws_secret_key,
+      'optional_tools': optional_tools
   }
 
   for file_name in DATA_FILES:
@@ -203,8 +202,7 @@ def _RenderConfig(vm,
     if (file_name == 'hadoop/workers.j2' and
         FLAGS.hadoop_version.split('.')[0] < '3'):
       file_name = 'hadoop/slaves.j2'
-    remote_path = posixpath.join(HADOOP_CONF_DIR,
-                                 os.path.basename(file_name))
+    remote_path = posixpath.join(HADOOP_CONF_DIR, os.path.basename(file_name))
     if file_name.endswith('.j2'):
       vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
     else:
@@ -242,24 +240,26 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
       _RenderConfig, master=master, workers=workers, configure_s3=configure_s3)
   vm_util.RunThreaded(fn, vms)
 
-  master.RemoteCommand(
-      "rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
-          HADOOP_PRIVATE_KEY))
+  master.RemoteCommand("rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
+      HADOOP_PRIVATE_KEY))
 
   public_key = master.RemoteCommand('cat {0}.pub'.format(HADOOP_PRIVATE_KEY))[0]
 
   def AddKey(vm):
     vm.RemoteCommand('echo "{0}" >> ~/.ssh/authorized_keys'.format(public_key))
+
   vm_util.RunThreaded(AddKey, vms)
 
-  context = {'hadoop_dir': HADOOP_DIR,
-             'vm_ips': [vm.internal_ip for vm in vms],
-             'start_yarn': start_yarn}
+  context = {
+      'hadoop_dir': HADOOP_DIR,
+      'vm_ips': [vm.internal_ip for vm in vms],
+      'start_yarn': start_yarn
+  }
 
   # HDFS setup and formatting, YARN startup
   script_path = posixpath.join(HADOOP_DIR, 'start-hadoop.sh')
-  master.RenderTemplate(data.ResourcePath(START_HADOOP_SCRIPT),
-                        script_path, context=context)
+  master.RenderTemplate(
+      data.ResourcePath(START_HADOOP_SCRIPT), script_path, context=context)
   master.RemoteCommand('bash {0}'.format(script_path), should_log=True)
 
   logging.info('Sleeping 10s for Hadoop nodes to join.')

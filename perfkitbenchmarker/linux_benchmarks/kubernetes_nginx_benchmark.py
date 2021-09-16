@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs wrk2 clients against replicated nginx servers behind a load balancer."""
 
 import functools
@@ -22,7 +21,6 @@ import tempfile
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import nginx_benchmark
 
@@ -102,15 +100,13 @@ def _PrepareCluster(benchmark_spec):
   if FLAGS.nginx_use_ssl:
     nginx_port = 443
 
-  with kubernetes_helper.CreateRenderedManifestFile(
-      'container/kubernetes_nginx/kubernetes_nginx.yaml.j2', {
-          'nginx_image': container_image,
-          'nginx_replicas': replicas,
-          'nginx_content_size': FLAGS.nginx_content_size,
-          'nginx_port': nginx_port,
-          'nginx_worker_connections': FLAGS.nginx_worker_connections
-      }) as rendered_manifest:
-    benchmark_spec.container_cluster.ApplyManifest(rendered_manifest.name)
+  benchmark_spec.container_cluster.ApplyManifest(
+      'container/kubernetes_nginx/kubernetes_nginx.yaml.j2',
+      nginx_image=container_image,
+      nginx_replicas=replicas,
+      nginx_content_size=FLAGS.nginx_content_size,
+      nginx_port=nginx_port,
+      nginx_worker_connections=FLAGS.nginx_worker_connections)
 
   benchmark_spec.container_cluster.WaitForResource(
       'deploy/nginx-deployment', 'available')

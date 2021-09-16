@@ -25,3 +25,7 @@ export HDFS_DATANODE_USER="{{user}}"
 export HDFS_SECONDARYNAMENODE_USER="{{user}}"
 export YARN_RESOURCEMANAGER_USER="{{user}}"
 export YARN_NODEMANAGER_USER="{{user}}"
+# https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/#Overview
+{% if optional_tools %}
+export HADOOP_OPTIONAL_TOOLS="{{optional_tools}}"
+{% endif %}

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Contains classes/functions related to GKE (Google Kubernetes Engine)."""
 
 import json
@@ -72,8 +71,8 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
   def RemoteBuild(self, image):
     """Build the image remotely."""
     full_tag = self.GetFullRegistryTag(image.name)
-    build_cmd = util.GcloudCommand(self, 'builds', 'submit',
-                                   '--tag', full_tag, image.directory)
+    build_cmd = util.GcloudCommand(self, 'builds', 'submit', '--tag', full_tag,
+                                   image.directory)
     del build_cmd.flags['zone']
     build_cmd.Issue()
 
@@ -86,8 +85,8 @@ class GkeCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
-    self.cluster_version = (FLAGS.container_cluster_version or
-                            DEFAULT_CONTAINER_VERSION)
+    self.cluster_version = (
+        FLAGS.container_cluster_version or DEFAULT_CONTAINER_VERSION)
     self.use_application_default_credentials = True
 
   def GetResourceMetadata(self):
@@ -125,8 +124,8 @@ class GkeCluster(container_service.KubernetesCluster):
     # are a GCP managed service account like the GCE default service account,
     # which we can't tell to which project they belong.
     elif re.match(SERVICE_ACCOUNT_PATTERN, user):
-      logging.info(
-          'Re-using configured service-account for GKE Cluster: %s', user)
+      logging.info('Re-using configured service-account for GKE Cluster: %s',
+                   user)
       cmd.flags['service-account'] = user
       self.use_application_default_credentials = False
     else:
@@ -201,6 +200,13 @@ class GkeCluster(container_service.KubernetesCluster):
       kubernetes_helper.CreateFromFile(
           data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))
 
+    # GKE does not wait for kube-dns by default
+    logging.info('Waiting for kube-dns')
+    self.WaitForResource(
+        'deployment/kube-dns',
+        condition_name='Available',
+        namespace='kube-system')
+
   def _GetInstanceGroups(self):
     cmd = util.GcloudCommand(self, 'container', 'node-pools', 'list')
     cmd.flags['cluster'] = self.name
@@ -223,21 +229,20 @@ class GkeCluster(container_service.KubernetesCluster):
     return instances
 
   def _IsDeleting(self):
-    cmd = util.GcloudCommand(
-        self, 'container', 'clusters', 'describe', self.name)
+    cmd = util.GcloudCommand(self, 'container', 'clusters', 'describe',
+                             self.name)
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
     return True if stdout else False
 
   def _Delete(self):
     """Deletes the cluster."""
-    cmd = util.GcloudCommand(
-        self, 'container', 'clusters', 'delete', self.name)
+    cmd = util.GcloudCommand(self, 'container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns True if the cluster exits."""
-    cmd = util.GcloudCommand(
-        self, 'container', 'clusters', 'describe', self.name)
+    cmd = util.GcloudCommand(self, 'container', 'clusters', 'describe',
+                             self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return retcode == 0

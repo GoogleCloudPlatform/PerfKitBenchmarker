@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Contains classes related to managed container services.
 
 For now this just consists of a base cluster class that other container
@@ -22,11 +21,15 @@ expanded to support first-class container benchmarks.
 """
 
 import collections
+import functools
 import ipaddress
 import itertools
 import os
 import time
+from typing import Any, Dict, List, Optional
+
 from absl import flags
+import jinja2
 from perfkitbenchmarker import context
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import data
@@ -36,6 +39,7 @@ from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import units
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -43,52 +47,55 @@ from perfkitbenchmarker.configs import spec
 import requests
 import yaml
 
-
 KUBERNETES = 'Kubernetes'
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('kubeconfig', None,
-                    'Path to kubeconfig to be used by kubectl. '
-                    'If unspecified, it will be set to a file in this run\'s '
-                    'temporary directory.')
+flags.DEFINE_string(
+    'kubeconfig', None, 'Path to kubeconfig to be used by kubectl. '
+    'If unspecified, it will be set to a file in this run\'s '
+    'temporary directory.')
 
-flags.DEFINE_string('kubectl', 'kubectl',
-                    'Path to kubectl tool')
+flags.DEFINE_string('kubectl', 'kubectl', 'Path to kubectl tool')
 
-flags.DEFINE_boolean('local_container_build', False,
-                     'Force container images to be built locally rather than '
-                     'just as a fallback if there is no remote image builder '
-                     'associated with the registry.')
+flags.DEFINE_boolean(
+    'local_container_build', False,
+    'Force container images to be built locally rather than '
+    'just as a fallback if there is no remote image builder '
+    'associated with the registry.')
 
-flags.DEFINE_boolean('static_container_image', True,
-                     'Whether container images are static (i.e. are not '
-                     'managed by PKB). If this is set, PKB will accept the '
-                     'image as fully qualified (including repository) and will '
-                     'not attempt to build it.')
+flags.DEFINE_boolean(
+    'static_container_image', True,
+    'Whether container images are static (i.e. are not '
+    'managed by PKB). If this is set, PKB will accept the '
+    'image as fully qualified (including repository) and will '
+    'not attempt to build it.')
 
-flags.DEFINE_boolean('force_container_build', False,
-                     'Whether to force PKB to build container images even '
-                     'if they already exist in the registry.')
+flags.DEFINE_boolean(
+    'force_container_build', False,
+    'Whether to force PKB to build container images even '
+    'if they already exist in the registry.')
 
-flags.DEFINE_string('container_cluster_cloud', None,
-                    'Sets the cloud to use for the container cluster. '
-                    'This will override both the value set in the config and '
-                    'the value set using the generic "cloud" flag.')
+flags.DEFINE_string(
+    'container_cluster_cloud', None,
+    'Sets the cloud to use for the container cluster. '
+    'This will override both the value set in the config and '
+    'the value set using the generic "cloud" flag.')
 
-flags.DEFINE_integer('container_cluster_num_vms', None,
-                     'Number of nodes in the cluster. Defaults to '
-                     'container_cluster.vm_count')
+flags.DEFINE_integer(
+    'container_cluster_num_vms', None,
+    'Number of nodes in the cluster. Defaults to '
+    'container_cluster.vm_count')
 
 flags.DEFINE_string('container_cluster_type', KUBERNETES,
                     'The type of container cluster.')
 
-flags.DEFINE_string('container_cluster_version', None,
-                    'Optional version flag to pass to the cluster create '
-                    'command. If not specified, the cloud-specific container '
-                    'implementation will chose an appropriate default.')
+flags.DEFINE_string(
+    'container_cluster_version', None,
+    'Optional version flag to pass to the cluster create '
+    'command. If not specified, the cloud-specific container '
+    'implementation will chose an appropriate default.')
 
-_K8S_FINISHED_PHASES = frozenset(['Succeeded', 'Failed'])
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
 kind: Ingress
@@ -99,6 +106,28 @@ spec:
     serviceName: {service_name}
     servicePort: 8080
 """
+
+
+class ContainerException(errors.Error):
+  """Exception during the creation or execution of a container."""
+
+
+class FatalContainerException(errors.Resource.CreationError,
+                              ContainerException):
+  """Fatal Exception during the creation or execution of a container."""
+  pass
+
+
+class RetriableContainerException(errors.Resource.RetryableCreationError,
+                                  ContainerException):
+  """Retriable Exception during the creation or execution of a container."""
+  pass
+
+
+def RunKubectlCommand(command: List[str], **kwargs):
+  """Run a kubectl command."""
+  cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig] + command
+  return vm_util.IssueCommand(cmd, **kwargs)
 
 
 class ContainerSpec(spec.BaseSpec):
@@ -127,14 +156,22 @@ class ContainerSpec(spec.BaseSpec):
     """
     result = super(ContainerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'image': (option_decoders.StringDecoder, {}),
-        'static_image': (option_decoders.BooleanDecoder, {'default': False}),
-        'cpus': (option_decoders.FloatDecoder, {'default': None}),
+        'image': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'static_image': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'cpus': (option_decoders.FloatDecoder, {
+            'default': None
+        }),
         'memory': (custom_virtual_machine_spec.MemoryDecoder, {
             'default': None
         }),
         'command': (_CommandDecoder, {}),
-        'container_port': (option_decoders.IntDecoder, {'default': 8080}),
+        'container_port': (option_decoders.IntDecoder, {
+            'default': 8080
+        }),
     })
     return result
 
@@ -144,7 +181,8 @@ class _CommandDecoder(option_decoders.ListDecoder):
 
   def __init__(self, **kwargs):
     super(_CommandDecoder, self).__init__(
-        default=None, none_ok=True,
+        default=None,
+        none_ok=True,
         item_decoder=option_decoders.StringDecoder(),
         **kwargs)
 
@@ -152,7 +190,9 @@ class _CommandDecoder(option_decoders.ListDecoder):
 class BaseContainer(resource.BaseResource):
   """Class representing a single container."""
 
-  def __init__(self, container_spec):
+  def __init__(self, container_spec=None, **_):
+    # Hack to make container_spec a kwarg
+    assert container_spec
     super(BaseContainer, self).__init__()
     self.cpus = container_spec.cpus
     self.memory = container_spec.memory
@@ -160,8 +200,16 @@ class BaseContainer(resource.BaseResource):
     self.image = container_spec.image
     self.ip_address = None
 
-  def WaitForExit(self, timeout=1200):
-    """Waits until the container has finished running."""
+  def WaitForExit(self, timeout: int = 1200) -> Dict[str, Any]:
+    """Gets the successfully finished container.
+
+    Args:
+      timeout: The timeout to wait in seconds
+
+    Raises:
+      FatalContainerException: If the container fails
+      RetriableContainerException: If the container times out wihout succeeding.
+    """
     raise NotImplementedError()
 
   def GetLogs(self):
@@ -235,7 +283,9 @@ class ContainerRegistrySpec(spec.BaseSpec):
     result = super(ContainerRegistrySpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.StringDecoder, {}),
-        'spec': (option_decoders.PerCloudConfigDecoder, {'default': {}})
+        'spec': (option_decoders.PerCloudConfigDecoder, {
+            'default': {}
+        })
     })
     return result
 
@@ -260,9 +310,7 @@ class BaseContainerRegistry(resource.BaseResource):
     self.name = registry_spec.name or 'pkb%s' % FLAGS.run_uri
     self.local_build_times = {}
     self.remote_build_times = {}
-    self.metadata.update({
-        'cloud': self.CLOUD
-    })
+    self.metadata.update({'cloud': self.CLOUD})
 
   def _Create(self):
     """Creates the image registry."""
@@ -281,15 +329,15 @@ class BaseContainerRegistry(resource.BaseResource):
           'build_type': 'local',
           'image': image_name,
       })
-      samples.append(sample.Sample(
-          'Image Build Time', build_time, 'seconds', metadata))
+      samples.append(
+          sample.Sample('Image Build Time', build_time, 'seconds', metadata))
     for image_name, build_time in self.remote_build_times.items():
       metadata.update({
           'build_type': 'remote',
           'image': image_name,
       })
-      samples.append(sample.Sample(
-          'Image Build Time', build_time, 'seconds', metadata))
+      samples.append(
+          sample.Sample('Image Build Time', build_time, 'seconds', metadata))
     return samples
 
   def GetFullRegistryTag(self, image):
@@ -331,13 +379,14 @@ class BaseContainerRegistry(resource.BaseResource):
       image: Instance of _ContainerImage representing the image to build.
     """
     build_cmd = [
-        'docker', 'build', '--no-cache',
-        '-t', image.name, image.directory
+        'docker', 'build', '--no-cache', '-t', image.name, image.directory
     ]
     vm_util.IssueCommand(build_cmd)
 
   def GetOrBuild(self, image):
     """Finds the image in the registry or builds it.
+
+    TODO(pclay): Add support for build ARGs.
 
     Args:
       image: The PKB name for the image (string).
@@ -348,8 +397,8 @@ class BaseContainerRegistry(resource.BaseResource):
     full_image = self.GetFullRegistryTag(image)
     if not FLAGS.force_container_build:
       inspect_cmd = ['docker', 'image', 'inspect', full_image]
-      _, _, retcode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True,
-                                           raise_on_failure=False)
+      _, _, retcode = vm_util.IssueCommand(
+          inspect_cmd, suppress_warning=True, raise_on_failure=False)
       if retcode == 0:
         return full_image
     self._Build(image)
@@ -393,8 +442,8 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
 
 
 def GetContainerClusterClass(cloud, cluster_type):
-  return resource.GetResourceClass(BaseContainerCluster,
-                                   CLOUD=cloud, CLUSTER_TYPE=cluster_type)
+  return resource.GetResourceClass(
+      BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type)
 
 
 class BaseContainerCluster(resource.BaseResource):
@@ -456,49 +505,109 @@ class BaseContainerCluster(resource.BaseResource):
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = []
-    samples.append(sample.Sample(
-        'Cluster Creation Time',
-        self.resource_ready_time - self.create_start_time,
-        'seconds'))
+    samples.append(
+        sample.Sample('Cluster Creation Time',
+                      self.resource_ready_time - self.create_start_time,
+                      'seconds'))
     for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
-        samples.append(sample.Sample(
-            'Container Deployment Time',
-            container.resource_ready_time - container.create_start_time,
-            'seconds', metadata))
+        samples.append(
+            sample.Sample(
+                'Container Deployment Time',
+                container.resource_ready_time - container.create_start_time,
+                'seconds', metadata))
       if container.delete_end_time and container.delete_start_time:
-        samples.append(sample.Sample(
-            'Container Delete Time',
-            container.delete_end_time - container.delete_start_time,
-            'seconds', metadata))
+        samples.append(
+            sample.Sample(
+                'Container Delete Time',
+                container.delete_end_time - container.delete_start_time,
+                'seconds', metadata))
     for service in self.services.values():
       metadata = {'image': service.image.split('/')[-1]}
       if service.resource_ready_time and service.create_start_time:
-        samples.append(sample.Sample(
-            'Service Deployment Time',
-            service.resource_ready_time - service.create_start_time,
-            'seconds', metadata))
+        samples.append(
+            sample.Sample(
+                'Service Deployment Time',
+                service.resource_ready_time - service.create_start_time,
+                'seconds', metadata))
       if service.delete_end_time and service.delete_start_time:
-        samples.append(sample.Sample(
-            'Service Delete Time',
-            service.delete_end_time - service.delete_start_time,
-            'seconds', metadata))
+        samples.append(
+            sample.Sample('Service Delete Time',
+                          service.delete_end_time - service.delete_start_time,
+                          'seconds', metadata))
 
     return samples
 
 
-class KubernetesContainer(BaseContainer):
-  """A Kubernetes flavor of Container."""
+class KubernetesPod:
+  """Representation of a Kubernetes pod.
 
-  def __init__(self, container_spec, name):
-    super(KubernetesContainer, self).__init__(container_spec)
+  It can be created as a PKB managed resource using KubernetesContainer,
+  or created with ApplyManifest and directly constructed.
+  """
+
+  def __init__(self, name=None, **_):
+    assert name
     self.name = name
+
+  def _GetPod(self) -> Dict[str, Any]:
+    """Gets a representation of the POD and returns it."""
+    stdout, _, _ = RunKubectlCommand(['get', 'pod', self.name, '-o', 'yaml'])
+    pod = yaml.safe_load(stdout)
+    self.ip_address = pod.get('status', {}).get('podIP')
+    return pod
+
+  def WaitForExit(self, timeout: int = None) -> Dict[str, Any]:
+    """Gets the finished running container."""
+
+    @vm_util.Retry(
+        timeout=timeout, retryable_exceptions=(RetriableContainerException,))
+    def _WaitForExit():
+      # Inspect the pod's status to determine if it succeeded, has failed, or is
+      # doomed to fail.
+      # https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/
+      pod = self._GetPod()
+      status = pod['status']
+      phase = status['phase']
+      if phase == 'Succeeded':
+        return pod
+      elif phase == 'Failed':
+        raise FatalContainerException(
+            f"Pod {self.name} failed:\n{yaml.dump(pod['status'])}")
+      else:
+        for condition in status.get('conditions', []):
+          if (condition['type'] == 'PodScheduled' and
+              condition['status'] == 'False' and
+              condition['reason'] == 'Unschedulable'):
+            # TODO(pclay): Revisit this when we scale clusters.
+            raise FatalContainerException(
+                f"Pod {self.name} failed to schedule:\n{condition['message']}")
+        for container_status in status.get('containerStatuses', []):
+          waiting_status = container_status['state'].get('waiting', {})
+          if waiting_status.get('reason') in [
+              'ErrImagePull', 'ImagePullBackOff'
+          ]:
+            raise FatalContainerException(
+                f'Failed to find container image for {status.name}:\n' +
+                yaml.dump(waiting_status.get('message')))
+        raise RetriableContainerException(
+            f'Pod phase ({phase}) not in finished phases.')
+
+    return _WaitForExit()
+
+  def GetLogs(self):
+    """Returns the logs from the container."""
+    stdout, _, _ = RunKubectlCommand(['logs', self.name])
+    return stdout
+
+
+class KubernetesContainer(BaseContainer, KubernetesPod):
+  """A KubernetesPod based flavor of Container."""
 
   def _Create(self):
     """Creates the container."""
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'run',
         self.name,
         '--image=%s' % self.image,
@@ -516,7 +625,7 @@ class KubernetesContainer(BaseContainer):
     if self.command:
       run_cmd.extend(['--command', '--'])
       run_cmd.extend(self.command)
-    vm_util.IssueCommand(run_cmd)
+    RunKubectlCommand(run_cmd)
 
   def _Delete(self):
     """Deletes the container."""
@@ -525,31 +634,6 @@ class KubernetesContainer(BaseContainer):
   def _IsReady(self):
     """Returns true if the container has stopped pending."""
     return self._GetPod()['status']['phase'] != 'Pending'
-
-  def _GetPod(self):
-    """Gets a representation of the POD and returns it."""
-    stdout, _, _ = vm_util.IssueCommand([
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'get', 'pod', self.name, '-o', 'yaml'])
-    pod = yaml.safe_load(stdout)
-    if pod:
-      self.ip_address = pod.get('status', {}).get('podIP', None)
-    return pod
-
-  def WaitForExit(self, timeout=None):
-    """Waits until the container has finished running."""
-    @vm_util.Retry(timeout=timeout)
-    def _WaitForExit():
-      phase = self._GetPod()['status']['phase']
-      if phase not in _K8S_FINISHED_PHASES:
-        raise Exception('POD phase (%s) not in finished phases.' % phase)
-    _WaitForExit()
-
-  def GetLogs(self):
-    """Returns the logs from the container."""
-    stdout, _, _ = vm_util.IssueCommand([
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'logs', self.name])
-    return stdout
 
 
 class KubernetesContainerService(BaseContainerService):
@@ -562,11 +646,9 @@ class KubernetesContainerService(BaseContainerService):
 
   def _Create(self):
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'run',
-        self.name,
-        '--image=%s' % self.image,
-        '--port', str(self.port)
+        'run', self.name,
+        '--image=%s' % self.image, '--port',
+        str(self.port)
     ]
 
     limits = []
@@ -580,16 +662,14 @@ class KubernetesContainerService(BaseContainerService):
     if self.command:
       run_cmd.extend(['--command', '--'])
       run_cmd.extend(self.command)
-    vm_util.IssueCommand(run_cmd)
+    RunKubectlCommand(run_cmd)
 
     expose_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig', FLAGS.kubeconfig,
-        'expose', 'deployment', self.name,
-        '--type', 'NodePort',
-        '--target-port', str(self.port)
+        'expose', 'deployment', self.name, '--type', 'NodePort',
+        '--target-port',
+        str(self.port)
     ]
-    vm_util.IssueCommand(expose_cmd)
+    RunKubectlCommand(expose_cmd)
     with vm_util.NamedTemporaryFile() as tf:
       tf.write(_K8S_INGRESS.format(service_name=self.name))
       tf.close()
@@ -599,11 +679,10 @@ class KubernetesContainerService(BaseContainerService):
     """Attempts to set the Service's ip address."""
     ingress_name = '%s-ingress' % self.name
     get_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'get', 'ing', ingress_name,
-        '-o', 'jsonpath={.status.loadBalancer.ingress[*].ip}'
+        'get', 'ing', ingress_name, '-o',
+        'jsonpath={.status.loadBalancer.ingress[*].ip}'
     ]
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    stdout, _, _ = RunKubectlCommand(get_cmd)
     ip_address = stdout
     if ip_address:
       self.ip_address = ip_address
@@ -626,13 +705,8 @@ class KubernetesContainerService(BaseContainerService):
       tf.close()
       kubernetes_helper.DeleteFromFile(tf.name)
 
-    delete_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig', FLAGS.kubeconfig,
-        'delete', 'deployment',
-        self.name
-    ]
-    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
+    delete_cmd = ['delete', 'deployment', self.name]
+    RunKubectlCommand(delete_cmd, raise_on_failure=False)
 
 
 class KubernetesCluster(BaseContainerCluster):
@@ -643,7 +717,7 @@ class KubernetesCluster(BaseContainerCluster):
   def DeployContainer(self, base_name, container_spec):
     """Deploys Containers according to the ContainerSpec."""
     name = base_name + str(len(self.containers[base_name]))
-    container = KubernetesContainer(container_spec, name)
+    container = KubernetesContainer(container_spec=container_spec, name=name)
     self.containers[base_name].append(container)
     container.Create()
 
@@ -653,27 +727,37 @@ class KubernetesCluster(BaseContainerCluster):
     self.services[name] = service
     service.Create()
 
-  def ApplyManifest(self, manifest_filename):
-    """Applies a declarative Kubernetes manifest."""
-    run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'apply',
-        '-f',
-        manifest_filename
-    ]
-    vm_util.IssueCommand(run_cmd)
+  # TODO(pclay): Revisit instance methods that don't rely on instance data.
+  def ApplyManifest(self, manifest_file, **kwargs):
+    """Applies a declarative Kubernetes manifest; possibly with jinja.
 
-  def WaitForResource(self, resource_name, condition_name):
+    Args:
+      manifest_file: The name of the YAML file or YAML template.
+      **kwargs: Arguments to the jinja template.
+    """
+    filename = data.ResourcePath(manifest_file)
+    if not filename.endswith('.j2'):
+      assert not kwargs
+      RunKubectlCommand(['apply', '-f', filename])
+      return
+
+    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+    with open(filename) as template_file, vm_util.NamedTemporaryFile(
+        mode='w', suffix='.yaml') as rendered_template:
+      manifest = environment.from_string(template_file.read()).render(kwargs)
+      rendered_template.write(manifest)
+      rendered_template.close()
+      RunKubectlCommand(['apply', '-f', rendered_template.name])
+
+  def WaitForResource(self, resource_name, condition_name, namespace=None):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'wait',
-        '--for=condition=%s' % condition_name,
-        '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
-        resource_name
+        'wait', f'--for=condition={condition_name}',
+        f'--timeout={vm_util.DEFAULT_TIMEOUT}s', resource_name
     ]
-
-    vm_util.IssueRetryableCommand(run_cmd)
+    if namespace:
+      run_cmd.append(f'--namespace={namespace}')
+    RunKubectlCommand(run_cmd)
 
   def WaitForRollout(self, resource_name):
     """Blocks until a Kubernetes rollout is completed."""
@@ -691,12 +775,11 @@ class KubernetesCluster(BaseContainerCluster):
   def GetLoadBalancerIP(self, service_name):
     """Returns the IP address of a LoadBalancer service when ready."""
     get_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'get', 'service', service_name,
-        '-o', 'jsonpath={.status.loadBalancer.ingress[0].ip}'
+        'get', 'service', service_name, '-o',
+        'jsonpath={.status.loadBalancer.ingress[0].ip}'
     ]
 
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    stdout, _, _ = RunKubectlCommand(get_cmd)
 
     try:
       # Ensure the load balancer is ready by parsing the output IP
@@ -712,25 +795,59 @@ class KubernetesCluster(BaseContainerCluster):
 
     Args:
       name: The name of the ConfigMap to create
-      from_file_dir: The directory name containing files that will be
-          key/values in the ConfigMap
+      from_file_dir: The directory name containing files that will be key/values
+        in the ConfigMap
     """
-    create_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'create', 'configmap', name,
-        '--from-file', from_file_dir
-    ]
+    RunKubectlCommand(
+        ['create', 'configmap', name, '--from-file', from_file_dir])
 
-    vm_util.IssueCommand(create_cmd)
+  def CreateServiceAccount(self,
+                           name: str,
+                           clusterrole: Optional[str] = None,
+                           namespace='default'):
+    """Create a k8s service account and cluster-role-binding."""
+    RunKubectlCommand(
+        ['create', 'serviceaccount', name, '--namespace', namespace])
+    if clusterrole:
+      # TODO(pclay): Support customer cluster roles?
+      RunKubectlCommand([
+          'create',
+          'clusterrolebinding',
+          f'{name}-role',
+          f'--clusterrole={clusterrole}',
+          f'--serviceaccount={namespace}:{name}',
+          '--namespace',
+          namespace,
+      ])
+
+  # TODO(pclay): Move to cached property in
+  @property
+  @functools.lru_cache(maxsize=1)
+  def node_memory_allocatable(self) -> units.Quantity:
+    """Usable memory of each node in cluster in KiB."""
+    stdout, _, _ = RunKubectlCommand(
+        # TODO(pclay): Take a minimum of all nodes?
+        [
+            'get', 'nodes', '-o',
+            'jsonpath={.items[0].status.allocatable.memory}'
+        ])
+    return units.ParseExpression(stdout)
+
+  @property
+  @functools.lru_cache(maxsize=1)
+  def node_num_cpu(self) -> int:
+    """vCPU of each node in cluster."""
+    stdout, _, _ = RunKubectlCommand(
+        ['get', 'nodes', '-o', 'jsonpath={.items[0].status.capacity.cpu}'])
+    return int(stdout)
 
   def GetPodLabel(self, resource_name):
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'get', resource_name,
         '-o', 'jsonpath="{.spec.selector.matchLabels.app}"'
     ]
 
-    stdout, _, _ = vm_util.IssueCommand(run_cmd)
+    stdout, _, _ = RunKubectlCommand(run_cmd)
     return yaml.safe_load(stdout)
 
   def GetPodIps(self, resource_name):
@@ -742,18 +859,15 @@ class KubernetesCluster(BaseContainerCluster):
     pod_label = self.GetPodLabel(resource_name)
 
     get_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'get', 'pods', '-l', 'app=%s' % pod_label,
         '-o', 'jsonpath="{.items[*].status.podIP}"'
     ]
 
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    stdout, _, _ = RunKubectlCommand(get_cmd)
     return yaml.safe_load(stdout).split()
 
-  def RunKubectlCommand(self, pod_name, cmd):
+  def RunKubectlExec(self, pod_name, cmd):
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'exec', '-it', pod_name, '--'
     ] + cmd
-    vm_util.IssueCommand(run_cmd)
-
+    RunKubectlCommand(run_cmd)
