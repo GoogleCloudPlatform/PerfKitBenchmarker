@@ -16,8 +16,6 @@
 
 
 import functools
-import multiprocessing
-import multiprocessing.managers
 import os
 import signal
 import threading
@@ -37,9 +35,8 @@ def _RaiseValueError():
   raise ValueError('ValueError')
 
 
-def _IncrementCounter(lock, counter):
-  with lock:
-    counter.value += 1
+def _IncrementCounter(counter):
+  counter.value += 1
 
 
 def _AppendLength(int_list):
@@ -50,6 +47,12 @@ def _WaitAndAppendInt(int_list, int_to_append, event=None, timeout=None):
   if event:
     event.wait(timeout)
   int_list.append(int_to_append)
+
+
+class Counter():
+
+  def __init__(self):
+    self.value = 0
 
 
 class GetCallStringTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -166,16 +169,15 @@ class RunParallelProcessesTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result, [(i, 'a') for i in range(10)])
 
   def testException(self):
-    manager = multiprocessing.managers.SyncManager()
-    manager.start()
-    lock = manager.Lock()
-    counter = manager.Value('i', 0)
-    calls = [(_IncrementCounter, (lock, counter), {}),
+    counter = Counter()
+    calls = [(_IncrementCounter, (counter,), {}),
              (_RaiseValueError, (), {}),
-             (_IncrementCounter, (lock, counter), {})]
+             (_IncrementCounter, (counter,), {})]
     with self.assertRaises(errors.VmUtil.CalledProcessException):
       background_tasks.RunParallelProcesses(calls, max_concurrency=1)
-    self.assertEqual(counter.value, 2)
+
+    # RunParallelProcesses does not gurantee the tasks are run in order.
+    self.assertLessEqual(counter.value, 2, 'Unexpected counter value')
 
 
 if __name__ == '__main__':
