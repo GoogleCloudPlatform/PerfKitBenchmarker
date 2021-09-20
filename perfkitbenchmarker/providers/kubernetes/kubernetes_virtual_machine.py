@@ -17,6 +17,7 @@
 
 import json
 import logging
+import os
 import posixpath
 
 from absl import flags
@@ -407,6 +408,7 @@ class DebianBasedKubernetesVirtualMachine(
     else:
       remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
       remote_path = remote_path.strip()
+      file_name = posixpath.basename(remote_path)
       src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
     if retries is None:
       retries = FLAGS.ssh_retries
@@ -425,10 +427,18 @@ class DebianBasedKubernetesVirtualMachine(
                     (retcode, ' '.join(cmd), stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     if copy_to:
-      file_name = posixpath.basename(file_path)
       remote_path = remote_path or file_name
       self.RemoteCommand('mv %s %s; chmod 777 %s' %
                          (file_name, remote_path, remote_path))
+    # Validate file sizes
+    # Sometimes kubectl cp seems to gracefully truncate the file.
+    local_size = os.path.getsize(file_path)
+    stdout, _ = self.RemoteCommand(f'stat -c %s {remote_path}')
+    remote_size = int(stdout)
+    if local_size != remote_size:
+      raise errors.VirtualMachine.RemoteCommandError(
+          f'Failed to copy {file_name}. '
+          f'Remote size {remote_size} != local size {local_size}')
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def PrepareVMEnvironment(self):
