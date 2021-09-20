@@ -17,6 +17,28 @@ from perfkitbenchmarker.linux_packages import openmpi
 FLAGS = flags.FLAGS
 flags.DEFINE_enum('mpi_vendor', 'intel', ['intel', 'openmpi'], 'MPI provider.')
 
+flags.DEFINE_list(
+    'omb_mpi_env', [], 'Comma separated list of environment variables, e.g. '
+    '--omb_mpi_env=FI_PROVIDER=tcp,FI_LOG_LEVEL=info')
+
+flags.DEFINE_list(
+    'omb_mpi_genv', [], 'Comma separated list of global environment variables, '
+    'i.e. environment variables to be applied to all nodes, e.g. '
+    '--omb_mpi_genv=I_MPI_PIN_PROCESSOR_LIST=0,I_MPI_PIN=1 '
+    'When running with Intel MPI, these translate to -genv mpirun options. '
+    'When running with OpenMPI, both --omb_mpi_env and --omb_mpi_genv are '
+    'treated the same via the -x mpirun option')
+
+flags.register_validator(
+    'omb_mpi_env',
+    lambda env_params: all('=' in param for param in env_params),
+    message='--omb_mpi_env values must be in format "key=value" or "key="')
+
+flags.register_validator(
+    'omb_mpi_genv',
+    lambda genv_params: all('=' in param for param in genv_params),
+    message='--omb_mpi_genv values must be in format "key=value" or "key="')
+
 VERSION = '5.7.1'
 _PKG_NAME = 'osu-micro-benchmarks'
 _DATA_URL = ('http://mvapich.cse.ohio-state.edu/download/mvapich/'
@@ -77,8 +99,7 @@ _NUM_RECEIVER_THREADS = flags.DEFINE_integer(
 flag_util.DEFINE_integerlist(
     'omb_mpi_processes', flag_util.IntegerList([1, 0]),
     'MPI processes to use per host.  1=One process, 0=only real cores')
-_MPI_DEBUG = flags.DEFINE_integer(
-    'omb_mpi_debug', 5, 'Debug level to use.  Set to 0 for no debugging')
+
 _MPI_PERHOST = flags.DEFINE_integer('omb_perhost', 1, 'MPI option -perhost.')
 
 
@@ -186,6 +207,7 @@ class RunResult:
     run_time: Time in seconds to run the test.
     pinning: MPI processes pinning.
     perhost: MPI option -perhost.
+    mpi_env: environment variables to set for mpirun command.
   """
   name: str
   metadata: Dict[str, Any]
@@ -200,6 +222,7 @@ class RunResult:
   run_time: int
   pinning: List[str]
   perhost: int
+  mpi_env: Dict[str, str]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -316,7 +339,13 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
         number_processes=number_processes,
         run_time=run_time,
         pinning=ParseMpiPinning(txt.splitlines()),
-        perhost=_MPI_PERHOST.value)
+        perhost=_MPI_PERHOST.value,
+        mpi_env={
+            k: v for k, v in [
+                envvar.split('=', 1)
+                for envvar in FLAGS.omb_mpi_env + FLAGS.omb_mpi_genv
+            ]
+        })
 
 
 def _GetMpiVersion(vm) -> Optional[str]:
@@ -331,6 +360,8 @@ def _RunBenchmarkWithIntelMpi(
     vm,
     name: str,
     perhost: int,
+    environment: List[str],
+    global_environment: List[str],
     number_processes: int = None,
     hosts: List[Any] = None,
     options: Dict[str, Any] = None) -> Tuple[str, str]:
@@ -338,9 +369,10 @@ def _RunBenchmarkWithIntelMpi(
   # Create the mpirun command
   full_benchmark_path = _PathToBenchmark(vm, name)
   mpirun_cmd = []
-  if _MPI_DEBUG.value:
-    mpirun_cmd.append(f'I_MPI_DEBUG={_MPI_DEBUG.value}')
+  mpirun_cmd.extend(sorted(environment))
   mpirun_cmd.append('mpirun')
+  mpirun_cmd.extend(
+      f'-genv {variable}' for variable in sorted(global_environment))
   if perhost:
     mpirun_cmd.append(f'-perhost {perhost}')
   if number_processes:
@@ -364,21 +396,28 @@ def _RunBenchmarkWithIntelMpi(
 def _RunBenchmarkWithOpenMpi(vm,
                              name: str,
                              perhost: int,
+                             environment: List[str],
+                             global_environment: List[str],
                              number_processes: int = None,
                              hosts: List[Any] = None,
                              options: Dict[str, Any] = None) -> Tuple[str, str]:
   """Runs the microbenchmark using OpenMPI library."""
   # Create the mpirun command
+  full_env = sorted(environment + global_environment)
   full_benchmark_path = _PathToBenchmark(vm, name)
-  mpirun_cmd = []
+  mpirun_cmd = [f'{env_var}' for env_var in full_env]
   mpirun_cmd.append('mpirun')
-  mpirun_cmd.append('--use-hwthread-cpus')
+  mpirun_cmd.extend([f'-x {env_var.split("=", 1)[0]}' for env_var in full_env])
+
+  # Useful for verifying process mapping.
   mpirun_cmd.append('-report-bindings')
   mpirun_cmd.append('-display-map')
-  if perhost:
-    mpirun_cmd.append(f'-npernode {perhost}')
+
   if number_processes:
     mpirun_cmd.append(f'-n {number_processes}')
+  if perhost:
+    mpirun_cmd.append(f'-npernode {perhost}')
+  mpirun_cmd.append('--use-hwthread-cpus')
   if hosts:
     host_ips = ','.join(
         [f'{vm.internal_ip}:slots={number_processes}' for vm in hosts])
@@ -418,7 +457,8 @@ def _RunBenchmark(vm,
   run_impl = _RunBenchmarkWithIntelMpi
   if FLAGS.mpi_vendor == 'openmpi':
     run_impl = _RunBenchmarkWithOpenMpi
-  return run_impl(vm, name, perhost, number_processes, hosts, options)
+  return run_impl(vm, name, perhost, FLAGS.omb_mpi_env, FLAGS.omb_mpi_genv,
+                  number_processes, hosts, options)
 
 
 def _PathToBenchmark(vm, name: str) -> str:

@@ -118,14 +118,18 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
         mock.patch.object(intelmpi, 'MpirunMpiVersion', return_value='2019.6'))
     self.enter_context(mock.patch.object(omb.time, 'time', return_value=0))
 
-  @flagsaver.flagsaver(omb_mpi_debug=0)
+  @flagsaver.flagsaver(
+      omb_mpi_env=['IMPI_DEBUG=5'],
+      omb_mpi_genv=['I_MPI_PIN_PROCESSOR_LIST=0', 'I_MPI_PIN=1'])
   def testRunBenchmarkNormal(self):
     # all calls done with vm.RemoteCommand
     benchmark = 'barrier'
     benchmark_path = f'path/to/osu_{benchmark}'
     textoutput = 'textoutput'
     ls_cmd = f'ls {omb._RUN_DIR}/*/osu_{benchmark}'
-    expected_full_cmd = ('. mpivars.sh; mpirun -perhost 1 -n 2 '
+    expected_full_cmd = ('. mpivars.sh; IMPI_DEBUG=5 mpirun '
+                         '-genv I_MPI_PIN=1 '
+                         '-genv I_MPI_PIN_PROCESSOR_LIST=0 -perhost 1 -n 2 '
                          f'-hosts 10.0.0.1,10.0.0.2 {benchmark_path} '
                          '-t 1 --full')
     vm = mock.Mock(internal_ip='10.0.0.1')
@@ -164,10 +168,13 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
     mock_nfs_osu.assert_called_with(vms, mpi_dir)
     vm.RemoteCommand.assert_called_with(f'ls {mpi_dir}/*/osu_hello')
     vm.RobustRemoteCommand.assert_called_with(
-        '. mpivars.sh; I_MPI_DEBUG=5 mpirun -perhost 1 -n 2 '
+        '. mpivars.sh; mpirun -perhost 1 -n 2 '
         f'-hosts 10.0.0.1,10.0.0.2 {mpi_dir}/startup/osu_hello')
 
-  @flagsaver.flagsaver(omb_iterations=10, omb_mpi_debug=0)
+  @flagsaver.flagsaver(
+      omb_iterations=10,
+      omb_mpi_env=['IMPI_DEBUG=5'],
+      omb_mpi_genv=['I_MPI_PIN_PROCESSOR_LIST=0', 'I_MPI_PIN=1'])
   def testRunResult(self):
     test_output = inspect.cleandoc("""
     [0] MPI startup(): Rank    Pid      Node name       Pin cpu
@@ -197,7 +204,9 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
             'bandwidth': 6.39,
             'messages_per_second': 6385003.8
         }],
-        full_cmd=('. mpivars.sh; mpirun -perhost 1 -n 2 '
+        full_cmd=('. mpivars.sh; IMPI_DEBUG=5 mpirun '
+                  '-genv I_MPI_PIN=1 '
+                  '-genv I_MPI_PIN_PROCESSOR_LIST=0 -perhost 1 -n 2 '
                   f'-hosts 10.0.0.1,10.0.0.2 {mpitest_path} --iterations 10'),
         units='MB/s',
         params={'--iterations': 10},
@@ -207,7 +216,12 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
         number_processes=2,
         run_time=0,
         pinning=['0:0:0,1', '1:1:0,1'],
-        perhost=1)
+        perhost=1,
+        mpi_env={
+            'I_MPI_PIN_PROCESSOR_LIST': '0',
+            'I_MPI_PIN': '1',
+            'IMPI_DEBUG': '5'
+        })
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes
@@ -239,8 +253,8 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
     benchmark_path = f'path/to/osu_{benchmark}'
     textoutput = 'textoutput'
     ls_cmd = f'ls {omb._RUN_DIR}/*/osu_{benchmark}'
-    expected_full_cmd = ('mpirun --use-hwthread-cpus -report-bindings '
-                         '-display-map -npernode 1 -n 2 '
+    expected_full_cmd = ('mpirun -report-bindings -display-map '
+                         '-n 2 -npernode 1 --use-hwthread-cpus '
                          '-host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
                          f'{benchmark_path} -t 1 --full')
     vm = mock.Mock(internal_ip='10.0.0.1')
@@ -276,11 +290,15 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
     vm.Install.assert_called_with('openmpi')
     vm.RemoteCommand.assert_called_with(f'ls {mpi_dir}/*/osu_hello')
     vm.RobustRemoteCommand.assert_called_with(
-        'mpirun --use-hwthread-cpus -report-bindings -display-map -npernode 1 '
-        '-n 2 -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
+        'mpirun -report-bindings -display-map -n 2 -npernode 1 '
+        '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
         f'{mpi_dir}/startup/osu_hello')
 
-  @flagsaver.flagsaver(omb_iterations=10)
+  @flagsaver.flagsaver(
+      omb_iterations=10,
+      # For OpenMPI, env and genv are treated the same.
+      omb_mpi_env=['OMPI_MCA_btl=self,tcp'],
+      omb_mpi_genv=['OMPI_MCA_hwloc_base_binding_policy=core'])
   def testRunResult(self):
     test_output = inspect.cleandoc("""
     [0] MPI startup(): Rank    Pid      Node name       Pin cpu
@@ -310,8 +328,12 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
             'bandwidth': 6.39,
             'messages_per_second': 6385003.8
         }],
-        full_cmd=('mpirun --use-hwthread-cpus -report-bindings -display-map '
-                  '-npernode 1 -n 2 -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
+        full_cmd=('OMPI_MCA_btl=self,tcp '
+                  'OMPI_MCA_hwloc_base_binding_policy=core '
+                  'mpirun -x OMPI_MCA_btl '
+                  '-x OMPI_MCA_hwloc_base_binding_policy '
+                  '-report-bindings -display-map -n 2 -npernode 1 '
+                  '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
                   f'{mpitest_path} --iterations 10'),
         units='MB/s',
         params={'--iterations': 10},
@@ -321,7 +343,11 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
         number_processes=2,
         run_time=0,
         pinning=['0:0:0,1', '1:1:0,1'],
-        perhost=1)
+        perhost=1,
+        mpi_env={
+            'OMPI_MCA_btl': 'self,tcp',
+            'OMPI_MCA_hwloc_base_binding_policy': 'core',
+        })
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes

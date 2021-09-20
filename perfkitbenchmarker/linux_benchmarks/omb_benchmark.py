@@ -102,6 +102,7 @@ def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:
         'run_time': round(result.run_time, 1),
         'pinning': pinning,
         'perhost': result.perhost,
+        'mpi_env': ';'.join(f'{k}={v}' for k, v in result.mpi_env.items()),
     })
     yield entry
 
