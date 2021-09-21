@@ -21,6 +21,13 @@ class NonFreezeRestoreResource(resource.BaseResource):
     pass
 
 
+class CreateRaisesNonFreezeRestoreResource(NonFreezeRestoreResource):
+  """Dummy class that fails to create a resource."""
+
+  def _Create(self):
+    raise errors.Resource.CreationError()
+
+
 class IncompleteFreezeRestoreResource(NonFreezeRestoreResource):
   """Dummy class that is missing _UpdateTimeout()."""
 
@@ -40,6 +47,21 @@ class CompleteFreezeRestoreResource(IncompleteFreezeRestoreResource):
 
 def _CreateFreezeRestoreResource():
   return CompleteFreezeRestoreResource(enable_freeze_restore=True)
+
+
+class ResourceTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def testDeleteResourceBadCreate(self):
+    test_resource = CreateRaisesNonFreezeRestoreResource()
+    mock_delete = self.enter_context(
+        mock.patch.object(test_resource, '_Delete'))
+
+    with self.assertRaises(errors.Resource.CreationError):
+      test_resource.Create()
+    self.assertFalse(test_resource.created)
+
+    test_resource.Delete()
+    mock_delete.assert_not_called()
 
 
 class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):

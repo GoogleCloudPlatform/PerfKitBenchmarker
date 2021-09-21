@@ -171,3 +171,4 @@
     in the case of table loading failures.
 -   Enable the aggregation for "Return=NOT_FOUND" errors.
 -   Added no_proxy flag for proxy settings
+-   Stop attempting to delete PKB resources that failed to create.

@@ -299,6 +299,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     with cls.vm_pool_lock:
       if cls.vm_pool:
         vm = cls.vm_pool.popleft()
+        vm.Create()
         vm.from_pool = True
         return vm
       else:

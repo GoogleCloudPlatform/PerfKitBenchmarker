@@ -102,6 +102,7 @@ class AwsVpcS3EndpointTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_run_cmd.reset_mock()
     endpoint.id = ENDPOINT_ID
     self.mock_run_cmd.side_effect = [DELETE_RES, []]
+    endpoint.created = True
     endpoint.Delete()
     calls = endpoint._RunCommand.call_args_list
     self.assertEqual(mock.call(DELETE_ENDPOINT_CMD), calls[0])
