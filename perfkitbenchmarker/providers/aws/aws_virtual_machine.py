@@ -894,8 +894,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(stderr)
     if 'InstanceLimitExceeded' in stderr or 'VcpuLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
-    if 'RequestLimitExceeded' in stderr and FLAGS.retry_on_rate_limited:
-      raise errors.Resource.RetryableCreationError(stderr)
+    if 'RequestLimitExceeded' in stderr:
+      if FLAGS.retry_on_rate_limited:
+        raise errors.Resource.RetryableCreationError(stderr)
+      else:
+        raise errors.Benchmarks.QuotaFailure(stderr)
+
     # When launching more than 1 VM into the same placement group, there is an
     # occasional error that the placement group has already been used in a
     # separate zone. Retrying fixes this error.
