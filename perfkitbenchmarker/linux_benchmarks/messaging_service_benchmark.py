@@ -35,7 +35,6 @@ from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import messaging_service_util
 from perfkitbenchmarker import sample
 
 BENCHMARK_NAME = 'messaging_service'
@@ -55,6 +54,8 @@ messaging_service:
         GCP:
           machine_type: n2-standard-8
           zone: us-central1-a
+  messaging_service:
+    delivery: pull
 """
 
 FLAGS = flags.FLAGS
@@ -109,12 +110,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   Args:
     benchmark_spec: The benchmark specification.
   """
-  benchmark_spec.always_call_cleanup = True
-  client = benchmark_spec.vm_groups['default'][0]
-
-  benchmark_spec.instance = messaging_service_util.get_instance(
-      client, FLAGS.cloud)
-  benchmark_spec.instance.prepare()
+  benchmark_spec.messaging_service.PrepareClientVm()
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -128,12 +124,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   Returns:
     List of samples. Produced when running the benchmark from client VM
-    (on 'instance.Run()' call).
+    (on 'messaging_service.Run()' call).
   """
-  publish_results = benchmark_spec.instance.run(
+  publish_results = benchmark_spec.messaging_service.Run(
       'publish_latency', int(FLAGS.messaging_service_number_of_messages),
       int(FLAGS.messaging_service_message_size))
-  pull_results = benchmark_spec.instance.run(
+  pull_results = benchmark_spec.messaging_service.Run(
       'pull_latency', int(FLAGS.messaging_service_number_of_messages),
       int(FLAGS.messaging_service_message_size))
   publish_results.update(pull_results)
@@ -145,14 +141,5 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
-def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Cleanup resources.
-
-  It cleans up resources that were created (on the Prepare phase) to allow the
-  benchmark to run. For GCP Cloud Pub/Sub it deletes the topic and subscription
-  that were created.
-
-  Args:
-    benchmark_spec: The benchmark specification.
-  """
-  benchmark_spec.instance.cleanup()
+def Cleanup(_: bm_spec.BenchmarkSpec):
+  pass

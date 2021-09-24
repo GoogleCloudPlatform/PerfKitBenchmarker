@@ -1650,6 +1650,78 @@ class _AppServiceDecoder(option_decoders.TypeVerifier):
         **config)
 
 
+class _MessagingServiceSpec(spec.BaseSpec):
+  """Specs needed to configure messaging service.
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments to
+      construct in order to decode the named option.
+    """
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS}),
+        # TODO(odiego): Add support for push delivery mechanism
+        'delivery': (option_decoders.EnumDecoder, {
+            'valid_values': ('pull',)}),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+    # TODO(odiego): Handle delivery when adding more delivery mechanisms
+
+
+class _MessagingServiceDecoder(option_decoders.TypeVerifier):
+  """Validate the messaging_service dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify messaging_service dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _MessagingServiceSpec object built from the config passed in in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    messaging_service_config = super().Decode(value, component_full_name,
+                                              flag_values)
+    result = _MessagingServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **messaging_service_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -1765,6 +1837,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None,
             'none_ok': True,
         }),
+        'messaging_service': (_MessagingServiceDecoder, {
+            'default': None,
+        })
     })
     return result
 

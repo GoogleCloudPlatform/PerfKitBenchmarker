@@ -35,6 +35,7 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
@@ -153,6 +154,7 @@ class BenchmarkSpec(object):
     self.edw_service = None
     self.nfs_service = None
     self.smb_service = None
+    self.messaging_service = None
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
@@ -607,6 +609,23 @@ class BenchmarkSpec(object):
       return
     self.vpn_service = vpn_service.VPNService(self.config.vpn_service)
 
+  def ConstructMessagingService(self):
+    """Create the messaging_service object.
+
+    Assumes VMs are already constructed.
+    """
+    if self.config.messaging_service is None:
+      return
+    cloud = self.config.messaging_service.cloud
+    delivery = self.config.messaging_service.delivery
+    providers.LoadProvider(cloud)
+    messaging_service_class = messaging_service.GetMessagingServiceClass(
+        cloud, delivery
+    )
+    self.messaging_service = messaging_service_class.FromSpec(
+        self.config.messaging_service)
+    self.messaging_service.setVms(self.vm_groups)
+
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
@@ -714,6 +733,8 @@ class BenchmarkSpec(object):
       self.edw_service.Create()
     if self.vpn_service:
       self.vpn_service.Create()
+    if hasattr(self, 'messaging_service') and self.messaging_service:
+      self.messaging_service.Create()
 
   def Delete(self):
     if self.deleted:
@@ -741,6 +762,8 @@ class BenchmarkSpec(object):
       self.nfs_service.Delete()
     if self.smb_service:
       self.smb_service.Delete()
+    if hasattr(self, 'messaging_service') and self.messaging_service:
+      self.messaging_service.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).

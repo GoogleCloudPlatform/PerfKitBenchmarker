@@ -723,6 +723,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructRelationalDb()
   spec.ConstructSpanner()
   spec.ConstructNonRelationalDb()
+  spec.ConstructMessagingService()
   # CapacityReservations need to be constructed after VirtualMachines because
   # it needs information about the VMs (machine type, count, zone, etc). The
   # CapacityReservations will be provisioned before VMs.
