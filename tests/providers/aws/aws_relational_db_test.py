@@ -17,9 +17,9 @@ import contextlib
 import json
 import os
 import unittest
+
 from absl import flags
 import mock
-
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -29,6 +29,7 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
 from perfkitbenchmarker.sql_engine_utils import MYSQL
+from tests import pkb_common_test_case
 from six.moves import builtins
 
 FLAGS = flags.FLAGS
@@ -48,26 +49,22 @@ def _ReadTestDataFile(filename):
     return fp.read()
 
 
-class AwsRelationalDbSpecTestCase(unittest.TestCase):
+class AwsRelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the creation of an AwsRelationalDbSpec."""
   pass
 
 
-class AwsRelationalDbFlagsTestCase(unittest.TestCase):
+class AwsRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the flags defined in AwsRelationalDb."""
   pass
 
 
-class AwsRelationalDbTestCase(unittest.TestCase):
+class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AwsRelationalDbTestCase, self).setUp()
-    flag_values = {'run_uri': '123', 'project': None}
-    p = mock.patch(aws_relational_db.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
+    FLAGS['run_uri'].value = '123'
     FLAGS['use_managed_db'].parse(True)
-    self.addCleanup(p.stop)
 
   @contextlib.contextmanager
   def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
