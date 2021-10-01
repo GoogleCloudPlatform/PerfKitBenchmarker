@@ -27,7 +27,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_relational_db
-from perfkitbenchmarker.providers.aws.aws_relational_db import (AwsRelationalDb)
 from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
 from perfkitbenchmarker.sql_engine_utils import MYSQL
 from six.moves import builtins
@@ -41,7 +40,7 @@ _FLAGS = None
 _AWS_PREFIX = 'aws --output json'
 
 
-def readTestDataFile(filename):
+def _ReadTestDataFile(filename):
   path = os.path.join(
       os.path.dirname(__file__), '../../data',
       filename)
@@ -62,6 +61,7 @@ class AwsRelationalDbFlagsTestCase(unittest.TestCase):
 class AwsRelationalDbTestCase(unittest.TestCase):
 
   def setUp(self):
+    super(AwsRelationalDbTestCase, self).setUp()
     flag_values = {'run_uri': '123', 'project': None}
     p = mock.patch(aws_relational_db.__name__ + '.FLAGS')
     flags_mock = p.start()
@@ -152,7 +152,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     db_class.server_vm = m
 
   def CreateDbFromMockSpec(self, mock_spec):
-    aws_db = AwsRelationalDb(mock_spec)
+    aws_db = aws_relational_db.AwsRelationalDb(mock_spec)
 
     # Set necessary instance attributes that are not part of the spec
     aws_db.security_group_name = 'fake_security_group'
@@ -289,7 +289,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
     self.assertIn('--engine-version=5.6.29', command_string)
 
   def testIsNotReady(self):
-    test_data = readTestDataFile('aws-describe-db-instances-creating.json')
+    test_data = _ReadTestDataFile('aws-describe-db-instances-creating.json')
     with self._PatchCriticalObjects(stdout=test_data):
       db = self.CreateDbFromSpec()
       db.all_instance_ids.append('pkb-db-instance-123')
@@ -297,7 +297,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
       self.assertEqual(False, db._IsReady(timeout=0))
 
   def testIsReady(self):
-    test_data = readTestDataFile('aws-describe-db-instances-available.json')
+    test_data = _ReadTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects(stdout=test_data):
       db = self.CreateDbFromSpec()
       db.all_instance_ids.append('pkb-db-instance-123')
@@ -305,7 +305,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
       self.assertEqual(True, db._IsReady())
 
   def testParseEndpoint(self):
-    test_data = readTestDataFile('aws-describe-db-instances-available.json')
+    test_data = _ReadTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects():
       db = self.CreateDbFromSpec()
 
@@ -314,7 +314,7 @@ class AwsRelationalDbTestCase(unittest.TestCase):
           db._ParseEndpointFromInstance(json.loads(test_data)))
 
   def testParsePort(self):
-    test_data = readTestDataFile('aws-describe-db-instances-available.json')
+    test_data = _ReadTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects():
       db = self.CreateDbFromSpec()
 
