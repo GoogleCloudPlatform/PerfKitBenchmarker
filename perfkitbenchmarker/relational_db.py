@@ -213,6 +213,7 @@ class BaseRelationalDb(resource.BaseResource):
     """
     super(BaseRelationalDb, self).__init__()
     self.spec = relational_db_spec
+    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.port = self.GetDefaultPort()
     if not FLAGS.use_managed_db:
       if self.spec.high_availability:
@@ -761,7 +762,7 @@ class BaseRelationalDb(resource.BaseResource):
     if FLAGS.db_flags:
       for flag in FLAGS.db_flags:
         _, stderr, _ = self.client_vm_query_tools.IssueSqlCommand(
-            'SET %s;' % flag, raise_on_failure=False)
+            'SET %s;' % flag, ignore_failure=True)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
 

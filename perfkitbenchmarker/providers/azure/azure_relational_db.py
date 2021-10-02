@@ -76,7 +76,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)
-    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     if util.IsZone(self.spec.db_spec.zone):
       raise errors.Config.InvalidValue(
           'Availability zones are currently not supported by Azure DBs')

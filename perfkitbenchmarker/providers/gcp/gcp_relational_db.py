@@ -107,7 +107,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
     self.project = FLAGS.project or util.GetDefaultProject()
-    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
     self.unmanaged_db_exists = None if self.is_managed_db else False
 

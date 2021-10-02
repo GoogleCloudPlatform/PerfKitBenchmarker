@@ -52,10 +52,11 @@ class FakeRelationalDb(relational_db.BaseRelationalDb):
     pass
 
 
-class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
+class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RelationalDbUnamangedTestCase, self).setUp()
+    super(RelationalDbUnmanagedTestCase, self).setUp()
+    FLAGS['run_uri'].value = '123456'
     self.min_mysql_spec = {
         'cloud': 'GCP',
         'engine': 'mysql',

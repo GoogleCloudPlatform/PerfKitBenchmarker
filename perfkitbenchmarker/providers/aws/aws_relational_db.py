@@ -122,7 +122,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
   def __init__(self, relational_db_spec):
     super(AwsRelationalDb, self).__init__(relational_db_spec)
-    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.cluster_id = None
     self.all_instance_ids = []
     self.primary_zone = None
