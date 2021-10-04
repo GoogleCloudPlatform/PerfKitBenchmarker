@@ -57,7 +57,9 @@
 -   Add Azure support for VM stop start benchmark.
 -   Add `--os_type=debian11` support for GCP, AWS and Azure Providers.
 -   Add cURL benchmark for object storage.
+-   Add vbench video encoding benchmark to PKB.
 -   Add Kubernetes based DPB Service for Spark
+
 
 ### Enhancements:
 
