@@ -104,7 +104,7 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
       '--cluster-replicas', '1',
       '--cluster-yes'
   ] + ip_and_port_list
-  bm_spec.container_cluster.RunKubectlCommand('redis-0', cmd)
+  bm_spec.container_cluster.RunKubectlExec('redis-0', cmd)
 
   bm_spec.redis_endpoint_ip = pod_ips[0]
 
