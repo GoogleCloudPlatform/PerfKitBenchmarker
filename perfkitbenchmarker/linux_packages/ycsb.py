@@ -205,6 +205,13 @@ _SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
     'ycsb_fail_on_incomplete_loading', False,
     'Whether to fail the benchmarking if loading is not complete, '
     'e.g., there are insert failures.')
+_INCOMPLETE_LOADING_METRIC = flags.DEFINE_string(
+    'ycsb_insert_error_metric', 'insert Return=ERROR',
+    'Used with --ycsb_fail_on_incomplete_loading. Will fail the benchmark if '
+    'this metric\'s value is non-zero. This metric should be an indicator of '
+    'incomplete table loading. If insertion retries are enabled via '
+    'core_workload_insertion_retry_limit, then the default metric may be '
+    'non-zero even though the retried insertion eventually succeeded.')
 _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.')
@@ -1391,7 +1398,7 @@ class YCSBExecutor(object):
 
     def _HasInsertFailures(result_samples):
       for s in result_samples:
-        if s.metric == 'insert Return=ERROR' and s.value > 0:
+        if s.metric == _INCOMPLETE_LOADING_METRIC.value and s.value > 0:
           return True
       return False
 
