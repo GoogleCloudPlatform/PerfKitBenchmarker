@@ -23,6 +23,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import cuda_samples
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
@@ -44,7 +45,6 @@ _DTOD = flags.DEFINE_boolean(
 _WC = flags.DEFINE_boolean(
     'cuda_memcpy_wc', False, 'Allocate pinned memory as write-combined.')
 
-BANDWIDTH_TEST_PATH = '/usr/local/cuda/extras/demo_suite/bandwidthTest'
 
 FLAGS = flags.FLAGS
 
@@ -67,6 +67,7 @@ cuda_memcpy:
         Azure:
           machine_type: Standard_NC6s_v3
           zone: eastus
+          image: microsoft-dsvm:ubuntu-hpc:1804:latest
 """
 
 
@@ -88,7 +89,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   Args:
     bm_spec: The benchmark specification
   """
-  vm_util.RunThreaded(lambda vm: vm.Install('cuda_toolkit'), bm_spec.vms)
+  vm_util.RunThreaded(lambda vm: vm.Install('cuda_samples'), bm_spec.vms)
 
 
 def _MetadataFromFlags() -> [str, Any]:
@@ -117,8 +118,9 @@ def _CollectGpuSamples(
     return []
   global_metadata = _MetadataFromFlags()
   global_metadata.update(cuda_toolkit.GetMetadata(vm))
-  global_cmd = [BANDWIDTH_TEST_PATH, '--csv', f'--memory={_MEMORY.value}',
-                f'--mode={_MODE.value}']
+
+  global_cmd = [cuda_samples.GetBandwidthTestPath(vm), '--csv',
+                f'--memory={_MEMORY.value}', f'--mode={_MODE.value}']
   if _HTOD.value:
     global_cmd.append('--htod')
   if _DTOH.value:
