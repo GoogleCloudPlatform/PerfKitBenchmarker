@@ -34,7 +34,7 @@ import posixpath
 import re
 import threading
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -105,7 +105,20 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
   CLOUD = gcp.CLOUD
 
   def __init__(self, *args, **kwargs):
+    self.num_local_ssds: int = None
+    self.preemptible: bool = None
+    self.boot_disk_size: int = None
+    self.boot_disk_type: str = None
+    self.project: str = None
+    self.image_family: str = None
+    self.image_project: str = None
+    self.node_type: str = None
+    self.min_cpu_platform: str = None
+    self.threads_per_core: int = None
+    self.gce_tags: List[str] = None
+    self.min_node_cpus: int = None
     super(GceVmSpec, self).__init__(*args, **kwargs)
+
     if isinstance(self.machine_type,
                   custom_virtual_machine_spec.CustomMachineTypeSpec):
       logging.warning('Specifying a custom machine in the format of '

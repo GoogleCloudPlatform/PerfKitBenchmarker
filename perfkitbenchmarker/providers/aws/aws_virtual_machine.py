@@ -1042,7 +1042,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Start(self):
     """Starts the VM."""
     if not self.id:
-      raise errors.Benchmarks.VmStateError(
+      raise errors.Benchmarks.RunError(
           'Expected VM id to be non-null. Please make sure the VM exists.')
     start_cmd = util.AWS_PREFIX + [
         'ec2', 'start-instances',
@@ -1057,7 +1057,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Stop(self):
     """Stops the VM."""
     if not self.id:
-      raise errors.Benchmarks.VmStateError(
+      raise errors.Benchmarks.RunError(
           'Expected VM id to be non-null. Please make sure the VM exists.')
     stop_cmd = util.AWS_PREFIX + [
         'ec2', 'stop-instances',

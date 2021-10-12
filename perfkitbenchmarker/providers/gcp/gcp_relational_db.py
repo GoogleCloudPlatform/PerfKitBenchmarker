@@ -74,7 +74,7 @@ DEFAULT_ENGINE_VERSIONS = {
 
 # TODO(chunla): Move to engine specific module
 DEFAULT_USERNAME = {
-    sql_engine_utils.MYSQL: 'mysql',
+    sql_engine_utils.MYSQL: 'root',
     sql_engine_utils.POSTGRES: 'postgres',
     sql_engine_utils.SQLSERVER: 'sqlserver',
 }
