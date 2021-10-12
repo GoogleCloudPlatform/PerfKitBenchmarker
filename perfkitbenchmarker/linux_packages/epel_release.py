@@ -36,7 +36,7 @@ _EPEL_URLS = {
 # Additional commands to run after installing the RPM.
 _EPEL_CMDS = {
     os_types.CENTOS7: 'sudo yum install -y epel-release',
-    os_types.CENTOS8: 'sudo dnf config-manager --set-enabled PowerTools'
+    os_types.CENTOS8: 'sudo dnf config-manager --set-enabled powertools'
 }
 
 # The ids of the EPEL yum repo
