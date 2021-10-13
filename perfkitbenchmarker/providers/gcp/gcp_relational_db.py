@@ -397,7 +397,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
       cmd = util.GcloudCommand(
           self, 'sql', 'users', 'set-password', default_user,
-          '--host=dummy_host', '--instance={0}'.format(self.instance_id),
+          '--host=%', '--instance={0}'.format(self.instance_id),
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
     self.client_vm_query_tools.InstallPackages()
