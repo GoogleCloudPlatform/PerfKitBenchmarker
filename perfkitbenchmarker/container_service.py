@@ -96,6 +96,11 @@ flags.DEFINE_string(
     'command. If not specified, the cloud-specific container '
     'implementation will chose an appropriate default.')
 
+# TODO(user): Consider supporting multiarch manifests.
+flags.DEFINE_string('container_cluster_architecture', 'linux/amd64',
+                    'The architecture that the container cluster uses. '
+                    'Defaults to linux/amd64')
+
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
 kind: Ingress
@@ -379,7 +384,10 @@ class BaseContainerRegistry(resource.BaseResource):
       image: Instance of _ContainerImage representing the image to build.
     """
     build_cmd = [
-        'docker', 'build', '--no-cache', '-t', image.name, image.directory
+        'docker', 'buildx', 'build',
+        '--platform', FLAGS.container_cluster_architecture,
+        '--no-cache', '--load',
+        '-t', image.name, image.directory
     ]
     vm_util.IssueCommand(build_cmd)
 
