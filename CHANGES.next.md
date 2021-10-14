@@ -118,6 +118,8 @@
 -   Support default subnets in --aws_subnet with `default` as value passed.
 -   Add Unsupported config failure substatus for runs that are not supported by
     the cloud.
+-   Add support for nodepools to `container_cluster` benchmark spec. Currently
+    only supports GCP.
 
 ### Bug fixes and maintenance updates:
 

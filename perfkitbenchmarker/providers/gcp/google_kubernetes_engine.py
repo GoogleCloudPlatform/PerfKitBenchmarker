@@ -27,6 +27,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
+import six
 
 FLAGS = flags.FLAGS
 
@@ -111,6 +112,9 @@ class GkeCluster(container_service.KubernetesCluster):
     """Creates the cluster."""
     cmd = util.GcloudCommand(self, 'container', 'clusters', 'create', self.name)
 
+    self._AddNodeParamsToCmd(self.vm_config, self.num_nodes,
+                             container_service.DEFAULT_NODEPOOL, cmd)
+
     cmd.flags['cluster-version'] = self.cluster_version
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
@@ -132,46 +136,28 @@ class GkeCluster(container_service.KubernetesCluster):
       logging.info('Using default GCE service account for GKE cluster')
       cmd.flags['scopes'] = 'cloud-platform'
 
-    if self.vm_config.gpu_count:
-      cmd.flags['accelerator'] = (
-          gce_virtual_machine.GenerateAcceleratorSpecString(
-              self.vm_config.gpu_type, self.vm_config.gpu_count))
-    if self.vm_config.min_cpu_platform:
-      cmd.flags['min-cpu-platform'] = self.vm_config.min_cpu_platform
-
-    if self.vm_config.threads_per_core:
-      # TODO(user): Remove when threads-per-core is available in GA
-      cmd.use_alpha_gcloud = True
-      cmd.flags['threads-per-core'] = self.vm_config.threads_per_core
-
-    if self.vm_config.boot_disk_size:
-      cmd.flags['disk-size'] = self.vm_config.boot_disk_size
-    if self.vm_config.boot_disk_type:
-      cmd.flags['disk-type'] = self.vm_config.boot_disk_type
-    if self.vm_config.max_local_disks:
-      # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
-      # leaves alpha. See
-      # https://cloud.google.com/sdk/gcloud/reference/alpha/container/clusters/create
-      cmd.flags['local-ssd-count'] = self.vm_config.max_local_disks
-
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
 
-    cmd.flags['num-nodes'] = self.num_nodes
-
-    if self.vm_config.machine_type is None:
-      cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
-          self.vm_config.cpus, self.vm_config.memory_mib)
-    else:
-      cmd.flags['machine-type'] = self.vm_config.machine_type
-
-    if self.vm_config.network:
-      cmd.flags['network'] = self.vm_config.network.network_resource.name
-
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    self._IssueResourceCreationCommand(cmd)
+
+    self._CreateNodePools()
+
+  def _CreateNodePools(self):
+    """Creates additional nodepools for the cluster, if applicable."""
+    for name, nodepool in six.iteritems(self.nodepools):
+      cmd = util.GcloudCommand(self, 'container', 'node-pools', 'create', name,
+                               '--cluster', self.name)
+
+      self._AddNodeParamsToCmd(nodepool.vm_config, nodepool.vm_count, name, cmd)
+      self._IssueResourceCreationCommand(cmd)
+
+  def _IssueResourceCreationCommand(self, cmd):
+    """Issues a command to gcloud to create resources."""
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
@@ -185,6 +171,43 @@ class GkeCluster(container_service.KubernetesCluster):
             (self.zone, stderr))
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
+
+  def _AddNodeParamsToCmd(self, vm_config, num_nodes, name, cmd):
+    """Modifies cmd to include node specific command arguments."""
+
+    if vm_config.gpu_count:
+      cmd.flags['accelerator'] = (
+          gce_virtual_machine.GenerateAcceleratorSpecString(
+              vm_config.gpu_type,
+              vm_config.gpu_count))
+    if vm_config.min_cpu_platform:
+      cmd.flags['min-cpu-platform'] = vm_config.min_cpu_platform
+
+    if vm_config.threads_per_core:
+      # TODO(user): Remove when threads-per-core is available in GA
+      cmd.use_alpha_gcloud = True
+      cmd.flags['threads-per-core'] = vm_config.threads_per_core
+
+    if vm_config.boot_disk_size:
+      cmd.flags['disk-size'] = vm_config.boot_disk_size
+    if vm_config.boot_disk_type:
+      cmd.flags['disk-type'] = vm_config.boot_disk_type
+    if vm_config.max_local_disks:
+      # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
+      # leaves alpha. See
+      # https://cloud.google.com/sdk/gcloud/reference/alpha/container/clusters/create
+      cmd.flags['local-ssd-count'] = vm_config.max_local_disks
+
+    cmd.flags['num-nodes'] = num_nodes
+
+    if vm_config.machine_type is None:
+      cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
+          vm_config.cpus,
+          vm_config.memory_mib)
+    else:
+      cmd.flags['machine-type'] = vm_config.machine_type
+
+    cmd.flags['node-labels'] = f'pkb_nodepool={name}'
 
   def _PostCreate(self):
     """Acquire cluster authentication."""

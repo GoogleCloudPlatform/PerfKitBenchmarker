@@ -131,6 +131,37 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
 }
 """
 
+_EXPECTED_CALL_BODY_WITH_VM_GROUP = """
+{
+    "spec": {
+        "dnsPolicy":
+            "ClusterFirst",
+        "volumes": [],
+        "containers": [{
+            "name": "fake_name",
+            "volumeMounts": [],
+            "workingDir": "/root",
+            "image": "test_image",
+            "securityContext": {
+                "privileged": true
+            },
+            "command": ["tail", "-f", "/dev/null"]
+        }],
+        "nodeSelector": {
+            "pkb_nodepool": "my_vm_group"
+        }
+    },
+    "kind": "Pod",
+    "metadata": {
+        "name": "fake_name",
+        "labels": {
+            "pkb": "fake_name"
+        }
+    },
+    "apiVersion": "v1"
+}
+"""
+
 
 def get_write_mock_from_temp_file_mock(temp_file_mock):
   """Returns the write method mock from the NamedTemporaryFile mock.
@@ -272,6 +303,34 @@ class KubernetesVirtualMachineOsTypesTestCase(
       create_json = json.loads(write_mock.call_args[0][0])
       self.assertEqual(create_json['spec']['containers'][0]['image'],
                        'ubuntu:16.04')
+
+
+class KubernetesVirtualMachineVmGroupAffinityTestCase(
+    BaseKubernetesVirtualMachineTestCase):
+
+  @staticmethod
+  def create_kubernetes_vm():
+    spec = kubernetes_pod_spec.KubernetesPodSpec(
+        _COMPONENT,
+        image='test_image',
+        install_packages=False,
+        machine_type='test_machine_type',
+        zone='test_zone')
+    kub_vm = TestKubernetesVirtualMachine(spec)
+    kub_vm.name = _NAME
+    kub_vm.vm_group = 'my_vm_group'
+    kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name
+    kub_vm._Create()
+
+  def testCreateVmGroupAffinity(self):
+    with patch_critical_objects() as (_, temp_file):
+      self.create_kubernetes_vm()
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      self.assertJsonEqual(
+          write_mock.call_args[0][0],
+          _EXPECTED_CALL_BODY_WITH_VM_GROUP
+      )
 
 
 class KubernetesVirtualMachineTestCase(

@@ -1097,6 +1097,94 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _NodepoolSpec(spec.BaseSpec):
+  """Configurable options of a Nodepool."""
+
+  def __init__(self,
+               component_full_name,
+               group_name,
+               flag_values=None,
+               **kwargs):
+    super(_NodepoolSpec, self).__init__(
+        '{0}.{1}'.format(component_full_name, group_name),
+        flag_values=flag_values,
+        **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_NodepoolSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'vm_count': (option_decoders.IntDecoder, {
+            'default': _DEFAULT_VM_COUNT,
+            'min': 0
+        }),
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+    """
+    super(_NodepoolSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['container_cluster_num_vms'].present:
+      config_values['vm_count'] = flag_values.container_cluster_num_vms
+
+    # Need to apply the first zone in the zones flag, if specified,
+    # to the spec. _NodepoolSpec does not currently support
+    # running in multiple zones in a single PKB invocation.
+    if flag_values['zones'].present:
+      for cloud in config_values['vm_spec']:
+        config_values['vm_spec'][cloud]['zone'] = (flag_values.zones[0])
+
+
+class _NodepoolsDecoder(option_decoders.TypeVerifier):
+  """Validate the nodepool dictionary of a nodepools config object."""
+
+  def __init__(self, **kwargs):
+    super(_NodepoolsDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify Nodepool dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _NodepoolsDecoder built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    nodepools_configs = super(_NodepoolsDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = {}
+    for nodepool_name, nodepool_config in six.iteritems(nodepools_configs):
+      result[nodepool_name] = _NodepoolSpec(
+          self._GetOptionFullName(component_full_name), nodepool_name,
+          flag_values, **nodepool_config)
+    return result
+
+
 class _ContainerClusterSpec(spec.BaseSpec):
   """Spec containing info needed to create a container cluster."""
 
@@ -1117,6 +1205,25 @@ class _ContainerClusterSpec(spec.BaseSpec):
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
         **vm_config)
+    nodepools = {}
+    for nodepool_name, nodepool_spec in sorted(six.iteritems(self.nodepools)):
+      if nodepool_name == container_service.DEFAULT_NODEPOOL:
+        raise errors.Config.InvalidValue(
+            'Nodepool name {0} is reserved for use during cluster creation. '
+            'Please rename nodepool'.format(nodepool_name))
+      nodepool_config = getattr(nodepool_spec.vm_spec, self.cloud, None)
+      if nodepool_config is None:
+        raise errors.Config.MissingOption(
+            '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
+            'configuration for "{1}".'.format(component_full_name, self.cloud))
+      vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+      nodepool_spec.vm_spec = vm_spec_class(
+          '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+          flag_values=flag_values,
+          **nodepool_config)
+      nodepools[nodepool_name] = nodepool_spec
+
+    self.nodepools = nodepools
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1149,7 +1256,14 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'none_ok': True,
             'min': 0
         }),
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
+        # vm_spec is used to define the machine type for the default nodepool
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        # nodepools specifies a list of additional nodepools to create alongside
+        # the default nodepool (nodepool created on cluster creation).
+        'nodepools': (_NodepoolsDecoder, {
+            'default': {},
+            'none_ok': True
+        }),
     })
     return result
 
@@ -1208,7 +1322,7 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-      _SparkServiceSpec Build from the config passed in in value.
+      _SparkServiceSpec Build from the config passed in value.
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """

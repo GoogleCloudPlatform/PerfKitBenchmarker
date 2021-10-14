@@ -246,6 +246,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             'dnsPolicy': 'ClusterFirst',
         }
     }
+
+    if self.vm_group:
+      template['spec']['nodeSelector'] = {'pkb_nodepool': self.vm_group}
+
     if FLAGS.kubernetes_anti_affinity:
       template['spec']['affinity'] = {
           'podAntiAffinity': {

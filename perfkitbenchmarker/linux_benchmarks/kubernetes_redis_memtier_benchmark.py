@@ -55,6 +55,10 @@ kubernetes_redis_memtier:
       GCP:
         machine_type: n2-standard-2
         zone: us-central1-a
+    nodepools:
+      clients:
+        vm_spec: *default_single_core
+        vm_count: 1
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -67,10 +71,8 @@ _BenchmarkSpec = benchmark_spec.BenchmarkSpec
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Load and return benchmark config spec."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  # TODO(user): Setting the client vm_spec currently does nothing. Adding
-  # nodepool support will this to be supported.
   if FLAGS.redis_memtier_client_machine_type:
-    vm_spec = config['vm_groups']['clients']['vm_spec']
+    vm_spec = config['container_cluster']['nodepools']['clients']['vm_spec']
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = (
           FLAGS.redis_memtier_client_machine_type)

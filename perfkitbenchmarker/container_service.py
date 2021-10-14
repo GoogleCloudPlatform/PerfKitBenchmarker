@@ -45,9 +45,11 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 import requests
+import six
 import yaml
 
 KUBERNETES = 'Kubernetes'
+DEFAULT_NODEPOOL = 'default'
 
 FLAGS = flags.FLAGS
 
@@ -263,6 +265,8 @@ class ContainerRegistrySpec(spec.BaseSpec):
     super(ContainerRegistrySpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
+    if flag_values['container_cluster_cloud'].present:
+      config_values['cloud'] = flag_values.container_cluster_cloud
     updated_spec = {}
     if flag_values['project'].present:
       updated_spec['project'] = flag_values.project
@@ -465,6 +469,12 @@ class BaseContainerCluster(resource.BaseResource):
     self.name = 'pkb-%s' % FLAGS.run_uri
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
+    for name, nodepool in six.iteritems(cluster_spec.nodepools):
+      nodepool.vm_config = virtual_machine.GetVmClass(
+          self.CLOUD, os_types.DEFAULT)(nodepool.vm_spec)
+      nodepool.num_nodes = nodepool.vm_count
+      cluster_spec.nodepools[name] = nodepool
+    self.nodepools = cluster_spec.nodepools
     self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
         cluster_spec.vm_spec)
     self.num_nodes = cluster_spec.vm_count
@@ -486,12 +496,22 @@ class BaseContainerCluster(resource.BaseResource):
 
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
+    nodepools = {}
+    for name, nodepool in six.iteritems(self.nodepools):
+      nodepool_metadata = {
+          'size': nodepool.num_nodes,
+          'machine_type': nodepool.vm_config.machine_type,
+          'name': name
+      }
+      nodepools[name] = nodepool_metadata
+
     metadata = {
         'cloud': self.CLOUD,
         'cluster_type': self.CLUSTER_TYPE,
         'zone': self.zone,
         'size': self.num_nodes,
         'machine_type': self.vm_config.machine_type,
+        'nodepools': nodepools
     }
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:

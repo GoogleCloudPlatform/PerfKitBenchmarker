@@ -971,6 +971,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       usage while running the benchmark.
     background_network_ip_type: Type of IP address to use for generating
       background network workload
+    vm_group: The VM group this VM is associated with, if applicable.
   """
 
   is_static = False
@@ -1026,6 +1027,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.num_disable_cpus = None
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
+    self.vm_group = None
 
   @property
   @classmethod
