@@ -3,6 +3,12 @@
 This is a hands-on lab/tutorial for generating benchmarks for Google Cloud
 Bigtable.
 
+**NOTE: We will deprecate this tutorial in favor of
+[an upgraded version](./batch_testing.md) which not only covers the test cases
+below, but also provides a way of running multiple tests in a coordinated way.
+(For benchmarking purpose, it's common to run many tests with different
+combinations of parameter values.)**
+
 ## Overview
 
 ### Introducing PerfKit Benchmarker
@@ -209,7 +215,7 @@ Using the BigQuery command-line tool `bq`, initialize an empty __dataset__.
 bq mk pkb_results
 ```
 
-__Output (do not copy)__
+**Expected output**
 
 ```output
 Dataset '[PROJECT-ID]:pkb_results' successfully created.
@@ -233,9 +239,7 @@ First, you'll need to create a Bigtable instance and load it with test data.
 
     ```sh
     gcloud bigtable instances create pkb-benchmarks \
-      --cluster=pkb-benchmarks-1 \
-      --cluster-zone=us-central1-b \
-      --cluster-num-nodes=3 \
+      --cluster-config=id=pkb-benchmarks-1,zone=us-central1-b,nodes=3 \
       --display-name=pkb-benchmarks
     ```
 
@@ -342,7 +346,7 @@ __Note__: This tutorial splits the benchmarks into two workload categories:
             ycsb_record_count: 100000000
 
             # Workload file commented out so users can provide their own
-            # ycsb_workload_files=workloada
+            # ycsb_workload_files: workloada
 
             # Lock environment to a particular version
             hbase_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hbase-1.4.7-bin.tar.gz

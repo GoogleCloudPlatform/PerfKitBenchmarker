@@ -1,0 +1,74 @@
+####################################################################################################
+# Runner configuration defines how the benchmarks should be run, as well as common PKB settings for
+# ALL the benchmarks. The common settings will be overriden by individual benchmark configs if the
+# same configuration key is present in both.
+#
+# To make the template easier to work with, you can answer the following questions first, and then
+# complete the [place holders] in the main body.
+#
+# Questions:
+#   Q0: How do you want to run the benchmarks? (e.g., run in parallel)
+#       - TIP: if you want "run in parallel", please skip Q3. If you want "run in sequence", please
+#         skip Q1 and Q2. If you want the benchmarks to run one by one in any order just once,
+#         please skip Q1, Q2, and Q3.
+#
+#   Q1: The number of run iterations for each benchmark? (e.g., 2)
+#
+#   Q2: The maximum number of concurrent benchmark runs? (e.g., 2)
+#       - TIP: benchmarks that use the same Bigtable instance will not be run at the same time.
+#
+#   Q3: The filenames (with extention) of the benchmarks run at each stage? (e.g., latency.yaml)
+#       - TIP: the benchmarks will be run in stages. If a stage has multiple benchmarks, they will
+#         be run in parallel, and their filenames should be separated by space.
+#
+#   Q4: The project ID of your GCP project that resource usage will be charged to? (e.g., test_project)
+#
+#   Q5: The name of the BigQuery table to store the results? (e.g., test_project:pkb_results.codelab)
+#       - TIP: the format of table name is "<the project id>:<dataset id>.<table id>". You can opt
+#         out by removing the line of "bigquery_table:". If you do want to use BigQuery, please
+#         create a dataset in advance. In the example answer, the dataset is "pkb_results".
+####################################################################################################
+runner:
+  # Uncomment the following block if the answer to Q0 is "run in parallel"
+  # unordered_tests:
+  #   num_iterations: [Q1]
+  #   concurrency: [Q2]
+
+  # Uncomment the following block if the answer to Q0 is "run in sequence"
+  # ordered_tests:
+  # - [Q3_stage_0_benchmarks]
+  # - [Q3_stage_1_benchmarks]
+  # - ...
+
+  pkb_flags:
+    project: [Q4]
+    file_log_level: info
+
+    #################################
+    # Worker VM settings
+    #################################
+    gcloud_scopes: https://www.googleapis.com/auth/bigtable.admin,https://www.googleapis.com/auth/bigtable.data,storage-rw
+    ssh_connect_timeout: 30
+    ssh_reuse_connections: false
+    # The following settings only work for runner and worker VMs in the same VPC network: "default".
+    # If runner and worker VMs don't share the same network, you can simply remove the settings.
+    gce_network_name: default
+    gce_remote_access_firewall_rule: default-allow-internal
+    connect_via_internal_ip: true
+
+    #################################
+    # Dependency settings
+    #################################
+    # We ensure the following packages will always be available.
+    hbase_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hbase-1.4.7-bin.tar.gz
+    hadoop_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hadoop-3.3.1.tar.gz
+    google_bigtable_hbase_jar_url: https://storage.googleapis.com/cbt_ycsb_client_jar/bigtable-hbase-1.x-hadoop-1.20.1.jar
+    ycsb_version: 0.17.0
+    ycsb_log_remote_command_output: false
+
+    #################################
+    # YCSB result settings
+    #################################
+    ycsb_measurement_type: hdrhistogram
+    get_bigtable_cluster_cpu_utilization: true
+    bigquery_table: [Q5]
