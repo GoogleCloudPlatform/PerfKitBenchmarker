@@ -141,6 +141,9 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
 
+    if self.vm_config.network:
+      cmd.flags['network'] = self.vm_config.network.network_resource.name
+
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     self._IssueResourceCreationCommand(cmd)
