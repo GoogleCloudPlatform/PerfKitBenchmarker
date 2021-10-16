@@ -21,6 +21,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
@@ -591,6 +592,13 @@ def _CreateMetadataDict(benchmark_spec):
       'model': benchmark_spec.benchmark,
       'version': MLPERF_VERSION,
   }
+  vms = benchmark_spec.vms
+  num_vms = len(vms)
+  vm = vms[0]
+  gpus_per_node = nvidia_driver.QueryNumberOfGpus(vm)
+  total_gpus = gpus_per_node * num_vms
+  metadata.update(cuda_toolkit.GetMetadata(vm))
+  metadata['total_gpus'] = total_gpus
   if benchmark_spec.tpus:
     metadata.update({
         'train_tpu_num_shards':
