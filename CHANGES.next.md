@@ -179,3 +179,5 @@
 -   Added no_proxy flag for proxy settings
 -   Stop attempting to delete PKB resources that failed to create.
 -   Added a new user guide for bigtable walkthrough.
+-   Sanitize the shell code in bigtable walkthrough doc: removing dollar sign
+    and using variable expansion.

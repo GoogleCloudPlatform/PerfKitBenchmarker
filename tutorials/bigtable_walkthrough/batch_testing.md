@@ -157,7 +157,7 @@ The VM should already have gcloud installed, and you can verify the config with
 command:
 
 ```sh
-$ gcloud config list
+gcloud config list
 ```
 
 **Expected output**
@@ -172,7 +172,7 @@ The project id should correspond to the benchmarking project. If not, you can
 set it with command:
 
 ```sh
-$ gcloud config set project <the project id>
+gcloud config set project <the project id>
 ```
 
 **Expected output**
@@ -196,7 +196,7 @@ Using the BigQuery command line tool `bq`, initialize an empty **dataset**
 `pkb_results`.
 
 ```sh
-$ bq mk pkb_results
+bq mk pkb_results
 ```
 
 **Expected output**
@@ -236,19 +236,19 @@ created in [the parallel_tests sample folder](./batch_configs/parallel_tests):
 To download the configs, you should first create a config folder:
 
 ```sh
-$ mkdir ~/pkb_configs
+mkdir ~/pkb_configs
 ```
 
 Then you can execute the following commands:
 
 ```sh
-$ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/latency.yaml \
-  --output ~/pkb_configs/latency.yaml
+curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/latency.yaml \
+--output ~/pkb_configs/latency.yaml
 ```
 
 ```sh
-$ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/throughput.yaml \
-  --output ~/pkb_configs/throughput.yaml
+curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/throughput.yaml \
+--output ~/pkb_configs/throughput.yaml
 ```
 
 > **TIP**: You can learn how to build the sample configs by reading the
@@ -309,8 +309,8 @@ We have created a runner config in
 *runner.yaml*. You can download it with command:
 
 ```sh
-$ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/runner.yaml \
-  --output ~/pkb_configs/runner.yaml
+curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/runner.yaml \
+--output ~/pkb_configs/runner.yaml
 ```
 
 As the runner config uses a hard-coded project id: `test_project`, you should
@@ -318,8 +318,8 @@ replace it with your project id. You can use your preferred editor (such as
 `nano` and `vim`) to modify the file, or execute the following command:
 
 ```sh
-$ PROJECT_ID=<the project id>
-$ sed -i "s/test_project/$PROJECT_ID/g" ~/pkb_configs/runner.yaml
+PROJECT_ID=<the project id>
+sed -i "s/test_project/${PROJECT_ID}/g" ~/pkb_configs/runner.yaml
 ```
 
 > **TIP**: You can learn how to build the sample config reading the
@@ -331,7 +331,7 @@ detailed instructions.
 1.  Check your config folder which should have the following files:
 
     ```sh
-    $ ls ~/pkb_configs
+    ls ~/pkb_configs
     ```
 
     **Expected output**
@@ -343,22 +343,22 @@ detailed instructions.
 1.  Install docker on the runner VM via command (one-off operation):
 
     ```sh
-    $ sudo apt install docker.io
+    sudo apt install docker.io
     ```
 
 1.  Set up authentication (one-off operation,
     [reference](https://cloud.google.com/container-registry/docs/advanced-authentication#gcloud-helper))
 
     ```sh
-    $ sudo gcloud auth configure-docker
+    sudo gcloud auth configure-docker
     ```
 
 1.  Execute the following docker command (note that `sudo` is needed to avoid
     the `permission denied` error):
 
     ```sh
-    $ sudo docker run --init --rm -it -v ~/pkb_configs:/pkb/configs \
-      -v /tmp:/tmp gcr.io/cloud-bigtable-ecosystem/pkb:latest
+    sudo docker run --init --rm -it -v ~/pkb_configs:/pkb/configs \
+    -v /tmp:/tmp gcr.io/cloud-bigtable-ecosystem/pkb:latest
     ```
 
     When you execute the command for the first time, the docker image will be
@@ -402,7 +402,7 @@ detailed instructions.
     recent ones:
 
     ```sh
-    $ ls -lt /tmp/perfkitbenchmarker/runs
+    ls -lt /tmp/perfkitbenchmarker/runs
     ```
 
     For a run ID `0cde98c0`, the relevant log file is
@@ -564,14 +564,14 @@ BigQuery dataset.
     are left behind for some reason. You can list them with command:
 
     ```sh
-    $ gcloud bigtable instances list
+    gcloud bigtable instances list
     ```
 
     The ephemeral instances have id like `pkb-bigtable-<run ID>`. The deletion
     command is:
 
     ```sh
-    $ gcloud bigtable instances delete <the instance id>
+    gcloud bigtable instances delete <the instance id>
     ```
 1.  Normally, worker VMs will also be cleaned up automatically. In case some VMs
     are left behind, you can go to the
@@ -581,7 +581,7 @@ BigQuery dataset.
 1.  To remove the BigQuery dataset `pkb_results`, the command is:
 
     ```sh
-    $ bq rm pkb_results
+    bq rm pkb_results
     ```
 
 ## Additional tips
@@ -645,23 +645,23 @@ the equivalent of the basic tutorial. We will redo
     update *runner.yaml* with commands:
 
     ```sh
-    $ sudo rm ~/pkb_configs/*
-    $ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/latency.yaml \
-      --output ~/pkb_configs/latency.yaml
-    $ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/throughput.yaml \
-      --output ~/pkb_configs/throughput.yaml
-    $ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/load.yaml \
-      --output ~/pkb_configs/load.yaml
-    $ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/runner.yaml \
-      --output ~/pkb_configs/runner.yaml
-    $ PROJECT_ID=<the project id>
-    $ sed -i "s/test_project/$PROJECT_ID/g" ~/pkb_configs/runner.yaml
+    sudo rm ~/pkb_configs/*
+    curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/latency.yaml \
+    --output ~/pkb_configs/latency.yaml
+    curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/throughput.yaml \
+    --output ~/pkb_configs/throughput.yaml
+    curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/load.yaml \
+    --output ~/pkb_configs/load.yaml
+    curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests/runner.yaml \
+    --output ~/pkb_configs/runner.yaml
+    PROJECT_ID=<the project id>
+    sed -i "s/test_project/${PROJECT_ID}/g" ~/pkb_configs/runner.yaml
     ```
 
 1.  For Task 5, check the config folder *~/pkb_configs*:
 
     ```sh
-    $ ls ~/pkb_configs
+    ls ~/pkb_configs
     ```
 
     **Expected output**
@@ -674,16 +674,16 @@ the equivalent of the basic tutorial. We will redo
     that the instance will persist:
 
     ```sh
-    $ gcloud bigtable instances create pkb-benchmarks \
-      --cluster-config=id=pkb-benchmarks-1,zone=us-central1-b,nodes=3 \
-      --display-name=pkb-benchmarks
+    gcloud bigtable instances create pkb-benchmarks \
+    --cluster-config=id=pkb-benchmarks-1,zone=us-central1-b,nodes=3 \
+    --display-name=pkb-benchmarks
     ```
 
     Then, you can execute the `docker run` command again:
 
     ```sh
-    $ sudo docker run --init --rm -it -v ~/pkb_configs:/pkb/configs \
-      -v /tmp:/tmp gcr.io/cloud-bigtable-ecosystem/pkb:latest
+    sudo docker run --init --rm -it -v ~/pkb_configs:/pkb/configs \
+    -v /tmp:/tmp gcr.io/cloud-bigtable-ecosystem/pkb:latest
     ```
 
     The end-to-end runtime is about 40 minutes.
@@ -691,7 +691,7 @@ the equivalent of the basic tutorial. We will redo
     In the end, you should manually delete the Bigtable instance:
 
     ```sh
-    $ gcloud bigtable instances delete pkb-benchmarks
+    gcloud bigtable instances delete pkb-benchmarks
     ```
 
 ### Test failures due to temporary unavailability of the service
