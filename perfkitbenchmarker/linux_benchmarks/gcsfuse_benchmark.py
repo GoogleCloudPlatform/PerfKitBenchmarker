@@ -20,7 +20,10 @@ gcsfuse:
     Read GCS data via gcsfuse. Specify the number of VMs with --num_vms.
   vm_groups:
     default:
-      vm_count: null
+      disk_spec:
+        GCP:
+          disk_type: object_storage
+          mount_point: /gcs
       vm_spec:
         GCP:
           machine_type: n1-standard-96
@@ -61,10 +64,7 @@ def Prepare(benchmark_spec):
 
 
 def _Prepare(vm):
-  """Mount gcsfuse at /gcs and set up the test script."""
-  # Mount gcsfuse at /gcs
-  vm.Install('gcsfuse')
-
+  """Mount gcsfuse and set up the test script."""
   # Set up the test script
   path = data.ResourcePath(os.path.join(_REMOTE_SCRIPTS_DIR, _REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vm)
@@ -92,7 +92,7 @@ def Run(benchmark_spec):
 
 
 def _ReadThroughputTestViaGcsfuse(vm):
-  metrics = _ReadThroughputTest(vm, '/gcs/')
+  metrics = _ReadThroughputTest(vm, vm.GetScratchDir() + '/')
   metadata = {
       'gcsfuse_version': FLAGS.gcsfuse_version,
       'gcsfuse_options': FLAGS.gcsfuse_options,
@@ -120,12 +120,5 @@ def _ReadThroughputTest(vm, mountpoint):
   return [float(line) for line in stdout.split('\n') if line]
 
 
-def Cleanup(benchmark_spec):
-  """Unmount gcsfuse from the VM.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-  """
-  vm = benchmark_spec.vms[0]
-  vm.Uninstall('gcsfuse')  # Unmount gcsfuse
+def Cleanup(_):
+  pass

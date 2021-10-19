@@ -80,6 +80,9 @@ RAM = 'ram'
 NFS = 'nfs'
 SMB = 'smb'
 
+# FUSE mounted object storage bucket
+OBJECT_STORAGE = 'object_storage'
+
 # Map old disk type names to new disk type names
 DISK_TYPE_MAPS = dict()
 

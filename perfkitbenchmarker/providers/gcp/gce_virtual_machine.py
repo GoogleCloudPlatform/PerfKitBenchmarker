@@ -52,6 +52,7 @@ from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gcs
+from perfkitbenchmarker.providers.gcp import gcsfuse_disk
 from perfkitbenchmarker.providers.gcp import util
 import six
 from six.moves import range
@@ -829,6 +830,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           raise errors.Error('Not enough local disks.')
       elif disk_spec.disk_type == disk.NFS:
         data_disk = self._GetNfsService().CreateNfsDisk()
+      elif disk_spec.disk_type == disk.OBJECT_STORAGE:
+        data_disk = gcsfuse_disk.GcsFuseDisk(disk_spec)
       else:
         name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,

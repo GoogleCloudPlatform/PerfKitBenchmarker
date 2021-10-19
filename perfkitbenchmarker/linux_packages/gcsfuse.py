@@ -29,17 +29,3 @@ def AptInstall(vm):
 
   vm.RemoteCommand(
       f'sudo apt-get install -y --allow-downgrades {PACKAGE_LOCAL}')
-
-  vm.RemoteCommand(
-      'sudo mkdir -p {mnt} && sudo chmod a+w {mnt}'.format(mnt=MNT))
-  vm.RemoteCommand('gcsfuse {opts} {mnt}'.format(
-      opts=FLAGS.gcsfuse_options, mnt=MNT))
-
-
-def Uninstall(vm):
-  """Unmounts gcsfuse.
-
-  Args:
-    vm: BaseVirtualMachine. VM to receive the scripts.
-  """
-  vm.RemoteCommand('sudo umount {mnt}'.format(mnt=MNT))

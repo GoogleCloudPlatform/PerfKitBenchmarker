@@ -120,6 +120,7 @@
     the cloud.
 -   Add support for nodepools to `container_cluster` benchmark spec. Currently
     only supports GCP.
+-   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
 
 ### Bug fixes and maintenance updates:
 
