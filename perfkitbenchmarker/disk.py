@@ -208,6 +208,11 @@ class BaseDiskSpec(spec.BaseSpec):
   SPEC_TYPE = 'BaseDiskSpec'
   CLOUD = None
 
+  def __init__(self, *args, **kwargs):
+    self.device_path: str = None
+    self.mount_point: str = None
+    super(BaseDiskSpec, self).__init__(*args, **kwargs)
+
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Overrides config values with flag values.
