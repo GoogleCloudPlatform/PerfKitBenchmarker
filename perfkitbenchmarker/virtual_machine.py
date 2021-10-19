@@ -27,6 +27,7 @@ import socket
 import threading
 import time
 import typing
+from typing import List
 
 from absl import flags
 import jinja2
@@ -298,6 +299,16 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   # needing to reboot often indicates a design problem since restarting a
   # container can have side effects in certain situations.
   IS_REBOOTABLE = True
+
+  install_packages: bool  # mixed from BaseVirtualMachine
+  is_static: bool  # mixed from BaseVirtualMachine
+  scratch_disks: List[disk.BaseDisk]  # mixed from BaseVirtualMachine
+  ssh_private_key: str  # mixed from BaseVirtualMachine
+  user_name: str  # mixed from BaseVirtualMachine
+
+  @abc.abstractmethod
+  def GetConnectionIp(self):
+    """See BaseVirtualMachine."""
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()

@@ -20,8 +20,8 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import openfoam_benchmark
 from perfkitbenchmarker.linux_packages import openmpi
@@ -85,7 +85,9 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         sample.Sample('time_sys', 137, unit, expected_metadata), samples[2])
 
   def testYumInstallRaisesNotImplementedError(self):
-    self.mock_vm = linux_virtual_machine.Rhel7Mixin()
+    static_vm_spec = static_virtual_machine.StaticVmSpec('test_static_vm_spec')
+    self.mock_vm = static_virtual_machine.Rhel7BasedStaticVirtualMachine(
+        static_vm_spec)
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
       self.mock_vm.Install('openfoam')
