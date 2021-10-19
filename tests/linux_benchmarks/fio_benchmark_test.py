@@ -70,7 +70,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read'],
             [1, 2], [1],
-            None, None, 600, ['randrepeat=0', 'offset_increment=1k']),
+            None, None, 600, True, ['randrepeat=0', 'offset_increment=1k']),
         expected_jobfile)
 
   def testMultipleScenarios(self):
@@ -108,7 +108,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read', 'sequential_write'],
             [1], [1],
-            None, None, 600, ['randrepeat=0']),
+            None, None, 600, True, ['randrepeat=0']),
         expected_jobfile)
 
   def testCustomBlocksize(self):
@@ -117,7 +117,7 @@ numjobs=1"""
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
-        [1], [1], None, units.Unit('megabyte') * 2, 600, {})
+        [1], [1], None, units.Unit('megabyte') * 2, 600, True, {})
 
     self.assertIn('blocksize=2000000B', job_file)
 
@@ -125,6 +125,13 @@ numjobs=1"""
     # SCENARIOS variable.
     self.assertEqual(fio_benchmark.SCENARIOS['sequential_write']['blocksize'],
                      orig_blocksize)
+
+  def testIndirectIO(self):
+    job_file = fio_benchmark.GenerateJobFileString(
+        self.filename,
+        ['sequential_read'],
+        [1], [1], None, units.Unit('megabyte') * 2, 600, False, {})
+    self.assertIn('direct=0', job_file)
 
   def testParseGenerateScenario(self):
     expected_jobfile = """
@@ -162,7 +169,7 @@ numjobs=1"""
             self.filename,
             ['seq_64M_read_10TB', 'rand_16k_readwrite_5TB_rwmixread-65'],
             [1], [1],
-            None, None, 600, ['randrepeat=0']),
+            None, None, 600, True, ['randrepeat=0']),
         expected_jobfile)
 
 

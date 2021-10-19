@@ -1240,14 +1240,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def CreateRamDisk(self, disk_spec):
     """Performs Linux specific setup of ram disk."""
     assert disk_spec.mount_point
-    ramdisk = disk.RamDisk(disk_spec)
-    logging.info('Mounting and creating Ram Disk %s, %s',
-                 disk_spec.mount_point, disk_spec.disk_size)
-    mnt_cmd = ('sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
-               'sudo chown -R $USER:$USER {0};').format(
-                   disk_spec.mount_point, disk_spec.disk_size)
-    self.RemoteHostCommand(mnt_cmd)
+    ramdisk = self.RamDisk(disk_spec)
+    ramdisk.Mount(self)
     self.scratch_disks.append(ramdisk)
+
+  class RamDisk(disk.MountableDisk):
+    """Linux specific setup of ram disk."""
+
+    def Mount(self, vm):
+      logging.info('Mounting and creating Ram Disk %s, %s',
+                   self.mount_point, self.disk_size)
+      mnt_cmd = ('sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
+                 'sudo chown -R $USER:$USER {0};').format(
+                     self.mount_point, self.disk_size)
+      vm.RemoteHostCommand(mnt_cmd)
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
@@ -1283,10 +1289,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.StripeDisks(device_paths, data_disk.GetDevicePath())
 
     if disk_spec.mount_point:
-      self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
-      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
-                     disk_spec.disk_type, data_disk.mount_options,
-                     data_disk.fstab_options)
+      if isinstance(data_disk, disk.MountableDisk):
+        data_disk.Mount(self)
+      else:
+        self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
+        self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
+                       disk_spec.disk_type, data_disk.mount_options,
+                       data_disk.fstab_options)
 
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
