@@ -20,6 +20,7 @@ import json
 import logging
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
 
@@ -90,7 +91,11 @@ class GcpBigtableInstance(resource.BaseResource):
     cmd.flags['project'] = self.project
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
-    cmd.Issue()
+    _, stderr, _ = cmd.Issue()
+    if 'Insufficient node quota' in stderr:
+      raise errors.Benchmarks.QuotaFailure(
+          f'Insufficient node quota in project {self.project} '
+          f'and zone {self.zone}')
 
     if FLAGS.bigtable_replication_cluster:
       cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'clusters', 'create',
