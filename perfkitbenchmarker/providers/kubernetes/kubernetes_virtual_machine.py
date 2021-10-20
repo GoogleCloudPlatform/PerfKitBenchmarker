@@ -33,7 +33,6 @@ from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 import six
 
 FLAGS = flags.FLAGS
@@ -150,8 +149,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Deletes a POD."""
     delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'delete', 'pod', self.name]
-    output = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
-    logging.info(output[STDOUT].rstrip())
+    stdout, _, _ = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
+    logging.info(stdout.rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self):
