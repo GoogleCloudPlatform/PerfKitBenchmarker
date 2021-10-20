@@ -84,6 +84,10 @@ flags.DEFINE_boolean('get_bigtable_cluster_cpu_utilization', False,
                      'GOOGLE_APPLICATION_CREDENTIALS as described in '
                      'https://cloud.google.com/docs/authentication/'
                      'getting-started.')
+_MONITORING_ADDRESS = flags.DEFINE_string(
+    'google_monitoring_endpoint', 'monitoring.googleapis.com',
+    'Google API endpoint for monitoring requests. Used when '
+    '--get_bigtable_cluster_cpu_utilization is enabled.')
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
 BENCHMARK_CONFIG = """
@@ -290,7 +294,11 @@ def _GetCpuUtilizationSample(samples, instance_id):
   # pylint: disable=g-import-not-at-top
   from google.cloud import monitoring_v3
   from google.cloud.monitoring_v3 import query
-  client = monitoring_v3.MetricServiceClient()
+  from google.cloud.monitoring_v3.gapic.transports import metric_service_grpc_transport
+
+  client = monitoring_v3.MetricServiceClient(
+      transport=metric_service_grpc_transport.MetricServiceGrpcTransport(
+          address=_MONITORING_ADDRESS.value))
 
   cpu_samples = []
   time_units_in_secs = {'s': 1, 'ms': 0.001, 'us': 0.000001}
