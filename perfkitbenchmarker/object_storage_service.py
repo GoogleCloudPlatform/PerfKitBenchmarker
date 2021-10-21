@@ -40,6 +40,8 @@ _OBJECT_STORAGE_REGISTRY = {}
 
 
 class AutoRegisterObjectStorageMeta(abc.ABCMeta):
+  """Metaclass for auto registration."""
+  STORAGE_NAME = None
 
   def __init__(cls, name, bases, dct):
     super(AutoRegisterObjectStorageMeta, cls).__init__(name, bases, dct)
@@ -54,7 +56,6 @@ class AutoRegisterObjectStorageMeta(abc.ABCMeta):
 class ObjectStorageService(
     six.with_metaclass(AutoRegisterObjectStorageMeta, object)):
   """Base class for ObjectStorageServices."""
-  STORAGE_NAME = None
 
   # Keeping the location in the service object is not very clean, but
   # a nicer solution would be more complex, and we only use different
