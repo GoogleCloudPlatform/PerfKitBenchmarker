@@ -33,13 +33,34 @@ _DEB_REPO = ('deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ '
 # RedHat info
 _YUM_REPO_FILE = '/etc/yum.repos.d/azure-cli.repo'
 _YUM_REPO_KEY = 'https://packages.microsoft.com/keys/microsoft.asc'
-_YUM_REPO = """[azure-cli]
-name=Azure CLI
-baseurl=https://packages.microsoft.com/yumrepos/azure-cli
+_YUM_REPO_NAME = 'Azure CLI'
+_YUM_REPO_URL = 'https://packages.microsoft.com/yumrepos/azure-cli'
+_YUM_REPO = f"""[azure-cli]
+name={_YUM_REPO_NAME}
+baseurl={_YUM_REPO_URL}
 enabled=1
 gpgcheck=1
-gpgkey={key}
-""".format(key=_YUM_REPO_KEY)
+gpgkey={_YUM_REPO_KEY}
+"""
+
+
+def ZypperInstall(vm):
+  """Installs the azure-cli package on the VM for SUSE systems.
+
+  Args:
+    vm: Virtual Machine to install on.
+  """
+  # Work-around to remove conflicting python packages. See
+  # https://github.com/Azure/azure-cli/issues/13209
+  vm.RemoteCommand(
+      'sudo zypper install -y --oldpackage azure-cli-2.0.45-4.22.noarch')
+  vm.RemoteCommand('sudo zypper rm -y --clean-deps azure-cli')
+  vm.Install('curl')
+  vm.RemoteCommand('sudo rpm --import {key}'.format(key=_YUM_REPO_KEY))
+  vm.RemoteCommand(
+      f'sudo zypper addrepo --name "{_YUM_REPO_NAME}" '
+      f'--check {_YUM_REPO_URL} azure-cli')
+  vm.RemoteCommand('sudo zypper install -y --from azure-cli azure-cli')
 
 
 def AptInstall(vm):
