@@ -17,17 +17,28 @@ import os
 from typing import List
 
 from perfkitbenchmarker import sample
-
+PACKAGE_NAME = 'tailbench'
 TAILBENCH = 'tailbench-v0.9'
+
+# TODO(user): Find a way to get this data from a https source.
 
 TAILBENCH_TAR_URL = 'http://tailbench.csail.mit.edu/tailbench-v0.9.tgz'
 TAILBENCH_TAR = 'tailbench-v0.9.tgz'
-TAILBENCH_INPUT_TAR_URL = 'http://tailbench.csail.mit.edu/tailbench.inputs.tgz'
+TAILBENCH_URL = 'http://tailbench.csail.mit.edu/' + TAILBENCH_TAR
 TAILBENCH_INPUT_TAR = 'tailbench.inputs.tgz'
+TAILBENCH_INPUT_URL = 'http://tailbench.csail.mit.edu/' + TAILBENCH_INPUT_TAR
+PREPROVISIONED_DATA = {
+    TAILBENCH_TAR:
+        'b26ead61a857e4f6cb904d0b0d1af07b3b509ea0c62685d696f8a26883ee94a5',
+    TAILBENCH_INPUT_TAR:
+        '783b743e3d0d0b162bf92b93e219f67baa7c99666cb528a353d95721019817dd'
+}
+PACKAGE_DATA_URL = {
+    TAILBENCH_TAR: TAILBENCH_URL,
+    TAILBENCH_INPUT_TAR: TAILBENCH_INPUT_URL
+}
 
 BENCHMARK_NAME = 'tailbench'
-BENCHMARK_DATA = 'tailbench-v0.9.tgz'
-BENCHMARK_INPUT = 'tailbench.inputs.tgz'
 
 INSTALL_DIR = '/scratch_ts'
 
@@ -62,21 +73,6 @@ class _TestResult():
     self.subname = subname
 
 
-def InstallTailbench(remote_command):
-  """Installs tailbench on a VM.
-
-  Args:
-    remote_command: Function to run a remote command on the VM. This allows this
-      function to be reused by the windows/cygwin version of the tailbench test.
-  """
-  remote_command(f'wget {TAILBENCH_TAR_URL} -P {INSTALL_DIR}')
-  remote_command(f'cd {INSTALL_DIR} && tar xf {TAILBENCH_TAR}')
-  remote_command(f'wget {TAILBENCH_INPUT_TAR_URL} -P {INSTALL_DIR}')
-  remote_command(f'cd {INSTALL_DIR} && tar xf {TAILBENCH_INPUT_TAR}')
-  remote_command(f'cd {INSTALL_DIR} && mkdir scratch')
-  remote_command(f'cd {INSTALL_DIR} && mkdir results')
-
-
 def Install(vm):
   """Installs the tailbench dependencies and sets up the package on the VM."""
   # TODO(user): Rework all of this to use vm.Install to make more robust
@@ -88,8 +84,14 @@ def Install(vm):
       'pocketsphinx libboost-all-dev'
   )
   vm.Install('openjdk')
-  vm.Install('wget')
-  InstallTailbench(vm.RemoteCommand)
+
+  vm.InstallPreprovisionedPackageData(PACKAGE_NAME,
+                                      PREPROVISIONED_DATA.keys(), INSTALL_DIR)
+
+  vm.RemoteCommand(f'cd {INSTALL_DIR} && tar xf {TAILBENCH_TAR}')
+  vm.RemoteCommand(f'cd {INSTALL_DIR} && tar xf {TAILBENCH_INPUT_TAR}')
+  vm.RemoteCommand(f'cd {INSTALL_DIR} && mkdir scratch')
+  vm.RemoteCommand(f'cd {INSTALL_DIR} && mkdir results')
 
 
 def PrepareTailBench(vm):
