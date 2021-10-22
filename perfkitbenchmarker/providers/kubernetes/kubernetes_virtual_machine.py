@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import posixpath
+import stat
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -412,6 +413,14 @@ class DebianBasedKubernetesVirtualMachine(
       remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
       remote_path = remote_path.strip()
       file_name = posixpath.basename(remote_path)
+      try:
+        # kubectl cannot copy into a directory. Only to a new file
+        # https://github.com/kubernetes/kubernetes/pull/81782
+        if stat.S_ISDIR(os.stat(file_path).st_mode):
+          file_path = os.path.join(file_path, file_name)
+      except FileNotFoundError:
+        # file_path is already a non-existent file
+        pass
       src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
     if retries is None:
       retries = FLAGS.ssh_retries
