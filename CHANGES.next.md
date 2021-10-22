@@ -182,3 +182,5 @@
 -   Added a new user guide for bigtable walkthrough.
 -   Sanitize the shell code in bigtable walkthrough doc: removing dollar sign
     and using variable expansion.
+-   Added `--google_monitoring_endpoint` flag for querying a different endpoint
+    than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.

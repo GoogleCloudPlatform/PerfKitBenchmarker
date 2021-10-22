@@ -45,11 +45,6 @@ DEFAULT_REGION = 'eastus2'
 REGION = 'region'
 ZONE = 'zone'
 
-# https://azure.microsoft.com/en-us/blog/announcing-the-general-availability-of-proximity-placement-groups/
-# Central India does not support proximity placement groups.
-# Last Verified: 1/15/20
-UNSUPPORTED_PROXIMITY_PG_REGIONS = ['centralindia']
-
 
 def GetResourceGroup(zone=None):
   """Get the resource group for the current benchmark."""
@@ -64,11 +59,6 @@ def GetResourceGroup(zone=None):
         'pkb%s-%s' % (FLAGS.run_uri, spec.uid), zone=zone)
     spec.azure_resource_group = group
     return group
-
-
-def IsProximityPlacementGroupCompatible(region):
-  """Returns True if region supports Azure proximity placement groups."""
-  return region not in UNSUPPORTED_PROXIMITY_PG_REGIONS
 
 
 class AzureResourceGroup(resource.BaseResource):
@@ -549,8 +539,7 @@ class AzureNetwork(network.BaseNetwork):
     spread_placement_group = (
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD)
 
-    if cluster_placement_group and IsProximityPlacementGroupCompatible(
-        self.region):
+    if cluster_placement_group:
       self.placement_group = azure_placement_group.AzureProximityGroup(
           placement_group_spec)
     # With dedicated hosting and/or an availability zone, an availability set
