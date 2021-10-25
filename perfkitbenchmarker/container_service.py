@@ -790,14 +790,13 @@ class KubernetesCluster(BaseContainerCluster):
   def WaitForRollout(self, resource_name):
     """Blocks until a Kubernetes rollout is completed."""
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'rollout',
         'status',
         '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
         resource_name
     ]
 
-    vm_util.IssueCommand(run_cmd)
+    RunKubectlCommand(run_cmd)
 
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def GetLoadBalancerIP(self, service_name):
@@ -817,6 +816,21 @@ class KubernetesCluster(BaseContainerCluster):
           "Load Balancer IP for service '%s' is not ready." % service_name)
 
     return format(ip_address)
+
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  def GetClusterIP(self, service_name) -> str:
+    """Returns the IP address of a ClusterIP service when ready."""
+    get_cmd = [
+        'get', 'service', service_name, '-o', 'jsonpath={.spec.clusterIP}'
+    ]
+
+    stdout, _, _ = RunKubectlCommand(get_cmd)
+
+    if not stdout:
+      raise errors.Resource.RetryableCreationError(
+          "ClusterIP for service '%s' is not ready." % service_name)
+
+    return stdout
 
   def CreateConfigMap(self, name, from_file_dir):
     """Creates a Kubernetes ConfigMap.

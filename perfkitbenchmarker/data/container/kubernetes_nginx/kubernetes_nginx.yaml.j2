@@ -14,6 +14,14 @@ spec:
         appCluster: nginx-cluster
     spec:
       affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - nginx
         podAntiAffinity:
           # Schedule 1 Nginx pod per node
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -64,5 +72,4 @@ spec:
   selector:
     app: nginx
     appCluster: nginx-cluster
-  externalTrafficPolicy: Local
-  type: LoadBalancer
+  type: ClusterIP
