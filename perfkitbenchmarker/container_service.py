@@ -453,6 +453,13 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
     benchmark_spec.config.flags['kubeconfig'] = FLAGS.kubeconfig
 
 
+def NodePoolName(name: str) -> str:
+  """Clean node pool names to be usable by all providers."""
+  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens, but PKB
+  # likes to use underscores isnstead of hyphens so we convert them.
+  return name.replace('_', '-')
+
+
 def GetContainerClusterClass(cloud, cluster_type):
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type)
@@ -469,11 +476,13 @@ class BaseContainerCluster(resource.BaseResource):
     self.name = 'pkb-%s' % FLAGS.run_uri
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
-    for name, nodepool in six.iteritems(cluster_spec.nodepools):
+    for name, nodepool in cluster_spec.nodepools.copy().items():
       nodepool.vm_config = virtual_machine.GetVmClass(
           self.CLOUD, os_types.DEFAULT)(nodepool.vm_spec)
       nodepool.num_nodes = nodepool.vm_count
-      cluster_spec.nodepools[name] = nodepool
+      # Fix name
+      del cluster_spec.nodepools[name]
+      cluster_spec.nodepools[NodePoolName(name)] = nodepool
     self.nodepools = cluster_spec.nodepools
     self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
         cluster_spec.vm_spec)

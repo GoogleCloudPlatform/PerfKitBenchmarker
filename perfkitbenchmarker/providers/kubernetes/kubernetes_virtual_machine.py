@@ -22,6 +22,7 @@ import posixpath
 import stat
 
 from absl import flags
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -248,7 +249,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
 
     if self.vm_group:
-      template['spec']['nodeSelector'] = {'pkb_nodepool': self.vm_group}
+      template['spec']['nodeSelector'] = {
+          'pkb_nodepool': container_service.NodePoolName(self.vm_group)
+      }
 
     if FLAGS.kubernetes_anti_affinity:
       template['spec']['affinity'] = {
