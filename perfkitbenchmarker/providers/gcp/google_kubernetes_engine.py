@@ -15,6 +15,7 @@
 
 import json
 import logging
+import math
 import os
 import re
 
@@ -35,6 +36,18 @@ NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/Googl
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 DEFAULT_CONTAINER_VERSION = 'latest'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
+
+
+def _CalculateCidrSize(nodes: int) -> int:
+  # Defaults are used for pod and services CIDR ranges:
+  # https://cloud.google.com/kubernetes-engine/docs/concepts/alias-ips#cluster_sizing_secondary_range_svcs)
+  # Each node requires a /24 CIDR range for pods
+  # The cluster requires a /20 CIDR range for services
+  # So 2^(32 - nodes) - 2^(32 - 20) >= 2^(32 - 24) * CIDR
+  # OR CIDR <= 32 - log2(2^8 * nodes + 2^12)
+  cidr_size = int(32 - math.log2((nodes << 8) + (1 << 12)))
+  # /19 is narrowest CIDR range GKE supports
+  return min(cidr_size, 19)
 
 
 class GoogleContainerRegistry(container_service.BaseContainerRegistry):
@@ -140,6 +153,8 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
+
+    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
 
     if self.vm_config.network:
       cmd.flags['network'] = self.vm_config.network.network_resource.name
