@@ -184,3 +184,4 @@
     and using variable expansion.
 -   Added `--google_monitoring_endpoint` flag for querying a different endpoint
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
+-   Broadens Azure quota detection parsing
