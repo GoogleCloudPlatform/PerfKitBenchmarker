@@ -33,9 +33,11 @@ from perfkitbenchmarker.linux_packages import nvidia_driver
 CUDA_HOME = '/usr/local/cuda'
 
 flags.DEFINE_enum(
-    'cuda_toolkit_version', '11.0',
-    ['9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.3', 'None', ''],
-    'Version of CUDA Toolkit to install. '
+    'cuda_toolkit_version',
+    '11.5', [
+        '9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.3', '11.4',
+        '11.5', 'None', ''
+    ], 'Version of CUDA Toolkit to install. '
     'Input "None" or empty string to skip installation',
     module_name=__name__)
 
@@ -50,6 +52,10 @@ CUDA_11_1_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.1.1/lo
 CUDA_11_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-{os}-11-2-local_11.2.2-460.32.03-1_amd64.deb'
 
 CUDA_11_3_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_amd64.deb'
+
+CUDA_11_4_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.4.2/local_installers/cuda-repo-{os}-11-4-local_11.4.2-470.57.02-1_amd64.deb'
+
+CUDA_11_5_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.5.0/local_installers/cuda-repo-{os}-11-5-local_11.5.0-495.29.05-1_amd64.deb'
 
 CUDA_10_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-{os}-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb'
 
@@ -256,6 +262,14 @@ def _InstallCuda11Point3(vm):
   _InstallCuda11Generic(vm, CUDA_11_3_TOOLKIT, '11-3')
 
 
+def _InstallCuda11Point4(vm):
+  _InstallCuda11Generic(vm, CUDA_11_4_TOOLKIT, '11-4')
+
+
+def _InstallCuda11Point5(vm):
+  _InstallCuda11Generic(vm, CUDA_11_5_TOOLKIT, '11-5')
+
+
 def AptInstall(vm):
   """Installs CUDA toolkit on the VM if not already installed."""
   version_to_install = FLAGS.cuda_toolkit_version
@@ -291,6 +305,10 @@ def AptInstall(vm):
     _InstallCuda11Point2(vm)
   elif version_to_install == '11.3':
     _InstallCuda11Point3(vm)
+  elif version_to_install == '11.4':
+    _InstallCuda11Point4(vm)
+  elif version_to_install == '11.5':
+    _InstallCuda11Point5(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
