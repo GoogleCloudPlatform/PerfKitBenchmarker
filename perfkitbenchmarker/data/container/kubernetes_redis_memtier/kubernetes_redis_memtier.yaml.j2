@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster
+data:
+  redis.conf:  |+
+    cluster-enabled yes
+    cluster-node-timeout 15000
+    cluster-config-file /data/nodes.conf
+    appendonly yes
+    protected-mode no
+    dir /data
+    port {{ redis_port }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+spec:
+  serviceName: "redis-service"
+  replicas: {{ redis_replicas }}
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        appCluster: redis-cluster
+    spec:
+      terminationGracePeriodSeconds: 20
+      topologySpreadConstraints:
+      # Enforce max 2 Redis pods per node (leader and follower)
+      - maxSkew: 2
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: redis
+      affinity:
+        podAffinity:
+          # Cluster Redis pods together (leader and follower)
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - redis
+              topologyKey: kubernetes.io/hostname
+        podAntiAffinity:
+          # Prevent Redis pods from being scheduled with PKB VMs (VMs)
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: pkb
+                operator: Exists
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: redis
+        image: redis:6@sha256:729899abf01fd36b9f797afee2abffebc1d29202c275000a7c152126382c7f18
+        command:
+          - "redis-server"
+        args:
+          - "/conf/redis.conf"
+          - "--protected-mode"
+          - "no"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"
+        ports:
+            - name: redis
+              containerPort: {{ redis_port }}
+              protocol: "TCP"
+            - name: cluster
+              containerPort: {{ redis_cluster_port }}
+              protocol: "TCP"
+        volumeMounts:
+        - name: conf
+          mountPath: /conf
+          readOnly: false
+        - name: data
+          mountPath: /data
+          readOnly: false
+      volumes:
+      - name: conf
+        configMap:
+          name: redis-cluster
+          defaultMode: 0755
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Gi

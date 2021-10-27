@@ -21,11 +21,9 @@ same project.
 """
 
 import abc
+import enum
 
-from enum import Enum
 from absl import flags
-
-
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
@@ -36,7 +34,7 @@ flags.DEFINE_integer('mtu', None,
                      'Network MTU to set, if any.  Only enabled for GCP.')
 
 
-class NetType(Enum):
+class NetType(enum.Enum):
   DEFAULT = 'default'
   SINGLE = 'single'
   MULTI = 'multi'
@@ -110,7 +108,7 @@ class BaseNetworkSpec(object):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
 
-class BaseVpnGateway(object):
+class BaseVpnGateway(object, metaclass=abc.ABCMeta):
   """An object representing the Base VPN Gateway."""
   CLOUD = None
 
@@ -125,17 +123,6 @@ class BaseVpnGateway(object):
     self.cidr: str = cidr
     # Set to True if we need target Gateway up front (AWS)
     self.require_target_to_init = False
-
-  @abc.abstractmethod
-  def IsTunnelConfigured(self, tunnel_config):
-    """Returns True if the tunnel_config is complete.
-
-    Args:
-     tunnel_config: The tunnel_config of the tunnel to check.
-    Returns:
-       boolean.
-    """
-    raise NotImplementedError()
 
   @abc.abstractmethod
   def IsTunnelReady(self, tunnel_id):

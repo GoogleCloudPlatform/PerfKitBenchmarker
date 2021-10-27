@@ -282,7 +282,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       if self._IsDeleting():
         raise errors.Resource.RetryableDeletionError('Not yet deleted')
 
-    if self.deleted:
+    if self.deleted or not self.created:
       return
     if not self.delete_start_time:
       self.delete_start_time = time.time()

@@ -41,7 +41,11 @@ _RUN_RESULT = result = omb.RunResult(
     number_processes=6,
     run_time=0,
     pinning=['0:0:0,1,15', '1:1:0,1,15', '2:0:2,16,17', '3:1:2,16,17'],
-    perhost=1)
+    perhost=1,
+    mpi_env={
+        'I_MPI_DEBUG': '6',
+        'I_MPI_PIN_PROCESSOR_LIST': '0'
+    })
 
 _COMMON_METADATA = {
     'cmd': 'mpirun path/to/acc_latency',
@@ -54,6 +58,7 @@ _COMMON_METADATA = {
     'run_time': 0,
     'pinning': '0:0:0,1,15;1:1:0,1,15;2:0:2,16,17;3:1:2,16,17',
     'perhost': 1,
+    'mpi_env': 'I_MPI_DEBUG=6;I_MPI_PIN_PROCESSOR_LIST=0',
 }
 _METADATA1 = {'foo': 100, 'latency': 10, **_COMMON_METADATA}
 _METADATA2 = {'foo': 200, 'latency': 20, **_COMMON_METADATA}

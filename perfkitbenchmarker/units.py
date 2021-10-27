@@ -33,6 +33,9 @@ class _UnitRegistry(pint.UnitRegistry):
   def __init__(self):
     super(_UnitRegistry, self).__init__()
     self.define('K- = 1000')
+    # Kubernetes
+    self.define('Ki = kibibyte')
+    self.define('Mi = mebibyte')
     self.define('% = [percent] = percent')
 
   def parse_expression(self, input_string, *args, **kwargs):
@@ -83,6 +86,12 @@ ParseExpression = _UNIT_REGISTRY.parse_expression
 Quantity = _UNIT_REGISTRY.Quantity
 Unit = _UNIT_REGISTRY.Unit
 byte = Unit('byte')
+kilobyte = Unit('kilobyte')
+kibibyte = Unit('kibibyte')
+megabyte = Unit('megabyte')
+mebibyte = Unit('mebibyte')
+gigabyte = Unit('gigabyte')
+gibibyte = Unit('gibibyte')
 bit = Unit('bit')
 second = Unit('second')
 percent = Unit('percent')

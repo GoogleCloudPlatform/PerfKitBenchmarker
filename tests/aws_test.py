@@ -351,13 +351,36 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
 
-  def testInstanceRequestLimitExceededCreate(self):
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'retry_rate_limited',
+          'retry_rate_limited': True,
+          'expected_error': errors.Resource.RetryableCreationError
+      }, {
+          'testcase_name': 'do_not_retry_rate_limited',
+          'retry_rate_limited': False,
+          'expected_error': errors.Benchmarks.QuotaFailure
+      })
+  def testInstanceRequestLimitExceededCreate(self, retry_rate_limited,
+                                             expected_error):
+    FLAGS.retry_on_rate_limited = retry_rate_limited
     stderr = (
         'An error occurred (RequestLimitExceeded) when calling the RunInstances'
         ' operation (reached max retries: 4): Request limit exceeded.'
     )
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
-    with self.assertRaises(errors.Resource.RetryableCreationError) as e:
+    with self.assertRaises(expected_error) as e:
+      self.vm._Create()
+    self.assertEqual(str(e.exception), stderr)
+
+  def testInstanceUnsupportedConfigCreate(self):
+    stderr = (
+        'An error occurred (Unsupported) when calling the RunInstances '
+        'operation: The requested configuration is currently not supported. '
+        'Please check the documentation for supported configurations.'
+    )
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(errors.Benchmarks.UnsupportedConfigError) as e:
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
 

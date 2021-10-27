@@ -19,7 +19,7 @@ import collections
 import json
 import re
 import string
-from typing import Set
+from typing import Dict, Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -225,7 +225,13 @@ def AddDefaultTags(resource_id, region):
   AddTags(resource_id, region, **tags)
 
 
-def GetAccount():
+def _GetCallerId() -> Dict[str, str]:
+  cmd = AWS_PREFIX + ['sts', 'get-caller-identity']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  return json.loads(stdout)
+
+
+def GetAccount() -> str:
   """Retrieve details about the current IAM identity.
 
   http://docs.aws.amazon.com/cli/latest/reference/sts/get-caller-identity.html
@@ -234,10 +240,12 @@ def GetAccount():
     A string of the AWS account ID number of the account that owns or contains
     the calling entity.
   """
+  return _GetCallerId()['Account']
 
-  cmd = AWS_PREFIX + ['sts', 'get-caller-identity']
-  stdout, _, _ = vm_util.IssueCommand(cmd)
-  return json.loads(stdout)['Account']
+
+def GetCallerArn() -> str:
+  """Retrieve the ARN of the AWS credentials used."""
+  return _GetCallerId()['Arn']
 
 
 @vm_util.Retry()

@@ -34,7 +34,7 @@ import posixpath
 import re
 import threading
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -65,6 +65,7 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.')
+_UNSUPPORTED_RESOURCE = 'Could not fetch resource'
 _GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 _SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
@@ -104,7 +105,20 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
   CLOUD = gcp.CLOUD
 
   def __init__(self, *args, **kwargs):
+    self.num_local_ssds: int = None
+    self.preemptible: bool = None
+    self.boot_disk_size: int = None
+    self.boot_disk_type: str = None
+    self.project: str = None
+    self.image_family: str = None
+    self.image_project: str = None
+    self.node_type: str = None
+    self.min_cpu_platform: str = None
+    self.threads_per_core: int = None
+    self.gce_tags: List[str] = None
+    self.min_node_cpus: int = None
     super(GceVmSpec, self).__init__(*args, **kwargs)
+
     if isinstance(self.machine_type,
                   custom_virtual_machine_spec.CustomMachineTypeSpec):
       logging.warning('Specifying a custom machine in the format of '
@@ -658,6 +672,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         return
       if util.RATE_LIMITED_MESSAGE in stderr:
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
+      if _UNSUPPORTED_RESOURCE in stderr:
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if self.preemptible and _FAILED_TO_START_DUE_TO_PREEMPTION in stderr:
         self.spot_early_termination = True
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
@@ -1057,12 +1073,16 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
     for device_name in self._GetNetworkDevices():
       device = self._GetNetworkDeviceProperties(device_name)
       all_device_properties[device_name] = device
-      if device.get('driver') == self._GVNIC_DEVICE_NAME:
+      driver = device.get('driver')
+      driver_version = device.get('version')
+      if not driver:
+        logging.error(
+            'Network device %s lacks a driver %s', device_name, device)
+      elif driver == self._GVNIC_DEVICE_NAME:
         logging.info('gvnic properties %s', device)
-        if 'version' in device:
-          return device['version']
+        if driver_version:
+          return driver_version
         raise ValueError(f'No version in {device}')
-      logging.error('Network device %s lacks a driver %s', device_name, device)
 
   def _GetNetworkDeviceProperties(self, device_name: str) -> Dict[str, str]:
     """Returns a dict of the network device properties."""

@@ -97,7 +97,9 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testPlacementGroupDelete(self):
     self.mock_cmd.side_effect = [_EXISTS_RESPONSE, _DELETE_RESPONSE]
-    _CreateGcePlacementGroup().Delete()
+    pg = _CreateGcePlacementGroup()
+    pg.created = True
+    pg.Delete()
     self.mock_cmd.assert_called_with([
         'gcloud', 'compute', 'resource-policies', 'describe',
         _PLACEMENT_GROUP_NAME, '--format', 'json', '--project', 'myproject',

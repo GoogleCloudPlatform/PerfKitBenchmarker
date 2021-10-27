@@ -12,45 +12,65 @@ runs the benchmark can be found on: /data/messaging_service.
 import abc
 import os
 from typing import Any, Dict
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import resource
 
 MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
-TIMEOUT = 15  # 15 seconds from now
-SLEEP_TIME = 2
+MESSAGING_SERVICE_CLIENT_PY = 'messaging_service_client.py'
 
 
-class MessagingService:
+def GetMessagingServiceClass(cloud, delivery):
+  """Gets the underlying Messaging Service class."""
+  return resource.GetResourceClass(BaseMessagingService, CLOUD=cloud,
+                                   DELIVERY=delivery)
+
+
+class BaseMessagingService(resource.BaseResource):
   """Common interface of a messaging service resource.
 
   Attributes:
     client: The client virtual machine that runs the benchmark.
   """
 
-  def __init__(self, client: virtual_machine.BaseVirtualMachine):
-    """Initializes the instance with client VM."""
-    self.client = client
+  REQUIRED_ATTRS = ['CLOUD', 'DELIVERY']
+  RESOURCE_TYPE = 'BaseMessagingService'
 
-  @abc.abstractmethod
-  def prepare(self):
-    """Prepares client VM and resources.
+  # TODO(odiego): Move DELIVERY down to child classes when adding more options
+  DELIVERY = 'pull'
 
-    This method takes care of preparing the client VM - installing common needed
-    packages and uploading files. This method should be overwritten in
-    child implementations to install/upload specific packages/files, and to
-    create resources - on GCP it creates a Cloud PubSub topic and subscription.
-    """
+  @classmethod
+  def FromSpec(cls, messaging_service_spec):
+    return cls()
+
+  def setVms(self, vm_groups):
+    self.client_vm = vm_groups['clients' if 'clients' in
+                               vm_groups else 'default'][0]
+
+  def PrepareClientVm(self):
+    self._InstallCommonClientPackages()
+    self._InstallCloudClients()
+
+  def _InstallCommonClientPackages(self):
+    """Installs common software for running benchmarks on the client VM."""
     # Install commom packages
-    self.client.Install('python3')
-    self.client.Install('pip3')
-    self.client.RemoteCommand('sudo pip3 install absl-py numpy')
+    self.client_vm.Install('python3')
+    self.client_vm.Install('pip3')
+    self.client_vm.RemoteCommand('sudo pip3 install absl-py numpy')
 
     # Upload Common Client Interface
-    self.client.PushDataFile(os.path.join(
-        MESSAGING_SERVICE_DATA_DIR,
-        'messaging_service_client.py'))
+    self.client_vm.PushDataFile(
+        os.path.join(MESSAGING_SERVICE_DATA_DIR, MESSAGING_SERVICE_CLIENT_PY))
 
   @abc.abstractmethod
-  def run(self, benchmark_scenario: str, number_of_messages: str,
+  def _InstallCloudClients(self):
+    """Installs software for running benchmarks on the client VM.
+
+    This method should be overriden by subclasses to install software specific
+    to the flavor of MessagingService they provide.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def Run(self, benchmark_scenario: str, number_of_messages: str,
           message_size: str) -> Dict[str, Any]:
     """Runs remote commands on client VM - benchmark's run phase.
 
@@ -65,8 +85,8 @@ class MessagingService:
     Args:
       benchmark_scenario: Specifies which benchmark scenario to run.
       number_of_messages: Number of messages to use on the benchmark.
-      message_size: Size of the messages that will be used on the
-        benchmark. It specifies the number of characters in those messages.
+      message_size: Size of the messages that will be used on the benchmark. It
+        specifies the number of characters in those messages.
 
     Returns:
       Dictionary with metric_name (mean_latency, p50_latency...) as key and the
@@ -76,13 +96,4 @@ class MessagingService:
           ...
         }
     """
-
-  @abc.abstractmethod
-  def cleanup(self):
-    """Delete resources that were created as part of the benchmark.
-
-    This method takes care of cleaning resources that were created on the
-    'self.Prepare' method. Specific implementations should
-    override this method - on GCP it takes care of deleting the
-    Cloud PubSub topic and subscription that were created.
-    """
+    raise NotImplementedError

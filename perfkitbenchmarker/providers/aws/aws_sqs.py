@@ -5,44 +5,32 @@ This class handles resource creation/cleanup for SQS benchmark on AWS.
 
 import json
 import os
-import time
 
 from absl import flags
-from perfkitbenchmarker import errors
+from perfkitbenchmarker import messaging_service as msgsvc
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.messaging_service import MESSAGING_SERVICE_DATA_DIR
-from perfkitbenchmarker.messaging_service import MessagingService
-from perfkitbenchmarker.messaging_service import SLEEP_TIME
-from perfkitbenchmarker.messaging_service import TIMEOUT
-from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
-
 FLAGS = flags.FLAGS
+AWS_SQS_CLIENT_PY = 'aws_sqs_client.py'
 
 
-class AwsSqs(MessagingService):
+class AwsSqs(msgsvc.BaseMessagingService):
   """AWS SQS Interface Class."""
 
-  def __init__(self, client: aws_virtual_machine.AwsVirtualMachine):
-    super().__init__(client)
-    self.region = util.GetRegionFromZone(client.zone)
+  CLOUD = aws.CLOUD
+
+  def __init__(self):
+    super().__init__()
     self.queue_name = 'pkb-queue-{0}'.format(FLAGS.run_uri)
 
-  def _get_queue(self) -> str:
-    """Get SQS queue URL from AWS."""
-    cmd = util.AWS_PREFIX + [
-        'sqs',
-        'get-queue-url',
-        '--queue-name', self.queue_name,
-        '--region', self.region
-    ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    return json.loads(stdout)['QueueUrl']
+  def _Create(self):
+    """Handles AWS resources provision.
 
-  def _create_queue(self):
+    It creates an AWS SQS queue.
+    """
     cmd = util.AWS_PREFIX + [
         'sqs',
         'create-queue',
@@ -51,7 +39,7 @@ class AwsSqs(MessagingService):
     ]
     vm_util.IssueCommand(cmd)
 
-  def _queue_exists(self) -> bool:
+  def _Exists(self) -> bool:
     """Checks whether SQS queue already exists."""
     cmd = util.AWS_PREFIX + [
         'sqs',
@@ -60,52 +48,40 @@ class AwsSqs(MessagingService):
         '--region', self.region
     ]
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if retcode != 0:
-      return False
-    return True
+    return retcode == 0
 
-  def _delete_queue(self):
+  def _Delete(self):
     """Handle SQS queue deletion."""
     cmd = util.AWS_PREFIX + [
         'sqs',
         'delete-queue',
-        '--queue-url', self._get_queue(),
+        '--queue-url', self._GetQueue(),
         '--region', self.region
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)
 
-  def provision_resources(self):
-    """Handles AWS resources provision.
+  def _IsDeleting(self):
+    """Overrides BaseResource._IsDeleting.
 
-    It creates an AWS SQS queue.
+    Used internally while deleting to check if the deletion is still in
+    progress.
+
+    Returns:
+      A bool. True if the resource is not yet deleted, else False.
     """
-    self._create_queue()
-    timeout = time.time() + TIMEOUT
+    return self._Exists()
 
-    while not self._queue_exists():
-      if time.time() > timeout:
-        raise errors.Benchmarks.PrepareException(
-            'Timeout when creating resource.')
-      time.sleep(SLEEP_TIME)
-
-  def prepare(self):
-    """Handle the benchmark's prepare phase - done from benchmark VM."""
-    # Install/uploads common modules/files
-    super().prepare()
-
-    self.client.RemoteCommand(
+  def _InstallCloudClients(self):
+    self.client_vm.RemoteCommand(
         'sudo pip3 install boto3',
         ignore_failure=False)
-    self.client.PushDataFile(os.path.join(
-        MESSAGING_SERVICE_DATA_DIR,
-        'aws_sqs_client.py'))
-
+    self.client_vm.PushDataFile(os.path.join(
+        msgsvc.MESSAGING_SERVICE_DATA_DIR,
+        AWS_SQS_CLIENT_PY))
     # copy AWS creds
-    self.client.Install('aws_credentials')
-    # provision resources needed on AWS
-    self.provision_resources()
+    self.client_vm.Install('aws_credentials')
 
-  def run(self,
+  def Run(self,
           benchmark_scenario: str,
           number_of_messages: str,
           message_size: str):
@@ -116,20 +92,21 @@ class AwsSqs(MessagingService):
                f'--benchmark_scenario={benchmark_scenario} '
                f'--number_of_messages={number_of_messages} '
                f'--message_size={message_size}')
-    stdout, _ = self.client.RemoteCommand(command)
+    stdout, _ = self.client_vm.RemoteCommand(command)
     results = json.loads(stdout)
     return results
 
-  def cleanup(self):
-    """Handles AWS resources cleanup.
+  @property
+  def region(self):
+    return util.GetRegionFromZone(self.client_vm.zone)
 
-    It cleans up all the resources that were created on 'provision_resources'.
-    """
-    self._delete_queue()
-    timeout = time.time() + TIMEOUT
-
-    while self._queue_exists():
-      if time.time() > timeout:
-        raise errors.Resource.CleanupError(
-            'Timeout when deleting SQS.')
-      time.sleep(SLEEP_TIME)
+  def _GetQueue(self) -> str:
+    """Get SQS queue URL from AWS."""
+    cmd = util.AWS_PREFIX + [
+        'sqs',
+        'get-queue-url',
+        '--queue-name', self.queue_name,
+        '--region', self.region
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    return json.loads(stdout)['QueueUrl']

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Contains classes/functions related to Azure Container Instances.
 
 For now, these only support benchmarks that don't make use of the container's
@@ -43,18 +42,28 @@ class AciContainer(container_service.BaseContainer):
   def _Create(self):
     """Creates the container."""
     create_cmd = [
-        azure.AZURE_PATH, 'container', 'create',
-        '--name', self.name,
-        '--image', self.image,
-        '--restart-policy', 'Never',
-        '--cpu', str(int(self.cpus)),
-        '--memory', '%0.1f' % (self.memory / 1024.0),
+        azure.AZURE_PATH,
+        'container',
+        'create',
+        '--name',
+        self.name,
+        '--image',
+        self.image,
+        '--restart-policy',
+        'Never',
+        '--cpu',
+        str(int(self.cpus)),
+        '--memory',
+        '%0.1f' % (self.memory / 1024.0),
     ] + self.resource_group.args
     if self.registry and self.registry.CLOUD == azure.CLOUD:
       create_cmd.extend([
-          '--registry-login-server', self.registry.login_server,
-          '--registry-username', self.registry.service_principal.app_id,
-          '--registry-password', self.registry.service_principal.password,
+          '--registry-login-server',
+          self.registry.login_server,
+          '--registry-username',
+          self.registry.service_principal.app_id,
+          '--registry-password',
+          self.registry.service_principal.password,
       ])
     if self.command:
       # Note that this is inconsistent with other containers which use lists
@@ -66,8 +75,12 @@ class AciContainer(container_service.BaseContainer):
   def _Delete(self):
     """Deletes the container."""
     delete_cmd = [
-        azure.AZURE_PATH, 'container', 'delete',
-        '--name', self.name, '--yes',
+        azure.AZURE_PATH,
+        'container',
+        'delete',
+        '--name',
+        self.name,
+        '--yes',
     ] + self.resource_group.args
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -83,9 +96,8 @@ class AciContainer(container_service.BaseContainer):
 
   def _GetContainerInstance(self):
     """Gets a representation of the container and returns it."""
-    show_cmd = [
-        azure.AZURE_PATH, 'container', 'show', '--name', self.name
-    ] + self.resource_group.args
+    show_cmd = [azure.AZURE_PATH, 'container', 'show', '--name', self.name
+               ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(show_cmd)
     return json.loads(stdout)
 
@@ -96,19 +108,24 @@ class AciContainer(container_service.BaseContainer):
 
   def WaitForExit(self, timeout=None):
     """Waits until the container has finished running."""
-    @vm_util.Retry(timeout=timeout)
+
+    @vm_util.Retry(
+        timeout=timeout,
+        retryable_exceptions=(container_service.RetriableContainerException,))
     def _WaitForExit():
       container = self._GetContainerInstance()['containers'][0]
       state = container['instanceView']['currentState']['state']
       if state != 'Terminated':
-        raise Exception('Container not in terminated state (%s).' % state)
-    _WaitForExit()
+        raise container_service.RetriableContainerException(
+            f'Container in ({state}). Not yet in expected state Terminated.')
+      return container
+
+    return _WaitForExit()
 
   def GetLogs(self):
     """Returns the logs from the container."""
-    logs_cmd = [
-        azure.AZURE_PATH, 'container', 'logs', '--name', self.name
-    ] + self.resource_group.args
+    logs_cmd = [azure.AZURE_PATH, 'container', 'logs', '--name', self.name
+               ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(logs_cmd)
     return stdout
 

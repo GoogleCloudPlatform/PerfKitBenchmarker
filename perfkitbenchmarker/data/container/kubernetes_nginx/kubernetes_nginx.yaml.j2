@@ -29,7 +29,7 @@ spec:
         image: {{ nginx_image }}
         imagePullPolicy: Always
         ports:
-        - containerPort: 80
+        - containerPort: {{ nginx_port }}
         volumeMounts:
         - name: config-volume
           mountPath: /etc/nginx/sites-enabled/default
@@ -41,6 +41,10 @@ spec:
           - |
             mkdir -p /var/www/html
             dd bs=1 count={{ nginx_content_size }} if=/dev/urandom of=/var/www/html/random_content
+            mkdir -p /etc/nginx/ssl
+            openssl req -x509 -nodes -days 365 -newkey ec -subj "/CN=localhost" -pkeyopt ec_paramgen_curve:secp384r1 -keyout /etc/nginx/ssl/ecdsa.key -out /etc/nginx/ssl/ecdsa.crt
+            sed -i 's|worker_connections .*|worker_connections {{ nginx_worker_connections }};|g' /etc/nginx/nginx.conf
+            sed -i 's|\(\s*\)keepalive_timeout .*|\1keepalive_timeout 75;\n\1keepalive_requests 1000000000;|g' /etc/nginx/nginx.conf
             nginx -g 'daemon off;'
       volumes:
       - name: config-volume
@@ -54,9 +58,9 @@ metadata:
 spec:
   ports:
   - name: nginx-port
-    port: 80
+    port: {{ nginx_port }}
     protocol: TCP
-    targetPort: 80
+    targetPort: {{ nginx_port }}
   selector:
     app: nginx
     appCluster: nginx-cluster

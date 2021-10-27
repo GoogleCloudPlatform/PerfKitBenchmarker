@@ -173,6 +173,10 @@ class BaseVmSpec(spec.BaseSpec):
   SPEC_TYPE = 'BaseVmSpec'
   CLOUD = None
 
+  def __init__(self, *args, **kwargs):
+    self.machine_type = None
+    super(BaseVmSpec, self).__init__(*args, **kwargs)
+
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Overrides config values with flag values.
@@ -361,7 +365,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           return code is non-zero.
       timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
-      kwargs: Additional command arguments.
+      **kwargs: Additional command arguments.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -977,7 +981,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
-  def __init__(self, vm_spec):
+  def __init__(self, vm_spec: BaseVmSpec):
     """Initialize BaseVirtualMachine class.
 
     Args:

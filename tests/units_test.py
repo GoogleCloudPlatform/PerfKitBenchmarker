@@ -40,6 +40,10 @@ class UnitRegistryTestCase(unittest.TestCase):
     self.assertEqual(q.magnitude, 12.5)
     self.assertEqual(q.units, units.percent)
 
+  def testKubernetes(self):
+    self.assertEqual(units.ParseExpression('2048Ki'),
+                     2 * units.mebibyte)
+
 
 class TestPintPickling(unittest.TestCase):
 

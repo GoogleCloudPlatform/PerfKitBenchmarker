@@ -52,10 +52,11 @@ class FakeRelationalDb(relational_db.BaseRelationalDb):
     pass
 
 
-class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
+class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RelationalDbUnamangedTestCase, self).setUp()
+    super(RelationalDbUnmanagedTestCase, self).setUp()
+    FLAGS['run_uri'].value = '123456'
     self.min_mysql_spec = {
         'cloud': 'GCP',
         'engine': 'mysql',
@@ -117,6 +118,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.postgres_spec)
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     self.assertEqual(
@@ -129,6 +131,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.postgres_spec)
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     with mock.patch.object(db.client_vm, 'RemoteCommand') as remote_command:
@@ -137,9 +140,35 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     command = [
         mock.call(
             'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
-            ' dbname=abc\' -c "Select 1"')
+            ' dbname=abc\' -c "Select 1"',
+            ignore_failure=False,
+            timeout=None)
     ]
 
+    self.assertCountEqual(remote_command.call_args_list, command)
+
+  def testIssuePostgresClientCommandWithSessionVariables(self):
+    FLAGS['use_managed_db'].parse(False)
+    db = FakeRelationalDb(self.postgres_spec)
+    db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
+    db.client_vm = CreateTestLinuxVm()
+    db.server_vm = CreateTestLinuxVm()
+    with mock.patch.object(db.client_vm, 'RemoteCommand') as remote_command:
+      db.client_vm_query_tools.IssueSqlCommand(
+          'Select 1',
+          session_variables=['Set a=b;'],
+          database_name='abc',
+          ignore_failure=False,
+          timeout=None)
+
+    command = [
+        mock.call(
+            'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
+            ' dbname=abc\' -c "Set a=b;" -c "Select 1"',
+            ignore_failure=False,
+            timeout=None)
+    ]
     self.assertCountEqual(remote_command.call_args_list, command)
 
   def testMakePostgresServerCommand(self):
@@ -148,6 +177,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand(
             'Select 1', database_name='postgresql'),
@@ -160,6 +190,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand('Select 1'),
         'mysql -h 1.1.1.1 -P 3306 -u root'
@@ -171,6 +202,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
         'mysql -h localhost -P 3306 -u root '
@@ -182,6 +214,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand('Select 1'),
         '/opt/mssql-tools/bin/sqlcmd -S 1.1.1.1 -U root -P perfkitbenchmarker -Q "Select 1"'
@@ -193,6 +226,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
         '/opt/mssql-tools/bin/sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"'
@@ -203,6 +237,7 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['innodb_buffer_pool_size'].parse(100)
     db = FakeRelationalDb(self.mysql_spec)
     db.endpoint = '1.1.1.1'
+    db.port = db.GetDefaultPort()
     db.client_vm = CreateTestLinuxVm()
     db.server_vm = CreateTestLinuxVm()
     db.server_vm.IS_REBOOTABLE = False
@@ -255,17 +290,25 @@ class RelationalDbUnamangedTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('sudo cat None', should_log=True),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
-            '-e "SET GLOBAL max_connections=8000;"'),
+            '-e "SET GLOBAL max_connections=8000;"',
+            ignore_failure=False,
+            timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"CREATE USER \'root\'@\'None\' '
-            'IDENTIFIED BY \'perfkitbenchmarker\';"'),
+            'IDENTIFIED BY \'perfkitbenchmarker\';"',
+            ignore_failure=False,
+            timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
-            '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"'),
+            '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"',
+            ignore_failure=False,
+            timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
-            '"FLUSH PRIVILEGES;"')
+            '"FLUSH PRIVILEGES;"',
+            ignore_failure=False,
+            timeout=None)
     ]
 
     self.assertCountEqual(remote_command.call_args_list, command)

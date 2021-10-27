@@ -39,10 +39,6 @@ DEFAULT_MYSQL56_AURORA_VERSION = '5.6.10a'
 DEFAULT_POSTGRES_AURORA_VERSION = '9.6.9'
 DEFAULT_SQLSERVER_VERSION = '14.00.3223.3.v1'
 
-DEFAULT_MYSQL_PORT = 3306
-DEFAULT_POSTGRES_PORT = 5432
-DEFAULT_SQLSERVER_PORT = 1433
-
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 _MAP_ENGINE_TO_DEFAULT_VERSION = {
@@ -126,7 +122,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
   def __init__(self, relational_db_spec):
     super(AwsRelationalDb, self).__init__(relational_db_spec)
-    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.cluster_id = None
     self.all_instance_ids = []
     self.primary_zone = None
@@ -207,7 +202,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       the new subnet resource
     """
     cidr = self.client_vm.network.regional_network.vpc.NextSubnetCidrBlock()
-    logging.info('Attempting to create a subnet in zone %s' % new_subnet_zone)
+    logging.info('Attempting to create a subnet in zone %s', new_subnet_zone)
     new_subnet = (
         aws_network.AwsSubnet(
             new_subnet_zone,
@@ -295,7 +290,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
         '--group-id', self.security_group_id,
         '--source-group', self.security_group_id,
         '--protocol', 'tcp',
-        '--port={0}'.format(DEFAULT_POSTGRES_PORT),
+        '--port={0}'.format(self.port),
         '--region', self.region]
     stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
     logging.info('Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
@@ -428,8 +423,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       self.firewall.AllowPortInSecurityGroup(
           self.server_vm.region,
           self.server_vm.network.regional_network.vpc.default_security_group_id,
-          self.GetDefaultPort(),
-          self.GetDefaultPort(),
+          self.port,
+          self.port,
           ['%s/32' % self.client_vm.ip_address])
       self.unmanaged_db_exists = True
 
@@ -533,20 +528,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     """
     return describe_cluster_json['DBClusters'][0]['Endpoint']
 
-  def _ParsePortFromCluster(self, describe_cluster_json):
-    """Parses the json output from the CLI and returns the port.
-
-    Args:
-      describe_cluster_json: output in json format from calling
-        'aws rds describe-db-instances'
-
-    Returns:
-      port on which the server is listening, as an int
-    """
-    if describe_cluster_json is None:
-      return None
-    return int(describe_cluster_json['DBClusters'][0]['Port'])
-
   def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
     """Saves the primary, and secondary (only if HA) zone of the server.
 
@@ -595,25 +576,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
     return True
 
-  def GetDefaultPort(self):
-    """Returns the default port of a given database engine.
-
-    Returns:
-      (string): Default port
-    Raises:
-      RelationalDbEngineNotFoundError: if an unknown engine is
-                                                  requested.
-    """
-    engine = self.spec.engine
-    if engine == sql_engine_utils.MYSQL:
-      return DEFAULT_MYSQL_PORT
-    if engine == sql_engine_utils.POSTGRES:
-      return DEFAULT_POSTGRES_PORT
-    if engine == sql_engine_utils.SQLSERVER:
-      return DEFAULT_SQLSERVER_PORT
-    raise relational_db.RelationalDbEngineNotFoundError(
-        'Unsupported engine {0}'.format(engine))
-
   def _PostCreate(self):
     """Perform general post create operations on the cluster.
 
@@ -624,7 +586,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     super()._PostCreate()
 
     if not self.is_managed_db:
-      self.port = self.GetDefaultPort()
       self.client_vm_query_tools.InstallPackages()
     else:
       need_ha_modification = self.spec.engine in _RDS_ENGINES
@@ -801,7 +762,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     """
     json_output = self._DescribeInstance(instance_id)
     self.endpoint = self._ParseEndpointFromInstance(json_output)
-    self.port = self._ParsePortFromInstance(json_output)
 
   def _GetPortsForClusterInstance(self, cluster_id):
     """Assigns the ports and endpoints from the cluster_id to self.
@@ -810,7 +770,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     """
     json_output = self._DescribeCluster(cluster_id)
     self.endpoint = self._ParseEndpointFromCluster(json_output)
-    self.port = self._ParsePortFromCluster(json_output)
 
   def _AssertClientAndDbInSameRegion(self):
     """Asserts that the client vm is in the same region requested by the server.

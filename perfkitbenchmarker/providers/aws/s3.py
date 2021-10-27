@@ -175,7 +175,7 @@ class S3Service(object_storage_service.ObjectStorageService):
                                                   AWS_CREDENTIAL_LOCATION),
         AWS_CREDENTIAL_LOCATION)
     vm.PushFile(object_storage_service.FindBotoFile(),
-                object_storage_service.DEFAULT_BOTO_LOCATION)
+                object_storage_service.DEFAULT_BOTO_LOCATION_USER)
 
   def CleanupVM(self, vm):
     vm.Uninstall('awscli')

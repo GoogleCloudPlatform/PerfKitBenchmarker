@@ -57,6 +57,9 @@
 -   Add Azure support for VM stop start benchmark.
 -   Add `--os_type=debian11` support for GCP, AWS and Azure Providers.
 -   Add cURL benchmark for object storage.
+-   Add vbench video encoding benchmark to PKB.
+-   Add Kubernetes based DPB Service for Spark
+
 
 ### Enhancements:
 
@@ -113,6 +116,8 @@
     collect the cpu data for each workload (differentiated by workload_index);
     the time window estimation is also more accurate.
 -   Support default subnets in --aws_subnet with `default` as value passed.
+-   Add Unsupported config failure substatus for runs that are not supported by
+    the cloud.
 
 ### Bug fixes and maintenance updates:
 
@@ -165,6 +170,9 @@
 -   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
     resources can be cleaned up on cancellation.
 -   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
-    in the case of table loading failures.
+    in the case of table loading failures. --ycsb_insert_error_metric can be
+    used to determine which metric indicates that loading failed (defaults to
+    'insert Return=ERROR').
 -   Enable the aggregation for "Return=NOT_FOUND" errors.
 -   Added no_proxy flag for proxy settings
+-   Stop attempting to delete PKB resources that failed to create.

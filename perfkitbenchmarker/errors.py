@@ -186,6 +186,10 @@ class Benchmarks(object):
     recommended that the benchmark be completely re-run.
     """
 
+  class UnsupportedConfigError(Error):
+    """Errors due to an unsupported configuration running."""
+    pass
+
 
 class Resource(object):
   """Errors related to resource creation and deletion."""

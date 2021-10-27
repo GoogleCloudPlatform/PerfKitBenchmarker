@@ -894,13 +894,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(stderr)
     if 'InstanceLimitExceeded' in stderr or 'VcpuLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
-    if 'RequestLimitExceeded' in stderr and FLAGS.retry_on_rate_limited:
-      raise errors.Resource.RetryableCreationError(stderr)
+    if 'RequestLimitExceeded' in stderr:
+      if FLAGS.retry_on_rate_limited:
+        raise errors.Resource.RetryableCreationError(stderr)
+      else:
+        raise errors.Benchmarks.QuotaFailure(stderr)
+
     # When launching more than 1 VM into the same placement group, there is an
     # occasional error that the placement group has already been used in a
     # separate zone. Retrying fixes this error.
     if 'InvalidPlacementGroup.InUse' in stderr:
       raise errors.Resource.RetryableCreationError(stderr)
+    if 'Unsupported' in stderr:
+      raise errors.Benchmarks.UnsupportedConfigError(stderr)
     if retcode:
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
@@ -1036,7 +1042,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Start(self):
     """Starts the VM."""
     if not self.id:
-      raise errors.Benchmarks.VmStateError(
+      raise errors.Benchmarks.RunError(
           'Expected VM id to be non-null. Please make sure the VM exists.')
     start_cmd = util.AWS_PREFIX + [
         'ec2', 'start-instances',
@@ -1051,7 +1057,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Stop(self):
     """Stops the VM."""
     if not self.id:
-      raise errors.Benchmarks.VmStateError(
+      raise errors.Benchmarks.RunError(
           'Expected VM id to be non-null. Please make sure the VM exists.')
     stop_cmd = util.AWS_PREFIX + [
         'ec2', 'stop-instances',

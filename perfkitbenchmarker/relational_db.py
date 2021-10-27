@@ -134,7 +134,16 @@ POSTGRES_HBA_CONFIG = 'pg_hba.conf'
 POSTGRES_CONFIG = 'postgresql.conf'
 POSTGRES_CONFIG_PATH = '/etc/postgresql/{0}/main/'
 
-UNMANAGED_SQL_SERVER_PORT = 1433
+DEFAULT_MYSQL_PORT = 3306
+DEFAULT_POSTGRES_PORT = 5432
+DEFAULT_SQLSERVER_PORT = 1433
+
+DEFAULT_PORTS = {
+    sql_engine_utils.MYSQL: DEFAULT_MYSQL_PORT,
+    sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_PORT,
+    sql_engine_utils.SQLSERVER: DEFAULT_SQLSERVER_PORT,
+}
+
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
 
@@ -204,6 +213,8 @@ class BaseRelationalDb(resource.BaseResource):
     """
     super(BaseRelationalDb, self).__init__()
     self.spec = relational_db_spec
+    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+    self.port = self.GetDefaultPort()
     if not FLAGS.use_managed_db:
       if self.spec.high_availability:
         raise UnsupportedError('High availability is unsupported for unmanaged '
@@ -263,7 +274,7 @@ class BaseRelationalDb(resource.BaseResource):
   def client_vm_query_tools(self):
     if not hasattr(self, '_client_vm_query_tools'):
       connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, self.endpoint,
+          self.spec.engine, self.spec.engine_version, self.endpoint, self.port,
           self.spec.database_username, self.spec.database_password)
       self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
           self.client_vm, connection_properties)
@@ -273,7 +284,7 @@ class BaseRelationalDb(resource.BaseResource):
   def server_vm_query_tools(self):
     if not hasattr(self, '_server_vm_query_tools'):
       connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, 'localhost',
+          self.spec.engine, self.spec.engine_version, 'localhost', self.port,
           self.spec.database_username, self.spec.database_password)
       self._server_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
           self.server_vm, connection_properties)
@@ -454,10 +465,7 @@ class BaseRelationalDb(resource.BaseResource):
       stdout, stderr = self.server_vm.RemoteCommand(
           'sudo service postgresql status')
       return stdout and not stderr
-
     elif self.spec.engine == sql_engine_utils.SQLSERVER:
-      self.server_vm.firewall.AllowPort(self.server_vm,
-                                        UNMANAGED_SQL_SERVER_PORT)
       return True
 
     raise UnsupportedError('%s engine is not supported '
@@ -754,7 +762,7 @@ class BaseRelationalDb(resource.BaseResource):
     if FLAGS.db_flags:
       for flag in FLAGS.db_flags:
         _, stderr, _ = self.client_vm_query_tools.IssueSqlCommand(
-            'SET %s;' % flag, raise_on_failure=False)
+            'SET %s;' % flag, ignore_failure=True)
         if stderr:
           raise Exception('Invalid MySQL flags: %s' % stderr)
 
@@ -768,6 +776,14 @@ class BaseRelationalDb(resource.BaseResource):
         self.server_vm.RemoteCommand('sudo sh -c \'echo %s >> %s\'' %
                                      (flag, postgres_conf_file))
       self.server_vm.RemoteCommand('sudo systemctl restart postgresql')
+
+  def GetDefaultPort(self):
+    """Returns default port for the db engine from the spec."""
+    engine = sql_engine_utils.GetDbEngineType(self.spec.engine)
+    if engine not in DEFAULT_PORTS:
+      raise NotImplementedError('Default port not specified for '
+                                'engine {0}'.format(engine))
+    return DEFAULT_PORTS[engine]
 
   def PrintUnmanagedDbStats(self):
     """Print server logs on unmanaged db."""

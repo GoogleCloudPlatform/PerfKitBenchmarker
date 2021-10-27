@@ -20,6 +20,7 @@ import re
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import regex_util
 
 flags.DEFINE_integer(
@@ -94,12 +95,17 @@ def _CopyTar(vm):
   Tries local data directory first, then NET_PERF_URL
   """
 
-  try:
-    vm.PushDataFile(NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))
-  except data.ResourceNotFound:
-    vm.Install('curl')
-    vm.RemoteCommand(
-        f'curl {NETPERF_URL} -L -o {linux_packages.INSTALL_DIR}/{NETPERF_TAR}')
+  # Kubernetes VMs sometimes fail to copy the whole archive
+  if vm.CLOUD != providers.KUBERNETES:
+    try:
+      vm.PushDataFile(
+          NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))
+      return
+    except data.ResourceNotFound:
+      pass
+  vm.Install('curl')
+  vm.RemoteCommand(
+      f'curl {NETPERF_URL} -L -o {linux_packages.INSTALL_DIR}/{NETPERF_TAR}')
 
 
 def YumInstall(vm):

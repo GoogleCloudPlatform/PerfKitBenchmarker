@@ -135,6 +135,7 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
         AwsResponse(EXISTS_NONE_RESPONSE),
     ]
     pg = CreateAwsPlacementGroup()
+    pg.created = True
     pg.Delete()
     self.assertAwsCommands(DELETE_CALL, EXISTS_CALL)
 

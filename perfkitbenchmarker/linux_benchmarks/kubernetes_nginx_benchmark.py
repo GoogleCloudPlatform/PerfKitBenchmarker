@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs wrk2 clients against replicated nginx servers behind a load balancer."""
 
 import functools
@@ -20,7 +19,6 @@ import shutil
 import tempfile
 
 from absl import flags
-import jinja2
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
@@ -74,25 +72,15 @@ def GetConfig(user_config):
   return config
 
 
-def _CreateRenderedManifestFile(filename, config):
-  """Returns a file containing a rendered Jinja manifest (.j2) template."""
-  manifest_filename = data.ResourcePath(filename)
-  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-  with open(manifest_filename) as manifest_file:
-    manifest_template = environment.from_string(manifest_file.read())
-  rendered_yaml = tempfile.NamedTemporaryFile(mode='w')
-  rendered_yaml.write(manifest_template.render(config))
-  rendered_yaml.flush()
-  return rendered_yaml
-
-
 def _CreateNginxConfigMapDir():
   """Returns a TemporaryDirectory containing files in the Nginx ConfigMap."""
   if FLAGS.nginx_conf:
     nginx_conf_filename = FLAGS.nginx_conf
   else:
-    nginx_conf_filename = (
-        data.ResourcePath('container/kubernetes_nginx/http.conf'))
+    relative_nginx_conf_filename = 'container/kubernetes_nginx/http.conf'
+    if FLAGS.nginx_use_ssl:
+      relative_nginx_conf_filename = 'container/kubernetes_nginx/https.conf'
+    nginx_conf_filename = data.ResourcePath(relative_nginx_conf_filename)
 
   temp_dir = tempfile.TemporaryDirectory()
   config_map_filename = os.path.join(temp_dir.name, 'default')
@@ -108,13 +96,17 @@ def _PrepareCluster(benchmark_spec):
   container_image = benchmark_spec.container_specs['kubernetes_nginx'].image
   replicas = benchmark_spec.container_cluster.num_nodes
 
-  with _CreateRenderedManifestFile(
-      'container/kubernetes_nginx/kubernetes_nginx.yaml.j2', {
-          'nginx_image': container_image,
-          'nginx_replicas': replicas,
-          'nginx_content_size': FLAGS.nginx_content_size,
-      }) as rendered_manifest:
-    benchmark_spec.container_cluster.ApplyManifest(rendered_manifest.name)
+  nginx_port = 80
+  if FLAGS.nginx_use_ssl:
+    nginx_port = 443
+
+  benchmark_spec.container_cluster.ApplyManifest(
+      'container/kubernetes_nginx/kubernetes_nginx.yaml.j2',
+      nginx_image=container_image,
+      nginx_replicas=replicas,
+      nginx_content_size=FLAGS.nginx_content_size,
+      nginx_port=nginx_port,
+      nginx_worker_connections=FLAGS.nginx_worker_connections)
 
   benchmark_spec.container_cluster.WaitForResource(
       'deploy/nginx-deployment', 'available')

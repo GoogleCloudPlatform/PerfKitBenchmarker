@@ -5,6 +5,9 @@ for compiling FFmpeg.
 """
 from absl import flags
 
+_BUILD_FFMPEG_FROM_SOURCE = flags.DEFINE_boolean(
+    'build_ffmpeg_from_source', False, 'Whether to build ffmpeg from source')
+
 FLAGS = flags.FLAGS
 
 _APT_DEPS = [
@@ -23,6 +26,10 @@ def YumInstall(unused_vm):
 
 def AptInstall(vm):
   """Installs FFmpeg on systems with the apt package manager."""
+  if not _BUILD_FFMPEG_FROM_SOURCE.value:
+    vm.InstallPackages('ffmpeg')
+    return
+
   vm.InstallPackages(' '.join(_APT_DEPS))
   vm.Install('build_tools')
 

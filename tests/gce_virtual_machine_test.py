@@ -715,6 +715,38 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(errors.Resource.CreationError):
         vm._Create()
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name':
+              'unsupported_machine_type',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) Could not '
+              "fetch resource: - Invalid value for field 'resource.machineType'"
+              ": 'https://compute.googleapis.com/compute/v1/projects/"
+              "control-plane-tests/zones/us-west3-c/machineTypes/n2-standard-2'"
+              ". Machine type with name 'n2-standard-2' does not exist in zone "
+              "'us-west3-c'."
+          )
+      }, {
+          'testcase_name':
+              'unsupported_resource',
+          'fake_stderr':
+              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
+               "resource: - The resource 'projects/bionic-baton-343/zones/"
+               "us-west4-c/acceleratorTypes/nvidia-tesla-v100' was not found")
+      })
+  def testCreateVMUnsupportedConfig(self, fake_stderr):
+    fake_rets = [('stdout', fake_stderr, 1)]
+    with PatchCriticalObjects(fake_rets):
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
+        vm._Create()
+
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(

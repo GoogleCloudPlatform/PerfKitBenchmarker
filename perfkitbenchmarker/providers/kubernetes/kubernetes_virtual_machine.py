@@ -17,6 +17,7 @@
 
 import json
 import logging
+import os
 import posixpath
 
 from absl import flags
@@ -24,7 +25,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
-from perfkitbenchmarker import  linux_virtual_machine
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -44,7 +45,6 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Kubernetes POD."""
   CLOUD = providers.KUBERNETES
   DEFAULT_IMAGE = None
-  CONTAINER_COMMAND = None
   HOME_DIR = '/root'
   IS_REBOOTABLE = False
 
@@ -300,8 +300,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if resource_body:
       container['resources'] = resource_body
 
-    if self.CONTAINER_COMMAND:
-      container['command'] = self.CONTAINER_COMMAND
+    # Tail /dev/null as a means of keeping the container alive.
+    container['command'] = ['tail', '-f', '/dev/null']
 
     return container
 
@@ -364,7 +364,8 @@ class DebianBasedKubernetesVirtualMachine(
           suppress_warning=suppress_warning, timeout=timeout,
           raise_on_failure=False)
       # Check for ephemeral connection issues.
-      if not (retcode == 1 and 'error dialing backend: ssh' in stderr):
+      if not (retcode == 1 and ('error dialing backend: ssh' in stderr or
+                                'connect: connection timed out' in stderr)):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if not ignore_failure and retcode:
@@ -388,13 +389,15 @@ class DebianBasedKubernetesVirtualMachine(
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
     target.RemoteHostCopy(file_name, remote_path)
 
-  def RemoteHostCopy(self, file_path, remote_path='', copy_to=True):
+  def RemoteHostCopy(self, file_path, remote_path='', copy_to=True,
+                     retries=None):
     """Copies a file to or from the VM.
 
     Args:
       file_path: Local path to file.
       remote_path: Optional path of where to copy file on remote host.
       copy_to: True to copy to vm, False to copy from vm.
+      retries: Number of attempts for the copy
 
     Raises:
       RemoteCommandError: If there was a problem copying the file.
@@ -405,35 +408,54 @@ class DebianBasedKubernetesVirtualMachine(
     else:
       remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
       remote_path = remote_path.strip()
+      file_name = posixpath.basename(remote_path)
       src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
-    cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-           'cp', src_spec, dest_spec]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retries is None:
+      retries = FLAGS.ssh_retries
+    for _ in range(retries):
+      cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
+             'cp', src_spec, dest_spec]
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          cmd, raise_on_failure=False)
+      if not (retcode == 1 and ('error dialing backend: ssh' in stderr or
+                                'connect: connection timed out' in stderr)):
+        break
+      logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'STDOUT: %sSTDERR: %s' %
                     (retcode, ' '.join(cmd), stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     if copy_to:
-      file_name = posixpath.basename(file_path)
       remote_path = remote_path or file_name
       self.RemoteCommand('mv %s %s; chmod 777 %s' %
                          (file_name, remote_path, remote_path))
+    # Validate file sizes
+    # Sometimes kubectl cp seems to gracefully truncate the file.
+    local_size = os.path.getsize(file_path)
+    stdout, _ = self.RemoteCommand(f'stat -c %s {remote_path}')
+    remote_size = int(stdout)
+    if local_size != remote_size:
+      raise errors.VirtualMachine.RemoteCommandError(
+          f'Failed to copy {file_name}. '
+          f'Remote size {remote_size} != local size {local_size}')
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def PrepareVMEnvironment(self):
+    # Install sudo as most PrepareVMEnvironment assume it exists.
+    self.RemoteCommand(_install_sudo_command())
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
     # Don't rely on SSH being installed in Kubernetes containers,
     # so install it and restart the service so that it is ready to go.
     # Although ssh is not required to connect to the container, MPI
     # benchmarks require it.
+    # TODO(pclay): make optional
     self.InstallPackages('ssh')
     self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
     self.RemoteCommand('mkdir -p ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
-    self.Install('python')
 
     # cpio is needed for the MKL math library.
     # software-properties-common is needed for add-apt-repository
@@ -528,29 +550,25 @@ class DebianBasedKubernetesVirtualMachine(
     return self.TryRemoteCommand(stat_function(module_name, filename))
 
 
-def _install_sudo_command():
-  """Return a bash command that installs sudo and runs tail indefinitely.
+def _install_sudo_command() -> str:
+  """Return a bash command that installs sudo.
 
   This is useful for some docker images that don't have sudo installed.
 
   Returns:
-    a sequence of arguments that use bash to install sudo and never run
-    tail indefinitely.
+    a sequence of arguments that use bash to install sudo
   """
   # The canonical ubuntu images as well as the nvidia/cuda
   # image do not have sudo installed so install it and configure
   # the sudoers file such that the root user's environment is
-  # preserved when running as sudo. Then run tail indefinitely so that
-  # the container does not exit.
-  container_command = ' && '.join([
+  # preserved when running as sudo.
+  return ' && '.join([
       'apt-get update',
       'apt-get install -y sudo',
       'sed -i \'/env_reset/d\' /etc/sudoers',
       'sed -i \'/secure_path/d\' /etc/sudoers',
       'sudo ldconfig',
-      'tail -f /dev/null',
   ])
-  return ['bash', '-c', container_command]
 
 # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
 # Note that they do not include all packages that are typically
@@ -562,13 +580,11 @@ def _install_sudo_command():
 class Ubuntu1804BasedKubernetesVirtualMachine(
     DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin):
   DEFAULT_IMAGE = 'ubuntu:18.04'
-  CONTAINER_COMMAND = _install_sudo_command()
 
 
 class Ubuntu1604BasedKubernetesVirtualMachine(
     DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
   DEFAULT_IMAGE = 'ubuntu:16.04'
-  CONTAINER_COMMAND = _install_sudo_command()
 
 
 class Ubuntu1604Cuda9BasedKubernetesVirtualMachine(
@@ -576,4 +592,3 @@ class Ubuntu1604Cuda9BasedKubernetesVirtualMachine(
     linux_virtual_machine.Ubuntu1604Cuda9Mixin):
   # Image is from https://hub.docker.com/r/nvidia/cuda/
   DEFAULT_IMAGE = 'nvidia/cuda:9.0-devel-ubuntu16.04'
-  CONTAINER_COMMAND = _install_sudo_command()

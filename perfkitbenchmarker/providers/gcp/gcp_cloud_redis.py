@@ -26,12 +26,15 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import gcp
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 STANDARD_TIER = 'STANDARD'
 BASIC_TIER = 'BASIC'
 COMMAND_TIMEOUT = 600  # 10 minutes
+# Default redis api endpoint
+API_ENDPOINT = 'https://redis.googleapis.com/'
 
 
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
@@ -51,6 +54,10 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       self.tier = BASIC_TIER
     elif self.failover_style == managed_memory_store.Failover.FAILOVER_SAME_REGION:
       self.tier = STANDARD_TIER
+    cmd = util.GcloudCommand(self, 'config', 'set',
+                             'api_endpoint_overrides/redis',
+                             gcp_flags.API_OVERRIDE.value)
+    cmd.Issue()
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -109,6 +116,10 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete', self.name)
     cmd.flags['region'] = self.redis_region
     cmd.Issue(timeout=COMMAND_TIMEOUT, raise_on_failure=False)
+    reset_cmd = util.GcloudCommand(self, 'config', 'set',
+                                   'api_endpoint_overrides/redis',
+                                   'https://redis.googleapis.com/')
+    reset_cmd.Issue(timeout=COMMAND_TIMEOUT, raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the instance exists."""

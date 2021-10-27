@@ -18,10 +18,12 @@
 import os
 
 import unittest
+from unittest import mock
+
 from absl import flags as flgs
 import contextlib2
-import mock
 
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -175,7 +177,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testPostCreate(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with patch_critical_objects() as issue_command, mock.patch.object(
+        container_service, 'RunKubectlCommand') as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -185,6 +188,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
           'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
           command_string)
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
+
+      self.assertEqual(mock_kubectl_command.call_count, 1)
 
   def testDelete(self):
     spec = self.create_kubernetes_engine_spec()
@@ -357,7 +362,8 @@ class GoogleKubernetesEngineWithGpusTestCase(
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
   def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with patch_critical_objects() as issue_command, mock.patch.object(
+        container_service, 'RunKubectlCommand') as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -367,6 +373,8 @@ class GoogleKubernetesEngineWithGpusTestCase(
           'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
           command_string)
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
+
+      self.assertEqual(mock_kubectl_command.call_count, 1)
 
       expected_args_to_create_from_file = (
           _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT,

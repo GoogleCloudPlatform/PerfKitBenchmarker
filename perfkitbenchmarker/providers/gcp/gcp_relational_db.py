@@ -66,20 +66,17 @@ DEFAULT_MYSQL_VERSION = '5.7'
 DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_SQL_SERVER_VERSION = '2017_Standard'
 
-DEFAULT_MYSQL_PORT = 3306
-DEFAULT_POSTGRES_PORT = 5432
-DEFAULT_SQLSERVER_PORT = 1433
-
-DEFAULT_PORTS = {
-    sql_engine_utils.MYSQL: DEFAULT_MYSQL_PORT,
-    sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_PORT,
-    sql_engine_utils.SQLSERVER: DEFAULT_SQLSERVER_PORT,
-}
-
 DEFAULT_ENGINE_VERSIONS = {
     sql_engine_utils.MYSQL: DEFAULT_MYSQL_VERSION,
     sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_VERSION,
     sql_engine_utils.SQLSERVER: DEFAULT_SQL_SERVER_VERSION,
+}
+
+# TODO(chunla): Move to engine specific module
+DEFAULT_USERNAME = {
+    sql_engine_utils.MYSQL: 'root',
+    sql_engine_utils.POSTGRES: 'postgres',
+    sql_engine_utils.SQLSERVER: 'sqlserver',
 }
 
 # PostgreSQL restrictions on memory.
@@ -110,7 +107,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
     self.project = FLAGS.project or util.GetDefaultProject()
-    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
     self.unmanaged_db_exists = None if self.is_managed_db else False
 
@@ -206,7 +202,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         self.endpoint = self.server_vm.ip_address
         self.firewall = gce_network.GceFirewall()
         self.firewall.AllowPort(
-            self.server_vm, 3306, source_range=[self.client_vm.ip_address])
+            self.server_vm, self.port, source_range=[self.client_vm.ip_address])
       self.unmanaged_db_exists = True
 
   def _GetHighAvailabilityFlag(self):
@@ -349,7 +345,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    self.port = self._GetDefaultPort(self.spec.engine)
     if not self.is_managed_db:
       return self._IsReadyUnmanaged()
 
@@ -396,16 +391,15 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           '--password={0}'.format(self.spec.database_password))
       _, _, _ = cmd.Issue()
 
-      # this is a fix for b/71594701
-      # by default the empty password on 'postgres'
-      # is a security violation.  Change the password to a non-default value.
-      if self.spec.engine == sql_engine_utils.POSTGRES:
-        cmd = util.GcloudCommand(
-            self, 'sql', 'users', 'set-password', 'postgres',
-            '--host=dummy_host', '--instance={0}'.format(self.instance_id),
-            '--password={0}'.format(self.spec.database_password))
-        _, _, _ = cmd.Issue()
+      # By default the empty password is a security violation.
+      # Change the password to a non-default value.
+      default_user = DEFAULT_USERNAME[self.spec.engine]
 
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'set-password', default_user,
+          '--host=dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
     self.client_vm_query_tools.InstallPackages()
 
   def _ApplyManagedDbFlags(self):
@@ -481,14 +475,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           'versions include {1}'.format(version, valid_versions))
 
     return version_mapping[version]
-
-  @staticmethod
-  def _GetDefaultPort(engine):
-    """Returns default port for the db engine from the spec."""
-    if engine not in DEFAULT_PORTS:
-      raise NotImplementedError('Default port not specified for '
-                                'engine {0}'.format(engine))
-    return DEFAULT_PORTS[engine]
 
   def _FailoverHA(self):
     """Fail over from master to replica."""

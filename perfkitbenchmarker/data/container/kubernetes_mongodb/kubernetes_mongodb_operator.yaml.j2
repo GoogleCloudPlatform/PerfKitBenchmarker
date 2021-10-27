@@ -1,0 +1,98 @@
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: mongodb
+spec:
+  members: 1
+  type: ReplicaSet
+  version: "4.4.9"
+  security:
+    authentication:
+      modes: ["SCRAM"]
+  users:
+  - name: admin
+    db: admin
+    passwordSecretRef: # a reference to the secret that will be used to generate the user's password
+      name: admin-password
+    roles:
+    - name: clusterAdmin
+      db: admin
+    - name: userAdminAnyDatabase
+      db: admin
+    - name: dbAdminAnyDatabase
+      db: admin
+    scramCredentialsSecretName: my-scram-admin
+  - name: ycsb
+    db: ycsb
+    passwordSecretRef: # a reference to the secret that will be used to generate the user's password
+      name: admin-password
+    roles:
+    - name: readWrite
+      db: ycsb
+    - name: clusterAdmin
+      db: ycsb
+    - name: userAdminAnyDatabase
+      db: ycsb
+    - name: dbAdminAnyDatabase
+      db: ycsb
+    scramCredentialsSecretName: my-scram-ycsb
+  additionalMongodConfig:
+    storage.wiredTiger.engineConfig.journalCompressor: zlib
+  statefulSet:
+    spec:
+      selector: { }
+      template:
+        spec:
+          containers:
+          - name: mongod
+            image: mongo:4.4.9@sha256:e3162aec7b6adc18c900e606053cddb4db4002190c63b788ec6a52adcfdc237a
+            resources:
+              requests:
+                cpu: {{ cpu_request }}
+                memory: {{ memory_request }}
+              limits:
+                cpu: {{ cpu_limit }}
+                memory: {{ memory_limit }}
+          - name: mongodb-agent
+            resources:
+              limits:
+                cpu: "0.1"
+                memory: 500Mi
+              requests:
+                cpu: "0.05"
+                memory: 500Mi
+      # Specifies a size for the data volume different from the default 10Gi
+      volumeClaimTemplates:
+      - metadata:
+          name: data-volume
+        spec:
+          storageClassName: {{ storage_class }}
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: {{ disk_size }}
+
+# the user credentials will be generated from this secret
+# once the credentials are generated, this secret is no longer required
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-password
+type: Opaque
+stringData:
+  password: "{{ admin_password }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  labels:
+    name: mongo
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-svc
+  type: LoadBalancer

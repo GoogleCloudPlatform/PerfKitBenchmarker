@@ -21,7 +21,10 @@ import logging
 import os
 import posixpath
 import time
+from typing import Dict
+
 from absl import flags
+from packaging import version
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
@@ -30,7 +33,8 @@ from perfkitbenchmarker.linux_packages import hadoop
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('spark_version', '3.1.2', 'Version of spark.')
+SPARK_VERSION_FLAG = flags.DEFINE_string('spark_version', '3.1.2',
+                                         'Version of spark.')
 
 DATA_FILES = [
     'spark/spark-defaults.conf.j2', 'spark/spark-env.sh.j2', 'spark/workers.j2'
@@ -43,6 +47,25 @@ SPARK_CONF_DIR = posixpath.join(SPARK_DIR, 'conf')
 SPARK_PRIVATE_KEY = posixpath.join(SPARK_CONF_DIR, 'spark_keyfile')
 
 SPARK_SUBMIT = posixpath.join(SPARK_BIN, 'spark-submit')
+
+
+def _SparkVersion() -> version.Version:
+  return version.Version(SPARK_VERSION_FLAG.value)
+
+
+def _ScalaVersion() -> version.Version:
+  if _SparkVersion().major >= 3:
+    # https://spark.apache.org/docs/3.0.0/#downloading
+    return version.Version('2.12')
+  else:
+    # https://spark.apache.org/docs/2.4.0/#downloading
+    return version.Version('2.11')
+
+
+def SparkExamplesJarPath() -> str:
+  return posixpath.join(
+      SPARK_DIR, 'examples/jars/',
+      f'spark-examples_{_ScalaVersion()}-{_SparkVersion()}.jar')
 
 
 def CheckPrerequisites():
@@ -59,8 +82,8 @@ def Install(vm):
   vm.Install('openjdk')
   vm.Install('python3')
   vm.Install('curl')
-  # Needed for HDFS not as a dependency (our Spark ships with Hadoop 3.2 client
-  # libraries)
+  # Needed for HDFS not as a dependency.
+  # Also used on Spark's classpath to support s3a client.
   vm.Install('hadoop')
   spark_url = ('https://downloads.apache.org/spark/spark-{0}/'
                'spark-{0}-bin-without-hadoop.tgz').format(FLAGS.spark_version)
@@ -71,8 +94,38 @@ def Install(vm):
 
 # Scheduling constants.
 # Give 90% of VM memory to Spark for scheduling.
-# This is roguhly consistent with Dataproc 2.0+
+# This is roughly consistent with Dataproc 2.0+
 SPARK_MEMORY_FRACTION = 0.9
+SPARK_DRIVER_MEMORY = 'spark.driver.memory'
+SPARK_WORKER_MEMORY = 'spark.executor.memory'
+SPARK_WORKER_VCPUS = 'spark.executor.cores'
+
+
+def GetConfiguration(driver_memory_mb: int,
+                     worker_memory_mb: int,
+                     worker_cores: int,
+                     num_workers: int,
+                     configure_s3: bool = False) -> Dict[str, str]:
+  """Calculate Spark configuration. Shared between VMs and k8s."""
+  conf = {
+      SPARK_DRIVER_MEMORY: f'{driver_memory_mb}m',
+      SPARK_WORKER_MEMORY: f'{worker_memory_mb}m',
+      SPARK_WORKER_VCPUS: str(worker_cores),
+      'spark.executor.instances': str(num_workers),
+      # Tell spark not to run job if it can't schedule all workers. This would
+      # silently degrade performance.
+      'spark.scheduler.minRegisteredResourcesRatio': '1'
+  }
+  if configure_s3:
+    # Configure S3A Hadoop's S3 filesystem
+    aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
+    conf.update({
+        # Use s3:// scheme to be consistent with EMR
+        'spark.hadoop.fs.s3.impl': 'org.apache.hadoop.fs.s3a.S3AFileSystem',
+        'spark.hadoop.fs.s3a.access.key': aws_access_key,
+        'spark.hadoop.fs.s3a.secret.key': aws_secret_key,
+    })
+  return conf
 
 
 def _RenderConfig(vm,
@@ -87,6 +140,13 @@ def _RenderConfig(vm,
   worker_memory_mb = int((worker.total_memory_kb / 1024) * memory_fraction)
   driver_memory_mb = int((leader.total_memory_kb / 1024) * memory_fraction)
 
+  spark_conf = GetConfiguration(
+      driver_memory_mb=driver_memory_mb,
+      worker_memory_mb=worker_memory_mb,
+      worker_cores=worker_cores,
+      num_workers=len(workers),
+      configure_s3=configure_s3)
+
   if vm.scratch_disks:
     # TODO(pclay): support multiple scratch disks. A current suboptimal
     # workaround is RAID0 local_ssds with --num_striped_disks.
@@ -94,23 +154,21 @@ def _RenderConfig(vm,
   else:
     scratch_dir = posixpath.join('/tmp/pkb/local_scratch', 'spark')
 
-  aws_access_key = None
-  aws_secret_key = None
+  optional_tools = None
   if configure_s3:
-    aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
+    optional_tools = 'hadoop-aws'
 
   context = {
+      'spark_conf': spark_conf,
       'leader_ip': leader.internal_ip,
       'worker_ips': [vm.internal_ip for vm in workers],
       'scratch_dir': scratch_dir,
       'worker_vcpus': worker_cores,
       'spark_private_key': SPARK_PRIVATE_KEY,
-      'worker_memory_mb': worker_memory_mb,
-      'driver_memory_mb': driver_memory_mb,
+      'worker_memory': spark_conf[SPARK_WORKER_MEMORY],
       'hadoop_cmd': hadoop.HADOOP_CMD,
       'python_cmd': 'python3',
-      'aws_access_key': aws_access_key,
-      'aws_secret_key': aws_secret_key,
+      'optional_tools': optional_tools
   }
 
   for file_name in DATA_FILES:

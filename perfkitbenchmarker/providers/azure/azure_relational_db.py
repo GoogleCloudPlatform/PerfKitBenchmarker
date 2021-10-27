@@ -31,11 +31,8 @@ DEFAULT_DATABASE_NAME = 'database'
 FLAGS = flags.FLAGS
 
 DEFAULT_MYSQL_VERSION = '5.7'
-DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_VERSION = '9.6'
-DEFAULT_POSTGRES_PORT = 5432
 DEFALUT_SQLSERVER_VERSION = 'DEFAULT'
-DEFAULT_SQLSERVER_PORT = 1433
 
 # Disk size configurations details at
 # https://docs.microsoft.com/en-us/cli/azure/mysql/server?view=azure-cli-latest#az_mysql_server_create
@@ -79,7 +76,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def __init__(self, relational_db_spec):
     super(AzureRelationalDb, self).__init__(relational_db_spec)
-    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     if util.IsZone(self.spec.db_spec.zone):
       raise errors.Config.InvalidValue(
           'Availability zones are currently not supported by Azure DBs')
@@ -131,25 +127,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     else:
       raise relational_db.RelationalDbEngineNotFoundError(
           'Unsupported engine {0}'.format(engine))
-
-  def GetDefaultPort(self):
-    """Returns the default port of a given database engine.
-
-    Returns:
-      (string): Default port
-    Raises:
-      RelationalDbEngineNotFoundError: if an unknown engine is
-                                                  requested.
-    """
-    engine = self.spec.engine
-    if engine == sql_engine_utils.POSTGRES:
-      return DEFAULT_POSTGRES_PORT
-    elif engine == sql_engine_utils.MYSQL:
-      return DEFAULT_MYSQL_PORT
-    elif engine == sql_engine_utils.SQLSERVER:
-      return DEFAULT_SQLSERVER_PORT
-    raise relational_db.RelationalDbEngineNotFoundError(
-        'Unsupported engine {0}'.format(engine))
 
   def GetAzCommandForEngine(self):
     engine = self.spec.engine
@@ -400,7 +377,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     self.firewall = azure_network.AzureFirewall()
     self.firewall.AllowPort(
         self.server_vm,
-        self.GetDefaultPort(),
+        self.port,
         source_range=['%s/32' % self.client_vm.ip_address])
 
   def _Create(self):
@@ -478,7 +455,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
     """
     super()._PostCreate()
-    self.port = self.GetDefaultPort()
 
     if self.is_managed_db:
       cmd = [

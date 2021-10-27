@@ -77,7 +77,7 @@ _DATA_SIZE = flags.DEFINE_integer(
     'enterprise_redis_data_size_bytes', 100,
     'The size of the data to write to redis enterprise.')
 
-_VERSION = '6.0.12-58'
+_VERSION = '6.2.4-54'
 _PACKAGE_NAME = 'redis_enterprise'
 _LICENSE = 'enterprise_redis_license'
 _WORKING_DIR = '~/redislabs'
@@ -87,15 +87,15 @@ _BIONIC_TAR = f'redislabs-{_VERSION}-bionic-amd64.tar'
 _USERNAME = 'user@google.com'
 _ONE_KILOBYTE = 1000
 PREPROVISIONED_DATA = {
-    # These checksums correspond to version 6.0.12-58. To update, run
+    # These checksums correspond to version 6.2.4-54. To update, run
     # 'sha256sum <redislabs-{VERSION}-rhel7-x86_64.tar>' and replace the values
     # below.
     _RHEL_TAR:
-        '743995f4ddf797cb1286dee4d51171df4c376530b97581efae63b0ead692fc2f',
+        'fb0b7aa5f115eb0bc2ac4fb958aaa7ad92bb260f2251a221a15b01fbdf4d2d14',
     _XENIAL_TAR:
-        'a7802b059dce6512be249462be43120a5fc156125ff0151ce66463e2abf52a6c',
+        'f78a6bb486f3dfb3e5ba9b5be86b1c880d0c76a08eb0dc4bd3aaaf9cc210406d',
     _BIONIC_TAR:
-        'a50accab0e23ecd9b0544f4810240dadeac73e566c1f11f573186bd824edba1e',
+        'dfe568958b243368c1f1c08c9cce9f660fa06e1bce38fa88f90503e344466927',
 }
 
 

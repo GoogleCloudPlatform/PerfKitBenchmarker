@@ -78,14 +78,6 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         }
     }
 
-    relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {
-        'GCP': FakeRelationalDb(None)
-    }
-
-  def tearDown(self):
-    super(RelationalDbSpecTestCase, self).tearDown()
-    relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {}
-
   def testMinimalConfig(self):
     result = benchmark_config_spec._RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
@@ -245,14 +237,6 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
             }
         }
     }
-
-    relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {
-        'GCP': FakeRelationalDb(None)
-    }
-
-  def tearDown(self):
-    super(RelationalDbFlagsTestCase, self).tearDown()
-    relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {}
 
   # Not testing this yet, because it requires the implementation
   # of a relational_db provider for the specified

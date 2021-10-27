@@ -26,10 +26,12 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GcpCloudRedisTestCase, self).setUp()
-    FLAGS.project = 'project'
-    FLAGS.zone = ['us-central1-a']
-    mock_spec = mock.Mock()
-    self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)):
+      FLAGS.project = 'project'
+      FLAGS.zone = ['us-central1-a']
+      mock_spec = mock.Mock()
+      self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
 
   def testCreate(self):
     with mock.patch.object(
@@ -42,7 +44,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         util.GcloudCommand, 'Issue', return_value=('{}', '', 0)) as gcloud:
       self.redis._Delete()
-      gcloud.assert_called_once_with(raise_on_failure=False, timeout=600)
+      gcloud.assert_called_with(raise_on_failure=False, timeout=600)
 
   def testExistTrue(self):
     with mock.patch.object(
