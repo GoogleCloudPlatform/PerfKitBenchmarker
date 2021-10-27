@@ -33,14 +33,6 @@ from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string(
-    'kubernetes_mongodb_client_machine_type', None,
-    'Machine type to use for the wrk2 client if different '
-    'from MongoDB server machine type.')
-flags.DEFINE_string(
-    'kubernetes_mongodb_server_machine_type', None,
-    'Machine type to use for the MongoDB server if different '
-    'from wrk2 client machine type.')
 flags.DEFINE_string('kubernetes_mongodb_cpu_request', '7.1',
                     'CPU request of mongodb.')
 flags.DEFINE_string('kubernetes_mongodb_memory_request', '16Gi',
@@ -61,17 +53,26 @@ BENCHMARK_CONFIG = """
 kubernetes_mongodb:
   description: Benchmarks MongoDB server performance.
   container_cluster:
-    vm_count: 3
-    vm_spec:
-      AWS:
-        zone: us-east-1a
-        machine_type: c5.xlarge
-      Azure:
-        zone: westus
-        machine_type: Standard_D3_v2
-      GCP:
-        machine_type: n2-standard-8
-        zone: us-central1-a
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec: *default_single_core
+    nodepools:
+      mongodb:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-8
+            zone: us-central1-a
+          Azure:
+            zone: westus
+            machine_type: Standard_D3_v2
+          AWS:
+            zone: us-east-1a
+            machine_type: c5.xlarge
+      clients:
+        vm_count: 1
+        vm_spec: *default_single_core
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -89,16 +90,9 @@ def GetConfig(user_config):
     loaded benchmark configuration
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.kubernetes_mongodb_client_machine_type:
-    vm_spec = config['vm_groups']['clients']['vm_spec']
-    vm_spec[FLAGS.cloud][
-        'machine_type'] = FLAGS.kubernetes_mongodb_client_machine_type
-  if FLAGS.kubernetes_mongodb_server_machine_type:
-    vm_spec = config['container_cluster']['vm_spec']
-    vm_spec[FLAGS.cloud][
-        'machine_type'] = FLAGS.kubernetes_mongodb_server_machine_type
   if FLAGS['ycsb_client_vms'].present:
-    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+    config['container_cluster']['nodepools']['mongodb']['vm_count'] = (
+        FLAGS.ycsb_client_vms)
   return config
 
 
@@ -130,7 +124,7 @@ def _PrepareDeployment(benchmark_spec):
   time.sleep(60)
 
   benchmark_spec.container_cluster.WaitForResource('pod/mongodb-0', 'Ready')
-  mongodb_cluster_ip = benchmark_spec.container_cluster.GetLoadBalancerIP(
+  mongodb_cluster_ip = benchmark_spec.container_cluster.GetClusterIP(
       'mongodb-service')
   benchmark_spec.mongodb_url = 'mongodb://ycsb:{password}@{ip_address}:27017/ycsb?authSource=ycsb'.format(
       password=admin_password, ip_address=mongodb_cluster_ip)
