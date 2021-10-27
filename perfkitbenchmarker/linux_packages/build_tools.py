@@ -27,6 +27,16 @@ flags.DEFINE_boolean('force_build_gcc_from_source', False, 'Whether to force '
 flags.DEFINE_boolean('build_fortran', False, 'Whether to build fortran '
                      'alongside c and c++ when building GCC.')
 
+GCC_TAR = 'gcc-{version}.tar.gz'
+GCC_URL = 'https://ftp.gnu.org/gnu/gcc/gcc-{version}/' + GCC_TAR
+PREPROVISIONED_DATA = {
+    GCC_TAR.format(version='9.2.0'):
+        'a931a750d6feadacbeecb321d73925cd5ebb6dfa7eff0802984af3aef63759f4'
+}
+PACKAGE_DATA_URL = {
+    GCC_TAR.format(version='9.2.0'): GCC_URL.format(version='9.2.0')
+}
+
 
 def YumInstall(vm):
   """Installs build tools on the VM."""
@@ -57,9 +67,14 @@ def BuildGccFromSource(vm, gcc_version):
 
   # build GCC on scratch disks for speed if possible
   build_dir = vm.GetScratchDir() if vm.scratch_disks else 'build_tools'
-  vm.RemoteCommand(f'cd {build_dir} && wget https://ftp.gnu.org/gnu/gcc/gcc-'
-                   f'{gcc_version}/gcc-{gcc_version}.tar.gz')
-  vm.RemoteCommand(f'cd {build_dir} && tar xzvf gcc-{gcc_version}.tar.gz')
+  gcc_tar = GCC_TAR.format(version=gcc_version)
+  if gcc_tar in PREPROVISIONED_DATA:
+    vm.InstallPreprovisionedPackageData(
+        'build_tools', PREPROVISIONED_DATA.keys(), build_dir)
+  else:
+    vm.RemoteCommand(f'cd {build_dir} && '
+                     f'wget {GCC_URL.format(version=gcc_version)}')
+  vm.RemoteCommand(f'cd {build_dir} && tar xzvf {gcc_tar}')
   vm.RemoteCommand(f'cd {build_dir} && mkdir -p obj.gcc-{gcc_version}')
   vm.RemoteCommand(f'cd {build_dir}/gcc-{gcc_version} && '
                    './contrib/download_prerequisites')
@@ -106,7 +121,7 @@ def GetVersionInfo(vm, pkg):
   return out.splitlines()[0] if out else None
 
 
-def Reinstall(vm, version='4.7'):
+def Reinstall(vm, version: str):
   """Install specific version of gcc.
 
   Args:
