@@ -103,7 +103,7 @@ class ServicePrincipal(resource.BaseResource):
   def _Exists(self):
     """Returns True if the service principal exists."""
     # Use show rather than list, because list requires admin privileges.
-    cmd = [azure.AZURE_PATH, 'ad', 'sp', 'show', '--id', self.name]
+    cmd = [azure.AZURE_PATH, 'ad', 'sp', 'show', '--id', self.app_id]
     try:
       vm_util.IssueCommand(cmd, raise_on_failure=True)
       return True
@@ -112,5 +112,5 @@ class ServicePrincipal(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the service principal."""
-    cmd = [azure.AZURE_PATH, 'ad', 'sp', 'delete', '--id', self.name]
+    cmd = [azure.AZURE_PATH, 'ad', 'sp', 'delete', '--id', self.app_id]
     vm_util.IssueCommand(cmd)

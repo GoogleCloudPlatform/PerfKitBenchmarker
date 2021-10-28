@@ -15,6 +15,8 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
+from typing import List
+
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
@@ -138,31 +140,57 @@ class AksCluster(container_service.KubernetesCluster):
     result['boot_disk_size'] = self.vm_config.os_disk.disk_size
     return result
 
-  # Creating an AKS cluster with a fresh service principal usually fails due
-  # to a race condition. Active Directory knows the service principal exists,
-  # but AKS does not. (https://github.com/Azure/azure-cli/issues/9585)
-  @vm_util.Retry()
   def _Create(self):
     """Creates the AKS cluster."""
     cmd = [
         azure.AZURE_PATH, 'aks', 'create',
         '--name', self.name,
-        '--node-vm-size', self.vm_config.machine_type,
-        '--node-count', str(self.num_nodes),
         '--location', self.region,
-        '--dns-name-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
         '--service-principal', self.service_principal.app_id,
         # TODO(pclay): avoid logging client secret
-        '--client-secret', self.service_principal.password,
-    ] + self.resource_group.args
-    if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
-      cmd += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
-    if self.cluster_version:
-      cmd += ['--kubernetes-version', self.cluster_version]
+        '--client-secret',
+        self.service_principal.password,
+        '--nodepool-name',
+        container_service.DEFAULT_NODEPOOL,
+        '--nodepool-labels',
+        f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
+    ] + self._GetNodeFlags(self.num_nodes, self.vm_config)
 
     # TODO(pclay): expose quota and capacity errors
-    vm_util.IssueCommand(cmd, timeout=1800)
+    # Creating an AKS cluster with a fresh service principal usually fails due
+    # to a race condition. Active Directory knows the service principal exists,
+    # but AKS does not. (https://github.com/Azure/azure-cli/issues/9585)
+    # Use 5 min timeout on service principle retry. cmd will fail fast.
+    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800)
+
+    for name, node_group in self.nodepools.items():
+      self._CreateNodeGroup(name, node_group)
+
+  def _CreateNodePool(self, name: str, node_pool):
+    """Creates a node pool."""
+    cmd = [
+        azure.AZURE_PATH, 'aks', 'nodepools', 'add',
+        '--cluster-name', self.name,
+        '--name', name,
+        '--labels', f'pkb_nodepool={node_pool}',
+    ] + self._GetNodeFlags(node_pool.num_nodes, node_pool.vm_config)
+    vm_util.IssueCommand(cmd, timeout=600)
+
+  def _GetNodeFlags(self, num_nodes: int, vm_config) -> List[str]:
+    """Common flags for create and nodepools add."""
+    args = [
+        '--node-vm-size', vm_config.machine_type,
+        '--node-count', str(num_nodes),
+    ] + self.resource_group.args
+    if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
+      args += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
+    if self.cluster_version:
+      args += ['--kubernetes-version', self.cluster_version]
+    return args
 
   def _Exists(self):
     """Returns True if the cluster exists."""
