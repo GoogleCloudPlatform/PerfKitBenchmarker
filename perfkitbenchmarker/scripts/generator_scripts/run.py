@@ -457,8 +457,8 @@ if __name__ == "__main__":
                       default=benchmark_template_default_path)
   parser.add_argument("-w", "--workload_template", type=valid_json_file,
                       help="workload template file in json format",
-                      default=os.path.join("workloads", "mpich_compile_multi_node",
-                                           "mpich_multi_node_template.json"))
+                      default=os.path.join("workloads", "dummy",
+                                           "dummy_template.json"))
   parser.add_argument("-v", "--validate",
                       help="Validate the json with the schema",
                       type=str2bool,
