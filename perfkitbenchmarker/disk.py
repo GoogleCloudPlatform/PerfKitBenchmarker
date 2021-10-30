@@ -80,6 +80,9 @@ RAM = 'ram'
 NFS = 'nfs'
 SMB = 'smb'
 
+# FUSE mounted object storage bucket
+OBJECT_STORAGE = 'object_storage'
+
 # Map old disk type names to new disk type names
 DISK_TYPE_MAPS = dict()
 
@@ -207,6 +210,11 @@ class BaseDiskSpec(spec.BaseSpec):
 
   SPEC_TYPE = 'BaseDiskSpec'
   CLOUD = None
+
+  def __init__(self, *args, **kwargs):
+    self.device_path: str = None
+    self.mount_point: str = None
+    super(BaseDiskSpec, self).__init__(*args, **kwargs)
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -348,6 +356,9 @@ class BaseDisk(resource.BaseResource):
         'num_stripes': self.num_striped_disks,
     })
 
+    # Set in derived classes by Attach()
+    self.vm = None
+
     # Linux related attributes.
     self.device_path = disk_spec.device_path
 
@@ -400,10 +411,11 @@ class BaseDisk(resource.BaseResource):
     """
     pass
 
-  @abc.abstractmethod
   def Detach(self):
     """Detaches the disk from a VM."""
-    pass
+    # This is currently never called.
+    # TODO(pclay): Figure out if static VMs should call this.
+    raise NotImplementedError
 
   def GetDevicePath(self):
     """Returns the path to the device inside a Linux VM."""
@@ -453,8 +465,11 @@ class StripedDisk(BaseDisk):
       disk.Detach()
 
 
-class RamDisk(BaseDisk):
-  """Object representing a Ram Disk."""
+class MountableDisk(BaseDisk):
+  """Object representing a disk that produces a mounted directory.
+
+  Examples are RamDisks or FUSE file systems.
+  """
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -462,10 +477,6 @@ class RamDisk(BaseDisk):
     Args:
       vm: The BaseVirtualMachine instance to which the disk will be attached.
     """
-    pass
-
-  def Detach(self):
-    """Detaches the disk from a VM."""
     pass
 
   def GetDevicePath(self):
@@ -484,16 +495,14 @@ class RamDisk(BaseDisk):
     """Deletes the disk."""
     pass
 
+  @abc.abstractmethod
+  def Mount(self, vm):
+    """Mount disk at specified mount point."""
+    raise NotImplementedError()
+
 
 class NetworkDisk(BaseDisk):
   """Object representing a Network Disk."""
-
-  def __init__(self, disk_spec):
-    super(NetworkDisk, self).__init__(disk_spec)
-    super(NetworkDisk, self).GetResourceMetadata()
-
-    # Set in derived classes by Attach()
-    self.vm = None
 
   @abc.abstractmethod
   def _GetNetworkDiskMountOptionsDict(self):
@@ -516,10 +525,6 @@ class NetworkDisk(BaseDisk):
   def Attach(self):
     """Attached NetworkDisk to a VM.  Must set self.vm."""
     raise NotImplementedError()
-
-  def Detach(self):
-    if self.vm:
-      self.vm.RemoteCommand('sudo umount %s' % self.mount_point)
 
   def _Create(self):
     # handled by the Network Disk service

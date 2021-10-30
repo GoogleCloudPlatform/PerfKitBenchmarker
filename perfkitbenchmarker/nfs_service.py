@@ -39,6 +39,7 @@ specsfs:
 import abc
 import logging
 import re
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import disk
@@ -77,12 +78,13 @@ class BaseNfsService(resource.BaseResource):
 
   # subclasses must override this with a list or tuple for acceptable
   # "nfs_tier" values if applicable.
+  CLOUD = 'Unknown'
   NFS_TIERS = None
   RESOURCE_TYPE = 'BaseNfsService'
   DEFAULT_NFS_VERSION = None
   DEFAULT_TIER = None
 
-  def __init__(self, disk_spec, zone):
+  def __init__(self, disk_spec: disk.BaseDiskSpec, zone):
     super(BaseNfsService, self).__init__()
     self.disk_spec = disk_spec
     self.zone = zone
@@ -151,8 +153,8 @@ class UnmanagedNfsService(BaseNfsService):
       'sudo mkdir -p {export_dir}',
       'sudo chown $USER:$USER {export_dir}',
       'sudo chmod 777 {export_dir}',
-      'echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
-      'sudo tee -a /etc/exports',
+      ('echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
+       'sudo tee -a /etc/exports'),
       'sudo exportfs -a'
   ])
 
@@ -163,18 +165,21 @@ class UnmanagedNfsService(BaseNfsService):
   _NFS_RESTART_CMD = 'sudo systemctl restart {nfs_name}'
 
   def __init__(self,
-               disk_spec,
+               disk_spec: Optional[disk.BaseDiskSpec],
                server_vm,
                check_export_not_same_mount=True,
                server_directory=None):
     super(UnmanagedNfsService, self).__init__(disk_spec, None)
     self.server_vm = server_vm
     # Path on the server to export. Must be different from mount_point.
-    self.server_directory = (
-        server_directory or disk_spec.device_path or
-        '/pkb-nfs-server-directory')
+    if server_directory:
+      self.server_directory = server_directory
+    elif disk_spec and disk_spec.device_path:
+      self.server_directory = disk_spec.device_path
+    else:
+      self.server_directory = '/pkb-nfs-server-directory'
     logging.info('Exporting server directory %s', self.server_directory)
-    if check_export_not_same_mount:
+    if check_export_not_same_mount and disk_spec:
       assert self.server_directory != disk_spec.mount_point, (
           'export server directory must be different from mount point')
 

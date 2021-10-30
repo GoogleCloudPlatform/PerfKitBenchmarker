@@ -1,0 +1,47 @@
+####################################################################################################
+# This config file was generated based on templates/benchmark_config.yaml and the following answers:
+#   Q1: The name of your experiment?                        A: throughput_test
+#   Q2: Storage type of Bigtable instance, ssd or hdd?      A: ssd
+#   Q3: The number of Bigtable nodes in a cluster?          A: 3
+#   Q4: The zone for Bigtable instance and VMs?             A: us-central1-b
+#   Q5: The row size in Bytes?                              A: 1024
+#   Q6: The number of rows in the table?                    A: 5000000
+#   Q7: The number of column qualifiers in a row?           A: 1
+#   Q8: The workloads to run?                               A: workloada
+#   Q9: The number of VMs?                                  A: 4
+#   Q10: The target overall QPS across all the VMs?         A: 24000
+#   Q11: How long each workload will be run in seconds?     A: 600
+####################################################################################################
+benchmarks:
+- cloud_bigtable_ycsb:
+    flags:
+      #################################
+      # Worker VM settings
+      #################################
+      machine_type: n1-highcpu-16
+      num_vms: 4
+      zones: us-central1-b
+
+      #################################
+      # Cloud Bigtable settings
+      #################################
+      google_bigtable_zone: us-central1-b
+      bigtable_node_count: 3
+      bigtable_storage_type: ssd
+      ycsb_field_count: 1
+      ycsb_field_length: 1024
+      ycsb_record_count: 5000000
+
+      #################################
+      # YCSB Workload settings
+      #################################
+      ycsb_run_parameters: target=6000,readallfields=false,requestdistribution=zipfian
+      ycsb_threads_per_client: 32
+      ycsb_operation_count: 2147483647
+      ycsb_timelimit: 600
+      ycsb_workload_files: workloada
+
+      #################################
+      # Benchmark labels
+      #################################
+      metadata: experiment:throughput_test

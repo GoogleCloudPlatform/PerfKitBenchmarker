@@ -118,6 +118,9 @@
 -   Support default subnets in --aws_subnet with `default` as value passed.
 -   Add Unsupported config failure substatus for runs that are not supported by
     the cloud.
+-   Add support for nodepools to `container_cluster` benchmark spec. Currently
+    only supports GCP.
+-   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
 
 ### Bug fixes and maintenance updates:
 
@@ -176,3 +179,9 @@
 -   Enable the aggregation for "Return=NOT_FOUND" errors.
 -   Added no_proxy flag for proxy settings
 -   Stop attempting to delete PKB resources that failed to create.
+-   Added a new user guide for bigtable walkthrough.
+-   Sanitize the shell code in bigtable walkthrough doc: removing dollar sign
+    and using variable expansion.
+-   Added `--google_monitoring_endpoint` flag for querying a different endpoint
+    than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
+-   Broadens Azure quota detection parsing

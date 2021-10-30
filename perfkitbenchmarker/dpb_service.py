@@ -173,7 +173,7 @@ class BaseDpbService(resource.BaseResource):
 
   @property
   def base_dir(self):
-    return self.persistent_fs_prefix + self.bucket
+    return self.persistent_fs_prefix + self.bucket  # pytype: disable=attribute-error  # bind-properties
 
   @abc.abstractmethod
   def SubmitJob(self,

@@ -61,6 +61,25 @@ spec:
               requests:
                 cpu: "0.05"
                 memory: 500Mi
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: pkb_nodepool
+                    operator: In
+                    values:
+                    - mongodb
+            podAntiAffinity:
+              # Schedule 1 MongoDB pod per node
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - mongodb-svc
+                topologyKey: kubernetes.io/hostname
       # Specifies a size for the data volume different from the default 10Gi
       volumeClaimTemplates:
       - metadata:
@@ -95,4 +114,4 @@ spec:
     targetPort: 27017
   selector:
     app: mongodb-svc
-  type: LoadBalancer
+  type: ClusterIP

@@ -595,9 +595,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, timeout=azure_vm_create_timeout, raise_on_failure=False)
     if retcode:
-      if ('Error Code: QuotaExceeded' in stderr or
-          re.search(r'exceeding approved \S+ \S+ quota', stderr) or
-          'exceeding quota limit' in stderr):
+      if 'quota' in stderr.lower():
         raise errors.Benchmarks.QuotaFailure(
             virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
       elif self.low_priority and 'OverconstrainedAllocationRequest' in stderr:

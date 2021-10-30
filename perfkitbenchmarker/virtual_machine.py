@@ -27,6 +27,7 @@ import socket
 import threading
 import time
 import typing
+from typing import List
 
 from absl import flags
 import jinja2
@@ -298,6 +299,16 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   # needing to reboot often indicates a design problem since restarting a
   # container can have side effects in certain situations.
   IS_REBOOTABLE = True
+
+  install_packages: bool  # mixed from BaseVirtualMachine
+  is_static: bool  # mixed from BaseVirtualMachine
+  scratch_disks: List[disk.BaseDisk]  # mixed from BaseVirtualMachine
+  ssh_private_key: str  # mixed from BaseVirtualMachine
+  user_name: str  # mixed from BaseVirtualMachine
+
+  @abc.abstractmethod
+  def GetConnectionIp(self):
+    """See BaseVirtualMachine."""
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()
@@ -971,6 +982,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       usage while running the benchmark.
     background_network_ip_type: Type of IP address to use for generating
       background network workload
+    vm_group: The VM group this VM is associated with, if applicable.
   """
 
   is_static = False
@@ -1026,6 +1038,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.num_disable_cpus = None
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
+    self.vm_group = None
 
   @property
   @classmethod

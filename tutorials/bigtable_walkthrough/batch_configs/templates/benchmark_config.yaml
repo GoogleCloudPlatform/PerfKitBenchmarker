@@ -1,0 +1,89 @@
+####################################################################################################
+# Benchmark config is the place where test customization resides. It will inherit & override the
+# common PKB flag settings from the runner config (if any).
+#
+# To make the template easier to work with, you can answer the following questions first, and then
+# complete the [place holders] in the main body.
+#
+# Questions:
+#   Q1: The name of your experiment? (e.g., latency_test)
+#
+#   Q2: Storage type of Bigtable instance, ssd or hdd? (e.g., ssd)
+#       - TIP: ssd is recommended for latency-sensitive applications. For the storage limit per
+#         node, please refer to https://cloud.google.com/bigtable/quotas#storage-per-node.
+#
+#   Q3: The number of Bigtable nodes in a cluster? (e.g., 3)
+#
+#   Q4: The zone for Bigtable instance and VMs? (e.g., us-central1-b)
+#       - TIP: please refer to https://cloud.google.com/bigtable/docs/locations and
+#         https://cloud.google.com/compute/docs/regions-zones. Prefer for the Bigtable instance and
+#         benchmarking VMs to be in the same zone to minimize noise in the results.
+#
+#   Q5: The row size in Bytes? (e.g., 1024)
+#
+#   Q6: The number of rows in the table? (e.g., 100000000)
+#
+#   Q7: The number of column qualifiers in a row? (e.g., 1)
+#       - TIP: the default column family is "cf".
+#
+#   Q8: The workloads to run? (e.g., workloada)
+#       - TIP: You can specify multiple workloads (comma separated). The popular workloads are:
+#           workloada -- half read/half update
+#           workloadb -- read/update ratio: 95/5
+#           workloadc -- read only
+#           workloadx -- update only
+#
+#   Q9: The number of VMs? (e.g., 1)
+#       - TIP: a single VM of type "n1-highcpu-16" and thread count 32 can achieve ~6K QPS with
+#         decent latencies when running workloada against a 100GB table (1KB row size) in a
+#         3-node Bigtable instance (ssd). Using more threads does not necessarily produce higher QPS
+#         as bottleneck may appear either on the client side (GCE VM) or the server side (Bigtable
+#         instance). Recommendations: #threads no more than 4x #cores, QPS per Bigtable node no more
+#         than 10k.
+#
+#   Q10: The target overall QPS across all the VMs (e.g., 24000)?
+#        - TIP: throttling may apply if the target is very small. If the target is too big, you may
+#          increase the value for question Q9 or "--ycsb_threads_per_client", but the target may not
+#          be achieved due to the bottlenecks mentioned above.
+#
+#   Q11: How long do you want each workload to run in seconds (e.g., 1800)?
+#        - TIP: table loading time is not included.
+####################################################################################################
+benchmarks:
+- cloud_bigtable_ycsb:
+    flags:
+      #################################
+      # Worker VM settings
+      #################################
+      machine_type: n1-highcpu-16   # a high-capacity VM model according to https://cloud.google.com/compute
+      num_vms: [Q9]
+      zones: [Q4]
+
+      #################################
+      # Cloud Bigtable settings
+      #################################
+      google_bigtable_zone: [Q4]
+      bigtable_node_count: [Q3]
+      bigtable_storage_type: [Q2]
+      ycsb_field_count: [Q7]
+      ycsb_field_length: [Q5 divided by Q7]
+      ycsb_record_count: [Q6]
+
+      #################################
+      # YCSB Workload settings
+      #################################
+      # "target" indicates the target number of operations per second across all the threads
+      # in a VM, and each operation addresses one row. The other run parameters correspond to the
+      # entries at https://github.com/brianfrankcooper/YCSB/blob/master/workloads/workload_template.
+      ycsb_run_parameters: target=[Q10 divided by Q9],readallfields=false,requestdistribution=zipfian
+      ycsb_threads_per_client: 32       # the number of threads per VM for the benchmark run
+      ycsb_operation_count: 2147483647  # large read/write operation cap to have the timelimit take effect
+      ycsb_timelimit: [Q11]
+      ycsb_workload_files: [Q8]
+
+      #################################
+      # Benchmark labels
+      #################################
+      # metadata will add labels to the benchmark results, by which you can retrieve a specific
+      # benchmark's results. Note that there is no space between "experiment:" and "[Q1]".
+      metadata: experiment:[Q1]

@@ -186,6 +186,10 @@ flags.DEFINE_integer('fio_command_timeout_sec', None,
 flags.DEFINE_enum('fio_rng', 'tausworthe64',
                   ['tausworthe', 'lfsr', 'tausworthe64'],
                   'Which RNG to use for 4k Random IOPS.')
+_DIRECT_IO = flags.DEFINE_boolean(
+    'fio_direct', True,
+    'Whether to use O_DIRECT to bypass OS cache. This is strongly '
+    'recommended, but not supported by all files.')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -245,7 +249,7 @@ JOB_FILE_TEMPLATE = """
 [global]
 ioengine=libaio
 invalidate=1
-direct=1
+direct={{direct}}
 runtime={{runtime}}
 time_based
 filename={{filename}}
@@ -392,7 +396,7 @@ def GetScenarioFromScenarioString(scenario_string):
 
 def GenerateJobFileString(filename, scenario_strings,
                           io_depths, num_jobs, working_set_size,
-                          block_size, runtime, parameters):
+                          block_size, runtime, direct, parameters):
   """Make a string with our fio job file.
 
   Args:
@@ -403,6 +407,7 @@ def GenerateJobFileString(filename, scenario_strings,
     working_set_size: int or None. If int, the size of the working set in GB.
     block_size: Quantity or None. If quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
+    direct: boolean. Whether to use direct IO.
     parameters: list. Other fio parameters to be applied to all jobs.
 
   Returns:
@@ -443,6 +448,7 @@ def GenerateJobFileString(filename, scenario_strings,
       scenarios=scenarios,
       iodepths=io_depths,
       numjobs=num_jobs,
+      direct=int(direct),
       parameters=parameters))
 
 
@@ -470,7 +476,7 @@ def ProcessedJobFileString(fio_jobfile_contents, remove_filename):
 def GetOrGenerateJobFileString(job_file_path, scenario_strings,
                                against_device, disk, io_depths,
                                num_jobs, working_set_size, block_size,
-                               runtime, parameters, job_file_contents):
+                               runtime, direct, parameters, job_file_contents):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -490,6 +496,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       in GB.
     block_size: Quantity or None. If Quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
+    direct: boolean. Whether to use direct IO.
     parameters: list. Other fio parameters to apply to all jobs.
     job_file_contents: string contents of fio job.
 
@@ -515,7 +522,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
 
     return GenerateJobFileString(filename, scenario_strings, io_depths,
                                  num_jobs, working_set_size, block_size,
-                                 runtime, parameters)
+                                 runtime, direct, parameters)
 
 
 NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
@@ -703,6 +710,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
       FLAGS.fio_working_set_size,
       FLAGS.fio_blocksize,
       FLAGS.fio_runtime,
+      _DIRECT_IO.value,
       FLAGS.fio_parameters,
       job_file_contents)
   job_file_path = vm_util.PrependTempDir(vm.name + LOCAL_JOB_FILE_SUFFIX)

@@ -45,9 +45,11 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 import requests
+import six
 import yaml
 
 KUBERNETES = 'Kubernetes'
+DEFAULT_NODEPOOL = 'default'
 
 FLAGS = flags.FLAGS
 
@@ -95,6 +97,11 @@ flags.DEFINE_string(
     'Optional version flag to pass to the cluster create '
     'command. If not specified, the cloud-specific container '
     'implementation will chose an appropriate default.')
+
+# TODO(user): Consider supporting multiarch manifests.
+flags.DEFINE_string('container_cluster_architecture', 'linux/amd64',
+                    'The architecture that the container cluster uses. '
+                    'Defaults to linux/amd64')
 
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
@@ -258,6 +265,8 @@ class ContainerRegistrySpec(spec.BaseSpec):
     super(ContainerRegistrySpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
+    if flag_values['container_cluster_cloud'].present:
+      config_values['cloud'] = flag_values.container_cluster_cloud
     updated_spec = {}
     if flag_values['project'].present:
       updated_spec['project'] = flag_values.project
@@ -379,7 +388,10 @@ class BaseContainerRegistry(resource.BaseResource):
       image: Instance of _ContainerImage representing the image to build.
     """
     build_cmd = [
-        'docker', 'build', '--no-cache', '-t', image.name, image.directory
+        'docker', 'buildx', 'build',
+        '--platform', FLAGS.container_cluster_architecture,
+        '--no-cache', '--load',
+        '-t', image.name, image.directory
     ]
     vm_util.IssueCommand(build_cmd)
 
@@ -441,6 +453,13 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
     benchmark_spec.config.flags['kubeconfig'] = FLAGS.kubeconfig
 
 
+def NodePoolName(name: str) -> str:
+  """Clean node pool names to be usable by all providers."""
+  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens, but PKB
+  # likes to use underscores isnstead of hyphens so we convert them.
+  return name.replace('_', '-')
+
+
 def GetContainerClusterClass(cloud, cluster_type):
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type)
@@ -457,6 +476,14 @@ class BaseContainerCluster(resource.BaseResource):
     self.name = 'pkb-%s' % FLAGS.run_uri
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
+    for name, nodepool in cluster_spec.nodepools.copy().items():
+      nodepool.vm_config = virtual_machine.GetVmClass(
+          self.CLOUD, os_types.DEFAULT)(nodepool.vm_spec)
+      nodepool.num_nodes = nodepool.vm_count
+      # Fix name
+      del cluster_spec.nodepools[name]
+      cluster_spec.nodepools[NodePoolName(name)] = nodepool
+    self.nodepools = cluster_spec.nodepools
     self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
         cluster_spec.vm_spec)
     self.num_nodes = cluster_spec.vm_count
@@ -478,12 +505,22 @@ class BaseContainerCluster(resource.BaseResource):
 
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
+    nodepools = {}
+    for name, nodepool in six.iteritems(self.nodepools):
+      nodepool_metadata = {
+          'size': nodepool.num_nodes,
+          'machine_type': nodepool.vm_config.machine_type,
+          'name': name
+      }
+      nodepools[name] = nodepool_metadata
+
     metadata = {
         'cloud': self.CLOUD,
         'cluster_type': self.CLUSTER_TYPE,
         'zone': self.zone,
         'size': self.num_nodes,
         'machine_type': self.vm_config.machine_type,
+        'nodepools': nodepools
     }
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
@@ -762,14 +799,13 @@ class KubernetesCluster(BaseContainerCluster):
   def WaitForRollout(self, resource_name):
     """Blocks until a Kubernetes rollout is completed."""
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'rollout',
         'status',
         '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
         resource_name
     ]
 
-    vm_util.IssueCommand(run_cmd)
+    RunKubectlCommand(run_cmd)
 
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def GetLoadBalancerIP(self, service_name):
@@ -789,6 +825,21 @@ class KubernetesCluster(BaseContainerCluster):
           "Load Balancer IP for service '%s' is not ready." % service_name)
 
     return format(ip_address)
+
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  def GetClusterIP(self, service_name) -> str:
+    """Returns the IP address of a ClusterIP service when ready."""
+    get_cmd = [
+        'get', 'service', service_name, '-o', 'jsonpath={.spec.clusterIP}'
+    ]
+
+    stdout, _, _ = RunKubectlCommand(get_cmd)
+
+    if not stdout:
+      raise errors.Resource.RetryableCreationError(
+          "ClusterIP for service '%s' is not ready." % service_name)
+
+    return stdout
 
   def CreateConfigMap(self, name, from_file_dir):
     """Creates a Kubernetes ConfigMap.

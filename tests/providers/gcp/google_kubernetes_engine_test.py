@@ -140,6 +140,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud container clusters create', command_string)
       self.assertIn('--num-nodes 2', command_string)
+      self.assertIn('--cluster-ipv4-cidr /19', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--zone us-central1-a', command_string)
       self.assertIn('--min-cpu-platform skylake', command_string)
@@ -236,6 +237,14 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
               'container_cluster_version': 'latest'
           }, metadata)
 
+  def testCidrCalculations(self):
+    self.assertEqual(google_kubernetes_engine._CalculateCidrSize(1), 19)
+    self.assertEqual(google_kubernetes_engine._CalculateCidrSize(16), 19)
+    self.assertEqual(google_kubernetes_engine._CalculateCidrSize(17), 18)
+    self.assertEqual(google_kubernetes_engine._CalculateCidrSize(48), 18)
+    self.assertEqual(google_kubernetes_engine._CalculateCidrSize(49), 17)
+    self.assertEqual(google_kubernetes_engine._CalculateCidrSize(250), 15)
+
 
 class GoogleKubernetesEngineAutoscalingTestCase(
     pkb_common_test_case.PkbCommonTestCase):
@@ -253,7 +262,7 @@ class GoogleKubernetesEngineAutoscalingTestCase(
             },
             'min_vm_count': 1,
             'vm_count': 2,
-            'max_vm_count': 3,
+            'max_vm_count': 30,
         })
     return kubernetes_engine_spec
 
@@ -269,7 +278,8 @@ class GoogleKubernetesEngineAutoscalingTestCase(
       self.assertIn('--enable-autoscaling', command_string)
       self.assertIn('--min-nodes 1', command_string)
       self.assertIn('--num-nodes 2', command_string)
-      self.assertIn('--max-nodes 3', command_string)
+      self.assertIn('--max-nodes 30', command_string)
+      self.assertIn('--cluster-ipv4-cidr /18', command_string)
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()

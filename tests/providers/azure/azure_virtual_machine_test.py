@@ -36,19 +36,35 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(mock.patch.object(util, 'GetResourceTags'))
 
   @parameterized.named_parameters(
-      ('QuotaExceeded', '', 'Error Code: QuotaExceeded', 1),
-      ('CoreQuotaExceeded', '',
-       'Operation could not be completed as it results in exceeding approved '
-       'standardEv3Family Cores quota', 1),
-      ('CoreQuotaExceededDifferentWording', '',
-       'The operation could not be completed as it results in exceeding quota '
-       'limit of standardEv3Family Cores', 1))
-  def testQuotaExceeded(self, _, stderror, retcode):
+      {
+          'testcase_name': 'QuotaExceeded',
+          'stderror': 'Error Code: QuotaExceeded'
+      },
+      {
+          'testcase_name': 'CoreQuotaExceeded',
+          'stderror':
+              'Operation could not be completed as it results in exceeding '
+              'approved standardEv3Family Cores quota'
+      },
+      {
+          'testcase_name': 'CoreQuotaExceededDifferentWording',
+          'stderror':
+              'The operation could not be completed as it results in exceeding '
+              'quota limit of standardEv3Family Cores'
+      },
+      {
+          'testcase_name': 'FamilyQuotaExceededWording',
+          'stderror':
+              'Operation could not be completed as it results in exceeding '
+              'approved Standard NDASv4_A100 Family Cores quota'
+      },
+  )
+  def testQuotaExceeded(self, stderror):
     spec = azure_virtual_machine.AzureVmSpec(
         _COMPONENT, machine_type='test_machine_type', zone='testing')
     vm = TestAzureVirtualMachine(spec)
 
-    self.mock_cmd.side_effect = [(_, stderror, retcode)]
+    self.mock_cmd.side_effect = [('', stderror, 1)]
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       vm._Create()
 

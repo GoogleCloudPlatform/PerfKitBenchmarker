@@ -118,6 +118,8 @@ flag_util.DEFINE_integerlist(
     'memtier_pipeline', [1],
     'Number of pipelines to use for memtier. Defaults to 1, '
     'i.e. no pipelining.')
+MEMTIER_CLUSTER_MODE = flags.DEFINE_bool(
+    'memtier_cluster_mode', False, 'Passthrough for --cluster-mode flag')
 
 
 def YumInstall(vm):
@@ -181,6 +183,7 @@ def BuildMemtierCommand(
     test_time: Optional[int] = None,
     outfile: Optional[pathlib.PosixPath] = None,
     password: Optional[str] = None,
+    cluster_mode: Optional[bool] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
@@ -203,7 +206,7 @@ def BuildMemtierCommand(
       'print-percentile': '50,90,95,99,99.9',
   }
   # Arguments passed without a parameter
-  no_param_args = {'random-data': random_data}
+  no_param_args = {'random-data': random_data, 'cluster-mode': cluster_mode}
   # Build the command
   cmd = ['memtier_benchmark']
   for arg, value in args.items():
@@ -397,7 +400,8 @@ def _Run(vm,
       test_time=test_time,
       requests=requests,
       password=password,
-      outfile=MEMTIER_RESULTS)
+      outfile=MEMTIER_RESULTS,
+      cluster_mode=MEMTIER_CLUSTER_MODE.value)
   vm.RemoteCommand(cmd)
 
   output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
@@ -419,6 +423,7 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_pipeline': pipeline,
       'memtier_version': GIT_TAG,
       'memtier_run_mode': MEMTIER_RUN_MODE.value,
+      'memtier_cluster_mode': MEMTIER_CLUSTER_MODE.value,
   }
   if MEMTIER_RUN_DURATION.value:
     meta['memtier_run_duration'] = MEMTIER_RUN_DURATION.value
@@ -519,12 +524,31 @@ def _ParseHistogram(
 def _ParseTotalThroughputAndLatency(
     memtier_results: Text) -> Tuple[float, float, float]:
   """Parses the 'TOTALS' output line and return throughput and latency."""
+  columns = None
   for raw_line in memtier_results.splitlines():
     line = raw_line.strip()
+    if re.match(r'^Type', line):
+      columns = re.split(r' \s+', line)
     if re.match(r'^Totals', line):
-      _, ops_per_sec, _, _, latency_ms, _, _, _, _, _, kb_per_sec = line.split()
-      return float(ops_per_sec), float(latency_ms), float(kb_per_sec)
-  raise errors.Benchmarks.RunError('No "TOTALS" line in memtier output.')
+      if not columns:
+        raise errors.Benchmarks.RunError(
+            'No "Type" line preceding "Totals" in memtier output.')
+      totals = line.split()
+      if len(totals) != len(columns):
+        raise errors.Benchmarks.RunError(
+            'Length mismatch between "Type" and "Totals" lines:'
+            f'\nType: {columns}\n Totals: {totals}')
+
+      def _FetchStat(key):
+        key_index = columns.index(key)
+        if key_index == -1:
+          raise errors.Benchmarks.RunError(
+              f'Stats table does not contain "{key}" column.')
+        return float(totals[columns.index(key)])  # pylint: disable=cell-var-from-loop
+
+      return (_FetchStat('Ops/sec'), _FetchStat('Avg. Latency'),
+              _FetchStat('KB/sec'))
+  raise errors.Benchmarks.RunError('No "Totals" line in memtier output.')
 
 
 def _ParseLine(pattern: str, line: str, approx_total: int, last_total: int,

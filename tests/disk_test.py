@@ -221,14 +221,6 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     nfs_disk.Attach(vm)
     vm.Install.assert_called_with('nfs_utils')
 
-  def testDetach(self):
-    vm = mock.Mock()
-    FLAGS['scratch_dir'].parse('/mnt')
-    nfs_disk = _NfsDisk(FLAGS)
-    nfs_disk.Attach(vm)  # to set the vm on the disk
-    nfs_disk.Detach()
-    vm.RemoteCommand.assert_called_with('sudo umount /mnt')
-
 
 class _SmbDisk(disk.SmbDisk):
 
@@ -302,15 +294,6 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     smb_disk = _SmbDisk()
     smb_disk.Attach(vm)
     vm.InstallPackages.assert_called_with('cifs-utils')
-
-  def testDetach(self):
-    vm = mock.Mock()
-    FLAGS['scratch_dir'].parse('/mnt')
-    smb_disk = _SmbDisk(FLAGS)
-    smb_disk.Attach(vm)  # to set the vm on the disk
-    smb_disk.Detach()
-    vm.RemoteCommand.assert_called_with('sudo umount /mnt')
-
 
 if __name__ == '__main__':
   unittest.main()

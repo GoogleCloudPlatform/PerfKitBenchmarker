@@ -19,8 +19,10 @@ import json
 import logging
 import os
 import posixpath
+import stat
 
 from absl import flags
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -33,7 +35,6 @@ from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 import six
 
 FLAGS = flags.FLAGS
@@ -150,8 +151,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Deletes a POD."""
     delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'delete', 'pod', self.name]
-    output = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
-    logging.info(output[STDOUT].rstrip())
+    stdout, _, _ = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
+    logging.info(stdout.rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self):
@@ -246,6 +247,12 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             'dnsPolicy': 'ClusterFirst',
         }
     }
+
+    if self.vm_group:
+      template['spec']['nodeSelector'] = {
+          'pkb_nodepool': container_service.NodePoolName(self.vm_group)
+      }
+
     if FLAGS.kubernetes_anti_affinity:
       template['spec']['affinity'] = {
           'podAntiAffinity': {
@@ -409,6 +416,14 @@ class DebianBasedKubernetesVirtualMachine(
       remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
       remote_path = remote_path.strip()
       file_name = posixpath.basename(remote_path)
+      try:
+        # kubectl cannot copy into a directory. Only to a new file
+        # https://github.com/kubernetes/kubernetes/pull/81782
+        if stat.S_ISDIR(os.stat(file_path).st_mode):
+          file_path = os.path.join(file_path, file_name)
+      except FileNotFoundError:
+        # file_path is already a non-existent file
+        pass
       src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
     if retries is None:
       retries = FLAGS.ssh_retries

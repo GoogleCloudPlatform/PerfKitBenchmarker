@@ -478,6 +478,7 @@ class BenchmarkSpec(object):
         if (disk_count > 1 and disk_spec.mount_point):
           for i, vm_disk_spec in enumerate(vm.disk_specs):
             vm_disk_spec.mount_point += str(i)
+      vm.vm_group = group_name
       vms.append(vm)
 
     return vms
@@ -545,7 +546,6 @@ class BenchmarkSpec(object):
 
         for vm in vms:
           vm.controller = clouds[group_spec.cloud]
-          vm.vm_group = group_name
 
         jujuvm.units.extend(vms)
         if jujuvm and jujuvm not in self.vms:

@@ -26,9 +26,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.vm_util import OUTPUT_EXIT_CODE as EXIT_CODE
-from perfkitbenchmarker.vm_util import OUTPUT_STDERR as STDERR
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 FLAGS = flags.FLAGS
 
@@ -90,9 +87,7 @@ def GetKubernetesDiskClass(volume_type):
 
 
 class KubernetesDisk(disk.BaseDisk):
-  """
-  Base class for Kubernetes Disks.
-  """
+  """Base class for Kubernetes Disks."""
 
   RESOURCE_TYPE = 'KubernetesDisk'
   REQUIRED_ATTRS = ['K8S_VOLUME_TYPE']
@@ -125,9 +120,7 @@ class KubernetesDisk(disk.BaseDisk):
 
 
 class EmptyDirDisk(KubernetesDisk):
-  """
-  Implementation of Kubernetes 'emptyDir' type of volume.
-  """
+  """Implementation of Kubernetes 'emptyDir' type of volume."""
 
   K8S_VOLUME_TYPE = 'emptyDir'
 
@@ -147,9 +140,7 @@ class EmptyDirDisk(KubernetesDisk):
 
 
 class CephDisk(KubernetesDisk):
-  """
-  Implementation of Kubernetes 'rbd' type of volume.
-  """
+  """Implementation of Kubernetes 'rbd' type of volume."""
 
   K8S_VOLUME_TYPE = 'rbd'
 
@@ -161,42 +152,42 @@ class CephDisk(KubernetesDisk):
     """Creates Rados Block Device volumes and installs filesystem on them."""
     cmd = ['rbd', '-p', FLAGS.rbd_pool, 'create', self.name, '--size',
            str(1024 * self.disk_size)]
-    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if output[EXIT_CODE] != 0:
-      raise Exception('Creating RBD image failed: %s' % output[STDERR])
+    _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
+      raise Exception('Creating RBD image failed: %s' % stderr)
 
     cmd = ['rbd', 'map', FLAGS.rbd_pool + '/' + self.name]
-    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if output[EXIT_CODE] != 0:
-      raise Exception('Mapping RBD image failed: %s' % output[STDERR])
-    rbd_device = output[STDOUT].rstrip()
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
+      raise Exception('Mapping RBD image failed: %s' % stderr)
+    rbd_device = stdout.rstrip()
     if '/dev/rbd' not in rbd_device:
       # Sometimes 'rbd map' command doesn't return any output.
       # Trying to find device location another way.
       cmd = ['rbd', 'showmapped']
-      output = vm_util.IssueCommand(cmd, raise_on_failure=False)
-      for image_device in output[STDOUT].split('\n'):
+      stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+      for image_device in stdout.split('\n'):
         if self.name in image_device:
           pattern = re.compile('/dev/rbd.*')
           output = pattern.findall(image_device)
-          rbd_device = output[STDOUT].rstrip()
+          rbd_device = output[0].rstrip()
           break
 
     cmd = ['/sbin/mkfs.ext4', rbd_device]
-    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if output[EXIT_CODE] != 0:
-      raise Exception('Formatting partition failed: %s' % output[STDERR])
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
+      raise Exception('Formatting partition failed: %s' % stderr)
 
     cmd = ['rbd', 'unmap', rbd_device]
-    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if output[EXIT_CODE] != 0:
-      raise Exception('Unmapping block device failed: %s' % output[STDERR])
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
+      raise Exception('Unmapping block device failed: %s' % stderr)
 
   def _Delete(self):
     """Deletes RBD image."""
     cmd = ['rbd', 'rm', FLAGS.rbd_pool + '/' + self.name]
-    output = vm_util.IssueCommand(cmd, raise_on_failure=False)
-    if output[EXIT_CODE] != 0:
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode != 0:
       msg = 'Removing RBD image failed. Reattempting.'
       logging.warning(msg)
       raise Exception(msg)

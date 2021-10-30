@@ -15,6 +15,11 @@
 
 from absl import flags
 
+_VERSION = flags.DEFINE_enum(
+    'cuda_samples_version', None,
+    ['9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.4'],
+    'Version of CUDA samples to install.')
+
 FLAGS = flags.FLAGS
 
 BANDWIDTH_TEST_PATH = '/usr/local/cuda/extras/demo_suite/bandwidthTest'
@@ -22,12 +27,10 @@ BANDWIDTH_TEST_PATH = '/usr/local/cuda/extras/demo_suite/bandwidthTest'
 
 def Install(vm):
   vm.Install('cuda_toolkit')
-  source_code = f'v{FLAGS.cuda_toolkit_version}.tar.gz'
-  vm.RemoteCommand(
-      'wget -c https://github.com/NVIDIA/cuda-samples/archive/refs/tags/'
-      f'{source_code}')
-  vm.RemoteCommand(f'tar -zxvf {source_code} && '
-                   f'cd cuda-samples-{FLAGS.cuda_toolkit_version} && make')
+  version = _VERSION.value or FLAGS.cuda_toolkit_version
+  vm.RemoteCommand(f'git clone --branch v{version} --depth 1 '
+                   'https://github.com/NVIDIA/cuda-samples.git')
+  vm.RemoteCommand('cd cuda-samples && make')
 
 
 def GetBandwidthTestPath(vm):
@@ -35,8 +38,7 @@ def GetBandwidthTestPath(vm):
   if vm.TryRemoteCommand(f'stat {BANDWIDTH_TEST_PATH}'):
     return BANDWIDTH_TEST_PATH
 
-  bandwidth_test_path = (f'cuda-samples-{FLAGS.cuda_toolkit_version}/bin/x86_64'
-                         '/linux/release/bandwidthTest')
+  bandwidth_test_path = 'cuda-samples/bin/x86_64/linux/release/bandwidthTest'
   if vm.TryRemoteCommand(f'stat {bandwidth_test_path}'):
     return bandwidth_test_path
 

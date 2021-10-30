@@ -27,6 +27,12 @@ _VERSION = '1.18.107'
 
 def Install(vm):
   """Installs the awscli package on the VM."""
+  version, _ = vm.RemoteCommand('aws --version', ignore_failure=True)
+  for package_with_versions in version.split():
+    if ('aws-cli' in package_with_versions and
+        package_with_versions.split('/')[1] >= _VERSION):
+      # awscli is already installed and at a later version.
+      return
   vm.Install('pip3')
   vm.RemoteCommand(
       f"sudo pip3 install 'awscli=={_VERSION}' "

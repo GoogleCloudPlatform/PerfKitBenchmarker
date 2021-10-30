@@ -306,7 +306,7 @@ def IssueCommand(
     force_info_log: bool = False,
     suppress_warning: bool = False,
     env: Optional[Dict[str, str]] = None,
-    timeout: int = DEFAULT_TIMEOUT,
+    timeout: Optional[int] = DEFAULT_TIMEOUT,
     cwd: Optional[str] = None,
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
