@@ -24,6 +24,8 @@ Steps for both Apt and Yum installs:
 4. Install the azure-cli.
 """
 
+from perfkitbenchmarker import vm_util
+
 # Debian info
 _DEB_REPO_FILE = '/etc/apt/sources.list.d/azure-cli.list'
 _DEB_REPO_KEY = 'https://packages.microsoft.com/keys/microsoft.asc'
@@ -44,6 +46,7 @@ gpgkey={_YUM_REPO_KEY}
 """
 
 
+@vm_util.Retry(poll_interval=15, timeout=5*60)
 def ZypperInstall(vm):
   """Installs the azure-cli package on the VM for SUSE systems.
 
