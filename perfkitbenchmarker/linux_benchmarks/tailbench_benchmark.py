@@ -93,7 +93,7 @@ def Run(benchmark_spec):
   for test in _TESTS.value:
     vm.PullFile(vm_util.GetTempDir(), f'{INSTALL_DIR}/results/{test}.txt')
     samples += tailbench.BuildHistogramSamples(
-        f'{vm_util.GetTempDir()}/{test}.txt', test)
+        f'{vm_util.GetTempDir()}/{test}.txt', test, 'latency')
   return samples
 
 
