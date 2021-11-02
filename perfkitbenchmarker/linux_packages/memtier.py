@@ -30,13 +30,11 @@ from perfkitbenchmarker import vm_util
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '793d74dbc09395dfc241342d847730a6197d7c0c'
-LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
-LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
-LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % linux_packages.INSTALL_DIR
 MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = ('build-essential autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev libssl-dev')
-YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
+YUM_PACKAGES = (
+    'zlib-devel pcre-devel libmemcached-devel libevent-devel openssl-devel')
 MEMTIER_RESULTS = pathlib.PosixPath('memtier_results')
 
 _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
@@ -126,13 +124,7 @@ def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
-  vm.Install('wget')
-  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL,
-                                            linux_packages.INSTALL_DIR))
-  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(linux_packages.INSTALL_DIR,
-                                                   LIBEVENT_TAR))
-  vm.RemoteCommand(
-      'cd {0} && ./configure && sudo make install'.format(LIBEVENT_DIR))
+
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
   pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
