@@ -190,7 +190,7 @@ def CreateHistogramSample(histogram: _Histogram,
                           subname: str,
                           units: str,
                           additional_metadata=None,
-                          metric_prefix='') -> Sample:
+                          metric='') -> Sample:
   """Given a histogram of values, create a sample.
 
   Args:
@@ -199,17 +199,17 @@ def CreateHistogramSample(histogram: _Histogram,
     subname: subname of histogram
     units: the units of measure used in the sample
     additional_metadata: any additional metadata to add
-    metric_prefix: prefix for the metric in sample
+    metric: metric in the sample
 
   Returns:
     sample: One sample object that reports the histogram passed in.
 
   """
   metadata = {
-      metric_prefix + 'histogram': _ConvertHistogramToString(histogram),
+      'histogram': _ConvertHistogramToString(histogram),
       'Name': name,
       'Subname': subname
   }
   if additional_metadata:
     metadata.update(additional_metadata)
-  return Sample(f'{name}:histogram', 0, units, metadata)
+  return Sample(metric, 0, units, metadata)

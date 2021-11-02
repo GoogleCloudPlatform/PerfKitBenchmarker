@@ -148,7 +148,7 @@ _EXPECTED_CALL_BODY_WITH_VM_GROUP = """
             "command": ["tail", "-f", "/dev/null"]
         }],
         "nodeSelector": {
-            "pkb_nodepool": "my_vm_group"
+            "pkb_nodepool": "my-vm-group"
         }
     },
     "kind": "Pod",

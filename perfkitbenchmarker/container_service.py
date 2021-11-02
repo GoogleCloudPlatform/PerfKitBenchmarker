@@ -453,6 +453,13 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
     benchmark_spec.config.flags['kubeconfig'] = FLAGS.kubeconfig
 
 
+def NodePoolName(name: str) -> str:
+  """Clean node pool names to be usable by all providers."""
+  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens, but PKB
+  # likes to use underscores isnstead of hyphens so we convert them.
+  return name.replace('_', '-')
+
+
 def GetContainerClusterClass(cloud, cluster_type):
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type)
@@ -469,11 +476,13 @@ class BaseContainerCluster(resource.BaseResource):
     self.name = 'pkb-%s' % FLAGS.run_uri
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
-    for name, nodepool in six.iteritems(cluster_spec.nodepools):
+    for name, nodepool in cluster_spec.nodepools.copy().items():
       nodepool.vm_config = virtual_machine.GetVmClass(
           self.CLOUD, os_types.DEFAULT)(nodepool.vm_spec)
       nodepool.num_nodes = nodepool.vm_count
-      cluster_spec.nodepools[name] = nodepool
+      # Fix name
+      del cluster_spec.nodepools[name]
+      cluster_spec.nodepools[NodePoolName(name)] = nodepool
     self.nodepools = cluster_spec.nodepools
     self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
         cluster_spec.vm_spec)
@@ -790,14 +799,13 @@ class KubernetesCluster(BaseContainerCluster):
   def WaitForRollout(self, resource_name):
     """Blocks until a Kubernetes rollout is completed."""
     run_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
         'rollout',
         'status',
         '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
         resource_name
     ]
 
-    vm_util.IssueCommand(run_cmd)
+    RunKubectlCommand(run_cmd)
 
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def GetLoadBalancerIP(self, service_name):
@@ -817,6 +825,21 @@ class KubernetesCluster(BaseContainerCluster):
           "Load Balancer IP for service '%s' is not ready." % service_name)
 
     return format(ip_address)
+
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  def GetClusterIP(self, service_name) -> str:
+    """Returns the IP address of a ClusterIP service when ready."""
+    get_cmd = [
+        'get', 'service', service_name, '-o', 'jsonpath={.spec.clusterIP}'
+    ]
+
+    stdout, _, _ = RunKubectlCommand(get_cmd)
+
+    if not stdout:
+      raise errors.Resource.RetryableCreationError(
+          "ClusterIP for service '%s' is not ready." % service_name)
+
+    return stdout
 
   def CreateConfigMap(self, name, from_file_dir):
     """Creates a Kubernetes ConfigMap.

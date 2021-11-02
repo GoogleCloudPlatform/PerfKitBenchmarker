@@ -118,8 +118,7 @@
 -   Support default subnets in --aws_subnet with `default` as value passed.
 -   Add Unsupported config failure substatus for runs that are not supported by
     the cloud.
--   Add support for nodepools to `container_cluster` benchmark spec. Currently
-    only supports GCP.
+-   Add support for nodepools to `container_cluster` benchmark spec.
 -   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
 
 ### Bug fixes and maintenance updates:
@@ -185,3 +184,4 @@
 -   Added `--google_monitoring_endpoint` flag for querying a different endpoint
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
 -   Update Go language binary to version 1.17.2
+-   Broadens Azure quota detection parsing

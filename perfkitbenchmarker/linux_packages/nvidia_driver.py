@@ -82,9 +82,10 @@ flag_util.DEFINE_integerlist('gpu_clock_speeds',
 flags.DEFINE_boolean('gpu_autoboost_enabled', None,
                      'whether gpu autoboost is enabled')
 
-flags.DEFINE_string('nvidia_driver_version', '450.80.02',
-                    'The version of nvidia driver to install. '
-                    'For example, "418.67" or "418.87.01."')
+flags.DEFINE_string(
+    'nvidia_driver_version', '495.29.05',
+    'The version of nvidia driver to install. '
+    'For example, "418.67" or "418.87.01."')
 flags.DEFINE_boolean('nvidia_driver_force_install', False,
                      'Whether to install NVIDIA driver, even if it is already '
                      'installed.')
@@ -212,7 +213,7 @@ def GetGpuType(vm):
       if not line:
         continue
       splitted = line.split()
-      if splitted[2] == 'Tesla':
+      if splitted[2] in ('Tesla', 'NVIDIA'):
         gpu_types.append(splitted[3])
       else:
         gpu_types.append(splitted[2])

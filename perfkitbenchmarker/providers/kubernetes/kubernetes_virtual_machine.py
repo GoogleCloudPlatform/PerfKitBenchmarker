@@ -22,6 +22,7 @@ import posixpath
 import stat
 
 from absl import flags
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -39,6 +40,10 @@ import six
 FLAGS = flags.FLAGS
 
 SELECTOR_PREFIX = 'pkb'
+
+_SETUP_SSH = flags.DEFINE_boolean(
+    'kubernetes_vm_setup_ssh', False,
+    'Set up SSH on Kubernetes VMs. Probably not needed any more?')
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -248,7 +253,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
 
     if self.vm_group:
-      template['spec']['nodeSelector'] = {'pkb_nodepool': self.vm_group}
+      template['spec']['nodeSelector'] = {
+          'pkb_nodepool': container_service.NodePoolName(self.vm_group)
+      }
 
     if FLAGS.kubernetes_anti_affinity:
       template['spec']['affinity'] = {
@@ -442,33 +449,35 @@ class DebianBasedKubernetesVirtualMachine(
       remote_path = remote_path or file_name
       self.RemoteCommand('mv %s %s; chmod 777 %s' %
                          (file_name, remote_path, remote_path))
-    # Validate file sizes
-    # Sometimes kubectl cp seems to gracefully truncate the file.
-    local_size = os.path.getsize(file_path)
-    stdout, _ = self.RemoteCommand(f'stat -c %s {remote_path}')
-    remote_size = int(stdout)
-    if local_size != remote_size:
-      raise errors.VirtualMachine.RemoteCommandError(
-          f'Failed to copy {file_name}. '
-          f'Remote size {remote_size} != local size {local_size}')
+    # TODO(pclay): Validate directories
+    if not stat.S_ISDIR(os.stat(file_path).st_mode):
+      # Validate file sizes
+      # Sometimes kubectl cp seems to gracefully truncate the file.
+      local_size = os.path.getsize(file_path)
+      stdout, _ = self.RemoteCommand(f'stat -c %s {remote_path}')
+      remote_size = int(stdout)
+      if local_size != remote_size:
+        raise errors.VirtualMachine.RemoteCommandError(
+            f'Failed to copy {file_name}. '
+            f'Remote size {remote_size} != local size {local_size}')
 
-  @vm_util.Retry(log_errors=False, poll_interval=1)
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
     self.RemoteCommand(_install_sudo_command())
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
-    # Don't rely on SSH being installed in Kubernetes containers,
-    # so install it and restart the service so that it is ready to go.
-    # Although ssh is not required to connect to the container, MPI
-    # benchmarks require it.
-    # TODO(pclay): make optional
-    self.InstallPackages('ssh')
-    self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
-    self.RemoteCommand('mkdir -p ~/.ssh')
-    with open(self.ssh_public_key) as f:
-      key = f.read()
-      self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
+    if _SETUP_SSH.value:
+      # Don't rely on SSH being installed in Kubernetes containers,
+      # so install it and restart the service so that it is ready to go.
+      # Although ssh is not required to connect to the container, MPI
+      # benchmarks require it.
+      self.InstallPackages('ssh')
+      self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
+      self.RemoteCommand('mkdir -p ~/.ssh')
+      with open(self.ssh_public_key) as f:
+        key = f.read()
+        self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
 
+    # TODO(pclay): figure out if this is all necessary.
     # cpio is needed for the MKL math library.
     # software-properties-common is needed for add-apt-repository
     self.InstallPackages('cpio software-properties-common')

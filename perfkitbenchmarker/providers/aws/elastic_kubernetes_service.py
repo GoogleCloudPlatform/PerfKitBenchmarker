@@ -22,6 +22,7 @@ instructions.
 
 import logging
 import re
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -84,29 +85,58 @@ class EksCluster(container_service.KubernetesCluster):
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
-    tags = util.MakeDefaultTags()
     eksctl_flags = {
         'kubeconfig': FLAGS.kubeconfig,
         'managed': True,
         'name': self.name,
-        'nodegroup-name': 'eks',
-        'nodes': self.num_nodes,
-        'nodes-min': self.min_nodes,
-        'nodes-max': self.max_nodes,
-        'node-type': self.vm_config.machine_type,
-        'node-volume-size': self.vm_config.boot_disk_size,
-        'region': self.region,
-        'tags': ','.join('{}={}'.format(k, v) for k, v in tags.items()),
-        'ssh-public-key':
-            aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
+        'nodegroup-name': container_service.DEFAULT_NODEPOOL,
         'version': self.cluster_version,
         # NAT mode uses an EIP.
         'vpc-nat-mode': 'Disable',
         'zones': ','.join(self.zones),
     }
+    if self.min_nodes != self.max_nodes:
+      eksctl_flags.update({
+          'nodes-min': self.min_nodes,
+          'nodes-max': self.max_nodes,
+      })
+    eksctl_flags.update(
+        self._GetNodeFlags(container_service.DEFAULT_NODEPOOL, self.num_nodes,
+                           self.vm_config))
+
     cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
         '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
     vm_util.IssueCommand(cmd, timeout=1800)
+
+    for name, node_group in self.nodepools.items():
+      self._CreateNodeGroup(name, node_group)
+
+  def _CreateNodeGroup(self, name: str, node_group):
+    """Creates a node group."""
+    eksctl_flags = {
+        'cluster': self.name,
+        'name': name,
+    }
+    eksctl_flags.update(
+        self._GetNodeFlags(name, node_group.num_nodes, node_group.vm_config))
+    cmd = [FLAGS.eksctl, 'create', 'node-group'] + sorted(
+        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
+    vm_util.IssueCommand(cmd, timeout=600)
+
+  def _GetNodeFlags(self, node_group: str, num_nodes: int,
+                    vm_config) -> Dict[str, Any]:
+    """Get common flags for creating clusters and node_groups."""
+    tags = util.MakeDefaultTags()
+    return {
+        'nodes': num_nodes,
+        'node-labels': f'pkb_nodepool={node_group}',
+        'node-type': vm_config.machine_type,
+        'node-volume-size': vm_config.boot_disk_size,
+        'region': self.region,
+        'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
+        'ssh-public-key':
+            aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
+    }
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""

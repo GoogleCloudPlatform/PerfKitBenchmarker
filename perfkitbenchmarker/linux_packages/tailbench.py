@@ -135,22 +135,22 @@ def _ParseResultsFile(input_file, name='') -> List[_TestResult]:
         service_values.append(float(line_values[1].strip()))
         sojourn_values.append(float(line_values[2].strip()))
   test_results = []
-  test_results.append(_TestResult(queue_values, name, 'queue_latency'))
-  test_results.append(_TestResult(service_values, name, 'service_latency'))
-  test_results.append(_TestResult(sojourn_values, name, 'sojourn_latency'))
+  test_results.append(_TestResult(queue_values, name, 'queue'))
+  test_results.append(_TestResult(service_values, name, 'service'))
+  test_results.append(_TestResult(sojourn_values, name, 'sojourn'))
   return test_results
 
 
 def BuildHistogramSamples(input_file,
                           name='',
-                          metric_prefix='',
+                          metric='',
                           additional_metadata=None) -> List[sample.Sample]:
   """Builds a list of samples for a the results of a test.
 
   Args:
     input_file: a string input file name.
     name: name of the test run that generated the file
-    metric_prefix: String. Prefix of the metric name to use.
+    metric: String. Metric name to use.
     additional_metadata: dict. Additional metadata attaching to Sample.
 
   Returns:
@@ -162,7 +162,7 @@ def BuildHistogramSamples(input_file,
   return [
       sample.CreateHistogramSample(result.histogram, result.name,
                                    result.subname, 'ms', additional_metadata,
-                                   metric_prefix) for result in test_results
+                                   metric) for result in test_results
   ]
 
 
