@@ -13,12 +13,10 @@ import boto3
 # see PEP 366 @ ReservedAssignment
 if __name__ == '__main__' and not __package__:
   # import for client VM
-  from messaging_service_client import MessagingServiceClient
-  from messaging_service_client import TIMEOUT
+  import messaging_service_client
 else:
   # import for blaze test
-  from perfkitbenchmarker.data.messaging_service.messaging_service_client import MessagingServiceClient
-  from perfkitbenchmarker.data.messaging_service.messaging_service_client import TIMEOUT
+  from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
 
 
 FLAGS = flags.FLAGS
@@ -27,7 +25,7 @@ flags.DEFINE_string('region', 'us-west-1', help='AWS region to use.')
 flags.DEFINE_string('queue_name', 'perfkit_queue', help='AWS SQS queue name.')
 
 
-class AWSSQSInterface(MessagingServiceClient):
+class AWSSQSInterface(messaging_service_client.MessagingServiceClient):
   """AWS SQS PubSub Interface Class."""
 
   def __init__(self, region_name: str, queue_name: str):
@@ -45,7 +43,9 @@ class AWSSQSInterface(MessagingServiceClient):
 
   def _pull_message(self) -> Dict[str, Any]:
     pulled_message = self.sqs_client.receive_message(
-        QueueUrl=self.queue.url, MaxNumberOfMessages=1, WaitTimeSeconds=TIMEOUT)
+        QueueUrl=self.queue.url,
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=messaging_service_client.TIMEOUT)
     return pulled_message
 
   def _acknowledge_received_message(self, response: Dict[str, Any]):

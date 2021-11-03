@@ -6,8 +6,7 @@ import unittest
 from absl.testing import parameterized
 import freezegun
 import mock
-from perfkitbenchmarker.data.messaging_service.messaging_service_client import MessagingServiceClient
-
+from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
 
 FAKE_DATETIME = datetime.datetime(2021, 6, 14)
 NUMBER_OF_MESSAGES = 10
@@ -67,7 +66,8 @@ AGGREGATE_PULL_METRICS = {
         'value': 0.11147687435150147,
         'unit': UNIT_OF_TIME,
         'metadata': {
-            'samples': METRICS}
+            'samples': METRICS
+        }
     },
     'pull_latency_mean_without_cold_start': {
         'value': 0.06490101814270019,
@@ -102,12 +102,26 @@ AGGREGATE_PULL_METRICS = {
 }
 
 
+class DummyMessagingServiceClient(
+    messaging_service_client.MessagingServiceClient):
+  """Dummy class to allow instance creation for abstract parent class."""
+
+  def _publish_message(self, message_payload: str):
+    pass
+
+  def _pull_message(self):
+    pass
+
+  def _acknowledge_received_message(self, response):
+    pass
+
+
 @freezegun.freeze_time(FAKE_DATETIME)
 class MessagingServiceClientTest(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.messaging_service = MessagingServiceClient()
+    self.messaging_service = DummyMessagingServiceClient()
 
   @parameterized.named_parameters(
       ('publish', 'publish_latency', AGGREGATE_PUBLISH_METRICS),
@@ -135,9 +149,9 @@ class MessagingServiceClientTest(parameterized.TestCase):
     self.assertLen(random_message, MESSAGE_SIZE)
     self.assertIsInstance(random_message, str)
 
-  @mock.patch.object(MessagingServiceClient, '_publish_message')
+  @mock.patch.object(DummyMessagingServiceClient, '_publish_message')
   @mock.patch.object(
-      MessagingServiceClient,
+      DummyMessagingServiceClient,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
   def testPublishMessages(self, summary_statistics_mock, publish_mock):
@@ -153,11 +167,11 @@ class MessagingServiceClientTest(parameterized.TestCase):
     self.assertEqual(publish_mock.call_count, NUMBER_OF_MESSAGES)
 
   @mock.patch.object(
-      MessagingServiceClient,
+      DummyMessagingServiceClient,
       '_publish_message',
       side_effect=Exception('MockedException'))
   @mock.patch.object(
-      MessagingServiceClient,
+      DummyMessagingServiceClient,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
   def testMeasurePublishMessagesException(self, summary_statistics_mock,
@@ -173,10 +187,11 @@ class MessagingServiceClientTest(parameterized.TestCase):
                                                NUMBER_OF_MESSAGES,
                                                FAILURE_COUNTER)
 
-  @mock.patch.object(MessagingServiceClient, '_pull_message')
-  @mock.patch.object(MessagingServiceClient, '_acknowledge_received_message')
+  @mock.patch.object(DummyMessagingServiceClient, '_pull_message')
+  @mock.patch.object(DummyMessagingServiceClient,
+                     '_acknowledge_received_message')
   @mock.patch.object(
-      MessagingServiceClient,
+      DummyMessagingServiceClient,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
   def testPullMessages(self, summary_statistics_mock, acknowledge_message_mock,
@@ -194,16 +209,16 @@ class MessagingServiceClientTest(parameterized.TestCase):
     self.assertEqual(acknowledge_message_mock.call_count, NUMBER_OF_MESSAGES)
 
   @mock.patch.object(
-      MessagingServiceClient,
+      DummyMessagingServiceClient,
       '_pull_message',
       side_effect=Exception('MockedException'))
-  @mock.patch.object(MessagingServiceClient, '_acknowledge_received_message')
+  @mock.patch.object(DummyMessagingServiceClient,
+                     '_acknowledge_received_message')
   @mock.patch.object(
-      MessagingServiceClient,
+      DummyMessagingServiceClient,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
-  def testPullMessagesException(self, summary_statistics_mock,
-                                _, pull_mock):
+  def testPullMessagesException(self, summary_statistics_mock, _, pull_mock):
 
     results = self.messaging_service._pull_messages(NUMBER_OF_MESSAGES)
 
@@ -215,17 +230,17 @@ class MessagingServiceClientTest(parameterized.TestCase):
                                                [], NUMBER_OF_MESSAGES,
                                                FAILURE_COUNTER)
 
-  @mock.patch.object(MessagingServiceClient, '_publish_messages')
+  @mock.patch.object(DummyMessagingServiceClient, '_publish_messages')
   def testRunPhasePublishScenario(self, publish_mock):
-    self.messaging_service.run_phase(
-        'publish_latency', NUMBER_OF_MESSAGES, MESSAGE_SIZE)
+    self.messaging_service.run_phase('publish_latency', NUMBER_OF_MESSAGES,
+                                     MESSAGE_SIZE)
 
     publish_mock.assert_called_with(NUMBER_OF_MESSAGES, MESSAGE_SIZE)
 
-  @mock.patch.object(MessagingServiceClient, '_pull_messages')
+  @mock.patch.object(DummyMessagingServiceClient, '_pull_messages')
   def testRunPhasePullScenario(self, pull_mock):
-    self.messaging_service.run_phase(
-        'pull_latency', NUMBER_OF_MESSAGES, MESSAGE_SIZE)
+    self.messaging_service.run_phase('pull_latency', NUMBER_OF_MESSAGES,
+                                     MESSAGE_SIZE)
 
     pull_mock.assert_called_with(NUMBER_OF_MESSAGES)
 

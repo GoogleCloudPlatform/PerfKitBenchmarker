@@ -11,7 +11,7 @@ from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 
 class DummyMessagingService(messaging_service.BaseMessagingService):

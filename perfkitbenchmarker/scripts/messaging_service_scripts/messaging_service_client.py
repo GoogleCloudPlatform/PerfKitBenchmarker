@@ -34,7 +34,7 @@ flags.DEFINE_integer('message_size',
                      "Ex: 1: 'A', 2: 'AA', ...")
 
 
-class MessagingServiceClient:
+class MessagingServiceClient(abc.ABC):
   """Generic MessagingServiceClient Class.
 
   This is a base class to all messaging service interfaces - GCP Cloud PubSub,
@@ -133,7 +133,7 @@ class MessagingServiceClient:
   def _publish_messages(
       self,
       number_of_messages: int,
-      message_size: int) -> List[float]:
+      message_size: int) -> Dict[str, Any]:
     """Publish messages on messaging service and measure single publish latency.
 
     This function attempts to publish messages to a messaging service in a
@@ -263,8 +263,13 @@ class MessagingServiceClient:
           'mean_latency': 0.3423443...
           ...
         }
+
+    Raises:
+      Exception: Raised if benchmark_scenario is unknown.
     """
     if benchmark_scenario == 'publish_latency':
       return self._publish_messages(number_of_messages, message_size)
     elif benchmark_scenario == 'pull_latency':
       return self._pull_messages(number_of_messages)
+    else:
+      raise Exception('Unknown benchmark scenario.')

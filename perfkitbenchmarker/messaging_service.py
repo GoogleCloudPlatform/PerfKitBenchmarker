@@ -14,7 +14,7 @@ import os
 from typing import Any, Dict
 from perfkitbenchmarker import resource
 
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 MESSAGING_SERVICE_CLIENT_PY = 'messaging_service_client.py'
 
 

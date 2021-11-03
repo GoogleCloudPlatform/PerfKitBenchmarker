@@ -16,7 +16,7 @@ SUBSCRIPTION = 'pkb-subscription-uri'
 BENCHMARK_SCENARIO = 'pull_latency'
 NUMBER_OF_MESSAGES = 10
 MESSAGE_SIZE = 10
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
 

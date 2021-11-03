@@ -14,7 +14,7 @@ _REGION = 'us-east-1b'
 _BENCHMARK_SCENARIO = 'pull_latency'
 _NUMBER_OF_MESSAGES = 10
 _MESSAGE_SIZE = 100
-_MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+_MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
 

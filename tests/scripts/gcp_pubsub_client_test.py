@@ -2,7 +2,7 @@
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.data.messaging_service.gcp_pubsub_client import GCPPubSubInterface
+from perfkitbenchmarker.scripts.messaging_service_scripts.gcp_pubsub_client import GCPPubSubInterface
 
 
 NUMBER_OF_MESSAGES = 1

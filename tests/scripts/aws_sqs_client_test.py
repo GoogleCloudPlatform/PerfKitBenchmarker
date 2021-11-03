@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.data.messaging_service.aws_sqs_client import AWSSQSInterface
+from perfkitbenchmarker.scripts.messaging_service_scripts.aws_sqs_client import AWSSQSInterface
 
 NUMBER_OF_MESSAGES = 1
 MESSAGE_SIZE = 10

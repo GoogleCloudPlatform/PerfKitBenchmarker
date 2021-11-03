@@ -14,25 +14,22 @@ from google.cloud.pubsub_v1.types import PullResponse
 # see PEP 366 @ ReservedAssignment
 if __name__ == '__main__' and not __package__:
   # import for client VM
-  from messaging_service_client import MessagingServiceClient
-  from messaging_service_client import TIMEOUT
-  from messaging_service_client import MESSAGE_CHARACTERS
+  import messaging_service_client
 else:
   # import for blaze test
-  from perfkitbenchmarker.data.messaging_service.messaging_service_client import MessagingServiceClient
-  from perfkitbenchmarker.data.messaging_service.messaging_service_client import TIMEOUT
-  from perfkitbenchmarker.data.messaging_service.messaging_service_client import MESSAGE_CHARACTERS
+  from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('pubsub_project', '', help='Project name.')
 flags.DEFINE_string('pubsub_topic', 'pkb-topic-default', help='Topic name.')
-flags.DEFINE_string('pubsub_subscription',
-                    'pkb-subscription-default',
-                    help='Subscription name.')
+flags.DEFINE_string(
+    'pubsub_subscription',
+    'pkb-subscription-default',
+    help='Subscription name.')
 
 
-class GCPPubSubInterface(MessagingServiceClient):
+class GCPPubSubInterface(messaging_service_client.MessagingServiceClient):
   """GCP PubSub Interface Class.
 
   This class takes care of running the specified benchmark on GCP PubSub.
@@ -47,20 +44,19 @@ class GCPPubSubInterface(MessagingServiceClient):
 
     self.topic_path = self.publisher.topic_path(self.project, self.topic)
     self.subscription_path = self.subscriber.subscription_path(
-        self.project,
-        self.subscription)
+        self.project, self.subscription)
 
   def _generate_random_message(self, message_size: int) -> bytes:
     message = ''.join(
-        random.choice(MESSAGE_CHARACTERS) for _ in range(message_size))
+        random.choice(messaging_service_client.MESSAGE_CHARACTERS)
+        for _ in range(message_size))
     return message.encode('utf-8')
 
   def _publish_message(self, message: bytes) -> str:
     """Publishes a single message to a PubSub topic."""
-    published_message = self.publisher.publish(
-        self.topic_path,
-        message)
-    message_id = published_message.result(timeout=TIMEOUT)
+    published_message = self.publisher.publish(self.topic_path, message)
+    message_id = published_message.result(
+        timeout=messaging_service_client.TIMEOUT)
     return message_id
 
   def _pull_message(self) -> PullResponse:
@@ -72,7 +68,7 @@ class GCPPubSubInterface(MessagingServiceClient):
             'subscription': self.subscription_path,
             'max_messages': 1
         },
-        retry=retry.Retry(deadline=TIMEOUT))
+        retry=retry.Retry(deadline=messaging_service_client.TIMEOUT))
     return pulled_message
 
   def _acknowledge_received_message(self, response: PullResponse) -> None:
@@ -82,8 +78,10 @@ class GCPPubSubInterface(MessagingServiceClient):
       for received_message in response.received_messages:
         ack_ids.append(received_message.ack_id)
       # Acknowledges the received messages so they will not be sent again.
-      self.subscriber.acknowledge(
-          request={'subscription': self.subscription_path, 'ack_ids': ack_ids})
+      self.subscriber.acknowledge(request={
+          'subscription': self.subscription_path,
+          'ack_ids': ack_ids
+      })
 
 
 def main():
