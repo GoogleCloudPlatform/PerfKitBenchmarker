@@ -164,7 +164,7 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
     remote_run_cmd = (f'python3 -m gcp_pubsub_client '
-                      f'--project={PROJECT} '
+                      f'--pubsub_project={PROJECT} '
                       f'--pubsub_topic={TOPIC} '
                       f'--pubsub_subscription={SUBSCRIPTION} '
                       f'--benchmark_scenario={BENCHMARK_SCENARIO} '

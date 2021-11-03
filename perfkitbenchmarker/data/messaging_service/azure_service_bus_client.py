@@ -31,8 +31,6 @@ flags.DEFINE_string(
     'pkb-subscription-default',
     help='Azure Service Bus subscription name.')
 
-FLAGS(sys.argv)
-
 
 class AzureServiceBusInterface(messaging_service_client.MessagingServiceClient):
   """Azure ServiceBus Interface Class."""
@@ -73,6 +71,7 @@ class AzureServiceBusInterface(messaging_service_client.MessagingServiceClient):
 
 
 def main():
+  FLAGS(sys.argv)
   benchmark_runner = AzureServiceBusInterface(FLAGS.connection_str,
                                               FLAGS.topic_name,
                                               FLAGS.subscription_name)

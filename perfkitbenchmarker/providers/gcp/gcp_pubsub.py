@@ -93,7 +93,7 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
         }
     """
     command = (f'python3 -m gcp_pubsub_client '
-               f'--project={self.project} '
+               f'--pubsub_project={self.project} '
                f'--pubsub_topic={self.pubsub_topic} '
                f'--pubsub_subscription={self.pubsub_subscription} '
                f'--benchmark_scenario={benchmark_scenario} '

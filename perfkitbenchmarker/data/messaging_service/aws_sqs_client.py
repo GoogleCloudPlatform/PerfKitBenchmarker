@@ -26,8 +26,6 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('region', 'us-west-1', help='AWS region to use.')
 flags.DEFINE_string('queue_name', 'perfkit_queue', help='AWS SQS queue name.')
 
-FLAGS(sys.argv)
-
 
 class AWSSQSInterface(MessagingServiceClient):
   """AWS SQS PubSub Interface Class."""
@@ -58,6 +56,7 @@ class AWSSQSInterface(MessagingServiceClient):
 
 
 def main():
+  FLAGS(sys.argv)
   benchmark_runner = AWSSQSInterface(FLAGS.region, FLAGS.queue_name)
   benchmark_runner.run_phase(FLAGS.benchmark_scenario, FLAGS.number_of_messages,
                              FLAGS.message_size)

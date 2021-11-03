@@ -25,13 +25,11 @@ else:
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('project', '', help='Project name.')
+flags.DEFINE_string('pubsub_project', '', help='Project name.')
 flags.DEFINE_string('pubsub_topic', 'pkb-topic-default', help='Topic name.')
 flags.DEFINE_string('pubsub_subscription',
                     'pkb-subscription-default',
                     help='Subscription name.')
-
-FLAGS(sys.argv)
 
 
 class GCPPubSubInterface(MessagingServiceClient):
@@ -89,7 +87,8 @@ class GCPPubSubInterface(MessagingServiceClient):
 
 
 def main():
-  benchmark_runner = GCPPubSubInterface(FLAGS.project,
+  FLAGS(sys.argv)
+  benchmark_runner = GCPPubSubInterface(FLAGS.pubsub_project,
                                         FLAGS.pubsub_topic,
                                         FLAGS.pubsub_subscription)
   benchmark_runner.run_phase(FLAGS.benchmark_scenario, FLAGS.number_of_messages,
