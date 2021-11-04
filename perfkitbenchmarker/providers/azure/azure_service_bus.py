@@ -17,7 +17,9 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 
 FLAGS = flags.FLAGS
-AZURE_SERVICE_BUS_CLIENT_PY = 'azure_service_bus_client.py'
+MESSAGING_SERVICE_SCRIPTS_VM_AZURE_DIR = os.path.join(
+    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'azure')
+MESSAGING_SERVICE_SCRIPTS_AZURE_BIN = 'messaging_service_scripts/azure_service_bus_client.py'
 
 
 class AzureServiceBus(msgsvc.BaseMessagingService):
@@ -77,9 +79,7 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
     # Install/uploads Azure specific modules/files.
     self.client_vm.RemoteCommand(
         'sudo pip3 install azure-servicebus', ignore_failure=False)
-    self.client_vm.PushDataFile(
-        os.path.join(msgsvc.MESSAGING_SERVICE_DATA_DIR,
-                     AZURE_SERVICE_BUS_CLIENT_PY))
+    self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_AZURE_BIN)
 
   @property
   def location(self):

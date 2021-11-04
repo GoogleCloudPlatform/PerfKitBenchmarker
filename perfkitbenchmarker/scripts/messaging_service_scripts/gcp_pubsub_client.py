@@ -11,13 +11,7 @@ from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1.types import PullResponse
 
-# see PEP 366 @ ReservedAssignment
-if __name__ == '__main__' and not __package__:
-  # import for client VM
-  import messaging_service_client
-else:
-  # import for blaze test
-  from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
+from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
 
 FLAGS = flags.FLAGS
 

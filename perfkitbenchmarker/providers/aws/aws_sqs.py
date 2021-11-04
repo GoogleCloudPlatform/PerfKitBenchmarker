@@ -12,9 +12,10 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
-
 FLAGS = flags.FLAGS
-AWS_SQS_CLIENT_PY = 'aws_sqs_client.py'
+MESSAGING_SERVICE_SCRIPTS_VM_AWS_DIR = os.path.join(
+    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'aws')
+MESSAGING_SERVICE_SCRIPTS_AWS_BIN = 'messaging_service_scripts/aws_sqs_client.py'
 
 
 class AwsSqs(msgsvc.BaseMessagingService):
@@ -73,17 +74,13 @@ class AwsSqs(msgsvc.BaseMessagingService):
 
   def _InstallCloudClients(self):
     self.client_vm.RemoteCommand(
-        'sudo pip3 install boto3',
-        ignore_failure=False)
-    self.client_vm.PushDataFile(os.path.join(
-        msgsvc.MESSAGING_SERVICE_DATA_DIR,
-        AWS_SQS_CLIENT_PY))
+        'sudo pip3 install boto3', ignore_failure=False)
+    self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_AWS_BIN)
+
     # copy AWS creds
     self.client_vm.Install('aws_credentials')
 
-  def Run(self,
-          benchmark_scenario: str,
-          number_of_messages: str,
+  def Run(self, benchmark_scenario: str, number_of_messages: str,
           message_size: str):
     """Runs remote commands on client VM - benchmark's run phase."""
     command = (f'python3 -m aws_sqs_client '

@@ -10,14 +10,7 @@ from typing import Any, Dict
 
 from absl import flags
 import boto3
-# see PEP 366 @ ReservedAssignment
-if __name__ == '__main__' and not __package__:
-  # import for client VM
-  import messaging_service_client
-else:
-  # import for blaze test
-  from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
-
+from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
 
 FLAGS = flags.FLAGS
 

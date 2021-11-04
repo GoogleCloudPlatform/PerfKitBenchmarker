@@ -1,6 +1,5 @@
 """Tests for gcp_pubsub."""
 
-import os
 import unittest
 
 from absl import flags
@@ -99,13 +98,12 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = [None, None, 0]
     self._MockIssueCommand(return_value)
 
-    sdk_cmd = ('sudo pip3 install boto3')
-    datafile_path = os.path.join(_MESSAGING_SERVICE_DATA_DIR,
-                                 'aws_sqs_client.py')
-
     self.sqs.PrepareClientVm()
-    self.client.RemoteCommand.assert_called_with(sdk_cmd, ignore_failure=False)
-    self.client.PushDataFile.assert_called_with(datafile_path)
+    self.client.assert_has_calls([
+        mock.call.RemoteCommand(
+            'sudo pip3 install boto3', ignore_failure=False),
+        mock.call.PushDataFile('messaging_service_scripts/aws_sqs_client.py'),
+    ])
     self.client.Install.assert_called_with('aws_credentials')
 
   def testRun(self):

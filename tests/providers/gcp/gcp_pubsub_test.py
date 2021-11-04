@@ -1,6 +1,5 @@
 """Tests for gcp_pubsub."""
 
-import os
 import unittest
 
 from absl import flags
@@ -150,14 +149,11 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = [None, None, 0]
     self._MockIssueCommand(return_value)
 
-    sdk_cmd = ('sudo pip3 install --upgrade --ignore-installed '
-               'google-cloud-pubsub')
-    datafile_path = os.path.join(MESSAGING_SERVICE_DATA_DIR,
-                                 'gcp_pubsub_client.py')
-
     self.pubsub.PrepareClientVm()
-    self.client.RemoteCommand.assert_called_with(sdk_cmd, ignore_failure=False)
-    self.client.PushDataFile.assert_called_with(datafile_path)
+    self.client.assert_has_calls([
+        mock.call.PushDataFile(
+            'messaging_service_scripts/gcp_pubsub_client.py'),
+    ])
 
   def testRun(self):
 

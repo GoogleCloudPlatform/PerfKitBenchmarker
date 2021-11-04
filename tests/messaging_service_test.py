@@ -3,7 +3,6 @@
 This is the common interface used by the benchmark VM to run the benchmark.
 """
 
-import os
 import unittest
 from unittest import mock
 
@@ -52,14 +51,20 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.messaging_service._InstallCommonClientPackages()
 
     self.client.assert_has_calls([
-        mock.call.Install('python3'),
-        mock.call.Install('pip3'),
-        mock.call.RemoteCommand('sudo pip3 install absl-py numpy')
+        mock.call.RemoteCommand('sudo pip3 install absl-py numpy'),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts'),
+        mock.call.RemoteCommand(
+            "find ~/perfkitbenchmarker -type d -exec touch '{}/__init__.py' \\;"
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/messaging_service_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/messaging_service_client.py'
+        )
     ])
-
-    datafile_path = os.path.join(MESSAGING_SERVICE_DATA_DIR,
-                                 'messaging_service_client.py')
-    self.client.PushDataFile.assert_called_with(datafile_path)
 
 
 if __name__ == '__main__':

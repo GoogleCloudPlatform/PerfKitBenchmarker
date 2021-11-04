@@ -4,20 +4,15 @@ This Azure ServiceBus client interface is implemented using Azure SDK for
 Python:
 https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/servicebus/azure-servicebus
 """
-# pylint: disable=g-import-not-at-top
 import random
 import sys
 
 from absl import flags
+# pytype: disable=import-error
 from azure import servicebus
+# pytype: enable=import-error
 
-# see PEP 366 @ ReservedAssignment
-if __name__ == '__main__' and not __package__:
-  # import for client VM
-  import messaging_service_client
-else:
-  # import for test
-  from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
+from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
 
 FLAGS = flags.FLAGS
 
