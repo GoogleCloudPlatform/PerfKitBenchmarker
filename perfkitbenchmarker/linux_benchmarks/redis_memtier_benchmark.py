@@ -90,11 +90,18 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   memtier.Load(server_vm, 'localhost', str(redis_server.DEFAULT_PORT))
 
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
+  vm_util.SetupSimulatedMaintenance(server_vm)
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
   client_vms = bm_spec.vm_groups['clients']
+
+  # if testing performance due to a live migration, simulate live migration.
+  # actual live migration timestamps is not reported by PKB.
+  if FLAGS.simulate_maintenance:
+    vm_util.StartSimulatedMaintenance()
+
   results = memtier.RunOverAllThreadsPipelinesAndClients(
       client_vms[0], bm_spec.redis_endpoint_ip, str(redis_server.DEFAULT_PORT))
   redis_metadata = redis_server.GetMetadata()

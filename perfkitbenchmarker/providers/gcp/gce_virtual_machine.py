@@ -911,8 +911,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def SimulateMaintenanceEvent(self):
     """Simulates a maintenance event on the VM."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'instances',
-                             'simulate-maintenance-event', self.name)
+    cmd = util.GcloudCommand(self, 'compute', 'instances',
+                             'simulate-maintenance-event', self.name, '--async')
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode:
       raise errors.VirtualMachine.VirtualMachineError(

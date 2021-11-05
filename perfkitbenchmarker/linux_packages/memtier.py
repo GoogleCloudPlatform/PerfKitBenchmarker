@@ -13,6 +13,7 @@
 # limitations under the License.
 """Module containing memtier installation, utilization and cleanup functions."""
 
+import copy
 import dataclasses
 import json
 import logging
@@ -41,6 +42,7 @@ _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
 _WRITE_ONLY = '1:0'
 CPU_TOLERANCE = 0.05
 WARM_UP_SECONDS = 360
+JSON_OUT_FILE = '/tmp/json_data'
 
 MemtierHistogram = List[Dict[str, Union[float, int]]]
 
@@ -176,6 +178,7 @@ def BuildMemtierCommand(
     outfile: Optional[pathlib.PosixPath] = None,
     password: Optional[str] = None,
     cluster_mode: Optional[bool] = None,
+    json_out_file: Optional[str] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
@@ -195,6 +198,7 @@ def BuildMemtierCommand(
       'requests': requests,
       'run-count': run_count,
       'test-time': test_time,
+      'json-out-file': json_out_file,
       'print-percentile': '50,90,95,99,99.9',
   }
   # Arguments passed without a parameter
@@ -393,11 +397,13 @@ def _Run(vm,
       requests=requests,
       password=password,
       outfile=MEMTIER_RESULTS,
-      cluster_mode=MEMTIER_CLUSTER_MODE.value)
+      cluster_mode=MEMTIER_CLUSTER_MODE.value,
+      json_out_file=JSON_OUT_FILE)
   vm.RemoteCommand(cmd)
 
   output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
-  return MemtierResult.Parse(output)
+  time_series_json, _ = vm.RemoteCommand('cat {0}'.format(JSON_OUT_FILE))
+  return MemtierResult.Parse(output, time_series_json)
 
 
 def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
@@ -433,13 +439,16 @@ class MemtierResult:
   latency_ms: float
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
+  ops_time_series: List[Tuple[int, int]]
 
   @classmethod
-  def Parse(cls, memtier_results: Text) -> 'MemtierResult':
+  def Parse(cls, memtier_results: Text,
+            time_series_json: Text) -> 'MemtierResult':
     """Parse memtier_benchmark result textfile and return results.
 
     Args:
       memtier_results: Text output of running Memtier benchmark.
+      time_series_json: Time series data of the results in json format.
 
     Returns:
       MemtierResult object.
@@ -473,8 +482,9 @@ class MemtierResult:
     ops_per_sec, latency_ms, kb_per_sec = _ParseTotalThroughputAndLatency(
         memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
+    ops_time_series = _ParseTimeSeries(time_series_json)
     return cls(ops_per_sec, kb_per_sec, latency_ms, get_histogram,
-               set_histogram)
+               set_histogram, ops_time_series)
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
@@ -485,10 +495,18 @@ class MemtierResult:
     ]
     for name, histogram in [('get', self.get_latency_histogram),
                             ('set', self.set_latency_histogram)]:
-      hist_meta = metadata.copy()
+      hist_meta = copy.deepcopy(metadata)
       hist_meta.update({'histogram': json.dumps(histogram)})
       samples.append(
           sample.Sample(f'{name} latency histogram', 0, '', hist_meta))
+    for interval, count in self.ops_time_series:
+      time_series_meta = copy.deepcopy(metadata)
+      time_series_meta.update({
+          'time_series_sec': interval,
+          'time_series_ops': count,
+      })
+      samples.append(
+          sample.Sample('Ops Time Series', count, 'ops', time_series_meta))
     return samples
 
 
@@ -560,3 +578,14 @@ def _ParseLine(pattern: str, line: str, approx_total: int, last_total: int,
 def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
   """Given total value and a 100-based percentage, returns the actual value."""
   return percent / 100 * total_value
+
+
+def _ParseTimeSeries(time_series_json: Text) -> List[Tuple[int, int]]:
+  """Parse time series ops throughput from json output."""
+  results = []
+  raw = json.loads(time_series_json)
+  time_series = raw['ALL STATS']['Totals']['Time-Serie']
+  for interval, data_dict in time_series.items():
+    results.append((interval, data_dict['Count']))
+  return results
+
