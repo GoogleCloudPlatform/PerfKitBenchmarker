@@ -64,6 +64,8 @@ flags.DEFINE_string('managed_db_memory', None,
                     'string as custom machine memory type.')
 flags.DEFINE_integer('managed_db_disk_size', None,
                      'Size of the database disk in GB.')
+flags.DEFINE_integer('db_num_striped_disks', None,
+                     'The number of data disks to stripe together to form one.')
 flags.DEFINE_string('managed_db_disk_type', None, 'Disk type of the database.')
 flags.DEFINE_integer('managed_db_disk_iops', None,
                      'Disk iops of the database on AWS io1 disks.')
