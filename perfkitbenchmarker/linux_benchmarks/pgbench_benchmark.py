@@ -31,13 +31,10 @@
 """
 
 import re
-import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import publisher
-from perfkitbenchmarker import sample
-
+from perfkitbenchmarker.linux_packages import pgbench
 
 flags.DEFINE_integer(
     'pgbench_scale_factor', 1, 'scale factor used to fill the database',
@@ -150,6 +147,14 @@ def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.client_counts = FLAGS.pgbench_client_counts
 
 
+def GetDbSize(relational_db, db_name):
+  """Get the size of the database."""
+  stdout, _ = relational_db.client_vm_query_tools.IssueSqlCommand(
+      f'SELECT pg_size_pretty(pg_database_size(\'{db_name}\'))',
+      database_name=TEST_DB_NAME)
+  return ParseSizeFromTable(stdout)
+
+
 def Prepare(benchmark_spec):
   """Prepares the client and server VM for the pgbench test.
 
@@ -174,14 +179,8 @@ def Prepare(benchmark_spec):
   CreateDatabase(benchmark_spec, DEFAULT_DB_NAME, TEST_DB_NAME)
 
   connection_string = db.client_vm_query_tools.GetConnectionString(TEST_DB_NAME)
-  vm.RobustRemoteCommand('pgbench {0} -i -s {1}'.format(
-      connection_string, benchmark_spec.scale_factor))
-
-  stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
-      'SELECT pg_size_pretty(pg_database_size(\'{0}\'))'.format(TEST_DB_NAME),
-      database_name=TEST_DB_NAME)
-
-  db.postgres_db_size_MB = ParseSizeFromTable(stdout)
+  vm.RobustRemoteCommand(f'pgbench {connection_string} -i '
+                         f'-s {benchmark_spec.scale_factor}')
 
 
 def ParseSizeFromTable(stdout):
@@ -211,7 +210,7 @@ def ParseSizeFromTable(stdout):
   elif units == 'GB':
     return size * 1000
   else:
-    raise Exception('Unknown how to parse units {0} {1}.'.format(size, units))
+    raise Exception(f'Unknown how to parse units {size} {units}.')
 
 
 def DoesDatabaseExist(client_vm, connection_string, database_name):
@@ -225,8 +224,8 @@ def DoesDatabaseExist(client_vm, connection_string, database_name):
   Returns:
     True if database_name exists, else False
   """
-  command = 'psql {0} -lqt | cut -d \| -f 1 | grep -qw {1}'.format(
-      connection_string, database_name)
+  command = (f'psql {connection_string} '
+             fr'-lqt | cut -d \| -f 1 | grep -qw {database_name}')
   _, _, return_value = client_vm.RemoteCommandWithReturnCode(
       command, ignore_failure=True)
   return return_value == 0
@@ -252,48 +251,13 @@ def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
 
   if DoesDatabaseExist(client_vm, connection_string, new_database_name):
     db.client_vm_query_tools.IssueSqlCommand(
-        'DROP DATABASE {0}'.format(new_database_name),
+        f'DROP DATABASE {new_database_name}',
         database_name=default_database_name)
 
   db.client_vm_query_tools.IssueSqlCommand(
       'CREATE DATABASE {0}'.format(new_database_name),
       database_name=default_database_name,
   )
-
-
-def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
-                          additional_metadata):
-  """Creates sample objects from the given pgbench output and metadata.
-
-  Two samples will be returned, one containing a latency list and
-  the other a tps (transactions per second) list. Each will contain
-  N floating point samples, where N = FLAGS.pgbench_seconds_per_test.
-
-  Args:
-    pgbench_stderr: stderr from the pgbench run command
-    num_clients: number of pgbench clients used
-    num_jobs: number of pgbench jobs (threads) used
-    additional_metadata: additional metadata to add to each sample
-
-  Returns:
-    A list containing a latency sample and a tps sample. Each sample
-    consists of a list of floats, sorted by time that were collected
-    by running pgbench with the given client and job counts.
-  """
-  lines = pgbench_stderr.splitlines()[2:]
-  tps_numbers = [float(line.split(' ')[3]) for line in lines]
-  latency_numbers = [float(line.split(' ')[6]) for line in lines]
-
-  metadata = additional_metadata.copy()
-  metadata.update({'clients': num_clients, 'jobs': num_jobs})
-  tps_metadata = metadata.copy()
-  tps_metadata.update({'tps': tps_numbers})
-  latency_metadata = metadata.copy()
-  latency_metadata.update({'latency': latency_numbers})
-
-  tps_sample = sample.Sample('tps_array', -1, 'tps', tps_metadata)
-  latency_sample = sample.Sample('latency_array', -1, 'ms', latency_metadata)
-  return [tps_sample, latency_sample]
 
 
 def Run(benchmark_spec):
@@ -308,31 +272,28 @@ def Run(benchmark_spec):
   """
   UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
 
-  db = benchmark_spec.relational_db
-  connection_string = db.client_vm_query_tools.GetConnectionString(
-      database_name=TEST_DB_NAME)
+  relational_db = benchmark_spec.relational_db
+  db_size = GetDbSize(relational_db, TEST_DB_NAME)
+  common_metadata = GetMetaData(db_size, benchmark_spec)
 
-  common_metadata = {
+  pgbench.RunPgBench(benchmark_spec, relational_db, benchmark_spec.vms[0],
+                     TEST_DB_NAME,
+                     benchmark_spec.client_counts,
+                     benchmark_spec.seconds_to_pause,
+                     benchmark_spec.seconds_per_test, common_metadata)
+  return []
+
+
+def GetMetaData(db_size, benchmark_spec):
+  """Gets the metadata related to pgbench."""
+  metadata = {
       'scale_factor': benchmark_spec.scale_factor,
-      'postgres_db_size_MB': db.postgres_db_size_MB,
+      'postgres_db_size_MB': db_size,
       'seconds_per_test': benchmark_spec.seconds_per_test,
       'seconds_to_pause_before_steps': benchmark_spec.seconds_to_pause,
   }
-  for client in benchmark_spec.client_counts:
-    time.sleep(benchmark_spec.seconds_to_pause)
-    jobs = min(client, 16)
-    command = ('pgbench {0} --client={1} --jobs={2} --time={3} --progress=1 '
-               '--report-latencies'.format(
-                   connection_string,
-                   client,
-                   jobs,
-                   benchmark_spec.seconds_per_test))
-    _, stderr = benchmark_spec.vms[0].RobustRemoteCommand(
-        command, should_log=True)
-    samples = MakeSamplesFromOutput(
-        stderr, client, jobs, common_metadata)
-    publisher.PublishRunStageSamples(benchmark_spec, samples)
-  return []
+
+  return metadata
 
 
 def Cleanup(benchmark_spec):
