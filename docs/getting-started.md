@@ -10,8 +10,11 @@ tested on Python 3.7. We recommend using a
 [virtual environment](https://docs.python.org/3/tutorial/venv.html) to manage
 different Python versions and their required `pip` dependencies.
 
-Create a virtual environment, this will set python3 as the default version. `sh
-python3 -m venv pkb-virtualenv`
+Create a virtual environment, this will set python3 as the default version.
+
+```sh
+python3 -m venv pkb-virtualenv
+```
 
 Activate this virtual environment. When you're finished you can simply type
 `deactivate`.
