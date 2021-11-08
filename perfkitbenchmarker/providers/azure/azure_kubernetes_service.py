@@ -208,6 +208,7 @@ class AksCluster(container_service.KubernetesCluster):
   def _Delete(self):
     """Deletes the AKS cluster."""
     # This will be deleted along with the resource group
+    super()._Delete()
     self._deleted = True
 
   def _PostCreate(self):

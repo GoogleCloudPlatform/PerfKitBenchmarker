@@ -199,7 +199,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       cluster._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertEqual(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 3)
       self.assertIn('gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
                     command_string)
       self.assertIn('--zone us-central1-a', command_string)

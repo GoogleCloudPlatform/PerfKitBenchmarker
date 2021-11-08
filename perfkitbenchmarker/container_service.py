@@ -751,6 +751,26 @@ class KubernetesCluster(BaseContainerCluster):
 
   CLUSTER_TYPE = KUBERNETES
 
+  def _DeleteAllFromDefaultNamespace(self):
+    """Deletes all resources from a namespace.
+
+    Since StatefulSets do not reclaim PVCs upon deletion, they are explicitly
+    deleted here to prevent dynamically provisioned PDs from leaking once the
+    cluster has been deleted.
+    """
+    run_cmd = [
+        'delete', 'all', '--all', '-n', 'default'
+    ]
+    RunKubectlCommand(run_cmd)
+
+    run_cmd = [
+        'delete', 'pvc', '--all', '-n', 'default'
+    ]
+    RunKubectlCommand(run_cmd)
+
+  def _Delete(self):
+    self._DeleteAllFromDefaultNamespace()
+
   def DeployContainer(self, base_name, container_spec):
     """Deploys Containers according to the ContainerSpec."""
     name = base_name + str(len(self.containers[base_name]))

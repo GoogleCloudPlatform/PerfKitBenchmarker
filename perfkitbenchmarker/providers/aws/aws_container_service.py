@@ -554,6 +554,7 @@ class AwsKopsCluster(container_service.KubernetesCluster):
 
   def _Delete(self):
     """Deletes the cluster."""
+    super()._Delete()
     delete_cmd = [
         FLAGS.kops, 'delete', 'cluster',
         '--name=%s' % self.name,
