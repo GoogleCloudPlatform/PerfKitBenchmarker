@@ -6,7 +6,7 @@ import unittest
 from absl.testing import parameterized
 import freezegun
 import mock
-from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 
 FAKE_DATETIME = datetime.datetime(2021, 6, 14)
 NUMBER_OF_MESSAGES = 10
@@ -102,9 +102,12 @@ AGGREGATE_PULL_METRICS = {
 }
 
 
-class DummyMessagingServiceClient(
-    messaging_service_client.MessagingServiceClient):
+class DummyMessagingServiceClient(client.BaseMessagingServiceClient):
   """Dummy class to allow instance creation for abstract parent class."""
+
+  @classmethod
+  def from_flags(cls):
+    pass
 
   def _publish_message(self, message_payload: str):
     pass

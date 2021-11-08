@@ -58,12 +58,26 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
             "find ~/perfkitbenchmarker -type d -exec touch '{}/__init__.py' \\;"
         ),
         mock.call.RemoteCommand(
-            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts'
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
         ),
         mock.call.PushDataFile(
-            'messaging_service_scripts/messaging_service_client.py',
-            '~/perfkitbenchmarker/scripts/messaging_service_scripts/messaging_service_client.py'
-        )
+            'messaging_service_scripts/common/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/app.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/app.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/client.py'
+        ),
     ])
 
 

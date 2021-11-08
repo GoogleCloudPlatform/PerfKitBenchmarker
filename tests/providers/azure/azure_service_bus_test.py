@@ -181,9 +181,20 @@ class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
     self.servicebus.PrepareClientVm()
     self.client.assert_has_calls([
         mock.call.RemoteCommand(
-            'sudo pip3 install azure-servicebus', ignore_failure=False),
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/azure'
+        ),
         mock.call.PushDataFile(
-            'messaging_service_scripts/azure_service_bus_client.py'),
+            'messaging_service_scripts/azure/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/azure/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/azure'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/azure/azure_service_bus_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/azure/azure_service_bus_client.py'
+        ),
+        mock.call.PushDataFile('messaging_service_scripts/azure_benchmark.py'),
     ])
 
   @mock.patch.object(
@@ -195,7 +206,7 @@ class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
     remote_run_cmd = (
-        f'python3 -m azure_service_bus_client '
+        f'python3 -m azure_benchmark '
         f'--topic_name={self.servicebus.topic_name} '
         f'--subscription_name={self.servicebus.subscription_name} '
         f'--benchmark_scenario={BENCHMARK_SCENARIO} '

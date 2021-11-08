@@ -18,9 +18,13 @@ MESSAGING_SERVICE_SCRIPTS_VM_PKB = os.path.join('~', 'perfkitbenchmarker')
 MESSAGING_SERVICE_SCRIPTS_VM_BIN_DIR = '~'
 MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR = os.path.join(
     '~', 'perfkitbenchmarker', 'scripts', 'messaging_service_scripts')
-MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX = 'messaging_service_scripts/'
+MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR = os.path.join(
+    MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'common')
+MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX = 'messaging_service_scripts/common/'
 MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
-    'messaging_service_client.py',
+    '__init__.py',
+    'app.py',
+    'client.py',
 ]
 
 
@@ -72,7 +76,7 @@ class BaseMessagingService(resource.BaseResource):
     self._CopyFiles(
         MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX,
         MESSAGING_SERVICE_SCRIPTS_COMMON_FILES,
-        MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR)
+        MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR)
 
   def _CopyFiles(self, prefix, data_srcs, vm_dest_dir):
     for subpath in data_srcs:

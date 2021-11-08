@@ -101,15 +101,27 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     self.sqs.PrepareClientVm()
     self.client.assert_has_calls([
         mock.call.RemoteCommand(
-            'sudo pip3 install boto3', ignore_failure=False),
-        mock.call.PushDataFile('messaging_service_scripts/aws_sqs_client.py'),
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/aws/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/aws/aws_sqs_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/aws_sqs_client.py'
+        ),
+        mock.call.PushDataFile('messaging_service_scripts/aws_benchmark.py'),
     ])
     self.client.Install.assert_called_with('aws_credentials')
 
   def testRun(self):
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
-    remote_run_cmd = (f'python3 -m aws_sqs_client '
+    remote_run_cmd = (f'python3 -m aws_benchmark '
                       f'--queue_name={self.sqs.queue_name} '
                       f'--region={self.sqs.region} '
                       f'--benchmark_scenario={_BENCHMARK_SCENARIO} '

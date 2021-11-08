@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.scripts.messaging_service_scripts.aws_sqs_client import AWSSQSInterface
+from perfkitbenchmarker.scripts.messaging_service_scripts.aws import aws_sqs_client
 
 NUMBER_OF_MESSAGES = 1
 MESSAGE_SIZE = 10
@@ -19,7 +19,7 @@ class AWSSQSClientTest(unittest.TestCase):
   def testPublishMessage(self, _, resource_mock):
     message = 'test_message'
 
-    aws_interface = AWSSQSInterface(REGION_NAME, QUEUE_NAME)
+    aws_interface = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
     aws_interface._publish_message(message)
 
     # assert publish was called
@@ -32,7 +32,7 @@ class AWSSQSClientTest(unittest.TestCase):
             'ReceiptHandle': 'MockedReceipt'
         }]
     }
-    aws_interface = AWSSQSInterface(REGION_NAME, QUEUE_NAME)
+    aws_interface = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
     aws_interface._pull_message()
     queue_url = resource_mock.return_value.get_queue_by_name().url
 
@@ -49,7 +49,7 @@ class AWSSQSClientTest(unittest.TestCase):
         }]
     }
 
-    aws_interface = AWSSQSInterface(REGION_NAME, QUEUE_NAME)
+    aws_interface = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
     aws_interface._acknowledge_received_message(response)
     queue_url = resource_mock.return_value.get_queue_by_name().url
 

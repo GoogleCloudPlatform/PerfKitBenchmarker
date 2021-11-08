@@ -151,15 +151,31 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.pubsub.PrepareClientVm()
     self.client.assert_has_calls([
+        mock.call.RemoteCommand(
+            'sudo pip3 install --upgrade --ignore-installed google-cloud-pubsub',
+            ignore_failure=False),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
+        ),
         mock.call.PushDataFile(
-            'messaging_service_scripts/gcp_pubsub_client.py'),
+            'messaging_service_scripts/gcp/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/gcp/gcp_pubsub_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/gcp_pubsub_client.py'
+        ),
+        mock.call.PushDataFile('messaging_service_scripts/gcp_benchmark.py'),
     ])
 
   def testRun(self):
 
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
-    remote_run_cmd = (f'python3 -m gcp_pubsub_client '
+    remote_run_cmd = (f'python3 -m gcp_benchmark '
                       f'--pubsub_project={PROJECT} '
                       f'--pubsub_topic={TOPIC} '
                       f'--pubsub_subscription={SUBSCRIPTION} '

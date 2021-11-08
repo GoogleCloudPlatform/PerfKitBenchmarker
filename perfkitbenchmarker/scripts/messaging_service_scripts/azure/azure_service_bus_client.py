@@ -5,14 +5,13 @@ Python:
 https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/servicebus/azure-servicebus
 """
 import random
-import sys
 
 from absl import flags
 # pytype: disable=import-error
 from azure import servicebus
 # pytype: enable=import-error
 
-from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 
 FLAGS = flags.FLAGS
 
@@ -26,8 +25,12 @@ flags.DEFINE_string(
     help='Azure Service Bus subscription name.')
 
 
-class AzureServiceBusInterface(messaging_service_client.MessagingServiceClient):
-  """Azure ServiceBus Interface Class."""
+class AzureServiceBusClient(client.BaseMessagingServiceClient):
+  """Azure ServiceBus Client Class."""
+
+  @classmethod
+  def from_flags(cls):
+    return cls(FLAGS.connection_str, FLAGS.topic_name, FLAGS.subscription_name)
 
   def __init__(self, connection_str: str, topic_name: str,
                subscription_name: str):
@@ -43,12 +46,12 @@ class AzureServiceBusInterface(messaging_service_client.MessagingServiceClient):
         self.servicebus_client.get_subscription_receiver(
             topic_name=self.topic_name,
             subscription_name=self.subscription_name,
-            max_wait_time=messaging_service_client.TIMEOUT))
+            max_wait_time=client.TIMEOUT))
 
   def _generate_random_message(
       self, message_size: int) -> servicebus.ServiceBusMessage:
     message = ''.join(
-        random.choice(messaging_service_client.MESSAGE_CHARACTERS)
+        random.choice(client.MESSAGE_CHARACTERS)
         for _ in range(message_size))
     return servicebus.ServiceBusMessage(message)
 
@@ -64,18 +67,6 @@ class AzureServiceBusInterface(messaging_service_client.MessagingServiceClient):
     message = response[0]
     self.subscription_receiver.complete_message(message)
 
-
-def main():
-  FLAGS(sys.argv)
-  benchmark_runner = AzureServiceBusInterface(FLAGS.connection_str,
-                                              FLAGS.topic_name,
-                                              FLAGS.subscription_name)
-  benchmark_runner.run_phase(FLAGS.benchmark_scenario, FLAGS.number_of_messages,
-                             FLAGS.message_size)
-  # closing sessions
-  benchmark_runner.topic_sender.close()
-  benchmark_runner.subscription_receiver.close()
-
-
-if __name__ == '__main__':
-  main()
+  def close(self):
+    self.topic_sender.close()
+    self.subscription_receiver.close()

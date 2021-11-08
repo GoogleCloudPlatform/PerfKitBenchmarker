@@ -2,17 +2,14 @@
 
 This PubSub client is implemented using Google Cloud SDK.
 """
-# pylint: disable=g-import-not-at-top
 import random
-import sys
 
 from absl import flags
 from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1.types import PullResponse
 
-from perfkitbenchmarker.scripts.messaging_service_scripts import messaging_service_client
-
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('pubsub_project', '', help='Project name.')
@@ -23,11 +20,16 @@ flags.DEFINE_string(
     help='Subscription name.')
 
 
-class GCPPubSubInterface(messaging_service_client.MessagingServiceClient):
-  """GCP PubSub Interface Class.
+class GCPPubSubClient(client.BaseMessagingServiceClient):
+  """GCP PubSub Client Class.
 
   This class takes care of running the specified benchmark on GCP PubSub.
   """
+
+  @classmethod
+  def from_flags(cls):
+    return cls(FLAGS.pubsub_project, FLAGS.pubsub_topic,
+               FLAGS.pubsub_subscription)
 
   def __init__(self, project: str, topic: str, subscription: str):
     self.project = project
@@ -42,15 +44,15 @@ class GCPPubSubInterface(messaging_service_client.MessagingServiceClient):
 
   def _generate_random_message(self, message_size: int) -> bytes:
     message = ''.join(
-        random.choice(messaging_service_client.MESSAGE_CHARACTERS)
-        for _ in range(message_size))
+        random.choice(client.MESSAGE_CHARACTERS) for _ in range(message_size))
     return message.encode('utf-8')
 
   def _publish_message(self, message: bytes) -> str:
     """Publishes a single message to a PubSub topic."""
-    published_message = self.publisher.publish(self.topic_path, message)
-    message_id = published_message.result(
-        timeout=messaging_service_client.TIMEOUT)
+    published_message = self.publisher.publish(
+        self.topic_path,
+        message)
+    message_id = published_message.result(timeout=client.TIMEOUT)
     return message_id
 
   def _pull_message(self) -> PullResponse:
@@ -62,7 +64,7 @@ class GCPPubSubInterface(messaging_service_client.MessagingServiceClient):
             'subscription': self.subscription_path,
             'max_messages': 1
         },
-        retry=retry.Retry(deadline=messaging_service_client.TIMEOUT))
+        retry=retry.Retry(deadline=client.TIMEOUT))
     return pulled_message
 
   def _acknowledge_received_message(self, response: PullResponse) -> None:
@@ -72,20 +74,5 @@ class GCPPubSubInterface(messaging_service_client.MessagingServiceClient):
       for received_message in response.received_messages:
         ack_ids.append(received_message.ack_id)
       # Acknowledges the received messages so they will not be sent again.
-      self.subscriber.acknowledge(request={
-          'subscription': self.subscription_path,
-          'ack_ids': ack_ids
-      })
-
-
-def main():
-  FLAGS(sys.argv)
-  benchmark_runner = GCPPubSubInterface(FLAGS.pubsub_project,
-                                        FLAGS.pubsub_topic,
-                                        FLAGS.pubsub_subscription)
-  benchmark_runner.run_phase(FLAGS.benchmark_scenario, FLAGS.number_of_messages,
-                             FLAGS.message_size)
-
-
-if __name__ == '__main__':
-  main()
+      self.subscriber.acknowledge(
+          request={'subscription': self.subscription_path, 'ack_ids': ack_ids})

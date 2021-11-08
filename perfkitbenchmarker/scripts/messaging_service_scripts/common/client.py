@@ -9,7 +9,7 @@ import json
 import random
 import string
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type, TypeVar
 
 from absl import flags
 import numpy as np
@@ -21,21 +21,13 @@ UNIT_OF_TIME = 'milliseconds'
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('benchmark_scenario',
-                  'publish_latency',
-                  ['publish_latency', 'pull_latency'],
-                  help='Which part of the benchmark to run.')
-flags.DEFINE_integer('number_of_messages',
-                     100,
-                     help='Number of messages to send on benchmark.')
-flags.DEFINE_integer('message_size',
-                     10,
-                     help='Number of characters to have in a message. '
-                     "Ex: 1: 'A', 2: 'AA', ...")
+# Workaround for forward declaration
+BaseMessagingServiceClientT = TypeVar(
+    'BaseMessagingServiceClientT', bound='BaseMessagingServiceClient')
 
 
-class MessagingServiceClient(abc.ABC):
-  """Generic MessagingServiceClient Class.
+class BaseMessagingServiceClient(abc.ABC):
+  """Generic BaseMessagingServiceClient Class.
 
   This is a base class to all messaging service interfaces - GCP Cloud PubSub,
   AWS SQS... Common functions are defined here, and the specific ones on their
@@ -61,7 +53,9 @@ class MessagingServiceClient(abc.ABC):
     metrics_data[scenario + '_mean'] = {
         'value': latency_mean,
         'unit': UNIT_OF_TIME,
-        'metadata': {'samples': results}
+        'metadata': {
+            'samples': results
+        }
     }
     metrics_data[scenario + '_mean_without_cold_start'] = {
         'value': latency_mean_without_cold_start,
@@ -95,14 +89,21 @@ class MessagingServiceClient(abc.ABC):
         random.choice(MESSAGE_CHARACTERS) for _ in range(message_size))
     return message
 
+  @classmethod
+  @abc.abstractmethod
+  def from_flags(
+      cls: Type[BaseMessagingServiceClientT]
+  ) -> BaseMessagingServiceClientT:
+    """Gets an actual instance based upon the FLAGS values."""
+    pass
+
   @abc.abstractmethod
   def _publish_message(self, message_payload: str) -> Any:
     """Publishes a single message to the messaging service.
 
     Args:
-      message_payload: Message, created by '_generate_random_message'.
-      This message will be the one that we publish/pull from the messaging
-      service.
+      message_payload: Message, created by '_generate_random_message'. This
+        message will be the one that we publish/pull from the messaging service.
 
     Returns:
       Return response to publish a message from the provider. For GCP PubSub
@@ -130,10 +131,14 @@ class MessagingServiceClient(abc.ABC):
       response: Response from _pull_message.
     """
 
-  def _publish_messages(
-      self,
-      number_of_messages: int,
-      message_size: int) -> Dict[str, Any]:
+  def close(self):
+    """Closes the underlying client objects.
+
+    Optional override. By default it does nothing.
+    """
+
+  def _publish_messages(self, number_of_messages: int,
+                        message_size: int) -> Dict[str, Any]:
     """Publish messages on messaging service and measure single publish latency.
 
     This function attempts to publish messages to a messaging service in a
@@ -149,8 +154,8 @@ class MessagingServiceClient(abc.ABC):
 
     Args:
       number_of_messages: Number of messages to publish.
-      message_size: Size of the messages that are being published.
-        It specifies the number of characters in those messages.
+      message_size: Size of the messages that are being published. It specifies
+        the number of characters in those messages.
 
     Returns:
       Dictionary produce by the benchmark with metric_name (mean_latency,
@@ -184,9 +189,7 @@ class MessagingServiceClient(abc.ABC):
     print(json.dumps(publish_metrics))
     return publish_metrics
 
-  def _pull_messages(
-      self,
-      number_of_messages: int) -> Dict[str, Any]:
+  def _pull_messages(self, number_of_messages: int) -> Dict[str, Any]:
     """Pull messages from messaging service and measure single pull latency.
 
     This function attempts to pull messages from a messaging service in a
@@ -252,8 +255,8 @@ class MessagingServiceClient(abc.ABC):
     Args:
       benchmark_scenario: Specifies which benchmark scenario to run.
       number_of_messages: Number of messages to use on the benchmark.
-      message_size: Size of the messages that will be used on the
-        benchmark. It specifies the number of characters in those messages.
+      message_size: Size of the messages that will be used on the benchmark. It
+        specifies the number of characters in those messages.
 
     Returns:
       Dictionary produce by the benchmark with metric_name (mean_latency,
