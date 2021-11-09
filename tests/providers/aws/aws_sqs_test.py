@@ -101,6 +101,8 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     self.sqs.PrepareClientVm()
     self.client.assert_has_calls([
         mock.call.RemoteCommand(
+            'sudo pip3 install boto3', ignore_failure=False),
+        mock.call.RemoteCommand(
             'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
         ),
         mock.call.PushDataFile(

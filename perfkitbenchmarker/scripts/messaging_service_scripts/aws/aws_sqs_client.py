@@ -33,18 +33,18 @@ class AwsSqsClient(client.BaseMessagingServiceClient):
     self.sqs_client = boto3.client('sqs', region_name=self.region_name)
     self.queue = self.sqs_resource.get_queue_by_name(QueueName=self.queue_name)
 
-  def _publish_message(self, message: str) -> Dict[str, Any]:
+  def publish_message(self, message: str) -> Dict[str, Any]:
     published_message = self.queue.send_message(MessageBody=message)
     return published_message
 
-  def _pull_message(self) -> Dict[str, Any]:
+  def pull_message(self) -> Dict[str, Any]:
     pulled_message = self.sqs_client.receive_message(
         QueueUrl=self.queue.url,
         MaxNumberOfMessages=1,
         WaitTimeSeconds=client.TIMEOUT)
     return pulled_message
 
-  def _acknowledge_received_message(self, response: Dict[str, Any]):
+  def acknowledge_received_message(self, response: Dict[str, Any]):
     message = response['Messages'][0]
     receipt_handle = message['ReceiptHandle']
     self.sqs_client.delete_message(

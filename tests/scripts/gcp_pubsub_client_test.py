@@ -21,7 +21,7 @@ class GCPPubSubClientTest(unittest.TestCase):
 
     gcp_interface = gcp_pubsub_client.GCPPubSubClient(PROJECT, TOPIC,
                                                       SUBSCRIPTION)
-    gcp_interface._publish_message(message)
+    gcp_interface.publish_message(message)
 
     # assert publish was called
     publisher_mock.return_value.publish.assert_called_with(topic_path, message)
@@ -29,7 +29,7 @@ class GCPPubSubClientTest(unittest.TestCase):
   def testPullMessage(self, subscriber_mock, _):
     gcp_interface = gcp_pubsub_client.GCPPubSubClient(PROJECT, TOPIC,
                                                       SUBSCRIPTION)
-    gcp_interface._pull_message()
+    gcp_interface.pull_message()
 
     # assert pull was called
     subscriber_mock.return_value.pull.assert_called()
@@ -41,7 +41,7 @@ class GCPPubSubClientTest(unittest.TestCase):
 
     gcp_interface = gcp_pubsub_client.GCPPubSubClient(PROJECT, TOPIC,
                                                       SUBSCRIPTION)
-    gcp_interface._acknowledge_received_message(response_mock)
+    gcp_interface.acknowledge_received_message(response_mock)
 
     # assert acknowledge was called
     subscriber_mock.return_value.acknowledge.assert_called()

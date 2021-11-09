@@ -49,7 +49,6 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testPrepareBasicVmClient(self):
     self.messaging_service._InstallCommonClientPackages()
-
     self.client.assert_has_calls([
         mock.call.RemoteCommand('sudo pip3 install absl-py numpy'),
         mock.call.RemoteCommand(
@@ -78,6 +77,13 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'messaging_service_scripts/common/client.py',
             '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/client.py'
         ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/runners.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/runners.py'
+        )
     ])
 
 

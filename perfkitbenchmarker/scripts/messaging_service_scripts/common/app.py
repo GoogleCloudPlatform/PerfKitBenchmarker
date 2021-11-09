@@ -1,9 +1,11 @@
 """Defines the App class."""
+
 from typing import Type
 
 from absl import flags
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
 
 _BENCHMARK_SCENARIO = flags.DEFINE_enum(
     'benchmark_scenario',
@@ -24,6 +26,7 @@ class App:
   This is a singleton that allows to create a runner instance honoring the flags
   and the client class provided.
   """
+
   instance = None
 
   @classmethod
@@ -60,7 +63,7 @@ class App:
     self.client_cls = None
     self.runner_registry = {}
 
-  def __call__(self, _) -> None:
+  def __call__(self, _):
     """Runs the benchmark for the flags passed to the script.
 
     Implementing this magic method allows you to pass this instance directly to
@@ -69,15 +72,14 @@ class App:
     Args:
       _: Unused. Just for compatibility with absl.app.run.
     """
-    client_class = self.get_client_class()
-    msgsvc_client = client_class.from_flags()
+    self._register_runners()
+    runner = self.get_runner()
     try:
-      msgsvc_client.run_phase(_BENCHMARK_SCENARIO.value,
-                              _NUMBER_OF_MESSAGES.value, _MESSAGE_SIZE.value)
+      runner.run_phase(_NUMBER_OF_MESSAGES.value, _MESSAGE_SIZE.value)
     finally:
-      msgsvc_client.close()
+      runner.close()
 
-  def get_client(self) -> client.BaseMessagingServiceClient:
+  def get_runner(self) -> runners.BaseRunner:
     """Creates a client instance, using the client class registered.
 
     Returns:
@@ -87,7 +89,9 @@ class App:
       Exception: No client class has been registered.
     """
     client_class = self.get_client_class()
-    return client_class.from_flags()
+    runner_class = self.get_runner_class()
+    runner_class.run_class_startup()
+    return runner_class(client_class.from_flags())
 
   def get_client_class(self) -> Type[client.BaseMessagingServiceClient]:
     """Gets the client class registered.
@@ -102,11 +106,31 @@ class App:
       raise Exception('No client class has been registered.')
     return self.client_cls
 
-  def register_client(
-      self, client_cls: Type[client.BaseMessagingServiceClient]) -> None:
+  def get_runner_class(self) -> Type[runners.BaseRunner]:
+    """Gets the BaseRunner class registered.
+
+    Returns:
+      A BaseRunner class.
+    """
+    try:
+      return self.runner_registry[_BENCHMARK_SCENARIO.value]
+    except KeyError:
+      raise Exception('Unknown benchmark_scenario flag value.')
+
+  def register_client(self,
+                      client_cls: Type[client.BaseMessagingServiceClient]):
     """Registers a client class to create instances with.
 
     Args:
       client_cls: The client class to register.
     """
     self.client_cls = client_cls
+
+  def _register_runners(self):
+    """Registers all runner classes to create instances depending on flags."""
+    self._register_runner('publish_latency', runners.PublishLatencyRunner)
+    self._register_runner('pull_latency', runners.PullLatencyRunner)
+
+  def _register_runner(self, benchmark_scenario: str,
+                       runner_cls: Type[runners.BaseRunner]):
+    self.runner_registry[benchmark_scenario] = runner_cls

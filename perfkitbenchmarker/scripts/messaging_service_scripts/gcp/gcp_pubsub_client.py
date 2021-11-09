@@ -10,6 +10,7 @@ from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1.types import PullResponse
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('pubsub_project', '', help='Project name.')
@@ -42,20 +43,18 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     self.subscription_path = self.subscriber.subscription_path(
         self.project, self.subscription)
 
-  def _generate_random_message(self, message_size: int) -> bytes:
+  def generate_random_message(self, message_size: int) -> bytes:
     message = ''.join(
         random.choice(client.MESSAGE_CHARACTERS) for _ in range(message_size))
     return message.encode('utf-8')
 
-  def _publish_message(self, message: bytes) -> str:
+  def publish_message(self, message: bytes) -> str:
     """Publishes a single message to a PubSub topic."""
-    published_message = self.publisher.publish(
-        self.topic_path,
-        message)
+    published_message = self.publisher.publish(self.topic_path, message)
     message_id = published_message.result(timeout=client.TIMEOUT)
     return message_id
 
-  def _pull_message(self) -> PullResponse:
+  def pull_message(self) -> PullResponse:
     """Pulls a single message from a PubSub Subscription."""
     # Cloud Pub/Sub has support for 2 different ways of retrieving messages:
     # Pull, and StreamingPull. We're using Pull, and doing 1 message / request.
@@ -67,12 +66,14 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
         retry=retry.Retry(deadline=client.TIMEOUT))
     return pulled_message
 
-  def _acknowledge_received_message(self, response: PullResponse) -> None:
+  def acknowledge_received_message(self, response: PullResponse) -> None:
     if response.received_messages[0].message.data:
       ack_ids = []
 
       for received_message in response.received_messages:
         ack_ids.append(received_message.ack_id)
       # Acknowledges the received messages so they will not be sent again.
-      self.subscriber.acknowledge(
-          request={'subscription': self.subscription_path, 'ack_ids': ack_ids})
+      self.subscriber.acknowledge(request={
+          'subscription': self.subscription_path,
+          'ack_ids': ack_ids
+      })

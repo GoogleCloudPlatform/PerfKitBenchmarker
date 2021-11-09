@@ -25,13 +25,14 @@ MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
     '__init__.py',
     'app.py',
     'client.py',
+    'runners.py',
 ]
 
 
 def GetMessagingServiceClass(cloud, delivery):
   """Gets the underlying Messaging Service class."""
-  return resource.GetResourceClass(BaseMessagingService, CLOUD=cloud,
-                                   DELIVERY=delivery)
+  return resource.GetResourceClass(
+      BaseMessagingService, CLOUD=cloud, DELIVERY=delivery)
 
 
 class BaseMessagingService(resource.BaseResource):

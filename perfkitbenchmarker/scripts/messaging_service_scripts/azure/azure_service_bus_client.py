@@ -48,22 +48,22 @@ class AzureServiceBusClient(client.BaseMessagingServiceClient):
             subscription_name=self.subscription_name,
             max_wait_time=client.TIMEOUT))
 
-  def _generate_random_message(
+  def generate_random_message(
       self, message_size: int) -> servicebus.ServiceBusMessage:
     message = ''.join(
         random.choice(client.MESSAGE_CHARACTERS)
         for _ in range(message_size))
     return servicebus.ServiceBusMessage(message)
 
-  def _publish_message(self, message):
+  def publish_message(self, message):
     self.topic_sender.send_messages(message)
 
-  def _pull_message(self):
+  def pull_message(self):
     pulled_message = self.subscription_receiver.receive_messages(
         max_message_count=1)
     return pulled_message
 
-  def _acknowledge_received_message(self, response):
+  def acknowledge_received_message(self, response):
     message = response[0]
     self.subscription_receiver.complete_message(message)
 

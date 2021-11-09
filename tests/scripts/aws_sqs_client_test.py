@@ -1,9 +1,10 @@
-"""Tests for data/messaging_service/aws_sqs_client.py."""
+"""Tests for scripts/messaging_service_scripts/aws_sqs_client.py."""
 
 import unittest
 from unittest import mock
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.aws import aws_sqs_client
+from tests import pkb_common_test_case
 
 NUMBER_OF_MESSAGES = 1
 MESSAGE_SIZE = 10
@@ -14,13 +15,13 @@ TIMEOUT = 10
 
 @mock.patch('boto3.resource')
 @mock.patch('boto3.client')
-class AWSSQSClientTest(unittest.TestCase):
+class AWSSQSClientTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testPublishMessage(self, _, resource_mock):
     message = 'test_message'
 
-    aws_interface = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
-    aws_interface._publish_message(message)
+    aws_client = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
+    aws_client.publish_message(message)
 
     # assert publish was called
     resource_mock.return_value.get_queue_by_name(
@@ -32,8 +33,8 @@ class AWSSQSClientTest(unittest.TestCase):
             'ReceiptHandle': 'MockedReceipt'
         }]
     }
-    aws_interface = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
-    aws_interface._pull_message()
+    aws_client = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
+    aws_client.pull_message()
     queue_url = resource_mock.return_value.get_queue_by_name().url
 
     # assert pull was called
@@ -49,8 +50,8 @@ class AWSSQSClientTest(unittest.TestCase):
         }]
     }
 
-    aws_interface = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
-    aws_interface._acknowledge_received_message(response)
+    aws_client = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
+    aws_client.acknowledge_received_message(response)
     queue_url = resource_mock.return_value.get_queue_by_name().url
 
     # assert acknowledge was called

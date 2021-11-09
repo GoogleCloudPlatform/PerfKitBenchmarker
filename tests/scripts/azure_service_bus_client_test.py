@@ -1,4 +1,4 @@
-"""Tests for data/messaging_service/gcp_pubsub_client.py."""
+"""Tests for scripts/messaging_service_scripts/azure/azure_service_bus_client.py."""
 import sys
 import unittest
 from unittest import mock
@@ -18,7 +18,7 @@ class AzureServiceBusClientTest(unittest.TestCase):
   def testGenerateRandomMessage(self):
     azure_interface = azure_service_bus_client.AzureServiceBusClient(
         _CONNECTION_STRING, _TOPIC, _SUBSCRIPTION)
-    azure_interface._generate_random_message(_MESSAGE_SIZE)
+    azure_interface.generate_random_message(_MESSAGE_SIZE)
 
     AZURE_MOCK.servicebus.ServiceBusMessage.assert_called()
 
@@ -26,7 +26,7 @@ class AzureServiceBusClientTest(unittest.TestCase):
     message = 'mocked_message'
     azure_interface = azure_service_bus_client.AzureServiceBusClient(
         _CONNECTION_STRING, _TOPIC, _SUBSCRIPTION)
-    azure_interface._publish_message(message)
+    azure_interface.publish_message(message)
     client = AZURE_MOCK.servicebus.ServiceBusClient
     connection_str = client.from_connection_string.return_value
     topic_sender = connection_str.get_topic_sender.return_value
@@ -37,7 +37,7 @@ class AzureServiceBusClientTest(unittest.TestCase):
   def testPullMessage(self):
     azure_interface = azure_service_bus_client.AzureServiceBusClient(
         _CONNECTION_STRING, _TOPIC, _SUBSCRIPTION)
-    azure_interface._pull_message()
+    azure_interface.pull_message()
     client = AZURE_MOCK.servicebus.ServiceBusClient
     connection_str = client.from_connection_string.return_value
     subscription_receiver = (
@@ -51,7 +51,7 @@ class AzureServiceBusClientTest(unittest.TestCase):
     message = ['mocked_message']
     azure_interface = azure_service_bus_client.AzureServiceBusClient(
         _CONNECTION_STRING, _TOPIC, _SUBSCRIPTION)
-    azure_interface._acknowledge_received_message(message)
+    azure_interface.acknowledge_received_message(message)
 
     client = AZURE_MOCK.servicebus.ServiceBusClient
     connection_str = client.from_connection_string.return_value
