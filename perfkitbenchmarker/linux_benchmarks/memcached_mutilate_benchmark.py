@@ -56,7 +56,8 @@ _CLIENT_VM_TYPE = flags.DEFINE_string(
     'from memcached server machine type.')
 _CLIENT_COUNT = flags.DEFINE_integer(
     'memcached_mutilate_num_client_vms', 1,
-    'Number of mutilate client machines to use.')
+    'Number of mutilate client machines to use. '
+    'To run memcached/mutilate on same machine, set to 0.')
 _SMP = flags.DEFINE_boolean(
     'set_smp_affinity', False,
     'Manually set smp affinity.')
@@ -122,6 +123,18 @@ def _InstallMemcached(vm):
   vm.Install('memcached_server')
 
 
+def GetClients(benchmark_spec):
+  """Get client VMs."""
+  if _CLIENT_COUNT.value:
+    return benchmark_spec.vm_groups['client']
+  return benchmark_spec.vm_groups['server']
+
+
+def GetServerIp(server):
+  """Get server ip."""
+  return server.ip if _CLIENT_COUNT.value else 'localhost'
+
+
 def Prepare(benchmark_spec):
   """Prepare the virtual machines to run mutilate against memcached.
 
@@ -129,7 +142,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  clients = benchmark_spec.vm_groups['client']
+  clients = GetClients(benchmark_spec)
   server = benchmark_spec.vm_groups['server'][0]
   client_install_fns = [
       functools.partial(vm.Install, 'mutilate') for vm in clients]
@@ -147,9 +160,9 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
-  clients = benchmark_spec.vm_groups['client']
+  clients = GetClients(benchmark_spec)
   server = benchmark_spec.vm_groups['server'][0]
-  server_ip = server.internal_ip
+  server_ip = GetServerIp(server)
   memcached_server.StopMemcached(server)
   time.sleep(60)
   for idx in range(_NUM_INSTANCES.value):
