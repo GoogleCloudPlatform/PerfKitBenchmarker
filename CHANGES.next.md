@@ -120,6 +120,7 @@
     the cloud.
 -   Add support for nodepools to `container_cluster` benchmark spec.
 -   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
+-   Add awscli V2 installation package
 
 ### Bug fixes and maintenance updates:
 
@@ -184,3 +185,4 @@
 -   Added `--google_monitoring_endpoint` flag for querying a different endpoint
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
 -   Broadens Azure quota detection parsing
+-   Added icelake, rome and milan as --gcp_min_cpu_platform options.
