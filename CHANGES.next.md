@@ -120,6 +120,7 @@
     the cloud.
 -   Add support for nodepools to `container_cluster` benchmark spec.
 -   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
+-   Add support for 5th gen Azure VMs.
 -   Add awscli V2 installation package
 
 ### Bug fixes and maintenance updates:
