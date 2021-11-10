@@ -65,9 +65,14 @@ AZURE_NVME_TYPES = [
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/azure-vms-no-temp-disk
 # D/Ev4 and D/E(i)sv4 VMs do not have tmp/OS disk; Dv3, Dsv3, and Ddv4 VMs do.
+# Same for *v5, including Milan machines.
 AZURE_NO_TMP_DISK_TYPES = [
     r'(Standard_D[0-9]+s?_v4)',
     r'(Standard_E[0-9]+i?s?_v4)',
+    r'(Standard_D[0-9]+s?_v5)',
+    r'(Standard_E[0-9]+i?s?_v5)',
+    r'(Standard_D[0-9]+as?_v5)',
+    r'(Standard_E[0-9]+as?_v5)',
 ]
 
 
