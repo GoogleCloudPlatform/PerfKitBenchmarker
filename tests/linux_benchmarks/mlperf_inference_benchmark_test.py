@@ -32,7 +32,7 @@ class MlperfInferenceBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
       self.contents = fp.read()
 
   def testTrainResults(self):
-    samples = mlperf_inference_benchmark.MakeSamplesFromOutput(
+    samples = mlperf_inference_benchmark.MakePerformanceSamplesFromOutput(
         {'version': 'v1.1'}, self.contents)
     metadata = {
         'mlperf 50.00 percentile latency (ns)': '40533329',

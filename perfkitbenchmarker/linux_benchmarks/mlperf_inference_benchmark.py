@@ -21,11 +21,13 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import docker
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 FLAGS = flags.FLAGS
 MLPERF_INFERENCE_VERSION = 'v1.1'
 
+_MLPERF_SCRATCH_PATH = '/scratch'
 BENCHMARK_NAME = 'mlperf_inference'
 BENCHMARK_CONFIG = """
 mlperf_inference:
@@ -45,19 +47,17 @@ mlperf_inference:
           machine_type: p4d.24xlarge
           zone: us-west-2a
           boot_disk_size: 200
-          image: ami-0ccc71d716eb5d6a4
         Azure:
           machine_type: Standard_ND96asr_v4
           zone: westus2
           boot_disk_size: 200
-          image: microsoft-dsvm:ubuntu-hpc:1804:latest
 """
 
 _SCENARIOS = flags.DEFINE_enum('mlperf_inference_scenarios', 'server',
                                ['server', 'singlestream', 'offline'],
                                'MLPerf has defined three different scenarios')
 
-_METADATA_COLUMNS = [
+_PERFORMANCE_METADATA = [
     'active_sms',
     'benchmark',
     'bert_opt_seqlen',
@@ -126,6 +126,41 @@ _METADATA_COLUMNS = [
     'performance_sample_count',
 ]
 
+_ACCURACY_METADATA = [
+    'active_sms',
+    'benchmark',
+    'bert_opt_seqlen',
+    'coalesced_tensor',
+    'enable_interleaved',
+    'gpu_batch_size',
+    'gpu_copy_streams',
+    'gpu_inference_streams',
+    'graphs_max_seqlen',
+    'input_dtype',
+    'input_format',
+    'precision',
+    'scenario',
+    'server_num_issue_query_threads',
+    'server_target_qps',
+    'soft_drop',
+    'system',
+    'tensor_path',
+    'use_graphs',
+    'config_name',
+    'config_ver',
+    'accuracy_level',
+    'optimization_level',
+    'inference_server',
+    'system_id',
+    'use_cpu',
+    'power_limit',
+    'cpu_freq',
+    'test_mode',
+    'fast',
+    'gpu_num_bundles',
+    'log_dir',
+]
+
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Load and return benchmark config.
@@ -152,9 +187,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   vm = bm_spec.vms[0]
 
   repository = f'inference_results_{MLPERF_INFERENCE_VERSION}'
-  vm.RemoteCommand(
-      f'git clone https://github.com/mlcommons/{repository}.git',
-      should_log=True)
+  vm.RemoteCommand(f'git clone https://github.com/mlcommons/{repository}.git')
 
   makefile = f'{repository}/closed/NVIDIA/Makefile'
   vm_util.ReplaceText(vm, 'shell uname -p', 'shell uname -m', makefile)
@@ -169,17 +202,15 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.Install('nvidia_docker')
 
   benchmark = FLAGS.mlperf_benchmark
-  bm_spec.env_cmd = ('export MLPERF_SCRATCH_PATH=/scratch && '
+  bm_spec.env_cmd = (f'export MLPERF_SCRATCH_PATH={_MLPERF_SCRATCH_PATH} && '
                      f'cd {repository}/closed/NVIDIA')
+  docker.AddUser(vm)
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make build_docker NO_BUILD=1 && '
       'make docker_add_user && '
-      'make launch_docker DOCKER_COMMAND="echo $MLPERF_SCRATCH_PATH" && '
-      'make launch_docker DOCKER_COMMAND="ls -al $MLPERF_SCRATCH_PATH" && '
       'make launch_docker DOCKER_COMMAND="make clean" && '
-      'make launch_docker DOCKER_COMMAND="make link_dirs" && '
-      'make launch_docker DOCKER_COMMAND="ls -al build/"',
+      'make launch_docker DOCKER_COMMAND="make link_dirs"',
       should_log=True)
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
@@ -189,10 +220,21 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND='
-      f'"make download_model BENCHMARKS={benchmark}" && '
+      f'"make download_model BENCHMARKS={benchmark}"',
+      should_log=True)
+  vm.RobustRemoteCommand(
+      f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND='
-      f'"make preprocess_data BENCHMARKS={benchmark}" && '
-      f'make launch_docker DOCKER_COMMAND="make build"',
+      f'"make preprocess_data BENCHMARKS={benchmark}"',
+      should_log=True)
+  vm.RobustRemoteCommand(
+      f'{bm_spec.env_cmd} && '
+      'make launch_docker DOCKER_COMMAND='
+      '"make build" && '
+      'make launch_docker DOCKER_COMMAND='
+      '"make generate_engines RUN_ARGS=\''
+      f'--benchmarks={FLAGS.mlperf_benchmark} '
+      f'--scenarios={_SCENARIOS.value}\'"',
       should_log=True)
 
 
@@ -221,12 +263,12 @@ def _CreateMetadataDict(
   return metadata
 
 
-def MakeSamplesFromOutput(metadata: Dict[str, Any],
-                          output: str) -> List[sample.Sample]:
-  """Create samples containing metrics.
+def MakePerformanceSamplesFromOutput(base_metadata: Dict[str, Any],
+                                     output: str) -> List[sample.Sample]:
+  """Create performance samples containing metrics.
 
   Args:
-    metadata: dict contains all the metadata that reports.
+    base_metadata: dict contains all the metadata that reports.
     output: string, command output
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/mlperf_inference_benchmark_test.py
@@ -234,12 +276,40 @@ def MakeSamplesFromOutput(metadata: Dict[str, Any],
   Returns:
     Samples containing training metrics.
   """
-  for column_name in _METADATA_COLUMNS:
+  metadata = {}
+  for column_name in _PERFORMANCE_METADATA:
     metadata[f'mlperf {column_name}'] = regex_util.ExtractExactlyOneMatch(
         fr'{re.escape(column_name)} *: *(.*)', output)
+  metadata.update(base_metadata)
   throughput = regex_util.ExtractFloat(
-      r': result_scheduled_samples_per_sec *: *(.*), Result is VALID', output)
+      r': result_scheduled_samples_per_sec: (\d+\.\d+), Result is VALID',
+      output)
   return [sample.Sample('throughput', float(throughput), 'samples/s', metadata)]
+
+
+def MakeAccuracySamplesFromOutput(base_metadata: Dict[str, Any],
+                                  output: str) -> List[sample.Sample]:
+  """Create accuracy samples containing metrics.
+
+  Args:
+    base_metadata: dict contains all the metadata that reports.
+    output: string, command output
+
+  Returns:
+    Samples containing training metrics.
+  """
+  metadata = {}
+  for column_name in _ACCURACY_METADATA:
+    metadata[f'mlperf {column_name}'] = regex_util.ExtractExactlyOneMatch(
+        fr'{re.escape(column_name)} *: *(.*)', output)
+  accuracy = regex_util.ExtractFloat(
+      r': Accuracy = (\d+\.\d+), Threshold = \d+\.\d+\. Accuracy test PASSED',
+      output)
+  metadata['Threshold'] = regex_util.ExtractFloat(
+      r': Accuracy = \d+\.\d+, Threshold = (\d+\.\d+)\. Accuracy test PASSED',
+      output)
+  metadata.update(base_metadata)
+  return [sample.Sample('accuracy', float(accuracy), '%', metadata)]
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -257,10 +327,19 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   metadata = _CreateMetadataDict(bm_spec)
   stdout, _ = vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
-      'make launch_docker DOCKER_COMMAND="make run RUN_ARGS=\'--benchmarks='
-      f'{FLAGS.mlperf_benchmark} --scenarios={_SCENARIOS.value}\'"',
+      'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
+      f'--benchmarks={FLAGS.mlperf_benchmark} '
+      f'--scenarios={_SCENARIOS.value} --fast --test_mode=PerformanceOnly\'"',
       should_log=True)
-  return MakeSamplesFromOutput(metadata, stdout)
+  performance_samples = MakePerformanceSamplesFromOutput(metadata, stdout)
+  stdout, _ = vm.RobustRemoteCommand(
+      f'{bm_spec.env_cmd} && '
+      'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
+      f'--benchmarks={FLAGS.mlperf_benchmark} '
+      f'--scenarios={_SCENARIOS.value} --fast --test_mode=AccuracyOnly\'"',
+      should_log=True)
+  accuracy_samples = MakeAccuracySamplesFromOutput(metadata, stdout)
+  return performance_samples + accuracy_samples
 
 
 def Cleanup(unused_bm_spec: benchmark_spec.BenchmarkSpec) -> None:
