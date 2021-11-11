@@ -23,10 +23,18 @@ Steps for Apt installs:
 4. Install the mssql-toools.
 """
 
+from perfkitbenchmarker import os_types
+
 # Debian info
 _DEB_REPO_KEY = 'https://packages.microsoft.com/keys/microsoft.asc'
-_DEB_REPO_FILE = 'https://packages.microsoft.com/config/ubuntu/16.04/prod.list'
+_DEB_REPO_FILE = 'https://packages.microsoft.com/config/ubuntu/{os}/prod.list'
 _DEB_FILE_LOCATION = '/etc/apt/sources.list.d/msprod.list'
+
+OS_TYPE_MAPPING = {
+    os_types.UBUNTU1604: '16.04',
+    os_types.UBUNTU1804: '18.04',
+    os_types.UBUNTU2004: '20.04'
+}
 
 
 def AptInstall(vm):
@@ -38,8 +46,9 @@ def AptInstall(vm):
   vm.Install('unixodbc_dev')
   vm.RemoteCommand(
       'curl {key} | sudo apt-key add -'.format(key=_DEB_REPO_KEY))
+  deb_repro_file = _DEB_REPO_FILE.format(os=OS_TYPE_MAPPING[vm.OS_TYPE])
   vm.RemoteCommand(
-      'curl {file} | sudo tee {location}'.format(file=_DEB_REPO_FILE,
+      'curl {file} | sudo tee {location}'.format(file=deb_repro_file,
                                                  location=_DEB_FILE_LOCATION))
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo ACCEPT_EULA=Y /usr/bin/apt-get -y install mssql-tools')
