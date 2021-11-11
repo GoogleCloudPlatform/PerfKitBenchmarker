@@ -25,7 +25,15 @@ MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
     '__init__.py',
     'app.py',
     'client.py',
+    'errors.py',
     'runners.py',
+    'e2e/__init__.py',
+    'e2e/latency_runner.py',
+    'e2e/main_process.py',
+    'e2e/protocol.py',
+    'e2e/publisher.py',
+    'e2e/receiver.py',
+    'e2e/worker_utils.py',
 ]
 
 
@@ -47,6 +55,10 @@ class BaseMessagingService(resource.BaseResource):
 
   # TODO(odiego): Move DELIVERY down to child classes when adding more options
   DELIVERY = 'pull'
+
+  END_TO_END_LATENCY = 'end_to_end_latency'
+  PUBLISH_LATENCY = 'publish_latency'
+  PULL_LATENCY = 'pull_latency'
 
   @classmethod
   def FromSpec(cls, messaging_service_spec):

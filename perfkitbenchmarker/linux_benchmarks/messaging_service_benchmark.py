@@ -58,15 +58,26 @@ messaging_service:
     delivery: pull
 """
 
+SINGLE_OP = 'single_op'
+END_TO_END = 'end_to_end'
+MEASUREMENT_CHOICES = [SINGLE_OP, END_TO_END]
+
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('messaging_service_number_of_messages',
-                     100,
-                     help='Number of messages to use on benchmark.')
-flags.DEFINE_integer('messaging_service_message_size',
-                     10,
-                     help='Number of characters to have in a message. '
-                     "Ex: 1: 'A', 2: 'AA', ...")
+_MEASUREMENT = flags.DEFINE_enum(
+    'messaging_service_measurement',
+    'single_op',
+    MEASUREMENT_CHOICES,
+    help='Way to measure latency.')
+_NUMBER_OF_MESSAGES = flags.DEFINE_integer(
+    'messaging_service_number_of_messages',
+    100,
+    help='Number of messages to use on benchmark.')
+_MESSAGE_SIZE = flags.DEFINE_integer(
+    'messaging_service_message_size',
+    10,
+    help='Number of characters to have in a message. '
+    "Ex: 1: 'A', 2: 'AA', ...")
 
 
 def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -90,11 +101,8 @@ def _CreateSamples(results: Dict[str, Any], number_of_messages: int,
     metric_metadata.update(common_metadata)
 
     # aggregated metrics, such as: mean, p50, p99...
-    samples.append(sample.Sample(
-        metric_name,
-        metric_value,
-        metric_unit,
-        metric_metadata))
+    samples.append(
+        sample.Sample(metric_name, metric_value, metric_unit, metric_metadata))
 
   return samples
 
@@ -126,18 +134,23 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     List of samples. Produced when running the benchmark from client VM
     (on 'messaging_service.Run()' call).
   """
-  publish_results = benchmark_spec.messaging_service.Run(
-      'publish_latency', int(FLAGS.messaging_service_number_of_messages),
-      int(FLAGS.messaging_service_message_size))
-  pull_results = benchmark_spec.messaging_service.Run(
-      'pull_latency', int(FLAGS.messaging_service_number_of_messages),
-      int(FLAGS.messaging_service_message_size))
-  publish_results.update(pull_results)
+  service = benchmark_spec.messaging_service
+  if _MEASUREMENT.value == SINGLE_OP:
+    publish_results = service.Run(service.PUBLISH_LATENCY,
+                                  int(_NUMBER_OF_MESSAGES.value),
+                                  int(_MESSAGE_SIZE.value))
+    pull_results = service.Run(service.PULL_LATENCY,
+                               int(_NUMBER_OF_MESSAGES.value),
+                               int(_MESSAGE_SIZE.value))
+    publish_results.update(pull_results)
+    results = publish_results
+  elif _MEASUREMENT.value == END_TO_END:
+    results = service.Run(service.END_TO_END_LATENCY,
+                          int(_NUMBER_OF_MESSAGES.value),
+                          int(_MESSAGE_SIZE.value))
   # Creating samples from results
-  samples = _CreateSamples(publish_results,
-                           int(FLAGS.messaging_service_number_of_messages),
-                           int(FLAGS.messaging_service_message_size),
-                           FLAGS.cloud)
+  samples = _CreateSamples(results, int(_NUMBER_OF_MESSAGES.value),
+                           int(_MESSAGE_SIZE.value), FLAGS.cloud)
   return samples
 
 
