@@ -17,6 +17,7 @@ import copy
 import dataclasses
 import json
 import logging
+import os
 import pathlib
 import re
 import time
@@ -36,7 +37,7 @@ APT_PACKAGES = ('build-essential autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev libssl-dev')
 YUM_PACKAGES = (
     'zlib-devel pcre-devel libmemcached-devel libevent-devel openssl-devel')
-MEMTIER_RESULTS = pathlib.PosixPath('memtier_results')
+MEMTIER_RESULTS = '/tmp/memtier_results'
 
 _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
 _WRITE_ONLY = '1:0'
@@ -178,7 +179,7 @@ def BuildMemtierCommand(
     outfile: Optional[pathlib.PosixPath] = None,
     password: Optional[str] = None,
     cluster_mode: Optional[bool] = None,
-    json_out_file: Optional[str] = None,
+    json_out_file: Optional[pathlib.PosixPath] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
@@ -198,6 +199,7 @@ def BuildMemtierCommand(
       'requests': requests,
       'run-count': run_count,
       'test-time': test_time,
+      'out-file': outfile,
       'json-out-file': json_out_file,
       'print-percentile': '50,90,95,99,99.9',
   }
@@ -211,8 +213,6 @@ def BuildMemtierCommand(
   for no_param_arg, value in no_param_args.items():
     if value:
       cmd.append(f'--{no_param_arg}')
-  if outfile:
-    cmd.extend(['>', str(outfile)])
   return ' '.join(cmd)
 
 
@@ -371,7 +371,10 @@ def _Run(vm,
          clients: int,
          password: Optional[str] = None) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
-  vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
+  results_file = pathlib.PosixPath(f'{MEMTIER_RESULTS}_{server_port}')
+  vm.RemoteCommand(f'rm -f {results_file}')
+  json_results_file = pathlib.PosixPath(f'{JSON_OUT_FILE}_{server_port}')
+  vm.RemoteCommand(f'rm -f {json_results_file}')
   # Specify one of run requests or run duration.
   requests = (
       MEMTIER_REQUESTS.value if MEMTIER_RUN_DURATION.value is None else None)
@@ -396,14 +399,22 @@ def _Run(vm,
       test_time=test_time,
       requests=requests,
       password=password,
-      outfile=MEMTIER_RESULTS,
+      outfile=results_file,
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
-      json_out_file=JSON_OUT_FILE)
+      json_out_file=json_results_file)
   vm.RemoteCommand(cmd)
 
-  output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
-  time_series_json, _ = vm.RemoteCommand('cat {0}'.format(JSON_OUT_FILE))
-  return MemtierResult.Parse(output, time_series_json)
+  vm.PullFile(vm_util.GetTempDir(), results_file)
+  vm.PullFile(vm_util.GetTempDir(), json_results_file)
+
+  output_path = os.path.join(
+      vm_util.GetTempDir(), f'memtier_results_{server_port}')
+  json_path = os.path.join(
+      vm_util.GetTempDir(), f'json_data_{server_port}')
+  with open(output_path, 'r') as output, open(json_path, 'r') as ts_json:
+    summary_data = output.read()
+    time_series_json = ts_json.read()
+  return MemtierResult.Parse(summary_data, time_series_json)
 
 
 def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:

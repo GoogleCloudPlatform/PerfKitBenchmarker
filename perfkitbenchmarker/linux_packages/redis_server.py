@@ -15,16 +15,14 @@
 
 """Module containing redis installation and cleanup functions."""
 
-from typing import Any, Dict
+import logging
+
+from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import linux_packages
 
 _VERSION = flags.DEFINE_string('redis_server_version', '6.2.1',
                                'Version of redis server to use.')
-flags.register_validator(
-    'redis_server_version',
-    lambda version: int(version.split('.')[0]) >= 6,
-    message='Redis version must be 6 or greater.')
 _IO_THREADS = flags.DEFINE_integer(
     'redis_server_io_threads', 4, 'Only supported for redis version >= 6, the '
     'number of redis server IO threads to use.')
@@ -45,7 +43,8 @@ _NUM_PROCESSES = flags.DEFINE_integer(
     lower_bound=1)
 
 
-DEFAULT_PORT = 6379
+# Default port for Redis
+_DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
@@ -107,15 +106,20 @@ def _BuildStartCommand(vm, port: int) -> str:
   cmd_args = [
       f'--port {port}',
       '--protected-mode no',
-      f'--io-threads {_IO_THREADS.value}',
-      '--ignore-warnings ARM64-COW-BUG',
   ]
+  # Add check for the MADV_FREE/fork arm64 Linux kernel bug
+  if _VERSION.value >= '6.2.1':
+    cmd_args.append('--ignore-warnings ARM64-COW-BUG')
   # Snapshotting
   if not _ENABLE_SNAPSHOTS.value:
     cmd_args.append('--save ""')
+  # IO threads
+  if _IO_THREADS.value:
+    cmd_args.append(f'--io-threads {_IO_THREADS.value}')
   # IO thread reads
-  do_reads = 'yes' if _IO_THREADS_DO_READS.value else 'no'
-  cmd_args.append(f'--io-threads-do-reads {do_reads}')
+  if _IO_THREADS_DO_READS.value:
+    do_reads = 'yes' if _IO_THREADS_DO_READS.value else 'no'
+    cmd_args.append(f'--io-threads-do-reads {do_reads}')
   # IO thread affinity
   if _IO_THREAD_AFFINITY.value:
     cpu_affinity = f'0-{vm.num_cpus-1}'
@@ -127,14 +131,15 @@ def Start(vm) -> None:
   """Start redis server process."""
   # Redis tuning parameters, see
   # https://www.techandme.se/performance-tips-for-redis-cache-server/.
-  vm.RemoteCommand(
-      'echo "'
-      'vm.overcommit_memory = 1\n'
-      'net.core.somaxconn = 65535\n'
-      '" | sudo tee -a /etc/sysctl.conf')
-  vm.RemoteCommand('sudo /usr/sbin/sysctl -p')
-  for i in range(_NUM_PROCESSES.value):
-    port = DEFAULT_PORT + i
+  # This command works on 2nd generation of VMs only.
+  update_sysvtl = vm.TryRemoteCommand('echo "'
+                                      'vm.overcommit_memory = 1\n'
+                                      'net.core.somaxconn = 65535\n'
+                                      '" | sudo tee -a /etc/sysctl.conf')
+  commit_sysvtl = vm.TryRemoteCommand('sudo /usr/sbin/sysctl -p')
+  if not (update_sysvtl and commit_sysvtl):
+    logging.info('Fail to optimize overcommit_memory and socket connections.')
+  for port in GetRedisPorts():
     vm.RemoteCommand(_BuildStartCommand(vm, port))
 
 
@@ -145,4 +150,10 @@ def GetMetadata() -> Dict[str, Any]:
       'redis_server_io_threads_do_reads': _IO_THREADS_DO_READS.value,
       'redis_server_io_threads_cpu_affinity': _IO_THREAD_AFFINITY.value,
       'redis_server_enable_snapshots': _ENABLE_SNAPSHOTS.value,
+      'redis_server_num_processes': _NUM_PROCESSES.value,
   }
+
+
+def GetRedisPorts() -> List[int]:
+  """Returns a list of redis port(s)."""
+  return [_DEFAULT_PORT + i for i in range(_NUM_PROCESSES.value)]
