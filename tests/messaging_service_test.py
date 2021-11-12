@@ -81,9 +81,65 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
         ),
         mock.call.PushDataFile(
+            'messaging_service_scripts/common/errors.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/errors.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
             'messaging_service_scripts/common/runners.py',
             '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/runners.py'
-        )
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/latency_runner.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/latency_runner.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/main_process.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/main_process.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/protocol.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/protocol.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/publisher.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/publisher.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/receiver.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/receiver.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/worker_utils.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/worker_utils.py'
+        ),
     ])
 
 

@@ -21,6 +21,7 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
+import datetime
 from typing import Any, Dict, List
 
 from absl import flags
@@ -55,6 +56,18 @@ redis_memtier:
 _BenchmarkSpec = benchmark_spec.BenchmarkSpec
 
 
+def CheckPrerequisites(_):
+  """Verifies that benchmark setup is correct."""
+  if len(redis_server.GetRedisPorts()) > 1 and (
+      len(FLAGS.memtier_pipeline) > 1 or
+      len(FLAGS.memtier_threads) > 1 or
+      len(FLAGS.memtier_clients) > 1):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'There can only be 1 setting for pipeline, threads and clients if '
+        'there are multiple redis endpoints. Consider splitting up the '
+        'benchmarking.')
+
+
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Load and return benchmark config spec."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -87,7 +100,8 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   # Install redis on the 1st machine.
   server_vm.Install('redis_server')
   redis_server.Start(server_vm)
-  memtier.Load(server_vm, 'localhost', str(redis_server.DEFAULT_PORT))
+  for port in redis_server.GetRedisPorts():
+    memtier.Load(server_vm, 'localhost', str(port))
 
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
   vm_util.SetupSimulatedMaintenance(server_vm)
@@ -97,16 +111,35 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
   client_vms = bm_spec.vm_groups['clients']
 
+  ports = [str(port) for port in redis_server.GetRedisPorts()]
+  def DistributeClientsToPorts(port):
+    client_index = int(port) % len(ports) % len(client_vms)
+    vm = client_vms[client_index]
+    return memtier.RunOverAllThreadsPipelinesAndClients(
+        vm, bm_spec.redis_endpoint_ip, port)
+
+  benchmark_metadata = {}
+
   # if testing performance due to a live migration, simulate live migration.
   # actual live migration timestamps is not reported by PKB.
   if FLAGS.simulate_maintenance:
     vm_util.StartSimulatedMaintenance()
+    simulate_maintenance_time = datetime.datetime.now() + datetime.timedelta(
+        seconds=FLAGS.simulate_maintenance_delay)
+    benchmark_metadata[
+        'simulate_maintenance_time'] = str(simulate_maintenance_time)
+    benchmark_metadata[
+        'simulate_maintenance_delay'] = FLAGS.simulate_maintenance_delay
 
-  results = memtier.RunOverAllThreadsPipelinesAndClients(
-      client_vms[0], bm_spec.redis_endpoint_ip, str(redis_server.DEFAULT_PORT))
+  raw_results = vm_util.RunThreaded(DistributeClientsToPorts, ports)
   redis_metadata = redis_server.GetMetadata()
-  for result_sample in results:
-    result_sample.metadata.update(redis_metadata)
+  results = []
+
+  for server_result in raw_results:
+    for result_sample in server_result:
+      result_sample.metadata.update(redis_metadata)
+      result_sample.metadata.update(benchmark_metadata)
+      results.append(result_sample)
   return results
 
 

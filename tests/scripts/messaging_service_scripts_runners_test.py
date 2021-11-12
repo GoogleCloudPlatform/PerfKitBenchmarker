@@ -1,6 +1,7 @@
 """Tests for scripts/messaging_service_scripts/common/runners.py."""
 
 import datetime
+import typing
 import unittest
 
 from absl.testing import parameterized
@@ -139,10 +140,11 @@ class MessagingServiceScriptsRunnersTest(parameterized.TestCase):
     self.assertIsInstance(results, dict)
 
     # check if functions were called
-    runner.client.publish_message.assert_called()
+    typing.cast(mock.MagicMock, runner.client.publish_message).assert_called()
     summary_statistics_mock.assert_called()
-    self.assertEqual(runner.client.publish_message.call_count,
-                     NUMBER_OF_MESSAGES)
+    self.assertEqual(
+        typing.cast(mock.MagicMock, runner.client.publish_message).call_count,
+        NUMBER_OF_MESSAGES)
 
   @mock.patch.object(
       runners.PublishLatencyRunner,
@@ -173,12 +175,17 @@ class MessagingServiceScriptsRunnersTest(parameterized.TestCase):
     self.assertIsInstance(results, dict)
 
     # check if functions were called
-    runner.client.pull_message.assert_called()
-    runner.client.acknowledge_received_message.assert_called()
+    typing.cast(mock.MagicMock, runner.client.pull_message).assert_called()
+    typing.cast(mock.MagicMock,
+                runner.client.acknowledge_received_message).assert_called()
     summary_statistics_mock.assert_called()
-    self.assertEqual(runner.client.pull_message.call_count, NUMBER_OF_MESSAGES)
-    self.assertEqual(runner.client.acknowledge_received_message.call_count,
-                     NUMBER_OF_MESSAGES)
+    self.assertEqual(
+        typing.cast(mock.MagicMock, runner.client.pull_message).call_count,
+        NUMBER_OF_MESSAGES)
+    self.assertEqual(
+        typing.cast(mock.MagicMock,
+                    runner.client.acknowledge_received_message).call_count,
+        NUMBER_OF_MESSAGES)
 
   @mock.patch.object(
       runners.PullLatencyRunner,

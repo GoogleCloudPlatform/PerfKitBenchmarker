@@ -6,11 +6,18 @@ from absl import flags
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
+from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import latency_runner
+
+PUBLISH_LATENCY = 'publish_latency'
+PULL_LATENCY = 'pull_latency'
+END_TO_END_LATENCY = 'end_to_end_latency'
+BENCHMARK_SCENARIO_CHOICES = [PUBLISH_LATENCY, PULL_LATENCY, END_TO_END_LATENCY]
 
 _BENCHMARK_SCENARIO = flags.DEFINE_enum(
     'benchmark_scenario',
-    'publish_latency', ['publish_latency', 'pull_latency'],
-    help='Which part of the benchmark to run.')
+    'publish_latency',
+    BENCHMARK_SCENARIO_CHOICES,
+    help='Which part of the benchmark to run.',)
 _NUMBER_OF_MESSAGES = flags.DEFINE_integer(
     'number_of_messages', 100, help='Number of messages to send on benchmark.')
 _MESSAGE_SIZE = flags.DEFINE_integer(
@@ -128,8 +135,10 @@ class App:
 
   def _register_runners(self):
     """Registers all runner classes to create instances depending on flags."""
-    self._register_runner('publish_latency', runners.PublishLatencyRunner)
-    self._register_runner('pull_latency', runners.PullLatencyRunner)
+    self._register_runner(PUBLISH_LATENCY, runners.PublishLatencyRunner)
+    self._register_runner(PULL_LATENCY, runners.PullLatencyRunner)
+    self._register_runner(
+        END_TO_END_LATENCY, latency_runner.EndToEndLatencyRunner)
 
   def _register_runner(self, benchmark_scenario: str,
                        runner_cls: Type[runners.BaseRunner]):
