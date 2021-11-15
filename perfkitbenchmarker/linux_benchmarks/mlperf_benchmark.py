@@ -65,9 +65,10 @@ GNMT = 'gnmt'
 SSD = 'ssd'
 MINIGO = 'minigo'
 BERT = 'bert'
+DLRM = 'dlrm'
 
 flags.DEFINE_enum('mlperf_benchmark', RESNET,
-                  [RESNET, TRANSFORMER, MASK, GNMT, SSD, MINIGO, BERT],
+                  [RESNET, TRANSFORMER, MASK, GNMT, SSD, MINIGO, BERT, DLRM],
                   'MLPerf benchmark test to run.')
 
 NVPROF = 'nvprof'

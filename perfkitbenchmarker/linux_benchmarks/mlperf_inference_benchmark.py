@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Run MLPerf Inference benchmarks."""
+import posixpath
 import re
 from typing import Any, Dict, List
 from absl import flags
@@ -20,6 +21,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_benchmarks import mlperf_benchmark
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import docker
 from perfkitbenchmarker.linux_packages import nvidia_driver
@@ -28,6 +30,11 @@ FLAGS = flags.FLAGS
 MLPERF_INFERENCE_VERSION = 'v1.1'
 
 _MLPERF_SCRATCH_PATH = '/scratch'
+_DLRM_DATA_MODULE = 'criteo'
+_DLRM_DATA = 'day_23.gz'
+_DLRM_PREPROCESSED_DATA = 'full_recalib.tar.gz'
+_DLRM_MODEL = '40m_limit.tar.gz'
+_DLRM_ROW_FREQ = 'tb00_40M.pt'
 BENCHMARK_NAME = 'mlperf_inference'
 BENCHMARK_CONFIG = """
 mlperf_inference:
@@ -58,22 +65,16 @@ _SCENARIOS = flags.DEFINE_enum('mlperf_inference_scenarios', 'server',
                                'MLPerf has defined three different scenarios')
 
 _PERFORMANCE_METADATA = [
-    'active_sms',
     'benchmark',
-    'bert_opt_seqlen',
     'coalesced_tensor',
-    'enable_interleaved',
     'gpu_batch_size',
     'gpu_copy_streams',
     'gpu_inference_streams',
-    'graphs_max_seqlen',
     'input_dtype',
     'input_format',
     'precision',
     'scenario',
-    'server_num_issue_query_threads',
     'server_target_qps',
-    'soft_drop',
     'system',
     'tensor_path',
     'use_graphs',
@@ -127,22 +128,16 @@ _PERFORMANCE_METADATA = [
 ]
 
 _ACCURACY_METADATA = [
-    'active_sms',
     'benchmark',
-    'bert_opt_seqlen',
     'coalesced_tensor',
-    'enable_interleaved',
     'gpu_batch_size',
     'gpu_copy_streams',
     'gpu_inference_streams',
-    'graphs_max_seqlen',
     'input_dtype',
     'input_format',
     'precision',
     'scenario',
-    'server_num_issue_query_threads',
     'server_target_qps',
-    'soft_drop',
     'system',
     'tensor_path',
     'use_graphs',
@@ -212,21 +207,49 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'make launch_docker DOCKER_COMMAND="make clean" && '
       'make launch_docker DOCKER_COMMAND="make link_dirs"',
       should_log=True)
-  vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && '
-      'make launch_docker DOCKER_COMMAND='
-      f'"make download_data BENCHMARKS={benchmark}"',
-      should_log=True)
-  vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && '
-      'make launch_docker DOCKER_COMMAND='
-      f'"make download_model BENCHMARKS={benchmark}"',
-      should_log=True)
-  vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && '
-      'make launch_docker DOCKER_COMMAND='
-      f'"make preprocess_data BENCHMARKS={benchmark}"',
-      should_log=True)
+  if benchmark == mlperf_benchmark.DLRM:
+    # Download data
+    data_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'data', _DLRM_DATA_MODULE)
+    vm.DownloadPreprovisionedData(data_dir, _DLRM_DATA_MODULE, _DLRM_DATA)
+    vm.RemoteCommand(f'cd {data_dir} && gzip -d {_DLRM_DATA}')
+
+    # Download model
+    model_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'models',
+                               FLAGS.mlperf_benchmark)
+    vm.DownloadPreprovisionedData(model_dir, FLAGS.mlperf_benchmark,
+                                  _DLRM_MODEL)
+    vm.RemoteCommand(f'cd {model_dir} && '
+                     f'tar -zxvf {_DLRM_MODEL} && '
+                     f'rm -f {_DLRM_MODEL}')
+    vm.DownloadPreprovisionedData(model_dir, FLAGS.mlperf_benchmark,
+                                  _DLRM_ROW_FREQ)
+
+    # Preprocess Data
+    preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
+                                           'preprocessed_data',
+                                           _DLRM_DATA_MODULE)
+    vm.DownloadPreprovisionedData(preprocessed_data_dir, _DLRM_DATA_MODULE,
+                                  _DLRM_PREPROCESSED_DATA)
+    vm.RemoteCommand(f'cd {preprocessed_data_dir} && '
+                     f'tar -zxvf {_DLRM_PREPROCESSED_DATA} && '
+                     f'rm -f {_DLRM_PREPROCESSED_DATA}')
+  else:
+    vm.RobustRemoteCommand(
+        f'{bm_spec.env_cmd} && '
+        'make launch_docker DOCKER_COMMAND='
+        f'"make download_data BENCHMARKS={benchmark}"',
+        should_log=True)
+    vm.RobustRemoteCommand(
+        f'{bm_spec.env_cmd} && '
+        'make launch_docker DOCKER_COMMAND='
+        f'"make download_model BENCHMARKS={benchmark}"',
+        should_log=True)
+    vm.RobustRemoteCommand(
+        f'{bm_spec.env_cmd} && '
+        'make launch_docker DOCKER_COMMAND='
+        f'"make preprocess_data BENCHMARKS={benchmark}"',
+        should_log=True)
+
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND='

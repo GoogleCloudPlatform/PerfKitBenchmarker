@@ -1,0 +1,93 @@
+Launching Docker session
+nvidia-docker run --rm  -w /work \
+  -v /home/perfkit/inference_results_v1.1/closed/NVIDIA:/work -v /home/perfkit:/mnt//home/perfkit \
+  --cap-add SYS_ADMIN --cap-add SYS_TIME \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  --shm-size=32gb \
+  -v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro \
+  --security-opt apparmor=unconfined --security-opt seccomp=unconfined \
+  --name mlperf-inference-perfkit-x86_64 -h mlperf-inference-perfkit-x86_64 --add-host mlperf-inference-perfkit-x86_64:127.0.0.1 \
+  --user 1000:1001 --net host --device /dev/fuse \
+  -v /scratch:/scratch  \
+  -e MLPERF_SCRATCH_PATH=/scratch \
+  -e HOST_HOSTNAME=pkb-91467a4c-0 \
+   \
+  mlperf-inference:perfkit-x86_64 make run_harness RUN_ARGS='--benchmarks=bert --scenarios=server --fast --test_mode=AccuracyOnly'
+active_sms : 60
+benchmark : Benchmark.BERT
+bert_opt_seqlen : 384
+coalesced_tensor : True
+enable_interleaved : False
+gemm_plugin_fairshare_cache_size : 120
+gpu_batch_size : 64
+gpu_copy_streams : 1
+gpu_inference_streams : 2
+graphs_max_seqlen : 200
+input_dtype : int32
+input_format : linear
+precision : int8
+scenario : Scenario.Server
+server_num_issue_query_threads : 1
+server_target_qps : 3100
+soft_drop : 0.99
+system : A100-SXM4-40GBx1
+tensor_path : ${PREPROCESSED_DATA_DIR}/squad_tokenized/input_ids.npy,${PREPROCESSED_DATA_DIR}/squad_tokenized/segment_ids.npy,${PREPROCESSED_DATA_DIR}/squad_tokenized/input_mask.npy
+use_graphs : True
+use_small_tile_gemm_plugin : True
+config_name : A100-SXM4-40GBx1_bert_Server
+config_ver : custom_k_99_MaxP
+accuracy_level : 99%
+optimization_level : plugin-enabled
+inference_server : custom
+system_id : A100-SXM4-40GBx1
+use_cpu : False
+power_limit : None
+cpu_freq : None
+test_mode : AccuracyOnly
+fast : True
+gpu_num_bundles : 2
+log_dir : /work/build/logs/2021.11.09-05.18.28
+&&&& RUNNING BERT_HARNESS # ./build/bin/harness_bert
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +492, GPU +0, now: CPU 6005, GPU 1131 (MiB)
+[I] [TRT] Loaded engine size: 2745 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 6005 MiB, GPU 1131 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +747, GPU +316, now: CPU 7287, GPU 1775 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +619, GPU +268, now: CPU 7906, GPU 2043 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 7906, GPU 2027 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 7906 MiB, GPU 2027 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 2414 MiB, GPU 2197 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +1, GPU +8, now: CPU 2415, GPU 2205 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 2415, GPU 2213 (MiB)
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 2926 MiB, GPU 2897 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 3246 MiB, GPU 5260 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 3246, GPU 5268 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +1, GPU +10, now: CPU 3247, GPU 5278 (MiB)
+[I] [TRT] Could not set default profile 0 for execution context. Profile index must be set explicitly.
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 3758 MiB, GPU 5962 MiB
+
+No warnings encountered during test.
+
+No errors encountered during test.
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU -1, GPU -102, now: CPU 3524, GPU 6766 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU -43, GPU +0, now: CPU 3481, GPU 6748 (MiB)
+{"exact_match": 83.09366130558183, "f1": 90.37586600946241}
+Reading examples...
+No cached features at 'eval_features.pickle'... converting from examples...
+Creating tokenizer...
+Converting examples to features...
+Caching features at 'eval_features.pickle'...
+Loading LoadGen logs...
+Post-processing predictions...
+Writing predictions to: /work/build/logs/2021.11.09-05.18.28/DGX-A100_A100-SXM4-40GBx1_TRT/bert-99/Server/predictions.json
+Evaluating predictions...
+
+======================= Perf harness results: =======================
+
+DGX-A100_A100-SXM4-40GBx1_TRT-custom_k_99_MaxP-Server:
+    bert: Cannot find performance result. Maybe you are running in AccuracyOnly mode.
+
+
+======================= Accuracy results: =======================
+
+DGX-A100_A100-SXM4-40GBx1_TRT-custom_k_99_MaxP-Server:
+    bert: Accuracy = 90.376, Threshold = 89.965. Accuracy test PASSED.
