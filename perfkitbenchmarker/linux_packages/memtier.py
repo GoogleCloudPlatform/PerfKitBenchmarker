@@ -121,6 +121,9 @@ flag_util.DEFINE_integerlist(
     'i.e. no pipelining.')
 MEMTIER_CLUSTER_MODE = flags.DEFINE_bool(
     'memtier_cluster_mode', False, 'Passthrough for --cluster-mode flag')
+MEMTIER_TIME_SERIES = flags.DEFINE_bool(
+    'memtier_time_series', False, 'Include per second time series output '
+    'for ops and max latency. This greatly increase the number of samples.')
 
 
 def YumInstall(vm):
@@ -373,7 +376,8 @@ def _Run(vm,
   """Runs the memtier benchmark on the vm."""
   results_file = pathlib.PosixPath(f'{MEMTIER_RESULTS}_{server_port}')
   vm.RemoteCommand(f'rm -f {results_file}')
-  json_results_file = pathlib.PosixPath(f'{JSON_OUT_FILE}_{server_port}')
+  json_results_file = (pathlib.PosixPath(f'{JSON_OUT_FILE}_{server_port}')
+                       if MEMTIER_TIME_SERIES.value else None)
   vm.RemoteCommand(f'rm -f {json_results_file}')
   # Specify one of run requests or run duration.
   requests = (
@@ -404,16 +408,22 @@ def _Run(vm,
       json_out_file=json_results_file)
   vm.RemoteCommand(cmd)
 
-  vm.PullFile(vm_util.GetTempDir(), results_file)
-  vm.PullFile(vm_util.GetTempDir(), json_results_file)
-
   output_path = os.path.join(
       vm_util.GetTempDir(), f'memtier_results_{server_port}')
-  json_path = os.path.join(
-      vm_util.GetTempDir(), f'json_data_{server_port}')
-  with open(output_path, 'r') as output, open(json_path, 'r') as ts_json:
+  vm_util.IssueCommand(['rm', '-f', output_path])
+  vm.PullFile(vm_util.GetTempDir(), results_file)
+
+  time_series_json = None
+  if json_results_file:
+    json_path = os.path.join(
+        vm_util.GetTempDir(), f'json_data_{server_port}')
+    vm_util.IssueCommand(['rm', '-f', json_path])
+    vm.PullFile(vm_util.GetTempDir(), json_results_file)
+    with open(json_path, 'r') as ts_json:
+      time_series_json = ts_json.read()
+
+  with open(output_path, 'r') as output:
     summary_data = output.read()
-    time_series_json = ts_json.read()
   return MemtierResult.Parse(summary_data, time_series_json)
 
 
@@ -451,10 +461,11 @@ class MemtierResult:
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
   ops_time_series: List[Tuple[int, int]]
+  max_latency_time_series: List[Tuple[int, int]]
 
   @classmethod
   def Parse(cls, memtier_results: Text,
-            time_series_json: Text) -> 'MemtierResult':
+            time_series_json: Optional[Text]) -> 'MemtierResult':
     """Parse memtier_benchmark result textfile and return results.
 
     Args:
@@ -493,9 +504,13 @@ class MemtierResult:
     ops_per_sec, latency_ms, kb_per_sec = _ParseTotalThroughputAndLatency(
         memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
-    ops_time_series = _ParseTimeSeries(time_series_json)
+    ops_time_series = []
+    max_latency_time_series = []
+    if time_series_json:
+      ops_time_series, max_latency_time_series = _ParseTimeSeries(
+          time_series_json)
     return cls(ops_per_sec, kb_per_sec, latency_ms, get_histogram,
-               set_histogram, ops_time_series)
+               set_histogram, ops_time_series, max_latency_time_series)
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
@@ -518,6 +533,15 @@ class MemtierResult:
       })
       samples.append(
           sample.Sample('Ops Time Series', count, 'ops', time_series_meta))
+    for interval, latency in self.max_latency_time_series:
+      time_series_meta = copy.deepcopy(metadata)
+      time_series_meta.update({
+          'time_series_sec': interval,
+          'time_series_max_latency': latency,
+      })
+      samples.append(
+          sample.Sample('Max Latency Time Series', latency, 'ms',
+                        time_series_meta))
     return samples
 
 
@@ -591,12 +615,14 @@ def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
   return percent / 100 * total_value
 
 
-def _ParseTimeSeries(time_series_json: Text) -> List[Tuple[int, int]]:
+def _ParseTimeSeries(time_series_json: Text
+                     ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
   """Parse time series ops throughput from json output."""
-  results = []
+  ops_series = []
+  max_latency_series = []
   raw = json.loads(time_series_json)
   time_series = raw['ALL STATS']['Totals']['Time-Serie']
   for interval, data_dict in time_series.items():
-    results.append((interval, data_dict['Count']))
-  return results
-
+    ops_series.append((interval, data_dict['Count']))
+    max_latency_series.append((interval, data_dict['Max Latency']))
+  return ops_series, max_latency_series
