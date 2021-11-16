@@ -186,3 +186,4 @@
 -   Added `--google_monitoring_endpoint` flag for querying a different endpoint
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
 -   Broadens Azure quota detection parsing
+-   Added icelake, rome and milan as --gcp_min_cpu_platform options.

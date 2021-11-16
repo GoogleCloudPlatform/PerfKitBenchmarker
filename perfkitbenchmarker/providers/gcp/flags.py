@@ -91,7 +91,7 @@ flags.DEFINE_string('gcp_node_type', None,
 flags.DEFINE_enum(
     'gcp_min_cpu_platform', None, [
         GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge', 'haswell',
-        'broadwell', 'skylake', 'cascadelake',
+        'broadwell', 'skylake', 'cascadelake', 'icelake', 'rome', 'milan',
     ], 'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
 flags.DEFINE_string(
