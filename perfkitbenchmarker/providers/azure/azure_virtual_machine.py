@@ -750,15 +750,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
-    self.InstallCli()
+    # N.B. Should already be installed by ShouldDownloadPreprovisionedData
+    self.Install('azure_cli')
     self.RemoteCommand(
         GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                                   filename))
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
+    # Do not install credentials. Data are fetched using locally generated
+    # connection strings and do not use credentials on the VM.
     self.Install('azure_cli')
-    self.Install('azure_credentials')
     return FLAGS.azure_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 

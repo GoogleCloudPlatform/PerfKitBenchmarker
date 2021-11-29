@@ -16,6 +16,8 @@
     versions less than 6 are no longer supported.
 -   Make Ubuntu 18 the default os_type.
 -   Deprecate Ubuntu 16 as it is EOL on 2021-05-01.
+-   Switch to Azure CLI to MSAL. This requires updating the CLI to >= 2.30.0.
+    -   See https://docs.microsoft.com/en-us/cli/azure/msal-based-azure-cli
 
 ### New features:
 
