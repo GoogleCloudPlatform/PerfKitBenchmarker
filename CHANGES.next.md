@@ -122,6 +122,7 @@
 -   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
 -   Add support for 5th gen Azure VMs.
 -   Support multiple Redis instances on the same VM and multiple client VMs.
+-   Support creating autoscaled Bigtable instances.
 
 ### Bug fixes and maintenance updates:
 

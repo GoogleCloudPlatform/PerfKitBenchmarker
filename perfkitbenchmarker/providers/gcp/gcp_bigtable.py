@@ -39,8 +39,20 @@ def _ValidateRoutingFlags(flag_dict):
           flag_dict['bigtable_replication_cluster'])
 
 
-flags.DEFINE_integer('bigtable_node_count', 3,
-                     'Number of nodes to create in the bigtable cluster.')
+flags.DEFINE_integer(
+    'bigtable_node_count', 3,
+    'Number of nodes to create in the bigtable cluster. '
+    'Ignored if --google_bigtable_autoscaling_min_nodes is '
+    'set.')
+_AUTOSCALING_MIN_NODES = flags.DEFINE_integer(
+    'bigtable_autoscaling_min_nodes', None,
+    'Minimum number of nodes for autoscaling.')
+_AUTOSCALING_MAX_NODES = flags.DEFINE_integer(
+    'bigtable_autoscaling_max_nodes', None,
+    'Maximum number of nodes for autoscaling.')
+_AUTOSCALING_CPU_TARGET = flags.DEFINE_integer(
+    'bigtable_autoscaling_cpu_target', None,
+    'The target CPU utilization percent for autoscaling.')
 flags.DEFINE_enum('bigtable_storage_type', 'ssd', ['ssd', 'hdd'],
                   'Storage class for the cluster')
 flags.DEFINE_string('google_bigtable_zone', 'us-central1-b',
@@ -61,6 +73,53 @@ flags.register_multi_flags_validator(
     'be set if bigtable_multicluster_routing is True.')
 
 
+def _BuildClusterConfigs(name, zone):
+  """Return flag values for --cluster_config when creating an instance.
+
+  Args:
+    name: Name prefix for the cluster(s) being created.
+    zone: Zone where the primary cluster will be created.
+
+  Returns:
+    List of strings for repeated --cluster_config flag values.
+  """
+  flag_values = []
+  cluster_config = {
+      'id': '{}-0'.format(name),
+      'zone': zone,
+      'nodes': FLAGS.bigtable_node_count,
+      # Depending on flag settings, the config may be incomplete, but we rely
+      # on gcloud to validate for us.
+      'autoscaling-min-nodes': _AUTOSCALING_MIN_NODES.value,
+      'autoscaling-max-nodes': _AUTOSCALING_MAX_NODES.value,
+      'autoscaling-cpu-target': _AUTOSCALING_CPU_TARGET.value,
+  }
+
+  # Ignore nodes if autoscaling is configured. --bigtable_node_count has a
+  # default value so we want to maintain backwards compatibility.
+  if _AUTOSCALING_MIN_NODES.value:
+    del cluster_config['nodes']
+
+  keys_to_remove = []
+  for k, v in cluster_config.items():
+    if v is None:
+      keys_to_remove.append(k)
+  for key in keys_to_remove:
+    del cluster_config[key]
+
+  flag_values.append(','.join(
+      '{}={}'.format(k, v) for (k, v) in cluster_config.items()))
+
+  if FLAGS.bigtable_replication_cluster:
+    replication_cluster_config = cluster_config.copy()
+    replication_cluster_config['id'] = '{}-1'.format(name)
+    replication_cluster_config['zone'] = FLAGS.bigtable_replication_cluster_zone
+    flag_values.append(','.join(
+        '{}={}'.format(k, v) for (k, v) in replication_cluster_config.items()))
+
+  return flag_values
+
+
 class GcpBigtableInstance(resource.BaseResource):
   """Object representing a GCP Bigtable Instance.
 
@@ -73,7 +132,7 @@ class GcpBigtableInstance(resource.BaseResource):
 
   def __init__(self, name, project, zone):
     super(GcpBigtableInstance, self).__init__()
-    self.num_nodes = FLAGS.bigtable_node_count
+
     self.storage_type = FLAGS.bigtable_storage_type
     self.name = name
     self.zone = zone
@@ -84,28 +143,19 @@ class GcpBigtableInstance(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'create',
                              self.name)
     cmd.flags['display-name'] = self.name
-    cmd.flags['cluster'] = '{}-0'.format(self.name)
-    cmd.flags['cluster-num-nodes'] = self.num_nodes
     cmd.flags['cluster-storage-type'] = self.storage_type
-    cmd.flags['cluster-zone'] = self.zone
     cmd.flags['project'] = self.project
+    cmd.flags['cluster-config'] = _BuildClusterConfigs(self.name, self.zone)
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
+
+    logging.info('Creating instance %s.', self.name)
+
     _, stderr, _ = cmd.Issue()
     if 'Insufficient node quota' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           f'Insufficient node quota in project {self.project} '
           f'and zone {self.zone}')
-
-    if FLAGS.bigtable_replication_cluster:
-      cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'clusters', 'create',
-                               '{}-1'.format(self.name))
-      cmd.flags['instance'] = self.name
-      cmd.flags['zone'] = FLAGS.bigtable_replication_cluster_zone
-      cmd.flags['num-nodes'] = self.num_nodes
-      cmd.Issue()
-
-    logging.info('Creating instance %s.', self.name)
 
     if FLAGS.bigtable_multicluster_routing:
       cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'app-profiles',
