@@ -22,6 +22,7 @@ and not within a container running on that VM.
 
 from absl import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import virtual_machine
 
 VERSION = flags.DEFINE_string('docker_version', None,
                               'Version of docker to install.')
@@ -98,3 +99,19 @@ def IsInstalled(vm):
                              ignore_failure=True,
                              suppress_warning=True)
   return bool(resp.rstrip())
+
+
+def AddUser(vm: virtual_machine.BaseVirtualMachine) -> None:
+  """Run Docker as a non-root user.
+
+  https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user
+
+  Args:
+    vm: The VM to work on
+  """
+  # Create the docker group.
+  vm.RemoteCommand('sudo groupadd docker', ignore_failure=True)
+  # Add your user to the docker group.
+  vm.RemoteCommand(f'sudo usermod -aG docker {vm.user_name}')
+  # Log out and log back in so that your group membership is re-evaluated.
+  vm.RemoteCommand(f'pkill -KILL -u {vm.user_name}', ignore_failure=True)

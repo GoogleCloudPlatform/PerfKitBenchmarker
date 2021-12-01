@@ -31,6 +31,8 @@ flags.DEFINE_string(
     'scopes to apply to every created machine')
 flags.DEFINE_boolean('gce_migrate_on_maintenance', True, 'If true, allow VM '
                      'migration on GCE host maintenance.')
+flags.DEFINE_boolean('gce_automatic_restart', False, 'If true, allow VM '
+                     'to restart when crashes.')
 flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
                      'VMs on GCE.')
 flags.DEFINE_string(

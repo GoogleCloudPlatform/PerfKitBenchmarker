@@ -14,14 +14,33 @@ import os
 from typing import Any, Dict
 from perfkitbenchmarker import resource
 
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
-MESSAGING_SERVICE_CLIENT_PY = 'messaging_service_client.py'
+MESSAGING_SERVICE_SCRIPTS_VM_PKB = os.path.join('~', 'perfkitbenchmarker')
+MESSAGING_SERVICE_SCRIPTS_VM_BIN_DIR = '~'
+MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR = os.path.join(
+    '~', 'perfkitbenchmarker', 'scripts', 'messaging_service_scripts')
+MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR = os.path.join(
+    MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'common')
+MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX = 'messaging_service_scripts/common/'
+MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
+    '__init__.py',
+    'app.py',
+    'client.py',
+    'errors.py',
+    'runners.py',
+    'e2e/__init__.py',
+    'e2e/latency_runner.py',
+    'e2e/main_process.py',
+    'e2e/protocol.py',
+    'e2e/publisher.py',
+    'e2e/receiver.py',
+    'e2e/worker_utils.py',
+]
 
 
 def GetMessagingServiceClass(cloud, delivery):
   """Gets the underlying Messaging Service class."""
-  return resource.GetResourceClass(BaseMessagingService, CLOUD=cloud,
-                                   DELIVERY=delivery)
+  return resource.GetResourceClass(
+      BaseMessagingService, CLOUD=cloud, DELIVERY=delivery)
 
 
 class BaseMessagingService(resource.BaseResource):
@@ -36,6 +55,10 @@ class BaseMessagingService(resource.BaseResource):
 
   # TODO(odiego): Move DELIVERY down to child classes when adding more options
   DELIVERY = 'pull'
+
+  END_TO_END_LATENCY = 'end_to_end_latency'
+  PUBLISH_LATENCY = 'publish_latency'
+  PULL_LATENCY = 'pull_latency'
 
   @classmethod
   def FromSpec(cls, messaging_service_spec):
@@ -56,9 +79,25 @@ class BaseMessagingService(resource.BaseResource):
     self.client_vm.Install('pip3')
     self.client_vm.RemoteCommand('sudo pip3 install absl-py numpy')
 
-    # Upload Common Client Interface
-    self.client_vm.PushDataFile(
-        os.path.join(MESSAGING_SERVICE_DATA_DIR, MESSAGING_SERVICE_CLIENT_PY))
+    # Upload common scripts
+    self.client_vm.RemoteCommand(
+        f'mkdir -p {MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR}')
+    self.client_vm.RemoteCommand(' '.join([
+        'find', MESSAGING_SERVICE_SCRIPTS_VM_PKB, '-type', 'd', '-exec',
+        'touch', "'{}/__init__.py'", '\\;'
+    ]))
+    self._CopyFiles(
+        MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX,
+        MESSAGING_SERVICE_SCRIPTS_COMMON_FILES,
+        MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR)
+
+  def _CopyFiles(self, prefix, data_srcs, vm_dest_dir):
+    for subpath in data_srcs:
+      dirname = os.path.dirname(os.path.join(vm_dest_dir, subpath))
+      self.client_vm.RemoteCommand(f'mkdir -p {dirname}')
+      self.client_vm.PushDataFile(
+          os.path.join(prefix, subpath),
+          os.path.join(vm_dest_dir, subpath))
 
   @abc.abstractmethod
   def _InstallCloudClients(self):

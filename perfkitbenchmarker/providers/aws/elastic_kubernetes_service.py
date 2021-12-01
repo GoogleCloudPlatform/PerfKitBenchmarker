@@ -140,6 +140,7 @@ class EksCluster(container_service.KubernetesCluster):
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
+    super()._Delete()
     cmd = [FLAGS.eksctl, 'delete', 'cluster',
            '--name', self.name,
            '--region', self.region]

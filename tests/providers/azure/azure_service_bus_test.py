@@ -1,5 +1,4 @@
 """Tests for azure_service_bus."""
-import os
 import unittest
 
 from absl import flags
@@ -13,7 +12,7 @@ _REGION = 'eastus'
 BENCHMARK_SCENARIO = 'pull_latency'
 NUMBER_OF_MESSAGES = 10
 MESSAGE_SIZE = 10
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
 
@@ -179,13 +178,26 @@ class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = [None, None, 0]
     self._MockIssueCommand(return_value)
 
-    sdk_cmd = ('sudo pip3 install azure-servicebus')
-    datafile_path = os.path.join(MESSAGING_SERVICE_DATA_DIR,
-                                 'azure_service_bus_client.py')
-
     self.servicebus.PrepareClientVm()
-    self.client.RemoteCommand.assert_called_with(sdk_cmd, ignore_failure=False)
-    self.client.PushDataFile.assert_called_with(datafile_path)
+    self.client.assert_has_calls([
+        mock.call.RemoteCommand(
+            'sudo pip3 install azure-servicebus', ignore_failure=False),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/azure'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/azure/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/azure/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/azure'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/azure/azure_service_bus_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/azure/azure_service_bus_client.py'
+        ),
+        mock.call.PushDataFile('messaging_service_scripts/azure_benchmark.py'),
+    ])
 
   @mock.patch.object(
       asb.AzureServiceBus,
@@ -196,7 +208,7 @@ class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
     remote_run_cmd = (
-        f'python3 -m azure_service_bus_client '
+        f'python3 -m azure_benchmark '
         f'--topic_name={self.servicebus.topic_name} '
         f'--subscription_name={self.servicebus.subscription_name} '
         f'--benchmark_scenario={BENCHMARK_SCENARIO} '

@@ -42,6 +42,22 @@ GET               2       100.00
 
 METADATA = {'test': 'foobar'}
 
+TIME_SERIES_JSON = """
+  {
+    "ALL STATS":
+    {
+      "Totals":
+      {
+        "Time-Serie":
+        {
+          "0": {"Count": 3, "Max Latency": 1},
+          "1": {"Count": 4, "Max Latency": 2.1}
+        }
+      }
+    }
+  }
+"""
+
 
 class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
@@ -66,6 +82,26 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             {'microsec': 9000.0, 'count': 10}])
     }
     set_metadata.update(METADATA)
+    time_series_0_metadata = {
+        'time_series_sec': '0',
+        'time_series_ops': 3,
+    }
+    time_series_0_metadata.update(METADATA)
+    time_series_1_metadata = {
+        'time_series_sec': '1',
+        'time_series_ops': 4,
+    }
+    time_series_1_metadata.update(METADATA)
+    latency_series_0_metadata = {
+        'time_series_sec': '0',
+        'time_series_max_latency': 1
+    }
+    latency_series_0_metadata.update(METADATA)
+    latency_series_1_metadata = {
+        'time_series_sec': '1',
+        'time_series_max_latency': 2.1
+    }
+    latency_series_1_metadata.update(METADATA)
     expected_result = [
         sample.Sample(
             metric='Ops Throughput',
@@ -91,9 +127,29 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             value=0,
             unit='',
             metadata=set_metadata),
+        sample.Sample(
+            metric='Ops Time Series',
+            value=3.0,
+            unit='ops',
+            metadata=time_series_0_metadata),
+        sample.Sample(
+            metric='Ops Time Series',
+            value=4.0,
+            unit='ops',
+            metadata=time_series_1_metadata),
+        sample.Sample(
+            metric='Max Latency Time Series',
+            value=1.0,
+            unit='ms',
+            metadata=latency_series_0_metadata),
+        sample.Sample(
+            metric='Max Latency Time Series',
+            value=2.1,
+            unit='ms',
+            metadata=latency_series_1_metadata),
     ]
     samples = []
-    results = memtier.MemtierResult.Parse(TEST_OUTPUT)
+    results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)
     samples.extend(results.GetSamples(METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
 

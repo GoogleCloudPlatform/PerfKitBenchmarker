@@ -277,6 +277,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def _Delete(self):
     """Deletes the cluster."""
+    super()._Delete()
     cmd = util.GcloudCommand(self, 'container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
     cmd.Issue(raise_on_failure=False)

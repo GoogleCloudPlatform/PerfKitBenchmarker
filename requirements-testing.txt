@@ -33,3 +33,5 @@ psutil>=5.6.6
 gcs-oauth2-boto-plugin
 azure-storage<=0.20.3
 freezegun
+boto3
+google-cloud-pubsub

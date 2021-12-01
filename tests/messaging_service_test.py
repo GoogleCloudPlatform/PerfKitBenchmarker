@@ -3,7 +3,6 @@
 This is the common interface used by the benchmark VM to run the benchmark.
 """
 
-import os
 import unittest
 from unittest import mock
 
@@ -11,7 +10,7 @@ from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 
 class DummyMessagingService(messaging_service.BaseMessagingService):
@@ -50,16 +49,98 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testPrepareBasicVmClient(self):
     self.messaging_service._InstallCommonClientPackages()
-
     self.client.assert_has_calls([
-        mock.call.Install('python3'),
-        mock.call.Install('pip3'),
-        mock.call.RemoteCommand('sudo pip3 install absl-py numpy')
+        mock.call.RemoteCommand('sudo pip3 install absl-py numpy'),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts'),
+        mock.call.RemoteCommand(
+            "find ~/perfkitbenchmarker -type d -exec touch '{}/__init__.py' \\;"
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/app.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/app.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/client.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/errors.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/errors.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/runners.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/runners.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/latency_runner.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/latency_runner.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/main_process.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/main_process.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/protocol.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/protocol.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/publisher.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/publisher.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/receiver.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/receiver.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/worker_utils.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/worker_utils.py'
+        ),
     ])
-
-    datafile_path = os.path.join(MESSAGING_SERVICE_DATA_DIR,
-                                 'messaging_service_client.py')
-    self.client.PushDataFile.assert_called_with(datafile_path)
 
 
 if __name__ == '__main__':

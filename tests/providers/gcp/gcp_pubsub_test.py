@@ -1,6 +1,5 @@
 """Tests for gcp_pubsub."""
 
-import os
 import unittest
 
 from absl import flags
@@ -16,7 +15,7 @@ SUBSCRIPTION = 'pkb-subscription-uri'
 BENCHMARK_SCENARIO = 'pull_latency'
 NUMBER_OF_MESSAGES = 10
 MESSAGE_SIZE = 10
-MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
 
@@ -150,21 +149,34 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = [None, None, 0]
     self._MockIssueCommand(return_value)
 
-    sdk_cmd = ('sudo pip3 install --upgrade --ignore-installed '
-               'google-cloud-pubsub')
-    datafile_path = os.path.join(MESSAGING_SERVICE_DATA_DIR,
-                                 'gcp_pubsub_client.py')
-
     self.pubsub.PrepareClientVm()
-    self.client.RemoteCommand.assert_called_with(sdk_cmd, ignore_failure=False)
-    self.client.PushDataFile.assert_called_with(datafile_path)
+    self.client.assert_has_calls([
+        mock.call.RemoteCommand(
+            'sudo pip3 install --upgrade --ignore-installed google-cloud-pubsub',
+            ignore_failure=False),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/gcp/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/gcp/gcp_pubsub_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/gcp_pubsub_client.py'
+        ),
+        mock.call.PushDataFile('messaging_service_scripts/gcp_benchmark.py'),
+    ])
 
   def testRun(self):
 
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
-    remote_run_cmd = (f'python3 -m gcp_pubsub_client '
-                      f'--project={PROJECT} '
+    remote_run_cmd = (f'python3 -m gcp_benchmark '
+                      f'--pubsub_project={PROJECT} '
                       f'--pubsub_topic={TOPIC} '
                       f'--pubsub_subscription={SUBSCRIPTION} '
                       f'--benchmark_scenario={BENCHMARK_SCENARIO} '

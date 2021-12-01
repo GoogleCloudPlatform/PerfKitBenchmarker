@@ -13,9 +13,11 @@
 # limitations under the License.
 """Module containing memtier installation, utilization and cleanup functions."""
 
+import copy
 import dataclasses
 import json
 import logging
+import os
 import pathlib
 import re
 import time
@@ -30,19 +32,18 @@ from perfkitbenchmarker import vm_util
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '793d74dbc09395dfc241342d847730a6197d7c0c'
-LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
-LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
-LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % linux_packages.INSTALL_DIR
 MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = ('build-essential autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev libssl-dev')
-YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
-MEMTIER_RESULTS = pathlib.PosixPath('memtier_results')
+YUM_PACKAGES = (
+    'zlib-devel pcre-devel libmemcached-devel libevent-devel openssl-devel')
+MEMTIER_RESULTS = '/tmp/memtier_results'
 
 _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
 _WRITE_ONLY = '1:0'
 CPU_TOLERANCE = 0.05
 WARM_UP_SECONDS = 360
+JSON_OUT_FILE = '/tmp/json_data'
 
 MemtierHistogram = List[Dict[str, Union[float, int]]]
 
@@ -120,19 +121,16 @@ flag_util.DEFINE_integerlist(
     'i.e. no pipelining.')
 MEMTIER_CLUSTER_MODE = flags.DEFINE_bool(
     'memtier_cluster_mode', False, 'Passthrough for --cluster-mode flag')
+MEMTIER_TIME_SERIES = flags.DEFINE_bool(
+    'memtier_time_series', False, 'Include per second time series output '
+    'for ops and max latency. This greatly increase the number of samples.')
 
 
 def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
-  vm.Install('wget')
-  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL,
-                                            linux_packages.INSTALL_DIR))
-  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(linux_packages.INSTALL_DIR,
-                                                   LIBEVENT_TAR))
-  vm.RemoteCommand(
-      'cd {0} && ./configure && sudo make install'.format(LIBEVENT_DIR))
+
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
   pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
@@ -184,6 +182,7 @@ def BuildMemtierCommand(
     outfile: Optional[pathlib.PosixPath] = None,
     password: Optional[str] = None,
     cluster_mode: Optional[bool] = None,
+    json_out_file: Optional[pathlib.PosixPath] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
@@ -203,6 +202,8 @@ def BuildMemtierCommand(
       'requests': requests,
       'run-count': run_count,
       'test-time': test_time,
+      'out-file': outfile,
+      'json-out-file': json_out_file,
       'print-percentile': '50,90,95,99,99.9',
   }
   # Arguments passed without a parameter
@@ -215,8 +216,6 @@ def BuildMemtierCommand(
   for no_param_arg, value in no_param_args.items():
     if value:
       cmd.append(f'--{no_param_arg}')
-  if outfile:
-    cmd.extend(['>', str(outfile)])
   return ' '.join(cmd)
 
 
@@ -375,7 +374,11 @@ def _Run(vm,
          clients: int,
          password: Optional[str] = None) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
-  vm.RemoteCommand('rm -f {0}'.format(MEMTIER_RESULTS))
+  results_file = pathlib.PosixPath(f'{MEMTIER_RESULTS}_{server_port}')
+  vm.RemoteCommand(f'rm -f {results_file}')
+  json_results_file = (pathlib.PosixPath(f'{JSON_OUT_FILE}_{server_port}')
+                       if MEMTIER_TIME_SERIES.value else None)
+  vm.RemoteCommand(f'rm -f {json_results_file}')
   # Specify one of run requests or run duration.
   requests = (
       MEMTIER_REQUESTS.value if MEMTIER_RUN_DURATION.value is None else None)
@@ -400,12 +403,28 @@ def _Run(vm,
       test_time=test_time,
       requests=requests,
       password=password,
-      outfile=MEMTIER_RESULTS,
-      cluster_mode=MEMTIER_CLUSTER_MODE.value)
+      outfile=results_file,
+      cluster_mode=MEMTIER_CLUSTER_MODE.value,
+      json_out_file=json_results_file)
   vm.RemoteCommand(cmd)
 
-  output, _ = vm.RemoteCommand('cat {0}'.format(MEMTIER_RESULTS))
-  return MemtierResult.Parse(output)
+  output_path = os.path.join(
+      vm_util.GetTempDir(), f'memtier_results_{server_port}')
+  vm_util.IssueCommand(['rm', '-f', output_path])
+  vm.PullFile(vm_util.GetTempDir(), results_file)
+
+  time_series_json = None
+  if json_results_file:
+    json_path = os.path.join(
+        vm_util.GetTempDir(), f'json_data_{server_port}')
+    vm_util.IssueCommand(['rm', '-f', json_path])
+    vm.PullFile(vm_util.GetTempDir(), json_results_file)
+    with open(json_path, 'r') as ts_json:
+      time_series_json = ts_json.read()
+
+  with open(output_path, 'r') as output:
+    summary_data = output.read()
+  return MemtierResult.Parse(summary_data, time_series_json)
 
 
 def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
@@ -441,13 +460,17 @@ class MemtierResult:
   latency_ms: float
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
+  ops_time_series: List[Tuple[int, int]]
+  max_latency_time_series: List[Tuple[int, int]]
 
   @classmethod
-  def Parse(cls, memtier_results: Text) -> 'MemtierResult':
+  def Parse(cls, memtier_results: Text,
+            time_series_json: Optional[Text]) -> 'MemtierResult':
     """Parse memtier_benchmark result textfile and return results.
 
     Args:
       memtier_results: Text output of running Memtier benchmark.
+      time_series_json: Time series data of the results in json format.
 
     Returns:
       MemtierResult object.
@@ -481,8 +504,13 @@ class MemtierResult:
     ops_per_sec, latency_ms, kb_per_sec = _ParseTotalThroughputAndLatency(
         memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
+    ops_time_series = []
+    max_latency_time_series = []
+    if time_series_json:
+      ops_time_series, max_latency_time_series = _ParseTimeSeries(
+          time_series_json)
     return cls(ops_per_sec, kb_per_sec, latency_ms, get_histogram,
-               set_histogram)
+               set_histogram, ops_time_series, max_latency_time_series)
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
@@ -493,10 +521,27 @@ class MemtierResult:
     ]
     for name, histogram in [('get', self.get_latency_histogram),
                             ('set', self.set_latency_histogram)]:
-      hist_meta = metadata.copy()
+      hist_meta = copy.deepcopy(metadata)
       hist_meta.update({'histogram': json.dumps(histogram)})
       samples.append(
           sample.Sample(f'{name} latency histogram', 0, '', hist_meta))
+    for interval, count in self.ops_time_series:
+      time_series_meta = copy.deepcopy(metadata)
+      time_series_meta.update({
+          'time_series_sec': interval,
+          'time_series_ops': count,
+      })
+      samples.append(
+          sample.Sample('Ops Time Series', count, 'ops', time_series_meta))
+    for interval, latency in self.max_latency_time_series:
+      time_series_meta = copy.deepcopy(metadata)
+      time_series_meta.update({
+          'time_series_sec': interval,
+          'time_series_max_latency': latency,
+      })
+      samples.append(
+          sample.Sample('Max Latency Time Series', latency, 'ms',
+                        time_series_meta))
     return samples
 
 
@@ -568,3 +613,16 @@ def _ParseLine(pattern: str, line: str, approx_total: int, last_total: int,
 def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
   """Given total value and a 100-based percentage, returns the actual value."""
   return percent / 100 * total_value
+
+
+def _ParseTimeSeries(time_series_json: Text
+                     ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+  """Parse time series ops throughput from json output."""
+  ops_series = []
+  max_latency_series = []
+  raw = json.loads(time_series_json)
+  time_series = raw['ALL STATS']['Totals']['Time-Serie']
+  for interval, data_dict in time_series.items():
+    ops_series.append((interval, data_dict['Count']))
+    max_latency_series.append((interval, data_dict['Max Latency']))
+  return ops_series, max_latency_series

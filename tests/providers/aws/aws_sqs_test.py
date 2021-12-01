@@ -1,6 +1,5 @@
 """Tests for gcp_pubsub."""
 
-import os
 import unittest
 
 from absl import flags
@@ -14,7 +13,7 @@ _REGION = 'us-east-1b'
 _BENCHMARK_SCENARIO = 'pull_latency'
 _NUMBER_OF_MESSAGES = 10
 _MESSAGE_SIZE = 100
-_MESSAGING_SERVICE_DATA_DIR = 'messaging_service'
+_MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
 
@@ -99,19 +98,32 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = [None, None, 0]
     self._MockIssueCommand(return_value)
 
-    sdk_cmd = ('sudo pip3 install boto3')
-    datafile_path = os.path.join(_MESSAGING_SERVICE_DATA_DIR,
-                                 'aws_sqs_client.py')
-
     self.sqs.PrepareClientVm()
-    self.client.RemoteCommand.assert_called_with(sdk_cmd, ignore_failure=False)
-    self.client.PushDataFile.assert_called_with(datafile_path)
+    self.client.assert_has_calls([
+        mock.call.RemoteCommand(
+            'sudo pip3 install boto3', ignore_failure=False),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/aws/__init__.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/__init__.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
+        ),
+        mock.call.PushDataFile(
+            'messaging_service_scripts/aws/aws_sqs_client.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/aws_sqs_client.py'
+        ),
+        mock.call.PushDataFile('messaging_service_scripts/aws_benchmark.py'),
+    ])
     self.client.Install.assert_called_with('aws_credentials')
 
   def testRun(self):
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
-    remote_run_cmd = (f'python3 -m aws_sqs_client '
+    remote_run_cmd = (f'python3 -m aws_benchmark '
                       f'--queue_name={self.sqs.queue_name} '
                       f'--region={self.sqs.region} '
                       f'--benchmark_scenario={_BENCHMARK_SCENARIO} '

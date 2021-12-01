@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing pgbench installation, cleanup and run functions."""
 
-
-"""Module containing pgbench installation and cleanup functions.
-
-  On Ubuntu 16.04 this will install pgbench 9.5.
-"""
-
+import time
+from perfkitbenchmarker import publisher
+from perfkitbenchmarker import sample
 
 APT_PACKAGES = (
     'postgresql-client-common',
@@ -33,7 +31,7 @@ def AptInstall(vm):
 
 
 def YumInstall(vm):
-  """Raises exception when trying to install on yum-based VMs"""
+  """Raises exception when trying to install on yum-based VMs."""
   raise NotImplementedError(
       'PKB currently only supports the installation of pgbench on '
       'Debian-based VMs')
@@ -44,3 +42,84 @@ def AptUninstall(vm):
   remove_str = 'sudo apt-get --purge autoremove -y '
   for package in APT_PACKAGES:
     vm.RemoteCommand(remove_str + package)
+
+
+def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
+                          additional_metadata):
+  """Creates sample objects from the given pgbench output and metadata.
+
+  Two samples will be returned, one containing a latency list and
+  the other a tps (transactions per second) list. Each will contain
+  N floating point samples, where N = FLAGS.pgbench_seconds_per_test.
+
+  Args:
+    pgbench_stderr: stderr from the pgbench run command
+    num_clients: number of pgbench clients used
+    num_jobs: number of pgbench jobs (threads) used
+    additional_metadata: additional metadata to add to each sample
+
+  Returns:
+    A list containing a latency sample and a tps sample. Each sample
+    consists of a list of floats, sorted by time that were collected
+    by running pgbench with the given client and job counts.
+  """
+  lines = pgbench_stderr.splitlines()[2:]
+  tps_numbers = [float(line.split(' ')[3]) for line in lines]
+  latency_numbers = [float(line.split(' ')[6]) for line in lines]
+
+  metadata = additional_metadata.copy()
+  metadata.update({'clients': num_clients, 'jobs': num_jobs})
+  tps_metadata = metadata.copy()
+  tps_metadata.update({'tps': tps_numbers})
+  latency_metadata = metadata.copy()
+  latency_metadata.update({'latency': latency_numbers})
+
+  tps_sample = sample.Sample('tps_array', -1, 'tps', tps_metadata)
+  latency_sample = sample.Sample('latency_array', -1, 'ms', latency_metadata)
+  return [tps_sample, latency_sample]
+
+
+def RunPgBench(benchmark_spec,
+               relational_db,
+               vm,
+               test_db_name,
+               client_counts,
+               seconds_to_pause,
+               seconds_per_test,
+               metadata,
+               file=None,
+               path=None):
+  """Run Pgbench on the client VM.
+
+  Args:
+    benchmark_spec: Benchmark spec of the run
+    relational_db: Relational database object
+    vm: Client VM
+    test_db_name: The name of the database
+    client_counts: Number of client
+    seconds_to_pause: Seconds to pause between test
+    seconds_per_test: Seconds per test
+    metadata: Metadata of the benchmark
+    file: Filename of the benchmark
+    path: File path of the benchmar.
+  """
+  connection_string = relational_db.client_vm_query_tools.GetConnectionString(
+      database_name=test_db_name)
+
+  if file and path:
+    metadata['pgbench_file'] = file
+
+  samples = []
+
+  for client in client_counts:
+    time.sleep(seconds_to_pause)
+    jobs = min(client, 16)
+    command = (f'pgbench {connection_string} --client={client} '
+               f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
+               '--report-latencies')
+
+    if file and path:
+      command = f'cd {path} {command} --file={file}'
+    _, stderr = vm.RobustRemoteCommand(command)
+    samples = MakeSamplesFromOutput(stderr, client, jobs, metadata)
+    publisher.PublishRunStageSamples(benchmark_spec, samples)

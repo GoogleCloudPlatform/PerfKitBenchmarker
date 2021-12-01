@@ -1,13 +1,13 @@
-"""Tests for data/messaging_service/messaging_service_client.py."""
+"""Tests for scripts/messaging_service_scripts/common/runners.py."""
 
 import datetime
+import typing
 import unittest
 
 from absl.testing import parameterized
 import freezegun
 import mock
-from perfkitbenchmarker.data.messaging_service.messaging_service_client import MessagingServiceClient
-
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
 
 FAKE_DATETIME = datetime.datetime(2021, 6, 14)
 NUMBER_OF_MESSAGES = 10
@@ -67,7 +67,8 @@ AGGREGATE_PULL_METRICS = {
         'value': 0.11147687435150147,
         'unit': UNIT_OF_TIME,
         'metadata': {
-            'samples': METRICS}
+            'samples': METRICS
+        }
     },
     'pull_latency_mean_without_cold_start': {
         'value': 0.06490101814270019,
@@ -103,18 +104,16 @@ AGGREGATE_PULL_METRICS = {
 
 
 @freezegun.freeze_time(FAKE_DATETIME)
-class MessagingServiceClientTest(parameterized.TestCase):
-
-  def setUp(self):
-    super().setUp()
-    self.messaging_service = MessagingServiceClient()
+class MessagingServiceScriptsRunnersTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('publish', 'publish_latency', AGGREGATE_PUBLISH_METRICS),
-      ('pull', 'pull_latency', AGGREGATE_PULL_METRICS))
+      ('Publish', 'publish_latency', AGGREGATE_PUBLISH_METRICS),
+      ('Pull', 'pull_latency', AGGREGATE_PULL_METRICS))
   def testGetSummaryStatistics(self, scenario, expected_samples):
-    actual_samples = self.messaging_service._get_summary_statistics(
-        scenario, METRICS, NUMBER_OF_MESSAGES, FAILURE_COUNTER)
+    runner = runners.PublishLatencyRunner(mock.Mock())
+    actual_samples = runner._get_summary_statistics(scenario, METRICS,
+                                                    NUMBER_OF_MESSAGES,
+                                                    FAILURE_COUNTER)
 
     for expected_sample_key in expected_samples:
       if expected_sample_key not in actual_samples:
@@ -129,105 +128,81 @@ class MessagingServiceClientTest(parameterized.TestCase):
             f'\n{actual_samples[expected_sample_key]}')
         raise Exception(sample_doesnt_match_message)
 
-  def testGenerateRandomMessage(self):
-    random_message = self.messaging_service._generate_random_message(
-        MESSAGE_SIZE)
-    self.assertLen(random_message, MESSAGE_SIZE)
-    self.assertIsInstance(random_message, str)
-
-  @mock.patch.object(MessagingServiceClient, '_publish_message')
   @mock.patch.object(
-      MessagingServiceClient,
+      runners.PublishLatencyRunner,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
-  def testPublishMessages(self, summary_statistics_mock, publish_mock):
+  def testPublishMessages(self, summary_statistics_mock):
 
-    results = self.messaging_service._publish_messages(NUMBER_OF_MESSAGES,
-                                                       MESSAGE_SIZE)
+    runner = runners.PublishLatencyRunner(mock.Mock())
+    results = runner.run_phase(NUMBER_OF_MESSAGES, MESSAGE_SIZE)
 
     self.assertIsInstance(results, dict)
 
     # check if functions were called
-    publish_mock.assert_called()
+    typing.cast(mock.MagicMock, runner.client.publish_message).assert_called()
     summary_statistics_mock.assert_called()
-    self.assertEqual(publish_mock.call_count, NUMBER_OF_MESSAGES)
+    self.assertEqual(
+        typing.cast(mock.MagicMock, runner.client.publish_message).call_count,
+        NUMBER_OF_MESSAGES)
 
   @mock.patch.object(
-      MessagingServiceClient,
-      '_publish_message',
-      side_effect=Exception('MockedException'))
-  @mock.patch.object(
-      MessagingServiceClient,
+      runners.PublishLatencyRunner,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
-  def testMeasurePublishMessagesException(self, summary_statistics_mock,
-                                          publish_mock):
-
-    results = self.messaging_service._publish_messages(NUMBER_OF_MESSAGES,
-                                                       MESSAGE_SIZE)
+  def testMeasurePublishMessagesException(self, summary_statistics_mock):
+    client_mock = mock.Mock()
+    client_mock.publish_message.side_effect = Exception('MockedException')
+    runner = runners.PublishLatencyRunner(client_mock)
+    results = runner.run_phase(NUMBER_OF_MESSAGES, MESSAGE_SIZE)
     self.assertEqual(results, {'mocked_dict': 'mocked_value'})
 
     # check if functions were called
-    publish_mock.assert_called()
+    client_mock.publish_message.assert_called()
     summary_statistics_mock.assert_called_with('publish_latency', [],
                                                NUMBER_OF_MESSAGES,
                                                FAILURE_COUNTER)
 
-  @mock.patch.object(MessagingServiceClient, '_pull_message')
-  @mock.patch.object(MessagingServiceClient, '_acknowledge_received_message')
   @mock.patch.object(
-      MessagingServiceClient,
+      runners.PullLatencyRunner,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
-  def testPullMessages(self, summary_statistics_mock, acknowledge_message_mock,
-                       pull_mock):
+  def testPullMessages(self, summary_statistics_mock):
 
-    results = self.messaging_service._pull_messages(NUMBER_OF_MESSAGES)
+    runner = runners.PullLatencyRunner(mock.Mock())
+    results = runner.run_phase(NUMBER_OF_MESSAGES, MESSAGE_SIZE)
 
     self.assertIsInstance(results, dict)
 
     # check if functions were called
-    pull_mock.assert_called()
-    acknowledge_message_mock.assert_called()
+    typing.cast(mock.MagicMock, runner.client.pull_message).assert_called()
+    typing.cast(mock.MagicMock,
+                runner.client.acknowledge_received_message).assert_called()
     summary_statistics_mock.assert_called()
-    self.assertEqual(pull_mock.call_count, NUMBER_OF_MESSAGES)
-    self.assertEqual(acknowledge_message_mock.call_count, NUMBER_OF_MESSAGES)
+    self.assertEqual(
+        typing.cast(mock.MagicMock, runner.client.pull_message).call_count,
+        NUMBER_OF_MESSAGES)
+    self.assertEqual(
+        typing.cast(mock.MagicMock,
+                    runner.client.acknowledge_received_message).call_count,
+        NUMBER_OF_MESSAGES)
 
   @mock.patch.object(
-      MessagingServiceClient,
-      '_pull_message',
-      side_effect=Exception('MockedException'))
-  @mock.patch.object(MessagingServiceClient, '_acknowledge_received_message')
-  @mock.patch.object(
-      MessagingServiceClient,
+      runners.PullLatencyRunner,
       '_get_summary_statistics',
       return_value={'mocked_dict': 'mocked_value'})
-  def testPullMessagesException(self, summary_statistics_mock,
-                                _, pull_mock):
-
-    results = self.messaging_service._pull_messages(NUMBER_OF_MESSAGES)
-
-    self.assertIsInstance(results, dict)
+  def testPullMessagesException(self, summary_statistics_mock):
+    client_mock = mock.Mock()
+    client_mock.pull_message.side_effect = Exception('MockedException')
+    runner = runners.PullLatencyRunner(client_mock)
+    results = runner.run_phase(NUMBER_OF_MESSAGES, MESSAGE_SIZE)
+    self.assertEqual(results, {'mocked_dict': 'mocked_value'})
 
     # check if functions were called
-    pull_mock.assert_called()
+    client_mock.pull_message.assert_called()
     summary_statistics_mock.assert_called_with('pull_and_acknowledge_latency',
                                                [], NUMBER_OF_MESSAGES,
                                                FAILURE_COUNTER)
-
-  @mock.patch.object(MessagingServiceClient, '_publish_messages')
-  def testRunPhasePublishScenario(self, publish_mock):
-    self.messaging_service.run_phase(
-        'publish_latency', NUMBER_OF_MESSAGES, MESSAGE_SIZE)
-
-    publish_mock.assert_called_with(NUMBER_OF_MESSAGES, MESSAGE_SIZE)
-
-  @mock.patch.object(MessagingServiceClient, '_pull_messages')
-  def testRunPhasePullScenario(self, pull_mock):
-    self.messaging_service.run_phase(
-        'pull_latency', NUMBER_OF_MESSAGES, MESSAGE_SIZE)
-
-    pull_mock.assert_called_with(NUMBER_OF_MESSAGES)
 
 
 if __name__ == '__main__':

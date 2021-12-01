@@ -1,0 +1,209 @@
+Launching Docker session
+nvidia-docker run --rm  -w /work \
+  -v /home/perfkit/inference_results_v1.1/closed/NVIDIA:/work -v /home/perfkit:/mnt//home/perfkit \
+  --cap-add SYS_ADMIN --cap-add SYS_TIME \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  --shm-size=32gb \
+  -v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro \
+  --security-opt apparmor=unconfined --security-opt seccomp=unconfined \
+  --name mlperf-inference-perfkit-x86_64 -h mlperf-inference-perfkit-x86_64 --add-host mlperf-inference-perfkit-x86_64:127.0.0.1 \
+  --user 1000:1001 --net host --device /dev/fuse \
+  -v /scratch:/scratch  \
+  -e MLPERF_SCRATCH_PATH=/scratch \
+  -e HOST_HOSTNAME=pkb-eda1e1b5-0 \
+   \
+  mlperf-inference:perfkit-x86_64 make run RUN_ARGS='--benchmarks=bert --scenarios=server'
+make[1]: Entering directory '/work'
+Warning: Failed writing log files to directory [/var/log/nvidia-mps]. No logs will be available.
+Replacing l0_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l0_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l0_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l1_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l1_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l1_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l2_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l2_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l2_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l3_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l3_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l3_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l4_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l4_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l4_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l5_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l5_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l5_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l6_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l6_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l6_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l7_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l7_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l7_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l8_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l8_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l8_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l9_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l9_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l9_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l10_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l10_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l10_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l11_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l11_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l11_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l12_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l12_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l12_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l13_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l13_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l13_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l14_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l14_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l14_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l15_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l15_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l15_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l16_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l16_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l16_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l17_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l17_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l17_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l18_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l18_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l18_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l19_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l19_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l19_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l20_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l20_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l20_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l21_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l21_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l21_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l22_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l22_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l22_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l23_fc_qkv with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l23_fc_aout with small-tile GEMM plugin, with fairshare cache size 120.
+Replacing l23_fc_mid_gelu with small-tile GEMM plugin, with fairshare cache size 120.
+Time taken to generate engines: 124.86983108520508 seconds
+make[1]: Leaving directory '/work'
+make[1]: Entering directory '/work'
+active_sms : 60
+benchmark : Benchmark.BERT
+bert_opt_seqlen : 384
+coalesced_tensor : True
+enable_interleaved : False
+gemm_plugin_fairshare_cache_size : 120
+gpu_batch_size : 64
+gpu_copy_streams : 1
+gpu_inference_streams : 2
+graphs_max_seqlen : 200
+input_dtype : int32
+input_format : linear
+precision : int8
+scenario : Scenario.Server
+server_num_issue_query_threads : 1
+server_target_qps : 3100
+soft_drop : 0.99
+system : A100-SXM4-40GBx1
+tensor_path : ${PREPROCESSED_DATA_DIR}/squad_tokenized/input_ids.npy,${PREPROCESSED_DATA_DIR}/squad_tokenized/segment_ids.npy,${PREPROCESSED_DATA_DIR}/squad_tokenized/input_mask.npy
+use_graphs : True
+use_small_tile_gemm_plugin : True
+config_name : A100-SXM4-40GBx1_bert_Server
+config_ver : custom_k_99_MaxP
+accuracy_level : 99%
+optimization_level : plugin-enabled
+inference_server : custom
+system_id : A100-SXM4-40GBx1
+use_cpu : False
+power_limit : None
+cpu_freq : None
+gpu_num_bundles : 2
+log_dir : /work/build/logs/2021.10.27-20.51.11
+&&&& RUNNING BERT_HARNESS # ./build/bin/harness_bert
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +492, GPU +0, now: CPU 6005, GPU 1131 (MiB)
+[I] [TRT] Loaded engine size: 2745 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 6005 MiB, GPU 1131 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +747, GPU +316, now: CPU 7287, GPU 1775 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +619, GPU +266, now: CPU 7906, GPU 2041 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 7906, GPU 2025 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 7906 MiB, GPU 2025 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 2414 MiB, GPU 2195 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +1, GPU +8, now: CPU 2415, GPU 2203 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 2415, GPU 2211 (MiB)
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 2926 MiB, GPU 2895 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 3246 MiB, GPU 5258 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 3246, GPU 5266 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +1, GPU +10, now: CPU 3247, GPU 5276 (MiB)
+[I] [TRT] Could not set default profile 0 for execution context. Profile index must be set explicitly.
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 3758 MiB, GPU 5960 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU -3, GPU -88, now: CPU 3688, GPU 7114 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 3126, GPU 6580 (MiB)
+================================================
+MLPerf Results Summary
+================================================
+SUT name : BERT SERVER
+Scenario : Server
+Mode     : PerformanceOnly
+Scheduled samples per second : 3102.76
+Result is : VALID
+  Performance constraints satisfied : Yes
+  Min duration satisfied : Yes
+  Min queries satisfied : Yes
+
+================================================
+Additional Stats
+================================================
+Completed samples per second    : 3102.49
+
+Min latency (ns)                : 4126840
+Max latency (ns)                : 605456500256
+Mean latency (ns)               : 3037717062
+50.00 percentile latency (ns)   : 40533329
+90.00 percentile latency (ns)   : 51387550
+95.00 percentile latency (ns)   : 54956149
+97.00 percentile latency (ns)   : 57792422
+99.00 percentile latency (ns)   : 82056764
+99.90 percentile latency (ns)   : 543294654940
+
+================================================
+Test Parameters Used
+================================================
+samples_per_query : 1
+target_qps : 3100
+target_latency (ns): 130000000
+max_async_queries : 0
+min_duration (ms): 600000
+max_duration (ms): 0
+min_query_count : 270336
+max_query_count : 0
+qsl_rng_seed : 1624344308455410291
+sample_index_rng_seed : 517984244576520566
+schedule_rng_seed : 10051496985653635065
+accuracy_log_rng_seed : 0
+accuracy_log_probability : 0
+accuracy_log_sampling_target : 0
+print_timestamps : 0
+performance_issue_unique : 0
+performance_issue_same : 0
+performance_issue_same_index : 0
+performance_sample_count : 10833
+
+No warnings encountered during test.
+
+No errors encountered during test.
+
+======================= Perf harness results: =======================
+
+DGX-A100_A100-SXM4-40GBx1_TRT-custom_k_99_MaxP-Server:
+    bert: result_scheduled_samples_per_sec: 3102.76, Result is VALID
+
+
+======================= Accuracy results: =======================
+
+DGX-A100_A100-SXM4-40GBx1_TRT-custom_k_99_MaxP-Server:
+    bert: No accuracy results in PerformanceOnly mode.
+
+make[1]: Leaving directory '/work'

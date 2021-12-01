@@ -89,7 +89,8 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
                       superuser: bool = False,
                       session_variables: str = '',
                       timeout: typing.Optional[int] = None,
-                      ignore_failure: bool = False):
+                      ignore_failure: bool = False,
+                      suppress_warning: bool = False):
     """Issue Sql Command."""
     command_string = None
     # Get the command to issue base on type
@@ -110,7 +111,8 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
       command_string = 'sudo ' + command_string
 
     return self.vm.RemoteCommand(
-        command_string, timeout=timeout, ignore_failure=ignore_failure)
+        command_string, timeout=timeout, ignore_failure=ignore_failure,
+        suppress_warning=suppress_warning)
 
   @abc.abstractmethod
   def InstallPackages(self) -> None:

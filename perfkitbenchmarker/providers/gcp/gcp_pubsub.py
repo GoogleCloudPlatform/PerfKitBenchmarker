@@ -16,7 +16,11 @@ from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-GCP_PUBSUB_CLIENT_PY = 'gcp_pubsub_client.py'
+MESSAGING_SERVICE_SCRIPTS_VM_GCP_DIR = os.path.join(
+    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'gcp')
+MESSAGING_SERVICE_SCRIPTS_GCP_PREFIX = 'messaging_service_scripts/gcp'
+MESSAGING_SERVICE_SCRIPTS_GCP_FILES = ['__init__.py', 'gcp_pubsub_client.py']
+MESSAGING_SERVICE_SCRIPTS_GCP_BIN = 'messaging_service_scripts/gcp_benchmark.py'
 
 
 class GCPCloudPubSub(msgsvc.BaseMessagingService):
@@ -65,8 +69,12 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
     self.client_vm.RemoteCommand(
         'sudo pip3 install --upgrade --ignore-installed google-cloud-pubsub',
         ignore_failure=False)
-    self.client_vm.PushDataFile(
-        os.path.join(msgsvc.MESSAGING_SERVICE_DATA_DIR, GCP_PUBSUB_CLIENT_PY))
+
+    self._CopyFiles(
+        MESSAGING_SERVICE_SCRIPTS_GCP_PREFIX,
+        MESSAGING_SERVICE_SCRIPTS_GCP_FILES,
+        MESSAGING_SERVICE_SCRIPTS_VM_GCP_DIR)
+    self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_GCP_BIN)
 
   def Run(self, benchmark_scenario: str, number_of_messages: str,
           message_size: str) -> Dict[str, Any]:
@@ -92,8 +100,8 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
           ...
         }
     """
-    command = (f'python3 -m gcp_pubsub_client '
-               f'--project={self.project} '
+    command = (f'python3 -m gcp_benchmark '
+               f'--pubsub_project={self.project} '
                f'--pubsub_topic={self.pubsub_topic} '
                f'--pubsub_subscription={self.pubsub_subscription} '
                f'--benchmark_scenario={benchmark_scenario} '

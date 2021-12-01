@@ -690,6 +690,10 @@ class _RelationalDbSpec(spec.BaseSpec):
           'cpus': flag_values.client_vm_cpus,
           'memory': flag_values.client_vm_memory
       }
+    if flag_values[
+        'db_num_striped_disks'].present and has_unmanaged_dbs:
+      config_values['vm_groups']['servers']['disk_spec'][cloud][
+          'num_striped_disks'] = flag_values.db_num_striped_disks
     if flag_values['managed_db_disk_size'].present:
       config_values['db_disk_spec'][cloud]['disk_size'] = (
           flag_values.managed_db_disk_size)
