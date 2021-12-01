@@ -467,7 +467,7 @@ spec:
             cpu: 1100m
             memory: 1Gi
           requests:
-            cpu: 500m
+            cpu: 100m
             memory: 200Mi
         securityContext:
           readOnlyRootFilesystem: true
