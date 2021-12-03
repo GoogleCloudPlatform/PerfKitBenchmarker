@@ -115,6 +115,7 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'c6g': 'graviton2',
     'm6g': 'graviton2',
     'r6g': 'graviton2',
+    't4g': 'graviton2',
 }
 
 # Parameters for use with Elastic Fiber Adapter
