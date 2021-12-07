@@ -48,8 +48,6 @@ mlperf_inference:
           machine_type: a2-highgpu-1g
           zone: us-central1-b
           boot_disk_size: 200
-          image_family: tf-latest-gpu
-          image_project: deeplearning-platform-release
         AWS:
           machine_type: p4d.24xlarge
           zone: us-west-2a
@@ -305,8 +303,7 @@ def MakePerformanceSamplesFromOutput(base_metadata: Dict[str, Any],
         fr'{re.escape(column_name)} *: *(.*)', output)
   metadata.update(base_metadata)
   throughput = regex_util.ExtractFloat(
-      r': result_scheduled_samples_per_sec: (\d+\.\d+), Result is VALID',
-      output)
+      r': result_scheduled_samples_per_sec: (\d+\.\d+)', output)
   return [sample.Sample('throughput', float(throughput), 'samples/s', metadata)]
 
 
