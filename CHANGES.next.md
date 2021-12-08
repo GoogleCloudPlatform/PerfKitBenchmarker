@@ -125,6 +125,7 @@
 -   Add support for 5th gen Azure VMs.
 -   Support multiple Redis instances on the same VM and multiple client VMs.
 -   Support creating autoscaled Bigtable instances.
+-   Support downloading data twice in object_storage_service_benchmark.
 
 ### Bug fixes and maintenance updates:
 

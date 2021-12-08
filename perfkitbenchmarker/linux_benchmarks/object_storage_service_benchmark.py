@@ -161,7 +161,6 @@ flags.DEFINE_boolean('object_storage_dont_delete_bucket', False,
                      'If True, the storage bucket won\'t be deleted. Useful '
                      'for running the api_multistream_reads scenario multiple '
                      'times against the same objects.')
-
 flags.DEFINE_string('object_storage_worker_output', None,
                     'If set, the worker threads\' output will be written to the'
                     'path provided.')
@@ -182,6 +181,10 @@ flags.DEFINE_boolean(
     'average latency per object. Otherwise, deletes one object per request '
     'and records individual delete latency'
 )
+_REDOWNLOAD = flags.DEFINE_boolean(
+    'object_storage_redownload', False,
+    'Download objects twice. Second download labeled "redownload" in metadata. '
+    'Currently only used with api_multistream and api_multistream_reads.')
 
 FLAGS = flags.FLAGS
 
@@ -311,6 +314,7 @@ class MultistreamOperationType(enum.Enum):
   upload = 2
   delete = 3
   bulk_delete = 4
+  redownload = 5
 
 
 def GetConfig(user_config):
@@ -421,7 +425,8 @@ def ProcessMultiStreamResults(start_times,
     latencies: a list of numpy arrays. Operation durations, in seconds.
     sizes: a list of numpy arrays. Object sizes used in each
       operation, in bytes.
-    operation: 'upload' or 'download'. The operation the results are from.
+    operation: 'upload', 'download', or 'redownload'.
+      The operation the results are from.
     all_sizes: a sequence of integers. all object sizes in the
       distribution used, in bytes.
     results: a list to append Sample objects to.
@@ -996,7 +1001,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: The provider's ObjectStorageService
     bucket_name: the primary bucket to benchmark.
-    operation: 'upload' or 'download'
+    operation: 'upload', 'download' or 'redownload'
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -1036,7 +1041,9 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
         '--object_sizes="%s"' % size_distribution,
         '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
         '--scenario=MultiStreamWrite']
-  elif operation == MultistreamOperationType.download:
+  elif operation in [
+      MultistreamOperationType.download, MultistreamOperationType.redownload
+  ]:
     cmd_args += ['--scenario=MultiStreamRead']
   elif operation == MultistreamOperationType.delete:
     cmd_args += [
@@ -1123,6 +1130,12 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
 
   logging.info('Finished multi-stream read test.')
 
+  if _REDOWNLOAD.value:
+    logging.info('Starting multi-stream re-read test.')
+    _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                       bucket_name, MultistreamOperationType.redownload)
+    logging.info('Finished multi-stream re-read test.')
+
 
 def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
                               service, bucket_name):
@@ -1201,6 +1214,12 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
                      bucket_name, MultistreamOperationType.download)
 
   logging.info('Finished multi-stream read test.')
+
+  if _REDOWNLOAD.value:
+    logging.info('Starting multi-stream re-read test.')
+    _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                       bucket_name, MultistreamOperationType.redownload)
+    logging.info('Finished multi-stream re-read test.')
 
 
 def MultiStreamDelete(results, metadata, vms, command_builder, service,
