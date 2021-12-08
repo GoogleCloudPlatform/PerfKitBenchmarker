@@ -32,6 +32,10 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
+
+class AwsStateRetryableError(Exception):
+  """Error for retrying when an AWS disk is in a transitional state."""
+
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
@@ -441,6 +445,38 @@ class AwsDisk(disk.BaseDisk):
     assert status in VOLUME_KNOWN_STATUSES, status
     return status in VOLUME_EXISTS_STATUSES
 
+  @vm_util.Retry(
+      poll_interval=0.5,
+      log_errors=True,
+      retryable_exceptions=(AwsStateRetryableError,))
+  def _WaitForAttachedState(self):
+    """Returns if the state of the disk is attached.
+
+    Returns:
+      Whether the disk is in an attached state. If not, raises an
+      error.
+
+    Raises:
+      AwsUnknownStatusError: If an unknown status is returned from AWS.
+      AwsStateRetryableError: If the disk attach is pending. This is retried.
+    """
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-volumes',
+        '--region=%s' % self.region,
+        '--volume-ids=%s' % self.id,
+    ]
+
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    status = response['Volumes'][0]['Attachments'][0]['State']
+    if status.lower() != 'attached':
+      logging.info('Disk (id:%s) attaching to '
+                   'VM (id:%s) has status %s.',
+                   self.id, self.attached_vm_id, status)
+
+      raise AwsStateRetryableError()
+
   def Attach(self, vm):
     """Attaches the disk to a VM.
 
@@ -466,6 +502,7 @@ class AwsDisk(disk.BaseDisk):
     logging.info('Attaching AWS volume %s. This may fail if the disk is not '
                  'ready, but will be retried.', self.id)
     util.IssueRetryableCommand(attach_cmd)
+    self._WaitForAttachedState()
 
   def Detach(self):
     """Detaches the disk from a VM."""
