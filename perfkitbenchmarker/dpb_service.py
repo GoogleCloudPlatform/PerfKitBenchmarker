@@ -404,6 +404,19 @@ class BaseDpbService(resource.BaseResource):
     raise NotImplementedError(
         f'No jar found for category {job_category} and type {job_type}.')
 
+  def GetClusterCreateTime(self) -> Optional[float]:
+    """Returns the cluster creation time.
+
+    This default implementation computes it by substracting the
+    resource_ready_time and create_start_time attributes.
+
+    Returns:
+      A float representing the creation time in seconds or None.
+    """
+    if self.resource_ready_time is None or self.create_start_time is None:
+      return None
+    return self.resource_ready_time - self.create_start_time
+
 
 class UnmanagedDpbService(BaseDpbService):
   """Object representing an un-managed dpb service."""
@@ -433,6 +446,41 @@ class UnmanagedDpbService(BaseDpbService):
 
     # set in _Create of derived classes
     self.leader = None
+
+  def GetClusterCreateTime(self) -> Optional[float]:
+    """Returns the cluster creation time.
+
+    UnmanagedDpbService Create phase doesn't consider actual VM creation, just
+    further provisioning. Thus, we need to add the VMs create time to the
+    default implementation.
+
+    Returns:
+      A float representing the creation time in seconds or None.
+    """
+
+    my_create_time = super().GetClusterCreateTime()
+    if my_create_time is None:
+      return None
+    vms = []
+    for vm_group in self.vms.values():
+      for vm in vm_group:
+        vms.append(vm)
+    first_vm_create_start_time = min(
+        (vm.create_start_time
+         for vm in vms
+         if vm.create_start_time is not None),
+        default=None,
+    )
+    last_vm_ready_start_time = max(
+        (vm.resource_ready_time
+         for vm in vms
+         if vm.resource_ready_time is not None),
+        default=None,
+    )
+    if first_vm_create_start_time is None or last_vm_ready_start_time is None:
+      return None
+    return (my_create_time + last_vm_ready_start_time -
+            first_vm_create_start_time)
 
 
 class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
@@ -614,6 +662,8 @@ class KubernetesSparkCluster(BaseDpbService):
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
     return {self.SPARK_JOB_TYPE: {'examples': spark.SparkExamplesJarPath()}}
+
+  # TODO(odiego): Implement GetClusterCreateTime adding K8s cluster create time
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)

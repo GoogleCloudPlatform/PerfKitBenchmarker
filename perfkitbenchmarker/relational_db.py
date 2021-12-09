@@ -673,7 +673,6 @@ class BaseRelationalDb(resource.BaseResource):
     # Minimal MySQL tuning; see AWS whitepaper in docstring.
     innodb_buffer_pool_gb = self.innodb_buffer_pool_size
     innodb_log_file_mb = self.innodb_log_file_size
-
     self.server_vm.RemoteCommand(
         'echo "\n'
         f'innodb_buffer_pool_size = {innodb_buffer_pool_gb}G\n'
@@ -698,9 +697,12 @@ class BaseRelationalDb(resource.BaseResource):
         'wait_timeout        = 86400\n'
         'interactive_timeout        = 86400" | sudo tee -a %s' %
         self.server_vm.GetPathToConfig(mysql_name))
-    self.server_vm.RemoteCommand('sudo sed -i "s/bind-address/#bind-address/g" '
-                                 '%s' %
-                                 self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo sed -i "s/^bind-address/#bind-address/g" '
+        '%s' % self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo sed -i "s/^mysqlx-bind-address/#mysqlx-bind-address/g" '
+        '%s' % self.server_vm.GetPathToConfig(mysql_name))
     self.server_vm.RemoteCommand(
         'sudo sed -i '
         '"s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" %s' %
@@ -710,10 +712,6 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm.RemoteCommand(
         'echo "\nlog_error_verbosity        = 3" | sudo tee -a %s' %
         self.server_vm.GetPathToConfig(mysql_name))
-    self.server_vm.RemoteCommand(
-        'sudo cat /etc/mysql/mysql.conf.d/mysql.sock',
-        should_log=True,
-        ignore_failure=True)
     # Restart.
     self.server_vm.RemoteCommand('sudo service %s restart' %
                                  self.server_vm.GetServiceName(mysql_name))
@@ -724,6 +722,9 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm_query_tools.IssueSqlCommand(
         'SET GLOBAL max_connections=8000;', superuser=True)
 
+    self.SetMYSQLClientPrivileges()
+
+  def SetMYSQLClientPrivileges(self):
     if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
       client_ip = self.client_vm.internal_ip
     else:
@@ -732,13 +733,14 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm_query_tools.IssueSqlCommand(
         'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %
         (self.spec.database_username, client_ip, self.spec.database_password),
-        superuser=True)
+        superuser=True, ignore_failure=True)
 
     self.server_vm_query_tools.IssueSqlCommand(
         'GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';' %
-        (self.spec.database_username, client_ip), superuser=True)
-    self.server_vm_query_tools.IssueSqlCommand('FLUSH PRIVILEGES;',
-                                               superuser=True)
+        (self.spec.database_username, client_ip), superuser=True,
+        ignore_failure=True)
+    self.server_vm_query_tools.IssueSqlCommand(
+        'FLUSH PRIVILEGES;', superuser=True, ignore_failure=True)
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""

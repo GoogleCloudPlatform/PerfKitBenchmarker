@@ -378,28 +378,33 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
+  @vm_util.Retry(max_retries=4, poll_interval=2)
+  def SetManagedDatabasePassword(self):
+    # The hostname '%' means unrestricted access from any host.
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.spec.database_username,
+        '--host=%', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    _, _, _ = cmd.Issue()
+
+    # By default the empty password is a security violation.
+    # Change the password to a non-default value.
+    default_user = DEFAULT_USERNAME[self.spec.engine]
+
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'set-password', default_user,
+        '--host=%', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    _, _, _ = cmd.Issue()
+
   def _PostCreate(self):
     """Creates the PKB user and sets the password.
     """
     super()._PostCreate()
 
     if self.is_managed_db:
-      # The hostname '%' means unrestricted access from any host.
-      cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'create', self.spec.database_username,
-          '--host=%', '--instance={0}'.format(self.instance_id),
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
+      self.SetManagedDatabasePassword()
 
-      # By default the empty password is a security violation.
-      # Change the password to a non-default value.
-      default_user = DEFAULT_USERNAME[self.spec.engine]
-
-      cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'set-password', default_user,
-          '--host=%', '--instance={0}'.format(self.instance_id),
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
     self.client_vm_query_tools.InstallPackages()
 
   def _ApplyManagedDbFlags(self):

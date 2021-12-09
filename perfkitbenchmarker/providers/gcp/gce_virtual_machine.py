@@ -446,6 +446,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if (not FLAGS.gce_migrate_on_maintenance or
         self.gpu_count or self.network.placement_group):
       self.on_host_maintenance = 'TERMINATE'
+    self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
 
@@ -528,7 +529,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
-    cmd.flags['no-restart-on-failure'] = True
+    if not self.automatic_restart:
+      cmd.flags['no-restart-on-failure'] = True
+    self.metadata['automatic_restart'] = self.automatic_restart
     if self.node_group:
       cmd.flags['node-group'] = self.node_group.name
     if self.gce_shielded_secure_boot:

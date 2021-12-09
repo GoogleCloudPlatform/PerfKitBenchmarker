@@ -231,7 +231,10 @@ For this lab, we want to run two benchmarks: one is to have a light workload to
 measure the latency of lightly-utilized Servers; the other is to have a heavy
 workload to measure the throughput of overloaded servers. They are already
 created in [the parallel_tests sample folder](./batch_configs/parallel_tests):
-*latency.yaml* and *throughput.yaml*, and you can directly use them.
+*latency.yaml* and *throughput.yaml*, and you can directly use them. Note that
+the throughput test does not fully exploit the server capacity because of the
+target throughput setting. For more realistic test, please refer to
+[Reference results](#reference-results).
 
 To download the configs, you should first create a config folder:
 
@@ -705,17 +708,18 @@ can make the test more resilient to server issues.
 ## Reference results
 
 In this section, we list some performance and cost data from our experiments.
-You can use them as reference to figure out parameter settings or detect if
-there is something wrong in your benchmarking. Unlike the lab above, the
-experiments in this section are more realistic: running 30-minute workload
-against a 100GB table. As a result, each benchmark takes about 70 minutes
-(including the time of table loading).
+You can use them as reference to understand the effect of test setup and tune
+your benchmarks. Unlike the lab above, the experiments use a more realistic
+setup: running 30-minute workload against a 100GB table without client side
+throttling (by removing the target throughput setting). Each benchmark takes
+about 70 minutes including the time of table loading.
 
-**The performance and cost shown below are not guaranteed**:
+**The performance and cost shown below are not guaranteed or permanent**:
 
 1.  There are factors that may impact the performance, such as the
     **network congestion** and the **distance** between the VMs and the Bigtable
     instances. Also note that the test table is pre-split with 200 keys.
+1.  New releases of Bigtable may improve the performance.
 1.  The cost estimate is calculated based on the Bigtable nodes and an
     **approximation** of the **logical table size**. The **actual disk usage**
     is charged in practice.
@@ -729,26 +733,26 @@ Common metadata (excerpts from BigQuery query results):
 
 Performance results (excerpts from BigQuery query results, `a / b` in the table indicates the read/update latency):
 
-| experiment      | workload_name | target_throughput | actual_throughput | p50_latency_ms | p99_latency_ms  | p999_latency_ms   | vm_count |
-| --------------- | ------------- | ----------------- | ----------------- | -------------- | --------------- |------------------ | -------- |
-| latency_test    | workloada     | 3000              | 2997.33           | 4.643 / 4.551  | 9.751 / 10.031  | 24.383 / 26.159   | 1        |
-| latency_test    | workloadb     | 3000              | 2997.31           | 4.507 / 4.507  | 9.959 / 10.127  | 41.887 / 35.455   | 1        |
-| latency_test    | workloadc     | 3000              | 2997.32           | 4.615 / na     | 10.111 / na     | 59.263 / na       | 1        |
-| latency_test    | workloadx     | 3000              | 2997.34           | na / 4.243     | na / 8.847      | na / 28.319       | 1        |
-| throughput_test | workloada     | 24000             | 16549.88          | 4.647 / 4.571  | 52.767 / 54.559 | 105.279 / 201.599 | 4        |
-| throughput_test | workloadb     | 24000             | 17529.86          | 4.719 / 4.735  | 48.799 / 49.471 | 125.439 / 167.423 | 4        |
-| throughput_test | workloadc     | 24000             | 19977.49          | 4.763 / na     | 32.831 / na     | 123.455 / na      | 4        |
-| throughput_test | workloadx     | 24000             | 18580.63          | na / 4.887     | na / 32.271     | na / 56.991       | 4        |
+| experiment     | workload_name | actual_throughput | p50_latency_ms | p99_latency_ms  | p999_latency_ms   | vm_count |
+| -------------- | ------------- | ----------------- | -------------- | --------------- | ----------------- | -------- |
+| light_workload | workloada     | 6419.68           | 4.623 / 4.451  | 10.535 / 9.391  | 80.447 / 59.711   | 1        |
+| light_workload | workloadb     | 6188.45           | 4.715 / 4.723  | 9.543 / 8.879   | 105.023 / 82.687  | 1        |
+| light_workload | workloadc     | 6469.17           | 4.387 / na     | 12.583 / na     | 114.815 / na      | 1        |
+| light_workload | workloadx     | 6892.63           | na / 4.351     | na / 7.835      | na / 43.167       | 1        |
+| heavy_workload | workloada     | 22188.64          | 4.203 / 4.061  | 63.743 / 64.191 | 151.039 / 165.247 | 6        |
+| heavy_workload | workloadb     | 24750.26          | 4.183 / 4.163  | 57.663 / 57.887 | 112.895 / 121.919 | 6        |
+| heavy_workload | workloadc     | 28044.21          | 4.235 / na     | 50.847 / na     | 99.007 / na       | 6        |
+| heavy_workload | workloadx     | 24894.84          | na / 4.085     | na / 57.951     | na / 74.751       | 6        |
 
 Resource utilization and monthly cost estimates for the above eight experiments (excerpts from BigQuery query results):
 
 | experiment      | workload_name | avg_cpu_all_nodes | avg_cpu_hottest_node  | bigtable_node_count | baseline_table_gb | baseline_monthly_cost_usd |
 | --------------- | ------------- | ----------------- | --------------------- | ------------------- | ----------------- | ------------------------- |
-| latency_test    | workloada     | 0.246             | 0.298                 | 3                   | 99                | 1420.83                   |
-| latency_test    | workloadb     | 0.239             | 0.281                 | 3                   | 99                | 1420.83                   |
-| latency_test    | workloadc     | 0.217             | 0.259                 | 3                   | 99                | 1420.83                   |
-| latency_test    | workloadx     | 0.26              | 0.299                 | 3                   | 99                | 1420.83                   |
-| throughput_test | workloada     | 0.903             | 0.957                 | 3                   | 99                | 1420.83                   |
-| throughput_test | workloadb     | 0.855             | 0.965                 | 3                   | 99                | 1420.83                   |
-| throughput_test | workloadc     | 0.867             | 0.951                 | 3                   | 99                | 1420.83                   |
-| throughput_test | workloadx     | 0.9               | 0.948                 | 3                   | 99                | 1420.83                   |
+| light_workload  | workloada     | 0.357             | 0.403                 | 3                   | 99                | 1420.83                   |
+| light_workload  | workloadb     | 0.26              | 0.291                 | 3                   | 99                | 1420.83                   |
+| light_workload  | workloadc     | 0.254             | 0.285                 | 3                   | 99                | 1420.83                   |
+| light_workload  | workloadx     | 0.437             | 0.498                 | 3                   | 99                | 1420.83                   |
+| heavy_workload  | workloada     | 0.881             | 0.982                 | 3                   | 99                | 1420.83                   |
+| heavy_workload  | workloadb     | 0.88              | 0.987                 | 3                   | 99                | 1420.83                   |
+| heavy_workload  | workloadc     | 0.919             | 0.988                 | 3                   | 99                | 1420.83                   |
+| heavy_workload  | workloadx     | 0.879             | 0.963                 | 3                   | 99                | 1420.83                   |

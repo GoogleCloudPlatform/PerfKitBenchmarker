@@ -16,6 +16,8 @@
     versions less than 6 are no longer supported.
 -   Make Ubuntu 18 the default os_type.
 -   Deprecate Ubuntu 16 as it is EOL on 2021-05-01.
+-   Switch to Azure CLI to MSAL. This requires updating the CLI to >= 2.30.0.
+    -   See https://docs.microsoft.com/en-us/cli/azure/msal-based-azure-cli
 
 ### New features:
 
@@ -122,6 +124,8 @@
 -   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
 -   Add support for 5th gen Azure VMs.
 -   Support multiple Redis instances on the same VM and multiple client VMs.
+-   Support creating autoscaled Bigtable instances.
+-   Support downloading data twice in object_storage_service_benchmark.
 -   Add awscli V2 installation package
 
 ### Bug fixes and maintenance updates:
@@ -187,3 +191,6 @@
 -   Added `--google_monitoring_endpoint` flag for querying a different endpoint
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
 -   Broadens Azure quota detection parsing
+-   AWS disk attaches now wait for attach, supporting io2 block express
+-   Update the performance results of Bigtable testing which used a more proper
+    client setup.

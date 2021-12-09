@@ -156,6 +156,7 @@ def PrepareHorovod(vm):
   vm.AuthenticateVm()
 
   vm.Install('google_cloud_sdk')
+  vm.Install('openmpi')
   vm.InstallPackages('wget git unzip')
   vm.Install('nccl')
 
@@ -179,7 +180,10 @@ def PrepareHorovod(vm):
       f'sudo {pip} install '
       '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
       f'nvidia-dali-tf-plugin-cuda{cuda_version}')
-
+  vm.RemoteCommand(f'sudo {pip} uninstall -y horovod')
+  vm.RemoteCommand(
+      f'sudo HOROVOD_GPU_OPERATIONS=NCCL HOROVOD_WITH_TENSORFLOW=1 HOROVOD_WITH_MPI=1 {pip} install -U --no-cache horovod'
+  )
   vm.RemoteCommand(
       f'sudo {pip} install pynvml cython scipy \'opencv-python==3.4.2.17\'')
   vm.RemoteCommand(
@@ -188,7 +192,6 @@ def PrepareHorovod(vm):
   vm.RemoteCommand(
       f'[ -d "tensorpack" ] || git clone https://github.com/tensorpack/tensorpack.git && sudo {pip} install ./tensorpack'
   )
-  vm.RemoteCommand(f'sudo {pip} install pynvml')
 
   _CopyAndUpdateRunScripts(FLAGS.horovod_model, vm)
 
@@ -413,8 +416,7 @@ def RunWithVMs(vms, extra_envs=None):
         'warmup_steps': 101,
         'results_dir': '/tmp/models',
         'gpu_memory_fraction': 0.95,
-        'use_static_loss_scaling': None,
-        'loss_scale': 128,
+        'static_loss_scale': 128,
         'lr_init': 0.016,
         'lr_warmup_epochs': 8,
         'momentum': 0.875,
@@ -422,10 +424,11 @@ def RunWithVMs(vms, extra_envs=None):
         'iter_unit': 'batch'
     }
     run_flags.update({
-        'precision': FLAGS.horovod_precision,
         'batch_size': FLAGS.horovod_batch_size,
         'num_iter': FLAGS.horovod_num_steps,
     })
+    if FLAGS.horovod_precision == 'fp16':
+      run_flags['amp'] = None
 
     # Load ImageNet training data from GCS if benchmark is not in synthetic mode
     if not FLAGS.horovod_synthetic:

@@ -46,6 +46,12 @@ _SETUP_SSH = flags.DEFINE_boolean(
     'Set up SSH on Kubernetes VMs. Probably not needed any more?')
 
 
+def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
+  """Determine if kubectl error is retriable."""
+  return (retcode == 1 and ('error dialing backend:' in stderr or
+                            'connect: connection timed out' in stderr))
+
+
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Kubernetes POD."""
   CLOUD = providers.KUBERNETES
@@ -375,8 +381,7 @@ class DebianBasedKubernetesVirtualMachine(
           suppress_warning=suppress_warning, timeout=timeout,
           raise_on_failure=False)
       # Check for ephemeral connection issues.
-      if not (retcode == 1 and ('error dialing backend: ssh' in stderr or
-                                'connect: connection timed out' in stderr)):
+      if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if not ignore_failure and retcode:
@@ -436,8 +441,7 @@ class DebianBasedKubernetesVirtualMachine(
              'cp', src_spec, dest_spec]
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False)
-      if not (retcode == 1 and ('error dialing backend: ssh' in stderr or
-                                'connect: connection timed out' in stderr)):
+      if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if retcode:
@@ -463,7 +467,7 @@ class DebianBasedKubernetesVirtualMachine(
 
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
-    self.RemoteCommand(_install_sudo_command())
+    self.RemoteCommand(_InstallSudoCommand())
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
     if _SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
@@ -571,7 +575,7 @@ class DebianBasedKubernetesVirtualMachine(
     return self.TryRemoteCommand(stat_function(module_name, filename))
 
 
-def _install_sudo_command() -> str:
+def _InstallSudoCommand() -> str:
   """Return a bash command that installs sudo.
 
   This is useful for some docker images that don't have sudo installed.
