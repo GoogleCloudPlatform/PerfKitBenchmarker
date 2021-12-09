@@ -264,7 +264,7 @@ class AzureDisk(disk.BaseDisk):
         return '/dev/nvme%sn1' % str(self.lun)
       # Temp disk naming isn't always /dev/sdb:
       # https://github.com/MicrosoftDocs/azure-docs/issues/54055
-      return '/dev/disk/azure/resource'
+      return '/dev/disk/cloud/azure_resource'
     else:
       try:
         start_index = 1  # the os drive is always at index 0; skip the OS drive.
