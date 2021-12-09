@@ -105,7 +105,8 @@ def main(args):
       logging.error('Script %s failed', script, exc_info=e)
 
   logging.info('Writing results to %s', args.report_dir)
-  spark.createDataFrame(results).coalesce(1).write.json(args.report_dir)
+  spark.createDataFrame(results).coalesce(1).write.mode('overwrite').json(
+      args.report_dir)
 
 
 if __name__ == '__main__':

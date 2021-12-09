@@ -1,4 +1,4 @@
-# Copyright 20121 PerfKitBenchmarker Authors. All rights reserved.
+  # Copyright 20121 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -142,6 +142,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
             ' dbname=abc\' -c "Select 1"',
             ignore_failure=False,
+            suppress_warning=False,
             timeout=None)
     ]
 
@@ -160,6 +161,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
           session_variables=['Set a=b;'],
           database_name='abc',
           ignore_failure=False,
+          suppress_warning=False,
           timeout=None)
 
     command = [
@@ -167,6 +169,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
             ' dbname=abc\' -c "Set a=b;" -c "Select 1"',
             ignore_failure=False,
+            suppress_warning=False,
             timeout=None)
     ]
     self.assertCountEqual(remote_command.call_args_list, command)
@@ -292,22 +295,26 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
             '-e "SET GLOBAL max_connections=8000;"',
             ignore_failure=False,
+            suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"CREATE USER \'root\'@\'None\' '
             'IDENTIFIED BY \'perfkitbenchmarker\';"',
             ignore_failure=False,
+            suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"',
             ignore_failure=False,
+            suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"FLUSH PRIVILEGES;"',
             ignore_failure=False,
+            suppress_warning=False,
             timeout=None)
     ]
 

@@ -1,0 +1,211 @@
+Launching Docker session
+nvidia-docker run --rm  -w /work \
+  -v /home/perfkit/inference_results_v1.1/closed/NVIDIA:/work -v /home/perfkit:/mnt//home/perfkit \
+  --cap-add SYS_ADMIN --cap-add SYS_TIME \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  --shm-size=32gb \
+  -v /etc/timezone:/etc/timezone:ro -v /etc/localtime:/etc/localtime:ro \
+  --security-opt apparmor=unconfined --security-opt seccomp=unconfined \
+  --name mlperf-inference-perfkit-x86_64 -h mlperf-inference-perfkit-x86_64 --add-host mlperf-inference-perfkit-x86_64:127.0.0.1 \
+  --user 1001:1002 --net host --device /dev/fuse \
+  -v /scratch:/scratch  \
+  -e MLPERF_SCRATCH_PATH=/scratch \
+  -e HOST_HOSTNAME=pkb-ff4631df-0 \
+   \
+  mlperf-inference:perfkit-x86_64 make run_harness RUN_ARGS='--benchmarks=dlrm --scenarios=server --fast --test_mode=PerformanceOnly'
+benchmark : Benchmark.DLRM
+coalesced_tensor : True
+complete_threads : 1
+enable_interleaved_top_mlp : False
+gemm_plugin_fairshare_cache_size : 18
+gpu_batch_size : 262100
+gpu_copy_streams : 1
+gpu_inference_streams : 1
+gpu_num_bundles : 2
+input_dtype : int8
+input_format : chw4
+output_padding_granularity : 128
+precision : int8
+sample_partition_path : ${PREPROCESSED_DATA_DIR}/criteo/full_recalib/sample_partition.npy
+scenario : Scenario.Server
+server_target_qps : 2100000
+start_from_device : True
+system : A100-SXM4-40GBx8
+tensor_path : ${PREPROCESSED_DATA_DIR}/criteo/full_recalib/numeric_int8_chw4.npy,${PREPROCESSED_DATA_DIR}/criteo/full_recalib/categorical_int32.npy
+use_graphs : False
+use_jemalloc : True
+use_small_tile_gemm_plugin : True
+config_name : A100-SXM4-40GBx8_dlrm_Server
+config_ver : custom_k_99_MaxP
+accuracy_level : 99%
+optimization_level : plugin-enabled
+inference_server : custom
+system_id : A100-SXM4-40GBx8
+use_cpu : False
+power_limit : None
+cpu_freq : None
+test_mode : PerformanceOnly
+fast : True
+log_dir : /work/build/logs/2021.11.13-04.12.53
+&&&& RUNNING DLRM_HARNESS # ./build/bin/harness_dlrm
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)
+[I] [TRT] Loaded engine size: 11 MB
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine begin: CPU 0 MiB, GPU 10924 MiB
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +316, now: CPU 0, GPU 11242 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +268, now: CPU 0, GPU 11510 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34426 (MiB)
+[I] [TRT] [MemUsageSnapshot] deserializeCudaEngine end: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation begin: CPU 0 MiB, GPU 34426 MiB
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +8, now: CPU 0, GPU 34434 (MiB)
+[I] [TRT] [MemUsageChange] Init cuDNN: CPU +0, GPU +8, now: CPU 0, GPU 34442 (MiB)
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+[I] [TRT] [MemUsageSnapshot] ExecutionContext creation end: CPU 0 MiB, GPU 34956 MiB
+================================================
+MLPerf Results Summary
+================================================
+SUT name : DLRM SERVER
+Scenario : Server
+Mode     : PerformanceOnly
+Scheduled samples per second : 2102380.29
+Result is : VALID
+  Performance constraints satisfied : Yes
+  Min duration satisfied : Yes
+  Min queries satisfied : Yes
+
+================================================
+Additional Stats
+================================================
+Completed samples per second    : 2102359.14
+
+Min latency (ns)                : 159697
+Max latency (ns)                : 12452412
+Mean latency (ns)               : 1375416
+50.00 percentile latency (ns)   : 1285505
+90.00 percentile latency (ns)   : 1984044
+95.00 percentile latency (ns)   : 2319343
+97.00 percentile latency (ns)   : 2568660
+99.00 percentile latency (ns)   : 3507998
+99.90 percentile latency (ns)   : 5628323
+
+================================================
+Test Parameters Used
+================================================
+samples_per_query : 1
+target_qps : 2.1e+06
+target_latency (ns): 30000000
+max_async_queries : 0
+min_duration (ms): 60000
+max_duration (ms): 0
+min_query_count : 1
+max_query_count : 0
+qsl_rng_seed : 1624344308455410291
+sample_index_rng_seed : 517984244576520566
+schedule_rng_seed : 10051496985653635065
+accuracy_log_rng_seed : 0
+accuracy_log_probability : 0
+accuracy_log_sampling_target : 0
+print_timestamps : 0
+performance_issue_unique : 0
+performance_issue_same : 0
+performance_issue_same_index : 0
+performance_sample_count : 204800
+
+9 warnings encountered. See detailed log.
+
+No errors encountered during test.
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+[I] [TRT] [MemUsageChange] Init cuBLAS/cuBLASLt: CPU +0, GPU +0, now: CPU 0, GPU 34938 (MiB)
+User-item pairs per second: 567765080.178
+
+======================= Perf harness results: =======================
+
+DGX-A100_A100-SXM4-40GBx8_TRT-custom_k_99_MaxP-Server:
+    dlrm: result_scheduled_samples_per_sec: 2102380.0, Result is VALID
+
+
+======================= Accuracy results: =======================
+
+DGX-A100_A100-SXM4-40GBx8_TRT-custom_k_99_MaxP-Server:
+    dlrm: No accuracy results in PerformanceOnly mode.

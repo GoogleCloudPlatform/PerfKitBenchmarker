@@ -48,6 +48,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import List, Optional
 
 from absl import flags
@@ -284,7 +285,7 @@ def Run(benchmark_spec):
   metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
 
   # Run PySpark Spark SQL Runner
-  report_dir = '/'.join([cluster.base_dir, 'report'])
+  report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
   args = [
       '--sql-scripts',
       ','.join(benchmark_spec.staged_queries),
@@ -320,7 +321,8 @@ def Run(benchmark_spec):
   temp_run_dir = temp_dir.GetRunDirPath()
   storage_service.Copy(report_dir, temp_run_dir, recursive=True)
   report_file = None
-  for dir_name, _, files in os.walk(os.path.join(temp_run_dir, 'report')):
+  for dir_name, _, files in os.walk(
+      os.path.join(temp_run_dir, os.path.basename(report_dir))):
     for filename in files:
       if filename.endswith('.json'):
         report_file = os.path.join(dir_name, filename)
