@@ -65,8 +65,21 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 'gs://'
+    self._cluster_create_time = None
     if self.user_managed and not FLAGS.dpb_service_bucket:
       self.bucket = self._GetCluster()['config']['tempBucket']
+
+  def GetClusterCreateTime(self) -> Optional[float]:
+    """Returns the cluster creation time.
+
+    On this implementation, the time returned is based on the timestamps
+    reported by the Dataproc API (which is stored in the _cluster_create_time
+    attribute).
+
+    Returns:
+      A float representing the creation time in seconds or None.
+    """
+    return self._cluster_create_time
 
   @staticmethod
   def _ParseTime(state_time: str) -> datetime.datetime:
@@ -160,11 +173,29 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['metadata'] = util.FormatTags(metadata)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min
-    # TODO(saksena): Retrieve the cluster create time and hold in a var
-    _, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    self._cluster_create_time = self._ParseClusterCreateTime(stdout)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
+
+  @classmethod
+  def _ParseClusterCreateTime(cls, stdout: str) -> Optional[float]:
+    """Parses the cluster create time from a raw API response."""
+    try:
+      creation_data = json.loads(stdout)
+    except json.JSONDecodeError:
+      creation_data = {}
+    can_parse = creation_data.get('status', {}).get('state') == 'RUNNING'
+    status_history = creation_data.get('statusHistory', [])
+    can_parse = can_parse and len(
+        status_history) == 1 and status_history[0]['state'] == 'CREATING'
+    if not can_parse:
+      logging.warning('Unable to parse cluster creation duration.')
+      return None
+    creation_start = cls._ParseTime(status_history[0]['stateStartTime'])
+    creation_end = cls._ParseTime(creation_data['status']['stateStartTime'])
+    return (creation_end - creation_start).total_seconds()
 
   def _Delete(self):
     """Deletes the cluster."""

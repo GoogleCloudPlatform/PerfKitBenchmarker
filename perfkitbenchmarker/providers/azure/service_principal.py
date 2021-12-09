@@ -26,8 +26,6 @@ from perfkitbenchmarker.providers import azure
 
 FLAGS = flags.FLAGS
 
-SERVICE_PRINCIPAL_FILE = 'aksServicePrincipal.json'
-
 
 class ServicePrincipal(resource.BaseResource):
   """Class representing an Azure service principal."""
@@ -47,8 +45,10 @@ class ServicePrincipal(resource.BaseResource):
   @classmethod
   def LoadFromFile(cls):
     """Loads a service principal from a file."""
-    with open(object_storage_service.FindCredentialFile(azure_credentials.AZURE_CREDENTIAL_PROFILE_FILE), encoding='utf-8-sig') as profile_fp, \
-        open(object_storage_service.FindCredentialFile(azure_credentials.AZURE_CREDENTIAL_TOKENS_FILE)) as tokens_fp:
+    with open(
+        object_storage_service.FindCredentialFile(
+            azure_credentials.PROFILE_FILE),
+        encoding='utf-8-sig') as profile_fp:
       subscriptions = json.load(profile_fp)['subscriptions']
       subscription = [sub for sub in subscriptions if sub['isDefault']][0]
       subscription_type = subscription['user']['type']
@@ -62,19 +62,26 @@ class ServicePrincipal(resource.BaseResource):
       # name and id are backwards
       name = subscription['id']
       app_id = subscription['user']['name']
-      for token in json.load(tokens_fp):
-        if token['servicePrincipalId'] == app_id:
-          logging.info("Azure credentials are of type 'servicePrincipal'. "
-                       'Will reuse them for benchmarking.')
-          return cls(
-              name, app_id, password=token['accessToken'], user_managed=True)
-      logging.warning('No access tokens found matching Azure defaultProfile '
-                      'Will try to create a new service principal.')
-      return cls()
+
+      # If subscription_type is servicePrincipal then service_principals.json
+      # will exist.
+      with open(
+          object_storage_service.FindCredentialFile(
+              azure_credentials.SERVICE_PRINCIPAL_FILE)
+      ) as service_principals_fp:
+        for sp in json.load(service_principals_fp):
+          if sp['client_id'] == app_id:
+            logging.info("Azure credentials are of type 'servicePrincipal'. "
+                         'Will reuse them for benchmarking.')
+            return cls(
+                name, app_id, password=sp['client_secret'], user_managed=True)
+        logging.warning('No access tokens found matching Azure defaultProfile '
+                        'Will try to create a new service principal.')
+        return cls()
 
   def __init__(self, name=None, app_id=None, password=None, user_managed=False):
     super(ServicePrincipal, self).__init__(user_managed)
-    # Service principles can be referred to by user provided name as long as
+    # Service principals can be referred to by user provided name as long as
     # they are prefixed by http:// or by a server generated appId.
     # Prefer user provided ID for idempotence when talking to Active Directory.
     # When talking to AKS or ACR, app_id is required.

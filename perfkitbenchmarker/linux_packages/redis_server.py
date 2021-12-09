@@ -21,6 +21,17 @@ from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import linux_packages
 
+
+class RedisEvictionPolicy():
+  """Enum of options for --redis_eviction_policy."""
+  NOEVICTION = 'noeviction'
+  ALLKEYS_LRU = 'allkeys-lru'
+  VOLATILE_LRU = 'volatile-lru'
+  ALLKEYS_RANDOM = 'allkeys-random'
+  VOLATILE_RANDOM = 'volatile-random'
+  VOLATILE_TTL = 'volatile-ttl'
+
+
 _VERSION = flags.DEFINE_string('redis_server_version', '6.2.1',
                                'Version of redis server to use.')
 _IO_THREADS = flags.DEFINE_integer(
@@ -41,6 +52,13 @@ _NUM_PROCESSES = flags.DEFINE_integer(
     'Total number of redis server processes. Useful when running with a redis '
     'version lower than 6.',
     lower_bound=1)
+_EVICTION_POLICY = flags.DEFINE_enum(
+    'redis_eviction_policy', RedisEvictionPolicy.NOEVICTION,
+    [RedisEvictionPolicy.NOEVICTION, RedisEvictionPolicy.ALLKEYS_LRU,
+     RedisEvictionPolicy.VOLATILE_LRU, RedisEvictionPolicy.ALLKEYS_RANDOM,
+     RedisEvictionPolicy.VOLATILE_RANDOM, RedisEvictionPolicy.VOLATILE_TTL],
+    'Redis eviction policy when maxmemory limit is reached. This requires '
+    'running clients with larger amounts of data than Redis can hold.')
 
 
 # Default port for Redis
@@ -124,6 +142,8 @@ def _BuildStartCommand(vm, port: int) -> str:
   if _IO_THREAD_AFFINITY.value:
     cpu_affinity = f'0-{vm.num_cpus-1}'
     cmd_args.append(f'--server_cpulist {cpu_affinity}')
+  if _EVICTION_POLICY.value:
+    cmd_args.append(f'--maxmemory-policy {_EVICTION_POLICY.value}')
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
 

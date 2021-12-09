@@ -166,12 +166,13 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
                  str(service.create_start_time))
     logging.info('Resource resource_ready_time %s ',
                  str(service.resource_ready_time))
-    create_time = service.resource_ready_time - service.create_start_time
+    create_time = service.GetClusterCreateTime()
     logging.info('Resource create_time %s ', str(create_time))
 
-    results.append(
-        sample.Sample('dpb_cluster_create_time', create_time, 'seconds',
-                      metadata.copy()))
+    if create_time is not None:
+      results.append(
+          sample.Sample('dpb_cluster_create_time', create_time, 'seconds',
+                        metadata.copy()))
 
   metadata.update({'base_dir': base_dir})
   metadata.update(

@@ -280,15 +280,13 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call(
             'echo "\nskip-name-resolve\nconnect_timeout        = 86400\nwait_timeout        = 86400\ninteractive_timeout        = 86400" | sudo tee -a None'
         ),
-        mock.call('sudo sed -i "s/bind-address/#bind-address/g" None'),
+        mock.call('sudo sed -i "s/^bind-address/#bind-address/g" None'),
+        mock.call(
+            'sudo sed -i "s/^mysqlx-bind-address/#mysqlx-bind-address/g" None'),
         mock.call(
             'sudo sed -i "s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" None'
         ),
         mock.call('echo "\nlog_error_verbosity        = 3" | sudo tee -a None'),
-        mock.call(
-            'sudo cat /etc/mysql/mysql.conf.d/mysql.sock',
-            ignore_failure=True,
-            should_log=True),
         mock.call('sudo service None restart'),
         mock.call('sudo cat None', should_log=True),
         mock.call(
@@ -301,19 +299,19 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"CREATE USER \'root\'@\'None\' '
             'IDENTIFIED BY \'perfkitbenchmarker\';"',
-            ignore_failure=False,
+            ignore_failure=True,
             suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"',
-            ignore_failure=False,
+            ignore_failure=True,
             suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"FLUSH PRIVILEGES;"',
-            ignore_failure=False,
+            ignore_failure=True,
             suppress_warning=False,
             timeout=None)
     ]

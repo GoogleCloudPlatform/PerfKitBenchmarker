@@ -32,6 +32,10 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
+
+class AwsStateRetryableError(Exception):
+  """Error for retrying when an AWS disk is in a transitional state."""
+
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
@@ -95,9 +99,31 @@ LOCAL_HDD_PREFIXES = ['d2', 'hs1', 'h1', 'c1', 'cc2', 'm1', 'm2']
 # Following lists based on
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html
 NON_EBS_NVME_TYPES = [
-    'c4', 'd2', 'f1', 'g3', 'h1', 'i3', 'm4', 'p2', 'p3', 'r4', 't2', 'x1',
-    'x1e', 'm1', 'm3', 'c1', 'cc2', 'c3', 'm2', 'cr1', 'r3', 'hs1', 'i2', 'g2',
-    't1'
+    'c4',
+    'd2',
+    'f1',
+    'g3',
+    'h1',
+    'i3',
+    'm4',
+    'p2',
+    'p3',
+    'r4',
+    't2',
+    'x1',
+    'x1e',
+    'm1',
+    'm3',
+    'c1',
+    'cc2',
+    'c3',
+    'm2',
+    'cr1',
+    'r3',
+    'hs1',
+    'i2',
+    'g2',
+    't1',
 ]
 NON_LOCAL_NVME_TYPES = LOCAL_HDD_PREFIXES + [
     'c3', 'cr1', 'g2', 'i2', 'm3', 'r3', 'x1', 'x1e']
@@ -160,6 +186,25 @@ NUM_LOCAL_VOLUMES = {
     'i3.8xlarge': 4,
     'i3.16xlarge': 8,
     'i3.metal': 8,
+    'i4i.large': 1,
+    'i4i.xlarge': 1,
+    'i4i.2xlarge': 1,
+    'i4i.4xlarge': 1,
+    'i4i.8xlarge': 2,
+    'i4i.16xlarge': 4,
+    'i4i.32xlarge': 8,
+    'is4gen.medium': 1,
+    'is4gen.large': 1,
+    'is4gen.xlarge': 1,
+    'is4gen.2xlarge': 1,
+    'is4gen.4xlarge': 2,
+    'is4gen.8xlarge': 4,
+    'im4gn.large': 1,
+    'im4gn.xlarge': 1,
+    'im4gn.2xlarge': 1,
+    'im4gn.4xlarge': 1,
+    'im4gn.8xlarge': 2,
+    'im4gn.16xlarge': 4,
     'i3en.large': 1,
     'i3en.xlarge': 1,
     'i3en.2xlarge': 2,
@@ -400,6 +445,38 @@ class AwsDisk(disk.BaseDisk):
     assert status in VOLUME_KNOWN_STATUSES, status
     return status in VOLUME_EXISTS_STATUSES
 
+  @vm_util.Retry(
+      poll_interval=0.5,
+      log_errors=True,
+      retryable_exceptions=(AwsStateRetryableError,))
+  def _WaitForAttachedState(self):
+    """Returns if the state of the disk is attached.
+
+    Returns:
+      Whether the disk is in an attached state. If not, raises an
+      error.
+
+    Raises:
+      AwsUnknownStatusError: If an unknown status is returned from AWS.
+      AwsStateRetryableError: If the disk attach is pending. This is retried.
+    """
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-volumes',
+        '--region=%s' % self.region,
+        '--volume-ids=%s' % self.id,
+    ]
+
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    status = response['Volumes'][0]['Attachments'][0]['State']
+    if status.lower() != 'attached':
+      logging.info('Disk (id:%s) attaching to '
+                   'VM (id:%s) has status %s.',
+                   self.id, self.attached_vm_id, status)
+
+      raise AwsStateRetryableError()
+
   def Attach(self, vm):
     """Attaches the disk to a VM.
 
@@ -425,6 +502,7 @@ class AwsDisk(disk.BaseDisk):
     logging.info('Attaching AWS volume %s. This may fail if the disk is not '
                  'ready, but will be retried.', self.id)
     util.IssueRetryableCommand(attach_cmd)
+    self._WaitForAttachedState()
 
   def Detach(self):
     """Detaches the disk from a VM."""

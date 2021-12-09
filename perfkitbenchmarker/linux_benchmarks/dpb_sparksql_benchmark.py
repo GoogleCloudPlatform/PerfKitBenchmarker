@@ -356,6 +356,11 @@ def Run(benchmark_spec):
   results.append(
       sample.Sample('sparksql_geomean_run_time',
                     sample.GeoMean(run_times.values()), 'seconds', metadata))
+  cluster_create_time = cluster.GetClusterCreateTime()
+  if cluster_create_time is not None:
+    results.append(
+        sample.Sample('dpb_cluster_create_time', cluster_create_time, 'seconds',
+                      metadata))
   return results
 
 
